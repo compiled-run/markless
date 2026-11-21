@@ -143,7 +143,7 @@ data class FetchRequest(val url: String, val method: String, val headers: List<P
 
 /** `JSON.stringify` of a value: non-finite numbers are `null`. */
 /** What a touch adds to a script pointer handler's event, in the order the reference writes them. */
-private val TOUCH_FIELDS = listOf("button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp", "shiftKey", "ctrlKey", "altKey", "metaKey", "isTrusted", "detail")
+private val TOUCH_FIELDS = listOf("button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp", "shiftKey", "ctrlKey", "altKey", "metaKey", "isTrusted", "detail", "key")
 
 fun jsonValue(v: JsValue): String = when (v) {
 	JsValue.Null -> "null"
@@ -680,6 +680,7 @@ class Runtime(
 				val own = handlerFor(node.substringBefore('@'), name) ?: continue
 				val scope = scopeOf(node) ?: continue
 				val f = if (name == EventName.Dismiss) mapOf("reason" to optional("reason", JsValue.Str("")), "pressTarget" to JsValue.Null, "isTrusted" to JsValue.Bool(false))
+				else if (name == EventName.Keydown) mapOf("isTrusted" to JsValue.Bool(false), "key" to optional("key", JsValue.Str("")), "target" to JsValue.Str(target), "currentTarget" to JsValue.Str(node))
 				else mapOf(
 					"isTrusted" to JsValue.Bool(false),
 					"target" to JsValue.Str(target), "currentTarget" to JsValue.Str(node), "relatedTarget" to optional("relatedTarget", JsValue.Null),

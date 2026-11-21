@@ -1462,6 +1462,7 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		CustomEvent: 'engine',
 		MouseEvent: 'engine',
 		PointerEvent: 'engine',
+		KeyboardEvent: 'engine',
 		...Object.fromEntries(Object.keys(NATIVE_SCRIPT_DOM_CLASSES).map((name) => [name, 'engine' as const])),
 	};
 
@@ -1513,6 +1514,9 @@ export const NATIVE_SCRIPT_CLICK_FIELDS: ReadonlyArray<string> = [
 	'altKey',
 	'metaKey',
 ];
+
+/** What a keydown a script raised carries into a JavaScript keydown handler: its key. */
+export const NATIVE_SCRIPT_KEY_FIELDS: ReadonlyArray<string> = ['key'];
 
 /** A script pointer handler's event's elements, which reach JavaScript as proxies (`relatedTarget` null when none). */
 export const NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS: ReadonlyArray<string> = ['target', 'currentTarget', 'relatedTarget'];

@@ -581,6 +581,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A KeyboardEvent a script dispatches runs the element's keydown handler with its key.
+		name: 'script-keys',
+		fixture: 'proofs/u87-script-keys/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
 		name: 'by-id',
 		fixture: 'test/fixtures/ById.tsrx',
 		actions: [

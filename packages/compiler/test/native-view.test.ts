@@ -4187,7 +4187,7 @@ ${markup}
 });
 
 describe('pointer events', () => {
-	it('runs a handler that makes an event and dispatches it on an element as JavaScript; a KeyboardEvent stays refused', async () => {
+	it('runs a handler that makes an event and dispatches it on an element as JavaScript, a KeyboardEvent too, whose keydown handler the build then keeps', async () => {
 		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
 export function Raise() @{
 	let hover = state('none');
@@ -4200,14 +4200,23 @@ export function Raise() @{
 }`);
 		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
 		expect(payload!.handlers.slice(1).map((handler) => handler.ops.map((op) => op.op))).toEqual([['script'], ['script']]);
-		const keys = await nativeView(`import { element } from '@markless/core';
+		const source = `import { element, state } from '@markless/core';
 export function Keys() @{
+	let heard = state('');
 	const box = element<HTMLDivElement>();
-	<button onClick={() => box?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home' }))}>Home</button>
-}`);
-		expect(keys.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
-			"the click handler uses `KeyboardEvent`, which a phone's script engine does not provide",
-		]);
+	<div>
+		<div el={box} onKeydown={(event) => (heard = event.key)}>{heard}</div>
+		<button onClick={() => box?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home' }))}>Home</button>
+	</div>
+}`;
+		const first = await nativeView(source);
+		expect(first.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		expect(first.raisesKeys).toBe(true);
+		expect(first.payload!.events.map((event) => event.event)).toEqual(['activate']);
+		const kept = await nativeView(source, { keyHandlers: true });
+		expect(kept.raisesKeys).toBeUndefined();
+		expect(kept.diagnostics).toEqual([]);
+		expect(kept.payload!.events.map((event) => event.event)).toEqual(['keydown', 'activate']);
 	});
 
 	it("runs a pointer handler that keeps its event's elements as JavaScript, each element a proxy", async () => {

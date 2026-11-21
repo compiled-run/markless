@@ -244,7 +244,7 @@ public final class NativeRuntime {
 	/// What a dismiss or pointer event carries while its handlers run.
 	private var eventFields: [NativeEventField: NativeValue]?
 	/// What a touch adds to a script pointer handler's event, in the order the reference writes them.
-	private let touchFields: [NativeEventField] = [.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp, .shiftKey, .ctrlKey, .altKey, .metaKey, .isTrusted, .detail]
+	private let touchFields: [NativeEventField] = [.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp, .shiftKey, .ctrlKey, .altKey, .metaKey, .isTrusted, .detail, .key]
 	/// Where the last touch came up, which the click it makes reports; a click no touch made is at 0, 0.
 	private var tapPoint: (x: Double, y: Double)?
 	/// The element a phone browser's mouse is over: the last one tapped, until a tap elsewhere moves it.
@@ -826,7 +826,7 @@ public final class NativeRuntime {
 		}
 		let event = try reader.object(
 			required: ["node", "type", "bubbles"],
-			optional: ["reason", "relatedTarget", "pointerId", "pointerType", "isPrimary", "button", "buttons", "clientX", "clientY"])
+			optional: ["reason", "relatedTarget", "pointerId", "pointerType", "isPrimary", "button", "buttons", "clientX", "clientY", "key"])
 		let target = try event["node"].string()
 		let type = try event["type"].string()
 		var chain: [String] = []
@@ -853,6 +853,8 @@ public final class NativeRuntime {
 			guard let own = handlerOf(node, name), let scope = try scopeOf(node) else { continue }
 			eventFields = name == .dismiss
 				? [.reason: try optional("reason", .string("")), .pressTarget: .null, .isTrusted: .bool(false)]
+				: name == .keydown
+				? [.isTrusted: .bool(false), .key: try optional("key", .string("")), .target: .string(target), .currentTarget: .string(node)]
 				: [
 					.isTrusted: .bool(false),
 					.target: .string(target), .currentTarget: .string(node), .relatedTarget: try optional("relatedTarget", .null),

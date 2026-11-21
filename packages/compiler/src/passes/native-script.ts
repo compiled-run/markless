@@ -2,6 +2,7 @@ import type { NativeScript, NativeScriptService } from '@markless/serializer';
 import {
 	NATIVE_SCRIPT_DOM_CLASSES,
 	NATIVE_SCRIPT_CLICK_FIELDS,
+	NATIVE_SCRIPT_KEY_FIELDS,
 	NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	NATIVE_SCRIPT_SUBMITTED_FORM,
@@ -100,6 +101,7 @@ if (!host) {
 	g.CustomEvent = eventKind(EventBase, { detail: null });
 	g.MouseEvent = eventKind(EventBase, { detail: 0, button: 0, buttons: 0, clientX: 0, clientY: 0, relatedTarget: null });
 	g.PointerEvent = eventKind(g.MouseEvent, { pointerId: 0, pointerType: '', isPrimary: false });
+	g.KeyboardEvent = eventKind(EventBase, { key: '', code: '', repeat: false, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false });
 	// The DOM's interfaces, so an element proxy answers instanceof as the browser's element does; none can be constructed.
 	var domClasses = ${JSON.stringify(NATIVE_SCRIPT_DOM_CLASSES)};
 	var defineClass = function (name) {
@@ -515,7 +517,7 @@ var elementOf = function (id) {
 			if (event.detail !== null && typeof event.detail === 'object' && typeof event.detail.reason === 'string')
 				raised.reason = event.detail.reason;
 			if (event.relatedTarget && typeof event.relatedTarget.__node === 'string') raised.relatedTarget = event.relatedTarget.__node;
-			['pointerId', 'pointerType', 'isPrimary', 'button', 'buttons', 'clientX', 'clientY'].forEach(function (field) {
+			['pointerId', 'pointerType', 'isPrimary', 'button', 'buttons', 'clientX', 'clientY', 'key'].forEach(function (field) {
 				if (field in event) raised[field] = event[field];
 			});
 			host.out.raises.push(raised);
@@ -579,7 +581,7 @@ var eventOf = function (given, frame) {
 		preventDefault: function () { this.defaultPrevented = true; },
 		stopPropagation: function () {},
 	};
-	${JSON.stringify([...new Set([...NATIVE_SCRIPT_POINTER_FIELDS, ...NATIVE_SCRIPT_CLICK_FIELDS])])}.forEach(function (field) { if (field in given) event[field] = given[field]; });
+	${JSON.stringify([...new Set([...NATIVE_SCRIPT_POINTER_FIELDS, ...NATIVE_SCRIPT_CLICK_FIELDS, ...NATIVE_SCRIPT_KEY_FIELDS])])}.forEach(function (field) { if (field in given) event[field] = given[field]; });
 	if (given.nodes)
 		${JSON.stringify(NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS)}.forEach(function (field) {
 			event[field] = given.nodes[field] == null ? null : elementOf(given.nodes[field]);

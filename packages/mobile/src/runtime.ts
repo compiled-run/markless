@@ -17,6 +17,7 @@ import type {
 import {
 	NATIVE_DOCUMENT_BODY,
 	NATIVE_SCRIPT_CLICK_FIELDS,
+	NATIVE_SCRIPT_KEY_FIELDS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	nativeLocale,
 	nativeNumberMessage,
@@ -156,6 +157,7 @@ type Raised = {
 	readonly buttons?: number;
 	readonly clientX?: number;
 	readonly clientY?: number;
+	readonly key?: string;
 };
 const RAISE_DEPTH = 32;
 
@@ -948,7 +950,9 @@ export function createNativeRuntime(
 				const fields: NativeEventFields =
 					event.type === DISMISS_EVENT
 						? { reason: event.reason ?? '', pressTarget: null, isTrusted: false }
-						: {
+						: event.type === 'keydown'
+							? { isTrusted: false, key: event.key ?? '', target: event.node, currentTarget: node }
+							: {
 								isTrusted: false,
 								target: event.node,
 								currentTarget: node,
@@ -2289,7 +2293,7 @@ export function createNativeRuntime(
 				const frame = frameOf(op.bindings, text, scope);
 				const touch =
 					typeof eventValue === 'object'
-						? [...new Set([...NATIVE_SCRIPT_POINTER_FIELDS, ...NATIVE_SCRIPT_CLICK_FIELDS, 'isTrusted'])].flatMap((field) => {
+						? [...new Set([...NATIVE_SCRIPT_POINTER_FIELDS, ...NATIVE_SCRIPT_CLICK_FIELDS, ...NATIVE_SCRIPT_KEY_FIELDS, 'isTrusted'])].flatMap((field) => {
 								const value = eventValue[field as keyof NativeEventFields];
 								return value === undefined ? [] : [[field, value] as const];
 							})

@@ -98,6 +98,8 @@ export type NativeViewArtifact = {
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 	/** Modules the build resolved but was not given an analysis of; the caller analyzes them and builds again. */
 	readonly missingModules?: ReadonlyArray<string>;
+	/** A script in the payload makes a `KeyboardEvent`, so the caller builds again with `keyHandlers`. */
+	readonly raisesKeys?: true;
 	/** Where each element node of the payload is written, by node id, for build errors that name an element. */
 	readonly elementSources: ReadonlyMap<
 		string,
@@ -1005,6 +1007,8 @@ export type NativeViewOptions = {
 	 * `never`: data only.
 	 */
 	readonly scriptHandlers?: 'fallback' | 'all' | 'never';
+	/** Keep elements' keydown handlers, which a script's `KeyboardEvent` can raise though a phone has no hardware keyboard. */
+	readonly keyHandlers?: boolean;
 	/** A module's source as the build read it, by filename: where a native build finds a value's own JavaScript. */
 	readonly readSource?: (filename: string) => string | undefined;
 };
@@ -1328,6 +1332,7 @@ export function createNativeViewPayload(
 	};
 	const refuseAt = refuse;
 	const features = new Set<NativeDeviceFeature>();
+	const keptForScripts = (eventName: string) => options.keyHandlers === true && eventName === 'keydown';
 	const keyboardOnly = (what: string, span?: SourceSpan) => {
 		diagnostics.push({
 			code: NATIVE_KEYBOARD_ONLY_CODE,
@@ -1378,12 +1383,15 @@ export function createNativeViewPayload(
 		if (payload && mentionsDate([payload.nodes, payload.handlers])) refuse(DATE_AS_VALUE);
 		return finish(payload);
 	};
+	/** Whether a script function the payload keeps makes a `KeyboardEvent`; set once those functions are known. */
+	let scriptsMakeKeys = (): boolean => false;
 	const finish = (payload: NativeViewPayload | null): NativeViewArtifact => ({
 		passId: 'native-view',
 		payload: diagnostics.some((diagnostic) => diagnostic.severity === 'error') ? null : payload,
 		features: [...features],
 		diagnostics,
 		...(missingModules.size > 0 ? { missingModules: [...missingModules] } : {}),
+		...(!options.keyHandlers && scriptsMakeKeys() ? { raisesKeys: true as const } : {}),
 		elementSources,
 	});
 
@@ -2450,6 +2458,10 @@ export function createNativeViewPayload(
 		{ readonly id: string; readonly module: ModuleFacts; readonly fact: SemanticScriptFunction }
 	>();
 	const scriptServices = new Set<NativeScriptService>();
+	scriptsMakeKeys = () =>
+		[...scriptFunctions.values()].some(({ fact }) =>
+			fact.globals.some((global) => !global.typeofOnly && (global.property ?? global.name) === 'KeyboardEvent'),
+		);
 	let scriptNamesDomClasses = false;
 	/** Forms whose submit handler runs as JavaScript: their script may build FormData from the form it is given. */
 	const scriptSubmits = new Set<string>();
@@ -5281,6 +5293,7 @@ export function createNativeViewPayload(
 					if (NOT_ON_PHONES.has(event.eventName)) continue;
 					if (
 						KEYBOARD_ONLY.has(event.eventName) &&
+						!keptForScripts(event.eventName) &&
 						(!TEXT_ENTRY.has(element ?? '') ||
 							TICKED_TYPES.has(inputType ?? '') ||
 							inputType === 'range')
@@ -5359,6 +5372,7 @@ export function createNativeViewPayload(
 					if (NOT_ON_PHONES.has(event.eventName)) continue;
 					if (
 						KEYBOARD_ONLY.has(event.eventName) &&
+						!keptForScripts(event.eventName) &&
 						(!TEXT_ENTRY.has(element ?? '') || TICKED_TYPES.has(inputType ?? ''))
 					) {
 						keyboardOnly(`the ${event.eventName} handler on <${element}> ${id}`, event.handlerSpan);
@@ -6217,7 +6231,13 @@ export function createNativeViewPayload(
 				handlerCallsScript = false;
 			}
 		};
-		if (DATA_ONLY_EVENTS.has(event.eventName)) return helped();
+		// Off a text field only a script raises keydown, and nothing it does is cancelled, so JavaScript may run it.
+		const hostElement = pressed && nodeById().get(pressed.currentTarget);
+		const raisedKeydown =
+			event.eventName === 'keydown' &&
+			hostElement?.kind === 'element' &&
+			!TEXT_ENTRY.has(hostElement.element);
+		if (DATA_ONLY_EVENTS.has(event.eventName) && !raisedKeydown) return helped();
 		const submitting = event.eventName === 'submit';
 		// The web sends a form whose submit handler does not cancel it at once; only the analyzer's sync policy says it always does.
 		const form =
