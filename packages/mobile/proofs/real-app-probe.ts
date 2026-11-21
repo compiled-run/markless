@@ -8,7 +8,7 @@ import { parseArgs } from 'node:util';
 import { buildSemanticGraph, type CompilerDiagnostic } from '@markless/compiler';
 import { buildRouteManifestFromFileIds } from '@markless/router';
 import * as compile from '../src/compile.ts';
-import { resolvePackageModule, servedReader } from '../src/harness/rung.ts';
+import { resolvePackageModule, servedFileReader, servedReader } from '../src/harness/rung.ts';
 
 type Module = { readonly filename: string; readonly source: string };
 type ReadModule = (specifier: string, importer: string) => Module | undefined;
@@ -28,6 +28,8 @@ type AppCompiler = (input: {
 		importer: string,
 	) => { readonly file: string; readonly cssText: string } | undefined;
 	readonly readServedStylesheet?: (href: string) => { readonly file: string; readonly cssText: string } | undefined;
+	readonly readServedFile?: (href: string) => { readonly file: string; readonly bytes: Uint8Array } | undefined;
+	readonly readAsset?: (specifier: string, importer: string) => { readonly file: string; readonly bytes: Uint8Array } | undefined;
 }) => Promise<{ readonly diagnostics: ReadonlyArray<PageDiagnostic> }>;
 
 const { values } = parseArgs({
@@ -165,6 +167,13 @@ function summarize(
 async function probeApp(app: string, appRoot: string): Promise<PageResult[]> {
 	const read = readerFor();
 	const served = servedReader(appRoot);
+	const servedFile = servedFileReader(appRoot);
+	// An asset a module imports (an image), beside the importer, as Vite resolves it.
+	const asset = (specifier: string, importer: string) => {
+		if (!specifier.startsWith('.')) return undefined;
+		const file = resolve(dirname(importer), specifier);
+		return existsSync(file) && statSync(file).isFile() ? { file, bytes: new Uint8Array(readFileSync(file)) } : undefined;
+	};
 	const all = files(appRoot);
 	const pageIds = all
 		.map((file) => relative(appRoot, file))
@@ -242,6 +251,8 @@ async function probeApp(app: string, appRoot: string): Promise<PageResult[]> {
 				readModule: read,
 				readStylesheet: stylesheetReader,
 				readServedStylesheet: served,
+				readServedFile: servedFile,
+				readAsset: asset,
 			});
 			for (const route of tsrx)
 				results.push(
@@ -268,6 +279,8 @@ async function probeApp(app: string, appRoot: string): Promise<PageResult[]> {
 						readModule: read,
 						readStylesheet: stylesheetReader,
 						readServedStylesheet: served,
+						readServedFile: servedFile,
+						readAsset: asset,
 					})
 				: await compile.compileNativeComponent({
 						filename: page.filename,

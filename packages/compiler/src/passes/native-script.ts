@@ -9,8 +9,11 @@ import {
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
 export type NativeScriptModuleInput = {
 	readonly code: string;
-	/** The module each `__i` slot loads, or null for a slot nothing the script keeps reads. */
-	readonly imports: ReadonlyArray<number | null>;
+	/**
+	 * The module each `__i` slot loads, or null for a slot nothing the script keeps reads; `{ asset }` for an asset import,
+	 * a module whose default export is the asset's URL.
+	 */
+	readonly imports: ReadonlyArray<number | null | { readonly asset: string }>;
 	readonly functions: ReadonlyArray<{ readonly id: string; readonly code: string }>;
 };
 
@@ -766,7 +769,15 @@ export function nativeScriptOf(
 		return [
 			`modules[${index}] = function (exports) {`,
 			'"use strict";',
-			`var __i = [${module.imports.map((target) => (target === null ? 'null' : `load(${target})`)).join(', ')}];`,
+			`var __i = [${module.imports
+				.map((target) =>
+					target === null
+						? 'null'
+						: typeof target === 'object'
+							? `{ "default": ${JSON.stringify(target.asset)} }`
+							: `load(${target})`,
+				)
+				.join(', ')}];`,
 			module.code,
 			...module.functions.map(
 				(fn) => `functions[${JSON.stringify(fn.id)}] = function (__s) {\n${fn.code}\n};`,

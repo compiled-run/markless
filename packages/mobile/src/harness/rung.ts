@@ -29,10 +29,13 @@ import {
 import type { DeviceAppConfig, DeviceManifest } from '../permissions.ts';
 import { pageScrollDiagnostics } from '../page-scroll.ts';
 import { dragonDir, dragonStyleExport } from '../style-export.ts';
+import type { NativeImage, NativeImageManifest } from '../images.ts';
 import { nativeStyleInput, nativeStyleInputAt, type NativeStyleInput } from '../style-input.ts';
 import { readProofExpected } from './expected.ts';
 import {
 	PROOF_FONTS_FOLDER,
+	PROOF_IMAGES_FOLDER,
+	PROOF_IMAGES_PATH,
 	PROOF_PAYLOAD_PATH,
 	PROOF_PLATFORMS,
 	PROOF_STYLE_PATH,
@@ -94,16 +97,63 @@ export function readRelativeStylesheet(specifier: string, importer: string) {
 		: undefined;
 }
 
-/** A stylesheet an app serves at a path (`/static/news.css`): the file in its public folder, as Vite serves it. */
-export function servedReader(appRoot: string) {
+/** A file an app serves at a path (`/static/y18.gif`): the file in its public folder, as Vite serves it. */
+export function servedFileReader(appRoot: string) {
 	const publicDir = resolve(appRoot, 'public');
 	return (href: string) => {
 		if (!href.startsWith('/') || href.startsWith('//')) return undefined;
 		const file = resolve(publicDir, `.${href.split(/[?#]/)[0]}`);
 		return file.startsWith(`${publicDir}/`) && existsSync(file) && statSync(file).isFile()
-			? { file: relative(repoRoot, file), cssText: readFileSync(file, 'utf8') }
+			? { file: relative(repoRoot, file), bytes: new Uint8Array(readFileSync(file)) }
 			: undefined;
 	};
+}
+
+/** A stylesheet an app serves at a path (`/static/news.css`): the file in its public folder, as Vite serves it. */
+export function servedReader(appRoot: string) {
+	const read = servedFileReader(appRoot);
+	return (href: string) => {
+		const served = read(href);
+		return served && { file: served.file, cssText: new TextDecoder().decode(served.bytes) };
+	};
+}
+
+/** A file a module imports as an asset, beside the importer (`import logo from './logo.png'`). */
+export function assetReader(specifier: string, importer: string) {
+	if (!specifier.startsWith('.')) return undefined;
+	const file = resolve(repoRoot, dirname(importer), specifier);
+	return existsSync(file) && statSync(file).isFile()
+		? { file: relative(repoRoot, file), bytes: new Uint8Array(readFileSync(file)) }
+		: undefined;
+}
+
+/** The app's packaged images: each file under `markless-images/`, and the manifest of src to file and natural size. */
+function imageAssets(images: ReadonlyArray<NativeImage>): Array<[string, Uint8Array]> {
+	if (images.length === 0) return [];
+	const manifest: Record<string, NativeImageManifest[string]> = {};
+	const files: Array<[string, Uint8Array]> = [];
+	for (const image of images) {
+		const size =
+			image.width !== undefined && image.height !== undefined
+				? { width: image.width, height: image.height }
+				: {};
+		// An SVG file travels as its compiled drawing; the phone never reads SVG.
+		if (image.drawing) {
+			manifest[image.src] = { ...size, drawing: image.drawing };
+			continue;
+		}
+		const file = `${PROOF_IMAGES_FOLDER}/${createHash('sha256').update(image.bytes).digest('hex')}.${image.format}`;
+		manifest[image.src] = {
+			file,
+			...size,
+			...(image.orientation && { orientation: image.orientation }),
+		};
+		if (!files.some(([path]) => path === file)) files.push([file, image.bytes]);
+	}
+	return [
+		[PROOF_IMAGES_PATH, new TextEncoder().encode(`${JSON.stringify(manifest)}\n`)],
+		...files,
+	];
 }
 
 /** The app's document, when the rung has its own (`document.tsrx`, whose stylesheet imports reach every page). */
@@ -133,6 +183,8 @@ export function compileRungApp(
 		readModule: readRelativeModule,
 		readStylesheet: readRelativeStylesheet,
 		readServedStylesheet: servedReader(dir),
+		readServedFile: servedFileReader(dir),
+		readAsset: assetReader,
 	});
 }
 
@@ -361,6 +413,8 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				...(expected.route === undefined ? {} : { page: `pages/${expected.route}.tsrx` }),
 				readModule: readWorkspaceModule,
 				readServedStylesheet: servedReader(dir),
+				readServedFile: servedFileReader(dir),
+				readAsset: assetReader,
 				...(appConfig.device ? { device: appConfig.device } : {}),
 				target: platform,
 			});
@@ -378,7 +432,11 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				PROOF_PAYLOAD_PATH,
 				new TextEncoder().encode(payloads[platform]),
 			]);
-			if (build.styles.some((style) => style.cssText.length > 0) || build.stylesheets.length > 0) {
+			assets[platform].push(...imageAssets(build.images));
+			if (
+				build.styles.some((style) => style.cssText.length > 0) ||
+				build.stylesheets.length > 0
+			) {
 				// Dragon lays out one input for both phones, so both must build the same views.
 				if (
 					payloads.ios !== undefined &&
@@ -429,6 +487,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				PROOF_PAYLOAD_PATH,
 				new TextEncoder().encode(payloads[platform]),
 			]);
+			assets[platform].push(...imageAssets(build.images));
 			if (build.styleInputs.length > 0 && platform === 'android') {
 				// Dragon lays out one input for both phones, so both must build the same views.
 				if (payloads.ios !== payloads.android)
