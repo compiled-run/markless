@@ -646,6 +646,26 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A hint superseded by a surface shown from inside it, a hint shown over a surface, an outside press reaching both, Escape.
+		name: 'overlay-hint',
+		fixture: 'proofs/u61-overlay-hint/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'pointerdown', host: 'h7' },
+			{ event: 'pointerup', host: 'h7' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'pointerdown', host: 'h10' },
+			{ event: 'pointerup', host: 'h10' },
+			{ event: 'activate', host: 'h10' },
+			{ event: 'pointerdown', host: 'h1' },
+			{ event: 'pointerup', host: 'h1' },
+			{ event: 'pointerdown', host: 'h4' },
+			{ event: 'pointerup', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'dismiss', host: 'h5', reason: 'escape' },
+		],
+	},
+	{
 		name: 'element-proxies',
 		fixture: 'test/fixtures/OptionFocus.tsrx',
 		actions: [

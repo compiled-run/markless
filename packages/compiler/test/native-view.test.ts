@@ -3311,8 +3311,8 @@ export function Tray() @{
 		]);
 	});
 
-	it('refuses a hint surface by name; a set method it has no lowering for runs as JavaScript', async () => {
-		const { diagnostics } = await nativeView(`import { state } from '@markless/core';
+	it('keeps a hint surface\'s mark for the overlay stack, refuses one that follows state; a set method it has no lowering for runs as JavaScript', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 const seen = new Set<string>();
 export function Tip() @{
 	let open = state(false);
@@ -3321,8 +3321,18 @@ export function Tip() @{
 		<div overlay overlay-hint hidden={open !== true}>Tip</div>
 	</div>
 }`);
-		expect(diagnostics.map((d) => d.message)).toEqual([
-			'an `overlay-hint` surface (a tooltip or hovercard), which phones do not show yet',
+		expect(diagnostics).toEqual([]);
+		expect(payload!.nodes.find((node) => node.id === 'h2')).toMatchObject({
+			attributes: { overlay: '', 'overlay-hint': '' },
+		});
+		const bound = await nativeView(`import { state } from '@markless/core';
+export function Tip() @{
+	let open = state(false);
+	let hint = state(true);
+	<div overlay overlay-hint={hint} hidden={open !== true}>Tip</div>
+}`);
+		expect(bound.diagnostics.map((d) => d.message)).toEqual([
+			'`overlay-hint` that follows state; the overlay stack reads it once, when the surface shows, so write it bare',
 		]);
 	});
 });

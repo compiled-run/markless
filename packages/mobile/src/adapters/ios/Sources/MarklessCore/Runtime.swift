@@ -378,6 +378,12 @@ public final class NativeRuntime {
 		try overlayNodes.filter { node in try !instances(of: node).isEmpty && attributeNow(node.id, "hidden") == nil }.map(\.id)
 	}
 
+	/// A hint (a tooltip, a hovercard) carries `overlay-hint` beside `overlay`, as authored.
+	private func isHint(_ overlay: String) -> Bool {
+		guard case let .element(_, attributes, _) = nodesById[overlay]?.kind else { return false }
+		return attributes[OverlayProtocol.hintAttribute] != nil
+	}
+
 	/// An overlay is modal when it or an element inside it has `aria-modal="true"`, bound or else static.
 	private func isModal(_ overlay: String) throws -> Bool {
 		try payload.nodes.contains { node in
@@ -1312,8 +1318,9 @@ public final class NativeRuntime {
 			if action.event == .pointerdown {
 				raise(.pointerover, action.host, nil)
 				crossing(.pointerenter, action.host, nil, nil)
-				// The behaviour's document listener hears the press: the topmost overlay it landed outside is told.
-				if let top = self.stack.last, !self.contains(top, action.host), let dismiss = handlerOf(top, .dismiss) {
+				// The behaviour's document listener hears the press: the topmost hint and the topmost other overlay it landed outside are told.
+				for top in [self.stack.last(where: self.isHint), self.stack.last(where: { !self.isHint($0) })] {
+					guard let top, !self.contains(top, action.host), let dismiss = handlerOf(top, .dismiss) else { continue }
 					runs.append((dismiss.handler, [.reason: .string("outside-press"), .pressTarget: .string(action.host)]))
 				}
 				raise(.pointerdown, action.host, nil)
@@ -1584,6 +1591,20 @@ public final class NativeRuntime {
 		try seedRows()
 		try follow()
 		calls += try syncAsync()
+		// An overlay becoming shown supersedes every shown hint it is not inside, before it joins the stack.
+		let shownFirst = try shownOverlays()
+		var working = stackBefore.filter(shownFirst.contains)
+		for newcomer in shownFirst where !stackBefore.contains(newcomer) {
+			for hint in working where isHint(hint) && !contains(hint, newcomer) {
+				guard let dismiss = payload.events.first(where: { $0.host == hint && $0.event == .dismiss }) else { continue }
+				eventFields = [.reason: .string("superseded"), .pressTarget: .null]
+				defer { eventFields = nil }
+				let taken = try run(handlers[dismiss.handler] ?? [], in: .empty)
+				if case .navigate? = taken.first { return taken }
+				calls.append(contentsOf: taken)
+			}
+			working.append(newcomer)
+		}
 		let shownNow = try shownOverlays()
 		let released = stackBefore.filter { !shownNow.contains($0) }
 		let enlisted = shownNow.filter { !stackBefore.contains($0) }
