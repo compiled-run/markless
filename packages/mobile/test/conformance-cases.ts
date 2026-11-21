@@ -283,6 +283,21 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A sheet in an @if arm: no `sheet` entry when its arm leaves or comes; the host closes it with the arm and builds
+		// it as its state says.
+		name: 'sheet-in-arm',
+		fixture: 'proofs/y5-sheet-in-arm/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'dismiss', host: 'sheet:component-edge:0' },
+		],
+	},
+	{
 		name: 'guards',
 		fixture: 'test/fixtures/Guards.tsrx',
 		actions: [
@@ -1096,6 +1111,17 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h4' },
 			{ event: 'activate', host: 'h5' },
 			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		// A child's props computed by app functions (`reduce`, `charAt`) run in the script and follow the state they read.
+		name: 'script-props',
+		fixture: 'proofs/j17-script-prop/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
 		],
 	},
 	{

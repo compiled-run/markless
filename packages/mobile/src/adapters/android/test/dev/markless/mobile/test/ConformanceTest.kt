@@ -287,9 +287,10 @@ private fun decoderStrictness() {
 	val sheet = ok.replace("]}],\"events\"", "]},{\"kind\":\"sheet\",\"id\":\"s\",\"parent\":\"h0\",\"open\":{\"cell\":\"c\"},\"snapPoints\":[1],\"dismissible\":true,\"modal\":true},{\"kind\":\"element\",\"id\":\"h1\",\"element\":\"p\",\"parent\":\"s\"}],\"events\"")
 		.replace("\"handler\":\"x\"}]", "\"handler\":\"x\"},{\"host\":\"s\",\"event\":\"dismiss\",\"handler\":\"x\"}]")
 	check("decodes a sheet and its content", runCatching { Payload.decode(sheet.toByteArray()) }.getOrNull()?.nodes?.any { it is Node.Sheet && it.snapPoints == listOf(1.0) } == true) { runCatching { Payload.decode(sheet.toByteArray()) }.exceptionOrNull().toString() }
-	refuses("a sheet resting at one height below full", sheet.replace("\"snapPoints\":[1]", "\"snapPoints\":[0.5]"), "snapPoints")
+	check("decodes a sheet resting at one height below full", runCatching { Payload.decode(sheet.replace("\"snapPoints\":[1]", "\"snapPoints\":[0.5]").toByteArray()) }.getOrNull()?.nodes?.any { it is Node.Sheet && it.snapPoints == listOf(0.5) } == true) { "a sheet at [0.5] did not decode" }
+	refuses("a sheet resting at no height", sheet.replace("\"snapPoints\":[1]", "\"snapPoints\":[0]"), "snapPoints")
 	refuses("a sheet whose largest height is not full", sheet.replace("\"snapPoints\":[1]", "\"snapPoints\":[0.3,0.8]"), "snapPoints")
-	refuses("a sheet in an arm", sheet.replace("\"modal\":true", "\"modal\":true,\"arm\":{\"branch\":\"b\",\"index\":0}"), "unknown field \"arm\"")
+	refuses("a sheet in an arm of no branch", sheet.replace("\"modal\":true", "\"modal\":true,\"arm\":{\"branch\":\"b\",\"index\":0}"), "not a preceding branch")
 	refuses("a sheet inside a sheet", sheet.replace("\"parent\":\"s\"}", "\"parent\":\"s\"},{\"kind\":\"sheet\",\"id\":\"s2\",\"parent\":\"s\",\"open\":{\"literal\":false},\"snapPoints\":[1],\"dismissible\":false,\"modal\":true}"), "has a Sheet node as its parent")
 	refuses("a dismiss event on an element", sheet.replace("\"host\":\"s\",\"event\":\"dismiss\"", "\"host\":\"h0\",\"event\":\"dismiss\""), "names no sheet")
 	val script = ok.replace("{\"op\":\"assign\",\"cell\":\"c\",\"value\":{\"literal\":1}}", "{\"op\":\"script\",\"fn\":\"fn:0\",\"type\":\"click\",\"bindings\":{\"c\":{\"cell\":\"c\"}}}")

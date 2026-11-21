@@ -188,7 +188,7 @@ export type NativeRuntime = {
 	readonly arms: () => ReadonlyArray<readonly [node: string, index: number | null]>;
 	/** Every shown list's row keys, in order. */
 	readonly rows: () => ReadonlyArray<readonly [node: string, keys: ReadonlyArray<string>]>;
-	/** Every system sheet and whether its `open` is truthy. */
+	/** Every system sheet shown (its arm, if any, showing) and whether its `open` is truthy. */
 	readonly sheets: () => ReadonlyArray<readonly [node: string, open: boolean]>;
 	/** Every shown checkbox's and radio button's checkedness. */
 	readonly checks: () => ReadonlyArray<readonly [node: string, checked: boolean]>;
@@ -1418,7 +1418,9 @@ export function createNativeRuntime(
 		);
 	const sheets = () =>
 		payload.nodes.flatMap((node) =>
-			node.kind === 'sheet' ? [[node.id, Boolean(evaluate(node.open))] as const] : [],
+			node.kind === 'sheet' && shown(node)
+				? [[node.id, Boolean(evaluate(node.open))] as const]
+				: [],
 		);
 	const keyed = <T>(list: ReadonlyArray<readonly [string, string, T]>) =>
 		new Map(list.map(([node, name, value]) => [`${node}\0${name}`, value]));
@@ -2120,8 +2122,9 @@ export function createNativeRuntime(
 						: [];
 				}
 				if (node.kind === 'sheet') {
-					const open = afterSheets.get(node.id)!;
-					return beforeSheets.get(node.id) !== open
+					const before = beforeSheets.get(node.id);
+					const open = afterSheets.get(node.id);
+					return before !== undefined && open !== undefined && before !== open
 						? [{ op: 'sheet', node: node.id, open }]
 						: [];
 				}
