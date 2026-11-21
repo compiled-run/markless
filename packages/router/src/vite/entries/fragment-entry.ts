@@ -51,14 +51,26 @@ export interface FragmentNavigationConfig {
 	// A mouse fetches after resting this long on a link; press, focus and touch fetch at once.
 	readonly hoverDwellMs: number;
 	readonly prefetchTtlMs: number;
+	// Characters of page text kept for pages fetched ahead, all together.
+	readonly heldChars: number;
 	// At most this many unused prefetches may still be streaming; starting another cancels the oldest.
 	readonly prefetchConnections: number;
+	// Wire bytes viewport and idle fetches may spend per page shown.
+	readonly guessBudget: number;
+	// Development and tests: a move a lifecycle does not allow throws; in production it is reported and recovers.
+	readonly strictMoves: boolean;
+	// Performance mark names: [budget spent, guessing skipped].
+	readonly prefetchMarks: readonly [budgetSpent: string, skipped: string];
+	// [intent, viewport, idle]: 0 never, 1 on a fast link, 2 on any (never under Save-Data or in a hidden tab).
+	readonly prefetchOn: readonly [intent: number, viewport: number, idle: number];
 	// Paths the server answers with endpoints, not pages: never fetched before a click or as a fragment.
 	readonly endpointPrefixes: readonly string[];
 	// At most this many visible-link fragments are fetched at idle on fast connections, in document order; 0 keeps HTML to intent only.
 	readonly idleFragments: number;
-	// An idle fetch stops once a page's region passes this many bytes, and that page waits for intent.
+	// An idle or viewport fetch stops once a page passes this many bytes on the wire, and that page waits for intent.
 	readonly idleFragmentBytes: number;
+	// The same stop for a compressed response that declares no length, counted on the decoded body.
+	readonly idleFragmentDecodedBytes: number;
 	readonly idleWithoutConnectionInfo: boolean;
 	// false: nothing is fetched before a click.
 	readonly prefetch: boolean;
@@ -85,9 +97,12 @@ export type FragmentPrefetch = {
 	// When the response's Cache-Control ends its reuse (on arrival for no-store and no-cache).
 	expires?: number;
 	readonly result: Promise<FragmentFetched>;
-	// The response is still arriving, so it holds a connection.
-	open: boolean;
-	readonly abort: () => void;
+	// 0 a guess (idle or viewport, under the byte budget), 1 wanted (intent or a click), 2 arrived, 3 gone.
+	phase: number;
+	// A guess becomes wanted: no byte budget, and its document is parsed on arrival.
+	readonly want: () => void;
+	// again: the page may be fetched ahead again by the next page shown.
+	readonly abort: (again?: boolean) => void;
 };
 
 // What the inline bootstrap leaves on the document for the swap module (entries/fragment-entry.ts).
@@ -106,7 +121,6 @@ export type FragmentNavigationState = {
 	readonly request: (url: URL, speculative: boolean) => FragmentPrefetch;
 	readonly prefetch: (url: URL) => void;
 	readonly parse: (url: string, text: string) => FragmentFetched;
-	readonly idleDownloads: boolean;
 	// Schedules the idle tier: at idle, fetch a few page fragments of the links in view; their code waits for intent.
 	readonly rescan: () => void;
 	// Bumped by Back, Forward, a hash link and a click on the page shown: each cancels a navigation whose page has not swapped in.
@@ -204,12 +218,16 @@ function take(
 		return {
 			at: now,
 			writes: state.writes,
+			phase: 2,
 			result: Promise.resolve(ready ?? state.parse(url.href, cached)),
-			open: false,
+			want: () => {},
 			abort: () => {},
 		};
 	}
-	if (existing && state.fresh(existing, now)) return existing;
+	if (existing && state.fresh(existing, now)) {
+		existing.want();
+		return existing;
+	}
 	existing?.abort();
 	state.preloadCode(url, false);
 	return state.request(url, false);
