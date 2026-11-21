@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -17,6 +17,7 @@ import {
 	type RefreshState,
 } from '../src/runner/refresh.ts';
 import { rerunAfterPhoneLoss, transitionChunk, type Chunk } from '../src/runner/store.ts';
+import { simctl, SimulatorStuck, simulatorAnswers } from '../src/harness/simctl.ts';
 
 const queued: Chunk = {
 	state: 'queued',
@@ -109,6 +110,44 @@ describe('a chunk', () => {
 			);
 		expect(rerunAfterPhoneLoss(done(0))).toEqual(['03-counter']);
 		expect(rerunAfterPhoneLoss(done(1))).toEqual([]);
+	});
+});
+
+describe('a simulator that stops answering simctl', () => {
+	// A stand-in xcrun: the simulator reads Booted, and `simctl ui … appearance` never returns while STUCK is set, as measured.
+	const bin = mkdtempSync(join(tmpdir(), 'markless-xcrun-'));
+	writeFileSync(
+		join(bin, 'xcrun'),
+		`#!/bin/sh
+if [ "$2" = list ]; then echo '{"devices":{"ios":[{"udid":"U","name":"n","state":"Booted"}]}}'; exit 0; fi
+if [ "$2" = ui ] && [ -n "$STUCK" ]; then exec sleep 30; fi
+echo light
+`,
+	);
+	chmodSync(join(bin, 'xcrun'), 0o755);
+	const path = process.env.PATH;
+	beforeAll(() => {
+		process.env.PATH = `${bin}:${path}`;
+	});
+	afterAll(() => {
+		process.env.PATH = path;
+		delete process.env.STUCK;
+		rmSync(bin, { recursive: true, force: true });
+	});
+	it('fails the call by name once its time is up', async () => {
+		process.env.STUCK = '1';
+		const call = simctl(['ui', 'U', 'appearance', 'light'], { timeoutMs: 300 });
+		await expect(call).rejects.toBeInstanceOf(SimulatorStuck);
+		await expect(call).rejects.toThrow(
+			'simctl ui U appearance light did not answer in 0.3 s: the simulator is stuck',
+		);
+	});
+
+	it('does not answer the health check though it reads Booted, so the runner restarts it', async () => {
+		process.env.STUCK = '1';
+		expect(await simulatorAnswers('U', 300)).toBe(false);
+		delete process.env.STUCK;
+		expect(await simulatorAnswers('U', 300)).toBe(true);
 	});
 });
 
