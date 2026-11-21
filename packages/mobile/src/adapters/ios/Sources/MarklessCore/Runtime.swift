@@ -242,6 +242,8 @@ public final class NativeRuntime {
 	private var eventFields: [NativeEventField: NativeValue]?
 	/// The arms on screen when the running action began; nil between actions, when what shows is what the cells say.
 	private var drawnArms: [String: Int?]?
+	/// A text field's key or paste event: the field's text then, a script handler's `event.target.value`.
+	private var targetText: String?
 	/// What a touch adds to a script pointer handler's event, in the order the reference writes them.
 	private let touchFields: [NativeEventField] = [.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp]
 	/// The element that has focus, or nil.
@@ -681,7 +683,7 @@ public final class NativeRuntime {
 			return try callScript("leave")
 		}
 		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave")
-			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["commands", "navigate"])
+			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["commands", "navigate", "prevented"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
 			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
@@ -737,10 +739,12 @@ public final class NativeRuntime {
 			if name == "focus" { focused = node }
 			return .command(node: node, command: name, preventScroll: try parts[2].bool())
 		}
-		guard result.has("navigate") else { return aborts + clears + timers + requests + commands }
+		// A key or paste handler called preventDefault() before it first awaited.
+		let prevented: [NativeJournalEntry] = try result.has("prevented") && result["prevented"].bool() ? [.preventDefault] : []
+		guard result.has("navigate") else { return aborts + clears + timers + requests + commands + prevented }
 		let opened = try result["navigate"].object(["route", "params", "replace"])
 		let params = try opened["params"].keys().map { NativeRouteParam(name: $0, value: try opened["params"].field($0).string()) }
-		return aborts + clears + timers + requests + commands + [.navigate(route: try opened["route"].string(), params: params, replace: try opened["replace"].bool())]
+		return aborts + clears + timers + requests + commands + prevented + [.navigate(route: try opened["route"].string(), params: params, replace: try opened["replace"].bool())]
 	}
 
 	/// Tells the engine which async values are shown and what they read, when that moved; it starts and aborts runs.
@@ -1285,12 +1289,13 @@ public final class NativeRuntime {
 		eventValue = action.event == .input || action.event == .commit ? action.value ?? "" : nil
 		edit = eventValue
 		switch action.event {
-		case .keydown: eventFields = [.key: .string(action.value ?? "")]
+		case .keydown, .keyup: eventFields = [.key: .string(action.value ?? "")]
 		case .paste: eventFields = [.text: .string(action.value ?? "")]
 		case .activate: eventFields = [.detail: .number(Double(action.detail ?? 1))]
 		default: break
 		}
-		defer { eventValue = nil; edit = nil; eventFields = nil }
+		if [.keydown, .keyup, .paste].contains(action.event) { targetText = try textOf(field: action.host) }
+		defer { eventValue = nil; edit = nil; eventFields = nil; targetText = nil }
 		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: scope) }
 	}
 
@@ -1525,7 +1530,8 @@ public final class NativeRuntime {
 				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
 			case let .script(fn, type, bindings, catchCell):
 				let touch = touchFields.compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
-				let event: JSONValue = .object([("type", .string(type))] + (eventValue.map { [("value", JSONValue.string($0))] } ?? []) + touch)
+				let typed = [NativeEventField.key, .text].compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
+				let event: JSONValue = .object([("type", .string(type))] + ((eventValue ?? targetText).map { [("value", JSONValue.string($0))] } ?? []) + typed + touch)
 				let frame = try frame(of: bindings, in: scope)
 				calls.append(contentsOf: try enter(
 					[("kind", .string("dispatch")), ("fn", .string(fn)), ("frame", frame), ("elements", try elementFacts(frame)), ("event", event)]

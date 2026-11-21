@@ -13,10 +13,12 @@ import android.widget.EditText
  * An `<input>` or `<textarea>` whose `keydown` and `paste` handlers run as Chrome on Android runs them for its on-screen
  * keyboard: typed text is `Unidentified`, a delete is `Backspace`, the action key (unless it is Next) and Return are
  * `Enter`, a key event from a hardware keyboard is its own key. Each callback answers whether the handler called
- * `preventDefault()`, which leaves out the deletion, the line break, the action or the paste.
+ * `preventDefault()`, which leaves out the deletion, the line break, the action or the paste. `onKeyUp` runs after the key's
+ * edit, or after it was left out, as Chrome's keyup does.
  */
 class MarklessField(context: Context) : EditText(context) {
 	var onKey: ((String) -> Boolean)? = null
+	var onKeyUp: ((String) -> Unit)? = null
 	var onPaste: ((String) -> Boolean)? = null
 	private var enterAt = 0L
 	private val editingKeys = keyListener
@@ -29,39 +31,49 @@ class MarklessField(context: Context) : EditText(context) {
 			showSoftInputOnFocus = !value
 		}
 
+	/** The key's keydown, then [edit] unless the handler prevented it, then its keyup; answers whether it was prevented. */
+	private fun press(key: String, edit: () -> Boolean): Boolean {
+		val prevented = onKey?.invoke(key) == true
+		val done = if (prevented) true else edit()
+		onKeyUp?.invoke(key)
+		return done
+	}
+
 	override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
 		val connection = super.onCreateInputConnection(outAttrs) ?: return null
-		val key = onKey ?: return connection
+		if (onKey == null && onKeyUp == null) return connection
 		return object : InputConnectionWrapper(connection, true) {
+			// Typed text goes in even when its keydown is prevented (not measured on Chrome; no family prevents a character).
 			override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
-				key("Unidentified")
-				return super.commitText(text, newCursorPosition)
+				onKey?.invoke("Unidentified")
+				return super.commitText(text, newCursorPosition).also { onKeyUp?.invoke("Unidentified") }
 			}
 
 			override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean {
-				key("Unidentified")
-				return super.setComposingText(text, newCursorPosition)
+				onKey?.invoke("Unidentified")
+				return super.setComposingText(text, newCursorPosition).also { onKeyUp?.invoke("Unidentified") }
 			}
 
 			override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean =
-				if (beforeLength > 0 && key("Backspace")) true else super.deleteSurroundingText(beforeLength, afterLength)
+				if (beforeLength > 0) press("Backspace") { super.deleteSurroundingText(beforeLength, afterLength) }
+				else super.deleteSurroundingText(beforeLength, afterLength)
 		}
 	}
 
 	override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-		val key = onKey ?: return super.onKeyDown(keyCode, event)
+		if (onKey == null && onKeyUp == null) return super.onKeyDown(keyCode, event)
 		val name = keyName(keyCode, event) ?: return super.onKeyDown(keyCode, event)
 		if (name == "Enter") enterAt = SystemClock.uptimeMillis()
-		return if (key(name)) true else super.onKeyDown(keyCode, event)
+		return press(name) { super.onKeyDown(keyCode, event) }
 	}
 
 	override fun onEditorAction(actionCode: Int) {
-		val key = onKey
 		val enter = actionCode != EditorInfo.IME_ACTION_NEXT && actionCode != EditorInfo.IME_ACTION_PREVIOUS
 		// One press can arrive as the Enter key and then again as the keyboard's action: the handler runs once.
-		if (key != null && enter && SystemClock.uptimeMillis() - enterAt >= 500) {
+		if ((onKey != null || onKeyUp != null) && enter && SystemClock.uptimeMillis() - enterAt >= 500) {
 			enterAt = SystemClock.uptimeMillis()
-			if (key("Enter")) return
+			press("Enter") { super.onEditorAction(actionCode); true }
+			return
 		}
 		super.onEditorAction(actionCode)
 	}
