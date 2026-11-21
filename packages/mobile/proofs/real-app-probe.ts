@@ -8,7 +8,7 @@ import { parseArgs } from 'node:util';
 import { buildSemanticGraph, type CompilerDiagnostic } from '@markless/compiler';
 import { buildRouteManifestFromFileIds } from '@markless/router';
 import * as compile from '../src/compile.ts';
-import { resolvePackageModule } from '../src/harness/rung.ts';
+import { resolvePackageModule, servedReader } from '../src/harness/rung.ts';
 
 type Module = { readonly filename: string; readonly source: string };
 type ReadModule = (specifier: string, importer: string) => Module | undefined;
@@ -27,6 +27,7 @@ type AppCompiler = (input: {
 		specifier: string,
 		importer: string,
 	) => { readonly file: string; readonly cssText: string } | undefined;
+	readonly readServedStylesheet?: (href: string) => { readonly file: string; readonly cssText: string } | undefined;
 }) => Promise<{ readonly diagnostics: ReadonlyArray<PageDiagnostic> }>;
 
 const { values } = parseArgs({
@@ -163,6 +164,7 @@ function summarize(
 
 async function probeApp(app: string, appRoot: string): Promise<PageResult[]> {
 	const read = readerFor();
+	const served = servedReader(appRoot);
 	const all = files(appRoot);
 	const pageIds = all
 		.map((file) => relative(appRoot, file))
@@ -218,11 +220,16 @@ async function probeApp(app: string, appRoot: string): Promise<PageResult[]> {
 			refusals: [],
 			keyboardOnly: 0,
 		});
-	const pages = tsrx.map((route) => ({
-		page: route.file,
-		filename: join(appRoot, route.file),
-		source: readFileSync(join(appRoot, route.file), 'utf8'),
-	}));
+	const readPage = (file: string) => ({
+		page: file,
+		filename: join(appRoot, file),
+		source: readFileSync(join(appRoot, file), 'utf8'),
+	});
+	const pages = tsrx.map((route) => readPage(route.file));
+	// The app's 404 and error pages: a link to a path no route matches opens the not-found page, as the web's router does.
+	const statusPages = [manifest.statusPages.notFound, manifest.statusPages.error]
+		.filter((file): file is string => file?.endsWith('.tsrx') === true)
+		.map(readPage);
 	const documentFile = join(appRoot, 'document.tsrx');
 	const document = existsSync(documentFile)
 		? { filename: documentFile, source: readFileSync(documentFile, 'utf8') }
@@ -230,10 +237,11 @@ async function probeApp(app: string, appRoot: string): Promise<PageResult[]> {
 	if (compileNativeApp) {
 		try {
 			const build = await compileNativeApp({
-				pages,
+				pages: [...pages, ...statusPages],
 				...(document ? { document } : {}),
 				readModule: read,
 				readStylesheet: stylesheetReader,
+				readServedStylesheet: served,
 			});
 			for (const route of tsrx)
 				results.push(
@@ -255,10 +263,11 @@ async function probeApp(app: string, appRoot: string): Promise<PageResult[]> {
 		try {
 			const build = compileNativeApp
 				? await compileNativeApp({
-						pages: [page],
+						pages: [page, ...statusPages],
 						...(document ? { document } : {}),
 						readModule: read,
 						readStylesheet: stylesheetReader,
+						readServedStylesheet: served,
 					})
 				: await compile.compileNativeComponent({
 						filename: page.filename,

@@ -1,0 +1,34 @@
+appId: ${APP_ID}
+name: u101-slot-in-arm
+---
+- launchApp:
+      clearState: true
+- assertVisible: Slot in an arm
+- assertVisible: Middle row
+- assertVisible: Marker
+- assertVisible: Lower
+- assertVisible: Toggle
+- assertVisible:
+      text: Middle row
+      below: Marker
+- tapOn: Lower
+- assertVisible:
+      text: Marker
+      below: Middle row
+- assertVisible: Marker
+- assertVisible:
+      text: Marker
+      below: Middle row
+- tapOn: Toggle
+- assertNotVisible: Marker
+- assertVisible: Middle row
+- assertNotVisible: Marker
+- tapOn: Toggle
+- assertVisible: Marker
+- assertVisible:
+      text: Marker
+      below: Middle row
+- assertVisible: Marker
+- assertVisible:
+      text: Marker
+      below: Middle row

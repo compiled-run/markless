@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: j16-script-navigate
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Order desk
 - assertVisible: Nothing yet
 - assertVisible: Open next order
@@ -28,16 +28,16 @@ name: j16-script-navigate
 - assertNotVisible: Details for order 42
 - assertVisible: Order 43
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertNotVisible: Details for order 43
 - assertVisible: Home
 - assertVisible: Order desk

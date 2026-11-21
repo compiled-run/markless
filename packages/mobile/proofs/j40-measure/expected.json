@@ -1,0 +1,12 @@
+{
+	"rung": "J40",
+	"name": "JavaScript on the phone measures elements through their handles: getBoundingClientRect() and getComputedStyle().direction answer from the views as the tap began",
+	"steps": [
+		{ "visible": ["Boxes", "Quarter not yet", "Stacked not yet", "Direction not yet"] },
+		{
+			"do": { "tap": "Measure" },
+			"visible": ["Quarter 25", "Stacked yes", "Direction ltr"],
+			"absent": ["Quarter not yet"]
+		}
+	]
+}

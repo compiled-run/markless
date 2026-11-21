@@ -32,6 +32,14 @@ test('a cache past its bound, counted across Node versions, is emptied', () => {
 	expect(() => readdirSync(directory)).toThrow(/ENOENT/);
 });
 
+test('a cache past its bound is moved aside before it is removed, leaving nothing beside it', () => {
+	const directory = cacheWith({ 'v24.0.0-x64': 6 });
+	const parent = join(directory, '..');
+	const name = directory.slice(parent.length + 1);
+	pruneCompileCache(directory, 5);
+	expect(readdirSync(parent).filter((entry) => entry.startsWith(name))).toEqual([]);
+});
+
 test('a missing cache directory is left alone', () => {
 	expect(() =>
 		pruneCompileCache(join(tmpdir(), 'markless-compile-cache-missing'), 5),

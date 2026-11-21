@@ -7932,6 +7932,42 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_NATIVE_ANDROID_ONLY',
+		title: 'A long-press handler runs only on Android',
+		area: 'internal',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error-or-warning',
+		description: 'A long-press handler runs only on Android: a Markless build error.',
+		printed: [
+			'MARKLESS_NATIVE_ANDROID_ONLY: <what> runs only on Android, which raises it for a long press as Chrome does; Safari on iOS raises none, so the iOS app never runs it',
+			'Chrome on Android raises `contextmenu` when a person long-presses an element; Safari on iOS raises it for no touch.',
+			'https://markless.dev/errors/MARKLESS_NATIVE_ANDROID_ONLY',
+		],
+		structured: true,
+		why: 'Chrome on Android raises `contextmenu` when a person long-presses an element; Safari on iOS raises it for no touch.',
+		allow: [
+			{
+				id: 'l0',
+				runs: [
+					{
+						id: 'r0',
+						text: '// markless-allow MARKLESS_NATIVE_ANDROID_ONLY: the reason you accept it',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
+					},
+				],
+			},
+		],
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/native-view.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/native-view.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_NATIVE_DROP_ONLY',
 		title: 'A drop handler is left out of the native build',
 		area: 'internal',

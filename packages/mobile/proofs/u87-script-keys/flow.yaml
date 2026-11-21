@@ -1,0 +1,18 @@
+appId: ${APP_ID}
+name: u87-script-keys
+---
+- launchApp:
+    clearState: true
+- assertVisible: No key yet
+- assertVisible: Send Home
+- assertVisible: Send End
+- assertNotVisible: Script sent Home
+- tapOn: Send Home
+- assertVisible: Script sent Home
+- assertNotVisible: No key yet
+- assertVisible: Script sent Home
+- assertNotVisible: No key yet
+- tapOn: Send End
+- assertNotVisible: Script sent Home
+- assertVisible: Script sent End
+- assertNotVisible: Script sent Home

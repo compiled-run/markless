@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u5-toggle
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Toggle
 - assertVisible: Wi-Fi
 - assertVisible: Join known networks

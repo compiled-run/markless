@@ -1,0 +1,15 @@
+{
+	"rung": 210,
+	"name": "A part reads where it stands among its family's parts (roster.indexOf(mine)), as the web's render order gives it",
+	"steps": [
+		{
+			"visible": ["Steps", "Step 1: Pack", "Step 2: Ship", "Step 3: Track", "Current step 2"],
+			"absent": ["Step 0: Pack", "Step 4: Track"]
+		},
+		{
+			"do": { "tap": "Next step" },
+			"visible": ["Current step 3", "Step 3: Track"],
+			"absent": ["Current step 2"]
+		}
+	]
+}

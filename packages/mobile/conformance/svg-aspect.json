@@ -1,0 +1,467 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:mode",
+				"name": "mode",
+				"initial": "stretch"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Banner fit"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Change fit"
+					}
+				]
+			},
+			{
+				"kind": "branch",
+				"id": "branch-site:0",
+				"parent": "h0",
+				"tests": [
+					{
+						"binary": "===",
+						"left": {
+							"cell": "state:mode"
+						},
+						"right": {
+							"literal": "stretch"
+						}
+					},
+					{
+						"binary": "===",
+						"left": {
+							"cell": "state:mode"
+						},
+						"right": {
+							"literal": "crop"
+						}
+					},
+					null
+				],
+				"arms": 3
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "svg",
+				"parent": "h0",
+				"attributes": {
+					"viewBox": "0 0 100 50",
+					"width": "300",
+					"height": "60",
+					"preserveAspectRatio": "none"
+				},
+				"drawing": {
+					"viewBox": [
+						0,
+						0,
+						100,
+						50
+					],
+					"width": 300,
+					"height": 60,
+					"aspect": "none",
+					"shapes": [
+						{
+							"path": [
+								0,
+								0,
+								0,
+								1,
+								100,
+								0,
+								1,
+								100,
+								50,
+								1,
+								0,
+								50,
+								4
+							],
+							"fill": {
+								"r": 153,
+								"g": 204,
+								"b": 255,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						},
+						{
+							"path": [],
+							"fill": {
+								"r": 0,
+								"g": 0,
+								"b": 0,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 0,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4,
+							"text": {
+								"anchor": "middle",
+								"baseline": "alphabetic",
+								"runs": [
+									{
+										"text": "Stretched",
+										"x": 50,
+										"y": 30,
+										"size": 12,
+										"weight": 400,
+										"letterSpacing": 0,
+										"fill": {
+											"r": 0,
+											"g": 0,
+											"b": 0,
+											"alpha": 255
+										}
+									}
+								]
+							}
+						}
+					],
+					"label": "Stretched"
+				},
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "svg",
+				"parent": "h0",
+				"attributes": {
+					"viewBox": "0 0 100 50",
+					"width": "100",
+					"height": "100",
+					"preserveAspectRatio": "xMidYMid slice"
+				},
+				"drawing": {
+					"viewBox": [
+						0,
+						0,
+						100,
+						50
+					],
+					"width": 100,
+					"height": 100,
+					"aspect": {
+						"x": "mid",
+						"y": "mid",
+						"slice": true
+					},
+					"shapes": [
+						{
+							"path": [
+								0,
+								0,
+								0,
+								1,
+								100,
+								0,
+								1,
+								100,
+								50,
+								1,
+								0,
+								50,
+								4
+							],
+							"fill": {
+								"r": 255,
+								"g": 204,
+								"b": 153,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						},
+						{
+							"path": [],
+							"fill": {
+								"r": 0,
+								"g": 0,
+								"b": 0,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 0,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4,
+							"text": {
+								"anchor": "middle",
+								"baseline": "alphabetic",
+								"runs": [
+									{
+										"text": "Cropped",
+										"x": 50,
+										"y": 30,
+										"size": 12,
+										"weight": 400,
+										"letterSpacing": 0,
+										"fill": {
+											"r": 0,
+											"g": 0,
+											"b": 0,
+											"alpha": 255
+										}
+									}
+								]
+							}
+						}
+					],
+					"label": "Cropped"
+				},
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "svg",
+				"parent": "h0",
+				"attributes": {
+					"viewBox": "0 0 100 50",
+					"width": "300",
+					"height": "100",
+					"preserveAspectRatio": "xMinYMax meet"
+				},
+				"drawing": {
+					"viewBox": [
+						0,
+						0,
+						100,
+						50
+					],
+					"width": 300,
+					"height": 100,
+					"aspect": {
+						"x": "min",
+						"y": "max"
+					},
+					"shapes": [
+						{
+							"path": [
+								0,
+								0,
+								0,
+								1,
+								100,
+								0,
+								1,
+								100,
+								50,
+								1,
+								0,
+								50,
+								4
+							],
+							"fill": {
+								"r": 204,
+								"g": 255,
+								"b": 153,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						},
+						{
+							"path": [],
+							"fill": {
+								"r": 0,
+								"g": 0,
+								"b": 0,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 0,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4,
+							"text": {
+								"anchor": "middle",
+								"baseline": "alphabetic",
+								"runs": [
+									{
+										"text": "Bottom left",
+										"x": 50,
+										"y": 30,
+										"size": 12,
+										"weight": 400,
+										"letterSpacing": 0,
+										"fill": {
+											"r": 0,
+											"g": 0,
+											"b": 0,
+											"alpha": 255
+										}
+									}
+								]
+							}
+						}
+					],
+					"label": "Bottom left"
+				},
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 2
+				}
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:mode",
+						"value": {
+							"if": {
+								"binary": "===",
+								"left": {
+									"cell": "state:mode"
+								},
+								"right": {
+									"literal": "stretch"
+								}
+							},
+							"whenTrue": {
+								"literal": "crop"
+							},
+							"whenFalse": {
+								"if": {
+									"binary": "===",
+									"left": {
+										"cell": "state:mode"
+									},
+									"right": {
+										"literal": "crop"
+									}
+								},
+								"whenTrue": {
+									"literal": "corner"
+								},
+								"whenFalse": {
+									"literal": "stretch"
+								}
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Banner fit"
+		],
+		[
+			"h2:text0",
+			"Change fit"
+		]
+	],
+	"initialArms": [
+		[
+			"branch-site:0",
+			0
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 1
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 2
+				}
+			]
+		}
+	]
+}

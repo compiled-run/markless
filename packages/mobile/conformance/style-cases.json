@@ -1,0 +1,306 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "StyleCases",
+		"cells": [
+			{
+				"id": "state:point",
+				"name": "point",
+				"initial": null
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "div",
+				"parent": "h0",
+				"style": [
+					"--x: ",
+					{
+						"slot": "slot:h1#0"
+					},
+					"px; --y: ",
+					{
+						"slot": "slot:h1#1"
+					},
+					"px;"
+				],
+				"styleWhen": {
+					"case": "case:h1",
+					"value": false
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Surface"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Open"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Move"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Close"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:point",
+						"value": {
+							"object": [
+								[
+									"x",
+									{
+										"literal": 40
+									}
+								],
+								[
+									"y",
+									{
+										"literal": 200.5
+									}
+								]
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:point",
+						"value": {
+							"object": [
+								[
+									"x",
+									{
+										"literal": 12
+									}
+								],
+								[
+									"y",
+									{
+										"literal": 200.5
+									}
+								]
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:point",
+						"value": {
+							"literal": null
+						}
+					}
+				]
+			}
+		],
+		"slots": [
+			{
+				"id": "slot:h1#0",
+				"value": {
+					"member": {
+						"cell": "state:point"
+					},
+					"property": "x"
+				},
+				"when": {
+					"case": "case:h1",
+					"value": false
+				}
+			},
+			{
+				"id": "slot:h1#1",
+				"value": {
+					"member": {
+						"cell": "state:point"
+					},
+					"property": "y"
+				},
+				"when": {
+					"case": "case:h1",
+					"value": false
+				}
+			}
+		],
+		"styleCases": [
+			{
+				"id": "case:h1",
+				"value": {
+					"binary": "===",
+					"left": {
+						"cell": "state:point"
+					},
+					"right": {
+						"literal": null
+					}
+				}
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Surface"
+		],
+		[
+			"h2:text0",
+			"Open"
+		],
+		[
+			"h3:text0",
+			"Move"
+		],
+		[
+			"h4:text0",
+			"Close"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "case:h1",
+					"value": false
+				},
+				{
+					"op": "slot",
+					"slot": "slot:h1#0",
+					"value": 40
+				},
+				{
+					"op": "slot",
+					"slot": "slot:h1#1",
+					"value": 200.5
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "slot",
+					"slot": "slot:h1#0",
+					"value": 12
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "case:h1",
+					"value": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "case:h1",
+					"value": false
+				}
+			]
+		}
+	]
+}

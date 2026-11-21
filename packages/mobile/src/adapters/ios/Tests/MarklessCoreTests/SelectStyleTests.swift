@@ -97,3 +97,25 @@ private func writesArrow(_ node: StyleNode?) -> RGBA? {
 		#expect(error.reason == "h3 draws a drop-down arrow, whose geometry only Dragon's plan layout gives, and the export has no plan")
 	}
 }
+
+// Dragon's slots example with a select: on a slotted page the plan layout gives the slot writes, then the arrows, tagged and last.
+@Test func aSlottedLayoutGivesItsSlotWritesThenItsArrows() throws {
+	let style = try #require(try StyleExport.decodeApp(try fixture("slotted-select.native-app-style"))["/"])
+	let layout = String(decoding: try fixture("slotted-select.ios.layout"), as: UTF8.self)
+	let values = style.slots.map(\.initial)
+	let laid = try style.laidOut(width: 402, height: 778, scale: 3, slots: values, layout: { _ in layout })
+	let nodes = laid.assignments[0].nodes
+	#expect(nodes.first { $0.id == "h20" }?.selectArrow?.points == [1120, 40, 1132, 52, 1144, 40])
+	var red: Double?
+	for case let .backgroundColor(color) in nodes.first(where: { $0.id == "h8" })?.writes ?? [] { red = color.r }
+	#expect(red == 200)
+	guard case let .array(parts) = try JSONValue.parse(Data(layout.utf8)) else { throw PayloadError(path: "fixture", reason: "not an array") }
+	for broken in [
+		Array(parts.prefix(4)) + [.array([.string("other"), .array([])])],
+		Array(parts.prefix(3)) + [parts[4]],
+		Array(parts.prefix(4)),
+	] {
+		let text = JSONValue.array(broken).jsonText
+		#expect(throws: PayloadError.self) { try style.laidOut(width: 402, height: 778, scale: 3, slots: values, layout: { _ in text }) }
+	}
+}

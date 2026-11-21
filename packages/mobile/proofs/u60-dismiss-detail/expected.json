@@ -1,0 +1,25 @@
+{
+	"rung": 170,
+	"name": "A dismiss handler in JavaScript reads why it was dismissed and the element an outside press landed on",
+	"steps": [
+		{ "visible": ["Dismiss", "Guide", "Last nothing yet"], "absent": ["Step one"] },
+		{ "do": { "tap": "Guide" }, "visible": ["Step one", "Last nothing yet"] },
+		{
+			"do": { "tap": "Last nothing yet" },
+			"visible": ["Last outside-press"],
+			"absent": ["Step one", "Last nothing yet"]
+		},
+		{ "do": { "tap": "Guide" }, "visible": ["Step one", "Last outside-press"] },
+		{
+			"do": { "tap": "Guide" },
+			"visible": ["Last outside-press on Guide"],
+			"absent": ["Step one", "Last outside-press"]
+		},
+		{ "do": { "tap": "Guide" }, "visible": ["Step one", "Last outside-press on Guide"] },
+		{
+			"do": { "escape": true },
+			"visible": ["Last escape"],
+			"absent": ["Step one", "Last outside-press on Guide"]
+		}
+	]
+}

@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: r140-link-attributes
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Home tab, open
 - assertVisible: About tab
 - assertVisible: Open apple

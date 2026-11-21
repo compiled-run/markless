@@ -1,0 +1,14 @@
+{
+	"rung": 162,
+	"name": "a <link rel=stylesheet> to a file the app serves: the build reads it, as the browser loads it, and the page is styled by it",
+	"steps": [
+		{
+			"visible": ["Linked styles", "Visits 0", "Visit"]
+		},
+		{
+			"do": { "tap": "Visit" },
+			"visible": ["Visits 1"],
+			"absent": ["Visits 0"]
+		}
+	]
+}

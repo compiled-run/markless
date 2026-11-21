@@ -1,0 +1,71 @@
+{
+	"rung": "N6",
+	"name": "A plain <a href> to one of the app's pages, fixed or built while rendering, opens that page in place with its params, as a <Link> does on the web",
+	"steps": [
+		{
+			"visible": ["Start page", "About us", "Item seven", "Open item 3"],
+			"absent": ["We make lists", "Showing item 7"],
+			"title": "Links"
+		},
+		{
+			"do": {
+				"tap": "About us"
+			},
+			"visible": ["We make lists"],
+			"absent": ["Start page"],
+			"title": "About"
+		},
+		{
+			"do": {
+				"back": "gesture"
+			},
+			"visible": ["Start page", "Item seven"],
+			"absent": ["We make lists"],
+			"title": "Links"
+		},
+		{
+			"do": {
+				"tap": "Item seven"
+			},
+			"visible": ["Showing item 7"],
+			"absent": ["Start page"],
+			"title": "Item 7"
+		},
+		{
+			"do": {
+				"back": "gesture"
+			},
+			"visible": ["Start page", "About us", "Open item 3"],
+			"absent": ["Showing item 7"],
+			"title": "Links"
+		},
+		{
+			"do": {
+				"tap": "Pick 9"
+			},
+			"visible": ["Open item 9", "Start page"],
+			"absent": ["Open item 3"]
+		},
+		{
+			"do": {
+				"tap": "Open item 9"
+			},
+			"visible": ["Showing item 9"],
+			"absent": ["Start page"],
+			"title": "Item 9"
+		},
+		{
+			"do": {
+				"back": "gesture"
+			},
+			"visible": ["Start page", "Open item 9"],
+			"absent": ["Showing item 9"],
+			"title": "Links",
+			"onWeb": {
+				"why": "the web restores a page on Back from the server HTML it cached, so the page's state starts over; a native stack keeps the screen as it was left",
+				"visible": ["Start page", "Open item 3"],
+				"absent": ["Showing item 9"]
+			}
+		}
+	]
+}

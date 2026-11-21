@@ -14,6 +14,7 @@ export {
 	type NativeAppBuild,
 	type NativeBuild,
 	type NativeStylesheet,
+	type ReadServedStylesheet,
 	type ReadStylesheet,
 } from './compile.ts';
 export {
@@ -31,6 +32,7 @@ export {
 	formatNativeValue,
 	type NativeAction,
 	type NativeRuntime,
+	type NativeElementBox,
 	type NativeScriptHost,
 } from './runtime.ts';
 export type { NativeScriptEngine } from './script-engine.ts';
