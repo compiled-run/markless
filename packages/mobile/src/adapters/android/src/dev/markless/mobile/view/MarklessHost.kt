@@ -1232,10 +1232,12 @@ class MarklessHost(
 		if (view is RangeBar && name in RangeBar.SHAPE) view.show(current)
 		if (name == "role" || name == "aria-live") (payload.nodes.firstOrNull { it.id == id.substringBefore('@') } as? Node.Element)?.takeIf { it.liveFollows != null }?.let { liveRegion(it, view) }
 		when (name) {
-			// A label names its control, so TalkBack reads it there and not a second time on the label; a press on it activates the control.
-			"for" -> if (value != null) {
-				view.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
-				view.setOnClickListener { views[value]?.performClick() }
+			// A press on a label acts on its control, as the web does: a text field takes the keyboard, any other is pressed.
+			"for" -> if (value != null) view.setOnClickListener {
+				when (val control = views[value]) {
+					is EditText -> command(control, "focus", false)
+					else -> control?.performClick()
+				}
 			}
 			"aria-label" -> if (view is AudioButton) view.label(value) else {
 				view.contentDescription = value ?: (view as? DrawingView)?.label
@@ -1358,22 +1360,35 @@ class MarklessHost(
 	/** The text the elements named by a space-separated id list show, in view order. */
 	private fun textOf(ids: String): String = ids.split(' ').mapNotNull { views[it] }.joinToString(" ") { textWithin(it) }
 
-	private fun textWithin(view: View): String = when (view) {
-		is TextView -> view.text.toString()
-		is ViewGroup -> (0 until view.childCount).map { textWithin(view.getChildAt(it)) }.filter { it.isNotEmpty() }.joinToString(" ")
+	private fun textWithin(view: View, skipped: View? = null): String = when {
+		view === skipped -> ""
+		view is TextView -> view.text.toString()
+		view is ViewGroup -> (0 until view.childCount).map { textWithin(view.getChildAt(it), skipped) }.filter { it.isNotEmpty() }.joinToString(" ")
 		else -> ""
 	}
 
-	/** `aria-labelledby` as the content description, kept current after every journal. */
 	/** Each select shows its chosen option's label, as the web's closed `<select>` does. */
 	private fun refreshSelects() {
 		for ((id, view) in views) if (view is SelectBox) view.show(runtime.choices(id).firstOrNull { it.selected }?.label ?: "")
 	}
 
+	/** `aria-labelledby` as the content description, kept current after every journal; a `<label>` names its control with its
+	 * text, so TalkBack reads it there and not a second time on the label. */
 	private fun refreshRelations() {
 		for ((id, current) in attrs) {
 			val view = views[id] ?: continue
 			if (current["aria-label"] == null) current["aria-labelledby"]?.let { view.contentDescription = textOf(it) }
+			val target = current["for"] ?: continue
+			val control = views[target] ?: continue
+			val own = attrs[target].orEmpty()
+			val unnamed = own["aria-label"] == null && own["aria-labelledby"] == null
+			if (unnamed) control.contentDescription = textWithin(view, control)
+			val inside = generateSequence(control.parent) { it.parent }.any { it === view }
+			if (!inside) view.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+			else if (unnamed && view is ViewGroup)
+				for (child in (0 until view.childCount).map { view.getChildAt(it) })
+					if (child !== control && !(child is ViewGroup && generateSequence(control.parent) { it.parent }.any { it === child }))
+						child.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
 		}
 	}
 

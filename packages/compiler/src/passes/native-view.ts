@@ -450,6 +450,16 @@ function returningInto(
 
 /** `<input>` types a person ticks: a press checks them before their handlers run. */
 const TICKED_TYPES = new Set(['checkbox', 'radio']);
+/** The elements a <label> names (HTML's labelable elements), the first inside it when it has no `for`. */
+const LABELABLE_ELEMENTS = new Set([
+	'button',
+	'input',
+	'meter',
+	'output',
+	'progress',
+	'select',
+	'textarea',
+]);
 
 /** `<input>` types a host draws as a single-line text field (a password masked); each blocks the return key's submit when a form has two. */
 const TEXT_TYPES = new Set(['text', 'search', 'tel', 'password', 'email']);
@@ -8770,6 +8780,44 @@ export function createNativeViewPayload(
 			...node,
 			bindings: [...(node.bindings ?? []), { attribute: reference.attribute, value }],
 		};
+	}
+
+	// A <label> with no `for` names the first labelable element inside it, as the web resolves the control it activates.
+	{
+		const byId = nodeById();
+		const inside = (id: string, ancestor: string) => {
+			for (let at = byId.get(id)?.parent; at; at = byId.get(at)?.parent)
+				if (at === ancestor) return true;
+			return false;
+		};
+		for (const [index, label] of nodes.entries()) {
+			if (
+				label.kind !== 'element' ||
+				label.element !== 'label' ||
+				label.attributes?.['for'] !== undefined ||
+				label.bindings?.some(
+					(binding) => 'attribute' in binding && binding.attribute === 'for',
+				)
+			)
+				continue;
+			const control = nodes.find(
+				(node) =>
+					node.kind === 'element' &&
+					LABELABLE_ELEMENTS.has(node.element) &&
+					!(node.element === 'input' && node.attributes?.['type'] === 'hidden') &&
+					inside(node.id, label.id),
+			);
+			if (control === undefined || control.row !== label.row) continue;
+			const rowKey = control.row && rowKeys.get(control.row);
+			if (control.row && !rowKey) continue;
+			const value: NativeExpr = rowKey
+				? { template: [`${control.id}@`, ...rowKey] }
+				: { literal: control.id };
+			nodes[index] = {
+				...label,
+				bindings: [...(label.bindings ?? []), { attribute: 'for', value }],
+			};
+		}
 	}
 
 	// A tap lands on the innermost element that handles it, so a handler that reads `event.target` runs once per element a
