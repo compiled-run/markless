@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { resolve } from 'pathe';
 import type { markless } from '@markless/bundler/vite';
+import type { MarklessRouterOptions } from '../../src/vite/index.ts';
 import { takeBuildSlot } from './build-slots.ts';
 
 export { holdBuildSlot } from './build-slots.ts';
@@ -11,6 +12,9 @@ export type FixtureBuild = {
 	/** The fixture's own Vite config; without it the plugins are `markless()` and `router()`. */
 	readonly configFile?: string;
 	readonly markless?: Parameters<typeof markless>[0];
+	/** Puts `@markless/ui`'s `ui()` before `markless()`, as an app that uses its icons does. */
+	readonly ui?: true;
+	readonly router?: MarklessRouterOptions;
 	readonly nitro?: Record<string, unknown>;
 	readonly build?: Record<string, unknown>;
 	/** Kills the build and rejects with a `stalled` error once it runs this long. */
@@ -62,7 +66,10 @@ export async function buildFixture(build: FixtureBuild): Promise<void> {
 			let report = '';
 			proc.stdout!.on('data', (chunk: Buffer) => (output += chunk));
 			proc.stderr!.on('data', (chunk: Buffer) => (output += chunk));
-			(proc.stdio[3] as NodeJS.ReadableStream).on('data', (chunk: Buffer) => (report += chunk));
+			(proc.stdio[3] as NodeJS.ReadableStream).on(
+				'data',
+				(chunk: Buffer) => (report += chunk),
+			);
 			const stall =
 				build.stallMs === undefined
 					? undefined

@@ -110,6 +110,81 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	#expect(store.read("k") == nil)
 }
 
+@MainActor @Test func aLiveRegionAnnouncesItsChangeOnceAJournalIsApplied() throws {
+	var spoken: [(text: String, assertive: Bool)] = []
+	let controller = try MarklessViewController(payload: vectorPayload("live"), store: MemoryStore())
+	let views = try tree(controller)
+	views.announce = { spoken.append(($0, $1)) }
+	// An atomic region (an <output>) is read whole; a polite region without aria-atomic reads only what changed.
+	try views.apply([
+		.text(node: "h2:text0", value: "1 in basket"),
+		.text(node: "h5:text0", value: "Added 1"),
+	])
+	#expect(spoken.map(\.text) == ["1 in basket", "Added 1"])
+	#expect(spoken.allSatisfy { !$0.assertive })
+	spoken = []
+	try views.apply([.text(node: "h3:text0", value: "Too many")])
+	#expect(spoken.map(\.text) == ["Too many"])
+	#expect(spoken.first?.assertive == true)
+	spoken = []
+	try views.apply([.text(node: "h7:text0", value: "Panel shown")])
+	#expect(spoken.isEmpty)
+}
+
+@MainActor @Test func aTextareaSendsEachEditAndTakesWritesFromOtherHandlers() throws {
+	var sent: [NativeAction] = []
+	let controller = try MarklessViewController(payload: vectorPayload("notes"), store: MemoryStore())
+	let views = try tree(controller)
+	let area = try #require(views.elements["h1"] as? TextArea)
+	#expect(area.text == "First line")
+	#expect(area.accessibilityLabel == "Notes")
+	#expect(area.isEditable)
+	controller.view.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+	controller.view.layoutIfNeeded()
+	// Two lines tall, as Chrome's default rows="2".
+	#expect(area.frame.height > 2 * (area.font?.lineHeight ?? 17))
+	area.onChange.append { sent.append(NativeAction(event: .input, host: "h1", value: $0)) }
+	area.text = "First line\nSecond line"
+	area.delegate?.textViewDidChange?(area)
+	#expect(sent.last?.value == "First line\nSecond line")
+	try views.apply([.property(node: "h1", name: "value", value: "")])
+	#expect(area.text == "")
+}
+
+@MainActor @Test func aFieldsKeysAndPasteRunItsHandlersAndPreventDefaultLeavesOutWhatTheyDo() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("text-keys"), store: MemoryStore())
+	let views = try tree(controller)
+	let field = try #require(views.elements["h1"] as? TextField)
+	let area = try #require(views.elements["h2"] as? TextArea)
+	let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
+	window.rootViewController = controller
+	window.makeKeyAndVisible()
+	#expect(field.becomeFirstResponder())
+	field.insertText("a")
+	#expect(field.text == "a")
+	field.sendActions(for: .editingChanged)
+	#expect(field.delegate?.textFieldShouldReturn?(field) == false)
+	#expect(field.text == "")
+	#expect(views.labels["h3:text0"]?.text == "1 tags: a; 0 removed; last key Enter")
+	// Backspace in the empty field: the handler takes it, and there was nothing to delete anyway.
+	field.deleteBackward()
+	#expect(views.labels["h3:text0"]?.text == "1 tags: a; 1 removed; last key Backspace")
+	// The menu's Paste runs the handler, which prevents it, so nothing goes in (a test may not read the pasteboard).
+	field.paste(nil)
+	#expect(field.text == "")
+	_ = field.onPaste?("x,y")
+	#expect(views.labels["h4:text0"]?.text == "pasted x,y; sent")
+	#expect(area.becomeFirstResponder())
+	area.insertText("hi")
+	area.delegate?.textViewDidChange?(area)
+	area.insertText("\n")
+	#expect(area.text == "")
+	#expect(views.labels["h4:text0"]?.text == "pasted x,y; sent hi")
+	// With the textarea empty, Enter is not prevented and breaks the line.
+	area.insertText("\n")
+	#expect(area.text == "\n")
+}
+
 @MainActor @Test func aTextFieldSendsItsTextAndTakesWritesFromOtherHandlers() throws {
 	let controller = try MarklessViewController(payload: vectorPayload("input"), store: MemoryStore())
 	let views = try tree(controller)
@@ -139,6 +214,26 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	try #require(views.elements["h4"] as? UIButton).sendActions(for: .touchUpInside)
 	#expect(field.text == "Bo")
 	#expect(views.labels["h3:text0"]?.text == "Hello Bo")
+}
+
+@MainActor @Test func aRangeIsASliderOnItsStepsThatSendsTheValueItLandsOn() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("range"), store: MemoryStore())
+	let views = try tree(controller)
+	let built = views.elements["h2"]
+	let slider = try #require(built as? RangeSlider, "h2 is \(String(describing: built.map { type(of: $0) }))")
+	controller.view.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+	controller.view.layoutIfNeeded()
+	#expect(slider.frame.width >= 129, "frame \(slider.frame)")
+	#expect(slider.frame.height >= 31, "frame \(slider.frame)")
+	#expect(slider.number == 5)
+	#expect(slider.accessibilityLabel == "Volume")
+	#expect(slider.accessibilityValue == "5")
+	var sent: [String] = []
+	slider.onInput = { sent.append($0) }
+	slider.accessibilityIncrement()
+	slider.accessibilityIncrement()
+	#expect(slider.number == 7)
+	#expect(sent == ["6", "7"])
 }
 
 @MainActor @Test func rowsAreBuiltRemovedAndMovedNotRebuilt() throws {

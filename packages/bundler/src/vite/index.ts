@@ -121,6 +121,8 @@ type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	prerenderWakeChannel?: boolean;
 	publicPath?: (fileName: string) => string;
 	updateDevPrerenderHashes?: (hashes: ReadonlyMap<string, string>) => void;
+	joinedRepeatKeys?: boolean;
+	joinedKeysRebuild?: boolean;
 };
 type RolldownInputConfig = string | readonly string[] | Record<string, string> | undefined;
 const MARKLESS_SKIP_DUPLICATE_BUILDS = Symbol('markless-skip-duplicate-builds');
@@ -233,6 +235,16 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		);
 	};
 
+	// A client build that compiled a @for keyed by fields joined into a string runs once more with the key-joining runtime.
+	const buildClient = async (builder: ViteBuilder, client: BuildEnvironment) => {
+		rolldownOptions.joinedKeysRebuild = true;
+		await builder.build(client);
+		if (rolldownOptions.joinedRepeatKeys || !basePlugin.api.joinedRepeatKeys()) return;
+		rolldownOptions.joinedRepeatKeys = true;
+		client.isBuilt = false;
+		await builder.build(client);
+	};
+
 	const marklessPlugin = {
 		...basePlugin,
 		name: 'vite-plugin-markless',
@@ -256,7 +268,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				const client = builder.environments[viteEnvironmentName('client', options)];
 				if (!client) throw new Error('The reloaded config has no client environment.');
 				try {
-					await builder.build(client);
+					await buildClient(builder, client);
 				} catch (error) {
 					await flushCompileCache().catch(() => {});
 					throw error;
@@ -319,6 +331,16 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			await (typeof hook === 'function' ? hook : hook?.handler)?.call(this, error);
 			// A build Vite runs without `buildApp`, such as `build()`, never flushes the store, so it settles here.
 			await compileCache?.settle();
+			if (
+				!error &&
+				!rolldownOptions.joinedKeysRebuild &&
+				!rolldownOptions.joinedRepeatKeys &&
+				this.environment?.config.consumer === 'client' &&
+				basePlugin.api.joinedRepeatKeys()
+			)
+				this.error(
+					'MARKLESS_JOINED_KEYS_REBUILD_UNAVAILABLE: a @for here is keyed by fields joined into a string, which needs a second client build with the key-joining runtime, and this build ran without the builder that runs it. Build with `vite build` (or createBuilder().buildApp()).',
+				);
 		},
 		configResolved(resolvedConfig) {
 			if (options.experimentalNativePacking !== undefined)
@@ -409,7 +431,11 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 					if (handoff) {
 						basePlugin.api.adoptClientBuildHandoff(handoff);
 						builder.environments[clientEnvironment]!.isBuilt = true;
-					} else await prepareClientBuild();
+					} else {
+						await prepareClientBuild();
+						const client = builder.environments[clientEnvironment];
+						if (client) await buildClient(builder, client);
+					}
 					await buildMarklessEnvironments(builder, options);
 				} catch (error) {
 					// A failed build still has compile results landing in the store; resolving first races whoever removes it.
@@ -841,7 +867,13 @@ async function repeatsAcceptedTsrxSource(
 		return false;
 	}
 	const accepted = acceptedSources.get(ctx.file);
-	if (accepted?.source === source && accepted.timestamp !== ctx.timestamp) return true;
+	// An added file changes every glob listing, whatever an earlier change event already read.
+	if (
+		ctx.type !== 'create' &&
+		accepted?.source === source &&
+		accepted.timestamp !== ctx.timestamp
+	)
+		return true;
 	acceptedSources.set(ctx.file, { source, timestamp: ctx.timestamp });
 	return false;
 }

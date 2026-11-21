@@ -1,0 +1,62 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/ssr"
+			],
+			"delta": 146,
+			"reason": "pages that compose components carry a nested list's enclosing prefix so the browser finds its enclosing list by exact id; without it a nested list in a composed child can wire under the wrong list",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 55,
+			"reason": "pages that compose components carry a nested list's enclosing prefix so the browser finds its enclosing list by exact id; without it a nested list in a composed child can wire under the wrong list",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 55,
+			"reason": "pages that compose components carry a nested list's enclosing prefix so the browser finds its enclosing list by exact id; without it a nested list in a composed child can wire under the wrong list",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 55,
+			"reason": "pages that compose components carry a nested list's enclosing prefix so the browser finds its enclosing list by exact id; without it a nested list in a composed child can wire under the wrong list",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 76,
+			"reason": "pages that compose components carry a nested list's enclosing prefix so the browser finds its enclosing list by exact id; without it a nested list in a composed child can wire under the wrong list",
+			"date": "2026-11-20"
+		}
+	]
+}

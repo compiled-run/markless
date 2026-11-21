@@ -6,9 +6,13 @@ export {
 	createNativeViewPayload,
 	nativeRefusal,
 	nativeUnsupported,
+	NATIVE_KEYBOARD_ONLY_CODE,
+	NATIVE_MOUSE_ONLY_CODE,
+	NATIVE_DROP_ONLY_CODE,
 	NATIVE_REFUSALS,
 	NATIVE_UNSUPPORTED_CODE,
 	type NativeRefusalKind,
 	type NativeViewArtifact,
 	type NativeViewOptions,
 } from './passes/native-view.ts';
+export { fontFaceSources } from './passes/native-font-faces.ts';

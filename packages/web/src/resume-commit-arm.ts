@@ -24,7 +24,7 @@ import type {
 	ResumeRuntimeInput,
 } from './resume-types.ts';
 import type { ProtocolStatePayload } from '@markless/serializer';
-import type { SlotRead } from './resume-keyed-repeats.ts';
+import type { PaintSnapshot } from './resume-keyed-repeats.ts';
 
 // D1 tier 4: commitArm replaces the DOM range between an async boundary's
 // comment-anchor pair with freshly rendered arm content and re-registers the
@@ -47,8 +47,8 @@ export type ArmCommitUpdate = {
 	readonly arm?: number;
 	/** Keep the shown content and paint this arm after it, replacing only a previous `after` commit. */
 	readonly after?: boolean;
-	/** Whether a row slot's read moved since this arm's markup was rendered. */
-	readonly moved?: (read: SlotRead) => boolean;
+	/** What this arm's keyed rows were rendered from. */
+	readonly painted?: PaintSnapshot;
 };
 
 export type ArmRegistrationDeps = Parameters<typeof createArmCommitter>[0];
@@ -127,7 +127,7 @@ export function createArmCommitter(
 		readonly storeHostSubscription?: (hostNodeId: string, release: () => void) => void;
 		readonly registerKeyedRepeats?: (
 			records: ReadonlyArray<ResumeKeyedRepeatRecord>,
-			moved?: (read: SlotRead) => boolean,
+			painted?: PaintSnapshot,
 			computed?: ArmCommitUpdate['computed'],
 		) => Promise<void>;
 		readonly asyncBoundaryWiring?: () => Promise<AsyncBoundaryWiring> | undefined;
@@ -190,7 +190,7 @@ export async function registerArmRecordSet(
 	deps: ArmRegistrationDeps,
 	installEventType: (eventType: string) => void,
 	boundary: ResumeArmRange,
-	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed' | 'cells' | 'moved'> & {
+	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed' | 'cells' | 'painted'> & {
 		// A minted row has no anchors around it, so it hands over the comments its @try records count in.
 		readonly comments?: ReadonlyArray<ResumeDomComment>;
 	},
@@ -216,7 +216,7 @@ export async function registerArmRecordSet(
 		await deps.registerComputedRefreshes(update.computed!);
 	}
 	if (deferred.repeats.length)
-		await deps.registerKeyedRepeats?.(deferred.repeats, update.moved, update.computed);
+		await deps.registerKeyedRepeats?.(deferred.repeats, update.painted, update.computed);
 	for (const step of deferred.steps) await step();
 	return materialized;
 }

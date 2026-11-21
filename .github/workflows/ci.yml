@@ -24,7 +24,7 @@ permissions:
 
 jobs:
     agent-files:
-        runs-on: ubuntu-26.04
+        runs-on: ${{ github.event_name == 'merge_group' && contains(format(' {0} ', vars.MERGE_QUEUE_RUNNER_JOBS), ' agent-files ') && vars.MERGE_QUEUE_RUNNER || 'ubuntu-26.04' }}
         timeout-minutes: 10
         steps:
             - uses: actions/checkout@v4
@@ -38,7 +38,7 @@ jobs:
             - uses: actions/setup-node@v4
               with:
                   node-version: 24
-                  cache: pnpm
+                  cache: ${{ runner.environment != 'self-hosted' && 'pnpm' || '' }}
 
             - name: Verify committed agent files match .ruler/ sources
               run: |
@@ -65,7 +65,7 @@ jobs:
     # `vp check --no-fmt` adds the lint stage (fmt is excluded: the tree has
     # pre-existing formatting drift that is scheduled separately).
     typecheck:
-        runs-on: ubuntu-26.04
+        runs-on: ${{ github.event_name == 'merge_group' && contains(format(' {0} ', vars.MERGE_QUEUE_RUNNER_JOBS), ' typecheck ') && vars.MERGE_QUEUE_RUNNER || 'ubuntu-26.04' }}
         timeout-minutes: 10
         env:
             NPM_CONFIG_AUDIT: 'false'
@@ -87,7 +87,7 @@ jobs:
             - uses: actions/setup-node@v4
               with:
                   node-version: 24
-                  cache: pnpm
+                  cache: ${{ runner.environment != 'self-hosted' && 'pnpm' || '' }}
 
             - name: Install Markless dependencies
               run: pnpm install --frozen-lockfile
@@ -114,6 +114,7 @@ jobs:
     # have agreed for a while; also checks website/. Known 7.x gaps:
     # https://github.com/tsrx-org/tsrx/issues/136
     typecheck-ts7:
+        if: github.event_name != 'pull_request'
         runs-on: ubuntu-26.04
         timeout-minutes: 10
         env:
@@ -281,8 +282,7 @@ jobs:
               with:
                   lookup-only: true
                   path: receipts-completed.txt
-                  key:
-                      receipts-${{ hashFiles('ci-base-key.txt', 'boxes-bundler-key.txt',
+                  key: receipts-${{ hashFiles('ci-base-key.txt', 'boxes-bundler-key.txt',
                       'boxes-router-key.txt', 'boxes-music-player-key.txt',
                       'boxes-music-player-ssr-key.txt', 'packages/analyzer/**/*',
                       'packages/web/**/*', '!**/node_modules/**', '!**/dist/**', '!**/.witness/**')
@@ -490,6 +490,10 @@ jobs:
               timeout-minutes: 10
               run: pnpm --dir packages/vitest-browser exec playwright install chromium webkit
 
+            - name: Warm the runner's WebKit before the first test opens a page
+              if: steps.lane.outputs.run == 'true'
+              run: node scripts/ci/warm-webkit.mjs
+
             - name: Run unit and integration tests
               if: steps.lane.outputs.run == 'true'
               env:
@@ -606,6 +610,7 @@ jobs:
     # Packaged editor completion matrix: builds the CJS plugin bundles, so it
     # owns a runner instead of serializing behind the test suites.
     completion-matrix:
+        if: github.event_name != 'pull_request'
         runs-on: ubuntu-26.04
         outputs:
             run: ${{ steps.lane.outputs.run }}
@@ -672,6 +677,7 @@ jobs:
     # writes are the only copy of that evidence, so they leave as an artifact for
     # the `receipts` job to validate.
     boxes-bundler:
+        if: github.event_name != 'pull_request'
         runs-on: ubuntu-26.04
         outputs:
             run: ${{ steps.lane.outputs.run }}
@@ -793,6 +799,7 @@ jobs:
 
     # Router pipeline boxes.
     boxes-router:
+        if: github.event_name != 'pull_request'
         runs-on: ubuntu-26.04
         outputs:
             run: ${{ steps.lane.outputs.run }}
@@ -880,6 +887,7 @@ jobs:
 
     # music-player demo: analyzer gate tests then boxes, same order as before.
     boxes-music-player:
+        if: github.event_name != 'pull_request'
         runs-on: ubuntu-26.04
         outputs:
             run: ${{ steps.lane.outputs.run }}
@@ -971,6 +979,7 @@ jobs:
 
     # music-player-ssr demo: analyzer gate tests then boxes.
     boxes-music-player-ssr:
+        if: github.event_name != 'pull_request'
         runs-on: ubuntu-26.04
         outputs:
             run: ${{ steps.lane.outputs.run }}
@@ -1282,6 +1291,7 @@ jobs:
     # half of demos/executed-at-load. The box receipts are not part of the
     # analyzer receipt set, so this lane is not a `boxes-*` lane.
     demo-boxes:
+        if: github.event_name != 'pull_request'
         runs-on: ubuntu-26.04
         outputs:
             run: ${{ steps.lane.outputs.run }}
@@ -1550,14 +1560,16 @@ jobs:
     # scripts/ci/unit-budget.json. A job of its own so it reports when another lane
     # fails, and the unit marker waits for it so a re-run after a red budget measures again.
     unit-budget:
-        needs: unit
+        needs: [unit, changes]
         if: needs.unit.result == 'success' && needs.unit.outputs.run == 'true'
-        runs-on: ubuntu-26.04
+        runs-on: ${{ github.event_name == 'merge_group' && vars.MERGE_QUEUE_RUNNER || 'ubuntu-26.04' }}
         timeout-minutes: 5
         steps:
             - uses: actions/checkout@v4
               with:
                   persist-credentials: false
+                  # The changed-file set below diffs against the base the changes job chose.
+                  fetch-depth: 0
 
             - name: Download the unit budget measurements
               uses: actions/download-artifact@v4
@@ -1565,13 +1577,26 @@ jobs:
                   pattern: unit-budget-*
                   path: ${{ runner.temp }}/unit-budget
 
+            # The slot-line check fails only for test files this change adds or modifies; with no base, it only reports.
+            - name: List the files this change adds or modifies
+              env:
+                  BASE: ${{ needs.changes.outputs.base }}
+              run: |
+                  if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+                    git diff --name-only --diff-filter=AMR "$BASE" HEAD > "$RUNNER_TEMP/changed-files.txt"
+                    echo "$(wc -l < "$RUNNER_TEMP/changed-files.txt") files changed against $BASE"
+                  fi
+
             - name: Check the unit shards against their CPU and memory budget
-              run: node scripts/ci/unit-budget.mjs check --measurements "$RUNNER_TEMP/unit-budget"
+              run: |
+                  changed=()
+                  if [ -f "$RUNNER_TEMP/changed-files.txt" ]; then changed=(--changed "$RUNNER_TEMP/changed-files.txt"); fi
+                  node scripts/ci/unit-budget.mjs check --measurements "$RUNNER_TEMP/unit-budget" "${changed[@]}"
 
     save-lane-markers:
         needs: [unit, unit-budget, browser]
         if: always()
-        runs-on: ubuntu-26.04
+        runs-on: ${{ github.event_name == 'merge_group' && vars.MERGE_QUEUE_RUNNER || 'ubuntu-26.04' }}
         timeout-minutes: 5
         steps:
             - name: Mark the unit lane complete
@@ -1621,10 +1646,11 @@ jobs:
                 build-warnings,
             ]
         if: always()
-        runs-on: ubuntu-26.04
+        runs-on: ${{ github.event_name == 'merge_group' && vars.MERGE_QUEUE_RUNNER || 'ubuntu-26.04' }}
         timeout-minutes: 20
         env:
-            RUN_RECEIPTS: ${{ needs.lanes.outputs.run_receipts }}
+            # The receipt set is built from the box lanes, which run only outside pull requests.
+            RUN_RECEIPTS: ${{ github.event_name != 'pull_request' && needs.lanes.outputs.run_receipts || 'false' }}
             NPM_CONFIG_AUDIT: 'false'
             NPM_CONFIG_FUND: 'false'
             NPM_CONFIG_PREFER_OFFLINE: 'true'
@@ -1635,8 +1661,22 @@ jobs:
             # A lane whose content hash already had a green marker succeeds without
             # doing the work, so no lane is ever `skipped`. Only `unit-budget`
             # skips: when `unit` hit its hash, or failed, which lands here itself.
+            # The lanes with `if: github.event_name != 'pull_request'` skip on pull requests
+            # only; anywhere else each of them has to succeed (docs/ci-process.md, "Lanes").
             - name: Fail unless every test lane succeeded or hit its content hash
               id: gate
+              env:
+                  EVENT: ${{ github.event_name }}
+                  QUEUE_ONLY_RESULTS: >-
+                      typecheck-ts7=${{needs.typecheck-ts7.result}}
+                      completion-matrix=${{needs.completion-matrix.result}}
+                      boxes-bundler=${{needs.boxes-bundler.result}}
+                      boxes-router=${{needs.boxes-router.result}}
+                      boxes-music-player=${{needs.boxes-music-player.result}}
+                      boxes-music-player-ssr=${{needs.boxes-music-player-ssr.result}}
+                      demo-boxes=${{needs.demo-boxes.result}}
+                      build-scale=${{needs.build-scale.result}}
+                      build-warnings=${{needs.build-warnings.result}}
               run: |
                   results="${{ join(needs.*.result, ',') }}"
                   echo "lane results: $results"
@@ -1646,6 +1686,14 @@ jobs:
                           failed=1
                       fi
                   done
+                  if [ "$EVENT" != "pull_request" ]; then
+                      for lane in $QUEUE_ONLY_RESULTS; do
+                          if [ "${lane#*=}" != "success" ]; then
+                              echo "::error::${lane%%=*} runs only outside pull requests, and here it did not succeed (${lane#*=})"
+                              failed=1
+                          fi
+                      done
+                  fi
                   if [ "$failed" = "1" ]; then
                       echo "::error::A test lane did not succeed: $results"
                       exit 1
@@ -1668,7 +1716,7 @@ jobs:
               if: env.RUN_RECEIPTS == 'true'
               with:
                   node-version: 24
-                  cache: pnpm
+                  cache: ${{ runner.environment != 'self-hosted' && 'pnpm' || '' }}
 
             - name: Install Markless dependencies
               if: env.RUN_RECEIPTS == 'true'
@@ -1799,6 +1847,7 @@ jobs:
     # suite. It is blocking, because the whole point of the workspace-detection
     # work is the behavior only a real install can show.
     package-manager-matrix:
+        if: github.event_name != 'pull_request'
         runs-on: ubuntu-26.04
         timeout-minutes: 20
         env:
@@ -1836,6 +1885,7 @@ jobs:
     # A generated app built at 100 and 300 pages: build memory, the largest chunk and the largest
     # build artifact against scripts/benchmarks/build-scale/budgets.json, and the built server answers.
     build-scale:
+        if: github.event_name != 'pull_request'
         runs-on: ubuntu-26.04
         outputs:
             run: ${{ steps.lane.outputs.run }}
@@ -1891,6 +1941,7 @@ jobs:
     # (scripts/ci/build-warnings.mjs) and ship no Node-only code to the browser
     # (scripts/ci/browser-output-scan.mjs); the starters are held to the same in the unit lane.
     build-warnings:
+        if: github.event_name != 'pull_request'
         runs-on: ubuntu-26.04
         outputs:
             run: ${{ steps.lane.outputs.run }}
@@ -1943,7 +1994,7 @@ jobs:
                   path: build-warnings-completed.txt
 
     changes:
-        runs-on: ubuntu-26.04
+        runs-on: ${{ github.event_name == 'merge_group' && contains(format(' {0} ', vars.MERGE_QUEUE_RUNNER_JOBS), ' changes ') && vars.MERGE_QUEUE_RUNNER || 'ubuntu-26.04' }}
         timeout-minutes: 10
         permissions:
             contents: read
@@ -2000,7 +2051,7 @@ jobs:
 
     benchmark:
         needs: changes
-        if: needs.changes.outputs.bench == 'true'
+        if: github.event_name != 'pull_request' && needs.changes.outputs.bench == 'true'
         runs-on: ubuntu-26.04
         timeout-minutes: 30
         strategy:
@@ -2194,7 +2245,7 @@ jobs:
     benchmark-guard:
         needs: [changes, benchmark]
         if: needs.changes.outputs.bench == 'true'
-        runs-on: ubuntu-26.04
+        runs-on: ${{ github.event_name == 'merge_group' && vars.MERGE_QUEUE_RUNNER || 'ubuntu-26.04' }}
         timeout-minutes: 10
         env:
             MARKLESS_JSFB_BASELINE_RESULTS: ${{ github.workspace }}/.jsfb-merged/markless-jsfb/results-markless-base

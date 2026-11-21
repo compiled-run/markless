@@ -11,10 +11,14 @@ import dev.markless.mobile.core.obj
 import dev.markless.mobile.core.only
 import dev.markless.mobile.core.ScrollRange
 import dev.markless.mobile.core.str
+import dev.markless.mobile.core.jsonNumber
+import dev.markless.mobile.core.jsonString
+import dev.markless.mobile.core.text
 
 const val STYLE_EXPORT_SCHEMA_0 = "dragon.native-style-export/0"
 const val STYLE_EXPORT_SCHEMA = "dragon.native-style-export/1"
 const val APP_STYLE_VERSION = "markless.native-app-style/0"
+const val PLAN_VERSION = "dragon.markless-plan/1"
 
 /** The export state that holds the @media band; the host sets it from the device, never from a payload cell. */
 const val BAND_KEY = "@env#band"
@@ -45,39 +49,105 @@ sealed interface StyleWrite {
 	data object PaddingBoxClip : StyleWrite
 	/** `overscroll-behavior: none` on an axis; Android draws no bounce, so it is read and kept only. */
 	data class ScrollBounce(val x: Boolean, val y: Boolean) : StyleWrite
+	/** clip-path: inset(): top, right, bottom, left, each in CSS px or (percent) of the border box's width or height. */
+	data class ClipPathInset(val edges: List<Pair<Double, Boolean>>) : StyleWrite
+	/** The text a clip-path leaves exposed to the screen reader; a canvas clip does not change accessibility, so nothing to apply. */
+	data object ClipText : StyleWrite
+	/** The box paints in another stacking context's order (Dragon's re-hosting); [host] is that context's node. */
+	data class PaintOrder(val host: String, val bucket: Int, val rank: Int) : StyleWrite
 }
 
-/** [scrollRange], device px, only on a scroll container. */
-data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val scrollRange: ScrollRange? = null)
+/** One drawing operation of a dashed or dotted border, in device px; [side] names the side whose colour it takes (-1: none). */
+data class BorderOp(val op: String, val side: Int, val alpha: Double, val antialias: Boolean, val points: List<Double>)
+
+/** A dashed or dotted border as Dragon's own native paint draws it, the snapped border box at the origin (relative to the node's frame). */
+data class BorderOps(val originX: Double, val originY: Double, val ops: List<BorderOp>)
+
+/** Consecutive glyphs of a text line in one face at one instance size in device px; [xs] are pen origins in device px from the node's frame. */
+data class GlyphRun(val face: String, val size: Double, val glyphs: List<Int>, val xs: List<Double>)
+
+/** One line of a text node as Dragon shaped and placed it; [top] and [baseline] in device px from the node's frame. */
+data class TextLine(val top: Double, val baseline: Double, val runs: List<GlyphRun>)
+
+/** [scrollRange], device px, only on a scroll container; [lines], only on a framed text node, the glyphs Dragon draws for its [text]. */
+data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val scrollRange: ScrollRange? = null, val borderOps: BorderOps? = null, val lines: List<TextLine>? = null, val text: String? = null)
 
 /**
  * One reachable combination of style states: every node's frame and writes, complete, the canvas behind the page (null: white),
- * and [pageScroll] in device px, null when Dragon leaves it undecided.
+ * body's own background in its box when html's background is the canvas (null: body paints none), and [pageScroll] in device px,
+ * null when Dragon leaves it undecided.
  */
-data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNode>, val canvas: Rgba? = null, val pageScroll: ScrollRange? = null) {
+data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNode>, val canvas: Rgba? = null, val body: Rgba? = null, val pageScroll: ScrollRange? = null) {
 	val byId: Map<String, StyledNode> = nodes.associateBy { it.id }
 }
 
 data class StyleState(val key: String, val domain: List<JsValue>)
 
 /** One media feature the host evaluates; only `prefers-color-scheme` is implemented. */
-data class BandAtom(val feature: String, val keyword: String) {
-	fun holds(dark: Boolean): Boolean = when (keyword) {
-		"any" -> true
-		"dark" -> dark
-		"light" -> !dark
-		else -> throw MarklessDecodeError("prefers-color-scheme has no keyword \"$keyword\"")
+/** One comparison of a media feature, as Dragon's `rt-band` reads it. */
+data class BandComparison(val op: String, val value: Double, val num: Double, val den: Double)
+
+/** One media feature of the sheet's @media bands, as Dragon wrote it for the device to evaluate. */
+data class BandAtom(val feature: String, val keyword: String, val comparisons: List<BandComparison> = emptyList()) {
+	/** Whether the atom holds by the colour scheme alone; any other feature needs the page's size. */
+	fun holds(dark: Boolean): Boolean {
+		if (feature != "prefers-color-scheme" || comparisons.isNotEmpty()) throw MarklessDecodeError("the media feature $feature needs the page's size")
+		return when (keyword) {
+			"any" -> true
+			"dark" -> dark
+			"light" -> !dark
+			else -> throw MarklessDecodeError("prefers-color-scheme has no keyword \"$keyword\"")
+		}
 	}
 }
 
 /** The sheet's @media bands: per band, the truth value of every atom. */
 data class Bands(val atoms: List<BandAtom>, val bands: List<List<Boolean>>) {
-	/** The band whose truth vector is the device's. */
+	/** The band whose truth vector is the device's, by the colour scheme alone. */
 	fun band(dark: Boolean): Int {
 		val reading = atoms.map { it.holds(dark) }
 		val at = bands.indexOf(reading)
 		if (at < 0) throw MarklessDecodeError("no @media band holds the device's reading $reading")
 		return at
+	}
+
+	/**
+	 * The band of a page area [widthPx] x [heightPx] device px at [scale]: Dragon's own lookup (Chrome's media evaluation) when any
+	 * atom reads more than the colour scheme, else the colour scheme alone.
+	 */
+	fun band(dark: Boolean, widthPx: Double, heightPx: Double, scale: Double): Int {
+		if (atoms.all { it.feature == "prefers-color-scheme" }) return band(dark)
+		val lookup = library ?: throw MarklessDecodeError("@media ${atoms.map { it.feature }} needs Dragon's band lookup, which this host does not link")
+		fun bits(v: Double) = "\"${java.lang.Long.toHexString(v.toRawBits()).padStart(16, '0')}\""
+		val atomsText = atoms.joinToString(",") { a -> "[${jsonString(a.feature)},${jsonString(a.keyword)},[${a.comparisons.joinToString(",") { "[${jsonString(it.op)},${bits(it.value)},${bits(it.num)},${bits(it.den)}]" }}]]" }
+		val bandsText = bands.joinToString(",") { "[${it.joinToString(",")}]" }
+		// A phone's readings: a coarse primary pointer that does not hover, and no fine pointer.
+		val readings = "[\"coarse\",false,true,false,false,false,$dark]"
+		val line = "[\"rt-band\",[[$atomsText],[$bandsText]],[[${bits(Math.rint(widthPx))},${bits(Math.rint(heightPx))},${bits(scale)},$readings]]]"
+		val answer = lookup(line)
+		val result = Json.parse(answer).arr("band lookup")
+		val size = (result.getOrNull(1) as? Json.Arr)?.items?.firstOrNull()?.arr("band lookup size")
+		if (result.size != 2 || result[0] != Json.Str("ok") || size?.size != 3) throw MarklessDecodeError("Dragon's band lookup failed at $widthPx x $heightPx px: $answer")
+		val hex = (size[2] as? Json.Str)?.value?.takeIf { it.length == 16 } ?: throw MarklessDecodeError("band lookup: ${size[2].text()} is not a number's bit pattern")
+		val index = Double.fromBits(java.lang.Long.parseUnsignedLong(hex, 16))
+		if (index < 0 || index >= bands.size || index != Math.rint(index)) throw MarklessDecodeError("band lookup: band $index is not a band")
+		return index.toInt()
+	}
+
+	companion object {
+		/** Dragon's translated `runLibraryCase`, when the app is built with Dragon's engine; `rt-band` looks a band up by the page's size. */
+		var library: ((String) -> String)? = try {
+			val run = Class.forName("dev.dragon.layout.HarnessKt").getMethod("harness_runLibraryCase", String::class.java)
+			({ line: String ->
+				try {
+					run.invoke(null, line) as String
+				} catch (e: java.lang.reflect.InvocationTargetException) {
+					throw e.cause ?: e
+				}
+			})
+		} catch (_: ClassNotFoundException) {
+			null
+		}
 	}
 }
 
@@ -85,10 +155,20 @@ data class Bands(val atoms: List<BandAtom>, val bands: List<List<Boolean>>) {
  * One platform's slice of a Dragon style export: per state assignment, frames (device px, relative to the parent box) and
  * lowered writes per node id; [next] is `next[a][s][v]`, the assignment reached by setting state s to its v-th value (-1: none).
  */
+/** A system face of a style export (`system:<role>:<weight>`): a file of `/system/fonts` at the fonts.xml instance Dragon measured. */
+data class SystemFace(val file: String, val index: Int, val axes: Map<String, Double>)
+
 /** A system sheet's content at one resting height: its own document, laid out in the sheet's content area. */
 data class SheetHeight(val snapPoint: Double, val style: StyleExport)
 
-data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val states: List<StyleState>, val initial: Int, val assignments: List<Assignment>, val next: List<List<List<Int>>>, val bands: Bands? = null, val pageScrollUndecided: String? = null, val sheets: Map<String, List<SheetHeight>> = emptyMap()) {
+data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val states: List<StyleState>, val initial: Int, val assignments: List<Assignment>, val next: List<List<List<Int>>>, val bands: Bands? = null, val pageScrollUndecided: String? = null, val sheets: Map<String, List<SheetHeight>> = emptyMap(), val systemFaces: Map<String, SystemFace> = emptyMap(),
+	/** Dragon's layout plan ([PLAN_VERSION]) as JSON text: with it the page lays out at the screen's own size. */
+	val plan: String? = null,
+	/** Per assignment: each Dragon id the plan's geometry names, with the export's id for it (empty: no ids differ). */
+	val planNames: List<Map<String, String>> = emptyList(),
+	/** Each list whose rows the phone lays out: the box its rows hang from and the Dragon ids of one row's top boxes, in order. */
+	val planRepeats: List<PlanRepeat> = emptyList(),
+) {
 
 	/** The index of [BAND_KEY] among [states], or -1 for an export without @media. */
 	val bandState: Int = states.indexOfFirst { it.key == BAND_KEY }
@@ -98,16 +178,24 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 		if (bands != null && states[bandState].domain != bands.bands.indices.map { JsValue.Num(it.toDouble()) }) throw MarklessDecodeError("$BAND_KEY's domain does not name every band")
 	}
 
-	/** The band for the device's appearance; 0 without @media. */
-	fun band(dark: Boolean): Int = bands?.band(dark) ?: 0
+	/** The band for the device's appearance and the page area this export is laid out at; 0 without @media. */
+	fun band(dark: Boolean): Int = bands?.band(dark, viewportWidth * dpr, viewportHeight * dpr, dpr) ?: 0
 
 	/**
 	 * The assignment matching the cells' values at mount and the device's band, [initial] when it matches. Every state but the
 	 * band must follow exactly one of [cells] (the payload's styled cells); with [everyCell], every styled cell must have a state
 	 * (a page's export), else only the cells its nodes read do (a sheet's).
 	 */
-	fun start(cells: List<String>, value: (String) -> JsValue, dark: Boolean, everyCell: Boolean = true): Int {
-		val wanted = states.mapIndexed { s, st -> if (s == bandState) JsValue.Num(band(dark).toDouble()) else value(cellOf(st, cells)) }
+	fun start(cells: List<String>, value: (String) -> JsValue, dark: Boolean, everyCell: Boolean = true, branches: List<String> = emptyList(), arm: (String) -> JsValue? = { null }, rowStates: Set<String> = emptySet()): Int {
+		// A branch's state is the arm it shows; one no arm around it shows keeps a value no box reads: its first.
+		val wanted = states.mapIndexed { s, st ->
+			when {
+				s == bandState -> JsValue.Num(band(dark).toDouble())
+				// A state of each row styles only the rows, which take their own; the page keeps the template's.
+				st.key in rowStates -> assignments[initial].values[st.key] ?: st.domain[0]
+				else -> cellOf(st, cells + branches).let { c -> if (c in branches) arm(c) ?: st.domain[0] else value(c) }
+			}
+		}
 		if (everyCell) for (c in cells) stateFor(c)
 		fun matches(a: Int) = states.withIndex().all { (s, st) -> assignments[a].values[st.key]?.let { Js.strictEquals(it, wanted[s]) } == true }
 		if (matches(initial)) return initial
@@ -116,7 +204,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 
 	private fun cellOf(state: StyleState, cells: List<String>): String {
 		val named = cells.filter { state.key == it || state.key.endsWith("#$it") }
-		if (named.size != 1) throw MarklessDecodeError("style state \"${state.key}\" follows ${named.size} styled cells of the payload")
+		if (named.size != 1) throw MarklessDecodeError("style state \"${state.key}\" follows ${named.size} styled cells or branches of the payload")
 		return named[0]
 	}
 
@@ -146,8 +234,151 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 		return to
 	}
 
+	/**
+	 * This export laid out again by Dragon's plan for a page [width] x [height] dp at [scale]: every assignment's frames, border
+	 * widths, text lines, dashed borders and scroll ranges, in this screen's device px. [layout] is Dragon's translated
+	 * `runMarklessLayout`. Without a plan the export is returned as it is.
+	 */
+	fun laidOut(width: Double, height: Double, scale: Double, layout: (String) -> String, rows: ((Int) -> Map<String, List<LaidOutRow>>)? = null, rowsLayout: ((String) -> String)? = null): StyleExport {
+		val plan = plan ?: return this
+		val laid = assignments.indices.map { k ->
+			val names = planNames.getOrNull(k) ?: emptyMap()
+			val dragonId = names.entries.associate { (d, m) -> m to d }
+			val shown = if (planRepeats.isEmpty()) null else rows?.invoke(k)
+			val lists = shown?.let { byList ->
+				Json.Arr(planRepeats.map { r ->
+					obj("parent" to Json.Str(r.parent), "template" to Json.Arr(r.template.map { Json.Str(it) }), "rows" to Json.Arr((byList[r.id] ?: emptyList()).map { row ->
+						obj("key" to Json.Str(row.key), "assignment" to Json.Num(row.assignment.toDouble()), "texts" to Json.Arr(row.texts.entries.sortedBy { it.key }.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }))
+					}))
+				}).text()
+			}
+			val line = "{\"assignment\":$k,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":$plan${if (lists != null) ",\"rows\":$lists" else ""}}"
+			if (lists != null && rowsLayout == null) throw MarklessDecodeError("a page with rows needs Dragon's rows layout")
+			val result = Json.parse(if (lists == null) layout(line) else rowsLayout!!(line))
+			val parts = result.arr("plan layout")
+			if (parts.size != 3 || parts[0] != Json.Str("ok")) throw MarklessDecodeError("Dragon's layout at $width x $height dp and ${scale}x failed: ${result.text()}")
+			val page = parts[1].arr("plan layout page scroll")
+			val pageScroll = if (page.size == 3) null else range(rangeJson(page, "plan layout page scroll"), "plan layout page scroll")
+			val geometry = HashMap<String, List<Json>>()
+			for (g in parts[2].arr("plan layout nodes")) {
+				val f = g.arr("plan layout node")
+				val id = f.firstOrNull()?.str("plan layout node id") ?: throw MarklessDecodeError("plan layout node has no id")
+				// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
+				val at = id.indexOf('@')
+				if (at < 0) geometry[names[id] ?: id] = f else geometry[(names[id.substring(0, at)] ?: id.substring(0, at)) + id.substring(at)] = f
+			}
+			val assignment = assignments[k]
+			// The template of each list: one row's nodes, which no view shows; each row is a copy of them laid out here.
+			val template = HashMap<String, Pair<PlanRepeat, Boolean>>()
+			if (shown != null) for (r in planRepeats) {
+				val tops = r.template.map { names[it] ?: it }.toSet()
+				for (node in assignment.nodes) {
+					var at: String? = node.id
+					while (at != null && at !in tops) at = assignment.byId[at]?.parent
+					if (at != null) template[node.id] = r to (node.id in tops)
+				}
+			}
+			val withRows = ArrayList<StyledNode>()
+			for (node in assignment.nodes) {
+				val place = template[node.id]
+				if (place == null || shown == null) {
+					withRows.add(node)
+					continue
+				}
+				withRows.add(node.copy(frame = null, borderWidths = null, borderOps = null, scrollRange = null, lines = null))
+				for (row in shown[place.first.id] ?: emptyList()) {
+					val own = assignments[row.assignment].byId[node.id] ?: throw MarklessDecodeError("assignment ${row.assignment} has no node ${node.id} for row ${row.key}")
+					withRows.add(own.copy(id = "${node.id}@${row.key}", parent = if (place.second) node.parent else node.parent?.let { "$it@${row.key}" }, text = if (own.kind == "text") (row.texts[node.id] ?: own.text) else own.text))
+				}
+			}
+			assignment.copy(pageScroll = pageScroll, nodes = withRows.map { node ->
+				if (node.frame == null) return@map node
+				val f = geometry[node.id] ?: throw MarklessDecodeError("Dragon's layout has no box for ${node.id}")
+				val what = "plan layout of ${node.id}"
+				if (f.size != 6) throw MarklessDecodeError("$what: expected id, frame, border widths, lines, border operations and scroll range")
+				val frame = f[1].arr(what).map { planNumber(it) }
+				if (frame.size != 4) throw MarklessDecodeError("$what: expected x, y, width and height")
+				val widths = if (f[2] == Json.Null) null else f[2].arr(what).map { planNumber(it) }.also { if (it.size != 4) throw MarklessDecodeError("$what: border widths are not four sides") }
+				val lines = if (f[3] == Json.Null) null else textLines(Json.Arr(f[3].arr(what).map { l ->
+					val line = l.arr("$what.lines[]")
+					obj("top" to planNumbers(line[0]), "baseline" to planNumbers(line[1]), "runs" to Json.Arr(line[2].arr("$what.runs").map { r ->
+						val run = r.arr("$what.runs[]")
+						obj("face" to run[0], "size" to planNumbers(run[1]), "glyphs" to planNumbers(run[2]), "xs" to planNumbers(run[3]))
+					}))
+				}), "$what.lines")
+				val ops = if (f[4] == Json.Null) null else borderOps(planBorderOps(f[4], what), "$what.borderOps")
+				val scroll = if (f[5] == Json.Null) null else range(rangeJson(f[5].arr(what), what), what)
+				node.copy(
+					frame = Frame(frame[0], frame[1], frame[2], frame[3]), borderWidths = widths?.let { Edges(it[0], it[1], it[2], it[3]) },
+					borderOps = ops, scrollRange = scroll, lines = if (node.kind == "text") lines else null,
+				)
+			})
+		}
+		return copy(dpr = scale, viewportWidth = width, viewportHeight = height, assignments = laid)
+	}
+
 	companion object {
 		const val ANDROID_BACKEND = "android-views"
+
+		/** A number of Dragon's plan layout: its IEEE 754 bit pattern as 16 hex digits. */
+		private fun planNumber(v: Json): Double {
+			val hex = (v as? Json.Str)?.value?.takeIf { it.length == 16 } ?: throw MarklessDecodeError("plan layout: ${v.text()} is not a number's bit pattern")
+			return Double.fromBits(java.lang.Long.parseUnsignedLong(hex, 16))
+		}
+
+		/** Bit patterns as numbers, arrays element by element. */
+		private fun planNumbers(v: Json): Json = if (v is Json.Arr) Json.Arr(v.items.map(::planNumbers)) else Json.Num(planNumber(v))
+
+		private fun obj(vararg fields: Pair<String, Json>): Json = Json.Obj(linkedMapOf(*fields))
+
+		private fun rangeJson(v: List<Json>, what: String): Json {
+			if (v.size != 4) throw MarklessDecodeError("$what: expected minX, maxX, minY and maxY")
+			return obj("minX" to planNumbers(v[0]), "maxX" to planNumbers(v[1]), "minY" to planNumbers(v[2]), "maxY" to planNumbers(v[3]))
+		}
+
+		/** Dragon's border operations of a box, [[origin x, y], [width, height], widths, [[op, side, alpha, antialias, points]]], in the export's shape. */
+		private fun planBorderOps(v: Json, what: String): Json {
+			val p = v.arr("$what.borderOps")
+			if (p.size != 4) throw MarklessDecodeError("$what: expected origin, size, widths and border operations")
+			val origin = p[0].arr(what).map(::planNumber)
+			val size = p[1].arr(what).map(::planNumber)
+			if (origin.size != 2 || size.size != 2) throw MarklessDecodeError("$what: expected a border origin and size")
+			return obj(
+				"origin" to obj("x" to Json.Num(origin[0]), "y" to Json.Num(origin[1])),
+				"size" to obj("width" to Json.Num(size[0]), "height" to Json.Num(size[1])),
+				"widths" to planNumbers(p[2]),
+				"ops" to Json.Arr(p[3].arr(what).map { op ->
+					val o = op.arr("$what.ops[]")
+					if (o.size != 5) throw MarklessDecodeError("$what: expected op, side, alpha, antialias and points")
+					obj("op" to o[0], "side" to o[1], "alpha" to planNumbers(o[2]), "antialias" to o[3], "points" to planNumbers(o[4]))
+				}),
+			)
+		}
+
+		/** A target's or route's optional `plan` and `planNames`. */
+		private fun withPlan(style: StyleExport, t: Map<String, Json>, what: String): StyleExport {
+			val plan = t["plan"]?.let { p ->
+				val version = p.obj("$what.plan").field("version", "$what.plan").str("$what.plan.version")
+				if (version != PLAN_VERSION) throw MarklessDecodeError("$what.plan is $version; this host reads $PLAN_VERSION")
+				p.text()
+			}
+			val names = t["planNames"]?.arr("$what.planNames")?.mapIndexed { a, assignment ->
+				assignment.arr("$what.planNames[$a]").associate { pair ->
+					val n = pair.arr("$what.planNames[$a][]")
+					if (n.size != 2) throw MarklessDecodeError("$what.planNames[$a]: expected a Dragon id and the export's id")
+					n[0].str("$what.planNames[$a][][0]") to n[1].str("$what.planNames[$a][][1]")
+				}
+			} ?: emptyList()
+			if (t.containsKey("planNames") && names.size != style.assignments.size) throw MarklessDecodeError("$what.planNames names ${names.size} assignments; the export has ${style.assignments.size}")
+			val repeats = t["planRepeats"]?.arr("$what.planRepeats")?.mapIndexed { i, r ->
+				val o = r.obj("$what.planRepeats[$i]")
+				o.only(setOf("id", "parent", "template"), "$what.planRepeats[$i]")
+				val template = o.field("template", "$what.planRepeats[$i]").arr("$what.planRepeats[$i].template").map { it.str("$what.planRepeats[$i].template[]") }
+				if (template.isEmpty()) throw MarklessDecodeError("$what.planRepeats[$i]: a row has at least one box")
+				PlanRepeat(o.field("id", "$what.planRepeats[$i]").str("id"), o.field("parent", "$what.planRepeats[$i]").str("parent"), template)
+			} ?: emptyList()
+			return style.copy(plan = plan, planNames = names, planRepeats = repeats)
+		}
 
 		fun decode(bytes: ByteArray, target: String = "android"): StyleExport {
 			val root = Json.parse(bytes).obj("style export")
@@ -168,7 +399,33 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val undecided = root["warnings"]?.arr("warnings")?.map { it.obj("warnings[]") }?.firstOrNull { w ->
 				w.field("code", "warning").str("code") == "DRAGON_PAGE_SCROLL_UNDECIDED" && w.field("message", "warning").str("message").startsWith("$target: ")
 			}?.let { it.getValue("message").str("message").removePrefix("$target: ") }
-			return program(t, target, dpr, width, height, undecided) { w, what -> writes(w, what) }
+			return withPlan(program(t, target, dpr, width, height, undecided) { w, what -> writes(w, what) }.copy(systemFaces = root["systemFonts"]?.let { systemFaces(it, target) } ?: emptyMap()), t, target)
+		}
+
+		/** `systemFonts`: each system face with this target's file, face index and axes; an entry without this target is an error. */
+		private fun systemFaces(v: Json, target: String): Map<String, SystemFace> {
+			val out = LinkedHashMap<String, SystemFace>()
+			for ((n, e) in v.arr("systemFonts").withIndex()) {
+				val what = "systemFonts[$n]"
+				val o = e.obj(what)
+				o.only(setOf("id", "ios", "android"), what)
+				val id = o.field("id", what).str("$what.id")
+				if (!id.startsWith("system:")) throw MarklessDecodeError("$what.id \"$id\" is not a system face id")
+				if (id in out) throw MarklessDecodeError("$what lists $id twice")
+				val f = (o[target] ?: throw MarklessDecodeError("$what ($id) has no $target face")).obj("$what.$target")
+				f.only(setOf("file", "index", "axes", "sha256"), "$what.$target")
+				val file = f.field("file", what).str("$what.$target.file")
+				if (file.isEmpty() || file.contains('/') || file.startsWith(".")) throw MarklessDecodeError("$what.$target.file \"$file\" is not a file name in /system/fonts")
+				val index = f.field("index", what).num("$what.$target.index")
+				if (index < 0 || index != Math.floor(index)) throw MarklessDecodeError("$what.$target.index is $index, not a face index")
+				f.field("sha256", what).str("$what.$target.sha256")
+				val axes = f.field("axes", what).obj("$what.$target.axes").mapValues { (tag, x) ->
+					if (tag.length != 4) throw MarklessDecodeError("$what.$target.axes names \"$tag\", not a four-letter axis tag")
+					x.num("$what.$target.axes.$tag")
+				}
+				out[id] = SystemFace(file, index.toInt(), axes)
+			}
+			return out
 		}
 
 		/** One target's states, assignments and next table; [writesOf] reads a node's `writes` field. */
@@ -182,7 +439,9 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				val values = o.field("values", "assignments[$a]").obj("values").mapValues { (k, x) -> scalar(x, "assignments[$a].values.$k") }
 				val canvas = o["canvas"]?.let { color(it, "assignments[$a].canvas") }
 				if (canvas != null && canvas.alpha != 255) throw MarklessDecodeError("assignments[$a].canvas is not opaque")
-				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> node(x, "assignments[$a].nodes[$n]", writesOf) }, canvas, o["pageScroll"]?.let { range(it, "assignments[$a].pageScroll") })
+				val body = o["bodyBackground"]?.takeIf { it != Json.Null }?.let { color(it, "assignments[$a].bodyBackground") }
+				if (body != null && body.alpha != 255) throw MarklessDecodeError("assignments[$a].bodyBackground is not opaque")
+				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> node(x, "assignments[$a].nodes[$n]", writesOf) }, canvas, body, o["pageScroll"]?.let { range(it, "assignments[$a].pageScroll") })
 			}
 			val initial = t.field("initial", target).num("initial").toInt()
 			val next = t.field("next", target).arr("next").map { row -> row.arr("next[]").map { col -> col.arr("next[][]").map { it.num("next[][][]").toInt() } } }
@@ -198,9 +457,14 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				val f = a.obj("$what.atoms[$n]")
 				f.only(setOf("feature", "comparisons", "keyword"), "$what.atoms[$n]")
 				val feature = f.field("feature", what).str("feature")
-				if (feature != "prefers-color-scheme") throw MarklessDecodeError("$what.atoms[$n]: @media ($feature) is not implemented on Android; this host reads prefers-color-scheme only")
-				if (f.field("comparisons", what).arr("comparisons").isNotEmpty()) throw MarklessDecodeError("$what.atoms[$n]: prefers-color-scheme with comparisons")
-				BandAtom(feature, f.field("keyword", what).str("keyword")).also { it.holds(false) }
+				val comparisons = f.field("comparisons", what).arr("$what.atoms[$n].comparisons").mapIndexed { k, c ->
+					val at = "$what.atoms[$n].comparisons[$k]"
+					val o = c.obj(at)
+					o.only(setOf("op", "value", "num", "den"), at)
+					BandComparison(o.field("op", at).str("$at.op"), o.field("value", at).num("$at.value"), o.field("num", at).num("$at.num"), o.field("den", at).num("$at.den"))
+				}
+				if (feature == "prefers-color-scheme" && comparisons.isNotEmpty()) throw MarklessDecodeError("$what.atoms[$n]: prefers-color-scheme with comparisons")
+				BandAtom(feature, f.field("keyword", what).str("keyword"), comparisons).also { if (feature == "prefers-color-scheme") it.holds(false) }
 			}
 			val table = o.field("bands", what).arr("$what.bands").mapIndexed { n, b -> b.arr("$what.bands[$n]").map { (it as? Json.Bool)?.value ?: throw MarklessDecodeError("$what.bands[$n] holds a non-boolean") } }
 			if (table.isEmpty() || table.any { it.size != atoms.size }) throw MarklessDecodeError("$what: every band needs one truth value per atom")
@@ -220,7 +484,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 		 */
 		fun decodeApp(bytes: ByteArray, target: String = "android"): Map<String, StyleExport> {
 			val root = Json.parse(bytes).obj("app style")
-			root.only(setOf("version", "units", "warnings", "fonts", "targets"), "app style")
+			root.only(setOf("version", "units", "warnings", "fonts", "systemFonts", "targets"), "app style")
+			val faces = root["systemFonts"]?.let { systemFaces(it, target) } ?: emptyMap()
 			val version = root.field("version", "app style").str("version")
 			if (version != APP_STYLE_VERSION) throw MarklessDecodeError("unknown app style version \"$version\" (this host reads $APP_STYLE_VERSION)")
 			val t = root.field("targets", "app style").obj("targets").field(target, "targets").obj("targets.$target")
@@ -235,7 +500,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val routes = LinkedHashMap<String, StyleExport>()
 			for ((n, r) in t.field("routes", target).arr("routes").withIndex()) {
 				val o = r.obj("routes[$n]")
-				o.only(setOf("pattern", "component", "compiler", "readiness", "states", "initial", "next", "bands", "assignments", "sheets"), "routes[$n]")
+				o.only(setOf("pattern", "component", "compiler", "readiness", "states", "initial", "next", "bands", "assignments", "sheets", "plan", "planNames", "planRepeats"), "routes[$n]")
 				val pattern = o.field("pattern", "routes[$n]").str("pattern")
 				if (pattern in routes) throw MarklessDecodeError("app style lists route $pattern twice")
 				val listed = { w: Json, what: String ->
@@ -259,7 +524,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 						SheetHeight(ho.field("snapPoint", at).num("$at.snapPoint"), program(ho, at, dpr, hp.field("width", at).num("width"), hp.field("height", at).num("height"), null, listed))
 					}.also { if (it.isEmpty() || it.map { h -> h.snapPoint }.distinct().size != it.size) throw MarklessDecodeError("$where needs one layout per resting height") }
 				}
-				routes[pattern] = program(o, "routes[$n] ($pattern)", dpr, width, height, null, listed).copy(sheets = sheets)
+				routes[pattern] = withPlan(program(o, "routes[$n] ($pattern)", dpr, width, height, null, listed).copy(sheets = sheets, systemFaces = faces), o, "routes[$n]")
 				val missing = routes.getValue(pattern).assignments.indexOfFirst { it.canvas == null }
 				if (missing >= 0) throw MarklessDecodeError("routes[$n] ($pattern).assignments[$missing] has no canvas")
 			}
@@ -279,7 +544,60 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val writes = writesOf(o.field("writes", what), id)
 			val scroll = o["scrollRange"]?.let { range(it, "$what.scrollRange") }
 			if ((scroll != null) != writes.any { it is StyleWrite.ScrollContainer }) throw MarklessDecodeError("$what: a scroll range comes with a scroll-container write, and only then")
-			return StyledNode(id, parent, kind, frame, bw, writes, scroll)
+			val lines = o["lines"]?.let { textLines(it, "$what.lines") }
+			if (lines != null && (kind != "text" || frame == null)) throw MarklessDecodeError("$what: only a framed text node has lines")
+			val text = o["text"]?.takeIf { it != Json.Null }?.str("$what.text")
+			if (lines != null && text == null) throw MarklessDecodeError("$what has lines but no text")
+			return StyledNode(id, parent, kind, frame, bw, writes, scroll, o["borderOps"]?.let { borderOps(it, "$what.borderOps") }, lines, text)
+		}
+
+		private fun textLines(v: Json, what: String): List<TextLine> = v.arr(what).mapIndexed { n, x ->
+			val at = "$what[$n]"
+			val l = x.obj(at)
+			l.only(setOf("top", "baseline", "runs"), at)
+			val runs = l.field("runs", at).arr("$at.runs").mapIndexed { k, r ->
+				val where = "$at.runs[$k]"
+				val o = r.obj(where)
+				o.only(setOf("face", "size", "glyphs", "xs"), where)
+				val size = o.field("size", where).num("$where.size")
+				if (!(size > 0) || size.isInfinite()) throw MarklessDecodeError("$where.size is $size, not a positive size")
+				val glyphs = o.field("glyphs", where).arr("$where.glyphs").map {
+					val g = it.num("$where.glyphs[]")
+					if (g != Math.floor(g) || g < 0 || g > 65535) throw MarklessDecodeError("$where.glyphs holds $g, not a glyph id")
+					g.toInt()
+				}
+				val xs = o.field("xs", where).arr("$where.xs").map { it.num("$where.xs[]").also { x -> if (x.isNaN() || x.isInfinite()) throw MarklessDecodeError("$where.xs holds $x") } }
+				if (glyphs.isEmpty() || xs.size != glyphs.size) throw MarklessDecodeError("$where needs one x per glyph and at least one glyph")
+				GlyphRun(o.field("face", where).str("$where.face"), size, glyphs, xs)
+			}
+			TextLine(l.field("top", at).num("$at.top"), l.field("baseline", at).num("$at.baseline"), runs)
+		}
+
+		private fun borderOps(v: Json, what: String): BorderOps {
+			val o = v.obj(what)
+			o.only(setOf("origin", "size", "widths", "ops"), what)
+			val origin = o.field("origin", what).obj("$what.origin")
+			o.field("size", what).obj("$what.size")
+			if (o.field("widths", what).arr("$what.widths").size != 4) throw MarklessDecodeError("$what.widths is not four sides")
+			val ops = o.field("ops", what).arr("$what.ops").mapIndexed { n, x ->
+				val at = "$what.ops[$n]"
+				val f = x.obj(at)
+				f.only(setOf("op", "side", "alpha", "antialias", "points"), at)
+				val op = f.field("op", at).str("$at.op")
+				val side = f.field("side", at).num("$at.side").toInt()
+				val points = f.field("points", at).arr("$at.points").map { it.num("$at.points[]") }
+				val shaped = when (op) {
+					"begin-layer", "end-layer", "save", "restore" -> points.isEmpty()
+					"clip" -> points.size >= 6 && points.size % 2 == 0
+					"fill" -> points.size >= 6 && points.size % 2 == 0 && side in 0..3
+					"dot" -> points.size == 3 && side in 0..3
+					else -> throw MarklessDecodeError("$at is an unknown border operation \"$op\"")
+				}
+				if (!shaped) throw MarklessDecodeError("$at ($op) has the wrong points or side")
+				val antialias = f.field("antialias", at).let { if (it is Json.Bool) it.value else throw MarklessDecodeError("$at.antialias is not true or false") }
+				BorderOp(op, side, f.field("alpha", at).num("$at.alpha"), antialias, points)
+			}
+			return BorderOps(origin.field("x", what).num("$what.origin.x"), origin.field("y", what).num("$what.origin.y"), ops)
 		}
 
 		private fun scalar(v: Json, what: String): JsValue = when (v) {
@@ -321,8 +639,22 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				"scroll-indicators-hidden" -> StyleWrite.ScrollIndicatorsHidden
 				"padding-box-clip" -> StyleWrite.PaddingBoxClip
 				"scroll-bounce" -> StyleWrite.ScrollBounce((o.field("bounceX", what) as? Json.Bool ?: throw MarklessDecodeError("$what.bounceX must be a boolean")).value, (o.field("bounceY", what) as? Json.Bool ?: throw MarklessDecodeError("$what.bounceY must be a boolean")).value)
+				"clip-path-inset" -> StyleWrite.ClipPathInset(o.field("edges", what).arr("edges").map {
+					val e = it.obj("$what.edges[]")
+					val unit = e.field("unit", what).str("unit")
+					if (unit != "px" && unit != "%") throw MarklessDecodeError("$what: clip-path inset unit $unit is not px or %")
+					e.field("value", what).num("value") to (unit == "%")
+				}.also { if (it.size != 4) throw MarklessDecodeError("$what has ${it.size} inset edges, not 4") })
+				"clip-text" -> StyleWrite.ClipText.also { o.field("texts", what).arr("texts").forEach { t -> t.str("$what.texts[]") } }
+				"paint-order" -> StyleWrite.PaintOrder(o.field("host", what).str("host"), o.field("bucket", what).num("bucket").toInt(), o.field("rank", what).num("rank").toInt())
 				else -> throw MarklessDecodeError("$what has unknown style write kind \"$kind\"")
 			}
 		}
 	}
 }
+
+/** A list whose rows a phone lays out (Dragon's `planRepeats`): the box its rows hang from and one row's top boxes, by Dragon id. */
+data class PlanRepeat(val id: String, val parent: String, val template: List<String>)
+
+/** A row a page shows now: its key, the assignment its own states reach from the page's, and its texts by text node id. */
+data class LaidOutRow(val key: String, val assignment: Int, val texts: Map<String, String>)

@@ -4,7 +4,11 @@ import type {
 	ProtocolStatePayload,
 	ProtocolViewPayload,
 } from '@markless/serializer';
-import type { ProtocolSharedScope, RenderedPayloadScripts } from '@markless/serializer';
+import type {
+	ProtocolRepeatKeyParts,
+	ProtocolSharedScope,
+	RenderedPayloadScripts,
+} from '@markless/serializer';
 import type { CompilerDiagnostic, SourceSpan } from './diagnostics.ts';
 
 export type { CompilerDiagnostic, DiagnosticSuggestion, SourceSpan } from './diagnostics.ts';
@@ -145,8 +149,10 @@ export type SemanticScriptFunction = {
 	/** Each use of its first parameter (the event), as the member path read off it (`['target', 'value']`; empty: whole). */
 	readonly event?: ReadonlyArray<{ readonly path: ReadonlyArray<string>; readonly span: SourceSpan }>;
 	readonly globals: ReadonlyArray<SemanticScriptGlobal>;
-	/** Framework imports it uses (`navigate`), which are not JavaScript a script can run. */
+	/** Framework imports it uses that are not JavaScript a script can run. */
 	readonly framework: ReadonlyArray<{ readonly name: string; readonly source: string; readonly span: SourceSpan }>;
+	/** Each place it reaches `navigate` from `@markless/router`, which the host's route table stands in for. */
+	readonly navigates: ReadonlyArray<SourceSpan>;
 	readonly span: SourceSpan;
 	/** Constructs the engine cannot run as written (an `enum`), from type erasure. */
 	readonly unsupported: ReadonlyArray<{ readonly construct: string; readonly span: SourceSpan }>;
@@ -168,6 +174,7 @@ export type SemanticScriptStatement = {
 	/** Names it uses that a script leaves out (a component, top-level framework state). */
 	readonly dropped: ReadonlyArray<{ readonly name: string; readonly span: SourceSpan }>;
 	readonly framework: ReadonlyArray<{ readonly name: string; readonly source: string; readonly span: SourceSpan }>;
+	readonly navigates: ReadonlyArray<SourceSpan>;
 	readonly unsupported: ReadonlyArray<{ readonly construct: string; readonly span: SourceSpan }>;
 };
 
@@ -315,6 +322,8 @@ export type SemanticComponentPropBinding =
 			readonly definitionSpans?: ReadonlyArray<SourceSpan>;
 			/** A callback's body as statements, collected for native builds only (`nativeFacts`). */
 			readonly nativeStatements?: ReadonlyArray<SemanticHandlerStatement>;
+			/** The name each callback parameter binds (`''` for a pattern), where `parameters` holds its source text. */
+			readonly nativeParameters?: ReadonlyArray<string>;
 			/** An opaque prop's value as a tree, collected for native builds only (`nativeFacts`). */
 			readonly nativeExpression?: SemanticExpression;
 			// `@catch (error, reset)` reset names a callback prop's own source calls, with the boundary each resets.
@@ -1037,6 +1046,8 @@ export type SemanticKeyedRepeat = {
 	// Empty means the item ITSELF is the key (`key row`), which a list of scalars
 	// is; `indexKey` is what says a row has no data identity at all.
 	readonly keyPath: ReadonlyArray<string>;
+	// A key joined from the item's fields; `keyPath` is then empty and is not the key.
+	readonly keyParts?: ProtocolRepeatKeyParts;
 	readonly indexKey?: true;
 	// A @for inside another @for's row renders once per enclosing row.
 	readonly enclosingRepeatId?: string;
@@ -1512,7 +1523,13 @@ export type SemanticExpression =
 			readonly alternate: SemanticExpression;
 	  }
 	| { readonly kind: 'template'; readonly parts: ReadonlyArray<string | SemanticExpression> }
-	| { readonly kind: 'member'; readonly object: SemanticExpression; readonly property: string }
+	/** `optional`: the read is in an optional chain at or after a `?.`, so a nullish object gives undefined. */
+	| {
+			readonly kind: 'member';
+			readonly object: SemanticExpression;
+			readonly property: string;
+			readonly optional?: true;
+	  }
 	/** `object[index]` with an index that is not a literal. */
 	| {
 			readonly kind: 'index';
@@ -1998,6 +2015,8 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				readonly cardinality: 'zero-or-one';
 				readonly nullishTag: 'omit';
 				readonly tag: SemanticMarkupResidue;
+				/** Native builds only: the tag as a tree a native build folds for each use. */
+				readonly nativeTag?: SemanticExpression;
 				readonly staticAttributes: Readonly<Record<string, string>>;
 				readonly attributeSlots: ReadonlyArray<
 					| {
@@ -2167,6 +2186,7 @@ export type RenderDataRepeat = {
 	readonly collectionSource?: string;
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly keyPath: ReadonlyArray<string>;
+	readonly keyParts?: ProtocolRepeatKeyParts;
 	// Set only for `key row`: the empty path means read the item itself, not that
 	// the row is unkeyed. A position key stays a semantic-graph fact.
 	readonly itemKey?: true;
@@ -2339,6 +2359,7 @@ export type LoweredWriteThrough = {
 export type LoweredRowItem = {
 	readonly itemName: string;
 	readonly keyPath: ReadonlyArray<string> | null;
+	readonly keyParts?: ProtocolRepeatKeyParts;
 	readonly itemPath: ReadonlyArray<string>;
 	readonly enclosing?: LoweredRowItem;
 };
@@ -2422,6 +2443,7 @@ export type PayloadKeyedRepeat = {
 	readonly collectionGraphNodeId: string;
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly keyPath: ReadonlyArray<string>;
+	readonly keyParts?: ProtocolRepeatKeyParts;
 	// See SemanticKeyedRepeat: set only for a repeat inside another repeat's row.
 	readonly enclosingRepeatId?: string;
 	readonly enclosingItemPath?: ReadonlyArray<string>;
@@ -2703,6 +2725,7 @@ export type SymbolResolverPlan = {
 export type RowLocalStep = {
 	readonly rowIndex: number;
 	readonly keyPath: ReadonlyArray<string>;
+	readonly keyParts?: ProtocolRepeatKeyParts;
 	readonly indexKey?: true;
 	readonly graphNodeId?: string;
 	readonly collectionPath?: ReadonlyArray<string>;
@@ -3196,6 +3219,8 @@ export type RuntimeDemandMapArtifact = {
 	readonly nestedRecordModuleIds?: ReadonlyArray<string>;
 	readonly unknownRecordModuleIds: ReadonlyArray<string>;
 	readonly firstUsePage?: RuntimeDemandMapFirstUsePage;
+	/** A `@for` of this module is keyed by `keyParts`, so the app's browser runtime must join keys; absent otherwise. */
+	readonly joinedRepeatKeys?: true;
 };
 
 export type RuntimeDemandMapsArtifact = Record<RuntimeDemandClass, RuntimeDemandMapArtifact>;

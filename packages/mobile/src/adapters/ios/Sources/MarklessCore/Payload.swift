@@ -8,13 +8,14 @@ public let nativeDocumentBody = "#body"
 /// The overlay behaviour's names, as `packages/web/src/overlay-protocol.ts` spells them.
 public enum OverlayProtocol {
 	public static let attribute = "overlay"
+	public static let hintAttribute = "overlay-hint"
 	public static let modalAttribute = "aria-modal"
 	public static let modalValue = "true"
 }
 
 /// What an event carries, by the field an `{ event }` expression names.
 public enum NativeEventField: String, Sendable {
-	case value, reason, pressTarget
+	case value, reason, pressTarget, key, text, detail
 	/// A pointer event's, as a phone's browser reports a touch.
 	case target, currentTarget, relatedTarget, button, buttons, clientX, clientY, pointerId, pointerType, isPrimary, timeStamp
 }
@@ -44,6 +45,8 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case template([NativeTemplatePart])
 	/// `length` of a string or array, or an own property of an object.
 	case member(NativeExpr, String)
+	/// A member read in an optional chain (`a?.b`): null when the object is null, as JavaScript gives undefined.
+	case optionalMember(NativeExpr, String)
 	/// An array's element at an index computed while the app runs; null when it is not an integer inside the array.
 	case at(NativeExpr, of: NativeExpr)
 	case array([NativeArrayItem])
@@ -75,12 +78,14 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case checked(String)
 	/// A computed whose body runs in the script engine: function `fn` of the payload's script, called with `bindings`.
 	case script(fn: String, bindings: [NativeScriptBinding])
+	/// A text field's text now: what a person typed since, else its `value` binding, else its `value` attribute.
+	case field(String)
 
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .event, .focused, .local, .item, .routeParams, .formData, .checked: return []
-		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
+		case .literal, .event, .focused, .local, .item, .routeParams, .formData, .checked, .field: return []
+		case let .unary(_, inner), let .member(inner, _), let .optionalMember(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
 		case let .contains(within, node): return within.cells + node.cells
 		case let .captures(node, pointer): return node.cells + pointer.cells
 		case let .array(items): return items.flatMap(\.value.cells)
@@ -136,7 +141,8 @@ public struct NativeNode: Equatable, Sendable {
 		/// An `@if` chain or `@switch`: the first arm whose test is truthy, else the arm with no test, else none.
 		case branch(tests: [NativeExpr?])
 		/// A keyed `@for`: one row per item of `list`, keyed by `String()` of the item at `key`.
-		case `repeat`(list: NativeExpr, key: [String])
+		/// `key` nil: each row's key is its position (`byIndex`).
+		case `repeat`(list: NativeExpr, key: [String]?, keyParts: [NativeKeyPart]? = nil)
 		/// The platform's own sheet: its content (the nodes whose parent it is) is built at mount and kept while closed.
 		case sheet(open: NativeExpr, snapPoints: [Double], dismissible: Bool, modal: Bool)
 	}
@@ -154,6 +160,8 @@ public struct NativeNode: Equatable, Sendable {
 	public var defaultStyle: NativeDefaultStyle? = nil
 	/// On an `<svg>`: the shapes it draws.
 	public var drawing: NativeDrawing? = nil
+	/// A live region: a change to the text inside is announced.
+	public var live: NativeLive? = nil
 
 	public var isElement: Bool { if case .element = kind { true } else { false } }
 	public var isText: Bool { if case .text = kind { true } else { false } }
@@ -218,6 +226,11 @@ public struct NativeDrawing: Equatable, Sendable {
 public enum NativeEventName: String, Sendable {
 	case activate
 	case input
+	/// A text field took the keyboard, or gave it up.
+	case focus, blur
+	/// A key of the on-screen keyboard in a text field, and a paste from its edit menu, before either edits the text;
+	/// `keyup` is the same key after it.
+	case keydown, keyup, paste
 	/// The platform closed a system sheet; it is already closed when the handler runs.
 	case dismiss
 	/// The host's back gesture or Escape on an open `<dialog>`: it closes, as the browser's cancel does.
@@ -226,6 +239,8 @@ public enum NativeEventName: String, Sendable {
 	case enter
 	/// A form's, run only by a `submit` op.
 	case submit
+	/// A range input let go after its value moved: the web's `change` on it.
+	case commit
 	/// A `timer` journal entry's time has come.
 	case timer
 	/// The host is idle after the element appeared; once for each shown instance.
@@ -285,6 +300,10 @@ public enum NativeOp: Equatable, Sendable {
 	/// Runs function `fn` of the payload's script with the event (`type`, the web event's) and `bindings`, then writes the
 	/// cells it changed. A throw, or a rejection of what it returns, writes `{ name, message }` to `catch` when there is one.
 	case script(fn: String, type: String, bindings: [NativeScriptBinding], catch: String?)
+	/// `event.preventDefault()` in a text field's `keydown` or `paste` handler.
+	case preventDefault
+	/// `field.value = text` on a text field: its text becomes the value, with no input event; `node` evaluates to its id.
+	case fieldText(node: NativeExpr, value: NativeExpr)
 	/// `reset` of `@catch (error, reset)`: clears `catch` and runs again each of `cells` (read where the handler runs) that holds an error.
 	case reset(cells: [String], catch: String?)
 }
@@ -315,6 +334,97 @@ public struct NativeTooLong: Equatable, Sendable {
 		func write(_ value: Int) -> String { String(String(value).map { digits[Int(String($0))!] }) }
 		return text.replacingOccurrences(of: "{max}", with: write(max)).replacingOccurrences(of: "{length}", with: write(length))
 	}
+}
+
+/// Chromium's message for an email field whose value is not an email address, one per reason: `{value}` is the whole value,
+/// `{symbol}` the first character not allowed, `{domain}` the part after the `@`.
+public struct NativeEmailMismatch: Equatable, Sendable {
+	public let noAt, emptyLocal, emptyDomain, invalidLocal, invalidDomain, invalidDots, other: String
+
+	/// An email field's value as the web keeps it: line breaks dropped, then ASCII whitespace trimmed from both ends.
+	public static func value(_ typed: String) -> String {
+		let whitespace: Set<Unicode.Scalar> = ["\t", "\n", "\u{0C}", "\r", " "]
+		var scalars = Array(typed.unicodeScalars.filter { $0 != "\n" && $0 != "\r" })
+		while let first = scalars.first, whitespace.contains(first) { scalars.removeFirst() }
+		while let last = scalars.last, whitespace.contains(last) { scalars.removeLast() }
+		return String(String.UnicodeScalarView(scalars))
+	}
+
+	private static func isAlphanumeric(_ s: Unicode.Scalar) -> Bool { s.isASCII && (("a"..."z").contains(s) || ("A"..."Z").contains(s) || ("0"..."9").contains(s)) }
+	private static func isLocal(_ s: Unicode.Scalar) -> Bool { isAlphanumeric(s) || ".!#$%&'*+/=?^_`{|}~-".unicodeScalars.contains(s) }
+	private static func isLabel(_ label: Substring) -> Bool {
+		let s = Array(label.unicodeScalars)
+		guard (1...63).contains(s.count), isAlphanumeric(s.first!), isAlphanumeric(s.last!) else { return false }
+		return s.allSatisfy { isAlphanumeric($0) || $0 == "-" }
+	}
+
+	/// Why `value` (as ``value(_:)`` keeps it) is not an email address, in Chromium's words, or nil when it is one or is empty.
+	public func message(for value: String) -> String? {
+		if value.isEmpty { return nil }
+		let at = value.firstIndex(of: "@")
+		let local = at.map { value[..<$0] } ?? Substring(value)
+		let domain = at.map { value[value.index(after: $0)...] } ?? ""
+		if let at, at != value.startIndex, local.unicodeScalars.allSatisfy(Self.isLocal),
+			domain.split(separator: ".", omittingEmptySubsequences: false).allSatisfy(Self.isLabel) { return nil }
+		func fill(_ message: String, _ symbol: String = "") -> String {
+			var out = ""
+			var rest = Substring(message)
+			while let open = rest.firstIndex(of: "{") {
+				out += rest[..<open]
+				let tail = rest[open...]
+				if tail.hasPrefix("{value}") { out += value; rest = tail.dropFirst(7) }
+				else if tail.hasPrefix("{symbol}") { out += symbol; rest = tail.dropFirst(8) }
+				else if tail.hasPrefix("{domain}") { out += domain; rest = tail.dropFirst(8) }
+				else { out += "{"; rest = tail.dropFirst() }
+			}
+			return out + rest
+		}
+		guard let at else { return fill(noAt) }
+		if at == value.startIndex { return fill(emptyLocal) }
+		if domain.isEmpty { return fill(emptyDomain) }
+		if let bad = local.unicodeScalars.first(where: { !Self.isLocal($0) }) { return fill(invalidLocal, String(bad)) }
+		if let bad = domain.unicodeScalars.first(where: { !(Self.isAlphanumeric($0) || $0 == "." || $0 == "-") }) { return fill(invalidDomain, String(bad)) }
+		if domain.hasPrefix(".") || domain.hasSuffix(".") || domain.contains("..") { return fill(invalidDots) }
+		return fill(other)
+	}
+}
+
+/// A range input's value as the web keeps it (`nativeRangeValue` in @markless/serializer): `min` 0 and `max` 100 by default
+/// (a `max` below `min` is `min`); a value that is not a number is the midpoint; clamped into the range and moved to the
+/// nearest step from `min` (the greater of two as near), at or below `max`; written as JavaScript writes the number.
+public func nativeRangeValue(_ value: String?, min: String?, max: String?, step: String?) -> String {
+	func number(_ text: String?) -> Double? {
+		guard let text, text.range(of: #"^-?(\d+(\.\d+)?|\.\d+)([eE][-+]?\d+)?$"#, options: .regularExpression) != nil else { return nil }
+		return Double(text)
+	}
+	func places(_ n: Double) -> Int {
+		let written = jsNumber(n)
+		let parts = written.components(separatedBy: "e")
+		let mantissa = parts[0].components(separatedBy: ".")
+		let fraction = mantissa.count > 1 ? mantissa[1].count : 0
+		let exponent = parts.count > 1 ? Int(parts[1]) ?? 0 : 0
+		return Swift.max(0, fraction - exponent)
+	}
+	let low = number(min) ?? 0
+	let high = Swift.max(low, number(max) ?? 100)
+	let any = step?.trimmingCharacters(in: .whitespaces).lowercased() == "any"
+	let size: Double? = any ? nil : (number(step).flatMap { $0 > 0 ? $0 : nil } ?? 1)
+	var value = Swift.min(high, Swift.max(low, number(value) ?? low + (high - low) / 2))
+	if let size {
+		let unit = pow(10, Double(Swift.max(places(low), places(size), places(value))))
+		func whole(_ n: Double) -> Double { (n * unit).rounded() }
+		let stepUnits = whole(size)
+		var steps = ((whole(value) - whole(low)) / stepUnits + 0.5).rounded(.down)
+		while steps > 0 && whole(low) + steps * stepUnits > whole(high) { steps -= 1 }
+		value = (whole(low) + steps * stepUnits) / unit
+	}
+	return jsNumber(value)
+}
+
+/// A number as JavaScript's `String(n)` writes it for the values a range takes: whole numbers without a fraction.
+func jsNumber(_ n: Double) -> String {
+	if n == n.rounded(), abs(n) < 1e21 { return String(Int64(n)) }
+	return "\(n)"
 }
 
 /// A `maxlength` attribute's limit, by HTML's rules for parsing non-negative integers; nil (no limit) when it has none.
@@ -439,6 +549,14 @@ public struct NativeCell: Equatable, Sendable {
 	public var row: String? = nil
 	/// The clock when the screen opened: written at mount, before the first build.
 	public var clock = false
+	/// On a row's state: its first value as an expression of the row's item, taken once when the row is built.
+	public var first: NativeExpr? = nil
+	/// On a row's state: the values the row passes to the part that owns it; when one changes the row's state starts over.
+	public var rebuiltBy: [NativeExpr]? = nil
+	/// Its first value is `undefined` on the web, which `initial` spells as null: a script reads it so until it is written.
+	public var unset = false
+	/// Written while rendering from a value that follows state: at mount, and again whenever that value changes.
+	public var follows: NativeExpr? = nil
 }
 
 public struct NativeEvent: Equatable, Sendable {
@@ -469,12 +587,15 @@ public struct NativeViewPayload: Equatable, Sendable {
 	public let valueMissing: [(locale: String, messages: NativeValueMissing)]
 	/// What the web says when a text field a person edited is longer than its `maxlength`, by locale, in payload order.
 	public var tooLong: [(locale: String, message: NativeTooLong)] = []
+	/// What the web says when an email field holds no email address, by locale, in payload order.
+	public var typeMismatch: [(locale: String, message: NativeEmailMismatch)] = []
 
 	public static func == (a: NativeViewPayload, b: NativeViewPayload) -> Bool {
 		a.component == b.component && a.route == b.route && a.cells == b.cells && a.nodes == b.nodes && a.events == b.events
 			&& a.handlers == b.handlers && a.title == b.title && a.objects == b.objects && a.forms == b.forms && a.valueMissing.map(\.locale) == b.valueMissing.map(\.locale)
 			&& a.valueMissing.map(\.messages) == b.valueMissing.map(\.messages) && a.tooLong.map(\.locale) == b.tooLong.map(\.locale)
-			&& a.tooLong.map(\.message) == b.tooLong.map(\.message) && a.script == b.script
+			&& a.tooLong.map(\.message) == b.tooLong.map(\.message) && a.typeMismatch.map(\.locale) == b.typeMismatch.map(\.locale)
+			&& a.typeMismatch.map(\.message) == b.typeMismatch.map(\.message) && a.script == b.script
 	}
 	/// The JavaScript the page's script ops and computeds run; absent when every handler is data.
 	public var script: NativeScript? = nil
@@ -485,17 +606,22 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "script"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "typeMismatch", "script"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "async", "object", "row", "clock"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "domain", "device", "task", "async", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows"])
 			if field.has("clock"), try !field["clock"].bool() {
 				throw PayloadError(path: try field["clock"].path, reason: "clock is only ever true")
 			}
+			if field.has("unset"), try !field["unset"].bool() {
+				throw PayloadError(path: try field["unset"].path, reason: "unset is only ever true")
+			}
 			let initial = NativeValue(json: try field["initial"].value)
+			// The style export carries each state's domain; the payload's copy is Dragon's input, checked here and not kept.
+			if field.has("domain") { _ = try field["domain"].array().map { try $0.string() } }
 			var styled = false
 			if field.has("styled") {
 				guard try field["styled"].bool() else { throw PayloadError(path: try field["styled"].path, reason: "styled is only ever true") }
@@ -516,14 +642,18 @@ public struct NativeViewPayload: Equatable, Sendable {
 						boundaries: try async["boundaries"].array().map { try $0.string() })
 				}() : nil,
 				row: field.has("row") ? try field["row"].string() : nil,
-				clock: field.has("clock"))
+				clock: field.has("clock"),
+				first: field.has("first") ? try decodeExpr(try field["first"]) : nil,
+				rebuiltBy: field.has("rebuiltBy") ? try field["rebuiltBy"].array().map(decodeExpr) : nil,
+				unset: field.has("unset"),
+				follows: field.has("follows") ? try decodeExpr(try field["follows"]) : nil)
 		}
 		let nodes = try fields["nodes"].array().map { node -> NativeNode in
 			let kind = try node.field("kind").string()
 			let place = ["arm", "row"]
 			switch kind {
 			case "element":
-				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing"] + place)
+				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing", "live"] + place)
 				var attributes: [String: String] = [:]
 				if field.has("attributes") {
 					let reader = try field["attributes"]
@@ -544,7 +674,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 					row: try decodeRow(field), kind: .element(element: try field["element"].string(), attributes: attributes, bindings: bindings),
 					object: field.has("object") ? try field["object"].string() : nil,
 					defaultStyle: field.has("defaultStyle") ? try decodeDefaultStyle(try field["defaultStyle"]) : nil,
-					drawing: field.has("drawing") ? try decodeDrawing(try field["drawing"]) : nil)
+					drawing: field.has("drawing") ? try decodeDrawing(try field["drawing"]) : nil,
+					live: field.has("live") ? try decodeLive(try field["live"]) : nil)
 			case "text":
 				let field = try node.object(required: ["kind", "id", "parent", "parts"], optional: place)
 				let parts = try decodeParts(try field["parts"])
@@ -570,22 +701,26 @@ public struct NativeViewPayload: Equatable, Sendable {
 					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: try decodeArm(field),
 					row: try decodeRow(field), kind: .branch(tests: tests))
 			case "repeat":
-				let field = try node.object(required: ["kind", "id", "parent", "list", "key"], optional: place)
+				let field = try node.object(required: ["kind", "id", "parent", "list", "key"], optional: place + ["byIndex", "keyParts"])
+				let key = try field["key"].array().map { try $0.string() }
+				let byIndex = field.has("byIndex") ? try field["byIndex"].bool() : false
+				if byIndex && !key.isEmpty { throw try field["key"].fail("a list keyed by its index has no key path") }
 				return NativeNode(
 					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: try decodeArm(field),
 					row: try decodeRow(field),
-					kind: .repeat(list: try decodeExpr(try field["list"]), key: try field["key"].array().map { try $0.string() }))
+					kind: .repeat(list: try decodeExpr(try field["list"]), key: byIndex ? nil : key,
+						keyParts: try field.has("keyParts") ? decodeKeyParts(field["keyParts"]) : nil))
 			case "sheet":
-				let field = try node.object(["kind", "id", "parent", "open", "snapPoints", "dismissible", "modal"])
+				let field = try node.object(required: ["kind", "id", "parent", "open", "snapPoints", "dismissible", "modal"], optional: ["arm"])
 				let snapPoints = try field["snapPoints"].array().map { try $0.number() }
 				let valid = switch snapPoints.count {
-				case 1: snapPoints[0] == 1
+				case 1: snapPoints[0] > 0 && snapPoints[0] <= 1
 				case 2: snapPoints[0] > 0 && snapPoints[0] < 1 && snapPoints[1] == 1
 				default: false
 				}
-				guard valid else { throw PayloadError(path: node.path + ".snapPoints", reason: "a sheet rests at [1] or [x, 1] with 0 < x < 1") }
+				guard valid else { throw PayloadError(path: node.path + ".snapPoints", reason: "a sheet rests at [x] with 0 < x <= 1 or [x, 1] with 0 < x < 1") }
 				return NativeNode(
-					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: nil, row: nil,
+					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: try decodeArm(field), row: nil,
 					kind: .sheet(
 						open: try decodeExpr(try field["open"]), snapPoints: snapPoints, dismissible: try field["dismissible"].bool(),
 						modal: try field["modal"].bool()))
@@ -645,11 +780,19 @@ public struct NativeViewPayload: Equatable, Sendable {
 						throw PayloadError(path: op.path + ".method", reason: "unknown dialog method \"\(method)\"")
 					}
 					return .dialog(node: try opField["node"].string(), open: method == "showModal")
+				case "fieldText":
+					let opField = try op.object(["op", "node", "value"])
+					let node = try opField["node"]
+					let target: NativeExpr = if let fixed = try? node.string() { .literal(.string(fixed)) } else { try decodeExpr(node) }
+					return .fieldText(node: target, value: try decodeExpr(try opField["value"]))
+				case "preventDefault":
+					_ = try op.object(["op"])
+					return .preventDefault
 				case "command":
 					let keys = Set(try op.keys())
 					let opField = try op.object(required: ["op", "node", "command"], optional: ["preventScroll"])
 					let command = try opField["command"].string()
-					guard command == "focus" || command == "scrollIntoView" else {
+					guard ["focus", "scrollIntoView", "select"].contains(command) else {
 						throw PayloadError(path: op.path + ".command", reason: "unknown command \"\(command)\"")
 					}
 					let preventScroll = keys.contains("preventScroll") ? try opField["preventScroll"].bool() : false
@@ -734,6 +877,16 @@ public struct NativeViewPayload: Equatable, Sendable {
 				return (locale, NativeTooLong(text: try m["text"].string(), digits: digits))
 			}
 		}() : []
+		let typeMismatch: [(locale: String, message: NativeEmailMismatch)] = fields.has("typeMismatch") ? try {
+			let reader = try fields["typeMismatch"]
+			return try reader.keys().map { locale in
+				let m = try reader.field(locale).object(["noAt", "emptyLocal", "emptyDomain", "invalidLocal", "invalidDomain", "invalidDots", "other"])
+				return (locale, NativeEmailMismatch(
+					noAt: try m["noAt"].string(), emptyLocal: try m["emptyLocal"].string(), emptyDomain: try m["emptyDomain"].string(),
+					invalidLocal: try m["invalidLocal"].string(), invalidDomain: try m["invalidDomain"].string(),
+					invalidDots: try m["invalidDots"].string(), other: try m["other"].string()))
+			}
+		}() : []
 		let route: NativeRoute? = fields.has("route") ? try {
 			let r = try fields["route"].object(["pattern", "params"])
 			return NativeRoute(pattern: try r["pattern"].string(), params: try r["params"].array().map { try $0.string() })
@@ -741,7 +894,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		let payload = NativeViewPayload(
 			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers,
 			title: fields.has("title") ? try decodeParts(try fields["title"]) : nil,
-			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong,
+			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong, typeMismatch: typeMismatch,
 			script: fields.has("script") ? try decodeScript(try fields["script"]) : nil)
 		try payload.check()
 		return payload
@@ -775,6 +928,13 @@ public struct NativeViewPayload: Equatable, Sendable {
 		style.marker = try oneOf("marker", ["disc", "decimal"])
 		style.table = try oneOf("table", ["table", "row", "cell"])
 		return style
+	}
+
+	private static func decodeLive(_ reader: Reader) throws -> NativeLive {
+		let live = try reader.object(["politeness", "atomic"])
+		let politeness = try live["politeness"].string()
+		guard ["polite", "assertive"].contains(politeness) else { throw PayloadError(path: reader.path, reason: "unknown politeness \"\(politeness)\"") }
+		return NativeLive(assertive: politeness == "assertive", atomic: try live["atomic"].bool())
 	}
 
 	private static func decodeDrawing(_ reader: Reader) throws -> NativeDrawing {
@@ -827,7 +987,13 @@ public struct NativeViewPayload: Equatable, Sendable {
 				let fields = try binding.field("fields")
 				return NativeScriptBinding(name: name, kind: .fields(try fields.keys().map { NativeScriptField(name: $0, cell: try fields.field($0).string()) }))
 			case ["value"]: return NativeScriptBinding(name: name, kind: .value(try decodeExpr(try binding.field("value"))))
-			default: throw binding.fail("a script binding is { cell }, { fields } or { value }")
+			case ["elements"]: return NativeScriptBinding(name: name, kind: .elements(try decodeExpr(try binding.field("elements"))))
+			case ["object"]: return NativeScriptBinding(name: name, kind: .object(try decodeBindings(try binding.field("object"))))
+			case ["shared"]: return NativeScriptBinding(name: name, kind: .shared(try decodeBindings(try binding.field("shared"))))
+			case ["callback"]: return NativeScriptBinding(name: name, kind: .callback(try binding.field("callback").string()))
+			case ["bindings", "method"], ["method", "bindings"]:
+				return NativeScriptBinding(name: name, kind: .method(try binding.field("method").string(), try decodeBindings(try binding.field("bindings"))))
+			default: throw binding.fail("a script binding is { cell }, { fields }, { value }, { elements }, { object }, { shared }, { callback } or { method, bindings }")
 			}
 		}
 	}
@@ -905,6 +1071,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 				return .expr(try decodeExpr(part))
 			})
 		case ["member", "property"]: return .member(try decodeExpr(try field("member")), try field("property").string())
+		case ["member", "optional", "property"]:
+			guard try field("optional").bool() else { throw PayloadError(path: reader.path + ".optional", reason: "optional is only ever true") }
+			return .optionalMember(try decodeExpr(try field("member")), try field("property").string())
 		case ["at", "of"]: return .at(try decodeExpr(try field("at")), of: try decodeExpr(try field("of")))
 		case ["array"]:
 			return .array(try field("array").array().map { item in
@@ -932,6 +1101,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["formData"]: return .formData(try field("formData").string())
 		case ["checked"]: return .checked(try field("checked").string())
 		case ["bindings", "script"]: return .script(fn: try field("script").string(), bindings: try decodeBindings(try field("bindings")))
+		case ["field"]: return .field(try field("field").string())
 		case ["arguments", "call"]:
 			let name = try field("call").string()
 			guard let builtin = NativeBuiltin(rawValue: name) else { throw PayloadError(path: reader.path + ".call", reason: "unknown call \"\(name)\"") }
@@ -987,7 +1157,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			case let .branch(tests):
 				branchArms[node.id] = tests.count
 				try checkCells(node, tests.compactMap { $0 })
-			case let .repeat(list, _):
+			case let .repeat(list, _, _):
 				repeats.insert(node.id)
 				try checkCells(node, [list])
 			case let .sheet(open, _, _, _):
@@ -1206,4 +1376,23 @@ public struct NativeDeviceObject: Equatable, Sendable {
 	public let device: String
 	/// The first node of the component instance that made it.
 	public let owner: String
+}
+
+/// A live region: an assertive one interrupts the screen reader; an atomic one is read whole.
+public struct NativeLive: Sendable, Equatable {
+	public let assertive: Bool
+	public let atomic: Bool
+}
+
+/// One piece of a key joined from a row's fields: fixed text, or the value at a path on the item, as a template literal writes it.
+public enum NativeKeyPart: Equatable, Sendable {
+	case text(String)
+	case path([String])
+}
+
+func decodeKeyParts(_ reader: Reader) throws -> [NativeKeyPart] {
+	try reader.array().map { part in
+		if case .string = part.value { return .text(try part.string()) }
+		return .path(try part.array().map { try $0.string() })
+	}
 }

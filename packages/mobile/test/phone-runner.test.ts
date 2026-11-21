@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { loadProjectGraph, type ProjectGraph } from '../../analyzer/test-support/project-graph.ts';
 import { allRungFolders } from '../proofs/ladder.ts';
 import { affectedRungs } from '../src/runner/affected.ts';
@@ -31,6 +31,7 @@ import {
 	transitionChunk,
 	type Chunk,
 } from '../src/runner/store.ts';
+import { simctl, SimulatorStuck, simulatorAnswers } from '../src/harness/simctl.ts';
 
 const queued: Chunk = {
 	state: 'queued',
@@ -126,6 +127,44 @@ describe('a chunk', () => {
 	});
 });
 
+describe('a simulator that stops answering simctl', () => {
+	// A stand-in xcrun: the simulator reads Booted, and `simctl ui … appearance` never returns while STUCK is set, as measured.
+	const bin = mkdtempSync(join(tmpdir(), 'markless-xcrun-'));
+	writeFileSync(
+		join(bin, 'xcrun'),
+		`#!/bin/sh
+if [ "$2" = list ]; then echo '{"devices":{"ios":[{"udid":"U","name":"n","state":"Booted"}]}}'; exit 0; fi
+if [ "$2" = ui ] && [ -n "$STUCK" ]; then exec sleep 30; fi
+echo light
+`,
+	);
+	chmodSync(join(bin, 'xcrun'), 0o755);
+	const path = process.env.PATH;
+	beforeAll(() => {
+		process.env.PATH = `${bin}:${path}`;
+	});
+	afterAll(() => {
+		process.env.PATH = path;
+		delete process.env.STUCK;
+		rmSync(bin, { recursive: true, force: true });
+	});
+	it('fails the call by name once its time is up', async () => {
+		process.env.STUCK = '1';
+		const call = simctl(['ui', 'U', 'appearance', 'light'], { timeoutMs: 300 });
+		await expect(call).rejects.toBeInstanceOf(SimulatorStuck);
+		await expect(call).rejects.toThrow(
+			'simctl ui U appearance light did not answer in 0.3 s: the simulator is stuck',
+		);
+	});
+
+	it('does not answer the health check though it reads Booted, so the runner restarts it', async () => {
+		process.env.STUCK = '1';
+		expect(await simulatorAnswers('U', 300)).toBe(false);
+		delete process.env.STUCK;
+		expect(await simulatorAnswers('U', 300)).toBe(true);
+	});
+});
+
 describe('a phone', () => {
 	const booting: PhoneState = { state: 'booting', since: 0 };
 
@@ -214,6 +253,14 @@ describe('the rungs a change affects, from the project graph', () => {
 });
 
 describe("the runner's checkout", () => {
+	// Inside the commit hook git exports GIT_DIR and GIT_INDEX_FILE, which would point these git calls at the real repository.
+	const hookEnv = Object.entries(process.env).filter(([key]) => key.startsWith('GIT_'));
+	beforeAll(() => {
+		for (const [key] of hookEnv) delete process.env[key];
+	});
+	afterAll(() => {
+		for (const [key, value] of hookEnv) process.env[key] = value;
+	});
 	const behind: CheckoutFacts = {
 		head: 'a'.repeat(40),
 		upstream: 'b'.repeat(40),
@@ -287,6 +334,9 @@ describe("the runner's checkout", () => {
 
 	it('reads a checkout behind origin/main from git, after fetching it', async () => {
 		const scratch = mkdtempSync(join(tmpdir(), 'runner-refresh-'));
+		// A pre-commit hook exports GIT_DIR and GIT_INDEX_FILE, which would aim git, here and in checkoutFacts, at the real repository.
+		const hookGit = Object.entries(process.env).filter(([key]) => key.startsWith('GIT_'));
+		for (const [key] of hookGit) delete process.env[key];
 		const git = (cwd: string, ...args: string[]) =>
 			execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
 				cwd,
@@ -313,6 +363,7 @@ describe("the runner's checkout", () => {
 			writeFileSync(join(runner, 'note.txt'), 'local work');
 			expect(planRefresh(await checkoutFacts(runner)).kind).toBe('kept');
 		} finally {
+			Object.assign(process.env, Object.fromEntries(hookGit));
 			rmSync(scratch, { recursive: true, force: true });
 		}
 	});

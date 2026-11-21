@@ -1,11 +1,15 @@
 // Compiles each yardstick app's pages for the phones with compileNativeApp and writes, per screen, whether it builds and
-// each refusal the compiler reported: `node packages/mobile/apps/measure.ts [--out <file.json>]`.
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+// each refusal the compiler reported: `node packages/mobile/apps/measure.ts [--out <file.json>] [--styles]`. With
+// `--styles`, each screen that builds also runs through Dragon (MARKLESS_DRAGON_DIR), since a styled screen reaches a
+// phone only with a style export.
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import type { CompilerDiagnostic } from '@markless/compiler';
 import { buildRouteManifestFromFileIds } from '@markless/router';
 import { compileNativeApp } from '../src/compile.ts';
+import { dragonStyleExport } from '../src/style-export.ts';
 import { readAppConfig, readRelativeStylesheet, readWorkspaceModule } from '../src/harness/rung.ts';
 
 export const APPS = ['notes', 'shop', 'checkin'] as const;
@@ -26,6 +30,11 @@ export type ScreenResult = {
 	readonly refusals: ReadonlyArray<Refusal>;
 	/** Handlers a phone runs only from a hardware keyboard: reported, not refusals. */
 	readonly keyboardOnly: number;
+	/**
+	 * With `--styles`, for a screen that builds: whether Dragon made its style export (`true`), the reason it refused
+	 * (a string), or `null` for a screen with no styles.
+	 */
+	readonly styled?: true | string | null;
 };
 
 function pageFiles(dir: string, under = 'pages'): string[] {
@@ -50,7 +59,7 @@ function lineOf(diagnostic: CompilerDiagnostic): number | null {
 	return line;
 }
 
-export async function measureApp(app: string): Promise<ScreenResult[]> {
+export async function measureApp(app: string, styles = false): Promise<ScreenResult[]> {
 	const dir = join(appsDir, app);
 	const pages = pageFiles(dir);
 	const document = join(dir, 'document.tsrx');
@@ -74,6 +83,7 @@ export async function measureApp(app: string): Promise<ScreenResult[]> {
 			readModule: readWorkspaceModule,
 			readStylesheet: readRelativeStylesheet,
 			...readAppConfig(join(dir, 'pages')),
+			partial: true,
 		});
 	} catch (error) {
 		const thrown = {
@@ -89,6 +99,26 @@ export async function measureApp(app: string): Promise<ScreenResult[]> {
 			refusals: [thrown],
 			keyboardOnly: 0,
 		}));
+	}
+	// Dragon's answer for each styled screen that builds, by route pattern.
+	const styledBy = new Map<string, true | string>();
+	if (styles) {
+		const scratch = mkdtempSync(join(tmpdir(), 'markless-measure-'));
+		try {
+			for (const input of build.styleInputs) {
+				const file = join(scratch, `${styledBy.size}.json`);
+				writeFileSync(file, JSON.stringify(input.input));
+				try {
+					dragonStyleExport(file);
+					styledBy.set(input.pattern, true);
+				} catch (error) {
+					const reasons = (error as Error).message.split('\n').slice(1).join(' ').trim();
+					styledBy.set(input.pattern, reasons || (error as Error).message);
+				}
+			}
+		} finally {
+			rmSync(scratch, { recursive: true, force: true });
+		}
 	}
 	return routes.map((route) => {
 		const own = build.diagnostics.filter((diagnostic) => diagnostic.page === route.file);
@@ -111,17 +141,23 @@ export async function measureApp(app: string): Promise<ScreenResult[]> {
 			keyboardOnly: own.filter(
 				(diagnostic) => diagnostic.code === 'MARKLESS_NATIVE_KEYBOARD_ONLY',
 			).length,
+			...(styles && errors.length === 0 ? { styled: styledBy.get(route.pattern) ?? null } : {}),
 		};
 	});
 }
 
 if (import.meta.main) {
-	const { values } = parseArgs({ options: { out: { type: 'string' } } });
+	const { values } = parseArgs({
+		options: { out: { type: 'string' }, styles: { type: 'boolean' } },
+	});
 	const report: Record<string, ScreenResult[]> = {};
 	for (const app of APPS) {
-		report[app] = await measureApp(app);
+		report[app] = await measureApp(app, values.styles === true);
 		const built = report[app].filter((screen) => screen.builds).length;
-		console.error(`${app}: ${built} of ${report[app].length} screens build`);
+		const runs = report[app].filter((screen) => screen.builds && screen.styled !== undefined && typeof screen.styled !== 'string').length;
+		console.error(
+			`${app}: ${built} of ${report[app].length} screens build${values.styles ? `, ${runs} with their styles` : ''}`,
+		);
 	}
 	const text = `${JSON.stringify(report, null, '\t')}\n`;
 	if (values.out) writeFileSync(values.out, text);

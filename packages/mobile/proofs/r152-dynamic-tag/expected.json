@@ -1,0 +1,30 @@
+{
+	"rung": 152,
+	"name": "A dynamic element (`<{tag}>`) is the element its tag names for each use, with its attributes, events and children",
+	"steps": [
+		{
+			"visible": [
+				"Notes",
+				"Tap the first note",
+				"Tap the second note",
+				"First taps: 0",
+				"Second taps: 0"
+			],
+			"absent": ["First taps: 1"]
+		},
+		{
+			"do": {
+				"tap": "Tap the first note"
+			},
+			"visible": ["First taps: 1", "Second taps: 0"],
+			"absent": ["First taps: 0"]
+		},
+		{
+			"do": {
+				"tap": "Tap the second note"
+			},
+			"visible": ["First taps: 1", "Second taps: 1"],
+			"absent": ["Second taps: 0"]
+		}
+	]
+}

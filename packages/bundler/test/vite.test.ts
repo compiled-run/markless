@@ -1450,6 +1450,58 @@ export function App() @{
 		});
 	});
 
+	test('a new file reported as changed before it is reported as added still refreshes the page listing and reloads', async () => {
+		// Linux inotify reports a fresh write as a change before chokidar reports the add.
+		const plugin = getAsyncPlugin();
+		const send = vi.fn();
+		const listing = {
+			id: '\0listing:client',
+			file: null,
+			url: '/@id/listing:client',
+			type: 'js',
+			importers: new Set(),
+		};
+		const environment = {
+			name: 'client',
+			config: { consumer: 'client' },
+			hot: { send },
+			moduleGraph: {
+				getModuleById: vi.fn(),
+				getModulesByFile: () => new Set(),
+				invalidateModule: vi.fn(),
+			},
+			plugins: [
+				{
+					name: 'vite:import-glob',
+					hotUpdate: (ctx: { type: string }) =>
+						ctx.type === 'update' ? undefined : [listing],
+				},
+			],
+		};
+		callConfigResolved(plugin, { base: '/', command: 'serve', root: '/workspace/app' });
+		callConfigureServer(plugin, {
+			config: { root: '/workspace/app' },
+			environments: { client: environment },
+		});
+		const added = {
+			file: '/workspace/app/pages/notes.tsrx',
+			modules: [],
+			read: async () => source,
+		};
+
+		await callHotUpdate(plugin, { ...added, timestamp: 1, type: 'update' }, { environment });
+		expect(send).not.toHaveBeenCalled();
+		await callHotUpdate(plugin, { ...added, timestamp: 2, type: 'create' }, { environment });
+
+		expect(environment.moduleGraph.invalidateModule).toHaveBeenCalledWith(
+			listing,
+			expect.anything(),
+			2,
+			true,
+		);
+		expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: 'full-reload' }));
+	});
+
 	test('server hot updates forward through the configured client environment', async () => {
 		const plugin = getPlugin(
 			markless({ clientEnvironment: 'browser', serverEnvironment: 'edge' }),

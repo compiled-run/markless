@@ -92,7 +92,7 @@ const breakdown = (attribution) =>
 		: '';
 
 // The owner weighs a page by the code it runs and downloads before a reader touches it, so neither may grow.
-// Linux CI's Chromium runs a few hundred chars more of one build at load than a Mac does, so each platform has its anchors.
+// Linux CI and a Mac measure some pages differently, so each platform has its anchors.
 export const LOAD_PLATFORM = `${process.platform}-${process.arch}`;
 
 function checkLoadWeight(subject, load, platform, anchor, fail, note) {

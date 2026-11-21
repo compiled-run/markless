@@ -38,9 +38,10 @@ pnpm --filter @markless/mobile phones affected [--base <rev>]             # whic
     - it runs the hosts' own tests, which are remembered per source set and simulator;
     - then, for each rung, it installs the app and runs the flow with Maestro, the tool that drives the phone through
       each flow. Maestro's driver app is installed once per phone boot, not before every flow.
-6. Before a phone takes a chunk, the runner checks that the phone answers (the simulator reads Booted; the emulator is
+6. Before a phone takes a chunk, the runner checks that the phone answers (the simulator reads Booted and answers `simctl ui <udid> appearance` within 60 s; the emulator is
    an adb `device` with `sys.boot_completed` 1). A phone that does not answer is restarted first, so a job never starts
-   on a dead phone. Idle phones are checked every 30 s as well.
+   on a dead phone. Idle phones are checked every 30 s as well. A simctl call in a chunk that does not answer in 60 s
+   fails that chunk's remaining rungs by name ("the simulator is stuck"), and the runner restarts the simulator.
 7. A rung whose flow never reached the phone (Maestro exited without recording one command, as with "Device emulator-5570
    was requested, but it is not connected") runs once more. If the phone also stops answering, the runner restarts it
    and runs every failed rung of that chunk once more. The result lists those rungs under "ran again because its phone was

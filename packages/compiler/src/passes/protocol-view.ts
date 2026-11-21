@@ -684,6 +684,7 @@ function keyedRepeatRecords(input: ProtocolViewPayloadInput) {
 				collectionGraphNodeId: repeat.collectionGraphNodeId,
 				collectionPath: repeat.collectionPath,
 				keyPath: repeat.keyPath,
+				...(repeat.keyParts ? { keyParts: repeat.keyParts } : {}),
 				...(positionKeyed ? { indexKey: true as const } : {}),
 				...branchArmField(input, repeat),
 				...asyncArmField(input, repeat),

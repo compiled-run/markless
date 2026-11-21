@@ -30,8 +30,10 @@ beforeAll(async () => {
 		join(root, 'node_modules/nitro'),
 		'dir',
 	);
+	// The idle tier off, so every fragment request below comes from the gesture under test.
 	await buildFixture({
 		root,
+		router: { prefetch: { idle: 'none' } },
 	});
 	const server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
@@ -50,14 +52,8 @@ afterAll(async () => {
 type Seen = { readonly path: string; readonly fragment: boolean; readonly purpose?: string };
 type Session = { readonly page: Page; readonly errors: string[]; readonly requests: Seen[] };
 
-// Save-Data turns the idle tier off, so every fragment request below comes from the gesture under test.
 async function open(browser: Browser, path = '/'): Promise<Session> {
 	const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
-	await page.addInitScript(() =>
-		Object.defineProperty(navigator, 'connection', {
-			value: { effectiveType: '4g', saveData: true },
-		}),
-	);
 	const errors: string[] = [];
 	const requests: Seen[] = [];
 	page.on('pageerror', (error) => errors.push(String(error)));

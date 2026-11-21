@@ -31,8 +31,16 @@ import dev.markless.mobile.core.num
 import dev.markless.mobile.core.obj
 import dev.markless.mobile.core.str
 import dev.markless.mobile.style.BAND_KEY
+import dev.markless.mobile.style.BandAtom
+import dev.markless.mobile.style.BandComparison
+import dev.markless.mobile.style.Bands
 import dev.markless.mobile.style.Rgba
+import dev.markless.mobile.style.GlyphRun
 import dev.markless.mobile.style.StyleExport
+import dev.markless.mobile.style.shownRows
+import dev.markless.mobile.style.rowStates
+import dev.markless.mobile.style.SystemFace
+import dev.markless.mobile.style.TextLine
 import dev.markless.mobile.style.StyleWrite
 import java.io.File
 import kotlin.system.exitProcess
@@ -200,9 +208,11 @@ private fun runVector(file: File, vector: Map<String, Json>, runtime: Runtime) {
 			continue
 		}
 		val name = EventName.entries.firstOrNull { it.wire == event } ?: throw IllegalStateException("steps[$n] has unknown event $event")
-		val value = action["value"]?.str("action.value")
+		val carried = when (name) { EventName.Keydown, EventName.Keyup -> "key"; EventName.Paste -> "text"; else -> "value" }
+		val value = action[carried]?.str("action.$carried")
 		val reason = action["reason"]?.str("action.reason")
-		val actual = runtime.dispatch(field(action, "host", "action").str("host"), name, value, reason, touchOf(action)).joinToString(",", "[", "]") { it.toJson() }
+		val detail = (action["detail"] as? Json.Num)?.value?.toInt()
+		val actual = runtime.dispatch(field(action, "host", "action").str("host"), name, if (name == EventName.Activate) null else value, reason, detail, touchOf(action)).joinToString(",", "[", "]") { it.toJson() }
 		val expected = canonical(field(s, "journal", "steps[$n]"))
 		check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
 	}
@@ -277,9 +287,10 @@ private fun decoderStrictness() {
 	val sheet = ok.replace("]}],\"events\"", "]},{\"kind\":\"sheet\",\"id\":\"s\",\"parent\":\"h0\",\"open\":{\"cell\":\"c\"},\"snapPoints\":[1],\"dismissible\":true,\"modal\":true},{\"kind\":\"element\",\"id\":\"h1\",\"element\":\"p\",\"parent\":\"s\"}],\"events\"")
 		.replace("\"handler\":\"x\"}]", "\"handler\":\"x\"},{\"host\":\"s\",\"event\":\"dismiss\",\"handler\":\"x\"}]")
 	check("decodes a sheet and its content", runCatching { Payload.decode(sheet.toByteArray()) }.getOrNull()?.nodes?.any { it is Node.Sheet && it.snapPoints == listOf(1.0) } == true) { runCatching { Payload.decode(sheet.toByteArray()) }.exceptionOrNull().toString() }
-	refuses("a sheet resting at one height below full", sheet.replace("\"snapPoints\":[1]", "\"snapPoints\":[0.5]"), "snapPoints")
+	check("decodes a sheet resting at one height below full", runCatching { Payload.decode(sheet.replace("\"snapPoints\":[1]", "\"snapPoints\":[0.5]").toByteArray()) }.getOrNull()?.nodes?.any { it is Node.Sheet && it.snapPoints == listOf(0.5) } == true) { "a sheet at [0.5] did not decode" }
+	refuses("a sheet resting at no height", sheet.replace("\"snapPoints\":[1]", "\"snapPoints\":[0]"), "snapPoints")
 	refuses("a sheet whose largest height is not full", sheet.replace("\"snapPoints\":[1]", "\"snapPoints\":[0.3,0.8]"), "snapPoints")
-	refuses("a sheet in an arm", sheet.replace("\"modal\":true", "\"modal\":true,\"arm\":{\"branch\":\"b\",\"index\":0}"), "unknown field \"arm\"")
+	refuses("a sheet in an arm of no branch", sheet.replace("\"modal\":true", "\"modal\":true,\"arm\":{\"branch\":\"b\",\"index\":0}"), "not a preceding branch")
 	refuses("a sheet inside a sheet", sheet.replace("\"parent\":\"s\"}", "\"parent\":\"s\"},{\"kind\":\"sheet\",\"id\":\"s2\",\"parent\":\"s\",\"open\":{\"literal\":false},\"snapPoints\":[1],\"dismissible\":false,\"modal\":true}"), "has a Sheet node as its parent")
 	refuses("a dismiss event on an element", sheet.replace("\"host\":\"s\",\"event\":\"dismiss\"", "\"host\":\"h0\",\"event\":\"dismiss\""), "names no sheet")
 	val script = ok.replace("{\"op\":\"assign\",\"cell\":\"c\",\"value\":{\"literal\":1}}", "{\"op\":\"script\",\"fn\":\"fn:0\",\"type\":\"click\",\"bindings\":{\"c\":{\"cell\":\"c\"}}}")
@@ -348,6 +359,73 @@ private fun styleExport(fixtures: File) {
 	}
 	refusesStyle("an unknown write kind", text.replace("\"kind\": \"text-color\"", "\"kind\": \"box-shadow\""), "unknown style write kind \"box-shadow\"")
 	refusesStyle("an unknown schema", text.replace("native-style-export/0", "native-style-export/9"), "unknown style export schema")
+}
+
+private fun dashedBorders(fixtures: File) {
+	val text = File(fixtures, "u17-borders-dashed.native-style.json").readText()
+	val export = runCatching { StyleExport.decode(text.toByteArray()) }
+	check("decodes the u17 export's border operations", export.isSuccess) { export.exceptionOrNull().toString() }
+	export.getOrNull()?.let { e ->
+		val byId = e.assignments[0].byId
+		check("a dashed box carries Dragon's fills", (byId["h2"]?.borderOps?.ops?.count { it.op == "fill" } ?: 0) > 20) { "${byId["h2"]?.borderOps}" }
+		check("a dotted box carries dots", byId["h3"]?.borderOps?.ops?.any { it.op == "dot" } == true) { "${byId["h3"]?.borderOps}" }
+		check("a solid box carries none", byId["h5"]?.borderOps == null) { "${byId["h5"]?.borderOps}" }
+	}
+	val err = try { StyleExport.decode(text.replace("\"op\": \"dot\"", "\"op\": \"arc\"").toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
+	check("style export refuses an unknown border operation", err?.contains("unknown border operation \"arc\"") == true) { "error was: $err" }
+}
+
+private fun textLines(fixtures: File) {
+	val text = File(fixtures, "u17-borders-dashed.native-style.json").readText()
+	val run = """{ "face": "sha256:ab", "size": 39.37, "glyphs": [65, 1501], "xs": [0, 26.048019409179688] }"""
+	fun withLines(lines: String) = text.replace("\"text\": \"Borders\",", "\"text\": \"Borders\", \"lines\": $lines,")
+	val good = withLines("""[{ "top": -0.1875, "baseline": 37.8125, "runs": [$run] }]""")
+	check("the fixture gains lines", good != text) { "" }
+	val decoded = runCatching { StyleExport.decode(good.toByteArray()) }
+	check("decodes a text node's lines", decoded.isSuccess) { decoded.exceptionOrNull().toString() }
+	decoded.getOrNull()?.let { e ->
+		val lines = e.assignments[0].byId["h1:text0"]?.lines
+		check("a line keeps Dragon's glyphs, xs and baseline", lines == listOf(TextLine(-0.1875, 37.8125, listOf(GlyphRun("sha256:ab", 39.37, listOf(65, 1501), listOf(0.0, 26.048019409179688)))))) { "$lines" }
+		check("a text node without lines has none", e.assignments[0].byId["h2:text0"]?.lines == null) { "${e.assignments[0].byId["h2:text0"]?.lines}" }
+	}
+	fun refusesLines(name: String, changed: String, fragment: String) {
+		val err = try { StyleExport.decode(changed.toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
+		check("style export refuses $name", err != null && err.contains(fragment)) { "error was: $err" }
+	}
+	refusesLines("lines that are not a list", withLines("{}"), "lines must be an array")
+	refusesLines("a line with an unknown field", withLines("""[{ "top": 0, "baseline": 1, "runs": [], "width": 3 }]"""), "unknown field")
+	refusesLines("a line without a baseline", withLines("""[{ "top": 0, "runs": [] }]"""), "baseline")
+	refusesLines("a run with fewer xs than glyphs", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "face": "sha256:ab", "size": 10, "glyphs": [1, 2], "xs": [0] }] }]"""), "one x per glyph")
+	refusesLines("an empty run", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "face": "sha256:ab", "size": 10, "glyphs": [], "xs": [] }] }]"""), "at least one glyph")
+	refusesLines("a fractional glyph id", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "face": "sha256:ab", "size": 10, "glyphs": [1.5], "xs": [0] }] }]"""), "not a glyph id")
+	refusesLines("a glyph id past 16 bits", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "face": "sha256:ab", "size": 10, "glyphs": [70000], "xs": [0] }] }]"""), "not a glyph id")
+	refusesLines("a zero size", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "face": "sha256:ab", "size": 0, "glyphs": [1], "xs": [0] }] }]"""), "not a positive size")
+	refusesLines("a run without a face", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "size": 10, "glyphs": [1], "xs": [0] }] }]"""), "face")
+	refusesLines("lines on an element", text.replace("\"text\": null,", "\"text\": null, \"lines\": [],"), "only a framed text node has lines")
+}
+
+private fun systemFonts(fixtures: File) {
+	val text = File(fixtures, "u17-borders-dashed.native-style.json").readText()
+	val roboto = """{ "file": "Roboto-Regular.ttf", "index": 0, "axes": { "ital": 0, "wdth": 100, "wght": 700 }, "sha256": "9ca9" }"""
+	fun withFaces(faces: String) = text.replaceFirst("\n \"fonts\": [", "\n \"systemFonts\": $faces,\n \"fonts\": [")
+	val good = withFaces("""[{ "id": "system:system-ui:700", "ios": { "face": { "kind": "system", "weight": 0.4, "design": "default" } }, "android": $roboto }]""")
+	check("the fixture gains system fonts", good != text) { "" }
+	val decoded = runCatching { StyleExport.decode(good.toByteArray()) }
+	check("decodes the system fonts", decoded.isSuccess) { decoded.exceptionOrNull().toString() }
+	check("a system face keeps its file, index and axes", decoded.getOrNull()?.systemFaces == mapOf("system:system-ui:700" to SystemFace("Roboto-Regular.ttf", 0, mapOf("ital" to 0.0, "wdth" to 100.0, "wght" to 700.0)))) { "${decoded.getOrNull()?.systemFaces}" }
+	check("an export without system fonts has none", StyleExport.decode(text.toByteArray()).systemFaces.isEmpty()) { "" }
+	fun refuses(name: String, faces: String, fragment: String) {
+		val err = try { StyleExport.decode(withFaces(faces).toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
+		check("style export refuses $name", err != null && err.contains(fragment)) { "error was: $err" }
+	}
+	refuses("system fonts that are not a list", "{}", "systemFonts must be an array")
+	refuses("a system face without an Android face", """[{ "id": "system:serif:400", "ios": {} }]""", "has no android face")
+	refuses("a system face id that is not one", """[{ "id": "sha256:ab", "android": $roboto }]""", "not a system face id")
+	refuses("a system face listed twice", """[{ "id": "system:serif:400", "android": $roboto }, { "id": "system:serif:400", "android": $roboto }]""", "twice")
+	refuses("a path for a file", """[{ "id": "system:serif:400", "android": { "file": "../etc/x.ttf", "index": 0, "axes": {}, "sha256": "a" } }]""", "not a file name")
+	refuses("an unknown field", """[{ "id": "system:serif:400", "android": { "file": "a.ttf", "index": 0, "axes": {}, "sha256": "a", "weight": 4 } }]""", "unknown field")
+	refuses("a fractional face index", """[{ "id": "system:serif:400", "android": { "file": "a.ttf", "index": 0.5, "axes": {}, "sha256": "a" } }]""", "not a face index")
+	refuses("an axis tag that is not four letters", """[{ "id": "system:serif:400", "android": { "file": "a.ttf", "index": 0, "axes": { "weight": 4 }, "sha256": "a" } }]""", "four-letter axis tag")
 }
 
 private fun ops() {
@@ -510,7 +588,11 @@ private fun appStyle(fixtures: File) {
 		check("app style refuses $name", err != null && err.contains(fragment)) { "error was: $err" }
 	}
 	// The fixture may be compact or formatted: each edit allows whitespace after a colon.
-	refusesApp("an atom of another media feature", text.replace(Regex("\"feature\":\\s*\"prefers-color-scheme\""), "\"feature\":\"width\""), "@media (width) is not implemented on Android")
+	val widthBands = Bands(listOf(BandAtom("width", "none", listOf(BandComparison("ge", 600.0, 0.0, 0.0)))), listOf(listOf(false), listOf(true)))
+	val byScheme = runCatching { widthBands.band(dark = false) }.exceptionOrNull()
+	check("a width band needs the page's size", byScheme is MarklessDecodeError && byScheme.message!!.contains("needs the page's size")) { "error was: $byScheme" }
+	val bySize = runCatching { widthBands.band(dark = false, widthPx = 1080.0, heightPx = 2203.0, scale = 2.625) }.exceptionOrNull()
+	check("a width band needs Dragon's lookup, which the JVM test does not link", Bands.library == null && bySize is MarklessDecodeError && bySize.message!!.contains("needs Dragon's band lookup")) { "error was: $bySize" }
 	refusesApp("an unknown version", text.replace("markless.native-app-style/0", "markless.native-app-style/9"), "unknown app style version")
 	refusesApp("a write index out of range", text.replace(Regex("\"writes\":\\s*\\d+(\\s*)}"), "\"writes\":99999$1}"), "not an index of the app's write lists")
 	refusesApp("an unknown route field", text.replace(Regex("\"pattern\":\\s*\"/help\""), "\"pattern\":\"/help\",\"extra\":1"), "unknown field \"extra\"")
@@ -582,6 +664,40 @@ private fun overlays() {
 	refuses("focused other than true", payload.replace("{\"focusOrigin\":{\"literal\":\"h1\"}}", "{\"focused\":false}"), "focused must be true")
 }
 
+/** The S21 rung's app style and payload as the harness builds them (proofs/s21-styled-rows, Dragon branch cw/markless-rows). */
+private fun rowStyles(fixtures: File) {
+	val style = StyleExport.decodeApp(File(fixtures, "s21-styled-rows.native-app-style.json").readBytes()).getValue("/")
+	val page = AppPayload.decodeOrNull(Json.parse(File(fixtures, "s21-styled-rows.payload.json").readBytes()))!!.routes.single { it.route.pattern == "/" }.page
+	val runtime = Runtime(page)
+	val cells = page.cells.filter { it.styled }.map { it.id }
+	val branches = page.nodes.filter { it is Node.Branch && it.row == null }.map { it.id }
+	val rowStates = style.rowStates(page)
+	check("the export's row state is the row class", rowStates == setOf("h5#class")) { "$rowStates" }
+	val start = runCatching { style.start(cells, runtime::value, false, true, branches, runtime::styleArm, rowStates) }
+	check("a page with styled rows starts at the template's own row state", start.isSuccess) { start.exceptionOrNull().toString() }
+	val k = start.getOrNull() ?: return
+	val rows = style.shownRows(page, runtime)(k).getValue("repeat:0")
+	check("each row is listed by its key", rows.map { it.key } == listOf("a", "b")) { "${rows.map { it.key }}" }
+	// The template is laid out at the first value the class lists, `note pinned`: row b's.
+	check("each row takes the assignment its own class reaches", rows[1].assignment == k && rows[0].assignment != k) { "${rows.map { it.assignment }} from $k" }
+	check("a row's text is its own", rows[1].texts["h6:text0"] == "Call the plumber about the kitchen tap before Friday") { "${rows[1].texts}" }
+}
+
+/** The S23 rung's: each size's aria-pressed is a comparison with the picked size, so its row state lists "true" and "false". */
+private fun rowPressedStyles(fixtures: File) {
+	val style = StyleExport.decodeApp(File(fixtures, "s23-styled-row-pressed.native-app-style.json").readBytes()).getValue("/")
+	val page = AppPayload.decodeOrNull(Json.parse(File(fixtures, "s23-styled-row-pressed.payload.json").readBytes()))!!.routes.single { it.route.pattern == "/" }.page
+	val runtime = Runtime(page)
+	val branches = page.nodes.filter { it is Node.Branch && it.row == null }.map { it.id }
+	val start = runCatching { style.start(page.cells.filter { it.styled }.map { it.id }, runtime::value, false, true, branches, runtime::styleArm, style.rowStates(page)) }
+	check("a page whose rows' aria-pressed follows a comparison starts", start.isSuccess) { start.exceptionOrNull().toString() }
+	val k = start.getOrNull() ?: return
+	val rows = runCatching { style.shownRows(page, runtime)(k).getValue("repeat:0") }
+	check("each row's aria-pressed is a value its row state lists", rows.isSuccess) { rows.exceptionOrNull().toString() }
+	// The template is laid out pressed, the first value the comparison gives: the picked Medium's row.
+	check("only the picked row takes the pressed assignment", rows.getOrNull()?.map { it.assignment == k } == listOf(false, true, false)) { "${rows.getOrNull()?.map { it.key to it.assignment }} from $k" }
+}
+
 fun main(args: Array<String>) {
 	routes()
 	arrays()
@@ -593,7 +709,12 @@ fun main(args: Array<String>) {
 	styleExport(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	appStyle(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	appCanvas(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	dashedBorders(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	textLines(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	systemFonts(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	sheetStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	rowStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	rowPressedStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	val dirs = args.map(::File)
 	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)

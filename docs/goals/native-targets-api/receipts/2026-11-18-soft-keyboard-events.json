@@ -1,0 +1,2528 @@
+{
+ "measured": "2026-11-18",
+ "page": "soft-keyboard-events.html",
+ "runs": [
+  {
+   "name": "ios-safari-typing",
+   "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1",
+   "steps": [
+    {
+     "step": "tap-field",
+     "events": [
+      {
+       "el": "field",
+       "type": "focus",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "key-a",
+     "events": [
+      {
+       "el": "field",
+       "type": "keydown",
+       "key": "a",
+       "code": "KeyA",
+       "keyCode": 65,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "keypress",
+       "key": "a",
+       "code": "KeyA",
+       "keyCode": 97,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "a",
+       "isComposing": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "a",
+       "isComposing": false,
+       "value": "a",
+       "cancelable": false
+      },
+      {
+       "el": "field",
+       "type": "keyup",
+       "key": "a",
+       "code": "KeyA",
+       "keyCode": 65,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "key-space",
+     "events": [
+      {
+       "el": "field",
+       "type": "keydown",
+       "key": " ",
+       "code": "Space",
+       "keyCode": 32,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "keypress",
+       "key": " ",
+       "code": "Space",
+       "keyCode": 32,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": " ",
+       "isComposing": false,
+       "value": "a",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "input",
+       "inputType": "insertText",
+       "data": " ",
+       "isComposing": false,
+       "value": "a ",
+       "cancelable": false
+      },
+      {
+       "el": "field",
+       "type": "keyup",
+       "key": " ",
+       "code": "Space",
+       "keyCode": 32,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a ",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "key-delete",
+     "events": [
+      {
+       "el": "field",
+       "type": "keydown",
+       "key": "Backspace",
+       "code": "Backspace",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a ",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "beforeinput",
+       "inputType": "deleteContentBackward",
+       "data": null,
+       "isComposing": false,
+       "value": "a ",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "input",
+       "inputType": "deleteContentBackward",
+       "data": null,
+       "isComposing": false,
+       "value": "a",
+       "cancelable": false
+      },
+      {
+       "el": "field",
+       "type": "keyup",
+       "key": "Backspace",
+       "code": "Backspace",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "key-shift",
+     "events": [
+      {
+       "el": "field",
+       "type": "keydown",
+       "key": "Shift",
+       "code": "ShiftLeft",
+       "keyCode": 16,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "key-B",
+     "events": [
+      {
+       "el": "field",
+       "type": "keydown",
+       "key": "B",
+       "code": "KeyB",
+       "keyCode": 66,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "keypress",
+       "key": "B",
+       "code": "KeyB",
+       "keyCode": 66,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "B",
+       "isComposing": false,
+       "value": "a",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "B",
+       "isComposing": false,
+       "value": "aB",
+       "cancelable": false
+      },
+      {
+       "el": "field",
+       "type": "keyup",
+       "key": "B",
+       "code": "KeyB",
+       "keyCode": 66,
+       "isComposing": false,
+       "repeat": false,
+       "value": "aB",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "keyup",
+       "key": "Shift",
+       "code": "ShiftLeft",
+       "keyCode": 16,
+       "isComposing": false,
+       "repeat": false,
+       "value": "aB",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "key-return",
+     "events": [
+      {
+       "el": "field",
+       "type": "keydown",
+       "key": "Enter",
+       "code": "Enter",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "aB",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "keypress",
+       "key": "Enter",
+       "code": "Enter",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "aB",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "change",
+       "value": "aB",
+       "cancelable": false
+      },
+      {
+       "el": "field",
+       "type": "keyup",
+       "key": "Enter",
+       "code": "Enter",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "aB",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "paste",
+     "events": [
+      {
+       "el": "field",
+       "type": "paste",
+       "text": "PX9",
+       "types": [
+        "text/plain"
+       ],
+       "value": "aB",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "beforeinput",
+       "inputType": "insertFromPaste",
+       "data": "PX9",
+       "isComposing": false,
+       "value": "aB",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "input",
+       "inputType": "insertFromPaste",
+       "data": "PX9",
+       "isComposing": false,
+       "value": "aB PX9",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "tap-plain",
+     "events": [
+      {
+       "el": "field",
+       "type": "change",
+       "value": "aB PX9",
+       "cancelable": false
+      },
+      {
+       "el": "field",
+       "type": "blur",
+       "value": "aB PX9",
+       "cancelable": false
+      },
+      {
+       "el": "plain",
+       "type": "focus",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "plain-t",
+     "events": [
+      {
+       "el": "plain",
+       "type": "keydown",
+       "key": "T",
+       "code": "KeyT",
+       "keyCode": 84,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "keypress",
+       "key": "T",
+       "code": "KeyT",
+       "keyCode": 84,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "T",
+       "isComposing": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "T",
+       "isComposing": false,
+       "value": "T",
+       "cancelable": false
+      },
+      {
+       "el": "plain",
+       "type": "keyup",
+       "key": "T",
+       "code": "KeyT",
+       "keyCode": 84,
+       "isComposing": false,
+       "repeat": false,
+       "value": "T",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "plain-e",
+     "events": [
+      {
+       "el": "plain",
+       "type": "keydown",
+       "key": "e",
+       "code": "KeyE",
+       "keyCode": 69,
+       "isComposing": false,
+       "repeat": false,
+       "value": "T",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "keypress",
+       "key": "e",
+       "code": "KeyE",
+       "keyCode": 101,
+       "isComposing": false,
+       "repeat": false,
+       "value": "T",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "e",
+       "isComposing": false,
+       "value": "T",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "e",
+       "isComposing": false,
+       "value": "Te",
+       "cancelable": false
+      },
+      {
+       "el": "plain",
+       "type": "keyup",
+       "key": "e",
+       "code": "KeyE",
+       "keyCode": 69,
+       "isComposing": false,
+       "repeat": false,
+       "value": "Te",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "plain-h",
+     "events": [
+      {
+       "el": "plain",
+       "type": "keydown",
+       "key": "h",
+       "code": "KeyH",
+       "keyCode": 72,
+       "isComposing": false,
+       "repeat": false,
+       "value": "Te",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "keypress",
+       "key": "h",
+       "code": "KeyH",
+       "keyCode": 104,
+       "isComposing": false,
+       "repeat": false,
+       "value": "Te",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "h",
+       "isComposing": false,
+       "value": "Te",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "h",
+       "isComposing": false,
+       "value": "Teh",
+       "cancelable": false
+      },
+      {
+       "el": "plain",
+       "type": "keyup",
+       "key": "h",
+       "code": "KeyH",
+       "keyCode": 72,
+       "isComposing": false,
+       "repeat": false,
+       "value": "Teh",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "plain-space",
+     "events": [
+      {
+       "el": "plain",
+       "type": "keydown",
+       "key": " ",
+       "code": "Space",
+       "keyCode": 32,
+       "isComposing": false,
+       "repeat": false,
+       "value": "Teh",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "keypress",
+       "key": " ",
+       "code": "Space",
+       "keyCode": 32,
+       "isComposing": false,
+       "repeat": false,
+       "value": "Teh",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "beforeinput",
+       "inputType": "insertReplacementText",
+       "data": "The",
+       "isComposing": false,
+       "value": "Teh",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "input",
+       "inputType": "insertReplacementText",
+       "data": "The",
+       "isComposing": false,
+       "value": "The",
+       "cancelable": false
+      },
+      {
+       "el": "plain",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": " ",
+       "isComposing": false,
+       "value": "The",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "input",
+       "inputType": "insertText",
+       "data": " ",
+       "isComposing": false,
+       "value": "The ",
+       "cancelable": false
+      },
+      {
+       "el": "plain",
+       "type": "keyup",
+       "key": " ",
+       "code": "Space",
+       "keyCode": 32,
+       "isComposing": false,
+       "repeat": false,
+       "value": "The ",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "tap-notes",
+     "events": [
+      {
+       "el": "plain",
+       "type": "change",
+       "value": "The ",
+       "cancelable": false
+      },
+      {
+       "el": "plain",
+       "type": "blur",
+       "value": "The ",
+       "cancelable": false
+      },
+      {
+       "el": "notes",
+       "type": "focus",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "notes-a",
+     "events": [
+      {
+       "el": "notes",
+       "type": "keydown",
+       "key": "a",
+       "code": "KeyA",
+       "keyCode": 65,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "keypress",
+       "key": "a",
+       "code": "KeyA",
+       "keyCode": 97,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "a",
+       "isComposing": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "a",
+       "isComposing": false,
+       "value": "a",
+       "cancelable": false
+      },
+      {
+       "el": "notes",
+       "type": "keyup",
+       "key": "a",
+       "code": "KeyA",
+       "keyCode": 65,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "notes-return",
+     "events": [
+      {
+       "el": "notes",
+       "type": "keydown",
+       "key": "Enter",
+       "code": "Enter",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "keypress",
+       "key": "Enter",
+       "code": "Enter",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "beforeinput",
+       "inputType": "insertLineBreak",
+       "data": null,
+       "isComposing": false,
+       "value": "a",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "input",
+       "inputType": "insertLineBreak",
+       "data": null,
+       "isComposing": false,
+       "value": "a\n",
+       "cancelable": false
+      },
+      {
+       "el": "notes",
+       "type": "keyup",
+       "key": "Enter",
+       "code": "Enter",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a\n",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "notes-delete",
+     "events": [
+      {
+       "el": "notes",
+       "type": "keydown",
+       "key": "Backspace",
+       "code": "Backspace",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a\n",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "beforeinput",
+       "inputType": "deleteContentBackward",
+       "data": null,
+       "isComposing": false,
+       "value": "a\n",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "input",
+       "inputType": "deleteContentBackward",
+       "data": null,
+       "isComposing": false,
+       "value": "a",
+       "cancelable": false
+      },
+      {
+       "el": "notes",
+       "type": "keyup",
+       "key": "Backspace",
+       "code": "Backspace",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "tap-outside",
+     "events": [
+      {
+       "el": "notes",
+       "type": "change",
+       "value": "a",
+       "cancelable": false
+      },
+      {
+       "el": "notes",
+       "type": "blur",
+       "value": "a",
+       "cancelable": false
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "ios-safari-prevent-default",
+   "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1",
+   "steps": [
+    {
+     "step": "tap-last",
+     "events": [
+      {
+       "el": "last",
+       "type": "focus",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "last-a",
+     "events": [
+      {
+       "el": "last",
+       "type": "keydown",
+       "key": "A",
+       "code": "KeyA",
+       "keyCode": 65,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "last",
+       "type": "keypress",
+       "key": "A",
+       "code": "KeyA",
+       "keyCode": 65,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "last",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "A",
+       "isComposing": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "last",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "A",
+       "isComposing": false,
+       "value": "A",
+       "cancelable": false
+      },
+      {
+       "el": "last",
+       "type": "keyup",
+       "key": "A",
+       "code": "KeyA",
+       "keyCode": 65,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "last-delete",
+     "events": [
+      {
+       "el": "last",
+       "type": "keydown",
+       "key": "Backspace",
+       "code": "Backspace",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true,
+       "prevented": true
+      },
+      {
+       "el": "last",
+       "type": "keyup",
+       "key": "Backspace",
+       "code": "Backspace",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "last-return",
+     "events": [
+      {
+       "el": "last",
+       "type": "keydown",
+       "key": "Enter",
+       "code": "Enter",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true,
+       "prevented": true
+      },
+      {
+       "el": "last",
+       "type": "keyup",
+       "key": "Enter",
+       "code": "Enter",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "tap-plain-empty",
+     "events": [
+      {
+       "el": "last",
+       "type": "change",
+       "value": "A",
+       "cancelable": false
+      },
+      {
+       "el": "last",
+       "type": "blur",
+       "value": "A",
+       "cancelable": false
+      },
+      {
+       "el": "plain",
+       "type": "focus",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "tap-notes",
+     "events": [
+      {
+       "el": "plain",
+       "type": "blur",
+       "value": "",
+       "cancelable": false
+      },
+      {
+       "el": "notes",
+       "type": "focus",
+       "value": "",
+       "cancelable": false
+      },
+      {
+       "el": "notes",
+       "type": "keydown",
+       "key": "Shift",
+       "code": "ShiftLeft",
+       "keyCode": 16,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "notes-a",
+     "events": [
+      {
+       "el": "notes",
+       "type": "blur",
+       "value": "",
+       "cancelable": false
+      },
+      {
+       "el": "last",
+       "type": "focus",
+       "value": "A",
+       "cancelable": false
+      },
+      {
+       "el": "last",
+       "type": "keyup",
+       "key": "Shift",
+       "code": "ShiftLeft",
+       "keyCode": 16,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "tap-outside",
+     "events": [
+      {
+       "el": "last",
+       "type": "blur",
+       "value": "A",
+       "cancelable": false
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "ios-safari-prevent-default-2",
+   "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1",
+   "steps": [
+    {
+     "step": "tap-field-empty",
+     "events": [
+      {
+       "el": "field",
+       "type": "focus",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "empty-delete",
+     "events": [
+      {
+       "el": "field",
+       "type": "keydown",
+       "key": "Backspace",
+       "code": "Backspace",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true,
+       "prevented": true
+      },
+      {
+       "el": "field",
+       "type": "keyup",
+       "key": "Backspace",
+       "code": "Backspace",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "tap-notes",
+     "events": [
+      {
+       "el": "field",
+       "type": "blur",
+       "value": "",
+       "cancelable": false
+      },
+      {
+       "el": "notes",
+       "type": "focus",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "notes-a",
+     "events": [
+      {
+       "el": "notes",
+       "type": "blur",
+       "value": "",
+       "cancelable": false
+      },
+      {
+       "el": "last",
+       "type": "focus",
+       "value": "A",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "notes-return",
+     "events": [
+      {
+       "el": "last",
+       "type": "keydown",
+       "key": "Enter",
+       "code": "Enter",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true,
+       "prevented": true
+      },
+      {
+       "el": "last",
+       "type": "keyup",
+       "key": "Enter",
+       "code": "Enter",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "ios-safari-prevent-default-3",
+   "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1",
+   "steps": [
+    {
+     "step": "tap-notes",
+     "events": [
+      {
+       "el": "notes",
+       "type": "focus",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "notes-q",
+     "events": [
+      {
+       "el": "notes",
+       "type": "keydown",
+       "key": "q",
+       "code": "KeyQ",
+       "keyCode": 81,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "keypress",
+       "key": "q",
+       "code": "KeyQ",
+       "keyCode": 113,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "q",
+       "isComposing": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "q",
+       "isComposing": false,
+       "value": "q",
+       "cancelable": false
+      },
+      {
+       "el": "notes",
+       "type": "keyup",
+       "key": "q",
+       "code": "KeyQ",
+       "keyCode": 81,
+       "isComposing": false,
+       "repeat": false,
+       "value": "q",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "notes-return",
+     "events": [
+      {
+       "el": "notes",
+       "type": "keydown",
+       "key": "Enter",
+       "code": "Enter",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "q",
+       "cancelable": true,
+       "prevented": true
+      },
+      {
+       "el": "notes",
+       "type": "keyup",
+       "key": "Enter",
+       "code": "Enter",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "q",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "paste",
+     "events": [
+      {
+       "el": "notes",
+       "type": "paste",
+       "text": "PX9",
+       "types": [
+        "text/plain"
+       ],
+       "value": "q",
+       "cancelable": true,
+       "prevented": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "android-chrome-typing",
+   "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Mobile Safari/537.36",
+   "steps": [
+    {
+     "step": "(before the first step)",
+     "events": [
+      {
+       "el": "field",
+       "type": "focus",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "key-a",
+     "events": [
+      {
+       "el": "field",
+       "type": "keydown",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "a",
+       "isComposing": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "a",
+       "isComposing": false,
+       "value": "a",
+       "cancelable": false
+      },
+      {
+       "el": "field",
+       "type": "keyup",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "key-s",
+     "events": [
+      {
+       "el": "field",
+       "type": "keydown",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "s",
+       "isComposing": false,
+       "value": "a",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "s",
+       "isComposing": false,
+       "value": "as",
+       "cancelable": false
+      },
+      {
+       "el": "field",
+       "type": "keyup",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "as",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "key-space",
+     "events": [
+      {
+       "el": "field",
+       "type": "keydown",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "as",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": " ",
+       "isComposing": false,
+       "value": "as",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "input",
+       "inputType": "insertText",
+       "data": " ",
+       "isComposing": false,
+       "value": "as ",
+       "cancelable": false
+      },
+      {
+       "el": "field",
+       "type": "keyup",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "as ",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "key-delete",
+     "events": [
+      {
+       "el": "field",
+       "type": "keydown",
+       "key": "Backspace",
+       "code": "",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "as ",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "beforeinput",
+       "inputType": "deleteContentBackward",
+       "data": null,
+       "isComposing": false,
+       "value": "as ",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "input",
+       "inputType": "deleteContentBackward",
+       "data": null,
+       "isComposing": false,
+       "value": "as",
+       "cancelable": false
+      },
+      {
+       "el": "field",
+       "type": "keyup",
+       "key": "Backspace",
+       "code": "",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "as",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "key-B",
+     "events": [
+      {
+       "el": "field",
+       "type": "keydown",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "as",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "B",
+       "isComposing": false,
+       "value": "as",
+       "cancelable": true
+      },
+      {
+       "el": "field",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "B",
+       "isComposing": false,
+       "value": "asB",
+       "cancelable": false
+      },
+      {
+       "el": "field",
+       "type": "keyup",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "asB",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "key-enter",
+     "events": [
+      {
+       "el": "field",
+       "type": "change",
+       "value": "asB",
+       "cancelable": false
+      },
+      {
+       "el": "field",
+       "type": "blur",
+       "value": "asB",
+       "cancelable": false
+      },
+      {
+       "el": "plain",
+       "type": "focus",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "plain-t",
+     "events": [
+      {
+       "el": "plain",
+       "type": "keydown",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "T",
+       "isComposing": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "T",
+       "isComposing": false,
+       "value": "T",
+       "cancelable": false
+      },
+      {
+       "el": "plain",
+       "type": "keyup",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "T",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "plain-e",
+     "events": [
+      {
+       "el": "plain",
+       "type": "keydown",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "T",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "e",
+       "isComposing": false,
+       "value": "T",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "e",
+       "isComposing": false,
+       "value": "Te",
+       "cancelable": false
+      },
+      {
+       "el": "plain",
+       "type": "keyup",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "Te",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "plain-h",
+     "events": [
+      {
+       "el": "plain",
+       "type": "keydown",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "Te",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "h",
+       "isComposing": false,
+       "value": "Te",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "h",
+       "isComposing": false,
+       "value": "Teh",
+       "cancelable": false
+      },
+      {
+       "el": "plain",
+       "type": "keyup",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "Teh",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "plain-space",
+     "events": [
+      {
+       "el": "plain",
+       "type": "keydown",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "Teh",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "beforeinput",
+       "inputType": "deleteContentBackward",
+       "data": null,
+       "isComposing": false,
+       "value": "Teh",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "input",
+       "inputType": "deleteContentBackward",
+       "data": null,
+       "isComposing": false,
+       "value": "",
+       "cancelable": false
+      },
+      {
+       "el": "plain",
+       "type": "keyup",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "keydown",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "The ",
+       "isComposing": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "plain",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "The ",
+       "isComposing": false,
+       "value": "The ",
+       "cancelable": false
+      },
+      {
+       "el": "plain",
+       "type": "keyup",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "The ",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "copy",
+     "events": [
+      {
+       "el": "plain",
+       "type": "copy",
+       "value": "The ",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "tap-notes",
+     "events": [
+      {
+       "el": "plain",
+       "type": "change",
+       "value": "The ",
+       "cancelable": false
+      },
+      {
+       "el": "plain",
+       "type": "blur",
+       "value": "The ",
+       "cancelable": false
+      },
+      {
+       "el": "notes",
+       "type": "focus",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "menu-paste",
+     "events": [
+      {
+       "el": "notes",
+       "type": "paste",
+       "text": "The",
+       "types": [
+        "text/plain"
+       ],
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "beforeinput",
+       "inputType": "insertFromPaste",
+       "data": "The",
+       "isComposing": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "input",
+       "inputType": "insertFromPaste",
+       "data": "The",
+       "isComposing": false,
+       "value": "The",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "gboard-clip-chip",
+     "events": [
+      {
+       "el": "notes",
+       "type": "keydown",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "The",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "y ",
+       "isComposing": false,
+       "value": "The",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "y ",
+       "isComposing": false,
+       "value": "They ",
+       "cancelable": false
+      },
+      {
+       "el": "notes",
+       "type": "keyup",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "They ",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "notes-a",
+     "events": [
+      {
+       "el": "notes",
+       "type": "keydown",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "They ",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "a",
+       "isComposing": false,
+       "value": "They ",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "a",
+       "isComposing": false,
+       "value": "They a",
+       "cancelable": false
+      },
+      {
+       "el": "notes",
+       "type": "keyup",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "They a",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "notes-enter",
+     "events": [
+      {
+       "el": "notes",
+       "type": "keydown",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "They a",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "keyup",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "They a",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "keydown",
+       "key": "Enter",
+       "code": "",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "They a",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "keypress",
+       "key": "Enter",
+       "code": "",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "They a",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "beforeinput",
+       "inputType": "insertLineBreak",
+       "data": null,
+       "isComposing": false,
+       "value": "They a",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "input",
+       "inputType": "insertLineBreak",
+       "data": null,
+       "isComposing": false,
+       "value": "They a\n",
+       "cancelable": false
+      },
+      {
+       "el": "notes",
+       "type": "keyup",
+       "key": "Enter",
+       "code": "",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "They a\n",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "notes-delete",
+     "events": [
+      {
+       "el": "notes",
+       "type": "keydown",
+       "key": "Backspace",
+       "code": "",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "They a\n",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "beforeinput",
+       "inputType": "deleteContentBackward",
+       "data": null,
+       "isComposing": false,
+       "value": "They a\n",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "input",
+       "inputType": "deleteContentBackward",
+       "data": null,
+       "isComposing": false,
+       "value": "They a",
+       "cancelable": false
+      },
+      {
+       "el": "notes",
+       "type": "keyup",
+       "key": "Backspace",
+       "code": "",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "They a",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "tap-outside",
+     "events": [
+      {
+       "el": "notes",
+       "type": "change",
+       "value": "They a",
+       "cancelable": false
+      },
+      {
+       "el": "notes",
+       "type": "blur",
+       "value": "They a",
+       "cancelable": false
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "android-chrome-go-key",
+   "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Mobile Safari/537.36",
+   "steps": [
+    {
+     "step": "tap-last",
+     "events": [
+      {
+       "el": "last",
+       "type": "focus",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "last-a",
+     "events": [
+      {
+       "el": "last",
+       "type": "keydown",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "last",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "A",
+       "isComposing": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "last",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "A",
+       "isComposing": false,
+       "value": "A",
+       "cancelable": false
+      },
+      {
+       "el": "last",
+       "type": "keyup",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "last-go",
+     "events": [
+      {
+       "el": "last",
+       "type": "keydown",
+       "key": "Enter",
+       "code": "",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true
+      },
+      {
+       "el": "last",
+       "type": "keypress",
+       "key": "Enter",
+       "code": "",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true
+      },
+      {
+       "el": "last",
+       "type": "beforeinput",
+       "inputType": "insertLineBreak",
+       "data": null,
+       "isComposing": false,
+       "value": "A",
+       "cancelable": true
+      },
+      {
+       "el": "last",
+       "type": "change",
+       "value": "A",
+       "cancelable": false
+      },
+      {
+       "el": "last",
+       "type": "keyup",
+       "key": "Enter",
+       "code": "",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "last-delete-after",
+     "events": [
+      {
+       "el": "last",
+       "type": "keydown",
+       "key": "Backspace",
+       "code": "",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true
+      },
+      {
+       "el": "last",
+       "type": "beforeinput",
+       "inputType": "deleteContentBackward",
+       "data": null,
+       "isComposing": false,
+       "value": "A",
+       "cancelable": true
+      },
+      {
+       "el": "last",
+       "type": "input",
+       "inputType": "deleteContentBackward",
+       "data": null,
+       "isComposing": false,
+       "value": "",
+       "cancelable": false
+      },
+      {
+       "el": "last",
+       "type": "keyup",
+       "key": "Backspace",
+       "code": "",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "android-chrome-prevent-default",
+   "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Mobile Safari/537.36",
+   "steps": [
+    {
+     "step": "tap-last",
+     "events": [
+      {
+       "el": "last",
+       "type": "focus",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "last-a",
+     "events": [
+      {
+       "el": "last",
+       "type": "keydown",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "last",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "A",
+       "isComposing": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "last",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "A",
+       "isComposing": false,
+       "value": "A",
+       "cancelable": false
+      },
+      {
+       "el": "last",
+       "type": "keyup",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "last-delete",
+     "events": [
+      {
+       "el": "last",
+       "type": "keydown",
+       "key": "Backspace",
+       "code": "",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true,
+       "prevented": true
+      },
+      {
+       "el": "last",
+       "type": "keyup",
+       "key": "Backspace",
+       "code": "",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "last-go",
+     "events": [
+      {
+       "el": "last",
+       "type": "keydown",
+       "key": "Enter",
+       "code": "",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true,
+       "prevented": true
+      },
+      {
+       "el": "last",
+       "type": "keyup",
+       "key": "Enter",
+       "code": "",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "A",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "tap-plain-empty",
+     "events": [
+      {
+       "el": "last",
+       "type": "change",
+       "value": "A",
+       "cancelable": false
+      },
+      {
+       "el": "last",
+       "type": "blur",
+       "value": "A",
+       "cancelable": false
+      },
+      {
+       "el": "plain",
+       "type": "focus",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "empty-delete",
+     "events": [
+      {
+       "el": "plain",
+       "type": "keydown",
+       "key": "Backspace",
+       "code": "",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true,
+       "prevented": true
+      },
+      {
+       "el": "plain",
+       "type": "keyup",
+       "key": "Backspace",
+       "code": "",
+       "keyCode": 8,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "(before the first step)",
+     "events": [
+      {
+       "el": "last",
+       "type": "change",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "tap-notes",
+     "events": [
+      {
+       "el": "plain",
+       "type": "blur",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "(before the first step)",
+     "events": [
+      {
+       "el": "last",
+       "type": "blur",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "tap-notes",
+     "events": [
+      {
+       "el": "notes",
+       "type": "focus",
+       "value": "",
+       "cancelable": false
+      }
+     ]
+    },
+    {
+     "step": "notes-a",
+     "events": [
+      {
+       "el": "notes",
+       "type": "keydown",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "beforeinput",
+       "inputType": "insertText",
+       "data": "a",
+       "isComposing": false,
+       "value": "",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "input",
+       "inputType": "insertText",
+       "data": "a",
+       "isComposing": false,
+       "value": "a",
+       "cancelable": false
+      },
+      {
+       "el": "notes",
+       "type": "keyup",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "notes-enter",
+     "events": [
+      {
+       "el": "notes",
+       "type": "keydown",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "keyup",
+       "key": "Unidentified",
+       "code": "",
+       "keyCode": 229,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true
+      },
+      {
+       "el": "notes",
+       "type": "keydown",
+       "key": "Enter",
+       "code": "",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true,
+       "prevented": true
+      },
+      {
+       "el": "notes",
+       "type": "keyup",
+       "key": "Enter",
+       "code": "",
+       "keyCode": 13,
+       "isComposing": false,
+       "repeat": false,
+       "value": "a",
+       "cancelable": true
+      }
+     ]
+    },
+    {
+     "step": "menu-paste",
+     "events": [
+      {
+       "el": "notes",
+       "type": "paste",
+       "text": "The",
+       "types": [
+        "text/plain"
+       ],
+       "value": "a",
+       "cancelable": true,
+       "prevented": true
+      }
+     ]
+    },
+    {
+     "step": "tap-outside",
+     "events": [
+      {
+       "el": "notes",
+       "type": "change",
+       "value": "a",
+       "cancelable": false
+      },
+      {
+       "el": "notes",
+       "type": "blur",
+       "value": "a",
+       "cancelable": false
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

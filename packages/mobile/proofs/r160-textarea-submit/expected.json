@@ -1,0 +1,63 @@
+{
+	"rung": 160,
+	"name": "A textarea's text is its default value: it follows its state until a person edits it, and its form submits what it holds",
+	"steps": [
+		{
+			"visible": ["Postcard", "Draft Hello", "Nothing sent"],
+			"fields": {
+				"Note": "Hello",
+				"Sign": "Ada"
+			}
+		},
+		{
+			"do": {
+				"tap": "Suggest"
+			},
+			"visible": ["Draft Suggested", "Nothing sent"],
+			"fields": {
+				"Note": "Suggested",
+				"Sign": "Ada"
+			},
+			"absent": ["Draft Hello"]
+		},
+		{
+			"do": {
+				"tap": "Send"
+			},
+			"visible": ["Sent Suggested and Ada"],
+			"absent": ["Nothing sent"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Note",
+					"text": "Mine"
+				}
+			},
+			"visible": ["Draft Suggested", "Sent Suggested and Ada"],
+			"fields": {
+				"Note": "Mine",
+				"Sign": "Ada"
+			},
+			"absent": ["Draft Other"]
+		},
+		{
+			"do": {
+				"tap": "Suggest"
+			},
+			"visible": ["Draft Other", "Sent Suggested and Ada"],
+			"fields": {
+				"Note": "Mine",
+				"Sign": "Ada"
+			},
+			"absent": ["Draft Suggested"]
+		},
+		{
+			"do": {
+				"tap": "Send"
+			},
+			"visible": ["Sent Mine and Ada"],
+			"absent": ["Sent Suggested and Ada"]
+		}
+	]
+}

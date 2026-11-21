@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { NATIVE_REFUSALS } from '@markless/compiler/native';
+import {
+	NATIVE_KEYBOARD_ONLY_CODE,
+	NATIVE_DROP_ONLY_CODE,
+	NATIVE_MOUSE_ONLY_CODE,
+	NATIVE_REFUSALS,
+} from '@markless/compiler/native';
 import { buildRouteManifestFromFileIds, matchRouteManifest } from '@markless/router';
 import type {
 	NativeAppPayload,
@@ -20,7 +25,7 @@ import {
 } from '../src/index.ts';
 import { compileRungApp, readAppConfig, readWorkspaceModule } from '../src/harness/rung.ts';
 import { echoText } from '../src/harness/echo-server.ts';
-import { nativeMaxLength } from '@markless/serializer/native-view';
+import { nativeMaxLength, nativeRangeValue } from '@markless/serializer/native-view';
 import { nodeScriptHost } from '../src/node-engine.ts';
 import {
 	looksOnly,
@@ -44,7 +49,11 @@ const typedInto = (text: string, maxlength: string | null) => {
 // The native column before any device: each rung's payload, run by the reference runtime, must show what the
 // web build shows; a rung the compiler cannot lower yet must be refused by name, never emitted half right.
 const NATIVE_UNSUPPORTED = 'MARKLESS_NATIVE_UNSUPPORTED';
-const NATIVE_KEYBOARD_ONLY = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
+/** Whether a field's `value` property is bound; any other `value` write is a textarea's default value. */
+const bindsValue = (nodeOf: ReadonlyMap<string, NativeViewPayload['nodes'][number]>, id: string) => {
+	const node = nodeOf.get(id.split('@')[0]!);
+	return node?.kind === 'element' && (node.bindings ?? []).some((binding) => 'property' in binding && binding.property === 'value');
+};
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
 const REFUSED_RUNGS = new Set(['y4-sheet-beside-drawer', 'j7-page-refused']);
 
@@ -205,8 +214,10 @@ function mirror(
 		else if (entry.op === 'title') title = entry.value;
 		else if (entry.op === 'attribute')
 			attributes.set(`${entry.node}\0${entry.name}`, entry.value);
-		else if (entry.op === 'property') properties.set(entry.node, entry.value);
-		else if (entry.op === 'navigate') {
+		else if (entry.op === 'property') {
+			// A textarea's default value reaches its text, which this column does not compare.
+			if (bindsValue(nodeOf, entry.node)) properties.set(entry.node, entry.value);
+		} else if (entry.op === 'navigate') {
 			// One page per rung: a navigation opens this page again with the link's params.
 			expect(entry.route, `step ${index}: the link's route`).toBe(payload.route?.pattern);
 			mount(createNativeRuntime(payload, store, entry.params));
@@ -230,6 +241,14 @@ function mirror(
 					const text = kept.get(id) ?? fresh.get(id);
 					if (text !== undefined) texts.set(id, text);
 				}
+			// A row's copy is built with its bound attributes, as an arm's nodes are; a row that left takes its own with it.
+			const inRows = (id: string) => {
+				const at = id.indexOf('@');
+				return at >= 0 && rowNodes.includes(id.slice(0, at));
+			};
+			for (const key of attributes.keys()) if (inRows(key.split('\0')[0]!)) attributes.delete(key);
+			for (const [node, name, value] of runtime.attributes())
+				if (inRows(node) && entry.keys.includes(node.slice(node.indexOf('@') + 1))) attributes.set(`${node}\0${name}`, value);
 		} else if (entry.op === 'arm') {
 			chosen.set(entry.node, entry.index);
 			for (const [node, index] of runtime.arms())
@@ -281,6 +300,9 @@ function mirror(
 			expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 			for (const text of step.absent ?? [])
 				expect(shown, `step ${index}`).not.toContain(text);
+			// Which texts a page's styles hide is Dragon's layout; the payload must still hold them.
+			for (const text of step.hidden ?? [])
+				expect([...open.values()], `step ${index}`).toContain(text);
 			if (step.order)
 				expect(shown.filter((text) => step.order!.includes(text))).toEqual(step.order);
 			if (step.title !== undefined)
@@ -363,8 +385,11 @@ function walkApp(
 				`step ${index}: Back journals only what it cancels`,
 			).toEqual([]);
 			stack.pop();
-		} else if (looksOnly(action) || (action && ('swipe' in action || 'scrollTo' in action))) {
-			// Neither the appearance nor a sheet's resting height or scroll changes state: the hosts restyle and lay out.
+		} else if (
+			looksOnly(action) ||
+			(action && ('swipe' in action || 'scrollTo' in action || 'orientation' in action))
+		) {
+			// Neither the appearance, a rotation, nor a sheet's resting height or scroll changes state: the hosts restyle and lay out.
 		} else if (action) {
 			const top = stack.at(-1)!;
 			const host = top.elementReading(
@@ -459,6 +484,8 @@ function walk(
 	const services = scriptServices();
 	// The device's clock: a second passes between a person's actions.
 	let clock = Date.now();
+	/** The text field that has the keyboard, if any. */
+	let focused: string | undefined;
 	const start = () => {
 		const r = createNativeRuntime(payload, store, params, undefined, () => clock, services.host);
 		for (const cell of payload.cells)
@@ -502,7 +529,7 @@ function walk(
 	// A closed <dialog> shows nothing (the UA's dialog:not([open]) rule); the journal opens and closes it.
 	const openDialogs = new Map(runtime.dialogs());
 	const chosen = new Map(runtime.arms());
-	// What the platform's sheets show: changed only by `sheet` entries and by the platform closing one.
+	// What the platform's sheets show: changed by `sheet` entries, by the arm a sheet is in, and by the platform closing one.
 	const sheetOpen = new Map(runtime.sheets());
 	const inClosedSheet = (id: string): boolean => {
 		const parent = nodeOf.get(id)?.parent;
@@ -613,6 +640,12 @@ function walk(
 						.join(' '));
 		return label !== null && shownNode(node.id) ? [[id, label] as const] : [];
 	};
+	// A text field by its accessible name, as the web finds a textbox: a control named the same (a preview button) is not one.
+	const fieldReading = (text: string) =>
+		labels().find(([id, label]) => {
+			const element = nodeOf.get(id.split('@')[0]!);
+			return label === text && element?.kind === 'element' && (element.element === 'input' || element.element === 'textarea');
+		})?.[0] ?? elementReading(text);
 	const elementReading = (text: string) => {
 		const labelled = labels().find(([, label]) => label === text)?.[0];
 		if (labelled) return labelled;
@@ -620,11 +653,16 @@ function walk(
 		return node ? parentOf(node) : undefined;
 	};
 	// A field's text: what its `value` binding or attribute gave it, then what was typed or the journal wrote.
+	const builtAttributes = new Map(attributes);
+	const shownDefaults = new Map<string, string>();
 	const staticValue = (id: string) => {
 		const node = nodeOf.get(id);
-		return node?.kind === 'element' && node.element === 'input' && !properties.has(id)
-			? (node.attributes?.['value'] ?? '')
-			: undefined;
+		if (node?.kind !== 'element' || properties.has(id)) return undefined;
+		if (node.element === 'input') return node.attributes?.['value'] ?? '';
+		// A textarea shows its `value` attribute as the host built it, then the default values the journal writes.
+		if (node.element === 'textarea')
+			return shownDefaults.get(id) ?? builtAttributes.get(`${id}\0value`) ?? node.attributes?.['value'] ?? '';
+		return undefined;
 	};
 	const typed = new Map<string, string>();
 	const checks = new Map(runtime.checks());
@@ -735,7 +773,10 @@ function walk(
 			else if (entry.op === 'property' && entry.name === 'selected')
 				selected.set(entry.node, entry.value);
 			else if (entry.op === 'property') {
-				properties.set(entry.node, entry.value);
+				const node = nodeOf.get(entry.node.split('@')[0]!);
+				const followsDefault = node?.kind === 'element' && node.element === 'textarea' && !bindsValue(nodeOf, entry.node);
+				if (followsDefault) shownDefaults.set(entry.node, entry.value);
+				else properties.set(entry.node, entry.value);
 				typed.delete(entry.node);
 			}
 			else if (entry.op === 'navigate') {
@@ -785,6 +826,15 @@ function walk(
 					if (inArm(id, entry.node)) texts.set(id, text);
 				for (const [node, name, value] of runtime.attributes())
 					if (inArm(node, entry.node)) attributes.set(`${node}\0${name}`, value);
+				// The hosts build an arm's fields fresh: a box reads its checkedness from the runtime, a text field its markup.
+				for (const id of checks.keys()) if (inArm(id, entry.node)) checks.delete(id);
+				for (const [node, checked] of runtime.checks())
+					if (inArm(node, entry.node)) checks.set(node, checked);
+				for (const id of typed.keys()) if (inArm(id, entry.node)) typed.delete(id);
+				// A sheet leaves with its arm, closed; one that comes is built open or closed as its state says.
+				for (const node of sheetOpen.keys()) if (inArm(node, entry.node)) sheetOpen.delete(node);
+				for (const [node, open] of runtime.sheets())
+					if (inArm(node, entry.node)) sheetOpen.set(node, open);
 			} else if (entry.op === 'sheet') sheetOpen.set(entry.node, entry.open);
 			const scripted = services.answer(entry);
 			if (scripted) answered.push(() => runtime.dispatch(scripted));
@@ -907,6 +957,21 @@ function walk(
 			if (!choice || choice.disabled)
 				throw new Error(`step ${index}: "${action.choose.field}" has no option "${action.choose.option}" to pick`);
 			apply(runtime.dispatch({ event: 'choose', host: choice.option }), index);
+		} else if (action && 'slide' in action) {
+			const slider = elementReading(action.slide.field);
+			if (!slider) throw new Error(`step ${index}: nothing reads "${action.slide.field}" to slide`);
+			// The phone reports the end the thumb reaches, on the slider's step, as an input.
+			const end = attributeNow(slider, action.slide.to === 'max' ? 'max' : 'min');
+			const value = nativeRangeValue(
+				end ?? (action.slide.to === 'max' ? '100' : '0'),
+				attributeNow(slider, 'min'),
+				attributeNow(slider, 'max'),
+				attributeNow(slider, 'step'),
+			);
+			apply(runtime.dispatch({ event: 'input', host: slider, value }), index);
+			// Let go, the slider raises change when its value moved, as the web's End key does.
+			if (payload.events.some((event) => event.host === slider && event.event === 'commit'))
+				apply(runtime.dispatch({ event: 'commit', host: slider, value }), index);
 		} else if (action && 'drag' in action) {
 			const host = elementReading(action.drag.on);
 			if (!host) throw new Error(`step ${index}: nothing reads "${action.drag.on}" to drag`);
@@ -920,7 +985,7 @@ function walk(
 			for (let n = 1; n <= moves; n++) out.push(...touch('pointermove', n));
 			out.push(...touch(action.drag.scrolls ? 'pointercancel' : 'pointerup', moves));
 			apply(out, index);
-		} else if (action && !('tap' in action) && !('type' in action) && !('submit' in action) && !('dismissSheet' in action))
+		} else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
 			const sheet = openSheet(index);
@@ -931,8 +996,16 @@ function walk(
 			apply(runtime.dispatch({ event: 'dismiss', host: sheet }), index);
 		} else if (action) {
 			const name =
-				'tap' in action ? action.tap : 'type' in action ? action.type.field : action.submit;
-			const host = elementReading(name);
+				'tap' in action
+					? action.tap
+					: 'doubleTap' in action
+						? action.doubleTap
+						: 'type' in action
+						? action.type.field
+						: 'erase' in action
+							? action.erase
+							: action.submit;
+			const host = 'tap' in action || 'doubleTap' in action ? elementReading(name) : fieldReading(name);
 			if (!host)
 				throw new Error(
 					`step ${index}: nothing reads "${name}" to ${'tap' in action ? 'tap' : 'type into'}`,
@@ -958,14 +1031,19 @@ function walk(
 						]
 					: [];
 			apply(touched, index);
+			// A touch reaches the nearest element around it that handles a press, as on a phone; a row's copy (`<id>@<key>`)
+			// climbs through its node's parents, keeping the key while they are in the same row.
+			const at = host.indexOf('@');
+			const key = at < 0 ? '' : host.slice(at);
+			let node: string | null | undefined = at < 0 ? host : host.slice(0, at);
 			let pressed: string | null | undefined = host;
 			while (
-				pressed &&
-				!payload.events.some(
-					(event) => event.host === pressed && event.event === 'activate',
-				)
-			)
-				pressed = nodeOf.get(pressed)?.parent;
+				node &&
+				!payload.events.some((event) => event.host === node && event.event === 'activate')
+			) {
+				node = nodeOf.get(node)?.parent;
+				pressed = node && nodeOf.get(node)?.row ? `${node}${key}` : node;
+			}
 			// The return key in a field that submits nothing only puts the keyboard away.
 			const returns = payload.events.some(
 				(event) => event.host === host && event.event === 'enter',
@@ -974,17 +1052,78 @@ function walk(
 			const activates = !!pressed || host.includes('@');
 			if ('tap' in action && !activates && touched.length === 0)
 				throw new Error(`step ${index}: "${name}" is not a control and the press changed nothing`);
+			// A field takes the keyboard when typed into, and gives it up when anything else is tapped: its focus and blur run.
+			const handles = (node: string, event: 'input' | 'focus' | 'blur' | 'keydown' | 'keyup') =>
+				payload.events.some((candidate) => candidate.host === node.split('@')[0] && candidate.event === event);
+			if ('type' in action && focused !== host) {
+				if (focused && handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
+				focused = host;
+				if (handles(host, 'focus')) apply(runtime.dispatch({ event: 'focus', host }), index);
+			}
+			if (('tap' in action || 'doubleTap' in action) && focused && focused !== host) {
+				if (handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
+				focused = undefined;
+			}
+			// Backspace with the cursor at the end takes the last character; the input event then runs the handler.
+			const erased = (field: string): ReturnType<typeof runtime.dispatch> => {
+				const text = [...fieldText(field)].slice(0, -1).join('');
+				if (properties.has(field)) properties.set(field, text);
+				else typed.set(field, text);
+				return handles(field, 'input') ? runtime.dispatch({ event: 'input', host: field, value: text }) : [];
+			};
+			// A key runs the field's keydown handler first; preventDefault() there leaves out what the key does.
+			const keyed = (key: string): boolean => {
+				if (!handles(host, 'keydown')) return false;
+				const journal = runtime.dispatch({ event: 'keydown', host, key });
+				apply(journal, index);
+				return journal.some((entry) => entry.op === 'preventDefault');
+			};
+			// A key's keyup runs after what the key did, or after its keydown left that out.
+			const keyedUp = (key: string) => {
+				if (handles(host, 'keyup')) apply(runtime.dispatch({ event: 'keyup', host, key }), index);
+			};
+			// With a keyup handler, typing is key by key, each key's edit between its keydown and its keyup, as on the web.
+			const byKey = 'type' in action && handles(host, 'keyup');
+			if ('type' in action && !byKey) for (const key of action.type.text) keyed(key);
+			if (byKey) {
+				// The field was erased before typing; keys past its maxlength still go down and up, and edit nothing.
+				const kept = [...text!];
+				let sofar = '';
+				for (const key of action.type.text) {
+					const prevented = keyed(key);
+					if (!prevented && [...sofar].length < kept.length) {
+						sofar += kept[[...sofar].length];
+						if (properties.has(host)) properties.set(host, sofar);
+						else typed.set(host, sofar);
+						if (handles(host, 'input')) apply(runtime.dispatch({ event: 'input', host, value: sofar }), index);
+					}
+					keyedUp(key);
+				}
+			}
+			// A double tap is two presses, the second counted 2.
+			if ('doubleTap' in action)
+				apply(runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 1 }), index);
 			const dispatched =
 				'tap' in action
 					? activates
 						? runtime.dispatch({ event: 'activate', host: pressed ?? host })
 						: []
+					: 'doubleTap' in action
+						? runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 2 })
 					: 'type' in action
-						? runtime.dispatch({ event: 'input', host, value: text! })
-						: returns
-							? runtime.dispatch({ event: 'enter', host })
-							: [];
+						? handles(host, 'input') && !byKey
+							? runtime.dispatch({ event: 'input', host, value: text! })
+							: []
+						: 'erase' in action
+							? keyed('Backspace') || fieldText(host) === ''
+								? []
+								: erased(host)
+							: keyed('Enter') || !returns
+								? []
+								: runtime.dispatch({ event: 'enter', host });
 			apply(dispatched, index);
+			if ('erase' in action) keyedUp('Backspace');
+			else if ('submit' in action) keyedUp('Enter');
 		}
 		raiseLoadEvents(index);
 		check(index, step);
@@ -1007,7 +1146,7 @@ function walk(
 	function check(index: number, step: LadderStep) {
 		expect(invalid, `step ${index}: the message of a blocked submit`).toBe(step.invalid);
 		for (const [field, value] of Object.entries(step.fields ?? {})) {
-			const host = elementReading(field);
+			const host = fieldReading(field);
 			expect(host && fieldText(host), `step ${index}: the field "${field}"`).toBe(value);
 		}
 		if (step.calls) expect(calls, `step ${index}: the device calls made`).toEqual(step.calls);
@@ -1121,7 +1260,12 @@ test.each(
 				build.diagnostics.map((diagnostic) =>
 					diagnostic.severity === 'error' && refusalCodes.has(diagnostic.code)
 						? ['error', diagnostic.code]
-						: ['warning', NATIVE_KEYBOARD_ONLY],
+						: [
+								'warning',
+								[NATIVE_MOUSE_ONLY_CODE, NATIVE_DROP_ONLY_CODE].includes(diagnostic.code)
+									? diagnostic.code
+									: NATIVE_KEYBOARD_ONLY_CODE,
+							],
 				),
 			);
 			return;

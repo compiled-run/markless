@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 // One chunk on one phone, started by the runner through the machine queue: build (or reuse) the shell around the job's
 // host, run the host's own tests (remembered per source set), then install and run each rung's flow.
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildAndroidShell, installProofApk } from '../harness/android.ts';
 import { iosHostTests, androidHostTests, describeHostTests } from '../harness/host-tests.ts';
 import { exec } from '../harness/exec.ts';
 import { buildIosShell, installProofApp } from '../harness/ios.ts';
+import { simctl, SimulatorStuck } from '../harness/simctl.ts';
 import { runFlow } from '../harness/maestro.ts';
 import type { ProofPlatform } from '../harness/proof-app.ts';
 import { androidTools, cacheRoot } from '../harness/tools.ts';
@@ -30,6 +32,14 @@ const [job, chunkName, device, reinstall] = process.argv.slice(2);
 if (!job || !chunkName || !device)
 	throw new Error('usage: run-chunk.ts <job dir> <chunk> <device> [reinstall-driver]');
 const spec = readJson<JobSpec>(join(job, 'job.json'))!;
+// The shells take Dragon's engine from the checkout the job's styles were compiled with, as long as it has not moved since.
+if (spec.dragon) {
+	const head = execFileSync('git', ['-C', spec.dragon.dir, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+	if (head !== spec.dragon.commit)
+		throw new Error(`the job's Dragon checkout ${spec.dragon.dir} moved from ${spec.dragon.commit} to ${head} after the submit; submit again`);
+	process.env.MARKLESS_DRAGON_DIR = spec.dragon.dir;
+	if (spec.dragon.zig) process.env.MARKLESS_ZIG = spec.dragon.zig;
+}
 const chunk = readJson<Chunk>(chunkFile(job, chunkName))!;
 const platform: ProofPlatform = chunk.platform;
 const mobile = bundleMobile(job);
@@ -119,8 +129,7 @@ try {
 			let installError: string | undefined;
 			try {
 				// A rung that switched to dark leaves the phone dark for the next job's rungs: each starts light.
-				if (platform === 'ios')
-					await exec('xcrun', ['simctl', 'ui', device, 'appearance', 'light']);
+				if (platform === 'ios') await simctl(['ui', device, 'appearance', 'light']);
 				else
 					await exec(tools!.adb, ['-s', device, 'shell', 'cmd', 'uimode', 'night', 'no']);
 				await install(rung, dir);
@@ -134,6 +143,8 @@ try {
 						`tcp:${ECHO_SERVER_PORT}`,
 					]);
 			} catch (error) {
+				// A stuck simulator fails every rung left, so the queue moves on and the runner restarts it.
+				if (error instanceof SimulatorStuck) throw error;
 				installError = error instanceof Error ? error.message : String(error);
 			}
 			const installSeconds = seconds(installStarted);

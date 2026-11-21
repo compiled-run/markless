@@ -4,6 +4,7 @@ import {
 	type NativeDeviceObject,
 	type NativeDeviceValue,
 } from './native-device.ts';
+import type { ProtocolRepeatKeyParts } from './protocol.ts';
 
 // The target-neutral view a native host builds retained views from: no HTML, no DOM positions, no script.
 export const NATIVE_VIEW_VERSION = 'markless.native-view/0';
@@ -86,7 +87,12 @@ export type NativeExpr =
 	 * `length` of a string or array, an array's element at an index (`"0"`, `"1"`: null past its end, as `undefined` on
 	 * the web), or an own property of an object; anything else is a runtime error.
 	 */
-	| { readonly member: NativeExpr; readonly property: string }
+	| {
+			readonly member: NativeExpr;
+			readonly property: string;
+			/** In an optional chain (`a?.b`): a null object gives null, as JavaScript gives undefined. */
+			readonly optional?: true;
+	  }
 	/** An array's element at an index computed while the app runs: null when it is not an integer inside the array. */
 	| { readonly at: NativeExpr; readonly of: NativeExpr }
 	| { readonly array: ReadonlyArray<{ readonly spread: boolean; readonly value: NativeExpr }> }
@@ -108,9 +114,12 @@ export type NativeExpr =
 	/**
 	 * What the event that runs the handler carries: an `input` handler's field text after the edit
 	 * (`event.currentTarget.value`); a `dismiss` handler's `event.detail.reason` and `event.detail.pressTarget` (an element,
-	 * or null for Escape); a pointer handler's fields, as a phone's browser reports a touch (`NativePointerField`).
+	 * or null for Escape); a pointer handler's fields, as a phone's browser reports a touch (`NativePointerField`); a text
+	 * field's `keydown` or `keyup` handler's `event.key`, as the phone's browser gives it for its on-screen keyboard; a `paste`
+	 * handler's pasted plain text (`event.clipboardData.getData('text')`); a click handler's `event.detail`, how many presses
+	 * in a row on the element (a double tap's second press is 2).
 	 */
-	| { readonly event: 'value' | 'reason' | 'pressTarget' | NativePointerField }
+	| { readonly event: 'value' | 'reason' | 'pressTarget' | 'key' | 'text' | 'detail' | NativePointerField }
 	/** Whether the element `node` has captured the pointer `pointer` (`node.hasPointerCapture(pointer)`). */
 	| { readonly captures: NativeExpr; readonly pointer: NativeExpr }
 	/**
@@ -122,6 +131,8 @@ export type NativeExpr =
 	| { readonly formData: string }
 	/** A checkbox's or radio button's checkedness now: what its `checked` binding last set, or a person's tick since. */
 	| { readonly checked: string }
+	/** A text field's text now (`field.value`): what a person typed since, else its `value` binding, else its `value` attribute. */
+	| { readonly field: string }
 	/** The element that has focus (`document.activeElement`), or the document body when none has. */
 	| { readonly focused: true }
 	/** Whether the element `node` is `within` or inside it (`within.contains(node)`); false when either is not an element. */
@@ -146,15 +157,30 @@ export const NATIVE_DOCUMENT_BODY = '#body';
 export type NativeScriptBinding =
 	| { readonly cell: string }
 	| { readonly fields: Readonly<Record<string, string>> }
-	| { readonly value: NativeExpr };
+	| { readonly value: NativeExpr }
+	/**
+	 * An element (its node id) or an array of them, which the function reads through proxies: `getAttribute`,
+	 * `hasAttribute`, `contains`, and the commands `focus` and `scrollIntoView`. The host answers each read from the
+	 * entry's `elements`: the attributes each element has now and the elements it is inside.
+	 */
+	| { readonly elements: NativeExpr }
+	/** A family's shared object, member by member. */
+	| { readonly object: Readonly<Record<string, NativeScriptBinding>> }
+	/** A shared object's method: the script function `method` returns, run over its own `bindings` when called. */
+	| { readonly method: string; readonly bindings: Readonly<Record<string, NativeScriptBinding>> }
+	/** A `shared()` accessor (`selectState`): a function that returns that object. */
+	| { readonly shared: Readonly<Record<string, NativeScriptBinding>> }
+	/** A function a parent passed as a prop: the script function `callback`, its own names bound as `<name>.<its name>`. */
+	| { readonly callback: string };
 
 export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>;
 
 /**
  * Host services a payload's script uses, so a host provides only those: timers (`setTimeout` and the rest, through
- * `timer` entries), `fetch` (through `fetch` entries), `console`, and `crypto.randomUUID` (from a `seed` the host passes).
+ * `timer` entries), `fetch` (through `fetch` entries), `console`, `crypto.randomUUID` (from a `seed` the host passes),
+ * and `navigate` from @markless/router (through a `navigate` entry; the host passes the page's route `params`).
  */
-export type NativeScriptService = 'timers' | 'fetch' | 'console' | 'crypto';
+export type NativeScriptService = 'timers' | 'fetch' | 'console' | 'crypto' | 'navigate';
 
 /** The JavaScript a payload's `script` ops and script computeds run, in the platform's engine, started on first use. */
 export type NativeScript = {
@@ -164,6 +190,19 @@ export type NativeScript = {
 	readonly services: ReadonlyArray<NativeScriptService>;
 };
 
+/** Every cell an expression reads. */
+export function nativeExprCells(expr: NativeExpr, into = new Set<string>()): Set<string> {
+	if ('cell' in expr) into.add(expr.cell);
+	for (const child of Object.values(expr)) {
+		if (Array.isArray(child)) {
+			for (const item of child)
+				if (item && typeof item === 'object')
+					nativeExprCells((Array.isArray(item) ? item[1] : item) as NativeExpr, into);
+		} else if (child && typeof child === 'object') nativeExprCells(child as NativeExpr, into);
+	}
+	return into;
+}
+
 export type NativeTextPart =
 	| { readonly text: string }
 	| { readonly cell: string }
@@ -171,6 +210,8 @@ export type NativeTextPart =
 
 /** Where a node sits when it belongs to one arm of an `@if`: shown only while that arm is chosen. */
 export type NativeArmPlace = { readonly branch: string; readonly index: number };
+/** A branch's style state when it shows no arm (an `@if` with no `@else` whose test fails); otherwise its arm's index. */
+export const NATIVE_NO_ARM = 'none';
 
 /** Where a node sits: in an `@if` arm, or in a list row (`row` names the `repeat` node). */
 export type NativePlace = { readonly arm?: NativeArmPlace; readonly row?: string };
@@ -279,12 +320,14 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	abbr: { flow: 'inline' },
 	time: { flow: 'inline' },
 	data: { flow: 'inline' },
+	output: { flow: 'inline' },
 	bdi: { flow: 'inline' },
 	bdo: { flow: 'inline' },
 	wbr: { flow: 'inline' },
 	br: { flow: 'break' },
 	button: {},
 	input: {},
+	textarea: {},
 	a: {},
 	img: {},
 	audio: {},
@@ -372,6 +415,11 @@ export type NativeNode = NativePlace &
 				readonly defaultStyle?: NativeDefaultStyle;
 				/** On an `<svg>`: what it draws. Its shapes are not nodes. */
 				readonly drawing?: NativeDrawing;
+				/**
+				 * A live region (`aria-live`, `role="status"`, `"alert"` or `"log"`, `<output>`): a change to the text inside is
+				 * announced, after the screen reader's current speech when polite; `atomic` reads the whole region, else the changed text.
+				 */
+				readonly live?: { readonly politeness: 'polite' | 'assertive'; readonly atomic: boolean };
 				/** Attributes fixed at build time (`class` carries the component's scope class); absent when none. */
 				readonly attributes?: Readonly<Record<string, string>>;
 				/** The device object a `camera` element shows (`<base.camera el={cam} />`). */
@@ -409,6 +457,10 @@ export type NativeNode = NativePlace &
 				readonly parent: string | null;
 				readonly list: NativeExpr;
 				readonly key: ReadonlyArray<string>;
+				/** `key i` on the index: a row's key is its position (`"0"`, `"1"`), and `key` is empty. */
+				readonly byIndex?: true;
+				/** A key joined from the item's fields, as the web joins it; `key` is then empty and is not the key. */
+				readonly keyParts?: ProtocolRepeatKeyParts;
 		  }
 		| {
 				/**
@@ -445,15 +497,27 @@ export type NativeProperty = 'value' | 'checked' | 'indeterminate' | 'selected';
  * after it left, it is a new one): `idle` at the first moment the host is idle after the screen's first frame (or after
  * the element appears), `visible` the first time any of the element is on the screen.
  */
+/**
+ * `focus` and `blur` are a text field's: it took the keyboard, or gave it up. `keydown` and `paste` are a text field's too:
+ * a key of the on-screen keyboard, and a paste from its edit menu. `keyup` follows each `keydown` with the same key, after
+ * what the key did (or did not do, when the keydown was prevented).
+ */
 export type NativeEventName =
 	| 'activate'
 	| 'input'
+	| 'focus'
+	| 'blur'
+	| 'keydown'
+	| 'keyup'
+	| 'paste'
 	| 'dismiss'
 	| 'cancel'
 	| 'enter'
 	| 'submit'
 	| 'idle'
 	| 'visible'
+	/** A range input let go after its value moved: the web's `change` on it. */
+	| 'commit'
 	| NativePointerEventName;
 
 /**
@@ -557,6 +621,13 @@ export type NativeOp =
 			readonly command: NativeCommand;
 			readonly preventScroll?: true;
 	  }
+	/** `event.preventDefault()` in a text field's `keydown` or `paste` handler: the host leaves out what the key or paste does. */
+	| { readonly op: 'preventDefault' }
+	/**
+	 * `field.value = text` on a text field: its text becomes `value` (as a string), as if typed but with no input event; the
+	 * journal's `property` entry carries it to the field. `node` is a fixed id or an expression giving one (null: nothing).
+	 */
+	| { readonly op: 'fieldText'; readonly node: string | NativeExpr; readonly value: NativeExpr }
 	/**
 	 * Submits `form` as the web does when `submitter` is pressed, or the return key submits it with no submit button (null):
 	 * nothing when the submitter is disabled; then, unless the form has `novalidate` or the submitter `formnovalidate`,
@@ -613,7 +684,8 @@ export type NativeOp =
 	| { readonly op: 'reset'; readonly cells: ReadonlyArray<string>; readonly catch?: string };
 
 /** Element commands a host runs. */
-export type NativeCommand = 'focus' | 'scrollIntoView';
+/** `select` selects a text field's whole text, as `field.select()` does. */
+export type NativeCommand = 'focus' | 'scrollIntoView' | 'select';
 
 export type NativeViewPayload = {
 	readonly version: typeof NATIVE_VIEW_VERSION;
@@ -628,6 +700,8 @@ export type NativeViewPayload = {
 		readonly storage?: { readonly key: string };
 		/** A class or `ui-*` attribute binding reads this cell, so Dragon's export has a state for it; its changes are journalled as `state`. */
 		readonly styled?: true;
+		/** A styled string cell's every value, its first value first, so Dragon lays out one assignment per value. */
+		readonly domain?: ReadonlyArray<string>;
 		/** A live device value (`network.online`): the host fills it at mount and sends a `device` action when it changes. */
 		readonly device?: NativeDeviceValue;
 		/** For a device object's field (`cam.ready`): the object (`object:cam`). */
@@ -658,10 +732,30 @@ export type NativeViewPayload = {
 		 */
 		readonly row?: string;
 		/**
+		 * On a row's state: its first value as an expression of the row's item, taken once when the row is built (a family part
+		 * in a row seeds its state from a prop the row passes); `initial` is then never read.
+		 */
+		readonly first?: NativeExpr;
+		/**
+		 * On a row's state: the values the row passes to the part that owns it, read from the row's item. As on the web, when
+		 * one changes the part is built again: the row's state starts over from its first values.
+		 */
+		readonly rebuiltBy?: ReadonlyArray<NativeExpr>;
+		/**
 		 * The clock when the screen opened, in milliseconds since 1970 (UTC): the host writes it at mount, before the first
 		 * build, as a page's render reads the clock when it is served; `initial` is never shown.
 		 */
 		readonly clock?: true;
+		/**
+		 * Its first value is `undefined` on the web, which `initial` spells as null: a script reads it as `undefined` until
+		 * something writes it.
+		 */
+		readonly unset?: true;
+		/**
+		 * Written while rendering from a value that follows state (a root's `checkbox.checked = checked`): the host writes it
+		 * at mount and again whenever that value changes, as the web runs the write again.
+		 */
+		readonly follows?: NativeExpr;
 	}>;
 	/** Document order: a parent comes before its children, siblings in authored order. */
 	readonly nodes: ReadonlyArray<NativeNode>;
@@ -698,11 +792,16 @@ export type NativeViewPayload = {
 	readonly valueMissing?: Readonly<Record<string, NativeValueMissing>>;
 	/** What the web says when a text field a person edited is longer than its `maxlength`, by language; present when a form's text field has one. */
 	readonly tooLong?: Readonly<Record<string, NativeTooLong>>;
+	/** What the web says when an email field holds no email address, by language; present when a form has an email field. */
+	readonly typeMismatch?: Readonly<Record<string, NativeEmailMismatch>>;
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	readonly script?: NativeScript;
 };
 
 export const NATIVE_APP_VERSION = 'markless.native-app/0';
+
+/** The route an app payload carries its `pages/404.tsrx` under: where a link to a path no route matches opens, as on the web. */
+export const NATIVE_NOT_FOUND_ROUTE = '/404';
 
 /** An app of several routes: each route's page, in the router's match order (static before `[param]` segments). */
 export type NativeAppPayload = {
@@ -743,6 +842,104 @@ export function nativeMaxLength(attribute: string | null | undefined): number | 
 	return value;
 }
 
+/**
+ * Chromium's `validationMessage` for an email field whose value is not an email address, one per reason: `{value}` is the
+ * whole value, `{symbol}` the first character not allowed, `{domain}` the part after the `@`.
+ */
+export type NativeEmailMismatch = {
+	readonly noAt: string;
+	readonly emptyLocal: string;
+	readonly emptyDomain: string;
+	readonly invalidLocal: string;
+	readonly invalidDomain: string;
+	readonly invalidDots: string;
+	readonly other: string;
+};
+
+/** An email field's value as the web keeps it: line breaks dropped, then ASCII whitespace trimmed from both ends. */
+export function nativeEmailValue(typed: string): string {
+	return typed.replace(/[\r\n]/g, '').replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/g, '');
+}
+
+const EMAIL_LOCAL = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]$/;
+const EMAIL_LABEL = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
+
+/**
+ * Why an email field's value (as {@link nativeEmailValue} keeps it) is not an email address, in Chromium's words, or
+ * undefined when it is one or is empty. Validity is HTML's valid e-mail address; the reason is the first of Chromium's
+ * checks the value fails.
+ */
+export function nativeEmailMismatch(
+	messages: NativeEmailMismatch,
+	value: string,
+): string | undefined {
+	if (value === '') return undefined;
+	const at = value.indexOf('@');
+	const local = at < 0 ? value : value.slice(0, at);
+	const domain = at < 0 ? '' : value.slice(at + 1);
+	if (
+		at > 0 &&
+		[...local].every((character) => EMAIL_LOCAL.test(character)) &&
+		domain.split('.').every((label) => EMAIL_LABEL.test(label))
+	)
+		return undefined;
+	const fill = (message: string, symbol = '') =>
+		message.replace(/\{(value|symbol|domain)\}/g, (_, name: string) =>
+			name === 'value' ? value : name === 'domain' ? domain : symbol,
+		);
+	if (at < 0) return fill(messages.noAt);
+	if (at === 0) return fill(messages.emptyLocal);
+	if (domain === '') return fill(messages.emptyDomain);
+	const inLocal = [...local].find((character) => !EMAIL_LOCAL.test(character));
+	if (inLocal !== undefined) return fill(messages.invalidLocal, inLocal);
+	const inDomain = [...domain].find((character) => !/^[a-zA-Z0-9.-]$/.test(character));
+	if (inDomain !== undefined) return fill(messages.invalidDomain, inDomain);
+	if (domain.startsWith('.') || domain.endsWith('.') || domain.includes('..'))
+		return fill(messages.invalidDots);
+	return fill(messages.other);
+}
+
+/** A number as HTML parses a range input's attributes: a valid floating-point number, else undefined. */
+const rangeNumber = (text: string | null | undefined): number | undefined =>
+	text != null && /^-?(\d+(\.\d+)?|\.\d+)([eE][-+]?\d+)?$/.test(text) ? Number(text) : undefined;
+
+/** The decimal places a number is written with, so stepped values print as the browser writes them. */
+const decimals = (value: number): number => {
+	const [, fraction = '', exponent = '0'] = /^-?\d*(?:\.(\d+))?(?:e([-+]?\d+))?$/.exec(String(value)) ?? [];
+	return Math.max(0, fraction.length - Number(exponent));
+};
+
+/**
+ * A range input's value as the web keeps it, from its `value`, `min`, `max` and `step` attributes: `min` 0 and `max`
+ * 100 by default (a `max` below `min` is `min`); a value that is not a number is the midpoint; it is clamped into the
+ * range and moved to the nearest step from `min` (the greater of two as near), staying at or below `max`.
+ */
+export function nativeRangeValue(
+	value: string | null | undefined,
+	min: string | null | undefined,
+	max: string | null | undefined,
+	step: string | null | undefined,
+): string {
+	const low = rangeNumber(min) ?? 0;
+	const high = Math.max(low, rangeNumber(max) ?? 100);
+	const any = step?.trim().toLowerCase() === 'any';
+	const stepNumber = rangeNumber(step);
+	const size = any ? undefined : stepNumber !== undefined && stepNumber > 0 ? stepNumber : 1;
+	let number = rangeNumber(value) ?? low + (high - low) / 2;
+	number = Math.min(high, Math.max(low, number));
+	if (size !== undefined) {
+		// In whole units of the finest written place, as the browser's decimal arithmetic reads them.
+		const places = Math.max(decimals(low), decimals(size), decimals(number));
+		const unit = 10 ** places;
+		const whole = (n: number) => Math.round(n * unit);
+		const stepUnits = whole(size);
+		let steps = Math.floor((whole(number) - whole(low)) / stepUnits + 0.5);
+		while (steps > 0 && whole(low) + steps * stepUnits > whole(high)) steps--;
+		number = (whole(low) + steps * stepUnits) / unit;
+	}
+	return String(number);
+}
+
 /** A form's submittable fields and submit buttons, each in tree order. */
 export type NativeForm = {
 	readonly node: string;
@@ -758,6 +955,7 @@ export type NativeForm = {
 export type NativeFieldKind = 'text' | 'checkbox' | 'radio' | 'hidden' | 'select';
 
 export {
+	NATIVE_EMAIL_MISMATCH_BY_LOCALE,
 	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
 } from './native-validation-messages.ts';
@@ -797,6 +995,8 @@ export type NativeJournalEntry =
 			readonly command: NativeCommand;
 			readonly preventScroll?: true;
 	  }
+	/** The `keydown` or `paste` handler called `preventDefault()`: the host does not delete, break the line, return or paste. */
+	| { readonly op: 'preventDefault' }
 	/** A `<dialog>` opened in the top layer or closed (by an op, or by the host's back gesture as a `cancel`). */
 	| { readonly op: 'dialog'; readonly node: string; readonly open: boolean }
 	/** A submit stopped: the host moves focus to `node` as `focus()` would and shows `message` until the next action. */
@@ -909,11 +1109,12 @@ export const PLATFORM_PIECES_NAMESPACE = 'native';
 
 /**
  * Bound attributes that reach Dragon in every combination of the styled states, besides `class`: the ones a selector keys
- * state off (`[ui-open]`, `[aria-expanded]`) and `hidden`, whose UA rule Dragon applies. Others (`disabled`, `value`) stay
- * out of the style input, since Dragon does not model their rendering effect.
+ * state off (`[ui-open]`, `[aria-expanded]`), `hidden`, whose UA rule Dragon applies, and `disabled`, which selects `:disabled`
+ * and Chrome's disabled colours in Dragon. Others (`value`) stay out of the style input, since Dragon does not model their
+ * rendering effect.
  */
 export const isNativeStyleStateAttribute = (name: string): boolean =>
-	name === 'hidden' || name === 'role' || /^(ui|aria|data)-/.test(name);
+	name === 'hidden' || name === 'disabled' || name === 'role' || /^(ui|aria|data)-/.test(name);
 
 /** ECMAScript's own globals, which every engine a host runs has (JavaScriptCore, Hermes); `eval` is left out. */
 export const NATIVE_SCRIPT_LANGUAGE_GLOBALS: ReadonlyArray<string> = [
@@ -980,6 +1181,7 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		setInterval: 'timers',
 		clearInterval: 'timers',
 		queueMicrotask: 'engine',
+		structuredClone: 'engine',
 		console: 'console',
 		fetch: 'fetch',
 		crypto: 'crypto',
@@ -987,11 +1189,14 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 
 /**
  * What a script handler's event has on a phone, as member paths: a deeper read below `target.value` is a string's. Any
- * other member is refused at build time, since the web's event has it and a phone's does not.
+ * other member is refused at build time, since the web's event has it and a phone's does not. A text field's key and paste
+ * events carry the field's text as `target.value`; only a paste carries `clipboardData`, with its plain text.
  */
 export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> = [
 	['type'],
 	['key'],
+	['isComposing'],
+	['clipboardData', 'getData'],
 	['defaultPrevented'],
 	['preventDefault'],
 	['stopPropagation'],
@@ -1002,6 +1207,9 @@ export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> =
 	['currentTarget', 'value'],
 	['currentTarget', 'checked'],
 ];
+
+/** A submit handler's binding for its form's entries now, which its event's `target` and `currentTarget` carry for FormData. */
+export const NATIVE_SCRIPT_SUBMITTED_FORM = 'submitted form';
 
 /** What a touch adds to a script pointer handler's event: its plain values. The elements it names reach only data handlers. */
 export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [

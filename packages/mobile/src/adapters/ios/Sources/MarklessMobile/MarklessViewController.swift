@@ -3,6 +3,9 @@ import CryptoKit
 import Foundation
 import MarklessCore
 import UIKit
+#if canImport(DragonPlan)
+import DragonPlan
+#endif
 
 /// Shows one compiled Markless component as retained UIKit views and runs its handlers as data.
 ///
@@ -16,6 +19,10 @@ import UIKit
 public final class MarklessViewController: UIViewController {
 	private let payload: NativeViewPayload
 	private let style: StyleExport?
+	/// The page area in points the views were last laid out for by Dragon's plan; nil until then.
+	private var laidOutFor: CGSize?
+	/// How long the last layout at the screen's size took, in milliseconds (Dragon's layout of every assignment and the views' move).
+	private var layoutMilliseconds: Double?
 	private let fonts: [String: Data]
 	private let store: NativeStore
 	private let device: NativeDevice
@@ -60,9 +67,17 @@ public final class MarklessViewController: UIViewController {
 		runtime = NativeRuntime(
 			payload: self.payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages, scriptHost: MarklessScripting.shared.host)
 		super.init(nibName: nil, bundle: nil)
+		Self.linkDragon()
 		try buildPage()
 		try watchDevice()
 		followsAppearance()
+	}
+
+	/// Dragon's band lookup, when the host links Dragon's translated harness.
+	private static func linkDragon() {
+		#if canImport(DragonPlan)
+		StyleBands.library = DragonPlan.library
+		#endif
 	}
 
 	/// One screen of an app: the page for a route, opened with its params and its route's styles.
@@ -78,6 +93,7 @@ public final class MarklessViewController: UIViewController {
 		self.store = store
 		runtime = NativeRuntime(payload: page, store: store, params: params, scriptHost: MarklessScripting.shared.host)
 		super.init(nibName: nil, bundle: nil)
+		Self.linkDragon()
 		try buildPage()
 		try watchDevice()
 		followsAppearance()
@@ -93,7 +109,7 @@ public final class MarklessViewController: UIViewController {
 	private func applyBand() {
 		guard let bands, let band else { return }
 		do {
-			let now = try bands.band(dark: traitCollection.userInterfaceStyle == .dark)
+			let now = try bandNow(bands)
 			guard now != band else { return }
 			try tree?.apply([.state(cell: StyleBands.state, value: .number(Double(now)))])
 			self.band = now
@@ -101,6 +117,13 @@ public final class MarklessViewController: UIViewController {
 		} catch {
 			fatalError("Markless iOS host: \(error)")
 		}
+	}
+
+	/// The band of the page as it is shown: its laid-out page area once Dragon's plan has laid it out, else the export's.
+	private func bandNow(_ bands: StyleBands) throws -> Int {
+		let dark = traitCollection.userInterfaceStyle == .dark
+		guard let layout else { return try bands.band(dark: dark) }
+		return try bands.band(dark: dark, widthPx: layout.viewport.width * layout.dpr, heightPx: layout.viewport.height * layout.dpr, scale: layout.dpr)
 	}
 
 	/// Live device values reach the page's device cells as they change.
@@ -128,18 +151,20 @@ public final class MarklessViewController: UIViewController {
 		}
 		let dark = traitCollection.userInterfaceStyle == .dark
 		let texts = try runtime.texts()
-		layout = try style.map { try $0.resolve(for: payload, initialTexts: texts, value: runtime.value(of:), dark: dark) }
+		layout = try style.map { try $0.resolve(for: payload, initialTexts: texts, value: runtime.value(of:), arm: runtime.styleArm(of:), dark: dark) }
 		var sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:]
 		for sheet in style?.sheets ?? [] {
-			sheetLayouts[sheet.node] = try style!.resolveSheet(sheet.node, for: payload, initialTexts: texts, value: runtime.value(of:), dark: dark)
+			sheetLayouts[sheet.node] = try style!.resolveSheet(sheet.node, for: payload, initialTexts: texts, value: runtime.value(of:), arm: runtime.styleArm(of:), dark: dark)
 		}
 		bands = layout?.bands ?? sheetLayouts.values.joined().lazy.compactMap(\.layout.bands).first
-		band = try bands?.band(dark: dark)
-		let faces = try registerFaces(layout?.fontFiles ?? [], fonts: fonts)
+		band = try bands.map(bandNow)
+		let systemFaces = sheetLayouts.values.joined().reduce(layout?.systemFaces ?? [:]) { $0.merging($1.layout.systemFaces) { a, _ in a } }
+		let faces = try registerFaces(layout?.fontFiles ?? [], fonts: fonts).merging(systemFaces.mapValues { systemFont($0, size: 17) as UIFont }.mapValues(\.fontDescriptor)) { a, _ in a }
 		let device = self.device
 		tree = try ViewTree(
 			runtime: runtime, layout: layout, sheetLayouts: sheetLayouts, faces: faces,
-			onAction: { [weak self] action in self?.perform(action) },
+			onAction: { [weak self] action in _ = self?.perform(action) },
+			ask: { [weak self] action in self?.perform(action) ?? false },
 			objectView: { object, kind in try device.view(for: object, device: kind) })
 		tree?.presenter = self
 		navigationItem.title = try runtime.title()
@@ -211,10 +236,12 @@ public final class MarklessViewController: UIViewController {
 			let journal = try journalOf()
 			for case let .title(value) in journal { navigationItem.title = value }
 			try tree?.apply(journal.filter(\.isForViews))
+			if movesRows(journal) { layOutAtScreenSize(rowsMoved: true) }
 			try runCalls(journal)
 		} catch {
 			fatalError("Markless iOS host: \(error)")
 		}
+		writeLayoutDump()
 		tree?.presenter = self
 		scheduleLoadEvents()
 	}
@@ -265,8 +292,70 @@ public final class MarklessViewController: UIViewController {
 
 	public override func viewDidLayoutSubviews() {
 		super.viewDidLayoutSubviews()
+		layOutAtScreenSize()
 		if view.window != nil { FirstFrame.laidOut() }
 		raiseVisible()
+	}
+
+	/// With Dragon's plan, the page lays out at the size it is shown at, as a browser does: on first show, after a rotation and
+	/// whenever the window changes size. The page area is the safe area, which the page scroll view keeps its content inside.
+	/// Whether a journal changed what a styled list's rows lay out: its rows, a row's text or an attribute of a row's copy.
+	private func movesRows(_ journal: [NativeJournalEntry]) -> Bool {
+		guard let style, !style.planRepeats.isEmpty else { return false }
+		return journal.contains { entry in
+			switch entry {
+			case .rows: return true
+			case let .text(node, _), let .attribute(node, _, _): return node.contains("@")
+			default: return false
+			}
+		}
+	}
+
+	private func layOutAtScreenSize(rowsMoved: Bool = false) {
+		#if canImport(DragonPlan)
+		guard let style, style.plan != nil, let tree else { return }
+		let size = view.safeAreaLayoutGuide.layoutFrame.size
+		guard size.width > 0, size.height > 0, rowsMoved || size != laidOutFor else { return }
+		let started = CFAbsoluteTimeGetCurrent()
+		do {
+			let scale = Double(traitCollection.displayScale)
+			let shape = coreTextRowShaper(faces: style.systemFaces, dpr: scale)
+			let relaid = try style.laidOut(
+				width: Double(size.width), height: Double(size.height), scale: scale, layout: DragonPlan.layout,
+				rows: style.planRepeats.isEmpty ? nil : try style.shownRows(payload, runtime: runtime),
+				rowsLayout: { DragonPlan.rowsLayout($0, shape: shape) })
+			let now = try relaid.resolve(
+				for: payload, initialTexts: try runtime.texts(), value: runtime.value(of:), dark: traitCollection.userInterfaceStyle == .dark)
+			try tree.relayout(now)
+			layout = now
+			laidOutFor = size
+			applyBand()
+			layoutMilliseconds = (CFAbsoluteTimeGetCurrent() - started) * 1000
+		} catch {
+			fatalError("Markless iOS host: \(error)")
+		}
+		#endif
+		writeLayoutDump()
+	}
+
+	/// With the launch argument `-markless-layout-dump`, every shown box in points from the page's top left, written to
+	/// Documents/markless-layout.json after each layout and each journal, for a check against the phone's browser.
+	private func writeLayoutDump() {
+		guard ProcessInfo.processInfo.arguments.contains("-markless-layout-dump"), let tree, view.window != nil else { return }
+		let size = view.safeAreaLayoutGuide.layoutFrame.size
+		let number = { (v: CGFloat) in JSONValue.number(Double(v)) }
+		let dump = JSONValue.object([
+			("component", .string(payload.component)),
+			("viewport", .object([("width", number(size.width)), ("height", number(size.height))])),
+			("scale", number(traitCollection.displayScale)),
+			("assignment", .number(Double(tree.assignment))),
+			("layoutMilliseconds", layoutMilliseconds.map { .number($0) } ?? .null),
+			("nodes", .array(tree.shownFrames().map { node in
+				.array([.string(node.id), number(node.frame.minX), number(node.frame.minY), number(node.frame.width), number(node.frame.height)])
+			})),
+		])
+		guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+		try? Data(dump.jsonText.utf8).write(to: documents.appendingPathComponent("markless-layout.json"), options: .atomic)
 	}
 
 	@available(*, unavailable)
@@ -299,7 +388,7 @@ public final class MarklessViewController: UIViewController {
 
 	public override func viewIsAppearing(_ animated: Bool) {
 		super.viewIsAppearing(animated)
-		if let layout, abs(traitCollection.displayScale - layout.dpr) > 0.001 {
+		if let layout, style?.plan == nil, abs(traitCollection.displayScale - layout.dpr) > 0.001 {
 			fatalError("Markless iOS host: the style export was laid out at \(layout.dpr)x, this screen is \(traitCollection.displayScale)x")
 		}
 		applyBand()
@@ -321,24 +410,28 @@ public final class MarklessViewController: UIViewController {
 		if let script = payload.script { MarklessScripting.shared.warm(script) }
 	}
 
-	/// Runs the handler for an action and applies its journal, exactly as a tap does.
-	public func perform(_ action: NativeAction) {
+	/// Runs the handler for an action and applies its journal, exactly as a tap does; answers whether it called `preventDefault()`.
+	@discardableResult public func perform(_ action: NativeAction) -> Bool {
 		tree?.dismissMessage()
+		var prevented = false
 		do {
 			let journal = try runtime.dispatch(action)
 			if case let .navigate(route, params, replace)? = journal.last {
 				if replace || navigator == nil { leave() }
 				if let navigator { try navigator(route, params, replace) } else { try navigate(route, params) }
-				return
+				return false
 			}
+			prevented = journal.contains(.preventDefault)
 			for case let .title(value) in journal { navigationItem.title = value }
 			try tree?.apply(journal.filter(\.isForViews))
+			if movesRows(journal) { layOutAtScreenSize(rowsMoved: true) }
 			try runCalls(journal)
 			paintCanvas()
 		} catch {
 			fatalError("Markless iOS host: \(error)")
 		}
 		scheduleLoadEvents()
+		return prevented
 	}
 
 	/// Builds the page at `route` from scratch with `params`; its state starts over.
@@ -375,7 +468,7 @@ extension NativeJournalEntry {
 	/// Every entry but the ones the page's device runs and the title, which the screen's navigation bar shows.
 	var isForViews: Bool {
 		switch self {
-		case .call, .release, .title, .fetch, .abort: false
+		case .call, .release, .title, .fetch, .preventDefault, .abort: false
 		default: true
 		}
 	}

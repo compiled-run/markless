@@ -17,7 +17,12 @@
 						{
 							"id": "state:choice",
 							"name": "choice",
-							"initial": "apple"
+							"initial": "apple",
+							"styled": true,
+							"domain": [
+								"apple",
+								"pear"
+							]
 						}
 					],
 					"nodes": [
@@ -39,50 +44,10 @@
 							"element": "a",
 							"parent": "component-edge:0/h0",
 							"attributes": {
+								"aria-current": "page",
+								"aria-label": "Home tab, open",
 								"href": "/"
-							},
-							"bindings": [
-								{
-									"attribute": "aria-current",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "home"
-											},
-											"right": {
-												"literal": "home"
-											}
-										},
-										"whenTrue": {
-											"literal": "page"
-										},
-										"whenFalse": {
-											"literal": null
-										}
-									}
-								},
-								{
-									"attribute": "aria-label",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "home"
-											},
-											"right": {
-												"literal": "home"
-											}
-										},
-										"whenTrue": {
-											"literal": "Home tab, open"
-										},
-										"whenFalse": {
-											"literal": "Home tab"
-										}
-									}
-								}
-							]
+							}
 						},
 						{
 							"kind": "text",
@@ -100,50 +65,9 @@
 							"element": "a",
 							"parent": "component-edge:0/h0",
 							"attributes": {
+								"aria-label": "About tab",
 								"href": "/about"
-							},
-							"bindings": [
-								{
-									"attribute": "aria-current",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "home"
-											},
-											"right": {
-												"literal": "about"
-											}
-										},
-										"whenTrue": {
-											"literal": "page"
-										},
-										"whenFalse": {
-											"literal": null
-										}
-									}
-								},
-								{
-									"attribute": "aria-label",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "home"
-											},
-											"right": {
-												"literal": "about"
-											}
-										},
-										"whenTrue": {
-											"literal": "About tab, open"
-										},
-										"whenFalse": {
-											"literal": "About tab"
-										}
-									}
-								}
-							]
+							}
 						},
 						{
 							"kind": "text",
@@ -317,50 +241,9 @@
 							"element": "a",
 							"parent": "component-edge:0/h0",
 							"attributes": {
+								"aria-label": "Home tab",
 								"href": "/"
-							},
-							"bindings": [
-								{
-									"attribute": "aria-current",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "about"
-											},
-											"right": {
-												"literal": "home"
-											}
-										},
-										"whenTrue": {
-											"literal": "page"
-										},
-										"whenFalse": {
-											"literal": null
-										}
-									}
-								},
-								{
-									"attribute": "aria-label",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "about"
-											},
-											"right": {
-												"literal": "home"
-											}
-										},
-										"whenTrue": {
-											"literal": "Home tab, open"
-										},
-										"whenFalse": {
-											"literal": "Home tab"
-										}
-									}
-								}
-							]
+							}
 						},
 						{
 							"kind": "text",
@@ -378,50 +261,10 @@
 							"element": "a",
 							"parent": "component-edge:0/h0",
 							"attributes": {
+								"aria-current": "page",
+								"aria-label": "About tab, open",
 								"href": "/about"
-							},
-							"bindings": [
-								{
-									"attribute": "aria-current",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "about"
-											},
-											"right": {
-												"literal": "about"
-											}
-										},
-										"whenTrue": {
-											"literal": "page"
-										},
-										"whenFalse": {
-											"literal": null
-										}
-									}
-								},
-								{
-									"attribute": "aria-label",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "about"
-											},
-											"right": {
-												"literal": "about"
-											}
-										},
-										"whenTrue": {
-											"literal": "About tab, open"
-										},
-										"whenFalse": {
-											"literal": "About tab"
-										}
-									}
-								}
-							]
+							}
 						},
 						{
 							"kind": "text",
@@ -521,50 +364,9 @@
 							"element": "a",
 							"parent": "component-edge:0/h0",
 							"attributes": {
+								"aria-label": "Home tab",
 								"href": "/"
-							},
-							"bindings": [
-								{
-									"attribute": "aria-current",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "item"
-											},
-											"right": {
-												"literal": "home"
-											}
-										},
-										"whenTrue": {
-											"literal": "page"
-										},
-										"whenFalse": {
-											"literal": null
-										}
-									}
-								},
-								{
-									"attribute": "aria-label",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "item"
-											},
-											"right": {
-												"literal": "home"
-											}
-										},
-										"whenTrue": {
-											"literal": "Home tab, open"
-										},
-										"whenFalse": {
-											"literal": "Home tab"
-										}
-									}
-								}
-							]
+							}
 						},
 						{
 							"kind": "text",
@@ -582,50 +384,9 @@
 							"element": "a",
 							"parent": "component-edge:0/h0",
 							"attributes": {
+								"aria-label": "About tab",
 								"href": "/about"
-							},
-							"bindings": [
-								{
-									"attribute": "aria-current",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "item"
-											},
-											"right": {
-												"literal": "about"
-											}
-										},
-										"whenTrue": {
-											"literal": "page"
-										},
-										"whenFalse": {
-											"literal": null
-										}
-									}
-								},
-								{
-									"attribute": "aria-label",
-									"value": {
-										"if": {
-											"binary": "===",
-											"left": {
-												"literal": "item"
-											},
-											"right": {
-												"literal": "about"
-											}
-										},
-										"whenTrue": {
-											"literal": "About tab, open"
-										},
-										"whenFalse": {
-											"literal": "About tab"
-										}
-									}
-								}
-							]
+							}
 						},
 						{
 							"kind": "text",
@@ -759,6 +520,11 @@
 				"host": "h2"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:choice",
+					"value": "pear"
+				},
 				{
 					"op": "attribute",
 					"node": "component-edge:1",

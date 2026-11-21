@@ -33,6 +33,78 @@ const spanOf = (node: { start: number; end: number }, filename: string): SourceS
 const within = (node: { start: number; end: number }, outer: { start: number; end: number }) =>
 	node.start >= outer.start && node.end <= outer.end;
 
+/** `import.meta.env` as the web's production client build (Vite) defines it. */
+const CLIENT_ENV: Readonly<Record<string, boolean | string>> = {
+	SSR: false,
+	DEV: false,
+	PROD: true,
+	MODE: 'production',
+};
+
+const unchained = (node: AnyNode): AnyNode =>
+	node.type === 'ChainExpression' ? (node.expression as AnyNode) : node;
+const propertyName = (node: AnyNode): string | undefined =>
+	!node.computed && (node.property as AnyNode | undefined)?.type === 'Identifier'
+		? String((node.property as AnyNode).name)
+		: undefined;
+
+/** The value `import.meta.env.<name>` has in the web's client build, when the build defines it. */
+function clientEnvValue(node: AnyNode): boolean | string | undefined {
+	const read = unchained(node);
+	if (read.type !== 'MemberExpression') return undefined;
+	const env = read.object as AnyNode;
+	if (
+		env.type !== 'MemberExpression' ||
+		(env.object as AnyNode).type !== 'MetaProperty' ||
+		propertyName(env) !== 'env'
+	)
+		return undefined;
+	const name = propertyName(read);
+	return name !== undefined && Object.hasOwn(CLIENT_ENV, name) ? CLIENT_ENV[name] : undefined;
+}
+
+/** The branch an `if` or `?:` on an `import.meta.env` value takes in a client build; the other is dead code there. */
+function takenBranch(
+	node: AnyNode,
+): { readonly taken: AnyNode | null; readonly dead: AnyNode | null } | undefined {
+	if (node.type !== 'IfStatement' && node.type !== 'ConditionalExpression') return undefined;
+	let test = node.test as AnyNode;
+	let negated = false;
+	while (test.type === 'UnaryExpression' && test.operator === '!') {
+		negated = !negated;
+		test = test.argument as AnyNode;
+	}
+	const value = clientEnvValue(test);
+	if (value === undefined) return undefined;
+	const consequent = node.consequent as AnyNode;
+	const alternate = (node.alternate as AnyNode | null | undefined) ?? null;
+	return Boolean(value) !== negated
+		? { taken: consequent, dead: alternate }
+		: { taken: alternate, dead: consequent };
+}
+
+/** The branches a client build never runs, whose names a script does not need. */
+function deadIn(node: AnyNode, into: AnyNode[] = []): AnyNode[] {
+	const branch = takenBranch(node);
+	if (branch?.dead) into.push(branch.dead);
+	for (const value of Object.values(node)) {
+		if (Array.isArray(value)) {
+			for (const item of value) if (isNode(item)) deadIn(item, into);
+		} else if (isNode(value)) deadIn(value, into);
+	}
+	return into;
+}
+
+/** `import.meta.url`: the `import.meta` member path a node reads, when it reads one. */
+function metaPath(node: AnyNode): string | undefined {
+	if (node.type === 'MetaProperty') return 'import.meta';
+	const read = unchained(node);
+	if (read.type !== 'MemberExpression') return undefined;
+	const object = metaPath(read.object as AnyNode);
+	const name = propertyName(read);
+	return object && (name ? `${object}.${name}` : object);
+}
+
 const identifier = (name: string): AnyNode => ({ type: 'Identifier', name }) as AnyNode;
 const member = (object: AnyNode, property: string | number): AnyNode =>
 	({
@@ -55,6 +127,13 @@ const stateName = (name: string): AnyNode =>
 function cloneWith(node: AnyNode, replace: (node: AnyNode) => AnyNode | undefined): AnyNode {
 	const swapped = replace(node);
 	if (swapped) return swapped;
+	const branch = takenBranch(node);
+	if (branch)
+		return branch.taken
+			? cloneWith(branch.taken, replace)
+			: ({ type: 'EmptyStatement' } as AnyNode);
+	const env = clientEnvValue(node);
+	if (env !== undefined) return { type: 'Literal', value: env, raw: JSON.stringify(env) } as AnyNode;
 	const copy: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(node)) {
 		if (Array.isArray(value))
@@ -106,6 +185,26 @@ function semanticNodeOf(semantic: ModuleSemantics, node: AnyNode): AnyNode | und
 		if (candidate.start === start && candidate.end === node.end && candidate.type === node.type)
 			return candidate;
 	return undefined;
+}
+
+/** Framework functions a phone's script runs, as the host service that stands in for each (`globalThis.__marklessHost.<name>`). */
+const HOST_FUNCTIONS: Readonly<Record<string, ReadonlyArray<string>>> = {
+	'@markless/router': ['navigate'],
+};
+
+/** The host service a framework import stands for in a script, or undefined when a script cannot run it. */
+function hostFunctionOf(entry: {
+	readonly kind: string;
+	readonly specifier: string;
+	readonly name?: string | null;
+}): AnyNode | undefined {
+	if (
+		entry.kind !== 'named' ||
+		!entry.name ||
+		!HOST_FUNCTIONS[entry.specifier]?.includes(entry.name)
+	)
+		return undefined;
+	return member(member(identifier('globalThis'), '__marklessHost'), entry.name);
 }
 
 /** The import record a binding comes from, when it is a value import. */
@@ -231,6 +330,19 @@ function unsupportedIn(
 		into.push({ construct: 'markup', span: spanOf(node as never, filename) });
 		return;
 	}
+	const branch = takenBranch(node);
+	if (branch) {
+		if (branch.taken) unsupportedIn(branch.taken, filename, into);
+		return;
+	}
+	if (clientEnvValue(node) !== undefined) return;
+	const meta = metaPath(node);
+	if (meta) {
+		into.push({ construct: `\`${meta}\``, span: spanOf(node as never, filename) });
+		return;
+	}
+	if (node.type === 'ImportExpression')
+		into.push({ construct: 'a dynamic `import()`', span: spanOf(node as never, filename) });
 	if (node.type === 'TSEnumDeclaration' || node.type === 'TSModuleDeclaration')
 		into.push({
 			construct: node.type === 'TSEnumDeclaration' ? 'an `enum`' : 'a `namespace`',
@@ -253,6 +365,8 @@ export function scriptFunctionOf(
 	filename: string,
 	/** A value read while rendering, not a function: the code returns a function that gives it. */
 	asValue = false,
+	/** A shared factory's method, whose parameters are its arguments rather than an event. */
+	method = false,
 ): SemanticScriptFunction | undefined {
 	const root = semanticNodeOf(semantic, graphNode);
 	if (!root) return undefined;
@@ -263,6 +377,7 @@ export function scriptFunctionOf(
 	const viaState = new Map<number, Binding>();
 	const names = new Map<string, { name: string; written: boolean; span: SourceSpan }>();
 	const framework: { name: string; source: string; span: SourceSpan }[] = [];
+	const navigates: SourceSpan[] = [];
 	const globals: SemanticScriptGlobal[] = [];
 	const replaced = new Map<AnyNode, AnyNode>();
 	const unsupported: { construct: string; span: SourceSpan }[] = [];
@@ -270,9 +385,11 @@ export function scriptFunctionOf(
 	const usedImports = new Map<string, { slot: number; name: string | null }>();
 	for (let index = 0; index < parts.length; index++) {
 		const part = parts[index]!;
+		const dead = deadIn(part);
 		for (const reference of semantic.references) {
 			const node = reference.node as unknown as AnyNode;
 			if (reference.inTypePosition || !within(node as never, part as never)) continue;
+			if (dead.some((branch) => within(node as never, branch as never))) continue;
 			const binding = reference.binding;
 			if (!binding) {
 				globals.push(globalOf(semantic, reference, filename));
@@ -282,6 +399,12 @@ export function scriptFunctionOf(
 			if (declared && parts.some((other) => within(declared as never, other as never)))
 				continue;
 			const entry = importOf(semantic, binding);
+			const service = entry && hostFunctionOf(entry);
+			if (service) {
+				replaced.set(node, service);
+				navigates.push(spanOf(node as never, filename));
+				continue;
+			}
 			if (entry?.specifier.startsWith(FRAMEWORK_PREFIX)) {
 				framework.push({
 					name: reference.name,
@@ -342,9 +465,11 @@ export function scriptFunctionOf(
 	const eventReads: { path: string[]; span: SourceSpan }[] = [];
 	const [parameter] = (root.params as AnyNode[] | undefined) ?? [];
 	const eventBinding =
-		parameter?.type === 'Identifier' ? semantic.bindingOf(parameter as never) : null;
+		parameter?.type === 'Identifier' && !method ? semantic.bindingOf(parameter as never) : null;
+	const deadInRoot = deadIn(root);
 	for (const reference of eventBinding?.references ?? []) {
 		let at = reference.node as unknown as AnyNode;
+		if (deadInRoot.some((branch) => within(at as never, branch as never))) continue;
 		const path: string[] = [];
 		for (;;) {
 			const parent = semantic.parentOf(at as never) as AnyNode | null;
@@ -392,6 +517,7 @@ export function scriptFunctionOf(
 		...(eventBinding ? { event: eventReads } : {}),
 		globals,
 		framework,
+		navigates,
 		span: spanOf(root as never, filename),
 		unsupported,
 	};
@@ -430,16 +556,25 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 		const globals: SemanticScriptGlobal[] = [];
 		const dropped: { name: string; span: SourceSpan }[] = [];
 		const framework: { name: string; source: string; span: SourceSpan }[] = [];
+		const navigates: SourceSpan[] = [];
 		const unsupported: { construct: string; span: SourceSpan }[] = [];
+		const dead = deadIn(node);
 		for (const reference of semantic.references) {
 			const at = reference.node as unknown as AnyNode;
 			if (reference.inTypePosition || !within(at as never, range as never)) continue;
+			if (dead.some((branch) => within(at as never, branch as never))) continue;
 			const binding = reference.binding;
 			if (!binding) {
 				globals.push(globalOf(semantic, reference, filename));
 				continue;
 			}
 			const entry = importOf(semantic, binding);
+			const service = entry && hostFunctionOf(entry);
+			if (service) {
+				replaced.set(at, service);
+				navigates.push(spanOf(at as never, filename));
+				continue;
+			}
 			if (entry?.specifier.startsWith(FRAMEWORK_PREFIX)) {
 				framework.push({
 					name: reference.name,
@@ -471,6 +606,7 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 			globals,
 			dropped,
 			framework,
+			navigates,
 			unsupported,
 		});
 	};
@@ -613,6 +749,12 @@ export function scriptFactsOf(source: string, filename: string) {
 			const node = nodeOver(semantic, span);
 			return node && scriptFunctionOf(node, semantic, filename);
 		},
+		/** A shared factory's method written at `span` (its property). */
+		method: (span: SourceSpan): SemanticScriptFunction | undefined => {
+			const node = nodeOver(semantic, span);
+			const fn = node?.type === 'Property' ? (node.value as AnyNode | undefined) : undefined;
+			return fn && scriptFunctionOf(fn, semantic, filename, false, true);
+		},
 		/** A value the template reads, written at `span`. */
 		value: (span: SourceSpan): SemanticScriptFunction | undefined => {
 			const node = nodeOver(semantic, span);
@@ -643,6 +785,41 @@ export function scriptFactsOf(source: string, filename: string) {
 				return fn && scriptFunctionOf(fn, semantic, filename);
 			}
 			return undefined;
+		},
+		/**
+		 * A call to `name`, a function this module declares or imports from app code, with the arguments the caller passes as
+		 * the array `__s.args`; none for a component, framework state or a framework import.
+		 */
+		moduleCall: (name: string): SemanticScriptFunction | undefined => {
+			const binding = semantic.bindings.find(
+				(candidate) => candidate.name === name && candidate.scope.id === semantic.rootScope.id,
+			);
+			if (!binding) return undefined;
+			const imports = importSlots(semantic);
+			const imported = imports.record(binding);
+			const declaring = imported
+				? (binding.declarations[0] as AnyNode | undefined)
+				: !importOf(semantic, binding) && declaringNode(semantic, binding);
+			if (
+				!declaring ||
+				isComponent(declaring) ||
+				(declaring.type === 'VariableDeclarator' &&
+					isFrameworkCall(semantic, declaring.init as AnyNode))
+			)
+				return undefined;
+			const callee = imported ? generate(imports.reach(binding) as never, PRINT).code.trim() : name;
+			const span = spanOf(declaring as never, filename);
+			return {
+				code: `return function () {\nreturn ${callee}.apply(undefined, __s.args);\n};`,
+				names: [{ name: 'args', written: false, span }],
+				module: imported ? [] : [name],
+				imports: imported ? [{ slot: imported.index, name: imported.name }] : [],
+				globals: [],
+				framework: [],
+				navigates: [],
+				span,
+				unsupported: [],
+			};
 		},
 		module: (): SemanticScriptModule => (module ??= scriptModuleOf(semantic, filename)),
 	};

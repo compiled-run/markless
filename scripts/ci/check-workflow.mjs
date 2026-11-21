@@ -230,6 +230,65 @@ if (!jobNames.includes(GATE_JOB)) {
 	}
 }
 
+// 5b. A lane may skip pull requests only as `if: github.event_name != 'pull_request'`, and then the gate's
+// `QUEUE_ONLY_RESULTS` must name it, so a merge-queue or `main` run that skipped it still fails.
+const PR_EXCLUSION = "github.event_name != 'pull_request'";
+const queueOnly = (name) =>
+	ifOf(name) === PR_EXCLUSION || ifOf(name).startsWith(`${PR_EXCLUSION} && `);
+// The required checks and the jobs the gate reads `skipped` past have to report on every pull request.
+const EVERY_PULL_REQUEST = [GATE_JOB, 'agent-files', ...SKIP_CAUSING_JOBS];
+if (isCiSuite && jobNames.includes(GATE_JOB)) {
+	const gateNeeds = needsOf(GATE_JOB);
+	for (const name of jobNames) {
+		if (EVERY_PULL_REQUEST.includes(name) && queueOnly(name))
+			fail(`Job \`${name}\` skips pull requests, but every pull request needs it to report.`);
+		if (gateNeeds.includes(name) && !queueOnly(name) && /github\.event_name/.test(ifOf(name)))
+			fail(
+				`Lane \`${name}\` gates on the event in a form the gate cannot hold to account; skip pull requests only as \`if: ${PR_EXCLUSION}\`, alone or ahead of \`&&\`.`,
+			);
+	}
+	const gateStep = stepsOf(GATE_JOB).find((step) => step.id === 'gate');
+	const gateEnv = (gateStep && typeof gateStep.env === 'object' && gateStep.env) || {};
+	const listed = String(gateEnv.QUEUE_ONLY_RESULTS ?? '')
+		.split(/\s+/)
+		.filter(Boolean);
+	const expected = gateNeeds.filter(queueOnly);
+	for (const name of expected) {
+		if (!listed.includes(`${name}=\${{needs.${name}.result}}`))
+			fail(
+				`The \`${GATE_JOB}\` gate step does not list \`${name}=\${{needs.${name}.result}}\` in \`QUEUE_ONLY_RESULTS\`, so a merge-queue run that skipped \`${name}\` would pass.`,
+			);
+	}
+	for (const entry of listed) {
+		const name = entry.split('=')[0];
+		if (!expected.includes(name) || entry !== `${name}=\${{needs.${name}.result}}`)
+			fail(
+				`\`QUEUE_ONLY_RESULTS\` lists \`${entry}\`, which is not a lane the gate needs with \`if: ${PR_EXCLUSION}\`.`,
+			);
+	}
+	if (expected.length > 0) {
+		const run = String((gateStep && gateStep.run) ?? '');
+		if (
+			gateEnv.EVENT !== '${{ github.event_name }}' ||
+			!run.includes('"$EVENT" != "pull_request"') ||
+			!run.includes('$QUEUE_ONLY_RESULTS')
+		)
+			fail(
+				`The \`${GATE_JOB}\` gate step must read \`QUEUE_ONLY_RESULTS\` whenever \`EVENT: \${{ github.event_name }}\` is not \`pull_request\`, so the queue-only lanes block the merge queue and \`main\`.`,
+			);
+	}
+	const receiptsEnv = String(
+		(jobs[RECEIPTS_JOB] && jobs[RECEIPTS_JOB].env && jobs[RECEIPTS_JOB].env.RUN_RECEIPTS) ?? '',
+	);
+	if (
+		jobNames.some((name) => name.startsWith(BOX_JOB_PREFIX) && queueOnly(name)) &&
+		!receiptsEnv.startsWith(`\${{ ${PR_EXCLUSION} && `)
+	)
+		fail(
+			`Box lanes skip pull requests, so \`${RECEIPTS_JOB}\` has to set \`RUN_RECEIPTS\` false on them (\`\${{ ${PR_EXCLUSION} && ... || 'false' }}\`); otherwise it restores receipts no lane wrote.`,
+		);
+}
+
 // 6. Receipt aggregation: every box lane must upload, and the gate must need
 // those lanes and download what they uploaded before it checks them, only after
 // its result step found every lane green.
@@ -338,7 +397,8 @@ if (jobNames.includes(GATE_JOB) && !jobNames.includes(LANES_JOB)) {
 			fail(`Job \`${LANES_JOB}\` has no \`key_${slug}\` output, so a queue-tested push cannot carry lane \`${lane}\`'s marker.`);
 		if (needsOf(lane).length > 0)
 			fail(`Lane \`${lane}\` needs ${needsOf(lane).join(', ')}; it decides from its own probe, so waiting on another job only adds a runner-queue wait.`);
-		if (ifOf(lane) !== '') fail(`Lane \`${lane}\` has a job-level \`if:\`; only its probe may skip its work.`);
+		if (ifOf(lane) !== '' && ifOf(lane) !== PR_EXCLUSION)
+			fail(`Lane \`${lane}\` has a job-level \`if:\` other than \`${PR_EXCLUSION}\`; only its probe may skip its work.`);
 		const steps = stepsOf(lane);
 		const probeIndex = steps.findIndex((step) => step.id === LANE_STEP && step.uses === LANE_ACTION);
 		const probe = steps[probeIndex];
@@ -479,6 +539,19 @@ if (isCiSuite && !jobNames.includes(PLAYWRIGHT_JOB)) {
 	for (const name of jobNames) {
 		if (IMAGE_KEYS.some((image) => jobText(name).includes(image)) && jobs[name]?.['runs-on'] !== lanesRunner)
 			fail(`Job \`${name}\` keys a cache on \`${LANES_JOB}\`'s runner image but runs on \`${jobs[name]?.['runs-on']}\`, not \`${lanesRunner}\`.`);
+	}
+	// A self-hosted runner is reachable only from a merge_group run; the runner's own job-started hook refuses the rest.
+	const HOSTED_RUNNER = /^(ubuntu|macos|windows)-[0-9a-z.-]+$/;
+	const QUEUE_RUNNER =
+		/^\$\{\{ github\.event_name == 'merge_group' && (?:contains\(format\(' \{0\} ', vars\.MERGE_QUEUE_RUNNER_JOBS\), ' ([a-z0-9-]+) '\) && )?vars\.MERGE_QUEUE_RUNNER \|\| '(ubuntu-[0-9.]+)' \}\}$/;
+	for (const name of jobNames) {
+		const runsOn = jobs[name]?.['runs-on'];
+		if (typeof runsOn === 'string' && HOSTED_RUNNER.test(runsOn)) continue;
+		const queue = typeof runsOn === 'string' ? QUEUE_RUNNER.exec(runsOn) : null;
+		if (!queue)
+			fail(`Job \`${name}\` runs on \`${JSON.stringify(runsOn)}\`; use a GitHub-hosted image, or the merge_group-only MERGE_QUEUE_RUNNER expression with a hosted fallback.`);
+		else if (queue[1] !== undefined && queue[1] !== name)
+			fail(`Job \`${name}\` routes by MERGE_QUEUE_RUNNER_JOBS under the name \`${queue[1]}\`; use its own job name.`);
 	}
 	const launchers = nodeTestsLaunchingBrowsers();
 	if (launchers.length > 0 && jobNames.includes('unit')) {

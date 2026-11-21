@@ -292,7 +292,7 @@ test('an @if arm does not run its expressions once its condition turns false (#8
 	});
 });
 
-test.fails('a page the router prefetched shows a list derived from a storage() value written after the prefetch (#876)', async () => {
+test('a page the router prefetched shows a list derived from a storage() value written after the prefetch (#876)', async () => {
 	const context = await browser.newContext({ baseURL: app.origin });
 	try {
 		const page = await context.newPage();
@@ -349,7 +349,7 @@ test('a page that reads url.searchParams in an attribute renders (#865)', async 
 	});
 });
 
-test.fails(
+test(
 	'a @for key computed from the row item builds (#872)',
 	{ timeout: 240_000 },
 	async () => {
