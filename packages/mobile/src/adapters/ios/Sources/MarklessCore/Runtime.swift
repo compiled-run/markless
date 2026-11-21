@@ -603,7 +603,8 @@ public final class NativeRuntime {
 			if let known = computed[key] { return known }
 			let value = try scriptHost.unwrap().entry {
 				let text = try callScript("enter", .object([("kind", .string("compute")), ("fn", .string(fn)), ("frame", frame), ("elements", elements)] + entryCells()))
-				return NativeValue(json: try JSONValue.parse(Data(text.utf8)))
+				let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "compute").object(["json", "nonFinite"])
+				return try NativeValue.nonFiniteJoin(result["json"].value, result["nonFinite"].value)
 			}
 			computed[key] = value
 			return value
@@ -675,11 +676,14 @@ public final class NativeRuntime {
 	/// the route params when `navigate` is.
 	private func entryCells() -> [(String, JSONValue)] {
 		let ids = Set(payload.cells.map(\.id))
-		let cells = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0.json) } }
-			+ values.keys.filter { !ids.contains($0) }.sorted().map { ($0, values[$0]!.json) }
+		let slots = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0) } }
+			+ values.keys.filter { !ids.contains($0) }.sorted().map { ($0, values[$0]!) }
+		// JSON writes Infinity and NaN as null: the entry lists where they were, each path starting with its slot.
+		let split = NativeValue.object(slots.map { (key: $0.0, value: $0.1) }).nonFiniteSplit
 		let crypto = payload.script?.services.contains(.crypto) == true
 		let navigate = payload.script?.services.contains(.navigate) == true
-		return [("cells", .object(cells))]
+		let nonFinite: [(String, JSONValue)] = if case let .array(found) = split.nonFinite, !found.isEmpty { [("nonFinite", split.nonFinite)] } else { [] }
+		return [("cells", split.json)] + nonFinite
 			+ (unset.isEmpty ? [] : [("unset", .array(unset.sorted().map { .string($0) }))])
 			+ (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
 			+ (navigate ? [("params", .object(params.map { ($0.name, .string($0.value)) }))] : [])
@@ -695,11 +699,11 @@ public final class NativeRuntime {
 			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["calls", "commands", "navigate", "prevented"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
-			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
+			guard pair.count == 2 || pair.count == 3 else { throw write.fail("a write is [slot, value] or [slot, value, nonFinite]") }
 			let slot = try pair[0].string()
 			let cell = slot.firstIndex(of: "@").map { String(slot[..<$0]) } ?? slot
 			guard values[cell] != nil, payload.cells.contains(where: { $0.id == cell }) else { throw RuntimeError(reason: "the script wrote unknown cell \(cell)") }
-			let value = NativeValue(json: pair[1].value)
+			let value = try NativeValue.nonFiniteJoin(pair[1].value, pair.count == 3 ? pair[2].value : nil)
 			values[slot] = value
 			unset.remove(slot)
 			if let key = storageKeys[cell] { store.write(key, value) }
