@@ -566,6 +566,7 @@ function lowerRowItemWrite(
 			row: {
 				itemName: repeat.itemName,
 				keyPath: repeat.indexKey ? null : repeat.keyPath,
+				...(repeat.keyParts ? { keyParts: repeat.keyParts } : {}),
 				itemPath,
 				...(collection.enclosing ? { enclosing: collection.enclosing } : {}),
 			},
@@ -598,6 +599,7 @@ function rowCollectionOf(
 		enclosing: {
 			itemName: enclosing.itemName,
 			keyPath: enclosing.indexKey ? null : enclosing.keyPath,
+			...(enclosing.keyParts ? { keyParts: enclosing.keyParts } : {}),
 			itemPath: repeat.enclosingItemPath ?? [],
 			...(outer.enclosing ? { enclosing: outer.enclosing } : {}),
 		},

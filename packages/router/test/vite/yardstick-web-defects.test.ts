@@ -349,7 +349,7 @@ test('a page that reads url.searchParams in an attribute renders (#865)', async 
 	});
 });
 
-test.fails(
+test(
 	'a @for key computed from the row item builds (#872)',
 	{ timeout: 240_000 },
 	async () => {

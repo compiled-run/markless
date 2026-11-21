@@ -165,7 +165,7 @@
 	"anchors": {
 		"calibrationS": 1.228,
 		"cpuS": 2730.7,
-		"peakRssMb": 4147,
+		"peakRssMb": 3976,
 		"models": {
 			"factors": {
 				"AMD EPYC 7763 64-Core Processor": 1.048,
@@ -205,7 +205,7 @@
 			},
 			"2/3": {
 				"cpuS": 875.1,
-				"peakRssMb": 4147,
+				"peakRssMb": 3976,
 				"suite": 866.1,
 				"typical": 886.2
 			},
@@ -1341,6 +1341,29 @@
 				"/tmp/cc-scratch/ubdirs/44546975882"
 			],
 			"reason": "Node's compile cache (PR #896): within one unit run, test workers, fixture-build children and build workers reuse what earlier processes compiled, so total CPU at the anchors' speed fell by 11.7% to 12.8% across five attempts of run 44546975882 (3,036 / 3,041 / 3,056 / 3,057 / 3,076 against 3,481.7). The same main without the cache (#877, run 44548573716) stayed inside the margin. Anchored on attempts 3 to 5, whose artifacts were saved before each re-run replaced them; the unit job does not restore a cache from main yet."
+		},
+		{
+			"date": "2026-11-20",
+			"change": "anchors",
+			"from": {
+				"cpuS": 2730.7,
+				"peakRssMb": 4147
+			},
+			"to": {
+				"cpuS": 2730.7,
+				"peakRssMb": 3976
+			},
+			"runs": [
+				"44713921845",
+				"44721931883",
+				"44721932991",
+				"44726092778",
+				"44728821951",
+				"44735470266",
+				"44735470401",
+				"44735548059"
+			],
+			"reason": "memory only, down: after #981 (render-order sweep in child processes) the largest shard peak reads in two modes on main merge-queue runs, 3703-3716 MB and 4144-4442 MB; 3976 MB puts the readings 3703-4257 inside the unchanged ±7.9% band (3662-4290) and lowers the ceiling from 4475 to 4290 MB; CPU anchors unchanged"
 		}
 	],
 	"models": {

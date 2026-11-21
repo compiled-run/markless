@@ -1876,14 +1876,14 @@ export function repeatKeyUnstableDiagnostic(input: {
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: '@for key must identify the item stably',
-		message: `key ${input.keySource} does not derive identity from ${input.itemName} or an explicit index alias. Row state, event wiring, and DOM reuse follow the key, so rows of ${input.collectionSource} could not be matched with themselves reliably.`,
+		message: `key ${input.keySource} is not built from ${input.itemName} alone. A key may be the item (\`key ${input.itemName}\`), a path on it (\`key ${input.itemName}.id\`), a template literal or string + join of such paths (key \`\${${input.itemName}.id}:\${${input.itemName}.size}\`), or the row's position (\`index i; key i\`). Row state, event wiring, and DOM reuse follow the key, and the browser computes each row's key without loading page code, so a key that calls a function or reads anything besides the row item cannot match rows of ${input.collectionSource} with themselves.`,
 		why: 'The key is the stable identity root for a repeated graph scope across reorder, insert, delete, and resume; a value that is not derived from the item or its position cannot identify anything.',
 		primarySpan: sourceSpan(input.keyNode, input.filename),
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
 		suggestions: [
 			{
-				message: `Key by a stable field of ${input.itemName}, such as \`key ${input.itemName}.id\`, or key by position with \`index i; key i\` when state should follow the slot.`,
+				message: `Key by a stable field of ${input.itemName}, such as \`key ${input.itemName}.id\`, join fields into one string when no single field is unique, or key by position with \`index i; key i\` when state should follow the slot. A key a function computes can be stored on each item as a field.`,
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_KEY_UNSTABLE',
