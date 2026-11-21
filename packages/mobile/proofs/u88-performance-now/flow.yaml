@@ -1,0 +1,21 @@
+appId: ${APP_ID}
+name: u88-performance-now
+---
+- launchApp:
+    clearState: true
+- assertVisible: Read the clock
+- assertVisible: No reading yet
+- assertNotVisible: First reading
+- assertNotVisible: Later reading
+- assertNotVisible: Clock went back
+- tapOn: Read the clock
+- assertVisible: First reading
+- assertNotVisible: No reading yet
+- assertVisible: First reading
+- assertNotVisible: No reading yet
+- assertNotVisible: Clock went back
+- tapOn: Read the clock
+- assertNotVisible: First reading
+- assertVisible: Later reading
+- assertNotVisible: First reading
+- assertNotVisible: Clock went back

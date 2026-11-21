@@ -1458,6 +1458,7 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		console: 'console',
 		fetch: 'fetch',
 		crypto: 'crypto',
+		performance: 'engine',
 		Event: 'engine',
 		CustomEvent: 'engine',
 		MouseEvent: 'engine',

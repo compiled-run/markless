@@ -76,6 +76,11 @@ if (!host) {
 		signal.listeners.slice().forEach(function (fn) { fn.call(signal, event); });
 	};
 	if (typeof g.queueMicrotask !== 'function') g.queueMicrotask = function (fn) { Promise.resolve().then(fn); };
+	if (typeof g.performance !== 'object' || g.performance === null || typeof g.performance.now !== 'function') {
+		var timeOrigin = Date.now();
+		var latest = 0;
+		g.performance = { timeOrigin: timeOrigin, now: function () { latest = Math.max(latest, Date.now() - timeOrigin); return latest; } };
+	}
 	// Events a script makes and dispatches on an element: the host raises them on that element once the script returns.
 	var EventBase = function (type, init) {
 		init = init || {};

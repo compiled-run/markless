@@ -33,8 +33,7 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <button> component-edge:5/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:5/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_MOUSE_ONLY: the wheel handler on <div> component-edge:7/h2 runs only from a mouse or trackpad on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/carousel/carousel-engine.ts uses `getComputedStyle`: computed CSS, which a phone does not have at run time",
-			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/carousel/carousel-engine.ts uses `performance`, which a phone's script engine does not provide"
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/carousel/carousel-engine.ts uses `getComputedStyle`: computed CSS, which a phone does not have at run time"
 		]
 	},
 	"checkbox": {

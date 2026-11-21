@@ -1,0 +1,20 @@
+{
+	"rung": 204,
+	"name": "a JavaScript handler reads performance.now(): a number of milliseconds that never goes back",
+	"steps": [
+		{
+			"visible": ["Read the clock", "No reading yet"],
+			"absent": ["First reading", "Later reading", "Clock went back"]
+		},
+		{
+			"do": { "tap": "Read the clock" },
+			"visible": ["First reading"],
+			"absent": ["No reading yet", "Clock went back"]
+		},
+		{
+			"do": { "tap": "Read the clock" },
+			"visible": ["Later reading"],
+			"absent": ["First reading", "Clock went back"]
+		}
+	]
+}

@@ -590,6 +590,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A JavaScript handler's performance.now(): a number of milliseconds that never goes back.
+		name: 'performance-now',
+		fixture: 'proofs/u88-performance-now/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h1' },
+		],
+	},
+	{
 		name: 'by-id',
 		fixture: 'test/fixtures/ById.tsrx',
 		actions: [
