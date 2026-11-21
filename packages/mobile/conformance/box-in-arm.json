@@ -310,14 +310,37 @@
 		]
 	},
 	"initial": [
-		["h1:text0", "Task"],
-		["h4:text0", "No task"],
-		["h5:text0", "Load done"],
-		["h6:text0", "Load open"],
-		["h7:text0", "Clear"],
-		["h8:text0", "Box: untouched"]
+		[
+			"h1:text0",
+			"Task"
+		],
+		[
+			"h4:text0",
+			"No task"
+		],
+		[
+			"h5:text0",
+			"Load done"
+		],
+		[
+			"h6:text0",
+			"Load open"
+		],
+		[
+			"h7:text0",
+			"Clear"
+		],
+		[
+			"h8:text0",
+			"Box: untouched"
+		]
 	],
-	"initialArms": [["branch-site:0", 1]],
+	"initialArms": [
+		[
+			"branch-site:0",
+			1
+		]
+	],
 	"steps": [
 		{
 			"action": {
