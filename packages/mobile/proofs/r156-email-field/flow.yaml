@@ -1,0 +1,40 @@
+appId: ${APP_ID}
+name: r156-email-field
+---
+- launchApp:
+      clearState: true
+- assertVisible: Sign in
+- assertVisible: Not signed in
+- tapOn: Email
+- eraseText
+- inputText: ada
+- hideKeyboard
+- assertVisible: ada
+- assertVisible: Not signed in
+- assertVisible: ada
+- tapOn: Continue
+- assertVisible: Please include an '@' in the email address\. 'ada' is missing an '@'\.
+- assertVisible: Not signed in
+- assertVisible: Please include an '@' in the email address\. 'ada' is missing an '@'\.
+- tapOn: Email
+- eraseText
+- inputText: ada@
+- hideKeyboard
+- assertVisible: ada@
+- assertVisible: Not signed in
+- assertVisible: ada@
+- tapOn: Continue
+- assertVisible: Please enter a part following '@'\. 'ada@' is incomplete\.
+- assertVisible: Not signed in
+- assertVisible: Please enter a part following '@'\. 'ada@' is incomplete\.
+- tapOn: Email
+- eraseText
+- inputText: ada@example.com
+- hideKeyboard
+- assertVisible: ada@example\.com
+- assertVisible: Not signed in
+- assertVisible: ada@example\.com
+- tapOn: Continue
+- assertNotVisible: Not signed in
+- assertVisible: Signed in as \[ada@example\.com\]
+- assertNotVisible: Not signed in

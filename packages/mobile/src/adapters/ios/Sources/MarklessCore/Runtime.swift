@@ -236,7 +236,7 @@ public final class NativeRuntime {
 	/// Row state's list by cell id: its values are kept as `<cell>@<key>`.
 	private let rowOfCell: [String: String]
 	private var eventValue: String?
-	/// In an `input` dispatch: the field's text, which it already shows.
+	/// In an `input` dispatch: the field's text as typed, which it already shows; `eventValue` is it sanitized (an email field).
 	private var edit: String?
 	/// What a dismiss or pointer event carries while its handlers run.
 	private var eventFields: [NativeEventField: NativeValue]?
@@ -271,6 +271,9 @@ public final class NativeRuntime {
 	private var chosenNow: String?
 	private let missing: NativeValueMissing?
 	private let tooLong: NativeTooLong?
+	private let emailMismatch: NativeEmailMismatch?
+	/// The label the web draws on an `<input type="submit">` without a `value`, in the device's language.
+	public let submitLabel: String?
 	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
 	public private(set) var dialogs: [String: Bool]
 	/// Where a page with a script gets its engine; asked only when a script op runs or a script computed is read.
@@ -333,6 +336,10 @@ public final class NativeRuntime {
 		missing = payload.valueMissing.first { $0.locale == locale }?.messages
 		let tooLongLocale = nativeLocale(preferredLanguages, payload.tooLong.map(\.locale))
 		tooLong = payload.tooLong.first { $0.locale == tooLongLocale }?.message
+		let emailLocale = nativeLocale(preferredLanguages, payload.emailMismatch.map(\.locale))
+		emailMismatch = payload.emailMismatch.first { $0.locale == emailLocale }?.messages
+		let submitLocale = nativeLocale(preferredLanguages, payload.submitLabel.map(\.locale))
+		submitLabel = payload.submitLabel.first { $0.locale == submitLocale }?.label
 		dialogs = Dictionary(uniqueKeysWithValues: payload.nodes.compactMap { node in
 			if case let .element(element, _, _) = node.kind, element == "dialog" { return (node.id, false) }
 			return nil
@@ -569,7 +576,8 @@ public final class NativeRuntime {
 			if let known = computed[key] { return known }
 			let value = try scriptHost.unwrap().entry {
 				let text = try callScript("enter", .object([("kind", .string("compute")), ("fn", .string(fn)), ("frame", frame), ("elements", elements)] + entryCells()))
-				return NativeValue(json: try JSONValue.parse(Data(text.utf8)))
+				let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "compute").object(["json", "nonFinite"])
+				return try NativeValue.nonFiniteJoin(result["json"].value, result["nonFinite"].value)
 			}
 			computed[key] = value
 			return value
@@ -638,10 +646,13 @@ public final class NativeRuntime {
 	/// Every current value by slot (the page's cells in payload order, then row slots), and a seed when `crypto` is used.
 	private func entryCells() -> [(String, JSONValue)] {
 		let ids = Set(payload.cells.map(\.id))
-		let cells = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0.json) } }
-			+ values.keys.filter { !ids.contains($0) }.sorted().map { ($0, values[$0]!.json) }
+		let slots = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0) } }
+			+ values.keys.filter { !ids.contains($0) }.sorted().map { ($0, values[$0]!) }
+		// JSON writes Infinity and NaN as null: the entry lists where they were, each path starting with its slot.
+		let split = NativeValue.object(slots.map { (key: $0.0, value: $0.1) }).nonFiniteSplit
 		let crypto = payload.script?.services.contains(.crypto) == true
-		return [("cells", .object(cells))]
+		let nonFinite: [(String, JSONValue)] = if case let .array(found) = split.nonFinite, !found.isEmpty { [("nonFinite", split.nonFinite)] } else { [] }
+		return [("cells", split.json)] + nonFinite
 			+ (unset.isEmpty ? [] : [("unset", .array(unset.sorted().map { .string($0) }))])
 			+ (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
 	}
@@ -655,11 +666,11 @@ public final class NativeRuntime {
 		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(required: ["writes", "aborts", "timers", "clears", "requests", "logs"], optional: ["commands"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
-			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
+			guard pair.count == 2 || pair.count == 3 else { throw write.fail("a write is [slot, value] or [slot, value, nonFinite]") }
 			let slot = try pair[0].string()
 			let cell = slot.firstIndex(of: "@").map { String(slot[..<$0]) } ?? slot
 			guard values[cell] != nil, payload.cells.contains(where: { $0.id == cell }) else { throw RuntimeError(reason: "the script wrote unknown cell \(cell)") }
-			let value = NativeValue(json: pair[1].value)
+			let value = try NativeValue.nonFiniteJoin(pair[1].value, pair.count == 3 ? pair[2].value : nil)
 			values[slot] = value
 			unset.remove(slot)
 			if let key = storageKeys[cell] { store.write(key, value) }
@@ -886,8 +897,13 @@ public final class NativeRuntime {
 		try element(id).bindings.first { $0.isProperty && $0.name == name }
 	}
 
+	/// An email field's value is sanitized as HTML does; the field itself shows what was typed.
+	private func sanitized(_ id: String, _ text: String) throws -> String {
+		try attributeNow(id, "type") == "email" ? nativeEmailValue(text) : text
+	}
+
 	private func textOf(field id: String) throws -> String {
-		if let typed = edited[id] { return typed }
+		if let typed = edited[id] { return try sanitized(id, typed) }
 		if let binding = try propertyBinding(id, "value") { return textOf(try evaluate(binding.value)) }
 		return try attributeNow(id, "value") ?? ""
 	}
@@ -1087,6 +1103,10 @@ public final class NativeRuntime {
 				}
 			}
 		}
+		if field.kind == .text, try attributeNow(field.node, "type") == "email" {
+			guard let emailMismatch else { throw RuntimeError(reason: "the payload has no message for an email field that holds no email address") }
+			if let message = emailMismatch.message(for: try textOf(field: field.node)) { return message }
+		}
 		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		guard field.kind == .text, let max = nativeMaxLength(try attributeNow(field.node, "maxlength")), let typed = edited[field.node],
 			typed.utf16.count > max
@@ -1211,8 +1231,8 @@ public final class NativeRuntime {
 		let scope = instance.scope
 		// A press focuses the control it presses, as the browser does.
 		if action.event == .activate { focused = action.host }
-		eventValue = action.event == .input ? action.value ?? "" : nil
-		edit = eventValue
+		edit = action.event == .input ? action.value ?? "" : nil
+		eventValue = try edit.map { try sanitized(action.host, $0) }
 		switch action.event {
 		case .keydown: eventFields = [.key: .string(action.value ?? "")]
 		case .paste: eventFields = [.text: .string(action.value ?? "")]

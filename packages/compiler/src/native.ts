@@ -13,3 +13,4 @@ export {
 	type NativeViewOptions,
 } from './passes/native-view.ts';
 export { fontFaceSources } from './passes/native-font-faces.ts';
+export { compileDrawing, type DrawingElement, type DrawingResult } from './passes/native-drawing.ts';

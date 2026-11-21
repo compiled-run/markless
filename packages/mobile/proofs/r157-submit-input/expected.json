@@ -1,0 +1,19 @@
+{
+	"rung": 157,
+	"name": "an <input type=\"submit\"> is its form's submit button, labelled by its value, else by the browser's own label",
+	"steps": [
+		{ "visible": ["Forms", "Sign in", "Submit", "Nobody yet", "Second form not sent"] },
+		{
+			"do": { "tap": "Sign in" },
+			"visible": ["Nobody yet"],
+			"invalid": "Please fill out this field."
+		},
+		{
+			"do": { "type": { "field": "Name", "text": "Ada" } },
+			"visible": ["Nobody yet"],
+			"fields": { "Name": "Ada" }
+		},
+		{ "do": { "tap": "Sign in" }, "visible": ["Hello, Ada", "Second form not sent"], "absent": ["Nobody yet"] },
+		{ "do": { "tap": "Submit" }, "visible": ["Second form sent"], "absent": ["Second form not sent"] }
+	]
+}

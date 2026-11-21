@@ -147,6 +147,48 @@ fun jsonValue(v: JsValue): String = when (v) {
 	is JsValue.Obj -> v.fields.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonValue(it.value)}" }
 }
 
+/** JSON writes Infinity, -Infinity and NaN as null ([jsonValue]): each one's path and name, as JSON (nativeNonFiniteSplit). */
+fun nonFiniteJson(v: JsValue): String {
+	val found = ArrayList<String>()
+	fun walk(x: JsValue, path: List<String>) {
+		when (x) {
+			is JsValue.Num -> if (x.value.isNaN() || x.value.isInfinite()) found.add("[[${path.joinToString(",")}],${jsonString(if (x.value.isNaN()) "NaN" else if (x.value > 0) "Infinity" else "-Infinity")}]")
+			is JsValue.Arr -> x.items.forEachIndexed { k, item -> walk(item, path + k.toString()) }
+			is JsValue.Obj -> x.fields.forEach { (key, item) -> walk(item, path + jsonString(key)) }
+			else -> {}
+		}
+	}
+	walk(v, emptyList())
+	return found.joinToString(",", "[", "]")
+}
+
+/** A value JSON carried, with the non-finite numbers [nonFinite] lists put back at their paths (nativeNonFiniteJoin). */
+fun nonFiniteJoin(json: Json, nonFinite: Json?): JsValue {
+	var value = JsValue.fromJson(json)
+	for (entry in nonFinite?.arr("nonFinite").orEmpty()) {
+		val pair = entry.arr("a non-finite entry")
+		if (pair.size != 2) throw MarklessDecodeError("a non-finite entry is [path, name]")
+		val path = pair[0].arr("a non-finite path")
+		val number = when (val name = pair[1].str("a non-finite name")) {
+			"Infinity" -> Double.POSITIVE_INFINITY
+			"-Infinity" -> Double.NEGATIVE_INFINITY
+			"NaN" -> Double.NaN
+			else -> throw MarklessDecodeError("$name is not Infinity, -Infinity or NaN")
+		}
+		if (path.isEmpty()) { value = JsValue.Num(number); continue }
+		var at = value
+		for ((k, key) in path.withIndex()) {
+			val last = k == path.size - 1
+			when {
+				at is JsValue.Arr && key is Json.Num && key.value.toInt() in at.items.indices -> if (last) at.items[key.value.toInt()] = JsValue.Num(number) else at = at.items[key.value.toInt()]
+				at is JsValue.Obj && key is Json.Str && at.fields.containsKey(key.value) -> if (last) at.fields[key.value] = JsValue.Num(number) else at = at.fields[key.value]!!
+				else -> throw MarklessDecodeError("the non-finite path names nothing in the value")
+			}
+		}
+	}
+	return value
+}
+
 /**
  * The locale a browser with these preferred languages shows its own text in, among [available]: the first preference that
  * matches exactly, then without its script (`zh-Hant-TW` as `zh-TW`), then by language alone; else `en`.
@@ -389,7 +431,8 @@ class Runtime(
 				val entry = "{\"kind\":\"compute\",\"fn\":${jsonString(e.fn)},\"frame\":${frameOf(e.bindings, scope)},\"elements\":${elementFacts(e.bindings, scope)}$cells}"
 				computed[entry] ?: run {
 					val started = System.nanoTime()
-					val value = JsValue.fromJson(Json.parse(scriptCall("enter", entry)))
+					val result = Json.parse(scriptCall("enter", entry)).obj("compute")
+					val value = nonFiniteJoin(result.field("json", "compute"), result["nonFinite"])
 					onScriptEntry?.invoke(System.nanoTime() - started)
 					computed[entry] = value
 					value
@@ -530,6 +573,9 @@ class Runtime(
 	private fun entryCells(): String = buildString {
 		append(",\"cells\":")
 		append(values.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonValue(it.value)}" })
+		// JSON writes Infinity and NaN as null: the entry lists where they were, each path starting with its slot.
+		val nonFinite = nonFiniteJson(JsValue.Obj(LinkedHashMap(values)))
+		if (nonFinite != "[]") append(",\"nonFinite\":$nonFinite")
 		if (unset.isNotEmpty()) append(",\"unset\":${unset.sorted().joinToString(",", "[", "]") { jsonString(it) }}")
 		if (payload.script?.services?.contains("crypto") == true) scriptHost?.seed()?.let { append(",\"seed\":${jsonString(it)}") }
 	}
@@ -548,7 +594,7 @@ class Runtime(
 			val slot = pair[0].str("leave().writes[][0]")
 			val cell = slot.substringBefore('@')
 			if (payload.cells.none { it.id == cell }) throw MarklessRuntimeError("the script wrote unknown cell $cell")
-			val v = JsValue.fromJson(pair[1])
+			val v = nonFiniteJoin(pair[1], pair.getOrNull(2))
 			values[slot] = v
 			unset.remove(slot)
 			storageKeys[cell]?.let { store.set(it, v) }
@@ -736,7 +782,10 @@ class Runtime(
 	private fun propertyBinding(id: String, name: String) = elementOf(id).bindings.firstOrNull { it.property && it.name == name }
 
 	/** A text field's text: what was typed since its binding last wrote it, else its `value` binding, else its `value` attribute. */
-	fun textOf(id: String): String = edited[id] ?: propertyBinding(id, "value")?.let(::property) ?: attributeNow(id, "value") ?: ""
+	fun textOf(id: String): String = edited[id]?.let { sanitized(id, it) } ?: propertyBinding(id, "value")?.let(::property) ?: attributeNow(id, "value") ?: ""
+
+	/** An email field's value is sanitized as HTML does; the field itself shows what was typed. */
+	private fun sanitized(id: String, text: String): String = if (attributeNow(id, "type") == "email") nativeEmailValue(text) else text
 
 	/** Every non-row checkbox and radio button, in payload order. */
 	private val ticked = payload.nodes.filterIsInstance<Node.Element>().filter { it.element == "input" && it.row == null && it.attributes["type"].let { t -> t == "checkbox" || t == "radio" } }
@@ -859,6 +908,9 @@ class Runtime(
 
 	private val missing: ValueMissing? = payload.valueMissing[nativeLocale(preferredLanguages, payload.valueMissing.keys)]
 	private val tooLong: TooLong? = payload.tooLong[nativeLocale(preferredLanguages, payload.tooLong.keys)]
+	private val emailMismatch: EmailMismatch? = payload.emailMismatch[nativeLocale(preferredLanguages, payload.emailMismatch.keys)]
+	/** The label the web draws on an `<input type="submit">` without a `value`, in the device's language. */
+	val submitLabel: String? = payload.submitLabel[nativeLocale(preferredLanguages, payload.submitLabel.keys)]
 
 	private fun entriesOf(id: String): JsValue {
 		val form = forms[id] ?: throw MarklessRuntimeError("\"$id\" is not a form")
@@ -898,6 +950,10 @@ class Runtime(
 		if (absent) {
 			val messages = missing ?: throw MarklessRuntimeError("the payload has no message for a ${kind.wire} missing its value")
 			return when (kind) { FieldKind.Radio -> messages.radio; FieldKind.Checkbox -> messages.checkbox; else -> messages.text }
+		}
+		if (kind == FieldKind.Text && attributeNow(node, "type") == "email") {
+			val messages = emailMismatch ?: throw MarklessRuntimeError("the payload has no message for an email field that holds no email address")
+			messages.message(textOf(node))?.let { return it }
 		}
 		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		if (kind != FieldKind.Text) return null
@@ -1040,7 +1096,7 @@ class Runtime(
 		// A press focuses the control it presses, as the browser does.
 		if (event == EventName.Activate) focused = host
 		val carried = when (event) {
-			EventName.Input -> value?.let { mapOf("value" to JsValue.Str(it)) }
+			EventName.Input -> value?.let { mapOf("value" to JsValue.Str(sanitized(host, it))) }
 			EventName.Keydown -> mapOf("key" to JsValue.Str(value!!))
 			EventName.Paste -> mapOf("text" to JsValue.Str(value!!))
 			EventName.Activate -> mapOf("detail" to JsValue.Num((detail ?: 1).toDouble()))

@@ -262,6 +262,69 @@ export function Logger() @{
 		]);
 	});
 
+	it('writes a style binding the build knows as the style attribute, and refuses one that follows state by name', async () => {
+		const fixed = await nativeView(`const HIDDEN = 'position: absolute; width: 1px';
+const GAP = 12;
+export function Card() @{
+	<main>
+		<p style={HIDDEN}>Constant</p>
+		<p style={\`margin-top: \${GAP}px\`}>Template</p>
+		<p style={null}>None</p>
+		<p style={{ paddingLeft: '8px', color: 'red' }}>Object</p>
+	</main>
+}`);
+		expect(fixed.diagnostics).toEqual([]);
+		const styles = fixed.payload?.nodes.flatMap((node) => (node.kind === 'element' && node.element === 'p' ? [node.attributes?.style ?? null] : []));
+		// A style object the build knows is written as the web writes it, not dropped.
+		expect(styles).toEqual(['position: absolute; width: 1px', 'margin-top: 12px', null, 'padding-left:8px;color:red;']);
+		expect(fixed.payload?.nodes.some((node) => node.kind === 'element' && node.bindings?.some((b) => 'attribute' in b && b.attribute === 'style'))).toBe(false);
+		const follows = await nativeView(`import { state } from '@markless/core';
+export function Card() @{
+	let wide = state(false);
+	<p style={wide ? 'width: 100%' : 'width: 50%'} onClick={() => (wide = !wide)}>Follows</p>
+}`);
+		expect(follows.payload).toBeNull();
+		expect(follows.diagnostics.map((d) => d.message)).toContain(
+			"a style binding whose value follows state while the app runs, which waits on Dragon's typed style slots",
+		);
+	});
+
+	it("lowers Infinity, NaN and Number's constants, the non-finite ones by name", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Bounds() @{
+	let max = state(0);
+	<main>
+		<button onClick={() => (max = Number.POSITIVE_INFINITY)}>Uncap</button>
+		<button onClick={() => (max = -Infinity)}>Floor</button>
+		<button onClick={() => (max = Number.MAX_SAFE_INTEGER)}>Big</button>
+		<p>{String(max)}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const text = JSON.stringify(payload?.handlers);
+		expect(text).toContain('{"nonFinite":"Infinity"}');
+		expect(text).toContain(`{"literal":${Number.MAX_SAFE_INTEGER}}`);
+	});
+
+	it('folds a non-finite constant a widget writes while rendering, as a prop default', async () => {
+		const { payload, diagnostics } = await nativeView(`import { shared, state } from '@markless/core';
+const boxState = shared(() => {
+	const box = state({ max: 0 });
+	return { ...box };
+}, { scope: 'subtree' });
+function BoxRoot({ max = Number.POSITIVE_INFINITY }: { max?: number }) @{
+	const s = boxState();
+	s.max = max;
+	<p>{String(s.max)}</p>
+}
+export function Page() @{
+	<main><BoxRoot /></main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const cell = payload?.cells.find((c) => c.name === 'box.max');
+		expect(cell && [cell.initial, cell.nonFinite]).toEqual([null, [[[], 'Infinity']]]);
+	});
+
 	it('refuses constructs with no native lowering yet', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Field() @{
@@ -2383,7 +2446,7 @@ export function Forms() @{
 			<button>Send</button>
 		</form>
 		<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget, null).get('x')); }}>
-			<input type="email" name="x" />
+			<input type="url" name="x" />
 			<input name="code" pattern="[0-9]+" />
 			<input type="radio" name={sent} />
 			<button type="reset">Clear</button>
@@ -2396,7 +2459,7 @@ export function Forms() @{
 			'the submit handler builds FormData with a submitter, which a native build does not read yet',
 			'the <form> h1 has no onSubmit handler: the web sends it to its action and loads the answer (or sends a POST to an API route in place), and a phone app has no server or page to load',
 			'the submit handler on the <form> h4 does not call `event.preventDefault()` on every path before it awaits or returns: the web then sends the form to its action and loads a new page, which a phone app has no server or page for',
-			'the <input> h7 in the <form> h6 is an <input type="email">, which no native host draws or checks yet',
+			'the <input> h7 in the <form> h6 is an <input type="url">, which no native host draws or checks yet',
 			'the <input> h8 in the <form> h6 has `pattern`, which the web checks before a submit and no native host checks yet',
 			'the <input> h9 in the <form> h6 binds the `name` of a radio button, which a native build reads only as written',
 			'the <button> h10 in the <form> h6 is a reset button, which a native build has no lowering for yet',
@@ -2761,6 +2824,113 @@ export function Page() @{
 		expect(payload!.nodes).toEqual([
 			{ kind: 'text', id: 'text0', parent: null, parts: [{ text: 'Only text' }] },
 		]);
+	});
+});
+
+it('lowers a @try with no @catch: its error shows nothing, and the rest of the page stays, as the web renders it', async () => {
+	const { payload, diagnostics } = await nativeView(`import { computed } from '@markless/core';
+async function load(): Promise<string> { throw new Error('down'); }
+export function Account() @{
+	const account = computed(async () => load());
+	<main>
+		<h1>Account</h1>
+		@try {
+			<p>{account}</p>
+		} @pending {
+			<p>Loading</p>
+		}
+	</main>
+}`);
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	const branch = payload!.nodes.find((node) => node.kind === 'branch')!;
+	expect(branch).toMatchObject({ kind: 'branch', arms: 3 });
+	expect(payload!.nodes.some((node) => node.kind === 'branch' && node.id.endsWith(':caught'))).toBe(false);
+	expect(payload!.nodes.some((node) => 'arm' in node && node.arm?.index === 2)).toBe(false);
+});
+
+it('runs a class a helper computes as JavaScript, keeping the style scope around it', async () => {
+	const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function cn(...parts: Array<string | false>): string { return parts.filter(Boolean).join(' '); }
+export function Note() @{
+	const shown = state({ loud: false });
+	<main>
+		<style>.note { color: red; }</style>
+		<p class={cn('note', shown.loud && 'loud')}>A</p>
+	</main>
+}`);
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	const note = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'p');
+	if (note?.kind !== 'element') throw new Error('no p');
+	expect(note.bindings).toMatchObject([{ attribute: 'class', value: { if: { script: expect.any(String) } } }]);
+});
+
+it('reads a default import of an asset as the URL the build gives it, in markup and in phone JavaScript', async () => {
+	const asked: string[] = [];
+	const { payload, diagnostics } = await nativeView(
+		`import logo from './logo.png';
+export function Header() @{
+	<main>
+		<img src={logo} alt="Logo" />
+		<button onClick={() => console.log(logo)}>Log</button>
+	</main>
+}`,
+		{ assetImport: (specifier) => (asked.push(specifier), `/@markless-asset/${specifier.slice(2)}`) },
+	);
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	expect(asked).toContain('./logo.png');
+	const img = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'img');
+	if (img?.kind !== 'element') throw new Error('no img');
+	expect(img.bindings).toEqual([{ attribute: 'src', value: { literal: '/@markless-asset/logo.png' } }]);
+	expect(payload!.script?.source).toContain('{ "default": "/@markless-asset/logo.png" }');
+});
+
+describe('linked stylesheets', () => {
+	const source = `export function Page() @{
+	<main>
+		<link rel="stylesheet" href="/static/site.css" />
+		<p>Hi</p>
+	</main>
+}`;
+
+	it('reads a <link rel="stylesheet"> the build can read, as the browser loads it, and refuses one it cannot', async () => {
+		const asked: string[] = [];
+		const read = await nativeView(source, { linkStylesheet: (href) => (asked.push(href), true) });
+		expect(read.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		expect(asked).toEqual(['/static/site.css']);
+		expect(read.payload!.nodes.some((node) => node.kind === 'element' && node.element === 'link')).toBe(false);
+		const unread = await nativeView(source, { linkStylesheet: () => false });
+		expect(unread.diagnostics.map((diagnostic) => diagnostic.message)).toContain(
+			'<link rel="stylesheet" href="/static/site.css"> loads styles while the page runs',
+		);
+	});
+});
+
+describe('class bindings', () => {
+	it('keeps the style scope class around a class that follows state, as the web writes it', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Notes() @{
+	const shown = state({ loud: false, tone: '' });
+	<main>
+		<style>.note { color: red; }</style>
+		<p class={\`note \${shown.loud ? 'loud' : 'quiet'}\`}>A</p>
+		<p class={shown.tone}>B</p>
+	</main>
+}`);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		const [first, second] = payload!.nodes.filter((node) => node.kind === 'element' && node.element === 'p');
+		if (first?.kind !== 'element' || second?.kind !== 'element') throw new Error('not elements');
+		const scope = /mk-[a-z0-9]+/.exec(JSON.stringify(first.bindings))![0];
+		expect(first.bindings).toEqual([
+			{
+				attribute: 'class',
+				value: {
+					if: expect.anything(),
+					whenTrue: { template: [expect.anything(), ` ${scope}`] },
+					whenFalse: { literal: scope },
+				},
+			},
+		]);
+		expect(second.bindings).toMatchObject([{ attribute: 'class', value: { whenFalse: { literal: scope } } }]);
 	});
 });
 

@@ -8,14 +8,14 @@ import UIKit
 public enum MarklessRoot {
 	/// `path`: a deep link's path, else the `-route` launch argument, else `/` (an app) or the page's own route.
 	public static func controller(
-		payload: Data, style: Data?, fonts: [String: Data], path: String?, device: NativeDevice? = nil
+		payload: Data, style: Data?, fonts: [String: Data], images: [String: NativeImageAsset] = [:], path: String?, device: NativeDevice? = nil
 	) throws -> UIViewController {
 		let opened = path ?? MarklessViewController.launchRoute()
 		switch try NativePayload.decode(payload) {
 		case .app:
-			return try MarklessNavigationController(app: payload, style: style, fonts: fonts, path: opened, device: device)
+			return try MarklessNavigationController(app: payload, style: style, fonts: fonts, images: images, path: opened, device: device)
 		case .page:
-			return try MarklessViewController(payload: payload, style: style, fonts: fonts, device: device, route: opened)
+			return try MarklessViewController(payload: payload, style: style, fonts: fonts, images: images, device: device, route: opened)
 		}
 	}
 

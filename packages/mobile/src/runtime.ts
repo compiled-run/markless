@@ -17,6 +17,11 @@ import {
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	nativeLocale,
 	nativeMaxLength,
+	nativeEmailMismatch,
+	nativeNonFiniteJoin,
+	nativeNonFiniteSplit,
+	type NativeNonFinite,
+	nativeEmailValue,
 	nativeTooLongMessage,
 } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
@@ -98,6 +103,12 @@ export const SCRIPT_TIMER = 'script:';
 
 /** Each screen's async values run under their own name in an engine the app's screens share. */
 let screens = 0;
+
+/** The cells as an engine entry carries them: their JSON, and where each non-finite number was (paths from the slot). */
+const bridgedCells = (values: ReadonlyMap<string, Value>) => {
+	const { json, nonFinite } = nativeNonFiniteSplit(Object.fromEntries(values));
+	return { cells: json, ...(nonFinite.length > 0 ? { nonFinite } : {}) };
+};
 
 /** Runs a script function a `{ script }` expression names, with its bindings resolved where it is read. */
 type Compute = (fn: string, bindings: NativeScriptBindings, scope: NativeScope) => Value;
@@ -352,6 +363,8 @@ export function evaluateNativeExpr(
 	}
 	if ('cell' in expr) return read(expr.cell, scope);
 	if ('literal' in expr) return expr.literal;
+	if ('nonFinite' in expr)
+		return expr.nonFinite === 'NaN' ? Number.NaN : expr.nonFinite === 'Infinity' ? Infinity : -Infinity;
 	if ('field' in expr) {
 		if (!scope.fieldText) throw new Error(`the text of ${expr.field} read outside a runtime`);
 		return scope.fieldText(expr.field);
@@ -493,14 +506,15 @@ export function evaluateWithScript(
 					kind: 'compute',
 					fn,
 					frame,
-					cells: Object.fromEntries(values),
+					...bridgedCells(values),
 					...(host.seed ? { seed: host.seed() } : {}),
 				};
-				return JSON.parse(
+				const result = JSON.parse(
 					engine.evaluate(
 						`globalThis.__markless[${JSON.stringify(script.id)}].enter(${JSON.stringify(JSON.stringify(entry))})`,
 					),
-				) as Value;
+				) as { json: unknown; nonFinite: NativeNonFinite };
+				return nativeNonFiniteJoin(result.json, result.nonFinite) as Value;
 			},
 		);
 	return evaluate;
@@ -549,7 +563,7 @@ export function createNativeRuntime(
 				? now()
 				: cell.storage && store.has(cell.storage.key)
 					? store.get(cell.storage.key)!
-					: cell.initial,
+					: (nativeNonFiniteJoin(cell.initial, cell.nonFinite) as Value),
 		]),
 	);
 	for (const cell of payload.cells)
@@ -699,7 +713,7 @@ export function createNativeRuntime(
 		return facts;
 	};
 	const entryCells = () => ({
-		cells: Object.fromEntries(values),
+		...bridgedCells(values),
 		...(unset.size > 0 ? { unset: [...unset] } : {}),
 		...(script?.services.includes('crypto') && scriptHost?.seed
 			? { seed: scriptHost.seed() }
@@ -709,7 +723,7 @@ export function createNativeRuntime(
 	const enter = (entry: Record<string, unknown>): NativeJournalEntry[] => {
 		call('enter', { ...entry, ...entryCells() });
 		const result = JSON.parse(call('leave')) as {
-			readonly writes: ReadonlyArray<readonly [string, Value]>;
+			readonly writes: ReadonlyArray<readonly [string, Value, NativeNonFinite?]>;
 			readonly aborts: ReadonlyArray<number>;
 			readonly timers: ReadonlyArray<readonly [number, number]>;
 			readonly clears: ReadonlyArray<number>;
@@ -720,7 +734,8 @@ export function createNativeRuntime(
 			readonly logs: ReadonlyArray<readonly [string, string]>;
 			readonly commands?: ReadonlyArray<readonly [string, 'focus' | 'scrollIntoView' | 'showModal' | 'close', boolean]>;
 		};
-		for (const [slot, value] of result.writes) {
+		for (const [slot, json, nonFinite] of result.writes) {
+			const value = nativeNonFiniteJoin(json, nonFinite) as Value;
 			const at = slot.indexOf('@');
 			const cell = at < 0 ? slot : slot.slice(0, at);
 			if (!values.has(cell)) throw new Error(`the script wrote unknown cell ${cell}`);
@@ -824,9 +839,13 @@ export function createNativeRuntime(
 		}
 		const frame = frameOf(bindings, undefined, scope);
 		const elements = elementFacts(frame);
-		const key = JSON.stringify([fn, frame, elements]);
+		const key = JSON.stringify(nativeNonFiniteSplit([fn, frame, elements]));
 		if (computed.has(key)) return computed.get(key)!;
-		const value = JSON.parse(call('enter', { kind: 'compute', fn, frame, elements, ...entryCells() })) as Value;
+		const result = JSON.parse(call('enter', { kind: 'compute', fn, frame, elements, ...entryCells() })) as {
+			json: unknown;
+			nonFinite: NativeNonFinite;
+		};
+		const value = nativeNonFiniteJoin(result.json, result.nonFinite) as Value;
 		computed.set(key, value);
 		return value;
 	};
@@ -1077,8 +1096,11 @@ export function createNativeRuntime(
 	};
 	const propertyBinding = (id: string, name: string) =>
 		elementOf(id).bindings?.find((one) => 'property' in one && one.property === name);
+	// An email field's value is sanitized as HTML does; the field itself shows what was typed.
+	const sanitized = (id: string, text: string) =>
+		attributeNow(id, 'type') === 'email' ? nativeEmailValue(text) : text;
 	const textOf = (id: string): string => {
-		if (edited.has(id)) return edited.get(id)!;
+		if (edited.has(id)) return sanitized(id, edited.get(id)!);
 		const binding = propertyBinding(id, 'value');
 		return binding ? String(evaluate(binding.value) ?? '') : (attributeNow(id, 'value') ?? '');
 	};
@@ -1245,6 +1267,8 @@ export function createNativeRuntime(
 	const missing = messages[nativeLocale(preferredLanguages, Object.keys(messages))];
 	const tooLongMessages = payload.tooLong ?? {};
 	const tooLong = tooLongMessages[nativeLocale(preferredLanguages, Object.keys(tooLongMessages))];
+	const emailMessages = payload.emailMismatch ?? {};
+	const emailMismatch = emailMessages[nativeLocale(preferredLanguages, Object.keys(emailMessages))];
 	function entriesOf(id: string): Value {
 		const form = forms.get(id);
 		if (!form) throw new Error(`${id} is not a form`);
@@ -1279,6 +1303,12 @@ export function createNativeRuntime(
 		if (required && absent()) {
 			if (!missing) throw new Error(`the payload has no message for a ${kind} missing its value`);
 			return missing[kind as 'text' | 'checkbox' | 'radio'];
+		}
+		if (kind === 'text' && attributeNow(node, 'type') === 'email') {
+			if (!emailMismatch)
+				throw new Error('the payload has no message for an email field that holds no email address');
+			const mismatch = nativeEmailMismatch(emailMismatch, textOf(node));
+			if (mismatch !== undefined) return mismatch;
 		}
 		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		const max = kind === 'text' ? nativeMaxLength(attributeNow(node, 'maxlength')) : undefined;
@@ -1673,9 +1703,12 @@ export function createNativeRuntime(
 						? { text: action.text }
 						: action.event === 'activate'
 							? { detail: action.detail ?? 1 }
-							: edit;
+							: edit === undefined
+								? undefined
+								: sanitized(action.host, edit);
 			// A press focuses the control it presses, as the browser does.
 			if (action.event === 'activate') focused = action.host;
+			// The field keeps what was typed (a trailing space stays while typing on); its value reads sanitized.
 			return change(action.host, edit, () =>
 				run(handlers.get(event.handler) ?? [], eventValue, scope),
 			);

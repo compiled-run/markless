@@ -1,0 +1,30 @@
+appId: ${APP_ID}
+name: r157-submit-input
+---
+- launchApp:
+      clearState: true
+- assertVisible: Forms
+- assertVisible: Sign in
+- assertVisible: Submit
+- assertVisible: Nobody yet
+- assertVisible: Second form not sent
+- tapOn: Sign in
+- assertVisible: Please fill out this field\.
+- assertVisible: Nobody yet
+- assertVisible: Please fill out this field\.
+- tapOn: Name
+- eraseText
+- inputText: Ada
+- hideKeyboard
+- assertVisible: Ada
+- assertVisible: Nobody yet
+- assertVisible: Ada
+- tapOn: Sign in
+- assertNotVisible: Nobody yet
+- assertVisible: Hello, Ada
+- assertVisible: Second form not sent
+- assertNotVisible: Nobody yet
+- tapOn: Submit
+- assertNotVisible: Second form not sent
+- assertVisible: Second form sent
+- assertNotVisible: Second form not sent

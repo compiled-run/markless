@@ -39,6 +39,61 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A class that follows state keeps the module's style scope class around it, as the web writes it.
+		name: 'class-scope',
+		fixture: 'proofs/r152-class-scope/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		// A class a helper computes in JavaScript, with the style scope around it.
+		name: 'class-script',
+		fixture: 'proofs/r154-class-script/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
+		name: 'email-field',
+		fixture: 'proofs/r156-email-field/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'ada' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'a b@c' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'ada@x..y' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: ' ada@example.com ' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'submit-input',
+		fixture: 'proofs/r157-submit-input/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'Ada' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h7' },
+		],
+	},
+	{
+		name: 'infinite-bounds',
+		fixture: 'proofs/r159-infinite-bounds/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+		],
+	},
+	{
 		name: 'switches',
 		fixture: 'test/fixtures/Switches.tsrx',
 		actions: [

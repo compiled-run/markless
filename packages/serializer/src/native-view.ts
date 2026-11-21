@@ -65,6 +65,8 @@ export type NativeBuiltin =
 export type NativeExpr =
 	| { readonly cell: string }
 	| { readonly literal: NativeScalar | null }
+	/** `Infinity`, `-Infinity` or `NaN` (the globals, `Number.POSITIVE_INFINITY` and the like), which a JSON literal cannot hold. */
+	| { readonly nonFinite: 'Infinity' | '-Infinity' | 'NaN' }
 	/**
 	 * `typeof` gives JavaScript's answer for a JSON value: 'string', 'number', 'boolean', or 'object' for an array, an
 	 * object and null. A native value spells `undefined` as null, so the compiler emits it only compared with 'string',
@@ -185,6 +187,9 @@ export type NativeScript = {
 /** Every cell an expression reads. */
 export function nativeExprCells(expr: NativeExpr, into = new Set<string>()): Set<string> {
 	if ('cell' in expr) into.add(expr.cell);
+	// A script binding's `fields` names the cells of a state object the script reads.
+	if ('fields' in expr && expr.fields && typeof expr.fields === 'object')
+		for (const cell of Object.values(expr.fields as Record<string, unknown>)) if (typeof cell === 'string') into.add(cell);
 	for (const child of Object.values(expr)) {
 		if (Array.isArray(child)) {
 			for (const item of child)
@@ -673,6 +678,52 @@ export type NativeOp =
 /** `select` selects a text field's whole text, as `field.select()` does. */
 export type NativeCommand = 'focus' | 'scrollIntoView' | 'select';
 
+/** The non-finite numbers JSON cannot hold: each with its path (object keys and array indices) inside a value. */
+export type NativeNonFinite = ReadonlyArray<
+	readonly [path: ReadonlyArray<string | number>, name: 'Infinity' | '-Infinity' | 'NaN']
+>;
+
+/**
+ * A value as JSON carries it: each Infinity, -Infinity or NaN written as null, and where each was. A value with none comes
+ * back as it is with an empty list.
+ */
+export function nativeNonFiniteSplit(value: unknown): {
+	readonly json: unknown;
+	readonly nonFinite: NativeNonFinite;
+} {
+	const found: Array<readonly [ReadonlyArray<string | number>, 'Infinity' | '-Infinity' | 'NaN']> = [];
+	const walk = (v: unknown, path: ReadonlyArray<string | number>): unknown => {
+		if (typeof v === 'number' && !Number.isFinite(v)) {
+			found.push([path, Number.isNaN(v) ? 'NaN' : v > 0 ? 'Infinity' : '-Infinity']);
+			return null;
+		}
+		if (Array.isArray(v)) return v.map((item, index) => walk(item, [...path, index]));
+		if (v !== null && typeof v === 'object')
+			return Object.fromEntries(Object.entries(v).map(([key, item]) => [key, walk(item, [...path, key])]));
+		return v;
+	};
+	const json = walk(value, []);
+	return { json: found.length === 0 ? value : json, nonFinite: found };
+}
+
+/** A value JSON carried, with each non-finite number nativeNonFiniteSplit took out put back at its path. */
+export function nativeNonFiniteJoin(json: unknown, nonFinite: NativeNonFinite | undefined): unknown {
+	if (!nonFinite || nonFinite.length === 0) return json;
+	const copy = structuredClone(json) as unknown;
+	const number = { Infinity: Infinity, '-Infinity': -Infinity, NaN: Number.NaN } as const;
+	let root = copy;
+	for (const [path, name] of nonFinite) {
+		if (path.length === 0) {
+			root = number[name];
+			continue;
+		}
+		let at = root as Record<string | number, unknown>;
+		for (const key of path.slice(0, -1)) at = at[key] as Record<string | number, unknown>;
+		at[path[path.length - 1]!] = number[name];
+	}
+	return root;
+}
+
 export type NativeViewPayload = {
 	readonly version: typeof NATIVE_VIEW_VERSION;
 	readonly component: string;
@@ -683,6 +734,8 @@ export type NativeViewPayload = {
 		readonly id: string;
 		readonly name: string;
 		readonly initial: NativeValue;
+		/** Where `initial` holds Infinity, -Infinity or NaN, which JSON writes as null (nativeNonFiniteSplit). */
+		readonly nonFinite?: NativeNonFinite;
 		readonly storage?: { readonly key: string };
 		/** A class or `ui-*` attribute binding reads this cell, so Dragon's export has a state for it; its changes are journalled as `state`. */
 		readonly styled?: true;
@@ -778,6 +831,10 @@ export type NativeViewPayload = {
 	readonly valueMissing?: Readonly<Record<string, NativeValueMissing>>;
 	/** What the web says when a text field a person edited is longer than its `maxlength`, by language; present when a form's text field has one. */
 	readonly tooLong?: Readonly<Record<string, NativeTooLong>>;
+	/** What the web says when an email field's value is not an email address, by language; present when a form has an email field. */
+	readonly emailMismatch?: Readonly<Record<string, NativeEmailMismatch>>;
+	/** The label the web draws on an `<input type="submit">` with no `value`, by language; present when a form has one. */
+	readonly submitLabel?: Readonly<Record<string, string>>;
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	readonly script?: NativeScript;
 };
@@ -812,6 +869,66 @@ export function nativeTooLongMessage(message: NativeTooLong, max: number, length
 }
 
 /**
+ * Chromium's messages for an email field whose value is not an email address, one for each way it is not, in the order
+ * Chromium tells them apart; `{value}`, `{symbol}` and `{domain}` stand for the value, the first character not allowed
+ * and the part after the `@`.
+ */
+export type NativeEmailMismatch = {
+	readonly missingAt: string;
+	readonly noLocal: string;
+	readonly noDomain: string;
+	readonly localSymbol: string;
+	readonly domainSymbol: string;
+	readonly dot: string;
+	readonly other: string;
+};
+
+const EMAIL_LOCAL_SYMBOLS = ".!#$%&'*+/=?^_`{|}~-";
+const isAsciiAlphanumeric = (character: string) =>
+	(character >= 'a' && character <= 'z') ||
+	(character >= 'A' && character <= 'Z') ||
+	(character >= '0' && character <= '9');
+/** A label of an email address's domain, as HTML's valid email address has it: letters and digits, inner hyphens, at most 63. */
+const isEmailLabel = (label: string) =>
+	label.length >= 1 &&
+	label.length <= 63 &&
+	[...label].every((character) => isAsciiAlphanumeric(character) || character === '-') &&
+	label[0] !== '-' &&
+	label[label.length - 1] !== '-';
+
+/** An email field's value as HTML sanitizes it: line breaks removed, then ASCII whitespace stripped from both ends. */
+export function nativeEmailValue(value: string): string {
+	return value.replace(/[\r\n]/g, '').replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/g, '');
+}
+
+/**
+ * What Chromium says about an email field's (sanitized) `value`, or undefined when it is empty or a valid email address
+ * (HTML's "valid email address", ASCII only, as Chromium checks it).
+ */
+export function nativeEmailMismatch(messages: NativeEmailMismatch, value: string): string | undefined {
+	if (value === '') return undefined;
+	const at = value.indexOf('@');
+	if (at < 0) return messages.missingAt.replace('{value}', value);
+	const local = value.slice(0, at);
+	const domain = value.slice(at + 1);
+	const notLocal = (character: string) =>
+		!isAsciiAlphanumeric(character) && !EMAIL_LOCAL_SYMBOLS.includes(character);
+	if (local !== '' && ![...local].some(notLocal) && domain.split('.').every(isEmailLabel))
+		return undefined;
+	if (local === '') return messages.noLocal.replace('{value}', value);
+	if (domain === '') return messages.noDomain.replace('{value}', value);
+	const localSymbol = [...local].find(notLocal);
+	if (localSymbol !== undefined) return messages.localSymbol.replace('{symbol}', localSymbol);
+	const domainSymbol = [...domain].find(
+		(character) => !isAsciiAlphanumeric(character) && character !== '.' && character !== '-',
+	);
+	if (domainSymbol !== undefined) return messages.domainSymbol.replace('{symbol}', domainSymbol);
+	if (domain.startsWith('.') || domain.endsWith('.') || domain.includes('..'))
+		return messages.dot.replace('{domain}', domain);
+	return messages.other;
+}
+
+/**
  * A `maxlength` attribute's limit, by HTML's rules for parsing non-negative integers: leading ASCII whitespace, an
  * optional sign, then digits up to the first non-digit. Undefined (no limit) when there are no digits or it is negative.
  */
@@ -834,10 +951,12 @@ export type NativeForm = {
 	readonly authoredAriaDisabled?: true;
 };
 
-/** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, a hidden input, or a `<select>`. */
+/** A text field (`<input>` of type text, search, tel or email), a checkbox, a radio button, a hidden input, or a `<select>`. */
 export type NativeFieldKind = 'text' | 'checkbox' | 'radio' | 'hidden' | 'select';
 
 export {
+	NATIVE_EMAIL_MISMATCH_BY_LOCALE,
+	NATIVE_SUBMIT_LABEL_BY_LOCALE,
 	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
 } from './native-validation-messages.ts';

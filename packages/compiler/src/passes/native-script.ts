@@ -4,8 +4,11 @@ import { NATIVE_SCRIPT_POINTER_FIELDS } from '@markless/serializer/native-view';
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
 export type NativeScriptModuleInput = {
 	readonly code: string;
-	/** The module each `__i` slot loads, or null for a slot nothing the script keeps reads. */
-	readonly imports: ReadonlyArray<number | null>;
+	/**
+	 * The module each `__i` slot loads, or null for a slot nothing the script keeps reads; `{ asset }` for an asset import,
+	 * a module whose default export is the asset's URL.
+	 */
+	readonly imports: ReadonlyArray<number | null | { readonly asset: string }>;
 	readonly functions: ReadonlyArray<{ readonly id: string; readonly code: string }>;
 };
 
@@ -235,6 +238,40 @@ var frameOf = function (bindings) {
 	});
 	return names;
 };
+// JSON writes Infinity and NaN as null: a value crosses with where each was, as nativeNonFiniteSplit and Join do.
+var split = function (value) {
+	var found = [];
+	var walk = function (v, path) {
+		if (typeof v === 'number' && !isFinite(v)) {
+			found.push([path, v !== v ? 'NaN' : v > 0 ? 'Infinity' : '-Infinity']);
+			return null;
+		}
+		if (Array.isArray(v)) return v.map(function (item, k) { return walk(item, path.concat([k])); });
+		if (v !== null && typeof v === 'object') {
+			var out = {};
+			for (var key in v) out[key] = walk(v[key], path.concat([key]));
+			return out;
+		}
+		return v;
+	};
+	return { json: walk(value, []), nonFinite: found };
+};
+var NON_FINITE = { 'Infinity': Infinity, '-Infinity': -Infinity, 'NaN': NaN };
+var join = function (json, nonFinite) {
+	var root = json;
+	(nonFinite || []).forEach(function (entry) {
+		var path = entry[0];
+		if (path.length === 0) { root = NON_FINITE[entry[1]]; return; }
+		var at = root;
+		for (var k = 0; k < path.length - 1; k++) at = at[path[k]];
+		at[path[path.length - 1]] = NON_FINITE[entry[1]];
+	});
+	return root;
+};
+var stable = function (value) {
+	var s = split(value);
+	return JSON.stringify([s.json, s.nonFinite]);
+};
 // An element is a proxy that offers only what the host answers: the attributes it has now, whether it holds another
 // element, and the commands a handler's data can run. No tree walking, no selectors, no layout.
 var elementFacts = {};
@@ -272,12 +309,12 @@ var elementsOf = function (value) { return Array.isArray(value) ? value.map(elem
 var begin = function (entry) {
 	elementFacts = entry.elements || {};
 	proxies = {};
-	cells = entry.cells;
+	cells = join(entry.cells, entry.nonFinite);
 	unset = {};
 	forced = {};
 	(entry.unset || []).forEach(function (slot) { unset[slot] = true; });
 	before = {};
-	for (var slot in cells) before[slot] = JSON.stringify(cells[slot]);
+	for (var slot in cells) before[slot] = stable(cells[slot]);
 	host.out = { timers: [], clears: [], requests: [], aborts: [], logs: [], commands: [] };
 	host.seed = entry.seed || null;
 	host.counter = 0;
@@ -347,7 +384,7 @@ var plain = function (value) {
 	if (value === undefined || value === null) return null;
 	var type = typeof value;
 	if (type === 'string' || type === 'boolean') return value;
-	if (type === 'number') return isFinite(value) ? value : String(value);
+	if (type === 'number') return value;
 	if (Array.isArray(value)) return value.map(plain);
 	var proto = type === 'object' ? Object.getPrototypeOf(value) : undefined;
 	if (proto === Object.prototype || proto === null) {
@@ -364,7 +401,7 @@ g.__markless[id] = {
 		if (entry.kind === 'compute') {
 			var value = fn(entry.fn)(frameOf(entry.frame))();
 			host.out = null;
-			return JSON.stringify(plain(value));
+			return JSON.stringify(split(plain(value)));
 		}
 		if (entry.kind === 'dispatch') {
 			var settled = function (error) { fail(entry['catch'], error); };
@@ -416,8 +453,9 @@ g.__markless[id] = {
 	leave: function () {
 		var writes = [];
 		for (var slot in cells) {
-			var now = JSON.stringify(cells[slot]);
-			if (now !== before[slot] || forced[slot]) writes.push([slot, now === undefined ? null : JSON.parse(now)]);
+			if (stable(cells[slot]) === before[slot] && !forced[slot]) continue;
+			var given = JSON.parse(JSON.stringify(split(cells[slot] === undefined ? null : cells[slot])));
+			writes.push(given.nonFinite.length > 0 ? [slot, given.json, given.nonFinite] : [slot, given.json]);
 		}
 		var out = host.out;
 		host.out = null;
@@ -451,7 +489,15 @@ export function nativeScriptOf(
 		return [
 			`modules[${index}] = function (exports) {`,
 			'"use strict";',
-			`var __i = [${module.imports.map((target) => (target === null ? 'null' : `load(${target})`)).join(', ')}];`,
+			`var __i = [${module.imports
+				.map((target) =>
+					target === null
+						? 'null'
+						: typeof target === 'object'
+							? `{ "default": ${JSON.stringify(target.asset)} }`
+							: `load(${target})`,
+				)
+				.join(', ')}];`,
 			module.code,
 			...module.functions.map(
 				(fn) => `functions[${JSON.stringify(fn.id)}] = function (__s) {\n${fn.code}\n};`,

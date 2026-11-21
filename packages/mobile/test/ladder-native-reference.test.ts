@@ -18,9 +18,16 @@ import {
 	type NativeRuntime,
 	type NativeScreen,
 } from '../src/index.ts';
-import { compileRungApp, readAppConfig, readWorkspaceModule } from '../src/harness/rung.ts';
+import {
+	assetReader,
+	compileRungApp,
+	readAppConfig,
+	readWorkspaceModule,
+	servedFileReader,
+	servedReader,
+} from '../src/harness/rung.ts';
 import { echoText } from '../src/harness/echo-server.ts';
-import { nativeMaxLength } from '@markless/serializer/native-view';
+import { NATIVE_SUBMIT_LABEL_BY_LOCALE, nativeMaxLength } from '@markless/serializer/native-view';
 import { nodeScriptHost } from '../src/node-engine.ts';
 import {
 	looksOnly,
@@ -43,6 +50,14 @@ const typedInto = (text: string, maxlength: string | null) => {
 
 // The native column before any device: each rung's payload, run by the reference runtime, must show what the
 // web build shows; a rung the compiler cannot lower yet must be refused by name, never emitted half right.
+/** An <input type="submit">'s name: its value, else the label English Chromium draws, as the hosts show it in English. */
+const submitInputLabel = (
+	node: { readonly element: string; readonly attributes?: Readonly<Record<string, string>> },
+	value: string | null,
+) =>
+	node.element === 'input' && node.attributes?.type === 'submit'
+		? (value ?? NATIVE_SUBMIT_LABEL_BY_LOCALE.en ?? null)
+		: null;
 const NATIVE_UNSUPPORTED = 'MARKLESS_NATIVE_UNSUPPORTED';
 const NATIVE_KEYBOARD_ONLY = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
@@ -185,7 +200,9 @@ function mirror(
 		payload.nodes.flatMap((node) => {
 			if (node.kind !== 'element') return [];
 			const bound = attributes.get(`${node.id}\0aria-label`);
-			const label = bound !== undefined ? bound : (node.attributes?.['aria-label'] ?? null);
+			const label =
+				(bound !== undefined ? bound : (node.attributes?.['aria-label'] ?? null)) ??
+				submitInputLabel(node, attributes.get(`${node.id}\0value`) ?? node.attributes?.value ?? null);
 			return label !== null && shownNode(node.id) ? [[node.id, label] as const] : [];
 		});
 	// The element a text names: a labelled element, or the element holding that text (a row instance keeps its key).
@@ -608,6 +625,7 @@ function walk(
 		const label =
 			attribute('aria-label') ??
 			(node.element === 'img' ? (node.attributes?.alt ?? null) : null) ??
+			submitInputLabel(node, attribute('value')) ??
 			(labelledBy === null
 				? null
 				: labelledBy
@@ -1168,6 +1186,9 @@ test.each(
 			source: readFileSync(filename, 'utf8'),
 			...(page ? { page } : {}),
 			readModule: readWorkspaceModule,
+			readServedStylesheet: servedReader(join(proofsDir, folder)),
+			readServedFile: servedFileReader(join(proofsDir, folder)),
+			readAsset: assetReader,
 			...readAppConfig(join(proofsDir, folder)),
 			target,
 		});

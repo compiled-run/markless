@@ -17,7 +17,10 @@ import type {
 } from '@markless/serializer';
 import { PROTOCOL_IDLE_EVENT_NAME, PROTOCOL_VISIBLE_EVENT_NAME } from '@markless/serializer';
 import {
+	nativeNonFiniteSplit,
 	isNativeStyleStateAttribute,
+	NATIVE_EMAIL_MISMATCH_BY_LOCALE,
+	NATIVE_SUBMIT_LABEL_BY_LOCALE,
 	nativeExprCells,
 	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
@@ -300,7 +303,7 @@ function returningInto(
 const TICKED_TYPES = new Set(['checkbox', 'radio']);
 
 /** `<input>` types a host draws as a single-line text field; each blocks the return key's submit when a form has two. */
-const TEXT_TYPES = new Set(['text', 'search', 'tel']);
+const TEXT_TYPES = new Set(['text', 'search', 'tel', 'email']);
 /** Field attributes the web checks before a submit (or that limit typing) and no host checks yet. */
 const UNCHECKED_CONSTRAINTS = [
 	'pattern',
@@ -367,11 +370,50 @@ type Item =
 			readonly path: ReadonlyArray<number>;
 	  };
 
+/**
+ * The text a style binding writes when the build knows it (a literal, a constant, or a template of them): the element's
+ * style attribute, as the web writes it; null when it writes none; undefined when it follows state.
+ */
+function fixedStyle(expr: NativeExpr): string | null | undefined {
+	if ('literal' in expr)
+		return expr.literal === null || expr.literal === false
+			? null
+			: typeof expr.literal === 'string' || typeof expr.literal === 'number'
+				? String(expr.literal)
+				: undefined;
+	if ('template' in expr) {
+		let text = '';
+		for (const part of expr.template) {
+			if (typeof part === 'string') text += part;
+			else {
+				const given = fixedStyle(part);
+				if (given === undefined) return undefined;
+				text += given ?? '';
+			}
+		}
+		return text;
+	}
+	return undefined;
+}
+
+/** `Number`'s constants: the finite ones as literals, the non-finite ones by name. */
+const NUMBER_CONSTANTS: Readonly<Record<string, NativeExpr>> = {
+	POSITIVE_INFINITY: { nonFinite: 'Infinity' },
+	NEGATIVE_INFINITY: { nonFinite: '-Infinity' },
+	NaN: { nonFinite: 'NaN' },
+	MAX_SAFE_INTEGER: { literal: Number.MAX_SAFE_INTEGER },
+	MIN_SAFE_INTEGER: { literal: Number.MIN_SAFE_INTEGER },
+	MAX_VALUE: { literal: Number.MAX_VALUE },
+	MIN_VALUE: { literal: Number.MIN_VALUE },
+	EPSILON: { literal: Number.EPSILON },
+};
+
+// A non-finite number is a value too: the payload carries it beside its JSON (nativeNonFiniteSplit).
 const isNativeValue = (value: unknown): value is NativeValue =>
 	value === null ||
 	typeof value === 'string' ||
 	typeof value === 'boolean' ||
-	(typeof value === 'number' && Number.isFinite(value)) ||
+	typeof value === 'number' ||
 	(Array.isArray(value) && value.every(isNativeValue)) ||
 	(typeof value === 'object' &&
 		Object.getPrototypeOf(value) === Object.prototype &&
@@ -879,6 +921,16 @@ const isPrefix = (prefix: ReadonlyArray<number>, path: ReadonlyArray<number>): b
 
 /** Builds the native view of a module's root component from its semantic graph, or refuses with diagnostics. */
 export type NativeViewOptions = {
+	/**
+	 * A `<link rel="stylesheet">` with a fixed `href`: true when the build read that file (one the app serves), so it styles
+	 * the page as the browser's load does; else the link is refused.
+	 */
+	readonly linkStylesheet?: (href: string) => boolean;
+	/**
+	 * A default import of a file the build reads as an asset (`import logo from './logo.png'`): the URL the app shows it
+	 * by, as Vite gives the web its URL; undefined when the build does not read that file.
+	 */
+	readonly assetImport?: (specifier: string, importer: string) => string | undefined;
 	/** The page's route when the module is a page: the router's pattern and its param names. */
 	readonly route?: { readonly pattern: string; readonly params: ReadonlyArray<string> };
 	/**
@@ -1089,6 +1141,7 @@ function foldConstant(
 ): { readonly value: unknown } | undefined {
 	const fold = (inner: NativeExpr) => foldConstant(inner, initial);
 	if ('literal' in expr) return { value: expr.literal };
+	if ('nonFinite' in expr) return { value: Number(expr.nonFinite) };
 	const element = elementOf(expr);
 	if (element !== undefined) {
 		const token = elementToken(element);
@@ -2625,6 +2678,8 @@ export function createNativeViewPayload(
 			readonly statements: Set<number>;
 			readonly exports: Map<string, string>;
 			readonly slots: Map<number, number | null>;
+			/** Slots that import an asset (`import logo from './logo.png'`), with the URL the app shows it by. */
+			readonly assets: Map<number, string>;
 		};
 		const included = new Map<ModuleFacts, Included>();
 		const order: Included[] = [];
@@ -2646,6 +2701,7 @@ export function createNativeViewPayload(
 				statements: new Set(),
 				exports: new Map(),
 				slots: new Map(),
+				assets: new Map(),
 			};
 			included.set(module, entry);
 			order.push(entry);
@@ -2665,6 +2721,12 @@ export function createNativeViewPayload(
 			}
 			const { specifier, span } = factsOf(entry.module)!.imports[slot]!;
 			const module = moduleAt(entry.module, specifier);
+			const asset = module ? undefined : options.assetImport?.(specifier, entry.module.graph.filename);
+			if (asset !== undefined) {
+				entry.assets.set(slot, asset);
+				entry.slots.set(slot, null);
+				return undefined;
+			}
 			if (!module && missingModules.size === 0)
 				refuseScript(
 					`${where(entry.module)} imports \`${specifier}\`, which the build could not read for the phone's script`,
@@ -2791,7 +2853,10 @@ export function createNativeViewPayload(
 						entry.statements.has(index) ? [statement.code] : [],
 					),
 				].join('\n'),
-				imports: facts.imports.map((_, slot) => entry.slots.get(slot) ?? null),
+				imports: facts.imports.map((_, slot) => {
+					const asset = entry.assets.get(slot);
+					return asset !== undefined ? { asset } : (entry.slots.get(slot) ?? null);
+				}),
 				functions: [...scriptFunctions.values()]
 					.filter((fn) => fn.module === entry.module)
 					.map((fn) => ({ id: fn.id, code: fn.fact.code })),
@@ -3435,6 +3500,10 @@ export function createNativeViewPayload(
 				if (scope.locals.has(expression.name)) return { local: expression.name };
 				const bound = scope.args.get(expression.name);
 				if (bound) return bound;
+				if (expression.name === 'Infinity')
+					return { nonFinite: 'Infinity' };
+				if (expression.name === 'NaN')
+					return { nonFinite: 'NaN' };
 				if (scope.opaque === expression.name || scope.carried?.name === expression.name)
 					return refuse(`${what} reads its event`);
 				if (scope.deviceObjects.has(expression.name))
@@ -3547,6 +3616,11 @@ export function createNativeViewPayload(
 				const constant = constantAt(scope.module, expression.name);
 				if (constant) return moduleConstant(constant, what, scope);
 				const imported = scope.module.imports.get(expression.name);
+				const asset =
+					imported?.kind === 'default'
+						? options.assetImport?.(imported.source, scope.module.graph.filename)
+						: undefined;
+				if (asset !== undefined) return { literal: asset };
 				if (imported)
 					return refuse(
 						`${what} reads \`${expression.name}\` from \`${imported.source}\`, which this build cannot read as data`,
@@ -3651,6 +3725,15 @@ export function createNativeViewPayload(
 			}
 			case 'member': {
 				const holder = expression.object;
+				// Number's constants, as JavaScript gives them; the non-finite ones travel as their names.
+				if (
+					holder.kind === 'read' &&
+					holder.name === 'Number' &&
+					!scope.locals.has('Number') &&
+					!scope.args.has('Number') &&
+					Object.hasOwn(NUMBER_CONSTANTS, expression.property)
+				)
+					return NUMBER_CONSTANTS[expression.property]!;
 				if (
 					holder.kind === 'read' &&
 					scope.objects.has(holder.name) &&
@@ -4307,26 +4390,47 @@ export function createNativeViewPayload(
 				);
 				return value ? [{ attribute: target.name, value }] : [];
 			}
-			if (
-				target.kind === 'class' &&
-				target.trueValue !== undefined &&
-				target.falseValue !== undefined &&
-				target.constantClass === undefined &&
-				target.leadingClass === undefined
-			) {
-				const test = exprOf(read.expression, 'the class test', scope);
-				return test
-					? [
-							{
-								attribute: 'class',
-								value: {
-									if: test,
-									whenTrue: { literal: target.trueValue },
-									whenFalse: { literal: target.falseValue },
-								},
-							},
-						]
-					: [];
+			if (target.kind === 'class') {
+				const given = renderValue(
+					read.expression,
+					() => readScript(scope.module, read.sourceSpan),
+					'the class',
+					scope,
+				);
+				if (!given) return [];
+				const value: NativeExpr =
+					target.trueValue !== undefined && target.falseValue !== undefined
+						? { if: given, whenTrue: { literal: target.trueValue }, whenFalse: { literal: target.falseValue } }
+						: given;
+				const lead = target.leadingClass || undefined;
+				const constant = target.constantClass || undefined;
+				// As the web writes it: `[leading, value, constant].filter(Boolean).join(' ')`, the scopes kept around the value.
+				const fixed = [lead, constant].filter(Boolean).join(' ');
+				return [
+					{
+						attribute: 'class',
+						value:
+							fixed === ''
+								? value
+								: {
+										if: value,
+										whenTrue: {
+											template: [...(lead ? [`${lead} `] : []), value, ...(constant ? [` ${constant}`] : [])],
+										},
+										whenFalse: { literal: fixed },
+									},
+					},
+				];
+			}
+			// Inline style the build knows is the element's style attribute, which Dragon cascades; see `fixedStyle`.
+			if (target.kind === 'style') {
+				const value = renderValue(
+					read.expression,
+					() => readScript(scope.module, read.sourceSpan),
+					'the style',
+					scope,
+				);
+				return value ? [{ attribute: 'style', value }] : [];
 			}
 			refuse(`a ${target.kind} binding${'name' in target ? ` (\`${target.name}\`)` : ''}`);
 			return [];
@@ -4612,7 +4716,13 @@ export function createNativeViewPayload(
 							);
 					} else if (element === 'link') {
 						const rel = written.rel?.trim().toLowerCase().split(/\s+/) ?? [];
-						if (bound.includes('rel') || rel.includes('stylesheet'))
+						const read =
+							!bound.includes('rel') &&
+							!bound.includes('href') &&
+							rel.includes('stylesheet') &&
+							written.href !== undefined &&
+							options.linkStylesheet?.(written.href) === true;
+						if (!read && (bound.includes('rel') || rel.includes('stylesheet')))
 							refuseAs(
 								'stylesheet',
 								`<link rel="stylesheet"${written.href ? ` href="${written.href}"` : ''}> loads styles while the page runs`,
@@ -4703,7 +4813,16 @@ export function createNativeViewPayload(
 							),
 					),
 					...own,
-				];
+				].filter((binding) => {
+					if (!('attribute' in binding) || binding.attribute !== 'style') return true;
+					const fixed = fixedStyle(binding.value);
+					if (fixed === undefined)
+						refuse(
+							'a style binding whose value follows state while the app runs, which waits on Dragon\'s typed style slots',
+						);
+					else if (fixed !== null) attributes.style = fixed;
+					return false;
+				});
 				for (const attribute of handleAttrs) {
 					if (attribute.name === 'id') continue;
 					handleReferences.push({
@@ -5289,10 +5408,6 @@ export function createNativeViewPayload(
 				close();
 				const boundary = scope.module.boundaries.get(item.id);
 
-				if (item.arms.catch === undefined) {
-					refuse('a @try with no @catch; its error would leave this screen');
-					continue;
-				}
 				const branchId = scope.prefix + item.id;
 				const at = nodes.length;
 				const tasks = new Set<string>();
@@ -5381,7 +5496,7 @@ export function createNativeViewPayload(
 				}
 				// A handler that rejects keeps the shown content and opens @catch after it, as the web's spec says (a failed
 				// value on the first load still shows only @catch).
-				if (caught || refreshes) {
+				if ((caught || refreshes) && item.arms.catch !== undefined) {
 					const caughtId = `${branchId}:caught`;
 					const handlerFailed: NativeExpr = {
 						binary: '!==',
@@ -7478,6 +7593,8 @@ export function createNativeViewPayload(
 	wireTicks();
 	checkSelects();
 	let lengthLimited = false;
+	let emailChecked = false;
+	let submitLabel = false;
 	const forms = wireForms();
 	// The runtime keeps a field's text from its edits, so a field whose text a handler reads reports each edit.
 	for (const field of readFields)
@@ -7611,20 +7728,18 @@ export function createNativeViewPayload(
 		...(options.route
 			? { route: { pattern: options.route.pattern, params: options.route.params } }
 			: {}),
-		cells: cells.map((cell) => ({
-			...cell,
-			...(styledCells.has(cell.id) && !rowCells.has(cell.id)
-				? {
-						styled: true as const,
-						...(styledDomains.has(cell.id)
-							? { domain: styledDomains.get(cell.id)! }
-							: {}),
-					}
-				: {}),
-			...(undefinedFirst.has(cell.id) && !cell.row && cell.initial === null
-				? { unset: true as const }
-				: {}),
-		})),
+		cells: cells.map((given) => {
+			// JSON writes Infinity and NaN as null: the cell carries where they were beside its first value.
+			const { json, nonFinite } = nativeNonFiniteSplit(given.initial);
+			const cell = nonFinite.length > 0 ? { ...given, initial: json as NativeValue, nonFinite } : given;
+			return {
+				...cell,
+				...(styledCells.has(cell.id) && !rowCells.has(cell.id)
+					? { styled: true as const, ...(styledDomains.has(cell.id) ? { domain: styledDomains.get(cell.id)! } : {}) }
+					: {}),
+				...(undefinedFirst.has(cell.id) && !cell.row && given.initial === null ? { unset: true as const } : {}),
+			};
+		}),
 		nodes,
 		events,
 		handlers,
@@ -7632,6 +7747,8 @@ export function createNativeViewPayload(
 		...(objects.length > 0 ? { objects } : {}),
 		...(forms.length > 0 ? { forms, valueMissing: NATIVE_VALUE_MISSING_BY_LOCALE } : {}),
 		...(lengthLimited ? { tooLong: NATIVE_TOO_LONG_BY_LOCALE } : {}),
+		...(emailChecked ? { emailMismatch: NATIVE_EMAIL_MISMATCH_BY_LOCALE } : {}),
+		...(submitLabel ? { submitLabel: NATIVE_SUBMIT_LABEL_BY_LOCALE } : {}),
 		...(script ? { script } : {}),
 	});
 
@@ -7854,7 +7971,10 @@ export function createNativeViewPayload(
 					fields.push({ node: node.id, kind: 'select' });
 					continue;
 				}
-				if (node.element === 'button') {
+				// An <input type="submit"> is its form's submit button, as a <button> is.
+				const submitInput = node.element === 'input' && type === 'submit';
+				if (submitInput) submitLabel = true;
+				if (node.element === 'button' || submitInput) {
 					if (type === 'button') continue;
 					if (type === 'reset') {
 						refuse(
@@ -7893,6 +8013,7 @@ export function createNativeViewPayload(
 				if (kind === 'text') {
 					textFields.push(node.id);
 					if (attribute(node, 'maxlength')) lengthLimited = true;
+					if (type === 'email') emailChecked = true;
 				}
 			}
 			if (!submit) {

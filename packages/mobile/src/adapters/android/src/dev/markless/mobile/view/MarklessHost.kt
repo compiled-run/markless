@@ -161,6 +161,8 @@ class MarklessHost(
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
 	private val events = payload.events.groupBy { it.host }
 	private val views = HashMap<String, View>()
+	/** The images the app packaged, by the src a page writes. */
+	private val packaged: Map<String, PackagedImage> by lazy { packagedImages(context) }
 	private val built = HashMap<String, Instance>()
 	private val textViews = HashMap<String, TextView>()
 	/** Each text view that draws Dragon's glyph lines over itself instead of its own text. */
@@ -866,7 +868,7 @@ class MarklessHost(
 		// A family's visually hidden checkbox (aria-hidden) draws nothing; a plain one is a platform control.
 		val unseen = type == "hidden" || (type in TICKABLE && node.attributes["aria-hidden"] == "true")
 		if (unseen) inert.add(inst.id)
-		val view = when (if (node.element == "button" && holdsElements) "box-button" else if (drawing != null) "drawing" else if (unstyled?.rule == true) "rule" else if (unseen) "unseen" else if (type in TICKABLE) type else node.element) {
+		val view = when (if (node.element == "button" && holdsElements) "box-button" else if (drawing != null) "drawing" else if (unstyled?.rule == true) "rule" else if (unseen) "unseen" else if (type in TICKABLE) type else if (type == "submit") "submit-input" else node.element) {
 			"drawing" -> DrawingView(context, drawing!!, baseTextSize * (flow?.blockText(node.parent)?.size ?: 1.0)).also { named(it, inst.id, image = true) }
 			"rule" -> RuleView(context).also { named(it, inst.id) }
 			"unseen" -> View(context)
@@ -891,12 +893,24 @@ class MarklessHost(
 				gravity = Gravity.TOP or Gravity.START
 				named(this, inst.id)
 			}
+			// A button whose label is its value, as the browser draws it; `value` (an attribute) sets the label.
+			"submit-input" -> SubmitInput(context).apply {
+				background = null
+				minWidth = 0; minHeight = 0; minimumWidth = 0; minimumHeight = 0
+				isAllCaps = false
+				stateListAnimator = null
+				includeFontPadding = false
+				setPadding(0, 0, 0, 0)
+				gravity = Gravity.TOP or Gravity.START
+				text = runtime.submitLabel
+				named(this, inst.id)
+			}
 			"camera" -> {
 				val obj = node.obj ?: throw MarklessHostError("<camera> \"${node.id}\" shows no device object")
 				val device = payload.objects.firstOrNull { it.id == obj }?.device ?: throw MarklessHostError("<camera> \"${node.id}\" names unknown object \"$obj\"")
 				needDevice().view(obj, device).also { named(it, inst.id) }
 			}
-			"img" -> SizedImage(context).also { named(it, inst.id) }
+			"img" -> SizedImage(context, packaged, sized = style == null).also { named(it, inst.id) }
 			"audio" -> AudioButton(context).apply {
 				visibility = View.GONE
 				named(this, inst.id)
@@ -924,6 +938,8 @@ class MarklessHost(
 				if (node.element == "input") {
 					filters = arrayOf(LengthLimit { nativeMaxLength(attrs[inst.id]?.get("maxlength")) })
 					isSingleLine = true
+					// The keyboard Chrome gives an email field.
+					if (node.attributes["type"] == "email") inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
 				} else {
 					// A textarea's Return is a new line, and Chrome's default `rows="2"` shows two lines.
 					inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
@@ -1113,13 +1129,20 @@ class MarklessHost(
 				view.contentDescription = value
 				if (view is DrawingView && current["aria-hidden"] != "true") view.importantForAccessibility = if (value != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO
 			}
-			"alt" -> if (view is SizedImage) view.contentDescription = value
+			"alt" -> if (view is SizedImage) {
+				view.alt(value)
+				view.contentDescription = current["aria-label"] ?: value
+				// `alt=""` marks a decorative image, which TalkBack skips, as the web leaves it out of the tree.
+				if (current["aria-hidden"] != "true") view.importantForAccessibility = if (value == "" && current["aria-label"] == null) View.IMPORTANT_FOR_ACCESSIBILITY_NO else View.IMPORTANT_FOR_ACCESSIBILITY_YES
+			}
+			"width", "height" -> if (view is SizedImage) view.length(name, value)
 			"src" -> when (view) {
-				is SizedImage -> view.show(value)
+				is SizedImage -> view.src(value)
 				is AudioButton -> view.source(value)
 			}
 			"controls" -> if (view is AudioButton) view.visibility = if (value == null) View.GONE else View.VISIBLE
 			"disabled" -> view.isEnabled = value == null
+			"value" -> if (view is SubmitInput) view.text = value ?: runtime.submitLabel
 			"aria-pressed", "aria-selected" -> view.isSelected = value == "true"
 			"aria-expanded" -> expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }
 			"aria-hidden" -> view.importantForAccessibility = if (value == "true") View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else if (view is DrawingView) (if (view.contentDescription != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO) else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
@@ -1496,3 +1519,6 @@ private fun EditText.setAppText(text: String) {
 	limit?.appWriting = true
 	try { setText(text) } finally { limit?.appWriting = false }
 }
+
+/** An `<input type="submit">`: a button labelled by its `value`, else the browser's own label in the device's language. */
+class SubmitInput(context: android.content.Context) : Button(context)

@@ -666,7 +666,7 @@ function emitNode(
 		const expression = unwrapExpressionContainer(value);
 		const styleCss = staticStyleObjectCss(name, expression, context);
 		if (styleCss !== null) {
-			if (styleCss !== '') append(builder, ` style="${escapeAttribute(styleCss)}"`);
+			if (styleCss !== '') appendStaticAttribute(builder, path, 'style', styleCss);
 			continue;
 		}
 		const literal = staticAttributeValue(name, value, expression);

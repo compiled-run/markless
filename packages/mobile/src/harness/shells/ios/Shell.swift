@@ -268,7 +268,8 @@ final class ShellSceneDelegate: UIResponder, UIWindowSceneDelegate {
 			for file in (try? FileManager.default.contentsOfDirectory(at: fontFolder, includingPropertiesForKeys: nil)) ?? [] {
 				fonts["sha256:" + file.deletingPathExtension().lastPathComponent] = try Data(contentsOf: file)
 			}
-			return try MarklessRoot.controller(payload: payload, style: style, fonts: fonts, path: path, device: ProofDevice.shared)
+			return try MarklessRoot.controller(
+				payload: payload, style: style, fonts: fonts, images: NativeImageAsset.bundled(in: bundle), path: path, device: ProofDevice.shared)
 		} catch {
 			NSLog("markless-shell: %@", "\(error)")
 			let controller = UIViewController()

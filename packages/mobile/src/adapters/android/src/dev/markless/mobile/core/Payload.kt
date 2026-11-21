@@ -261,6 +261,47 @@ data class TooLong(val text: String, val digits: String = "0123456789") {
 	}
 }
 
+/**
+ * Chromium's messages for an email field whose value is not an email address, one for each way it is not; `{value}`,
+ * `{symbol}` and `{domain}` stand for the value, the first character not allowed and the part after the `@`.
+ */
+data class EmailMismatch(
+	val missingAt: String, val noLocal: String, val noDomain: String, val localSymbol: String, val domainSymbol: String, val dot: String, val other: String,
+) {
+	/** What Chromium says about an email field's (sanitized) value; null when it is empty or a valid email address. */
+	fun message(value: String): String? {
+		if (value.isEmpty()) return null
+		val at = value.indexOf('@')
+		if (at < 0) return missingAt.replace("{value}", value)
+		val local = value.substring(0, at)
+		val domain = value.substring(at + 1)
+		val notLocal = { c: Char -> !alphanumeric(c) && c !in LOCAL_SYMBOLS }
+		if (local.isNotEmpty() && local.none(notLocal) && domain.split('.').all(::label)) return null
+		if (local.isEmpty()) return noLocal.replace("{value}", value)
+		if (domain.isEmpty()) return noDomain.replace("{value}", value)
+		symbolOf(local, notLocal)?.let { return localSymbol.replace("{symbol}", it) }
+		symbolOf(domain) { !alphanumeric(it) && it != '.' && it != '-' }?.let { return domainSymbol.replace("{symbol}", it) }
+		if (domain.startsWith('.') || domain.endsWith('.') || domain.contains("..")) return dot.replace("{domain}", domain)
+		return other
+	}
+
+	private companion object {
+		const val LOCAL_SYMBOLS = ".!#\$%&'*+/=?^_`{|}~-"
+		fun alphanumeric(c: Char) = c in 'a'..'z' || c in 'A'..'Z' || c in '0'..'9'
+		fun label(part: String) = part.length in 1..63 && part.all { alphanumeric(it) || it == '-' } && part.first() != '-' && part.last() != '-'
+		/** The first code point of [text] that [bad] picks, whole even when it takes two UTF-16 units, as Chromium shows it. */
+		fun symbolOf(text: String, bad: (Char) -> Boolean): String? {
+			val at = text.indexOfFirst(bad)
+			if (at < 0) return null
+			return String(Character.toChars(text.codePointAt(at)))
+		}
+	}
+}
+
+/** An email field's value as HTML sanitizes it: line breaks removed, then ASCII whitespace stripped from both ends. */
+fun nativeEmailValue(value: String): String =
+	value.filter { it != '\r' && it != '\n' }.trim { it == ' ' || it == '\t' || it == '\n' || it == '\r' || it == '\u000C' }
+
 /** A `maxlength` attribute's limit, by HTML's rules for parsing non-negative integers; null (no limit) when it has none. */
 fun nativeMaxLength(attribute: String?): Int? {
 	if (attribute == null) return null
@@ -292,6 +333,10 @@ data class Payload(
 	val valueMissing: Map<String, ValueMissing> = emptyMap(),
 	/** [TooLong] by the locale the browser shows its own text in. */
 	val tooLong: Map<String, TooLong> = emptyMap(),
+	/** [EmailMismatch] by the locale the browser shows its own text in. */
+	val emailMismatch: Map<String, EmailMismatch> = emptyMap(),
+	/** The label the web draws on an `<input type="submit">` with no `value`, by the locale the browser shows its own text in. */
+	val submitLabel: Map<String, String> = emptyMap(),
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	val script: ScriptSource? = null,
 ) {
@@ -300,7 +345,7 @@ data class Payload(
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "script"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "emailMismatch", "submitLabel", "script"), "payload")
 			val route = root["route"]?.obj("payload.route")?.let { r ->
 				r.only(setOf("pattern", "params"), "payload.route")
 				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
@@ -373,7 +418,18 @@ data class Payload(
 				val runsScript = cells.any { it.async != null } || handlers.any { h -> scriptOps(h.ops) } || nodes.any { n -> readsOf(n).any(::hasScript) } || title.orEmpty().any { it is TextPart.Value && hasScript(it.expr) }
 				if (runsScript) throw MarklessDecodeError("a script op or computed in a payload with no script")
 			}
-			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, script)
+			val emailMismatch = root["emailMismatch"]?.obj("payload.emailMismatch")?.entries?.associateTo(LinkedHashMap()) { (locale, m) ->
+				val what = "payload.emailMismatch.$locale"
+				val mo = m.obj(what)
+				val kinds = listOf("missingAt", "noLocal", "noDomain", "localSymbol", "domainSymbol", "dot", "other")
+				mo.only(kinds.toSet(), what)
+				val t = kinds.map { mo.field(it, what).str("$what.$it") }
+				locale to EmailMismatch(t[0], t[1], t[2], t[3], t[4], t[5], t[6])
+			} ?: emptyMap()
+			val submitLabel = root["submitLabel"]?.obj("payload.submitLabel")?.entries?.associateTo(LinkedHashMap()) { (locale, label) ->
+				locale to label.str("payload.submitLabel.$locale")
+			} ?: emptyMap()
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, emailMismatch, submitLabel, script)
 		}
 
 		private fun readsOf(node: Node): List<Expr> = when (node) {
@@ -495,6 +551,16 @@ data class Payload(
 			fun sub(k: String) = expr(o.field(k, what), "$what.$k")
 			return when {
 				o.containsKey("cell") -> { o.only(setOf("cell"), what); Expr.CellRef(o.field("cell", what).str("$what.cell")) }
+				// A JSON literal cannot hold these; in memory they are numbers like any other.
+				o.containsKey("nonFinite") -> {
+					o.only(setOf("nonFinite"), what)
+					Expr.Literal(JsValue.Num(when (val name = o.field("nonFinite", what).str("$what.nonFinite")) {
+						"Infinity" -> Double.POSITIVE_INFINITY
+						"-Infinity" -> Double.NEGATIVE_INFINITY
+						"NaN" -> Double.NaN
+						else -> throw MarklessDecodeError("$what.nonFinite: unknown \"$name\"")
+					}))
+				}
 				o.containsKey("literal") -> { o.only(setOf("literal"), what); Expr.Literal(o.field("literal", what).let { if (it == Json.Null) JsValue.Null else scalar(it, "$what.literal") }) }
 				o.containsKey("unary") -> { o.only(setOf("unary", "value"), what); Expr.Unary(oneOf(o, "unary", UNARY, what), sub("value")) }
 				o.containsKey("binary") -> { o.only(setOf("binary", "left", "right"), what); Expr.Binary(oneOf(o, "binary", BINARY, what), sub("left"), sub("right")) }
@@ -574,7 +640,7 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial", "storage", "styled", "domain", "device", "task", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows", "async"), what)
+			o.only(setOf("id", "name", "initial", "storage", "styled", "domain", "device", "task", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows", "async", "nonFinite"), what)
 			// The style export carries each state's domain; the payload's copy is Dragon's input, checked here and not kept.
 			o["domain"]?.arr("$what.domain")?.forEach { it.str("$what.domain[]") }
 			val unset = o["unset"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.unset must be true when present"); true } ?: false
@@ -589,7 +655,7 @@ data class Payload(
 				a.only(setOf("script", "bindings", "boundaries"), "$what.async")
 				AsyncValue(a.field("script", what).str("$what.async.script"), scriptBindings(a.field("bindings", what), "$what.async.bindings"), a.field("boundaries", what).arr("$what.async.boundaries").map { it.str("$what.async.boundaries[]") })
 			}
-			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock, o["first"]?.let { expr(it, "$what.first") }, o["rebuiltBy"]?.arr("$what.rebuiltBy")?.mapIndexed { n, e -> expr(e, "$what.rebuiltBy[$n]") }, unset, o["follows"]?.let { expr(it, "$what.follows") }, async)
+			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), nonFiniteJoin(o.field("initial", what), o["nonFinite"]), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock, o["first"]?.let { expr(it, "$what.first") }, o["rebuiltBy"]?.arr("$what.rebuiltBy")?.mapIndexed { n, e -> expr(e, "$what.rebuiltBy[$n]") }, unset, o["follows"]?.let { expr(it, "$what.follows") }, async)
 		}
 
 		private fun defaultStyle(v: Json, what: String): DefaultStyle {
@@ -635,7 +701,8 @@ data class Payload(
 			return Live(politeness == "assertive", atomic.value)
 		}
 
-		private fun drawing(v: Json, what: String): Drawing {
+		/** A drawing; also how an SVG file's image travels in the app's image manifest. */
+		fun drawing(v: Json, what: String): Drawing {
 			val o = v.obj(what)
 			o.only(setOf("viewBox", "width", "height", "shapes", "em"), what)
 			val em = o["em"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.em must be true when present"); true } ?: false
