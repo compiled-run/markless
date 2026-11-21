@@ -2,6 +2,8 @@ import { ICON_SOURCE_ID, type IconsOptions } from '@markless/icons/vite';
 import type { Plugin } from 'vite';
 import { iconTransform } from './transforms/icons.ts';
 
+export { uiIconsOptions } from './transforms/icons.ts';
+
 export interface UiOptions {
 	icons?: false | IconsOptions;
 }

@@ -1,0 +1,18 @@
+appId: ${APP_ID}
+name: j19-client-build
+---
+- launchApp:
+    clearState: true
+- assertVisible: Client build
+- assertVisible: "Build: not asked"
+- assertVisible: "Greeting: none"
+- tapOn: Ask the build
+- assertNotVisible: "Build: not asked"
+- assertVisible: "Build: client, production, dev false, prod true"
+- assertVisible: "Greeting: none"
+- assertNotVisible: "Build: not asked"
+- tapOn: Load greeting
+- assertNotVisible: "Greeting: none"
+- assertVisible: "Greeting: hello from the client"
+- assertVisible: "Build: client, production, dev false, prod true"
+- assertNotVisible: "Greeting: none"
