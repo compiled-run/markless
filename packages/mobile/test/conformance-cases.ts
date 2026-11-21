@@ -1182,6 +1182,34 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'dismiss-detail',
+		fixture: 'proofs/u60-dismiss-detail/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'pointerdown', host: 'h5' },
+			{ event: 'pointerup', host: 'h5' },
+			{ event: 'pointerdown', host: 'h3' },
+			{ event: 'pointerup', host: 'h3' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'pointerdown', host: 'h2' },
+			{ event: 'pointerup', host: 'h2' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'dismiss', host: 'h4', reason: 'escape' },
+		],
+	},
+	{
+		name: 'active-element',
+		fixture: 'proofs/u64-active-element/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
 		name: 'shared-methods',
 		fixture: 'test/fixtures/SharedMonth.tsrx',
 		actions: [

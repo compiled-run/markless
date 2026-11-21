@@ -633,7 +633,9 @@ class Runtime(
 
 	/** One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries, in that order. */
 	private fun enter(fields: String, submission: Submission? = null): List<JournalEntry> {
-		val entry = "{$fields${entryCells()}}"
+		// A handler may read the focused element; a computed, which renders, never does, so only entries carry it.
+		val focus = focused?.takeIf { it != NATIVE_DOCUMENT_BODY }?.let { ",\"focused\":${jsonString(it)},\"focusElements\":${elementFacts(emptyMap(), Scope.EMPTY, listOf(it))}" } ?: ""
+		val entry = "{$fields$focus${entryCells()}}"
 		val started = System.nanoTime()
 		scriptCall("enter", entry)
 		val result = Json.parse(scriptCall("leave", null)).obj("leave()")
@@ -1612,13 +1614,17 @@ class Runtime(
 				calls.add(JournalEntry.Command(node.value, op.command, op.preventScroll))
 			}
 			is Op.Script -> {
+				val pressed = (fields?.get("pressTarget") as? JsValue.Str)?.value
+				val detail = (fields?.get("reason") as? JsValue.Str)?.let {
+					",\"detail\":{\"reason\":${jsonString(it.value)},\"pressTarget\":${pressed?.let(::jsonString) ?: "null"}}"
+				} ?: ""
 				val touch = TOUCH_FIELDS.mapNotNull { f -> fields?.get(f)?.let { ",${jsonString(f)}:${jsonValue(it)}" } }.joinToString("")
 				val typed = listOf("key", "text").mapNotNull { f -> (fields?.get(f) as? JsValue.Str)?.let { ",${jsonString(f)}:${jsonString(it.value)}" } }.joinToString("")
 				val named = if (fields?.get("currentTarget") is JsValue.Str) listOf("target", "currentTarget", "relatedTarget").associateWith { (fields?.get(it) as? JsValue.Str)?.value } else null
 				val nodes = named?.let { n -> ",\"nodes\":" + n.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value?.let(::jsonString) ?: "null"}" } } ?: ""
-				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$typed$touch$nodes}"
+				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$typed$touch$nodes$detail}"
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
-				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope, named?.values?.filterNotNull().orEmpty())},\"event\":$event$catch", submission))
+				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope, named?.values?.filterNotNull().orEmpty() + listOfNotNull(pressed))},\"event\":$event$catch", submission))
 			}
 			Op.PreventDefault -> calls.add(JournalEntry.PreventDefault)
 			is Op.FieldText -> {

@@ -1573,8 +1573,18 @@ export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> =
 	['currentTarget', 'checked'],
 ];
 
+/** What a script dismiss handler's event has beyond those: why the overlay was dismissed, and the element an outside press landed on. */
+export const NATIVE_SCRIPT_DISMISS_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> = [
+	['detail', 'reason'],
+	['detail', 'pressTarget'],
+];
 /** A submit handler's binding for its form's entries now, which its event's `target` and `currentTarget` carry for FormData. */
 export const NATIVE_SCRIPT_SUBMITTED_FORM = 'submitted form';
+
+/** Members of a page global a phone answers, read straight off it: the focused element, as a proxy. */
+export const NATIVE_SCRIPT_PAGE_MEMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
+	document: ['activeElement'],
+};
 
 /** What a touch adds to a script pointer handler's event: its plain values. The elements it names reach only data handlers. */
 export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [

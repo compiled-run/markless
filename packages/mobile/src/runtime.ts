@@ -117,7 +117,10 @@ export type NativeAction =
  * The URL a GET form leaves for: its action with the query replaced by the entries, each name and value encoded as
  * `application/x-www-form-urlencoded` (UTF-8, a space as `+`, all but `*-._` and ASCII letters and digits escaped).
  */
-export function nativeFormUrl(action: string, entries: ReadonlyArray<readonly [string, string]>): string {
+export function nativeFormUrl(
+	action: string,
+	entries: ReadonlyArray<readonly [string, string]>,
+): string {
 	const encode = (text: string) =>
 		[...new TextEncoder().encode(text)]
 			.map((byte) =>
@@ -410,7 +413,8 @@ export function evaluateNativeExpr(
 	}
 	if ('index' in expr) {
 		const position = scope.positions?.get(expr.index);
-		if (position === undefined) throw new Error(`the row index of ${expr.index} read outside its row`);
+		if (position === undefined)
+			throw new Error(`the row index of ${expr.index} read outside its row`);
 		return position;
 	}
 	if ('local' in expr) {
@@ -487,7 +491,11 @@ export function evaluateNativeExpr(
 	if ('cell' in expr) return read(expr.cell, scope);
 	if ('literal' in expr) return expr.literal;
 	if ('nonFinite' in expr)
-		return expr.nonFinite === 'NaN' ? Number.NaN : expr.nonFinite === 'Infinity' ? Infinity : -Infinity;
+		return expr.nonFinite === 'NaN'
+			? Number.NaN
+			: expr.nonFinite === 'Infinity'
+				? Infinity
+				: -Infinity;
 	if ('field' in expr) {
 		if (!scope.fieldText) throw new Error(`the text of ${expr.field} read outside a runtime`);
 		return scope.fieldText(expr.field);
@@ -614,20 +622,33 @@ export function evaluateWithScript(
 							'device' in binding
 								? { device: binding.device, object: binding.object }
 								: 'object' in binding
-								? { object: frameOf(binding.object) }
-								: 'method' in binding
-									? { method: binding.method, frame: frameOf(binding.bindings) }
-								: 'shared' in binding
-									? { shared: frameOf(binding.shared) }
-									: 'cell' in binding
-										? { slot: binding.cell }
-										: 'fields' in binding
-											? { fields: binding.fields }
-											: 'elements' in binding
-												? { elements: evaluate(binding.elements, values) }
-												: 'callback' in binding
-													? binding
-													: { value: evaluate(binding.value, values) },
+									? { object: frameOf(binding.object) }
+									: 'method' in binding
+										? {
+												method: binding.method,
+												frame: frameOf(binding.bindings),
+											}
+										: 'shared' in binding
+											? { shared: frameOf(binding.shared) }
+											: 'cell' in binding
+												? { slot: binding.cell }
+												: 'fields' in binding
+													? { fields: binding.fields }
+													: 'elements' in binding
+														? {
+																elements: evaluate(
+																	binding.elements,
+																	values,
+																),
+															}
+														: 'callback' in binding
+															? binding
+															: {
+																	value: evaluate(
+																		binding.value,
+																		values,
+																	),
+																},
 						]),
 					);
 				const frame = frameOf(bindings);
@@ -700,12 +721,16 @@ export function createNativeRuntime(
 				: cell.app && session.has(cell.id)
 					? session.get(cell.id)!
 					: cell.storage && store.has(cell.storage.key)
-					? store.get(cell.storage.key)!
-					: (nativeNonFiniteJoin(cell.initial, cell.nonFinite) as Value),
+						? store.get(cell.storage.key)!
+						: (nativeNonFiniteJoin(cell.initial, cell.nonFinite) as Value),
 		]),
 	);
 	for (const cell of payload.cells)
-		if (cell.unset && !(cell.storage && store.has(cell.storage.key)) && !(cell.app && session.has(cell.id)))
+		if (
+			cell.unset &&
+			!(cell.storage && store.has(cell.storage.key)) &&
+			!(cell.app && session.has(cell.id))
+		)
 			unset.add(cell.id);
 	const appCells = payload.cells.filter((cell) => cell.app).map((cell) => cell.id);
 	const keepApp = () => {
@@ -798,27 +823,44 @@ export function createNativeRuntime(
 				'device' in binding
 					? { device: binding.device, object: binding.object }
 					: 'object' in binding
-					? { object: frameOf(binding.object, eventValue, scope) }
-					: 'method' in binding
-						? { method: binding.method, frame: frameOf(binding.bindings, eventValue, scope) }
-					: 'shared' in binding
-						? { shared: frameOf(binding.shared, eventValue, scope) }
-						: 'cell' in binding
-							? { slot: slotOf(binding.cell, scope) }
-							: 'fields' in binding
-								? {
-										fields: Object.fromEntries(
-											Object.entries(binding.fields).map(([field, cell]) => [
-												field,
-												slotOf(cell, scope),
-											]),
-										),
-									}
-								: 'elements' in binding
-									? { elements: evaluate(binding.elements, eventValue, scope) }
-									: 'callback' in binding
-										? binding
-										: { value: evaluate(binding.value, eventValue, scope) },
+						? { object: frameOf(binding.object, eventValue, scope) }
+						: 'method' in binding
+							? {
+									method: binding.method,
+									frame: frameOf(binding.bindings, eventValue, scope),
+								}
+							: 'shared' in binding
+								? { shared: frameOf(binding.shared, eventValue, scope) }
+								: 'cell' in binding
+									? { slot: slotOf(binding.cell, scope) }
+									: 'fields' in binding
+										? {
+												fields: Object.fromEntries(
+													Object.entries(binding.fields).map(
+														([field, cell]) => [
+															field,
+															slotOf(cell, scope),
+														],
+													),
+												),
+											}
+										: 'elements' in binding
+											? {
+													elements: evaluate(
+														binding.elements,
+														eventValue,
+														scope,
+													),
+												}
+											: 'callback' in binding
+												? binding
+												: {
+														value: evaluate(
+															binding.value,
+															eventValue,
+															scope,
+														),
+													},
 			]),
 		);
 	/**
@@ -826,7 +868,10 @@ export function createNativeRuntime(
 	 * elements it is inside, nearest first.
 	 */
 	const elementFacts = (frame: Record<string, unknown>, also: readonly string[] = []) => {
-		const facts: Record<string, { attributes: Record<string, string>; ancestors: string[]; captures?: number[] }> = {};
+		const facts: Record<
+			string,
+			{ attributes: Record<string, string>; ancestors: string[]; captures?: number[] }
+		> = {};
 		const add = (id: unknown) => {
 			if (typeof id !== 'string' || facts[id] || !elements.isElement(id)) return;
 			const at = id.indexOf('@');
@@ -835,10 +880,14 @@ export function createNativeRuntime(
 			const attributes: Record<string, string> = {};
 			if (node?.kind === 'element') {
 				const scope = instances(node).find((instance) => instance.id === id)?.scope ?? base;
-				for (const name of Object.keys(node.attributes ?? {})) attributes[name] = node.attributes![name]!;
+				for (const name of Object.keys(node.attributes ?? {}))
+					attributes[name] = node.attributes![name]!;
 				for (const binding of node.bindings ?? []) {
 					if (!('attribute' in binding)) continue;
-					const value = marklessAttributeValue(binding.attribute, evaluate(binding.value, undefined, scope));
+					const value = marklessAttributeValue(
+						binding.attribute,
+						evaluate(binding.value, undefined, scope),
+					);
 					if (value === null) delete attributes[binding.attribute];
 					else attributes[binding.attribute] = value;
 				}
@@ -846,7 +895,9 @@ export function createNativeRuntime(
 			const ancestors: string[] = [];
 			for (let up = node?.parent; up; up = nodesById.get(up)?.parent)
 				ancestors.push(key && nodesById.get(up)?.row ? `${up}${key}` : up);
-			const captures = [...touches].flatMap(([pointer, touch]) => (touch.capture === id ? [pointer] : []));
+			const captures = [...touches].flatMap(([pointer, touch]) =>
+				touch.capture === id ? [pointer] : [],
+			);
 			facts[id] = { attributes, ancestors, ...(captures.length > 0 ? { captures } : {}) };
 		};
 		const visit = (names: Record<string, unknown>) => {
@@ -889,7 +940,12 @@ export function createNativeRuntime(
 		entry: Record<string, unknown>,
 		submission?: Submission,
 	): NativeJournalEntry[] => {
-		call('enter', { ...entry, ...entryCells() });
+		// A handler may read the focused element; a computed, which renders, never does, so only entries carry it.
+		const focus =
+			focused !== null && focused !== NATIVE_DOCUMENT_BODY
+				? { focused, focusElements: elementFacts({}, [focused]) }
+				: {};
+		call('enter', { ...entry, ...focus, ...entryCells() });
 		const result = JSON.parse(call('leave')) as {
 			readonly pending: ReadonlyArray<number>;
 			readonly settled: ReadonlyArray<number>;
@@ -975,24 +1031,34 @@ export function createNativeRuntime(
 					...(id !== undefined ? { resume: `${SCRIPT_CALL}${id}` } : {}),
 				}),
 			),
-			...(result.commands ?? []).flatMap(([node, command, argument]): NativeJournalEntry[] => {
-				if (command === 'setPointerCapture' || command === 'releasePointerCapture') {
-					const touch = touches.get(argument as number);
-					if (!touch) return [];
-					if (command === 'setPointerCapture') touch.capture = node;
-					else if (touch.capture === node) touch.capture = null;
-					return [];
-				}
-				const preventScroll = argument === true;
-				// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
-				if (command === 'showModal' || command === 'close') {
-					if (!dialogs.has(node)) throw new Error(`${command}() on ${node}, which is not a dialog`);
-					setDialog(node, command === 'showModal');
-					return [];
-				}
-				if (command === 'focus') focused = node;
-				return [{ op: 'command', node, command, ...(preventScroll ? { preventScroll: true as const } : {}) }];
-			}),
+			...(result.commands ?? []).flatMap(
+				([node, command, argument]): NativeJournalEntry[] => {
+					if (command === 'setPointerCapture' || command === 'releasePointerCapture') {
+						const touch = touches.get(argument as number);
+						if (!touch) return [];
+						if (command === 'setPointerCapture') touch.capture = node;
+						else if (touch.capture === node) touch.capture = null;
+						return [];
+					}
+					const preventScroll = argument === true;
+					// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
+					if (command === 'showModal' || command === 'close') {
+						if (!dialogs.has(node))
+							throw new Error(`${command}() on ${node}, which is not a dialog`);
+						setDialog(node, command === 'showModal');
+						return [];
+					}
+					if (command === 'focus') focused = node;
+					return [
+						{
+							op: 'command',
+							node,
+							command,
+							...(preventScroll ? { preventScroll: true as const } : {}),
+						},
+					];
+				},
+			),
 			...(result.prevented ? [{ op: 'preventDefault' } as NativeJournalEntry] : []),
 			...raised,
 			...(result.navigate
@@ -1015,17 +1081,28 @@ export function createNativeRuntime(
 	 * bubbles, each running its own handler for that type.
 	 */
 	const raise = (event: Raised): NativeJournalEntry[] => {
-		if (raising >= RAISE_DEPTH) throw new Error(`events raised from JavaScript nest deeper than ${RAISE_DEPTH}`);
+		if (raising >= RAISE_DEPTH)
+			throw new Error(`events raised from JavaScript nest deeper than ${RAISE_DEPTH}`);
 		raising++;
 		try {
 			const chain: string[] = [];
-			for (let node: string | null | undefined = nodeOf(event.node); node; node = nodesById.get(node)?.parent)
+			for (
+				let node: string | null | undefined = nodeOf(event.node);
+				node;
+				node = nodesById.get(node)?.parent
+			)
 				chain.push(node === nodeOf(event.node) ? event.node : node);
 			const calls: NativeJournalEntry[] = [];
 			if (event.type === 'click') {
 				const pressed = chain.find((node) => handlerOf(nodeOf(node), 'activate'));
 				const scope = pressed && scopeOf(pressed);
-				return pressed && scope ? run(handlers.get(handlerOf(nodeOf(pressed), 'activate')!.handler) ?? [], clickFields(false), scope) : [];
+				return pressed && scope
+					? run(
+							handlers.get(handlerOf(nodeOf(pressed), 'activate')!.handler) ?? [],
+							clickFields(false),
+							scope,
+						)
+					: [];
 			}
 			for (const node of event.bubbles ? chain : chain.slice(0, 1)) {
 				const own = handlerOf(nodeOf(node), event.type as NativePointerEventName);
@@ -1035,21 +1112,26 @@ export function createNativeRuntime(
 					event.type === DISMISS_EVENT
 						? { reason: event.reason ?? '', pressTarget: null, isTrusted: false }
 						: event.type === 'keydown'
-							? { isTrusted: false, key: event.key ?? '', target: event.node, currentTarget: node }
+							? {
+									isTrusted: false,
+									key: event.key ?? '',
+									target: event.node,
+									currentTarget: node,
+								}
 							: {
-								isTrusted: false,
-								target: event.node,
-								currentTarget: node,
-								relatedTarget: event.relatedTarget ?? null,
-								button: event.button ?? 0,
-								buttons: event.buttons ?? 0,
-								clientX: event.clientX ?? 0,
-								clientY: event.clientY ?? 0,
-								pointerId: event.pointerId ?? 0,
-								pointerType: event.pointerType ?? '',
-								isPrimary: event.isPrimary ?? false,
-								timeStamp: 0,
-							};
+									isTrusted: false,
+									target: event.node,
+									currentTarget: node,
+									relatedTarget: event.relatedTarget ?? null,
+									button: event.button ?? 0,
+									buttons: event.buttons ?? 0,
+									clientX: event.clientX ?? 0,
+									clientY: event.clientY ?? 0,
+									pointerId: event.pointerId ?? 0,
+									pointerType: event.pointerType ?? '',
+									isPrimary: event.isPrimary ?? false,
+									timeStamp: 0,
+								};
 				const out = run(handlers.get(own.handler) ?? [], fields, scope);
 				if (out[0]?.op === 'navigate') return out;
 				calls.push(...out);
@@ -1112,20 +1194,20 @@ export function createNativeRuntime(
 			'device' in binding
 				? binding.object
 				: 'object' in binding
-				? readFrame(binding.object, scope)
-				: 'shared' in binding
-					? readFrame(binding.shared, scope)
-					: 'method' in binding
-						? readFrame(binding.bindings, scope)
-						: 'cell' in binding
-							? read(binding.cell, scope)
-							: 'fields' in binding
-								? Object.values(binding.fields).map((cell) => read(cell, scope))
-								: 'elements' in binding
-									? evaluate(binding.elements, undefined, scope)
-									: 'callback' in binding
-										? null
-									: evaluate(binding.value, undefined, scope),
+					? readFrame(binding.object, scope)
+					: 'shared' in binding
+						? readFrame(binding.shared, scope)
+						: 'method' in binding
+							? readFrame(binding.bindings, scope)
+							: 'cell' in binding
+								? read(binding.cell, scope)
+								: 'fields' in binding
+									? Object.values(binding.fields).map((cell) => read(cell, scope))
+									: 'elements' in binding
+										? evaluate(binding.elements, undefined, scope)
+										: 'callback' in binding
+											? null
+											: evaluate(binding.value, undefined, scope),
 		);
 	// As on the web, a computed is not run again while nothing it reads has changed.
 	const computed = new Map<string, Value>();
@@ -1139,7 +1221,9 @@ export function createNativeRuntime(
 		const elements = elementFacts(frame);
 		const key = JSON.stringify([fn, frame, elements]);
 		if (computed.has(key)) return computed.get(key)!;
-		const result = JSON.parse(call('enter', { kind: 'compute', fn, frame, elements, ...entryCells() })) as {
+		const result = JSON.parse(
+			call('enter', { kind: 'compute', fn, frame, elements, ...entryCells() }),
+		) as {
 			json: unknown;
 			nonFinite: NativeNonFinite;
 		};
@@ -1188,7 +1272,9 @@ export function createNativeRuntime(
 		byId: (wanted) => {
 			for (const node of payload.nodes) {
 				if (node.kind !== 'element') continue;
-				const binding = node.bindings?.find((one) => 'attribute' in one && one.attribute === 'id');
+				const binding = node.bindings?.find(
+					(one) => 'attribute' in one && one.attribute === 'id',
+				);
 				for (const { id, scope } of instances(node)) {
 					const value = binding
 						? marklessAttributeValue('id', evaluate(binding.value, undefined, scope))
@@ -1285,7 +1371,9 @@ export function createNativeRuntime(
 				? String(index)
 				: repeat.keyParts
 					? repeat.keyParts
-							.map((part) => (typeof part === 'string' ? part : String(valueAt(item, part))))
+							.map((part) =>
+								typeof part === 'string' ? part : String(valueAt(item, part)),
+							)
 							.join('')
 					: String(valueAt(item, repeat.key)),
 			item,
@@ -1327,8 +1415,15 @@ export function createNativeRuntime(
 			const repeat = repeats.get(cell.row);
 			if (!repeat || !shown(repeat)) continue;
 			for (const { key, item } of rowsOf(repeat)) {
-				const scope = { ...base, items: new Map([[repeat.id, item]]), keys: new Map([[repeat.id, key]]) };
-				signatures.set(`${cell.id}@${key}`, JSON.stringify(cell.rebuiltBy.map((expr) => evaluate(expr, undefined, scope))));
+				const scope = {
+					...base,
+					items: new Map([[repeat.id, item]]),
+					keys: new Map([[repeat.id, key]]),
+				};
+				signatures.set(
+					`${cell.id}@${key}`,
+					JSON.stringify(cell.rebuiltBy.map((expr) => evaluate(expr, undefined, scope))),
+				);
 			}
 		}
 		return signatures;
@@ -1349,7 +1444,14 @@ export function createNativeRuntime(
 			for (const { key, item } of rowsOf(repeat)) {
 				const slot = `${cell.id}@${key}`;
 				if (values.has(slot)) continue;
-				values.set(slot, evaluate(cell.first, undefined, { ...base, items: new Map([[repeat.id, item]]), keys: new Map([[repeat.id, key]]) }));
+				values.set(
+					slot,
+					evaluate(cell.first, undefined, {
+						...base,
+						items: new Map([[repeat.id, item]]),
+						keys: new Map([[repeat.id, key]]),
+					}),
+				);
 			}
 		}
 	};
@@ -1460,7 +1562,10 @@ export function createNativeRuntime(
 		const node = elementOf(nodeOf(id));
 		const binding = node.bindings?.find((one) => 'attribute' in one && one.attribute === name);
 		return binding
-			? marklessAttributeValue(name, evaluate(binding.value, undefined, id === node.id ? undefined : scopeOf(id)))
+			? marklessAttributeValue(
+					name,
+					evaluate(binding.value, undefined, id === node.id ? undefined : scopeOf(id)),
+				)
 			: (node.attributes?.[name] ?? null);
 	};
 	const propertyBinding = (id: string, name: string) =>
@@ -1483,7 +1588,12 @@ export function createNativeRuntime(
 				: (attributeNow(id, 'value') ?? '');
 		// A range keeps a number in its range and on its step, whatever it is given.
 		return attributeNow(id, 'type') === 'range'
-			? nativeRangeValue(text, attributeNow(id, 'min'), attributeNow(id, 'max'), attributeNow(id, 'step'))
+			? nativeRangeValue(
+					text,
+					attributeNow(id, 'min'),
+					attributeNow(id, 'max'),
+					attributeNow(id, 'step'),
+				)
 			: text;
 	};
 	const ticked = payload.nodes.flatMap((node) =>
@@ -1657,7 +1767,8 @@ export function createNativeRuntime(
 	const tooLongMessages = payload.tooLong ?? {};
 	const tooLong = tooLongMessages[nativeLocale(preferredLanguages, Object.keys(tooLongMessages))];
 	const numberMessageSets = payload.numberMessages ?? {};
-	const numberMessages = numberMessageSets[nativeLocale(preferredLanguages, Object.keys(numberMessageSets))];
+	const numberMessages =
+		numberMessageSets[nativeLocale(preferredLanguages, Object.keys(numberMessageSets))];
 	const mismatchMessages = payload.typeMismatch ?? {};
 	const mismatch =
 		mismatchMessages[nativeLocale(preferredLanguages, Object.keys(mismatchMessages))];
@@ -1678,7 +1789,9 @@ export function createNativeRuntime(
 				return chosen ? [[name, optionValue(chosen)]] : [];
 			}
 			if (kind === 'number') return [[name, nativeNumberValue(textOf(node))]];
-			return [[name, kind === 'hidden' ? (attributeNow(node, 'value') ?? '') : valueOf(node)]];
+			return [
+				[name, kind === 'hidden' ? (attributeNow(node, 'value') ?? '') : valueOf(node)],
+			];
 		});
 	}
 	/** Why a field stops a submit, as the web says it, or undefined when it does not. */
@@ -1699,7 +1812,8 @@ export function createNativeRuntime(
 					? valueOf(node) === ''
 					: !checkedOf(node);
 		if (required && absent()) {
-			if (!missing) throw new Error(`the payload has no message for a ${kind} missing its value`);
+			if (!missing)
+				throw new Error(`the payload has no message for a ${kind} missing its value`);
 			return missing[kind === 'number' ? 'text' : (kind as 'text' | 'checkbox' | 'radio')];
 		}
 		if (kind === 'number') {
@@ -1711,7 +1825,11 @@ export function createNativeRuntime(
 			});
 			if (!problem) return undefined;
 			if (!numberMessages) throw new Error('the payload has no messages for a number field');
-			return nativeNumberMessage(numberMessages[problem.message], numberMessages, 'values' in problem ? problem.values : {});
+			return nativeNumberMessage(
+				numberMessages[problem.message],
+				numberMessages,
+				'values' in problem ? problem.values : {},
+			);
 		}
 		if (kind === 'text' && attributeNow(node, 'type') === 'email') {
 			if (!mismatch) throw new Error('the payload has no message for an email field');
@@ -1722,7 +1840,8 @@ export function createNativeRuntime(
 		const max = kind === 'text' ? nativeMaxLength(attributeNow(node, 'maxlength')) : undefined;
 		const typed = edited.get(node);
 		if (max === undefined || typed === undefined || typed.length <= max) return undefined;
-		if (!tooLong) throw new Error('the payload has no message for a field longer than its maxlength');
+		if (!tooLong)
+			throw new Error('the payload has no message for a field longer than its maxlength');
 		return nativeTooLongMessage(tooLong, max, typed.length);
 	};
 	/** The first field that stops a submit, with what the web says about it, or undefined when none does. */
@@ -1805,7 +1924,9 @@ export function createNativeRuntime(
 				node.kind === 'element' &&
 				elements.contains(overlay, node.id) &&
 				// A row's copies are keyed by row, so a row element is read as it was built.
-				(node.row ? node.attributes?.[OVERLAY_MODAL_ATTRIBUTE] : attributeNow(node.id, OVERLAY_MODAL_ATTRIBUTE)) === OVERLAY_MODAL_VALUE,
+				(node.row
+					? node.attributes?.[OVERLAY_MODAL_ATTRIBUTE]
+					: attributeNow(node.id, OVERLAY_MODAL_ATTRIBUTE)) === OVERLAY_MODAL_VALUE,
 		);
 	};
 	// Rows take their first values, and following cells theirs, before anything reads them, the overlays served shown included.
@@ -1839,18 +1960,23 @@ export function createNativeRuntime(
 	};
 	// A field an arm hid is a new element when it shows again: it starts from its markup, as the web builds it.
 	const forgetHidden = () => {
-		for (const key of fired) if (!shownInstance(key.slice(key.indexOf('\0') + 1))) fired.delete(key);
+		for (const key of fired)
+			if (!shownInstance(key.slice(key.indexOf('\0') + 1))) fired.delete(key);
 		for (const id of edited.keys()) if (!shownInstance(id)) edited.delete(id);
 		for (const node of ticked)
 			if (!shown(node))
-				checkedness.set(node.id, checkedBinding(node.id) ?? node.attributes?.['checked'] !== undefined);
+				checkedness.set(
+					node.id,
+					checkedBinding(node.id) ?? node.attributes?.['checked'] !== undefined,
+				);
 		// A component an arm hid renders anew when it shows again, so its state starts over (a seed runs again then).
 		for (const cell of payload.cells) {
 			if (!cell.arm) continue;
 			if (!armShown(cell.arm)) {
 				values.set(cell.id, cell.initial);
 				if (cell.seed) reseed.add(cell.id);
-			} else if (cell.seed && reseed.delete(cell.id)) values.set(cell.id, evaluate(cell.seed));
+			} else if (cell.seed && reseed.delete(cell.id))
+				values.set(cell.id, evaluate(cell.seed));
 		}
 	};
 	return {
@@ -1884,9 +2010,12 @@ export function createNativeRuntime(
 		logs: () => logs,
 		start: () => (asyncCells.length === 0 ? [] : change(undefined, undefined, () => [])),
 		resume: () =>
-			appCells.some((cell) => session.has(cell) && !Object.is(session.get(cell), values.get(cell)))
+			appCells.some(
+				(cell) => session.has(cell) && !Object.is(session.get(cell), values.get(cell)),
+			)
 				? change(undefined, undefined, () => {
-						for (const cell of appCells) if (session.has(cell)) values.set(cell, session.get(cell)!);
+						for (const cell of appCells)
+							if (session.has(cell)) values.set(cell, session.get(cell)!);
 						return [];
 					})
 				: [],
@@ -1921,8 +2050,13 @@ export function createNativeRuntime(
 						(event) => event.host === select.id && event.event === 'input',
 					);
 					if (before === action.host || !changed) return [];
-					for (const one of optionsOf(select.id)) selectedness.set(one.id, one.id === action.host);
-					return run(handlers.get(changed.handler) ?? [], optionValue(instance), instance.scope);
+					for (const one of optionsOf(select.id))
+						selectedness.set(one.id, one.id === action.host);
+					return run(
+						handlers.get(changed.handler) ?? [],
+						optionValue(instance),
+						instance.scope,
+					);
 				});
 			}
 			if (action.event === 'timer' && action.timer.startsWith(SCRIPT_TIMER))
@@ -2043,7 +2177,8 @@ export function createNativeRuntime(
 					};
 					if (!down) touches.set(pointerId, state);
 					const at = { x: touch.x ?? 0, y: touch.y ?? 0 };
-					if (touch.event !== 'pointermove') tapPoint = touch.event === 'pointerup' ? at : null;
+					if (touch.event !== 'pointermove')
+						tapPoint = touch.event === 'pointerup' ? at : null;
 					/** The elements from `id` out to the root, innermost first; those in its row keep its row's key. */
 					const chain = (id: string): string[] => {
 						const key = id.includes('@') ? id.slice(id.indexOf('@')) : '';
@@ -2053,7 +2188,13 @@ export function createNativeRuntime(
 							node;
 							node = nodesById.get(node)?.parent
 						)
-							out.push(node === nodeOf(id) ? id : key && nodesById.get(node)?.row ? `${node}${key}` : node);
+							out.push(
+								node === nodeOf(id)
+									? id
+									: key && nodesById.get(node)?.row
+										? `${node}${key}`
+										: node,
+							);
 						return out;
 					};
 					const fieldsOf = (
@@ -2122,7 +2263,11 @@ export function createNativeRuntime(
 					};
 					const flush = (): NativeJournalEntry[] | undefined => {
 						for (const step of runs.splice(0)) {
-							const out = run(handlers.get(step.handler) ?? [], step.fields, step.scope ?? scope);
+							const out = run(
+								handlers.get(step.handler) ?? [],
+								step.fields,
+								step.scope ?? scope,
+							);
 							if (out[0]?.op === 'navigate') return out;
 							calls.push(...out);
 						}
@@ -2132,11 +2277,19 @@ export function createNativeRuntime(
 						raise('pointerover', touch.host);
 						crossing('pointerenter', touch.host, null, null);
 						// The behaviour's document listener hears the press: the topmost hint and the topmost other overlay it landed outside are told.
-						for (const top of [stack.findLast(isHint), stack.findLast((overlay) => !isHint(overlay))]) {
+						for (const top of [
+							stack.findLast(isHint),
+							stack.findLast((overlay) => !isHint(overlay)),
+						]) {
 							const dismiss =
-								top !== undefined && !elements.contains(top, touch.host) ? handlerOf(top, 'dismiss') : undefined;
+								top !== undefined && !elements.contains(top, touch.host)
+									? handlerOf(top, 'dismiss')
+									: undefined;
 							if (dismiss)
-								runs.push({ handler: dismiss.handler, fields: { reason: 'outside-press', pressTarget: touch.host } });
+								runs.push({
+									handler: dismiss.handler,
+									fields: { reason: 'outside-press', pressTarget: touch.host },
+								});
 						}
 						raise('pointerdown', touch.host);
 						return flush() ?? calls;
@@ -2191,7 +2344,11 @@ export function createNativeRuntime(
 								scope: scopeOf(target) ?? scope,
 							});
 					};
-					const mouse = (type: NativeMouseEventName, target: string, related: string | null = null) => {
+					const mouse = (
+						type: NativeMouseEventName,
+						target: string,
+						related: string | null = null,
+					) => {
 						for (const node of chain(target)) mouseRun(type, target, node, related);
 					};
 					const mouseCrossing = (
@@ -2253,7 +2410,8 @@ export function createNativeRuntime(
 			// A press focuses the control it presses, as the browser does.
 			if (action.event === 'activate') focused = action.host;
 			// A number field's handlers read its value, which is empty while its text is no number.
-			const numeric = action.event === 'input' && elementOf(host).attributes?.['type'] === 'number';
+			const numeric =
+				action.event === 'input' && elementOf(host).attributes?.['type'] === 'number';
 			const fields =
 				action.event === 'activate'
 					? { ...clickFields(true), detail: action.detail ?? 1 }
@@ -2419,9 +2577,19 @@ export function createNativeRuntime(
 			if (op.op === 'script') {
 				const text = typeof eventValue === 'string' ? eventValue : eventValue?.value;
 				const frame = frameOf(op.bindings, text, scope);
+				const reason = typeof eventValue === 'object' ? eventValue.reason : undefined;
+				const pressTarget =
+					typeof eventValue === 'object' ? (eventValue.pressTarget ?? null) : null;
 				const touch =
 					typeof eventValue === 'object'
-						? [...new Set([...NATIVE_SCRIPT_POINTER_FIELDS, ...NATIVE_SCRIPT_CLICK_FIELDS, ...NATIVE_SCRIPT_KEY_FIELDS, 'isTrusted'])].flatMap((field) => {
+						? [
+								...new Set([
+									...NATIVE_SCRIPT_POINTER_FIELDS,
+									...NATIVE_SCRIPT_CLICK_FIELDS,
+									...NATIVE_SCRIPT_KEY_FIELDS,
+									'isTrusted',
+								]),
+							].flatMap((field) => {
 								const value = eventValue[field as keyof NativeEventFields];
 								return value === undefined ? [] : [[field, value] as const];
 							})
@@ -2435,24 +2603,37 @@ export function createNativeRuntime(
 							}
 						: undefined;
 				calls.push(
-					...enter({
-						kind: 'dispatch',
-						fn: op.fn,
-						frame,
-						elements: elementFacts(
+					...enter(
+						{
+							kind: 'dispatch',
+							fn: op.fn,
 							frame,
-							Object.values(nodes ?? {}).filter((node): node is string => node !== null),
-						),
-						event: {
-							type: op.type,
-							...(text === undefined ? {} : { value: text }),
-							...(typeof eventValue === 'object' && eventValue.key !== undefined ? { key: eventValue.key } : {}),
-							...(typeof eventValue === 'object' && eventValue.text !== undefined ? { text: eventValue.text } : {}),
-							...Object.fromEntries(touch),
-							...(nodes ? { nodes } : {}),
+							elements: elementFacts(
+								frame,
+								[
+									...Object.values(nodes ?? {}).filter((node): node is string => node !== null),
+									...(pressTarget === null ? [] : [pressTarget]),
+								],
+							),
+							event: {
+								type: op.type,
+								...(text === undefined ? {} : { value: text }),
+								...(typeof eventValue === 'object' && eventValue.key !== undefined
+									? { key: eventValue.key }
+									: {}),
+								...(typeof eventValue === 'object' && eventValue.text !== undefined
+									? { text: eventValue.text }
+									: {}),
+								...Object.fromEntries(touch),
+								...(nodes ? { nodes } : {}),
+								...(reason === undefined
+									? {}
+									: { detail: { reason, pressTarget } }),
+							},
+							...(op.catch ? { catch: slotOf(op.catch, scope) } : {}),
 						},
-						...(op.catch ? { catch: slotOf(op.catch, scope) } : {}),
-					}, submission),
+						submission,
+					),
 				);
 				continue;
 			}
@@ -2584,7 +2765,11 @@ export function createNativeRuntime(
 				const node = closing.shift()!;
 				const close = handlerOf(node, 'close');
 				if (!close) continue;
-				const out = run(handlers.get(close.handler) ?? [], undefined, scopeOf(node) ?? base);
+				const out = run(
+					handlers.get(close.handler) ?? [],
+					undefined,
+					scopeOf(node) ?? base,
+				);
 				if (out[0]?.op === 'navigate') return out;
 				calls.push(...out);
 			}
@@ -2611,7 +2796,11 @@ export function createNativeRuntime(
 					if (elements.contains(hint, newcomer)) continue;
 					const dismiss = handlerOf(hint, 'dismiss');
 					if (!dismiss) continue;
-					const out = run(handlers.get(dismiss.handler) ?? [], { reason: 'superseded', pressTarget: null }, base);
+					const out = run(
+						handlers.get(dismiss.handler) ?? [],
+						{ reason: 'superseded', pressTarget: null },
+						base,
+					);
 					if (out[0]?.op === 'navigate') return out;
 					calls.push(...out);
 				}

@@ -77,7 +77,9 @@ const look = (
 		initial: { start, ...screen() },
 		// Style-state entries follow what the build knows of a cell's values, which a cell JavaScript writes does not show.
 		steps: actions.map((action) => ({
-			journal: answering(runtime.dispatch(answer(action))).filter((entry) => entry.op !== 'state'),
+			journal: answering(runtime.dispatch(answer(action))).filter(
+				(entry) => entry.op !== 'state',
+			),
 			...screen(),
 		})),
 	};
@@ -114,8 +116,8 @@ describe('a handler means the same as data and as JavaScript', () => {
 		// Handlers that read focus, `contains` or an event's target element stay data; the triggers, which call the family's
 		// shared methods, and popover's focus landing, which focuses a handle through its proxy, run as JavaScript.
 		const elementCases = new Map([
-			['overlay', 4],
-			['popover', 2],
+			['overlay', 6],
+			['popover', 3],
 		]);
 		let data = 0;
 		let forced = 0;

@@ -5,6 +5,7 @@ import {
 	NATIVE_SCRIPT_CLICK_FIELDS,
 	NATIVE_SCRIPT_KEY_FIELDS,
 	NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS,
+	NATIVE_DOCUMENT_BODY,
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	NATIVE_SCRIPT_SUBMITTED_FORM,
 	NATIVE_UNBOUND_HANDLE,
@@ -343,6 +344,8 @@ if (!host) {
 	});
 	host.deviceObject = callsOn;
 	g.window = g.self = g;
+	// The page's one member a phone answers: the focused element (the body when none is), which the build allows alone.
+	g.document = { get activeElement() { return host.focus(); } };
 	host.Response = Response;
 	// The HTML structured clone, as Chromium runs it, for an engine that has none.
 	if (typeof g.structuredClone !== 'function') {
@@ -535,6 +538,7 @@ var pathOf = function (pattern, params) {
 // An element is a proxy that offers only what the host answers: the attributes it has now, whether it holds another
 // element, and the commands a handler's data can run. No tree walking, no selectors, no layout.
 var elementFacts = {};
+var BODY = ${JSON.stringify(NATIVE_DOCUMENT_BODY)};
 var proxies = {};
 // Which element holds each touch, as this entry's own capture calls left it; the host's facts answer the rest.
 var captured = {};
@@ -543,6 +547,7 @@ var elementOf = function (id) {
 	if (id === ${JSON.stringify(NATIVE_UNBOUND_HANDLE)}) return undefined;
 	if (proxies[id]) return proxies[id];
 	var facts = function () {
+		if (id === BODY) return { attributes: {}, ancestors: [] };
 		if (!elementFacts[id]) throw new Error('the host described no element ' + id);
 		return elementFacts[id];
 	};
@@ -638,6 +643,9 @@ var begin = function (entry) {
 	host.out = { timers: [], clears: [], requests: [], aborts: [], calls: [], logs: [], commands: [], pending: [], settled: [], raises: [], navigate: null };
 	host.place = navigation && entry.kind !== 'compute' ? { routes: navigation.routes, path: pathOf(navigation.here, entry.params || {}) } : null;
 	host.seed = entry.seed || null;
+	host.focused = entry.focused || null;
+	for (var known in entry.focusElements || {}) if (!elementFacts[known]) elementFacts[known] = entry.focusElements[known];
+	host.focus = function () { return elementOf(host.focused || BODY); };
 	host.counter = 0;
 };
 var fail = function (slot, error) {
@@ -651,8 +659,15 @@ var fail = function (slot, error) {
 var eventOf = function (given, frame) {
 	var entries = frame[${JSON.stringify(NATIVE_SCRIPT_SUBMITTED_FORM)}];
 	var target = entries ? new host.Form(entries) : { value: given.value === undefined ? '' : given.value, checked: given.checked === true };
+	var detail;
+	if (given.detail !== null && typeof given.detail === 'object') {
+		detail = { reason: given.detail.reason };
+		// Escape has no press: the key is absent, as on the web.
+		if (given.detail.pressTarget != null) detail.pressTarget = elementOf(given.detail.pressTarget);
+	}
 	var event = {
 		type: given.type,
+		detail: detail,
 		target: target,
 		currentTarget: target,
 		key: given.key,
@@ -663,6 +678,8 @@ var eventOf = function (given, frame) {
 		stopPropagation: function () {},
 	};
 	${JSON.stringify([...new Set([...NATIVE_SCRIPT_POINTER_FIELDS, ...NATIVE_SCRIPT_CLICK_FIELDS, ...NATIVE_SCRIPT_KEY_FIELDS])])}.forEach(function (field) { if (field in given) event[field] = given[field]; });
+	// A dismiss's detail is an object whose pressTarget is an element; a click's detail is its press count.
+	if (detail) event.detail = detail;
 	if (typeof given.pointerType === 'string') {
 		event.pressure = event.buttons > 0 ? 0.5 : 0;
 		event.getCoalescedEvents = function () { return event.type === 'pointermove' ? [event] : []; };

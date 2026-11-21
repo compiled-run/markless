@@ -743,8 +743,13 @@ public final class NativeRuntime {
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
 	private func enter(_ entry: [(String, JSONValue)], submission: Submission? = nil) throws -> [NativeJournalEntry] {
+		// A handler may read the focused element; a computed, which renders, never does, so only entries carry it.
+		var focus: [(String, JSONValue)] = []
+		if let focused, focused != nativeDocumentBody {
+			focus = [("focused", .string(focused)), ("focusElements", try elementFacts(.object([]), also: [focused]))]
+		}
 		let text = try scriptHost.unwrap().entry { () throws -> String in
-			_ = try callScript("enter", .object(entry + entryCells()))
+			_ = try callScript("enter", .object(entry + focus + entryCells()))
 			return try callScript("leave")
 		}
 		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave")
@@ -1795,10 +1800,16 @@ public final class NativeRuntime {
 					}
 					fields.append(("nodes", .object(nodes)))
 				}
+				var pressed: [String] = []
+				if case let .string(reason)? = eventFields?[.reason] {
+					var press: JSONValue = .null
+					if case let .string(node)? = eventFields?[.pressTarget] { press = .string(node); pressed = [node] }
+					fields.append(("detail", .object([("reason", .string(reason)), ("pressTarget", press)])))
+				}
 				let event: JSONValue = .object(fields)
 				let frame = try frame(of: bindings, in: scope)
 				calls.append(contentsOf: try enter(
-					[("kind", .string("dispatch")), ("fn", .string(fn)), ("frame", frame), ("elements", try elementFacts(frame, also: named)), ("event", event)]
+					[("kind", .string("dispatch")), ("fn", .string(fn)), ("frame", frame), ("elements", try elementFacts(frame, also: named + pressed)), ("event", event)]
 						+ (try catchCell.map { [("catch", JSONValue.string(try slot(of: $0, in: scope)))] } ?? []), submission: submission))
 			}
 		}
