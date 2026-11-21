@@ -115,7 +115,7 @@ export type NativeExpr =
 	 * What the event that runs the handler carries: an `input` handler's field text after the edit
 	 * (`event.currentTarget.value`); a `dismiss` handler's `event.detail.reason` and `event.detail.pressTarget` (an element,
 	 * or null for Escape); a pointer handler's fields, as a phone's browser reports a touch (`NativePointerField`); a text
-	 * field's `keydown` handler's `event.key`, as the phone's browser gives it for its on-screen keyboard; a `paste`
+	 * field's `keydown` or `keyup` handler's `event.key`, as the phone's browser gives it for its on-screen keyboard; a `paste`
 	 * handler's pasted plain text (`event.clipboardData.getData('text')`); a click handler's `event.detail`, how many presses
 	 * in a row on the element (a double tap's second press is 2).
 	 */
@@ -499,7 +499,8 @@ export type NativeProperty = 'value' | 'checked' | 'indeterminate' | 'selected';
  */
 /**
  * `focus` and `blur` are a text field's: it took the keyboard, or gave it up. `keydown` and `paste` are a text field's too:
- * a key of the on-screen keyboard, and a paste from its edit menu.
+ * a key of the on-screen keyboard, and a paste from its edit menu. `keyup` follows each `keydown` with the same key, after
+ * what the key did (or did not do, when the keydown was prevented).
  */
 export type NativeEventName =
 	| 'activate'
@@ -507,6 +508,7 @@ export type NativeEventName =
 	| 'focus'
 	| 'blur'
 	| 'keydown'
+	| 'keyup'
 	| 'paste'
 	| 'dismiss'
 	| 'cancel'
@@ -1191,11 +1193,14 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 
 /**
  * What a script handler's event has on a phone, as member paths: a deeper read below `target.value` is a string's. Any
- * other member is refused at build time, since the web's event has it and a phone's does not.
+ * other member is refused at build time, since the web's event has it and a phone's does not. A text field's key and paste
+ * events carry the field's text as `target.value`; only a paste carries `clipboardData`, with its plain text.
  */
 export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> = [
 	['type'],
 	['key'],
+	['isComposing'],
+	['clipboardData', 'getData'],
 	['defaultPrevented'],
 	['preventDefault'],
 	['stopPropagation'],

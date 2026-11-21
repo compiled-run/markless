@@ -557,6 +557,7 @@ var eventOf = function (given, frame) {
 		target: target,
 		currentTarget: target,
 		key: given.key,
+		isComposing: false,
 		defaultPrevented: false,
 		preventDefault: function () { this.defaultPrevented = true; },
 		stopPropagation: function () {},
@@ -566,6 +567,9 @@ var eventOf = function (given, frame) {
 		${JSON.stringify(NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS)}.forEach(function (field) {
 			event[field] = given.nodes[field] == null ? null : elementOf(given.nodes[field]);
 		});
+	// A paste carries the pasted plain text, as the edit menu's paste does.
+	if ('text' in given)
+		event.clipboardData = { getData: function (type) { return type === 'text' || type === 'text/plain' ? given.text : ''; } };
 	return event;
 };
 var errorOf = function (error) {
@@ -632,9 +636,11 @@ g.__markless[id] = {
 		}
 		if (entry.kind === 'dispatch') {
 			var settled = function (error) { fail(entry['catch'], error); };
+			var event = null;
 			try {
 				var frame = frameOf(entry.frame);
-				var result = fn(entry.fn)(frame)(eventOf(entry.event, frame));
+				event = eventOf(entry.event, frame);
+				var result = fn(entry.fn)(frame)(event);
 				if (result && typeof result.then === 'function') {
 					// The host keeps a submitted form busy from this entry until the entry the promise settles in.
 					var run = host.nextRun++;
@@ -645,6 +651,8 @@ g.__markless[id] = {
 			} catch (error) {
 				settled(error);
 			}
+			// A key's or paste's cancel reaches the host, as a browser reads defaultPrevented before the handler first awaits.
+			if (event && event.defaultPrevented && (entry.event.type === 'keydown' || entry.event.type === 'paste')) host.out.prevented = true;
 		} else if (entry.kind === 'timer') {
 			var timer = host.timers[entry.timer];
 			if (timer) {
@@ -693,6 +701,7 @@ g.__markless[id] = {
 		var out = host.out;
 		host.out = null;
 		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands, pending: out.pending, settled: out.settled, raises: out.raises };
+		if (out.prevented) left.prevented = true;
 		if (out.navigate) left.navigate = out.navigate;
 		return JSON.stringify(left);
 	},

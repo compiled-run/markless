@@ -184,6 +184,8 @@ class MarklessHost(
 	private val baseTextSize = TextView(context).textSize
 	private val expanded = HashMap<View, Boolean?>()
 	private val sheets = LinkedHashMap<String, SystemSheet>()
+	/** The sheets shown at the last journal: one whose arm leaves closes, one whose arm comes while open opens. */
+	private var shownSheets: Set<String> = emptySet()
 	/** Each view's current attributes, for the relations and roles the accessibility delegate reports. */
 	private val attrs = HashMap<String, HashMap<String, String>>()
 	/** Each scroll container's scroll views (outermost first) and the content box its children sit in. */
@@ -308,7 +310,7 @@ class MarklessHost(
 		buildShown()
 		refreshMarkers()
 		root = pageBox ?: views.getValue(single!!.id)
-		for ((id, open) in runtime.sheets()) if (open) root.post { sheets.getValue(id).open() }
+		syncSheets()
 		for (cell in payload.cells) cell.device?.let { name -> needDevice().watch(name, cell.obj) { if (!released) apply(runtime.device(cell.id, it)) } }
 		for (call in runtime.tasks()) runCall(call)
 		// The activity reads the title after building the host, so a start that retitles needs no title bar yet.
@@ -578,6 +580,7 @@ class MarklessHost(
 			}
 			Log.i(TAG, "journal ${entry.toJson()}")
 		}
+		syncSheets()
 		refreshRelations()
 		refreshSelects()
 		// A styled list's rows, a row's text or an attribute of a row's copy moved: the page is laid out again with its rows.
@@ -676,6 +679,13 @@ class MarklessHost(
 			changed = true
 		}
 		return changed
+	}
+
+	private fun syncSheets() {
+		val now = runtime.sheets().toMap()
+		for (id in shownSheets - now.keys) sheets.getValue(id).close()
+		for ((id, open) in now) if (open && id !in shownSheets) root.post { if (!released && id in shownSheets) sheets.getValue(id).open() }
+		shownSheets = now.keys
 	}
 
 	/** A sheet came to rest at [snapPoint]: its content takes that height's layout. */
@@ -973,7 +983,7 @@ class MarklessHost(
 					override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
 					override fun afterTextChanged(s: Editable) = dismissMessage()
 				})
-				if (node.element == "input" && events[node.id].orEmpty().any { it.event == EventName.Enter || it.event == EventName.Keydown }) imeOptions = EditorInfo.IME_ACTION_GO
+				if (node.element == "input" && events[node.id].orEmpty().any { it.event == EventName.Enter || it.event == EventName.Keydown || it.event == EventName.Keyup }) imeOptions = EditorInfo.IME_ACTION_GO
 				named(this, inst.id)
 			}
 			else -> MarklessBox(context).apply {
@@ -995,6 +1005,7 @@ class MarklessHost(
 			// Raised by the field's focus listener, set where the field is built.
 			EventName.Focus, EventName.Blur -> if (view !is EditText) throw MarklessHostError("${e.event.wire} event on \"${node.id}\", which is not a text field")
 			EventName.Keydown -> (view as? MarklessField ?: throw MarklessHostError("keydown event on \"${node.id}\", which is not a text field")).onKey = { key -> prevents(runtime.dispatch(inst.id, EventName.Keydown, key)) }
+			EventName.Keyup -> (view as? MarklessField ?: throw MarklessHostError("keyup event on \"${node.id}\", which is not a text field")).onKeyUp = { key -> apply(runtime.dispatch(inst.id, EventName.Keyup, key)) }
 			EventName.Paste -> (view as? MarklessField ?: throw MarklessHostError("paste event on \"${node.id}\", which is not a text field")).onPaste = { text -> prevents(runtime.dispatch(inst.id, EventName.Paste, text)) }
 			EventName.Cancel, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
 			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.Choose -> {}
@@ -1290,7 +1301,11 @@ class MarklessHost(
 		val node = inst.node
 		val layout = layoutOf(node) ?: return
 		val styled = layout.export.assignments[layout.assignment]
-		val s = styled.byId[inst.id] ?: throw MarklessHostError("style export has no node \"${inst.id}\"")
+		val s = styled.byId[inst.id] ?: if (node.row != null && layout.export.planRepeats.isNotEmpty()) {
+			// A row not laid out yet (at mount, or just added): the page is laid out again with its rows, which places it.
+			view.visibility = View.GONE
+			return
+		} else throw MarklessHostError("style export has no node \"${inst.id}\"")
 		if (s.kind != (if (node is Node.Text) "text" else "element")) throw MarklessHostError("style node \"${inst.id}\" is a ${s.kind}")
 		val absolute = layout.absolutes[layout.assignment]
 		val frame = s.frame

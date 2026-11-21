@@ -11,8 +11,8 @@ const val RAISE_DEPTH = 32
 const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
 const val OVERLAY_MODAL_VALUE = "true"
 
-/** The events that carry a string: an `input` the field's text, a `keydown` its key, a `paste` the pasted text. */
-private val VALUED = setOf(EventName.Input, EventName.Commit, EventName.Keydown, EventName.Paste)
+/** The events that carry a string: an `input` or `commit` the field's text, a `keydown` or `keyup` its key, a `paste` the pasted text. */
+private val VALUED = setOf(EventName.Input, EventName.Commit, EventName.Keydown, EventName.Keyup, EventName.Paste)
 
 sealed interface JournalEntry {
 	val node: String
@@ -621,6 +621,8 @@ class Runtime(
 				if (command == "focus") focused = node
 				JournalEntry.Command(node, command, (parts[2] as? Json.Bool)?.value == true)
 			} +
+			// A key or paste handler called preventDefault() before it first awaited.
+			(if ((result["prevented"] as? Json.Bool)?.value == true) listOf(JournalEntry.PreventDefault) else emptyList()) +
 			raised +
 			listOfNotNull(result["navigate"]?.let { n ->
 				val o = n.obj("leave().navigate")
@@ -1027,8 +1029,8 @@ class Runtime(
 	/** Every shown list's row keys, in order. */
 	fun rows(): List<Pair<String, List<String>>> = payload.nodes.filterIsInstance<Node.Repeat>().filter { isShown(it) }.map { r -> r.id to rowsOf(r).map { it.key } }
 
-	/** Every system sheet and whether its `open` is truthy. */
-	fun sheets(): List<Pair<String, Boolean>> = payload.nodes.filterIsInstance<Node.Sheet>().map { it.id to Js.truthy(evaluate(it.open)) }
+	/** Every system sheet shown (its arm, if any, showing) and whether its `open` is truthy. */
+	fun sheets(): List<Pair<String, Boolean>> = payload.nodes.filterIsInstance<Node.Sheet>().filter { isShown(it) }.map { it.id to Js.truthy(evaluate(it.open)) }
 
 	/** Each `<dialog>`'s top-layer state; every dialog mounts closed. */
 	private val dialogs = LinkedHashMap<String, Boolean>().apply {
@@ -1151,8 +1153,9 @@ class Runtime(
 		if (event == EventName.Activate) focused = host
 		val carried = when (event) {
 			EventName.Input, EventName.Commit -> value?.let { mapOf("value" to JsValue.Str(it)) }
-			EventName.Keydown -> mapOf("key" to JsValue.Str(value!!))
-			EventName.Paste -> mapOf("text" to JsValue.Str(value!!))
+			// A key's or paste's script handler reads the field's text then as `event.target.value`.
+			EventName.Keydown, EventName.Keyup -> mapOf("key" to JsValue.Str(value!!), "value" to JsValue.Str(textOf(host)))
+			EventName.Paste -> mapOf("text" to JsValue.Str(value!!), "value" to JsValue.Str(textOf(host)))
 			EventName.Activate -> mapOf("detail" to JsValue.Num((detail ?: 1).toDouble()))
 			else -> null
 		}
@@ -1381,9 +1384,10 @@ class Runtime(
 			}
 			is Op.Script -> {
 				val touch = TOUCH_FIELDS.mapNotNull { f -> fields?.get(f)?.let { ",${jsonString(f)}:${jsonValue(it)}" } }.joinToString("")
+				val typed = listOf("key", "text").mapNotNull { f -> (fields?.get(f) as? JsValue.Str)?.let { ",${jsonString(f)}:${jsonString(it.value)}" } }.joinToString("")
 				val named = if (fields?.get("currentTarget") is JsValue.Str) listOf("target", "currentTarget", "relatedTarget").associateWith { (fields?.get(it) as? JsValue.Str)?.value } else null
 				val nodes = named?.let { n -> ",\"nodes\":" + n.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value?.let(::jsonString) ?: "null"}" } } ?: ""
-				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$touch$nodes}"
+				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$typed$touch$nodes}"
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
 				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope, named?.values?.filterNotNull().orEmpty())},\"event\":$event$catch", submission))
 			}
@@ -1506,7 +1510,11 @@ class Runtime(
 				val b = beforeRows[node.id]; val a = afterRows[node.id]
 				if (b != null && a != null && b != a) journal.add(JournalEntry.Rows(node.id, a))
 			}
-			is Node.Sheet -> afterSheets.getValue(node.id).let { if (beforeSheets[node.id] != it) journal.add(JournalEntry.Sheet(node.id, it)) }
+			is Node.Sheet -> {
+				val before = beforeSheets[node.id]
+				val after = afterSheets[node.id]
+				if (before != null && after != null && before != after) journal.add(JournalEntry.Sheet(node.id, after))
+			}
 			is Node.Branch -> for (inst in instances(node)) if (inst.id in beforeArms && inst.id in afterArms && beforeArms[inst.id] != afterArms[inst.id]) journal.add(JournalEntry.Arm(inst.id, afterArms[inst.id]))
 			is Node.Text -> for (inst in instances(node)) {
 				val b = beforeTexts[inst.id]; val a = afterTexts[inst.id]

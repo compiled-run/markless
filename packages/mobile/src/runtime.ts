@@ -46,6 +46,8 @@ export type NativeAction =
 	| { readonly event: 'commit'; readonly host: string; readonly value: string }
 	/** A key of the on-screen keyboard in a text field, before it edits the text; `key` as the phone's browser names it. */
 	| { readonly event: 'keydown'; readonly host: string; readonly key: string }
+	/** The same key after what it did to the text (or did not, when its keydown was prevented). */
+	| { readonly event: 'keyup'; readonly host: string; readonly key: string }
 	/** A paste into a text field from its edit menu, before the text goes in. */
 	| { readonly event: 'paste'; readonly host: string; readonly text: string }
 	/** A live device value changed (connectivity, permission): the host writes the device cell. */
@@ -146,7 +148,7 @@ const RAISE_DEPTH = 32;
 /** What the event running a handler carries, by the field a `{ event }` expression names. */
 export type NativeEventFields = {
 	readonly value?: string;
-	/** A text field's `keydown`: the key as the phone's browser names it. */
+	/** A text field's `keydown` or `keyup`: the key as the phone's browser names it. */
 	readonly key?: string;
 	/** A `paste`: the pasted plain text. */
 	readonly text?: string;
@@ -216,7 +218,7 @@ export type NativeRuntime = {
 	readonly arms: () => ReadonlyArray<readonly [node: string, index: number | null]>;
 	/** Every shown list's row keys, in order. */
 	readonly rows: () => ReadonlyArray<readonly [node: string, keys: ReadonlyArray<string>]>;
-	/** Every system sheet and whether its `open` is truthy. */
+	/** Every system sheet shown (its arm, if any, showing) and whether its `open` is truthy. */
 	readonly sheets: () => ReadonlyArray<readonly [node: string, open: boolean]>;
 	/** Every shown checkbox's and radio button's checkedness. */
 	readonly checks: () => ReadonlyArray<readonly [node: string, checked: boolean]>;
@@ -531,11 +533,16 @@ export function evaluateWithScript(
 						]),
 					);
 				const frame = frameOf(bindings);
+				// A cell `undefined` on the web at first is still so here: no caller gives it a value of its own.
+				const unset = payload.cells
+					.filter((cell) => cell.unset && (values.get(cell.id) ?? null) === null)
+					.map((cell) => cell.id);
 				const entry = {
 					kind: 'compute',
 					fn,
 					frame,
 					cells: Object.fromEntries(values),
+					...(unset.length > 0 ? { unset } : {}),
 					...(host.seed ? { seed: host.seed() } : {}),
 				};
 				return JSON.parse(
@@ -789,6 +796,8 @@ export function createNativeRuntime(
 				| readonly [string, 'setPointerCapture' | 'releasePointerCapture', number]
 			>;
 			readonly raises?: ReadonlyArray<Raised>;
+			/** A key or paste handler called `preventDefault()` before it first awaited. */
+			readonly prevented?: true;
 		};
 		for (const [slot, value] of result.writes) {
 			const at = slot.indexOf('@');
@@ -852,6 +861,7 @@ export function createNativeRuntime(
 				if (command === 'focus') focused = node;
 				return [{ op: 'command', node, command, ...(preventScroll ? { preventScroll: true as const } : {}) }];
 			}),
+			...(result.prevented ? [{ op: 'preventDefault' } as NativeJournalEntry] : []),
 			...raised,
 			...(result.navigate
 				? [
@@ -1535,7 +1545,9 @@ export function createNativeRuntime(
 		);
 	const sheets = () =>
 		payload.nodes.flatMap((node) =>
-			node.kind === 'sheet' ? [[node.id, Boolean(evaluate(node.open))] as const] : [],
+			node.kind === 'sheet' && shown(node)
+				? [[node.id, Boolean(evaluate(node.open))] as const]
+				: [],
 		);
 	const keyed = <T>(list: ReadonlyArray<readonly [string, string, T]>) =>
 		new Map(list.map(([node, name, value]) => [`${node}\0${name}`, value]));
@@ -1917,10 +1929,10 @@ export function createNativeRuntime(
 			const edit =
 				action.event === 'input' || action.event === 'commit' ? action.value : undefined;
 			const eventValue: string | NativeEventFields | undefined =
-				action.event === 'keydown'
-					? { key: action.key }
+				action.event === 'keydown' || action.event === 'keyup'
+					? { key: action.key, value: textOf(action.host) }
 					: action.event === 'paste'
-						? { text: action.text }
+						? { text: action.text, value: textOf(action.host) }
 						: action.event === 'activate'
 							? { detail: action.detail ?? 1 }
 							: edit;
@@ -2112,6 +2124,8 @@ export function createNativeRuntime(
 						event: {
 							type: op.type,
 							...(text === undefined ? {} : { value: text }),
+							...(typeof eventValue === 'object' && eventValue.key !== undefined ? { key: eventValue.key } : {}),
+							...(typeof eventValue === 'object' && eventValue.text !== undefined ? { text: eventValue.text } : {}),
 							...Object.fromEntries(touch),
 							...(nodes ? { nodes } : {}),
 						},
@@ -2299,8 +2313,9 @@ export function createNativeRuntime(
 						: [];
 				}
 				if (node.kind === 'sheet') {
-					const open = afterSheets.get(node.id)!;
-					return beforeSheets.get(node.id) !== open
+					const before = beforeSheets.get(node.id);
+					const open = afterSheets.get(node.id);
+					return before !== undefined && open !== undefined && before !== open
 						? [{ op: 'sheet', node: node.id, open }]
 						: [];
 				}

@@ -1,0 +1,9 @@
+{
+	"rung": 198,
+	"name": "A component two imports down brings its <style> defaults (a block with a border) and its scope class beside the caller's class, and state seeded from a prop it was not given reads undefined, as on the web",
+	"steps": [
+		{
+			"visible": ["Family styles", "Top row", "Badge", "Seed none"]
+		}
+	]
+}
