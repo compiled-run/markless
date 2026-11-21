@@ -1,4 +1,4 @@
-import { Panel } from './panel.tsrx';
+import { Panel } from '../lib/FamilyPanel.tsrx';
 
 export default function App() @{
 	<main>

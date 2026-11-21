@@ -1,4 +1,4 @@
-import { Badge } from './badge.tsrx';
+import { Badge } from './FamilyBadge.tsrx';
 
 export function Panel() @{
 	<section>
