@@ -43,16 +43,17 @@ describe('an app-wide shared()', () => {
 		const cells = payload!.cells.filter((cell) => cell.name === 'count.taps');
 		expect(cells).toHaveLength(1);
 		expect(cells[0]!.id.startsWith('app/')).toBe(true);
+		expect(cells[0]!.app).toBe(true);
 	});
 
-	it('is refused by name in an app with pages, where each page would hold its own copy', async () => {
+	it('is held by the app across its pages: in an app, its cells are app cells', async () => {
 		const { payload, diagnostics } = await nativeView({
 			routes: [{ pattern: '/', params: [] }],
 			resolvePath: () => undefined,
 		});
-		expect(payload).toBeNull();
-		expect(diagnostics.map((diagnostic) => diagnostic.message)).toContain(
-			"countState: an app-wide shared() in an app with pages, which each page's screen would hold apart",
-		);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.cells.filter((cell) => cell.name === 'count.taps')).toEqual([
+			expect.objectContaining({ app: true, initial: 0 }),
+		]);
 	});
 });

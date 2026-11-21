@@ -1,0 +1,1406 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "LiveFollows",
+		"cells": [
+			{
+				"id": "state:paused",
+				"name": "paused",
+				"initial": false,
+				"styled": true
+			},
+			{
+				"id": "state:failed",
+				"name": "failed",
+				"initial": false,
+				"styled": true
+			},
+			{
+				"id": "state:slide",
+				"name": "slide",
+				"initial": 1
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "p",
+				"parent": "h0",
+				"bindings": [
+					{
+						"attribute": "aria-live",
+						"value": {
+							"if": {
+								"cell": "state:paused"
+							},
+							"whenTrue": {
+								"literal": "off"
+							},
+							"whenFalse": {
+								"literal": "polite"
+							}
+						}
+					}
+				],
+				"liveFollows": {
+					"politeness": {
+						"if": {
+							"logical": "||",
+							"left": {
+								"binary": "===",
+								"left": {
+									"if": {
+										"logical": "||",
+										"left": {
+											"binary": "===",
+											"left": {
+												"if": {
+													"cell": "state:paused"
+												},
+												"whenTrue": {
+													"literal": "off"
+												},
+												"whenFalse": {
+													"literal": "polite"
+												}
+											},
+											"right": {
+												"literal": false
+											}
+										},
+										"right": {
+											"binary": "===",
+											"left": {
+												"if": {
+													"cell": "state:paused"
+												},
+												"whenTrue": {
+													"literal": "off"
+												},
+												"whenFalse": {
+													"literal": "polite"
+												}
+											},
+											"right": {
+												"literal": null
+											}
+										}
+									},
+									"whenTrue": {
+										"literal": null
+									},
+									"whenFalse": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"if": {
+													"cell": "state:paused"
+												},
+												"whenTrue": {
+													"literal": "off"
+												},
+												"whenFalse": {
+													"literal": "polite"
+												}
+											},
+											"right": {
+												"literal": true
+											}
+										},
+										"whenTrue": {
+											"literal": "true"
+										},
+										"whenFalse": {
+											"call": "String",
+											"arguments": [
+												{
+													"if": {
+														"cell": "state:paused"
+													},
+													"whenTrue": {
+														"literal": "off"
+													},
+													"whenFalse": {
+														"literal": "polite"
+													}
+												}
+											]
+										}
+									}
+								},
+								"right": {
+									"literal": "polite"
+								}
+							},
+							"right": {
+								"binary": "===",
+								"left": {
+									"if": {
+										"logical": "||",
+										"left": {
+											"binary": "===",
+											"left": {
+												"if": {
+													"cell": "state:paused"
+												},
+												"whenTrue": {
+													"literal": "off"
+												},
+												"whenFalse": {
+													"literal": "polite"
+												}
+											},
+											"right": {
+												"literal": false
+											}
+										},
+										"right": {
+											"binary": "===",
+											"left": {
+												"if": {
+													"cell": "state:paused"
+												},
+												"whenTrue": {
+													"literal": "off"
+												},
+												"whenFalse": {
+													"literal": "polite"
+												}
+											},
+											"right": {
+												"literal": null
+											}
+										}
+									},
+									"whenTrue": {
+										"literal": null
+									},
+									"whenFalse": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"if": {
+													"cell": "state:paused"
+												},
+												"whenTrue": {
+													"literal": "off"
+												},
+												"whenFalse": {
+													"literal": "polite"
+												}
+											},
+											"right": {
+												"literal": true
+											}
+										},
+										"whenTrue": {
+											"literal": "true"
+										},
+										"whenFalse": {
+											"call": "String",
+											"arguments": [
+												{
+													"if": {
+														"cell": "state:paused"
+													},
+													"whenTrue": {
+														"literal": "off"
+													},
+													"whenFalse": {
+														"literal": "polite"
+													}
+												}
+											]
+										}
+									}
+								},
+								"right": {
+									"literal": "assertive"
+								}
+							}
+						},
+						"whenTrue": {
+							"if": {
+								"logical": "||",
+								"left": {
+									"binary": "===",
+									"left": {
+										"if": {
+											"cell": "state:paused"
+										},
+										"whenTrue": {
+											"literal": "off"
+										},
+										"whenFalse": {
+											"literal": "polite"
+										}
+									},
+									"right": {
+										"literal": false
+									}
+								},
+								"right": {
+									"binary": "===",
+									"left": {
+										"if": {
+											"cell": "state:paused"
+										},
+										"whenTrue": {
+											"literal": "off"
+										},
+										"whenFalse": {
+											"literal": "polite"
+										}
+									},
+									"right": {
+										"literal": null
+									}
+								}
+							},
+							"whenTrue": {
+								"literal": null
+							},
+							"whenFalse": {
+								"if": {
+									"binary": "===",
+									"left": {
+										"if": {
+											"cell": "state:paused"
+										},
+										"whenTrue": {
+											"literal": "off"
+										},
+										"whenFalse": {
+											"literal": "polite"
+										}
+									},
+									"right": {
+										"literal": true
+									}
+								},
+								"whenTrue": {
+									"literal": "true"
+								},
+								"whenFalse": {
+									"call": "String",
+									"arguments": [
+										{
+											"if": {
+												"cell": "state:paused"
+											},
+											"whenTrue": {
+												"literal": "off"
+											},
+											"whenFalse": {
+												"literal": "polite"
+											}
+										}
+									]
+								}
+							}
+						},
+						"whenFalse": {
+							"if": {
+								"binary": "===",
+								"left": {
+									"if": {
+										"logical": "||",
+										"left": {
+											"binary": "===",
+											"left": {
+												"if": {
+													"cell": "state:paused"
+												},
+												"whenTrue": {
+													"literal": "off"
+												},
+												"whenFalse": {
+													"literal": "polite"
+												}
+											},
+											"right": {
+												"literal": false
+											}
+										},
+										"right": {
+											"binary": "===",
+											"left": {
+												"if": {
+													"cell": "state:paused"
+												},
+												"whenTrue": {
+													"literal": "off"
+												},
+												"whenFalse": {
+													"literal": "polite"
+												}
+											},
+											"right": {
+												"literal": null
+											}
+										}
+									},
+									"whenTrue": {
+										"literal": null
+									},
+									"whenFalse": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"if": {
+													"cell": "state:paused"
+												},
+												"whenTrue": {
+													"literal": "off"
+												},
+												"whenFalse": {
+													"literal": "polite"
+												}
+											},
+											"right": {
+												"literal": true
+											}
+										},
+										"whenTrue": {
+											"literal": "true"
+										},
+										"whenFalse": {
+											"call": "String",
+											"arguments": [
+												{
+													"if": {
+														"cell": "state:paused"
+													},
+													"whenTrue": {
+														"literal": "off"
+													},
+													"whenFalse": {
+														"literal": "polite"
+													}
+												}
+											]
+										}
+									}
+								},
+								"right": {
+									"literal": "off"
+								}
+							},
+							"whenTrue": {
+								"literal": null
+							},
+							"whenFalse": {
+								"if": {
+									"binary": "===",
+									"left": {
+										"literal": null
+									},
+									"right": {
+										"literal": "alert"
+									}
+								},
+								"whenTrue": {
+									"literal": "assertive"
+								},
+								"whenFalse": {
+									"if": {
+										"logical": "||",
+										"left": {
+											"logical": "||",
+											"left": {
+												"logical": "||",
+												"left": {
+													"binary": "===",
+													"left": {
+														"literal": null
+													},
+													"right": {
+														"literal": "status"
+													}
+												},
+												"right": {
+													"binary": "===",
+													"left": {
+														"literal": null
+													},
+													"right": {
+														"literal": "alert"
+													}
+												}
+											},
+											"right": {
+												"literal": false
+											}
+										},
+										"right": {
+											"binary": "===",
+											"left": {
+												"literal": null
+											},
+											"right": {
+												"literal": "log"
+											}
+										}
+									},
+									"whenTrue": {
+										"literal": "polite"
+									},
+									"whenFalse": {
+										"literal": null
+									}
+								}
+							}
+						}
+					},
+					"atomic": {
+						"if": {
+							"binary": "===",
+							"left": {
+								"literal": null
+							},
+							"right": {
+								"literal": null
+							}
+						},
+						"whenTrue": {
+							"logical": "||",
+							"left": {
+								"logical": "||",
+								"left": {
+									"binary": "===",
+									"left": {
+										"literal": null
+									},
+									"right": {
+										"literal": "status"
+									}
+								},
+								"right": {
+									"binary": "===",
+									"left": {
+										"literal": null
+									},
+									"right": {
+										"literal": "alert"
+									}
+								}
+							},
+							"right": {
+								"literal": false
+							}
+						},
+						"whenFalse": {
+							"binary": "===",
+							"left": {
+								"literal": null
+							},
+							"right": {
+								"literal": "true"
+							}
+						}
+					}
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Slide ",
+								{
+									"cell": "state:slide"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "div",
+				"parent": "h0",
+				"bindings": [
+					{
+						"attribute": "role",
+						"value": {
+							"if": {
+								"cell": "state:failed"
+							},
+							"whenTrue": {
+								"literal": "alert"
+							},
+							"whenFalse": {
+								"literal": "status"
+							}
+						}
+					}
+				],
+				"liveFollows": {
+					"politeness": {
+						"if": {
+							"logical": "||",
+							"left": {
+								"binary": "===",
+								"left": {
+									"literal": null
+								},
+								"right": {
+									"literal": "polite"
+								}
+							},
+							"right": {
+								"binary": "===",
+								"left": {
+									"literal": null
+								},
+								"right": {
+									"literal": "assertive"
+								}
+							}
+						},
+						"whenTrue": {
+							"literal": null
+						},
+						"whenFalse": {
+							"if": {
+								"binary": "===",
+								"left": {
+									"literal": null
+								},
+								"right": {
+									"literal": "off"
+								}
+							},
+							"whenTrue": {
+								"literal": null
+							},
+							"whenFalse": {
+								"if": {
+									"binary": "===",
+									"left": {
+										"if": {
+											"logical": "||",
+											"left": {
+												"binary": "===",
+												"left": {
+													"if": {
+														"cell": "state:failed"
+													},
+													"whenTrue": {
+														"literal": "alert"
+													},
+													"whenFalse": {
+														"literal": "status"
+													}
+												},
+												"right": {
+													"literal": false
+												}
+											},
+											"right": {
+												"binary": "===",
+												"left": {
+													"if": {
+														"cell": "state:failed"
+													},
+													"whenTrue": {
+														"literal": "alert"
+													},
+													"whenFalse": {
+														"literal": "status"
+													}
+												},
+												"right": {
+													"literal": null
+												}
+											}
+										},
+										"whenTrue": {
+											"literal": null
+										},
+										"whenFalse": {
+											"if": {
+												"binary": "===",
+												"left": {
+													"if": {
+														"cell": "state:failed"
+													},
+													"whenTrue": {
+														"literal": "alert"
+													},
+													"whenFalse": {
+														"literal": "status"
+													}
+												},
+												"right": {
+													"literal": true
+												}
+											},
+											"whenTrue": {
+												"literal": "true"
+											},
+											"whenFalse": {
+												"call": "String",
+												"arguments": [
+													{
+														"if": {
+															"cell": "state:failed"
+														},
+														"whenTrue": {
+															"literal": "alert"
+														},
+														"whenFalse": {
+															"literal": "status"
+														}
+													}
+												]
+											}
+										}
+									},
+									"right": {
+										"literal": "alert"
+									}
+								},
+								"whenTrue": {
+									"literal": "assertive"
+								},
+								"whenFalse": {
+									"if": {
+										"logical": "||",
+										"left": {
+											"logical": "||",
+											"left": {
+												"logical": "||",
+												"left": {
+													"binary": "===",
+													"left": {
+														"if": {
+															"logical": "||",
+															"left": {
+																"binary": "===",
+																"left": {
+																	"if": {
+																		"cell": "state:failed"
+																	},
+																	"whenTrue": {
+																		"literal": "alert"
+																	},
+																	"whenFalse": {
+																		"literal": "status"
+																	}
+																},
+																"right": {
+																	"literal": false
+																}
+															},
+															"right": {
+																"binary": "===",
+																"left": {
+																	"if": {
+																		"cell": "state:failed"
+																	},
+																	"whenTrue": {
+																		"literal": "alert"
+																	},
+																	"whenFalse": {
+																		"literal": "status"
+																	}
+																},
+																"right": {
+																	"literal": null
+																}
+															}
+														},
+														"whenTrue": {
+															"literal": null
+														},
+														"whenFalse": {
+															"if": {
+																"binary": "===",
+																"left": {
+																	"if": {
+																		"cell": "state:failed"
+																	},
+																	"whenTrue": {
+																		"literal": "alert"
+																	},
+																	"whenFalse": {
+																		"literal": "status"
+																	}
+																},
+																"right": {
+																	"literal": true
+																}
+															},
+															"whenTrue": {
+																"literal": "true"
+															},
+															"whenFalse": {
+																"call": "String",
+																"arguments": [
+																	{
+																		"if": {
+																			"cell": "state:failed"
+																		},
+																		"whenTrue": {
+																			"literal": "alert"
+																		},
+																		"whenFalse": {
+																			"literal": "status"
+																		}
+																	}
+																]
+															}
+														}
+													},
+													"right": {
+														"literal": "status"
+													}
+												},
+												"right": {
+													"binary": "===",
+													"left": {
+														"if": {
+															"logical": "||",
+															"left": {
+																"binary": "===",
+																"left": {
+																	"if": {
+																		"cell": "state:failed"
+																	},
+																	"whenTrue": {
+																		"literal": "alert"
+																	},
+																	"whenFalse": {
+																		"literal": "status"
+																	}
+																},
+																"right": {
+																	"literal": false
+																}
+															},
+															"right": {
+																"binary": "===",
+																"left": {
+																	"if": {
+																		"cell": "state:failed"
+																	},
+																	"whenTrue": {
+																		"literal": "alert"
+																	},
+																	"whenFalse": {
+																		"literal": "status"
+																	}
+																},
+																"right": {
+																	"literal": null
+																}
+															}
+														},
+														"whenTrue": {
+															"literal": null
+														},
+														"whenFalse": {
+															"if": {
+																"binary": "===",
+																"left": {
+																	"if": {
+																		"cell": "state:failed"
+																	},
+																	"whenTrue": {
+																		"literal": "alert"
+																	},
+																	"whenFalse": {
+																		"literal": "status"
+																	}
+																},
+																"right": {
+																	"literal": true
+																}
+															},
+															"whenTrue": {
+																"literal": "true"
+															},
+															"whenFalse": {
+																"call": "String",
+																"arguments": [
+																	{
+																		"if": {
+																			"cell": "state:failed"
+																		},
+																		"whenTrue": {
+																			"literal": "alert"
+																		},
+																		"whenFalse": {
+																			"literal": "status"
+																		}
+																	}
+																]
+															}
+														}
+													},
+													"right": {
+														"literal": "alert"
+													}
+												}
+											},
+											"right": {
+												"literal": false
+											}
+										},
+										"right": {
+											"binary": "===",
+											"left": {
+												"if": {
+													"logical": "||",
+													"left": {
+														"binary": "===",
+														"left": {
+															"if": {
+																"cell": "state:failed"
+															},
+															"whenTrue": {
+																"literal": "alert"
+															},
+															"whenFalse": {
+																"literal": "status"
+															}
+														},
+														"right": {
+															"literal": false
+														}
+													},
+													"right": {
+														"binary": "===",
+														"left": {
+															"if": {
+																"cell": "state:failed"
+															},
+															"whenTrue": {
+																"literal": "alert"
+															},
+															"whenFalse": {
+																"literal": "status"
+															}
+														},
+														"right": {
+															"literal": null
+														}
+													}
+												},
+												"whenTrue": {
+													"literal": null
+												},
+												"whenFalse": {
+													"if": {
+														"binary": "===",
+														"left": {
+															"if": {
+																"cell": "state:failed"
+															},
+															"whenTrue": {
+																"literal": "alert"
+															},
+															"whenFalse": {
+																"literal": "status"
+															}
+														},
+														"right": {
+															"literal": true
+														}
+													},
+													"whenTrue": {
+														"literal": "true"
+													},
+													"whenFalse": {
+														"call": "String",
+														"arguments": [
+															{
+																"if": {
+																	"cell": "state:failed"
+																},
+																"whenTrue": {
+																	"literal": "alert"
+																},
+																"whenFalse": {
+																	"literal": "status"
+																}
+															}
+														]
+													}
+												}
+											},
+											"right": {
+												"literal": "log"
+											}
+										}
+									},
+									"whenTrue": {
+										"literal": "polite"
+									},
+									"whenFalse": {
+										"literal": null
+									}
+								}
+							}
+						}
+					},
+					"atomic": {
+						"if": {
+							"binary": "===",
+							"left": {
+								"literal": null
+							},
+							"right": {
+								"literal": null
+							}
+						},
+						"whenTrue": {
+							"logical": "||",
+							"left": {
+								"logical": "||",
+								"left": {
+									"binary": "===",
+									"left": {
+										"if": {
+											"logical": "||",
+											"left": {
+												"binary": "===",
+												"left": {
+													"if": {
+														"cell": "state:failed"
+													},
+													"whenTrue": {
+														"literal": "alert"
+													},
+													"whenFalse": {
+														"literal": "status"
+													}
+												},
+												"right": {
+													"literal": false
+												}
+											},
+											"right": {
+												"binary": "===",
+												"left": {
+													"if": {
+														"cell": "state:failed"
+													},
+													"whenTrue": {
+														"literal": "alert"
+													},
+													"whenFalse": {
+														"literal": "status"
+													}
+												},
+												"right": {
+													"literal": null
+												}
+											}
+										},
+										"whenTrue": {
+											"literal": null
+										},
+										"whenFalse": {
+											"if": {
+												"binary": "===",
+												"left": {
+													"if": {
+														"cell": "state:failed"
+													},
+													"whenTrue": {
+														"literal": "alert"
+													},
+													"whenFalse": {
+														"literal": "status"
+													}
+												},
+												"right": {
+													"literal": true
+												}
+											},
+											"whenTrue": {
+												"literal": "true"
+											},
+											"whenFalse": {
+												"call": "String",
+												"arguments": [
+													{
+														"if": {
+															"cell": "state:failed"
+														},
+														"whenTrue": {
+															"literal": "alert"
+														},
+														"whenFalse": {
+															"literal": "status"
+														}
+													}
+												]
+											}
+										}
+									},
+									"right": {
+										"literal": "status"
+									}
+								},
+								"right": {
+									"binary": "===",
+									"left": {
+										"if": {
+											"logical": "||",
+											"left": {
+												"binary": "===",
+												"left": {
+													"if": {
+														"cell": "state:failed"
+													},
+													"whenTrue": {
+														"literal": "alert"
+													},
+													"whenFalse": {
+														"literal": "status"
+													}
+												},
+												"right": {
+													"literal": false
+												}
+											},
+											"right": {
+												"binary": "===",
+												"left": {
+													"if": {
+														"cell": "state:failed"
+													},
+													"whenTrue": {
+														"literal": "alert"
+													},
+													"whenFalse": {
+														"literal": "status"
+													}
+												},
+												"right": {
+													"literal": null
+												}
+											}
+										},
+										"whenTrue": {
+											"literal": null
+										},
+										"whenFalse": {
+											"if": {
+												"binary": "===",
+												"left": {
+													"if": {
+														"cell": "state:failed"
+													},
+													"whenTrue": {
+														"literal": "alert"
+													},
+													"whenFalse": {
+														"literal": "status"
+													}
+												},
+												"right": {
+													"literal": true
+												}
+											},
+											"whenTrue": {
+												"literal": "true"
+											},
+											"whenFalse": {
+												"call": "String",
+												"arguments": [
+													{
+														"if": {
+															"cell": "state:failed"
+														},
+														"whenTrue": {
+															"literal": "alert"
+														},
+														"whenFalse": {
+															"literal": "status"
+														}
+													}
+												]
+											}
+										}
+									},
+									"right": {
+										"literal": "alert"
+									}
+								}
+							},
+							"right": {
+								"literal": false
+							}
+						},
+						"whenFalse": {
+							"binary": "===",
+							"left": {
+								"literal": null
+							},
+							"right": {
+								"literal": "true"
+							}
+						}
+					}
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"cell": "state:failed"
+							},
+							"whenTrue": {
+								"literal": "Upload failed"
+							},
+							"whenFalse": {
+								"literal": "Upload saved"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Next"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Pause"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Fail"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h5",
+				"event": "activate",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:slide",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:slide"
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:paused",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:paused"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:failed",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:failed"
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Slide 1"
+		],
+		[
+			"h2:text0",
+			"Upload saved"
+		],
+		[
+			"h3:text0",
+			"Next"
+		],
+		[
+			"h4:text0",
+			"Pause"
+		],
+		[
+			"h5:text0",
+			"Fail"
+		]
+	],
+	"initialAttributes": [
+		[
+			"h1",
+			"aria-live",
+			"polite"
+		],
+		[
+			"h2",
+			"role",
+			"status"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": "Slide 2"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:paused",
+					"value": true
+				},
+				{
+					"op": "attribute",
+					"node": "h1",
+					"name": "aria-live",
+					"value": "off"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": "Slide 3"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:failed",
+					"value": true
+				},
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "role",
+					"value": "alert"
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Upload failed"
+				}
+			]
+		}
+	]
+}

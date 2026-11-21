@@ -11,7 +11,9 @@ export type NativeDeviceFeature =
 	| 'camera'
 	| 'microphone'
 	| 'sharesheet'
-	| 'settings';
+	| 'settings'
+	| 'browser'
+	| 'web';
 
 export const DEVICE_FEATURES: {
 	readonly [feature in NativeDeviceFeature]: {
@@ -40,6 +42,9 @@ export const DEVICE_FEATURES: {
 	},
 	sharesheet: { iosUsageKeys: [], androidPermissions: [] },
 	settings: { iosUsageKeys: [], androidPermissions: [] },
+	browser: { iosUsageKeys: [], androidPermissions: [] },
+	/** A web view (an `<iframe>`) loads its page over the network. */
+	web: { iosUsageKeys: [], androidPermissions: ['android.permission.INTERNET'] },
 };
 
 /** Live values a component reads; reading one never asks permission. `initial` is what a build renders before the device answers. */
@@ -79,6 +84,8 @@ export const DEVICE_CALLS = {
 	'sharesheet.open': { feature: 'sharesheet', async: true },
 	/** The system Settings screen for this app. */
 	'settings.open': { feature: 'settings', async: false },
+	/** The system browser at a URL on another site (a GET form's action with its entries); not an author API. */
+	'browser.open': { feature: 'browser', async: false },
 } as const satisfies Readonly<
 	Record<string, { readonly feature: NativeDeviceFeature; readonly async: boolean; readonly object?: true }>
 >;

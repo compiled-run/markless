@@ -107,6 +107,8 @@ export type NativeExpr =
 	| { readonly local: string }
 	/** The current row's item of a list (`repeat` node id). */
 	| { readonly item: string }
+	/** The current row's position in its list (`repeat` node id), from 0: a `@for`'s `index`. */
+	| { readonly index: string }
 	/** The page's route params, an object of strings (the page component's `params` prop). */
 	| { readonly route: 'params' }
 	| { readonly call: NativeBuiltin; readonly arguments: ReadonlyArray<NativeExpr> }
@@ -141,6 +143,12 @@ export type NativeExpr =
 	| { readonly focusOrigin: NativeExpr }
 	/** Whether the value is an element (`value instanceof HTMLElement`). */
 	| { readonly isElement: NativeExpr }
+	/**
+	 * The element `drawn` (a node id in an `@if` arm) if it was on screen when this run began, else null: a handle bound
+	 * inside an arm, which the web binds only once the arm is drawn, so a write in the same handler that opens the arm
+	 * does not bind it yet.
+	 */
+	| { readonly drawn: string }
 	/** A computed whose body runs in the script engine: function `script` of the payload's script, called with `bindings`. */
 	| { readonly script: string; readonly bindings: NativeScriptBindings };
 
@@ -150,6 +158,9 @@ export type NativeExpr =
  */
 export const NATIVE_DOCUMENT_BODY = '#body';
 
+/** A handle whose element is not on the page, as JavaScript on the phone receives it: it reads as `undefined`, as on the web. */
+export const NATIVE_UNBOUND_HANDLE = '#unbound';
+
 /**
  * What the names of a script function mean, resolved where it runs: a cell it may write (inside a list row the host reads
  * and writes that row's value, `<cell>@<key>`), a state object as one cell per field, or a value it only reads.
@@ -158,6 +169,8 @@ export type NativeScriptBinding =
 	| { readonly cell: string }
 	| { readonly fields: Readonly<Record<string, string>> }
 	| { readonly value: NativeExpr }
+	/** A device object the component made (`cam`): the script calls its methods through the host. */
+	| { readonly device: NativeDeviceObject; readonly object: string }
 	/**
 	 * An element (its node id) or an array of them, which the function reads through proxies: `getAttribute`,
 	 * `hasAttribute`, `contains`, and the commands `focus` and `scrollIntoView`. The host answers each read from the
@@ -178,9 +191,10 @@ export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>
 /**
  * Host services a payload's script uses, so a host provides only those: timers (`setTimeout` and the rest, through
  * `timer` entries), `fetch` (through `fetch` entries), `console`, `crypto.randomUUID` (from a `seed` the host passes),
- * and `navigate` from @markless/router (through a `navigate` entry; the host passes the page's route `params`).
+ * `navigate` from @markless/router (through a `navigate` entry; the host passes the page's route `params`), and
+ * `@markless/device` calls (through `call` entries, answered with `resume` or `reject` actions).
  */
-export type NativeScriptService = 'timers' | 'fetch' | 'console' | 'crypto' | 'navigate';
+export type NativeScriptService = 'timers' | 'fetch' | 'console' | 'crypto' | 'navigate' | 'device';
 
 /** The JavaScript a payload's `script` ops and script computeds run, in the platform's engine, started on first use. */
 export type NativeScript = {
@@ -330,6 +344,8 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	textarea: {},
 	a: {},
 	img: {},
+	/** The platform's web view showing the page its `src` names, a fixed http(s) URL. */
+	iframe: {},
 	audio: {},
 	label: {},
 	dialog: {},
@@ -420,6 +436,11 @@ export type NativeNode = NativePlace &
 				 * announced, after the screen reader's current speech when polite; `atomic` reads the whole region, else the changed text.
 				 */
 				readonly live?: { readonly politeness: 'polite' | 'assertive'; readonly atomic: boolean };
+				/**
+				 * A live region whose `role`, `aria-live` or `aria-atomic` follows state: its politeness (`'polite'`,
+				 * `'assertive'` or null for none) and atomicity now, which the host evaluates each time it speaks.
+				 */
+				readonly liveFollows?: { readonly politeness: NativeExpr; readonly atomic: NativeExpr };
 				/** Attributes fixed at build time (`class` carries the component's scope class); absent when none. */
 				readonly attributes?: Readonly<Record<string, string>>;
 				/** The device object a `camera` element shows (`<base.camera el={cam} />`). */
@@ -698,6 +719,11 @@ export type NativeViewPayload = {
 		readonly name: string;
 		readonly initial: NativeValue;
 		readonly storage?: { readonly key: string };
+		/**
+		 * A cell of an app-wide `shared()`: the app holds one value for every page. A screen starts from the app's value,
+		 * writes its changes back, and takes the app's value again when it shows after Back (`resume`).
+		 */
+		readonly app?: true;
 		/** A class or `ui-*` attribute binding reads this cell, so Dragon's export has a state for it; its changes are journalled as `state`. */
 		readonly styled?: true;
 		/** A styled string cell's every value, its first value first, so Dragon lays out one assignment per value. */
@@ -949,6 +975,11 @@ export type NativeForm = {
 	readonly noValidate?: true;
 	/** An author wrote `aria-disabled` on one of its submit buttons, so a running submission marks none of them. */
 	readonly authoredAriaDisabled?: true;
+	/**
+	 * A GET form with no submit handler whose action is on another site: submitting calls `browser.open` with this URL,
+	 * its query replaced by the form's entries (`application/x-www-form-urlencoded`), as the web leaves for that page.
+	 */
+	readonly opens?: string;
 };
 
 /** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, a hidden input, or a `<select>`. */

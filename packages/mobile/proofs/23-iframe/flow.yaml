@@ -1,0 +1,14 @@
+appId: ${APP_ID}
+name: 23-iframe
+---
+- launchApp:
+    clearState: true
+- assertVisible: Embedded page
+- assertVisible: Below the frame
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible: This domain is for use in documentation examples without needing
+          permission\. This is not a service; avoid relying on it for testing
+          and monitoring purposes\.

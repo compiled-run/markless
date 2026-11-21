@@ -25,6 +25,7 @@ import {
 	NATIVE_DATA_SCRIPT_TYPES,
 	NATIVE_ELEMENTS,
 	NATIVE_DOCUMENT_BODY,
+	NATIVE_UNBOUND_HANDLE,
 	NATIVE_UNSHOWN_ELEMENTS,
 	NATIVE_SCRIPT_DISMISS_EVENT_MEMBERS,
 	NATIVE_SCRIPT_EVENT_MEMBERS,
@@ -315,7 +316,6 @@ const UNCHECKED_CONSTRAINTS = [
 	'max',
 	'step',
 	'multiple',
-	'readonly',
 	'form',
 ];
 /** A submit button's own overrides of where and how its form is sent. */
@@ -395,6 +395,45 @@ const isNativeValue = (value: unknown): value is NativeValue =>
 		Object.values(value as object).every(isNativeValue));
 
 /** Every value an attribute expression can write, when each comes from a literal in it; undefined when one may not. */
+/** An attribute's text as the web writes a bound value: `false` and nullish leave it out, `true` writes "true". */
+function attributeText(value: NativeExpr): NativeExpr {
+	return {
+		if: { logical: '||', left: { binary: '===', left: value, right: { literal: false } }, right: { binary: '===', left: value, right: { literal: null } } },
+		whenTrue: { literal: null },
+		whenFalse: { if: { binary: '===', left: value, right: { literal: true } }, whenTrue: { literal: 'true' }, whenFalse: { call: 'String', arguments: [value] } },
+	};
+}
+
+/**
+ * A live region's politeness (`'polite'`, `'assertive'` or null) and atomicity as ARIA defines them from `role`,
+ * `aria-live` and `aria-atomic`, for an element whose attributes follow state: the host evaluates them when it speaks.
+ */
+function liveRuleOf(
+	element: string,
+	attribute: (name: string) => NativeExpr,
+): { readonly politeness: NativeExpr; readonly atomic: NativeExpr } {
+	const is = (value: NativeExpr, text: string | null): NativeExpr => ({ binary: '===', left: value, right: { literal: text } });
+	const choose = (test: NativeExpr, whenTrue: NativeExpr, whenFalse: NativeExpr): NativeExpr => ({ if: test, whenTrue, whenFalse });
+	const role = attribute('role');
+	const live = attribute('aria-live');
+	const atomic = attribute('aria-atomic');
+	const implicit: NativeExpr = {
+		logical: '||',
+		left: { logical: '||', left: is(role, 'status'), right: is(role, 'alert') },
+		right: element === 'output' ? is(role, null) : { literal: false },
+	};
+	const politeness = choose(
+		{ logical: '||', left: is(live, 'polite'), right: is(live, 'assertive') },
+		live,
+		choose(
+			is(live, 'off'),
+			{ literal: null },
+			choose(is(role, 'alert'), { literal: 'assertive' }, choose({ logical: '||', left: implicit, right: is(role, 'log') }, { literal: 'polite' }, { literal: null })),
+		),
+	);
+	return { politeness, atomic: choose(is(atomic, null), implicit, is(atomic, 'true')) };
+}
+
 function writtenValuesOf(expr: NativeExpr): Set<string> | undefined {
 	if ('literal' in expr)
 		return new Set(
@@ -538,6 +577,8 @@ type Scope = {
 	readonly submitting?: string;
 	readonly locals: ReadonlySet<string>;
 	readonly items: ReadonlyMap<string, string>;
+	/** A `@for`'s `index` name, by the `repeat` node whose row position it reads. */
+	readonly indexes?: ReadonlyMap<string, string>;
 	readonly props: ReadonlyMap<string, Prop>;
 	/** Names whose members resolve to cells, handles and methods. */
 	readonly objects: ReadonlyMap<string, ObjectRef>;
@@ -809,6 +850,8 @@ function mentionsBuildValue(expr: unknown): boolean {
 function mentionsElement(expr: unknown): boolean {
 	if (!expr || typeof expr !== 'object') return false;
 	if ('element' in expr && typeof (expr as ElementValue).element === 'string') return true;
+	if ('drawn' in expr && typeof expr.drawn === 'string') return true;
+	if ('literal' in expr && expr.literal === NATIVE_UNBOUND_HANDLE) return true;
 	return Object.values(expr).some((child) =>
 		Array.isArray(child) ? child.some(mentionsElement) : mentionsElement(child),
 	);
@@ -1004,7 +1047,9 @@ function moduleFactsOf(graph: SemanticGraphArtifact) {
 		),
 		edgesById: new Map(graph.componentEdges.map((edge) => [edge.id, edge])),
 		eventsByHost: index(graph.events, (event) => event.hostNodeId),
-		repeatsById: new Map(graph.keyedRepeats.map((repeat) => [repeat.id, repeat])),
+		repeatsById: new Map(
+			[...graph.keyedRepeats, ...(graph.unplacedProjectedRepeats ?? [])].map((repeat) => [repeat.id, repeat]),
+		),
 		/** Sync computeds by component, then name: a read of one inlines its expression. */
 		computeds: graph.graphBindings.reduce((byComponent, binding) => {
 			if (binding.kind !== 'computed') return byComponent;
@@ -1575,13 +1620,56 @@ export function createNativeViewPayload(
 			fields: new Map(),
 			slots: new Map(),
 		};
+		const handles = new Map(
+			owner.graph.graphBindings.flatMap((binding) =>
+				binding.sharedDefinitionId === definition.id && binding.kind === 'element'
+					? [
+							[
+								binding.name,
+								{ key: `${prefix}${binding.id}`, plural: binding.plural === true },
+							] as const,
+						]
+					: [],
+			),
+		);
+		instance.scope = {
+			module: owner,
+			component: '',
+			handles,
+			cells: { byName, byBinding },
+			prefix,
+			locals: new Set(),
+			items: new Map(),
+			props: new Map(),
+			objects,
+			args: new Map(),
+			shared: new Map(),
+			deviceObjects: new Map(),
+		};
 		const objectFields = new Map<string, Map<string, string>>();
 		for (const binding of owner.graph.graphBindings) {
 			if (binding.sharedDefinitionId !== definition.id || binding.kind !== 'state') continue;
 			const id = `${prefix}${binding.id}`;
-			const value = nativeInitialOf(binding.initialValue);
-			noteUndefined(id, binding.initialValue);
-			if (binding.initialValueKnown !== true || !isNativeValue(value)) {
+			let first: unknown = binding.initialValue;
+			let known = binding.initialValueKnown === true;
+			// A first value that reads module constants is fixed when the app is built, as the web evaluates it once.
+			if (!known && binding.nativeExpression) {
+				const lowered = attempt(() =>
+					exprOf(binding.nativeExpression!, `the first value of \`${binding.name}\``, instance.scope),
+				);
+				const folded =
+					!lowered.failed && lowered.value && cellsOf(lowered.value).size === 0
+						? foldConstant(lowered.value, initialOf)
+						: undefined;
+				lowered.rollBack();
+				if (folded) {
+					first = folded.value;
+					known = true;
+				}
+			}
+			const value = nativeInitialOf(first);
+			noteUndefined(id, first);
+			if (!known || !isNativeValue(value)) {
 				refuse(
 					`shared state \`${binding.name}\` of ${definition.name} needs a JSON initial value known at build time`,
 				);
@@ -1634,38 +1722,14 @@ export function createNativeViewPayload(
 					});
 			}
 		}
-		const handles = new Map(
-			owner.graph.graphBindings.flatMap((binding) =>
-				binding.sharedDefinitionId === definition.id && binding.kind === 'element'
-					? [
-							[
-								binding.name,
-								{ key: `${prefix}${binding.id}`, plural: binding.plural === true },
-							] as const,
-						]
-					: [],
-			),
-		);
-		instance.scope = {
-			module: owner,
-			component: '',
-			handles,
-			cells: { byName, byBinding },
-			prefix,
-			locals: new Set(),
-			items: new Map(),
-			props: new Map(),
-			objects,
-			args: new Map(),
-			shared: new Map(),
-			deviceObjects: new Map(),
-		};
 		return instance;
 	};
 
 	const widgetRoots = new Map<string, string | undefined>();
 	/** Each app-wide shared() definition's one instance on this screen. */
 	const appInstances = new Map<string, SharedInstance>();
+	/** The cells of those instances: the app holds them across its pages. */
+	const appCells = new Set<string>();
 	/** The component that roots a definition's widgets: the first in its module whose body seeds it. */
 	const widgetRoot = (definition: SemanticSharedDefinition): string | undefined => {
 		if (widgetRoots.has(definition.id)) return widgetRoots.get(definition.id);
@@ -1738,20 +1802,18 @@ export function createNativeViewPayload(
 			if (definition.scope !== 'subtree') {
 				const scopeName = definition.scope ?? 'app';
 				// One instance for the whole screen, which every component joins, as the web's module-level one.
-				if (scopeName === 'app' && !options.routes) {
+				if (scopeName === 'app') {
+					const before = cells.length;
 					const instance =
 						appInstances.get(definition.id) ??
 						createInstance(definition, module, 'app/', undefined);
+					for (const cell of cells.slice(before)) appCells.add(cell.id);
 					appInstances.set(definition.id, instance);
 					subtree.set(definition.id, instance);
 					objects.set(use.localName, { kind: 'instance', instance });
 					continue;
 				}
-				refuse(
-					scopeName === 'app'
-						? `${definition.name}: an app-wide shared() in an app with pages, which each page's screen would hold apart`
-						: `${definition.name}: shared() with scope \`${scopeName}\``,
-				);
+				refuse(`${definition.name}: shared() with scope \`${scopeName}\``);
 				continue;
 			}
 			// As on the web, each rendered copy of the definition's root component starts a widget of its own (a checkbox inside
@@ -1773,13 +1835,8 @@ export function createNativeViewPayload(
 				refuse(`top-level state \`${binding.name}\` in an imported module`);
 				continue;
 			}
-			if (!moduleLevel && prefix !== '' && binding.storage) {
-				refuse(
-					`storage \`${binding.name}\` declared inside the child component ${component}`,
-				);
-				continue;
-			}
-			const id = moduleLevel ? binding.id : `${prefix}${binding.id}`;
+			// Every storage() with one key is one value, as on the web: its cell is named after the key, not the instance.
+			const id = moduleLevel || binding.storage ? binding.id : `${prefix}${binding.id}`;
 			let value: unknown = nativeInitialOf(binding.initialValue);
 			noteUndefined(id, binding.initialValue);
 			let known = binding.initialValueKnown === true;
@@ -1812,13 +1869,15 @@ export function createNativeViewPayload(
 				if (folded && lowered && cellsOf(lowered).size === 0) {
 					value = folded.value;
 					known = true;
-					// A prop the part was not given is `undefined` on the web, there and as an object's field.
-					const absent = (e: SemanticExpression) =>
-						e.kind === 'read' && isPropName(e.name, scope) && !propOf(e.name, scope);
+					const absent = (e: SemanticExpression) => e.kind === 'read' && absentProp(e.name, scope);
 					if (absent(initializer)) undefinedFirst.add(id);
-					else if (initializer.kind === 'object')
-						for (const [field, e] of initializer.entries)
-							if (absent(e)) undefinedFirst.add(`${id}.${field}`);
+					else {
+						undefinedFirst.delete(id);
+						if (initializer.kind === 'object')
+							for (const [field, e] of initializer.entries)
+								if (absent(e)) undefinedFirst.add(`${id}.${field}`);
+								else undefinedFirst.delete(`${id}.${field}`);
+					}
 				} else if (
 					lowered &&
 					row &&
@@ -1864,6 +1923,16 @@ export function createNativeViewPayload(
 					kind: 'fields',
 					cells: splitCells(id, binding.name, value, row),
 				});
+				continue;
+			}
+			const kept = binding.storage ? initialOf(id) : undefined;
+			if (kept !== undefined && JSON.stringify(kept) !== JSON.stringify(value)) {
+				refuse(
+					`storage \`${binding.name}\` of ${component} starts at ${JSON.stringify(value)}, but another storage() with key "${binding.storage!.key}" starts at ${JSON.stringify(kept)}`,
+					binding.sourceSpan,
+				);
+				byName.set(binding.name, id);
+				byBinding.set(binding.id, id);
 				continue;
 			}
 			byName.set(binding.name, id);
@@ -1945,11 +2014,7 @@ export function createNativeViewPayload(
 			);
 			return;
 		}
-		// A prop the root was not given is `undefined` there too; any other value replaces the first one.
-		const absent =
-			statement.value.kind === 'read' &&
-			isPropName(statement.value.name, scope) &&
-			!propOf(statement.value.name, scope);
+		const absent = statement.value.kind === 'read' && absentProp(statement.value.name, scope);
 		if (absent) undefinedFirst.add(cell);
 		else undefinedFirst.delete(cell);
 		setInitial(cell, folded.value);
@@ -2016,6 +2081,11 @@ export function createNativeViewPayload(
 		scope.props.get(scope.module.propNames.get(scope.component)?.get(name) ?? '');
 	const isPropName = (name: string, scope: Scope): boolean =>
 		scope.module.propNames.get(scope.component)?.has(name) === true;
+	/** A prop the part was not given and has no default for, which reads `undefined` on the web. */
+	const absentProp = (name: string, scope: Scope): boolean =>
+		isPropName(name, scope) &&
+		!propOf(name, scope) &&
+		!Object.hasOwn(scope.module.componentFacts.get(scope.component)?.native?.propDefaults ?? {}, name);
 
 	const cellOf = (name: string, scope: Scope): string | undefined => scope.cells.byName.get(name);
 	const isRouterLink = (scope: Scope, name: string): boolean => {
@@ -2374,6 +2444,13 @@ export function createNativeViewPayload(
 		return false;
 	}
 
+	/** A script's `@markless/device` calls: the host makes each, and the app declares what each needs. */
+	function checkDevices(devices: SemanticScriptFunction['devices']): void {
+		if (devices.length === 0) return;
+		scriptServices.add('device');
+		for (const { call } of devices) features.add(DEVICE_CALLS[call as NativeDeviceCall].feature);
+	}
+
 	/** Whether every global a script reads is one a phone's engine has; refuses each other one by name, file and line. */
 	function checkGlobals(
 		globals: ReadonlyArray<SemanticScriptGlobal>,
@@ -2425,6 +2502,7 @@ export function createNativeViewPayload(
 		if (known) return known.id;
 		let ok = checkGlobals(fact.globals, what, forms);
 		if (!checkNavigates(fact.navigates, what)) ok = false;
+		checkDevices(fact.devices);
 		for (const use of fact.framework) {
 			ok = false;
 			refuseScript(
@@ -2518,7 +2596,7 @@ export function createNativeViewPayload(
 	): Record<string, NativeScriptBinding> | null {
 		const bindings: Record<string, NativeScriptBinding> = {};
 		let ok = true;
-		for (const { name, written, span } of fact.names) {
+		for (const { name, written, span, calledOnly } of fact.names) {
 			const prop = propOf(name, scope);
 			if (prop?.kind === 'callback') {
 				const callback = written ? undefined : prop.span && scriptFacts(prop.scope.module)?.handler(prop.span);
@@ -2565,10 +2643,23 @@ export function createNativeViewPayload(
 					object?.kind === 'instance' ? { object: members } : { shared: members };
 				continue;
 			}
-			if (scope.deviceObjects.has(name)) {
+			const device = object ? undefined : scope.deviceObjects.get(name);
+			if (
+				device &&
+				!written &&
+				calledOnly?.every((method) => {
+					const call = `${device.device}.${method}`;
+					return isDeviceCall(call) && 'object' in DEVICE_CALLS[call];
+				})
+			) {
+				scriptServices.add('device');
+				bindings[name] = { device: device.device, object: device.id };
+				continue;
+			}
+			if (device) {
 				ok = false;
 				refuseScript(
-					`${what} uses \`${name}\` (a device object), which JavaScript on a phone cannot reach yet`,
+					`${what} uses \`${name}\` (a device object) other than to call its methods, which JavaScript on a phone cannot do yet`,
 					span,
 				);
 				continue;
@@ -2864,6 +2955,7 @@ export function createNativeViewPayload(
 				);
 			checkGlobals(statement.globals, at, forms || scriptSubmits.size > 0);
 			checkNavigates(statement.navigates, at);
+			checkDevices(statement.devices);
 			for (const name of statement.uses) local(entry, name);
 			for (const use of statement.imports) imported(entry, use.slot, use.name);
 		};
@@ -3040,9 +3132,20 @@ export function createNativeViewPayload(
 		if (!lateLowering) return refuse(`${what} as a value outside a handler`);
 		const bound = boundHandles.get(key) ?? [];
 		const byId = nodeById();
-		// An element in an @if arm is bound only while its arm shows, which the app knows only while it runs.
+		if (bound.some((id) => byId.get(id)?.arm) && !bound.some((id) => byId.get(id)?.row)) {
+			if (plural) return refuse(`${what}, a handle list bound inside an @if arm`);
+			const unarmed = bound.filter((id) => !byId.get(id)?.arm);
+			if (unarmed.length > 0 && bound.length > 1)
+				return refuse(`${what}, a handle bound to more than one element`);
+			const drawn = bound
+				.map((id): NativeExpr => ({ drawn: id }))
+				.reduceRight((right, left) => ({ logical: '??', left, right }));
+			return scriptReading
+				? { logical: '??', left: drawn, right: { literal: NATIVE_UNBOUND_HANDLE } }
+				: drawn;
+		}
 		if (bound.some((id) => byId.get(id)?.arm))
-			return refuse(`${what}, a handle bound inside an @if arm`);
+			return refuse(`${what}, a handle bound inside an @if arm within a @for row`);
 		if (scriptReading && plural && bound.some((id) => byId.get(id)?.row)) {
 			// JavaScript gets every row's copy, in the rows' order, as the web's handle list holds them.
 			const repeat = byId.get(bound[0]!)?.row;
@@ -3080,7 +3183,8 @@ export function createNativeViewPayload(
 		if (plural)
 			return { array: bound.map((id) => ({ spread: false, value: elementValue(id) })) };
 		if (bound.length > 1) return refuse(`${what}, a handle bound to more than one element`);
-		return bound[0] ? elementValue(bound[0]) : { literal: null };
+		if (bound[0]) return elementValue(bound[0]);
+		return scriptReading ? { literal: NATIVE_UNBOUND_HANDLE } : { literal: null };
 	};
 
 	/** Whether a node is an `<input>` a person ticks: a checkbox or a radio button. */
@@ -3091,6 +3195,12 @@ export function createNativeViewPayload(
 			node.element === 'input' &&
 			TICKED_TYPES.has(node.attributes?.['type'] ?? '')
 		);
+	};
+
+	/** Whether a node is a `<select>`, whose `change` handler reads the chosen option's value as its event's. */
+	const isSelect = (id: string): boolean => {
+		const node = nodeById().get(id);
+		return node?.kind === 'element' && node.element === 'select';
 	};
 
 	/** Whether `inner` is `outer` or inside it. */
@@ -3108,25 +3218,36 @@ export function createNativeViewPayload(
 		attributes: Readonly<Record<string, string>>,
 		bindings: ReadonlyArray<{ readonly attribute: string } | { readonly property: string }>,
 		span: SourceSpan | undefined,
-	): NonNullable<Extract<NativeNode, { kind: 'element' }>['live']> | undefined => {
+		row: string | undefined,
+	): Pick<Extract<NativeNode, { kind: 'element' }>, 'live' | 'liveFollows'> => {
 		const LIVE_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
 			role: new Set(['status', 'alert', 'log']),
 			'aria-live': new Set(['polite', 'assertive']),
 			'aria-atomic': new Set(['true', 'false']),
 		};
-		for (const [name, live] of Object.entries(LIVE_VALUES)) {
-			const bound = bindings.find(
+		const boundTo = (name: string) =>
+			bindings.find(
 				(binding): binding is { readonly attribute: string; readonly value: NativeExpr } =>
 					'attribute' in binding && binding.attribute === name,
 			);
-			if (!bound) continue;
+		const follows = Object.entries(LIVE_VALUES).some(([name, live]) => {
+			const bound = boundTo(name);
+			if (!bound) return false;
 			const values = writtenValuesOf(bound.value);
-			if (values && ![...values].some((value) => live.has(value))) continue;
-			refuse(
-				`the \`${name}\` of a <${element}> follows state; a native host makes a live region when it builds the view`,
-				span,
-			);
-			return undefined;
+			return !values || [...values].some((value) => live.has(value));
+		});
+		if (follows) {
+			if (row !== undefined) {
+				refuse(
+					`a <${element}> in a @for row whose \`role\`, \`aria-live\` or \`aria-atomic\` follows state; a native host makes such a live region only outside a row`,
+					span,
+				);
+				return {};
+			}
+			return { liveFollows: liveRuleOf(element, (name) => {
+				const bound = boundTo(name);
+				return bound ? attributeText(bound.value) : { literal: attributes[name] ?? null };
+			}) };
 		}
 		const role = attributes['role'];
 		const implicit =
@@ -3142,12 +3263,12 @@ export function createNativeViewPayload(
 						: implicit || role === 'log'
 							? 'polite'
 							: undefined;
-		if (!politeness) return undefined;
+		if (!politeness) return {};
 		const atomic =
 			attributes['aria-atomic'] === undefined
 				? implicit
 				: attributes['aria-atomic'] === 'true';
-		return { politeness, atomic };
+		return { live: { politeness, atomic } };
 	};
 	/** Whether a click on the element does nothing on the web beyond its handlers, so `preventDefault()` there changes nothing. */
 	const clickHasNoDefault = (id: string): boolean => {
@@ -3651,6 +3772,8 @@ export function createNativeViewPayload(
 					);
 				const repeat = scope.items.get(expression.name);
 				if (repeat) return { item: repeat };
+				const positioned = scope.indexes?.get(expression.name);
+				if (positioned) return { index: positioned };
 				const prop = propOf(expression.name, scope);
 				if (prop?.kind === 'value') return prop.expr;
 				const text = prop?.kind === 'children' ? projectedText(prop.chunk) : undefined;
@@ -4539,7 +4662,8 @@ export function createNativeViewPayload(
 	/** Where each element node is written, for refusals found after lowering. */
 	const nodeSpans = new Map<string, SourceSpan | undefined>();
 	/** Each list's row key as an expression of its row item: how a row's instance ids are spelt (`<node>@<key>`). */
-	const rowKeys = new Map<string, NativeExpr>();
+	/** A row's key as its instance ids spell it: an inner row's is its outer row's, `@`, then its own. */
+	const rowKeys = new Map<string, ReadonlyArray<string | NativeExpr>>();
 	const textRuns = new Map<string, number>();
 	const lowered = new Set<string>();
 
@@ -4886,6 +5010,22 @@ export function createNativeViewPayload(
 						);
 					if (consumed.includes(item.path)) continue;
 				}
+				if (element === 'iframe') {
+					// A phone shows a page another server answers; the app's own pages are not served to it.
+					const src = attributesAt(item.path).src?.trim();
+					const at = src !== undefined && URL.canParse(src) ? new URL(src) : undefined;
+					if (boundAt(item.path).some((name) => name === 'src' || name === 'srcdoc'))
+						refuse('an <iframe> whose `src` follows state', span);
+					else if (attributesAt(item.path).srcdoc !== undefined)
+						refuse('an <iframe> with `srcdoc`, which a native web view does not show yet', span);
+					else if (!at || (at.protocol !== 'https:' && at.protocol !== 'http:'))
+						refuse(
+							`an <iframe> whose \`src\` is ${src === undefined ? 'missing' : `"${src}"`}: a phone shows a fixed http(s) URL on another server, and the app's own pages are not served to it`,
+							span,
+						);
+					else features.add('web');
+					consumed.push(item.path);
+				}
 				const id = scope.prefix + item.id;
 				nodeSpans.set(id, span);
 				const spreadSlot = chunk.slots.find(
@@ -5086,7 +5226,7 @@ export function createNativeViewPayload(
 						);
 				}
 				const { value: label, ...unlabelled } = attributes;
-				const live = liveRegionOf(element ?? '*', attributes, bindings, item.span);
+				const live = liveRegionOf(element ?? '*', attributes, bindings, item.span, place.row);
 				nodes.push({
 					kind: 'element',
 					id,
@@ -5098,7 +5238,7 @@ export function createNativeViewPayload(
 					...(bindings.length > 0 ? { bindings } : {}),
 					...(defaultStyle ? { defaultStyle } : {}),
 					...(drawing ? { drawing } : {}),
-					...(live ? { live } : {}),
+					...live,
 					...place,
 				});
 				if (submitInput && label !== undefined) {
@@ -5570,10 +5710,6 @@ export function createNativeViewPayload(
 				close();
 				const repeat = scope.module.repeatsById.get(item.id);
 				const rowChunk = scope.module.chunks.get(item.row);
-				if (place.row) {
-					refuse('@for inside another @for');
-					continue;
-				}
 				const list = repeat?.collectionExpression
 					? renderValue(
 							repeat.collectionExpression,
@@ -5612,9 +5748,11 @@ export function createNativeViewPayload(
 						(object, property) => ({ member: object, property }),
 						{ item: repeatId },
 					);
-				if (!repeat.indexKey)
-					rowKeys.set(
-						repeatId,
+				// No expression reads a row's key when it is the row's index: such rows, and rows inside them, have none here.
+				const outerKey = place.row ? rowKeys.get(place.row) : [];
+				if (!repeat.indexKey && outerKey)
+					rowKeys.set(repeatId, [
+						...(place.row ? [...outerKey, '@'] : []),
 						repeat.keyParts
 							? {
 									template: repeat.keyParts.map((part) =>
@@ -5622,12 +5760,18 @@ export function createNativeViewPayload(
 									),
 								}
 							: itemAt(repeat.keyPath),
-					);
+					]);
 				lowerChunk(
 					rowChunk,
 					parent,
 					{ row: repeatId },
-					{ ...scope, items: new Map([...scope.items, [repeat.itemName, repeatId]]) },
+					{
+						...scope,
+						items: new Map([...scope.items, [repeat.itemName, repeatId]]),
+						...(repeat.indexName
+							? { indexes: new Map([...(scope.indexes ?? []), [repeat.indexName, repeatId]]) }
+							: {}),
+					},
 				);
 				if (item.empty) {
 					const emptyChunk = scope.module.chunks.get(item.empty);
@@ -6042,7 +6186,12 @@ export function createNativeViewPayload(
 				handlerCallsScript = false;
 			}
 		};
-		if (DATA_ONLY_EVENTS.has(event.eventName)) return helped();
+		// A select's change has no tap to join, so it runs as JavaScript when data cannot carry it.
+		if (
+			DATA_ONLY_EVENTS.has(event.eventName) &&
+			!(event.eventName === 'change' && pressed && isSelect(pressed.currentTarget))
+		)
+			return helped();
 		const submitting = event.eventName === 'submit';
 		// The web sends a form whose submit handler does not cancel it at once; only the analyzer's sync policy says it always does.
 		const form =
@@ -6199,6 +6348,7 @@ export function createNativeViewPayload(
 					globals: [],
 					framework: [],
 					navigates: [],
+					devices: [],
 					unsupported: [],
 					span: { filename: module.graph.filename, start: 0, end: 0 },
 				},
@@ -6396,6 +6546,9 @@ export function createNativeViewPayload(
 							},
 						}
 					: (event.eventName === 'input' && !(pressed && isTicked(pressed.currentTarget))) ||
+						  (event.eventName === 'change' &&
+								pressed !== undefined &&
+								isSelect(pressed.currentTarget)) ||
 						  // A range's change carries its value as its input does.
 						  (event.eventName === 'change' && pressed !== undefined && isRange(pressed.currentTarget))
 						? { ...running, event: parameter }
@@ -6582,6 +6735,7 @@ export function createNativeViewPayload(
 			if ('cell' in binding) into.add(binding.cell);
 			else if ('fields' in binding)
 				for (const cell of Object.values(binding.fields)) into.add(cell);
+			else if ('device' in binding) continue;
 			else if ('object' in binding) scriptWrites(binding.object, into);
 			else if ('shared' in binding) scriptWrites(binding.shared, into);
 			else if ('method' in binding) scriptWrites(binding.bindings, into);
@@ -7806,7 +7960,7 @@ export function createNativeViewPayload(
 				continue;
 			}
 			parts.push(`${position > 0 ? ' ' : ''}${id}${row ? '@' : ''}`);
-			if (rowKey) parts.push(rowKey);
+			if (rowKey) parts.push(...rowKey);
 		}
 		const value: NativeExpr = parts.every((part) => typeof part === 'string')
 			? { literal: parts.join('') }
@@ -8057,6 +8211,7 @@ export function createNativeViewPayload(
 			...(undefinedFirst.has(cell.id) && !cell.row && cell.initial === null
 				? { unset: true as const }
 				: {}),
+			...(appCells.has(cell.id) ? { app: true as const } : {}),
 		})),
 		nodes,
 		events,
@@ -8075,8 +8230,9 @@ export function createNativeViewPayload(
 	 */
 	/**
 	 * A `<select>` is a pop-up list of its `<option>`s, one chosen. What a native build does not draw or run yet is refused
-	 * by name: a list box (`multiple`, `size`), a select whose choice a binding sets, handlers on either element, and
-	 * anything but text inside an option or options inside a select.
+	 * by name: a list box (`multiple`, `size`), a select whose choice a binding sets, handlers on either element other
+	 * than a select's `change` (run with the new value when a person picks another option), and anything but text inside
+	 * an option or options inside a select.
 	 */
 	function checkSelects() {
 		const byId = nodeById();
@@ -8088,7 +8244,10 @@ export function createNativeViewPayload(
 				for (const pending of pendingHandlers)
 					if (
 						pending.host === node.id &&
-						!(node.element === 'select' && SELECT_EVENTS.has(pending.event.eventName))
+						!(
+							node.element === 'select' &&
+							(pending.event.eventName === 'change' || SELECT_EVENTS.has(pending.event.eventName))
+						)
 					)
 						refuse(
 							`the ${pending.event.eventName} handler on ${where}, which a native build does not run yet`,
@@ -8266,6 +8425,17 @@ export function createNativeViewPayload(
 					  )
 					? 'bound'
 					: undefined;
+		/** A GET form's action on another site, as the URL the web leaves for; undefined for this app's own or a bound one. */
+		const externalAction = (form: Extract<NativeNode, { kind: 'element' }>): string | undefined => {
+			if (attribute(form, 'action') !== 'static' || attribute(form, 'method') === 'bound') return undefined;
+			const method = form.attributes?.['method']?.trim().toLowerCase();
+			if (method !== undefined && method !== 'get') return undefined;
+			const action = form.attributes!['action']!.trim();
+			// A scheme-relative action takes the page's scheme, which a site served over HTTPS gives it.
+			if (!URL.canParse(action.startsWith('//') ? `https:${action}` : action)) return undefined;
+			const url = new URL(action.startsWith('//') ? `https:${action}` : action);
+			return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : undefined;
+		};
 		const handlerOf = (host: string, event: NativeViewPayload['events'][number]['event']) => {
 			const entry = events.find(
 				(candidate) => candidate.host === host && candidate.event === event,
@@ -8401,18 +8571,29 @@ export function createNativeViewPayload(
 					if (type === 'email') emailChecked = true;
 				}
 			}
-			if (!submit) {
+			const opens = submit ? undefined : externalAction(form);
+			if (!submit && !opens) {
 				if (submitters.length > 0 || textFields.length === 1)
 					refuse(
 						`${where} has no onSubmit handler: the web sends it to its action and loads the answer (or sends a POST to an API route in place), and a phone app has no server or page to load`,
 					);
 				continue;
 			}
-			if (!prevents(submit.ops))
-				refuse(
-					`the submit handler on ${where} does not call \`event.preventDefault()\` on every path before it awaits or returns: the web then sends the form to its action and loads a new page, which a phone app has no server or page for`,
-				);
-			submit.ops = withoutPrevent(submit.ops);
+			if (opens) {
+				features.add(DEVICE_CALLS['browser.open'].feature);
+				for (const submitter of submitters)
+					if (attribute(byId.get(submitter) as Extract<NativeNode, { kind: 'element' }>, 'name'))
+						refuse(
+							`the submit button ${submitter} of ${where} has a \`name\`, which the web adds to the query a native build opens; leave it out`,
+						);
+			}
+			if (submit) {
+				if (!prevents(submit.ops))
+					refuse(
+						`the submit handler on ${where} does not call \`event.preventDefault()\` on every path before it awaits or returns: the web then sends the form to its action and loads a new page, which a phone app has no server or page for`,
+					);
+				submit.ops = withoutPrevent(submit.ops);
+			}
 			for (const submitter of submitters)
 				ensureHandler(submitter, 'activate', 'submit').ops.push({
 					op: 'submit',
@@ -8458,6 +8639,7 @@ export function createNativeViewPayload(
 				node: form.id,
 				fields,
 				submitters,
+				...(opens ? { opens } : {}),
 				...(form.attributes?.['novalidate'] !== undefined
 					? { noValidate: true as const }
 					: {}),

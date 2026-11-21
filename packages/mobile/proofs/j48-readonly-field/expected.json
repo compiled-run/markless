@@ -1,0 +1,28 @@
+{
+	"rung": "J48",
+	"name": "a readonly text field is submitted but left out of the checks a submit runs, and a @markless/ui textbox submits in a form",
+	"steps": [
+		{ "visible": ["Coupon", "Nothing sent", "Unlock code"], "absent": ["Lock code"] },
+		{
+			"do": { "tap": "Send" },
+			"visible": ["Sent ada@example.com code []"],
+			"absent": ["Nothing sent", "Lock code"]
+		},
+		{ "do": { "tap": "Unlock code" }, "visible": ["Lock code"], "absent": ["Unlock code"] },
+		{
+			"do": { "tap": "Send" },
+			"visible": ["Sent ada@example.com code []"],
+			"invalid": "Please fill out this field."
+		},
+		{
+			"do": { "type": { "field": "Code", "text": "SAVE10" } },
+			"visible": ["Sent ada@example.com code []"],
+			"fields": { "Code": "SAVE10" }
+		},
+		{
+			"do": { "tap": "Send" },
+			"visible": ["Sent ada@example.com code [SAVE10]"],
+			"absent": ["Sent ada@example.com code []"]
+		}
+	]
+}
