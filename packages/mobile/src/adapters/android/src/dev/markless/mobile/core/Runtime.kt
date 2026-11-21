@@ -143,7 +143,7 @@ data class FetchRequest(val url: String, val method: String, val headers: List<P
 
 /** `JSON.stringify` of a value: non-finite numbers are `null`. */
 /** What a touch adds to a script pointer handler's event, in the order the reference writes them. */
-private val TOUCH_FIELDS = listOf("button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp", "shiftKey", "ctrlKey", "altKey", "metaKey", "isTrusted")
+private val TOUCH_FIELDS = listOf("button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp", "shiftKey", "ctrlKey", "altKey", "metaKey", "isTrusted", "detail")
 
 fun jsonValue(v: JsValue): String = when (v) {
 	JsValue.Null -> "null"
@@ -1202,6 +1202,7 @@ class Runtime(
 		return mapOf(
 			"isTrusted" to JsValue.Bool(trusted), "clientX" to JsValue.Num(at?.first ?: 0.0), "clientY" to JsValue.Num(at?.second ?: 0.0),
 			"shiftKey" to JsValue.Bool(false), "ctrlKey" to JsValue.Bool(false), "altKey" to JsValue.Bool(false), "metaKey" to JsValue.Bool(false),
+			"detail" to JsValue.Num(0.0),
 		)
 	}
 

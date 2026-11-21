@@ -1386,10 +1386,12 @@ export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [
 ];
 
 /**
- * What a tap's click adds to a script click handler's event, as a phone browser fills it: where the touch ended, and no
- * modifier key held (a phone has no hardware keyboard). A click no touch made (a screen reader's) is at 0, 0.
+ * What a tap's click adds to a script click handler's event, as a phone browser fills it: where the touch ended, no
+ * modifier key held (a phone has no hardware keyboard), and the press count. A click no touch made (a screen reader's, or
+ * a script's `click()`) is at 0, 0 with a count of 0.
  */
 export const NATIVE_SCRIPT_CLICK_FIELDS: ReadonlyArray<string> = [
+	'detail',
 	'clientX',
 	'clientY',
 	'shiftKey',

@@ -498,6 +498,16 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'copy-1/component-edge:2/h6' }],
 	},
 	{
+		// A JavaScript click handler's press count: 1 for a tap, 0 for a click() a script raised.
+		name: 'click-detail',
+		fixture: 'proofs/u86-click-detail/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h1' },
+		],
+	},
+	{
 		name: 'by-id',
 		fixture: 'test/fixtures/ById.tsrx',
 		actions: [

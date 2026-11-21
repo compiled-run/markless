@@ -235,7 +235,6 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:1/component-edge:2/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_UNSUPPORTED: the contextmenu event has no native meaning yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:2/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `event.detail`, which a tap on a phone does not have",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler uses `KeyboardEvent`, which a phone's script engine does not provide"
 		]
 	},
@@ -313,8 +312,7 @@
 		"diagnostics": [
 			"MARKLESS_NATIVE_UNSUPPORTED: a style binding",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:4/h4 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/rating/rating-walk.ts uses `window.getComputedStyle`: computed CSS, which a phone does not have at run time",
-			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `event.detail`, which a tap on a phone does not have"
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/rating/rating-walk.ts uses `window.getComputedStyle`: computed CSS, which a phone does not have at run time"
 		]
 	},
 	"resizable": {
@@ -367,7 +365,6 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `elementForValue` uses a call to `elements.find`, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler uses a ForOfStatement, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler's `if` test compares with `undefined` a value whose first value is `null`; a native value does not tell undefined from null",
-			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `event.detail`, which a tap on a phone does not have",
 			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler uses a call to `held.filter`, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler uses a returned call's value, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler uses an assignment to something other than a name or member, which needs a script engine",

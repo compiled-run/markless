@@ -244,7 +244,7 @@ public final class NativeRuntime {
 	/// What a dismiss or pointer event carries while its handlers run.
 	private var eventFields: [NativeEventField: NativeValue]?
 	/// What a touch adds to a script pointer handler's event, in the order the reference writes them.
-	private let touchFields: [NativeEventField] = [.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp, .shiftKey, .ctrlKey, .altKey, .metaKey, .isTrusted]
+	private let touchFields: [NativeEventField] = [.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp, .shiftKey, .ctrlKey, .altKey, .metaKey, .isTrusted, .detail]
 	/// Where the last touch came up, which the click it makes reports; a click no touch made is at 0, 0.
 	private var tapPoint: (x: Double, y: Double)?
 	/// The element a phone browser's mouse is over: the last one tapped, until a tap elsewhere moves it.
@@ -255,7 +255,7 @@ public final class NativeRuntime {
 		tapPoint = nil
 		return [
 			.isTrusted: .bool(trusted), .clientX: .number(at?.x ?? 0), .clientY: .number(at?.y ?? 0),
-			.shiftKey: .bool(false), .ctrlKey: .bool(false), .altKey: .bool(false), .metaKey: .bool(false),
+			.shiftKey: .bool(false), .ctrlKey: .bool(false), .altKey: .bool(false), .metaKey: .bool(false), .detail: .number(0),
 		]
 	}
 	/// The element that has focus, or nil.

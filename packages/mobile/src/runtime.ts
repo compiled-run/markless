@@ -1055,6 +1055,7 @@ export function createNativeRuntime(
 			ctrlKey: false,
 			altKey: false,
 			metaKey: false,
+			detail: 0,
 		};
 	};
 	/** A row's copy (`<node>@<key>`) sits where its node does in the tree. */
