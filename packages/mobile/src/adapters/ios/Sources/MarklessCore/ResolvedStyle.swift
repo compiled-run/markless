@@ -23,6 +23,10 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var paintOrder: (bucket: Int, rank: Int)?
 	/// Set on a scroll container: the axes CSS lets scroll, its offset range in points, and its scroll view's look.
 	public var scroll: ResolvedScroll?
+	/// A select's drop-down arrow, once Dragon's plan has laid the page out.
+	public var selectArrow: SelectArrowPaint?
+	/// A select's label: the box Dragon lays out inside it for its text, and that text's font and colour.
+	public var selectLabel: SelectLabel?
 
 	public static func == (a: ResolvedStyle, b: ResolvedStyle) -> Bool {
 		a.frame == b.frame && a.background == b.background && a.borderWidth == b.borderWidth && a.borderColor == b.borderColor
@@ -30,6 +34,22 @@ public struct ResolvedStyle: Equatable, Sendable {
 			&& a.textColor == b.textColor && a.lines == b.lines && a.linesText == b.linesText && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll
 			&& a.clipsChildren == b.clipsChildren && a.clipRect == b.clipRect
 			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank
+			&& a.selectArrow == b.selectArrow && a.selectLabel == b.selectLabel
+	}
+
+	public struct SelectArrowPaint: Equatable, Sendable {
+		public let arrow: SelectArrow
+		public let color: RGBA
+		/// Device px per point: the arrow's geometry is in device px.
+		public let scale: Double
+	}
+
+	/// `frame` in points from the select's border box; `fontSize` in points.
+	public struct SelectLabel: Equatable, Sendable {
+		public let frame: Frame
+		public let fontFamily: String
+		public let fontSize: Double
+		public let color: RGBA?
 	}
 
 	public struct DashedBorder: Equatable, Sendable {
@@ -182,9 +202,10 @@ extension StyleExport {
 		guard let start = matches(initial) ? initial : assignments.indices.first(where: matches) else {
 			throw styleError("no assignment of the style export matches the cells' values \(current.map(\.jsonText))")
 		}
+		let picker = payload.pickerContent
 		return StyleLayout(
 			assignments: try assignments.indices.map { index in
-				try resolveNodes(assignments[index].nodes, for: nodes, root: root, initialTexts: index == start ? initialTexts : nil)
+				try resolveNodes(assignments[index].nodes, for: nodes, picker: picker, root: root, initialTexts: index == start ? initialTexts : nil)
 			},
 			canvases: assignments.map(\.canvas),
 			bodies: try assignments.map { assignment in
@@ -210,13 +231,20 @@ extension StyleExport {
 	}
 
 	private func resolveNodes(
-		_ nodes: [StyleNode], for payloadNodes: [NativeNode], root: String?, initialTexts: [(node: String, text: String)]?
+		_ nodes: [StyleNode], for payloadNodes: [NativeNode], picker: Set<String>, root: String?, initialTexts: [(node: String, text: String)]?
 	) throws -> [String: ResolvedStyle] {
 		let byId = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
 		let payloadIds = Set(payloadNodes.map(\.id))
 		let texts = initialTexts.map { Dictionary(uniqueKeysWithValues: $0.map { ($0.node, $0.text) }) }
+		let payloadById = Dictionary(uniqueKeysWithValues: payloadNodes.map { ($0.id, $0) })
+		let isSelect = { (id: String) -> Bool in
+			if case .element("select", _, _)? = payloadById[id]?.kind { return true }
+			return false
+		}
 		var styles: [String: ResolvedStyle] = [:]
 		for node in payloadNodes {
+			// Dragon lays out no box for what shows only in a select's picker.
+			if picker.contains(node.id), byId[node.id] == nil { continue }
 			if case .branch = node.kind { continue }
 			if case .repeat = node.kind { continue }
 			if case .sheet = node.kind { throw styleError("\(node.id): a system sheet inside another sheet's content is not styled on iOS") }
@@ -250,6 +278,7 @@ extension StyleExport {
 			if let frame = style.frame {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
 			}
+			if isSelect(node.id) { style.selectLabel = try selectLabel(styled, nodes, isView: payloadIds.contains) }
 			styles[node.id] = style
 		}
 		// Each row's copy of a payload node ("<id>@<key>"), placed in its own copies of the boxes around it.
@@ -268,9 +297,31 @@ extension StyleExport {
 			if let frame = style.frame {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
 			}
+			if isSelect(base(styled.id)) { style.selectLabel = try selectLabel(styled, nodes, isView: isView) }
 			styles[styled.id] = style
 		}
 		return styles
+	}
+
+	/// The box Dragon lays out inside a select for its label (Chrome's `::inner`, which no payload node names), with the font
+	/// and colour of the text in it; nil when the select or that box shows nothing.
+	private func selectLabel(_ select: StyleNode, _ nodes: [StyleNode], isView: (String) -> Bool) throws -> ResolvedStyle.SelectLabel? {
+		guard select.frame != nil else { return nil }
+		let inner = nodes.filter { $0.parent == select.id && !isView($0.id) }
+		guard inner.count == 1, !inner[0].isText else {
+			throw styleError("\(select.id): a select's style export holds one box for its label, not \(inner.count)")
+		}
+		guard let box = inner[0].frame, let text = nodes.first(where: { $0.parent == inner[0].id && $0.isText }) else { return nil }
+		var font: (family: String, size: Double)?
+		var color: RGBA?
+		for write in text.writes {
+			if case let .font(family, size) = write { font = (family, size) }
+			if case let .textColor(c) = write { color = c }
+		}
+		guard let font else { throw styleError("\(select.id): its label's text has no font") }
+		return ResolvedStyle.SelectLabel(
+			frame: Frame(x: box.x / dpr, y: box.y / dpr, width: box.width / dpr, height: box.height / dpr),
+			fontFamily: font.family, fontSize: font.size, color: color)
 	}
 
 
@@ -343,6 +394,8 @@ extension StyleExport {
 				style.clipRect = r <= l || b <= t ? Frame(x: 0, y: 0, width: 0, height: 0) : Frame(x: l, y: t, width: r - l, height: b - t)
 			case .clipText: break
 			case let .paintOrder(_, bucket, rank): style.paintOrder = (bucket, rank)
+			case let .selectArrow(color):
+				if let arrow = node.selectArrow { style.selectArrow = ResolvedStyle.SelectArrowPaint(arrow: arrow, color: color, scale: dpr) }
 			}
 		}
 		// A scroll view clips its own content; any other box clips its children.

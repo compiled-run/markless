@@ -38,6 +38,19 @@ public enum StyleWrite: Sendable {
 	case clipText
 	/// The box paints in another stacking context's order (Dragon's re-hosting); `host` is that context's node.
 	case paintOrder(host: String, bucket: Int, rank: Int)
+	/// A select whose appearance devolves to menulist-button: its drop-down arrow is stroked in this colour, along the path
+	/// Dragon's plan layout gives (`StyleNode.selectArrow`).
+	case selectArrow(RGBA)
+}
+
+/// A select's drop-down arrow as Dragon's plan layout gives it: an open path of `points` (x, y pairs, the first moved to),
+/// stroked `strokeWidth` wide with butt caps and miter joins (limit 4), all in device px from the snapped border box, which
+/// sits at `origin` relative to the node's frame.
+public struct SelectArrow: Equatable, Sendable {
+	public let originX: Double
+	public let originY: Double
+	public let strokeWidth: Double
+	public let points: [Double]
 }
 
 /// A dashed or dotted border as Dragon's own native paint draws it (its port of Blink's side painter): operations in device px,
@@ -92,6 +105,10 @@ public struct StyleNode: Sendable {
 	public let scrollRange: ScrollOffsetRange?
 	/// Only on a framed text node: its lines as Dragon laid them out, glyph for glyph.
 	public let lines: [TextLine]?
+	/// Only on a select with a `selectArrow` write, once Dragon's plan has laid the page out.
+	public var selectArrow: SelectArrow? = nil
+
+	var drawsSelectArrow: Bool { writes.contains { if case .selectArrow = $0 { return true } else { return false } } }
 
 	/// The node with no box: a list's template, which only its rows' copies show.
 	func hidden() -> StyleNode {
@@ -534,6 +551,9 @@ public struct StyleExport: Sendable {
 				throw PayloadError(path: plan.path + ".version", reason: "this host reads \(dragonMarklessPlanVersion)")
 			}
 			style.plan = plan.value.jsonText
+		} else if let node = assignments.lazy.flatMap(\.nodes).first(where: \.drawsSelectArrow) {
+			throw PayloadError(
+				path: chosen.path, reason: "\(node.id) draws a drop-down arrow, whose geometry only Dragon's plan layout gives, and the export has no plan")
 		}
 		if targetFields.has("planNames") {
 			let perAssignment = try targetFields["planNames"]
@@ -604,23 +624,43 @@ public struct StyleExport: Sendable {
 			guard shown == nil || rowsLayout != nil else { throw PayloadError(path: "plan layout", reason: "a page with rows needs Dragon's rows layout") }
 			let result = try Reader(JSONValue.parse(Data((shown == nil ? layout(line) : rowsLayout!(line)).utf8)), at: "plan layout")
 			let parts = try result.array()
-			guard parts.count == (slotted ? 4 : 3), try parts[0].string() == "ok" else {
+			let tagged = parts.count > (slotted ? 4 : 3)
+			guard parts.count == (slotted ? 4 : 3) + (tagged ? 1 : 0), try parts[0].string() == "ok" else {
 				throw PayloadError(path: "plan layout", reason: "Dragon's layout at \(width) x \(height) points and \(scale)x failed: \(result.value.jsonText)")
+			}
+			// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
+			let exportId = { (id: String) -> String in
+				guard let at = id.firstIndex(of: "@") else { return names[id] ?? id }
+				let base = String(id[..<at])
+				return "\(names[base] ?? base)\(id[at...])"
+			}
+			var arrows: [String: (strokeWidth: Double, points: [Double])] = [:]
+			if tagged {
+				let last = parts[parts.count - 1]
+				let suffix = try last.array()
+				guard suffix.count == 2, try suffix[0].string() == "menulist-arrows" else { throw last.fail("expected [\"menulist-arrows\", arrows]") }
+				for arrow in try suffix[1].array() {
+					let a = try arrow.array()
+					guard a.count == 3 else { throw arrow.fail("expected id, stroke width and path") }
+					let id = exportId(try a[0].string())
+					guard arrows[id] == nil else { throw arrow.fail("\(id) has two arrows") }
+					var points: [Double] = []
+					for (k, segment) in try a[2].array().enumerated() {
+						let g = try segment.array()
+						guard g.count == 3, try g[0].string() == (k == 0 ? "move" : "line") else {
+							throw segment.fail("an arrow's path is a move and then lines")
+						}
+						points += [try planNumber(g[1].value), try planNumber(g[2].value)]
+					}
+					guard points.count >= 4 else { throw arrow.fail("an arrow's path needs a move and a line") }
+					arrows[id] = (try planNumber(a[1].value), points)
+				}
 			}
 			let bits = { (reader: Reader) throws -> JSONValue in try planNumbers(reader.value) }
 			let page = try parts[1].array()
 			pages.append(page.count == 3 ? nil : try StyleExport.decodeRange(Reader(.object(zip(["minX", "maxX", "minY", "maxY"], try page.map { try bits($0) }).map { ($0, $1) }), at: parts[1].path)))
 			var geometry: [String: Reader] = [:]
-			for node in try parts[2].array() {
-				let id = try node.array()[0].string()
-				// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
-				if let at = id.firstIndex(of: "@") {
-					let base = String(id[..<at])
-					geometry["\(names[base] ?? base)\(id[at...])"] = node
-				} else {
-					geometry[names[id] ?? id] = node
-				}
-			}
+			for node in try parts[2].array() { geometry[exportId(try node.array()[0].string())] = node }
 			var slotWrites: [String: [(kind: String, path: Reader, value: Double)]] = [:]
 			if slotted {
 				for write in try parts[3].array() {
@@ -663,7 +703,7 @@ public struct StyleExport: Sendable {
 			if let missing = slotWrites.keys.first(where: { id in !assignment.nodes.contains { $0.id == id } }) {
 				throw PayloadError(path: "plan layout", reason: "Dragon's layout writes a slot into \(missing), which assignment \(k) does not have")
 			}
-			let nodes = try withRows.map { node in
+			var nodes = try withRows.map { node in
 				try (slotWrites[node.id] ?? []).reduce(node) { try StyleExport.patched($0, kind: $1.kind, path: $1.path, value: $1.value) }
 			}.map { node -> StyleNode in
 				guard node.frame != nil else { return node }
@@ -687,6 +727,29 @@ public struct StyleExport: Sendable {
 					frame: Frame(x: frame[0], y: frame[1], width: frame[2], height: frame[3]),
 					borderWidths: widths.map { ($0[0], $0[1], $0[2], $0[3]) }, writes: node.writes, borderOps: ops,
 					scrollRange: range, lines: node.isText ? lines : nil)
+			}
+			var absolute: [String: (x: Double, y: Double)] = [:]
+			for (index, node) in nodes.enumerated() {
+				guard let frame = node.frame else { continue }
+				var parent = (x: 0.0, y: 0.0)
+				if let id = node.parent {
+					guard let at = absolute[id] else { continue }
+					parent = at
+				}
+				let at = (x: parent.x + frame.x, y: parent.y + frame.y)
+				absolute[node.id] = at
+				if let arrow = arrows.removeValue(forKey: node.id) {
+					guard node.drawsSelectArrow else { throw PayloadError(path: "plan layout", reason: "Dragon's layout gives \(node.id) an arrow, but it draws none") }
+					// Dragon snaps each edge from its absolute device px position, halves upward (Blink LayoutUnit::Round).
+					nodes[index].selectArrow = SelectArrow(
+						originX: (at.x + 0.5).rounded(.down) - at.x, originY: (at.y + 0.5).rounded(.down) - at.y,
+						strokeWidth: arrow.strokeWidth, points: arrow.points)
+				} else if node.drawsSelectArrow {
+					throw PayloadError(path: "plan layout", reason: "\(node.id) draws a drop-down arrow, but Dragon's layout gives it no arrow geometry")
+				}
+			}
+			if let stray = arrows.keys.sorted().first {
+				throw PayloadError(path: "plan layout", reason: "Dragon's layout gives an arrow for \(stray), which it shows no box for")
 			}
 			return (assignment.values, nodes, assignment.canvas, assignment.body)
 		}
@@ -882,6 +945,10 @@ public struct StyleExport: Sendable {
 			try expectKey(f, "dragonStacking.order")
 			_ = try f["index"].number()
 			return .paintOrder(host: try f["host"].string(), bucket: Int(try f["bucket"].number()), rank: Int(try f["rank"].number()))
+		case "select-arrow":
+			let f = try write.object(["kind", "color", "key"])
+			try expectKey(f, "dragonSelectArrow")
+			return .selectArrow(try decodeColor(try f["color"]))
 		default:
 			throw PayloadError(path: write.path + ".kind", reason: "unknown style write kind \"\(kind)\"")
 		}
