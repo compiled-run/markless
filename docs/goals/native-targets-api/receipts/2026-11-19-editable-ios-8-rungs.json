@@ -1,0 +1,54 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "u33-editable",
+			"failure": null,
+			"installSeconds": 0.326541874999999,
+			"flowSeconds": 24.962987875000007
+		},
+		{
+			"name": "u31-field-text",
+			"failure": null,
+			"installSeconds": 0.26291408300001057,
+			"flowSeconds": 28.077706458
+		},
+		{
+			"name": "u30-text-keys",
+			"failure": null,
+			"installSeconds": 0.26316858299999146,
+			"flowSeconds": 43.34730475000001
+		},
+		{
+			"name": "u29-field-focus",
+			"failure": null,
+			"installSeconds": 0.27203137499999136,
+			"flowSeconds": 32.58366437500002
+		},
+		{
+			"name": "u20-modal",
+			"failure": null,
+			"installSeconds": 0.30326345800003035,
+			"flowSeconds": 33.391149916000025
+		},
+		{
+			"name": "u21-popover",
+			"failure": null,
+			"installSeconds": 0.3154587500000489,
+			"flowSeconds": 36.16619025000004
+		},
+		{
+			"name": "u23-textbox",
+			"failure": null,
+			"installSeconds": 0.41415374999999766,
+			"flowSeconds": 27.364365917000047
+		},
+		{
+			"name": "16-keyboard",
+			"failure": null,
+			"installSeconds": 0.381291583000042,
+			"flowSeconds": 37.64657566700003
+		}
+	]
+}

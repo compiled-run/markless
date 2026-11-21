@@ -95,6 +95,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'list-key-from-fields',
+		fixture: 'test/fixtures/JoinedKeys.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h0@b-1' },
+			{ event: 'activate', host: 'component-edge:0/h0@b-1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'component-edge:0/h0@a-1' },
+			{ event: 'activate', host: 'h6@b-2' },
+		],
+	},
+	{
 		name: 'components',
 		fixture: 'proofs/07-child-component/App.tsrx',
 		actions: [
@@ -526,6 +538,16 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'rename',
+		fixture: 'test/fixtures/Rename.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'input', host: 'h2', value: 'Final' },
+			{ event: 'keydown', host: 'h2', key: 'Enter' },
+			{ event: 'activate', host: 'h1' },
+		],
+	},
+	{
 		name: 'press-count',
 		fixture: 'test/fixtures/PressCount.tsrx',
 		actions: [
@@ -689,6 +711,36 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h11' },
 			{ event: 'activate', host: 'h4' },
 			{ event: 'activate', host: 'h7' },
+		],
+	},
+	{
+		name: 'shared-methods',
+		fixture: 'test/fixtures/SharedMonth.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'activate', host: 'component-edge:2/h2' },
+			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'component-edge:2/h2' },
+		],
+	},
+	{
+		name: 'script-unset',
+		fixture: 'test/fixtures/UnsetFirst.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
+		name: 'follows',
+		fixture: 'proofs/u38-follows/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'activate', host: 'h5' },
 		],
 	},
 	{
