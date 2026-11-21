@@ -1192,10 +1192,10 @@ public final class NativeRuntime {
 	/// The page's `<title>` text, nil when it has none.
 	public func title() throws -> String? { try payload.title.map { try text(of: $0) } }
 
-	/// Every system sheet and whether its `open` is truthy.
+	/// Every system sheet shown (its arm, if any, showing) and whether its `open` is truthy.
 	public func sheets() throws -> [(node: String, open: Bool)] {
 		try payload.nodes.compactMap { node in
-			guard case let .sheet(open, _, _, _) = node.kind else { return nil }
+			guard case let .sheet(open, _, _, _) = node.kind, try isShown(node.arm) else { return nil }
 			return (node.id, try evaluate(open).isTruthy)
 		}
 	}

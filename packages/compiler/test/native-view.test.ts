@@ -1467,6 +1467,38 @@ export function Picker() @{
 		).toEqual([{ op: 'assign', cell: 'state:choosing', value: { literal: false } }]);
 	});
 
+	it('places a <native.sheet> in an @if arm with its content, and refuses one in a @for row', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+import { native } from '@markless/device';
+export function App() @{
+	let ready = state(false);
+	let open = state(false);
+	<main>
+		@if (ready) {
+			<native.sheet open={open} dismissible={false}><p>Hi</p></native.sheet>
+		}
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const sheet = payload!.nodes.find((node) => node.kind === 'sheet')!;
+		const content = payload!.nodes.filter((node) => node.parent === sheet.id);
+		expect(sheet.arm).toEqual({ branch: expect.any(String), index: 0 });
+		expect(content.map((node) => node.arm)).toEqual([sheet.arm]);
+		const rows = await nativeView(`import { state } from '@markless/core';
+import { native } from '@markless/device';
+export function App() @{
+	let items = state([{ id: 1 }]);
+	<main>
+		@for (const item of items; key item.id) {
+			<native.sheet open={false} dismissible={false}><p>Hi</p></native.sheet>
+		}
+	</main>
+}`);
+		expect(rows.diagnostics.map((diagnostic) => diagnostic.message)).toContain(
+			'a <native.sheet> inside a @for row',
+		);
+	});
+
 	it('refuses a <native.sheet> the platforms cannot all present, naming the reason', async () => {
 		const refusal = async (props: string) =>
 			(
@@ -1489,8 +1521,9 @@ export function App() @{
 		expect(await refusal('dismissible={false} snapPoints={[0.3, 0.6, 1]}')).toEqual([
 			[NATIVE_UNSUPPORTED_CODE, expect.stringContaining('`snapPoints` of <native.sheet>')],
 		]);
-		expect(await refusal('dismissible={false} snapPoints={[0.5]}')).toEqual([
-			[NATIVE_UNSUPPORTED_CODE, expect.stringContaining('the largest 1')],
+		expect(await refusal('dismissible={false} snapPoints={[0.5]}')).toEqual([]);
+		expect(await refusal('dismissible={false} snapPoints={[0.3, 0.6]}')).toEqual([
+			[NATIVE_UNSUPPORTED_CODE, expect.stringContaining('two with the larger 1')],
 		]);
 		expect(await refusal('dismissible={false} modal={false}')).toEqual([
 			[NATIVE_UNSUPPORTED_CODE, expect.stringContaining('`modal={false}`')],

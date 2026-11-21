@@ -287,9 +287,10 @@ private fun decoderStrictness() {
 	val sheet = ok.replace("]}],\"events\"", "]},{\"kind\":\"sheet\",\"id\":\"s\",\"parent\":\"h0\",\"open\":{\"cell\":\"c\"},\"snapPoints\":[1],\"dismissible\":true,\"modal\":true},{\"kind\":\"element\",\"id\":\"h1\",\"element\":\"p\",\"parent\":\"s\"}],\"events\"")
 		.replace("\"handler\":\"x\"}]", "\"handler\":\"x\"},{\"host\":\"s\",\"event\":\"dismiss\",\"handler\":\"x\"}]")
 	check("decodes a sheet and its content", runCatching { Payload.decode(sheet.toByteArray()) }.getOrNull()?.nodes?.any { it is Node.Sheet && it.snapPoints == listOf(1.0) } == true) { runCatching { Payload.decode(sheet.toByteArray()) }.exceptionOrNull().toString() }
-	refuses("a sheet resting at one height below full", sheet.replace("\"snapPoints\":[1]", "\"snapPoints\":[0.5]"), "snapPoints")
+	check("decodes a sheet resting at one height below full", runCatching { Payload.decode(sheet.replace("\"snapPoints\":[1]", "\"snapPoints\":[0.5]").toByteArray()) }.getOrNull()?.nodes?.any { it is Node.Sheet && it.snapPoints == listOf(0.5) } == true) { "a sheet at [0.5] did not decode" }
+	refuses("a sheet resting at no height", sheet.replace("\"snapPoints\":[1]", "\"snapPoints\":[0]"), "snapPoints")
 	refuses("a sheet whose largest height is not full", sheet.replace("\"snapPoints\":[1]", "\"snapPoints\":[0.3,0.8]"), "snapPoints")
-	refuses("a sheet in an arm", sheet.replace("\"modal\":true", "\"modal\":true,\"arm\":{\"branch\":\"b\",\"index\":0}"), "unknown field \"arm\"")
+	refuses("a sheet in an arm of no branch", sheet.replace("\"modal\":true", "\"modal\":true,\"arm\":{\"branch\":\"b\",\"index\":0}"), "not a preceding branch")
 	refuses("a sheet inside a sheet", sheet.replace("\"parent\":\"s\"}", "\"parent\":\"s\"},{\"kind\":\"sheet\",\"id\":\"s2\",\"parent\":\"s\",\"open\":{\"literal\":false},\"snapPoints\":[1],\"dismissible\":false,\"modal\":true}"), "has a Sheet node as its parent")
 	refuses("a dismiss event on an element", sheet.replace("\"host\":\"s\",\"event\":\"dismiss\"", "\"host\":\"h0\",\"event\":\"dismiss\""), "names no sheet")
 	val script = ok.replace("{\"op\":\"assign\",\"cell\":\"c\",\"value\":{\"literal\":1}}", "{\"op\":\"script\",\"fn\":\"fn:0\",\"type\":\"click\",\"bindings\":{\"c\":{\"cell\":\"c\"}}}")
@@ -682,6 +683,21 @@ private fun rowStyles(fixtures: File) {
 	check("a row's text is its own", rows[1].texts["h6:text0"] == "Call the plumber about the kitchen tap before Friday") { "${rows[1].texts}" }
 }
 
+/** The S23 rung's: each size's aria-pressed is a comparison with the picked size, so its row state lists "true" and "false". */
+private fun rowPressedStyles(fixtures: File) {
+	val style = StyleExport.decodeApp(File(fixtures, "s23-styled-row-pressed.native-app-style.json").readBytes()).getValue("/")
+	val page = AppPayload.decodeOrNull(Json.parse(File(fixtures, "s23-styled-row-pressed.payload.json").readBytes()))!!.routes.single { it.route.pattern == "/" }.page
+	val runtime = Runtime(page)
+	val branches = page.nodes.filter { it is Node.Branch && it.row == null }.map { it.id }
+	val start = runCatching { style.start(page.cells.filter { it.styled }.map { it.id }, runtime::value, false, true, branches, runtime::styleArm, style.rowStates(page)) }
+	check("a page whose rows' aria-pressed follows a comparison starts", start.isSuccess) { start.exceptionOrNull().toString() }
+	val k = start.getOrNull() ?: return
+	val rows = runCatching { style.shownRows(page, runtime)(k).getValue("repeat:0") }
+	check("each row's aria-pressed is a value its row state lists", rows.isSuccess) { rows.exceptionOrNull().toString() }
+	// The template is laid out pressed, the first value the comparison gives: the picked Medium's row.
+	check("only the picked row takes the pressed assignment", rows.getOrNull()?.map { it.assignment == k } == listOf(false, true, false)) { "${rows.getOrNull()?.map { it.key to it.assignment }} from $k" }
+}
+
 fun main(args: Array<String>) {
 	routes()
 	arrays()
@@ -698,6 +714,7 @@ fun main(args: Array<String>) {
 	systemFonts(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	sheetStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	rowStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	rowPressedStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	val dirs = args.map(::File)
 	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)

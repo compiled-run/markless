@@ -192,6 +192,8 @@ final class ViewTree {
 	private var timers: [String: Task<Void, Never>] = [:]
 	private var lists: [String: (anchor: UIView, keys: [String], built: [String: [String]])] = [:]
 	private(set) var sheets: [String: SystemSheet] = [:]
+	/// Sheets built since the last stacking pass, whose content an unstyled page still has to stack.
+	private var unstacked: Set<String> = []
 	/// The controller that presents the page's system sheets.
 	weak var presenter: UIViewController?
 	private var anchors = Set<ObjectIdentifier>()
@@ -294,6 +296,7 @@ final class ViewTree {
 		if layout == nil {
 			stackTree(root)
 			for sheet in sheets.values { stackTree(sheet.content) }
+			unstacked.removeAll()
 			alignTables()
 		} else {
 			try sizePage()
@@ -858,6 +861,8 @@ final class ViewTree {
 		if layout == nil {
 			stack(container)
 			for id in built.flatMap(withArms) { if let view = elements[id] { stackTree(view) } }
+			for id in unstacked { if let sheet = sheets[id] { stackTree(sheet.content) } }
+			unstacked.removeAll()
 		}
 	}
 
@@ -1173,7 +1178,8 @@ final class ViewTree {
 				var childIndex = 0
 				_ = try build(template, in: sheet.content, at: &childIndex, Context())
 				sheets[id] = sheet
-				if try runtime.evaluate(open).isTruthy { sheet.open(from: nil) }
+				if layout == nil { unstacked.insert(id) }
+				if try runtime.evaluate(open).isTruthy { sheet.open(from: presenter) }
 			}
 		}
 		return built
@@ -1241,6 +1247,7 @@ final class ViewTree {
 	}
 
 	private func remove(_ id: String) {
+		sheets.removeValue(forKey: id)?.close(animated: false)
 		if let branch = branches.removeValue(forKey: id) {
 			for inner in branch.built { remove(inner) }
 			anchors.remove(ObjectIdentifier(branch.anchor))
