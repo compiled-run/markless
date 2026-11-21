@@ -1102,7 +1102,7 @@ function walk(
 			// Typing shows the text in the field at once; the input event then runs the handler.
 			const text =
 				'type' in action
-					? typedInto(action.type.text, attributeNow(host, 'maxlength'))
+					? typedInto((action.type.append ? fieldText(host) : '') + action.type.text, attributeNow(host, 'maxlength'))
 					: undefined;
 			if (text !== undefined) {
 				if (properties.has(host)) properties.set(host, text);

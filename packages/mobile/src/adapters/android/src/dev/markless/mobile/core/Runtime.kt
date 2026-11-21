@@ -732,6 +732,8 @@ class Runtime(
 			} +
 			// A key or paste handler called preventDefault() before it first awaited.
 			(if ((result["prevented"] as? Json.Bool)?.value == true) listOf(JournalEntry.PreventDefault) else emptyList()) +
+			// An input handler that set its field's value (`event.target.value = …`) writes the field, as the DOM's setter does.
+			listOfNotNull(typing?.let { field -> result["value"]?.str("leave().value")?.let { text -> edited[field] = text; JournalEntry.Property(field, "value", text) } }) +
 			raised +
 			listOfNotNull(result["navigate"]?.let { n ->
 				val o = n.obj("leave().navigate")
@@ -746,6 +748,8 @@ class Runtime(
 
 	/** How deep events raised from JavaScript nest now. */
 	private var raising = 0
+	/** The text field whose input event is running, which a handler's `event.target.value` write lands on. */
+	private var typing: String? = null
 
 	/**
 	 * An event a script dispatched on an element (or its `click()`), raised once the script returned: `click` as a press on
@@ -1753,6 +1757,7 @@ class Runtime(
 		val bindingsBefore = ticked.associate { it.id to checkedBinding(it.id) }
 		val beforeProperties = properties().associate { (n, a, v) -> (n to a) to v }
 		if (value != null && host != null) edited[host] = value
+		typing = if (value != null) host else null
 		val beforeArms = arms().toMap()
 		val beforeRows = rows().toMap()
 		val beforeTitle = title()
