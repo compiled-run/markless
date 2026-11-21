@@ -23,7 +23,8 @@
 			{
 				"id": "component-edge:1/state:showing",
 				"name": "showing",
-				"initial": true
+				"initial": true,
+				"styled": true
 			},
 			{
 				"id": "object:component-edge:1/cam:ready",
@@ -544,6 +545,11 @@
 				"host": "component-edge:1/h1"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:1/state:showing",
+					"value": false
+				},
 				{
 					"op": "arm",
 					"node": "component-edge:1/branch-site:0",

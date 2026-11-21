@@ -27,7 +27,12 @@
 			{
 				"id": "state:status",
 				"name": "status",
-				"initial": "Idle"
+				"initial": "Idle",
+				"styled": true,
+				"domain": [
+					"Idle",
+					"Saving"
+				]
 			}
 		],
 		"nodes": [
@@ -2179,6 +2184,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:status",
+					"value": "Saving"
+				},
+				{
 					"op": "text",
 					"node": "h22:text0",
 					"value": "Saving"
@@ -2237,6 +2247,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:status",
+					"value": "Kept Lu"
+				},
+				{
 					"op": "text",
 					"node": "h13:text0",
 					"value": "13"
@@ -2254,6 +2269,11 @@
 				"timer": "timer:1"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:status",
+					"value": "No name"
+				},
 				{
 					"op": "text",
 					"node": "h13:text0",
@@ -2303,6 +2323,11 @@
 				"timer": "timer:2"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:status",
+					"value": "Kept mine"
+				},
 				{
 					"op": "text",
 					"node": "h22:text0",

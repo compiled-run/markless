@@ -1,0 +1,107 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Generics",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "generics mk-1d83lp0"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "title mk-1d83lp0"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Harbour tides"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "h2",
+			"parent": "h0",
+			"attributes": {
+				"class": "subtitle mk-1d83lp0"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Drawn in the phone's own font"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "sans mk-1d83lp0"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Sans-serif: waffles, quays and fjords along the harbour wall"
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "serif mk-1d83lp0"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Serif: the quick brown fox jumps over the lazy dog"
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "serif-bold mk-1d83lp0"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h6:text0",
+			"parent": "h6",
+			"text": "Bold serif: AVATAR Type office"
+		},
+		{
+			"kind": "element",
+			"id": "h7",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mono mk-1d83lp0"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h7:text0",
+			"parent": "h7",
+			"text": "Monospace: tide table 0412"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n}\n\n.generics.mk-1d83lp0 {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\t.title.mk-1d83lp0 {\n\t\t\t\tfont-family: system-ui;\n\t\t\t\tfont-size: 28px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n\t\t\t.subtitle.mk-1d83lp0 {\n\t\t\t\tfont-family: system-ui;\n\t\t\t\tfont-size: 20px;\n\t\t\t\tfont-weight: 400;\n\t\t\t}\n\t\t\t.sans.mk-1d83lp0 {\n\t\t\t\tfont-family: sans-serif;\n\t\t\t\tfont-size: 17px;\n\t\t\t}\n\t\t\t.serif.mk-1d83lp0 {\n\t\t\t\tfont-family: serif;\n\t\t\t\tfont-size: 17px;\n\t\t\t}\n\t\t\t.serif-bold.mk-1d83lp0 {\n\t\t\t\tfont-family: serif;\n\t\t\t\tfont-size: 17px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n\t\t\t.mono.mk-1d83lp0 {\n\t\t\t\tfont-family: monospace;\n\t\t\t\tfont-size: 15px;\n\t\t\t}",
+	"states": []
+}

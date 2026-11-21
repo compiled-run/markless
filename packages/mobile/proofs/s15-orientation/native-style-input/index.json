@@ -1,0 +1,47 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Week",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "upright"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Held upright: one day at a time"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "sideways"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Turned on its side: the whole week"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n\tcolor: #22223b;\n}\n\n.page {\n\tpadding: 16px;\n}\n\n.upright {\n\tpadding: 12px;\n\tbackground: #f2e9e4;\n}\n\n.sideways {\n\tdisplay: none;\n}\n\n@media (orientation: landscape) {\n\t.upright {\n\t\tdisplay: none;\n\t}\n\n\t.sideways {\n\t\tdisplay: block;\n\t\tpadding: 12px;\n\t\tbackground: #c9ada7;\n\t}\n}\n",
+	"states": []
+}

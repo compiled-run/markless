@@ -1,0 +1,18 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "s9-web-font",
+			"failure": null,
+			"installSeconds": 12.131903749999998,
+			"flowSeconds": 14.981123541999994
+		},
+		{
+			"name": "s10-web-font-woff2",
+			"failure": null,
+			"installSeconds": 0.24380695900000138,
+			"flowSeconds": 11.568594916999995
+		}
+	]
+}
