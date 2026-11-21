@@ -79,6 +79,19 @@ function calleeName(node: AnyNode | undefined): string | null {
 	return null;
 }
 
+/**
+ * Whether a member read is at or after a `?.` of its chain (`a?.b`, the `.c` of `a?.b.c`): JavaScript ends the whole
+ * chain with undefined at a nullish link. A parenthesized chain (`(a?.b).c`) is its own chain and ends that walk.
+ */
+function inOptionalChain(node: AnyNode): boolean {
+	let link: AnyNode | undefined = node;
+	while (link && (link.type === 'MemberExpression' || link.type === 'CallExpression')) {
+		if (link.optional === true) return true;
+		link = (link.type === 'MemberExpression' ? link.object : link.callee) as AnyNode | undefined;
+	}
+	return false;
+}
+
 /** A template value, test or assigned value as a tree a native host evaluates; names are the component's bindings. */
 export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression {
 	if (!node) return unsupported('a missing expression');
@@ -173,6 +186,7 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 					kind: 'member',
 					object: expressionTreeOf(node.object as AnyNode),
 					property,
+					...(inOptionalChain(node) ? { optional: true as const } : {}),
 				};
 			return node.computed && key && key.type !== 'Literal'
 				? {
