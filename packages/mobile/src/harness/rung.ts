@@ -58,12 +58,18 @@ export type ProofRung = {
 const APP_CONFIG = 'app.json';
 
 /** The config of the app a rung folder is (its own app.json) or belongs to (one beside it); empty when the app has none. */
-export function readAppConfig(rungDir: string): { readonly device?: DeviceAppConfig } {
+export function readAppConfig(rungDir: string): {
+	readonly device?: DeviceAppConfig;
+	readonly origin?: string;
+} {
 	const file = [join(rungDir, APP_CONFIG), join(dirname(rungDir), APP_CONFIG)].find((path) =>
 		existsSync(path),
 	);
 	return file
-		? (JSON.parse(readFileSync(file, 'utf8')) as { readonly device?: DeviceAppConfig })
+		? (JSON.parse(readFileSync(file, 'utf8')) as {
+				readonly device?: DeviceAppConfig;
+				readonly origin?: string;
+			})
 		: {};
 }
 
@@ -119,6 +125,7 @@ export function compileRungApp(
 		readonly device?: DeviceAppConfig;
 		/** Keep the pages that build when others refuse (a rung's `refusedPages`). */
 		readonly partial?: boolean;
+		readonly origin?: string;
 	} = {},
 ) {
 	const document = join(dir, APP_DOCUMENT);
@@ -369,6 +376,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				readModule: readWorkspaceModule,
 				readServedStylesheet: servedReader(dir),
 				...(appConfig.device ? { device: appConfig.device } : {}),
+				...(appConfig.origin !== undefined ? { origin: appConfig.origin } : {}),
 				target: platform,
 			});
 			if (!build.payload) {
@@ -426,6 +434,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				target: platform,
 				...(appConfig.device ? { device: appConfig.device } : {}),
 				...(expected.refusedPages ? { partial: true } : {}),
+				...(appConfig.origin !== undefined ? { origin: appConfig.origin } : {}),
 			});
 			if (!build.payload) {
 				const lines = build.diagnostics.map(
