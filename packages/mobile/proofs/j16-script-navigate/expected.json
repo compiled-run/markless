@@ -1,0 +1,34 @@
+{
+	"rung": "J16",
+	"name": "navigate() from JavaScript on the phone, to a path it builds while it runs: its own page, a pushed page, a relative path that replaces",
+	"steps": [
+		{
+			"visible": ["Order desk", "Nothing yet", "Open next order", "Stay here"],
+			"title": "Home"
+		},
+		{
+			"do": { "tap": "Stay here" },
+			"visible": ["Order desk", "Stayed on this page"],
+			"absent": ["Nothing yet"],
+			"title": "Home"
+		},
+		{
+			"do": { "tap": "Open next order" },
+			"visible": ["Details for order 42", "Next one instead"],
+			"absent": ["Order desk"],
+			"title": "Order 42"
+		},
+		{
+			"do": { "tap": "Next one instead" },
+			"visible": ["Details for order 43"],
+			"absent": ["Details for order 42"],
+			"title": "Order 43"
+		},
+		{
+			"do": { "back": "button" },
+			"visible": ["Order desk", "Open next order"],
+			"absent": ["Details for order 43", "Details for order 42"],
+			"title": "Home"
+		}
+	]
+}

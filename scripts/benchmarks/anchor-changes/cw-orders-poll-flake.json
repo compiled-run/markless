@@ -19,7 +19,7 @@
 				"web/resume-keyed-repeats"
 			],
 			"delta": 182,
-			"reason": "the wiring takes a typed paint snapshot and adopts painted rows under its collections, dropping each entry once used (#1010): 22387 -> 22569 B rendered",
+			"reason": "the wiring takes a typed paint snapshot and adopts painted rows under its collections, dropping each entry once used (#1010): 22695 -> 22877 B rendered",
 			"date": "2026-11-21"
 		},
 		{
@@ -53,7 +53,7 @@
 				"web/resume-keyed-repeats"
 			],
 			"delta": 182,
-			"reason": "the wiring takes a typed paint snapshot and adopts painted rows under its collections, dropping each entry once used (#1010): 22387 -> 22569 B rendered",
+			"reason": "the wiring takes a typed paint snapshot and adopts painted rows under its collections, dropping each entry once used (#1010): 22695 -> 22877 B rendered",
 			"date": "2026-11-21"
 		},
 		{
@@ -97,7 +97,7 @@
 				"web/resume-keyed-repeats"
 			],
 			"delta": 167,
-			"reason": "G10: the wiring takes a typed paint snapshot and adopts painted rows under its collections, dropping each entry once used (#1010): 22402 -> 22569 B rendered",
+			"reason": "G10: the wiring takes a typed paint snapshot and adopts painted rows under its collections, dropping each entry once used (#1010): 22710 -> 22877 B rendered",
 			"date": "2026-11-21"
 		}
 	]

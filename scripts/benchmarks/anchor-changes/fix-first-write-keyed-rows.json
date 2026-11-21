@@ -1,0 +1,178 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 308,
+			"reason": "a keyed list withdraws its published rows when disposed, and a row handle falls back to the served elements until its list wires",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-locators"
+			],
+			"delta": 97,
+			"reason": "a keyed list withdraws its published rows when disposed, and a row handle falls back to the served elements until its list wires",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -10,
+			"reason": "a keyed list withdraws its published rows when disposed, and a row handle falls back to the served elements until its list wires",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 308,
+			"reason": "a keyed list withdraws its published rows when disposed, and a row handle falls back to the served elements until its list wires",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-locators"
+			],
+			"delta": 97,
+			"reason": "a keyed list withdraws its published rows when disposed, and a row handle falls back to the served elements until its list wires",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -3,
+			"reason": "a keyed list withdraws its published rows when disposed, and a row handle falls back to the served elements until its list wires",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -4,
+			"reason": "a keyed list withdraws its published rows when disposed, and a row handle falls back to the served elements until its list wires",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 308,
+			"reason": "pages with keyed lists load resume-keyed-repeats, where each list now publishes its rows on screen so a row handle holds exactly those rows instead of every child of the list's parent",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 478,
+			"reason": "pages with keyed lists load resume-keyed-repeats, where each list now publishes its rows on screen so a row handle holds exactly those rows instead of every child of the list's parent",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 82,
+			"reason": "pages with keyed lists load resume-keyed-repeats, where each list now publishes its rows on screen so a row handle holds exactly those rows instead of every child of the list's parent",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 371,
+			"reason": "pages with keyed lists load resume-keyed-repeats, where each list now publishes its rows on screen so a row handle holds exactly those rows instead of every child of the list's parent",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 82,
+			"reason": "pages with keyed lists load resume-keyed-repeats, where each list now publishes its rows on screen so a row handle holds exactly those rows instead of every child of the list's parent",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 478,
+			"reason": "pages with keyed lists load resume-keyed-repeats, where each list now publishes its rows on screen so a row handle holds exactly those rows instead of every child of the list's parent",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 82,
+			"reason": "pages with keyed lists load resume-keyed-repeats, where each list now publishes its rows on screen so a row handle holds exactly those rows instead of every child of the list's parent",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 68,
+			"reason": "pages with keyed lists load resume-keyed-repeats, where each list now publishes its rows on screen so a row handle holds exactly those rows instead of every child of the list's parent",
+			"date": "2026-11-20"
+		}
+	]
+}
