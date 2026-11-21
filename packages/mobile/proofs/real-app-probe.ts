@@ -8,7 +8,7 @@ import { parseArgs } from 'node:util';
 import { buildSemanticGraph, type CompilerDiagnostic } from '@markless/compiler';
 import { buildRouteManifestFromFileIds } from '@markless/router';
 import * as compile from '../src/compile.ts';
-import { resolvePackageModule } from '../src/harness/rung.ts';
+import { resolvePackageModule, servedReader } from '../src/harness/rung.ts';
 
 type Module = { readonly filename: string; readonly source: string };
 type ReadModule = (specifier: string, importer: string) => Module | undefined;
@@ -27,6 +27,7 @@ type AppCompiler = (input: {
 		specifier: string,
 		importer: string,
 	) => { readonly file: string; readonly cssText: string } | undefined;
+	readonly readServedStylesheet?: (href: string) => { readonly file: string; readonly cssText: string } | undefined;
 }) => Promise<{ readonly diagnostics: ReadonlyArray<PageDiagnostic> }>;
 
 const { values } = parseArgs({
@@ -163,6 +164,7 @@ function summarize(
 
 async function probeApp(app: string, appRoot: string): Promise<PageResult[]> {
 	const read = readerFor();
+	const served = servedReader(appRoot);
 	const all = files(appRoot);
 	const pageIds = all
 		.map((file) => relative(appRoot, file))
@@ -234,6 +236,7 @@ async function probeApp(app: string, appRoot: string): Promise<PageResult[]> {
 				...(document ? { document } : {}),
 				readModule: read,
 				readStylesheet: stylesheetReader,
+				readServedStylesheet: served,
 			});
 			for (const route of tsrx)
 				results.push(
@@ -259,6 +262,7 @@ async function probeApp(app: string, appRoot: string): Promise<PageResult[]> {
 						...(document ? { document } : {}),
 						readModule: read,
 						readStylesheet: stylesheetReader,
+						readServedStylesheet: served,
 					})
 				: await compile.compileNativeComponent({
 						filename: page.filename,

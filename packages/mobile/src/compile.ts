@@ -59,6 +59,8 @@ export type NativeStylesheet = { readonly file: string; readonly cssText: string
 
 /** Reads a stylesheet a module imports for its effect (`./app.css`); the caller owns file access. */
 export type ReadStylesheet = (specifier: string, importer: string) => NativeStylesheet | undefined;
+/** A stylesheet the app serves at `href` (`/static/news.css`, from its public folder), as a `<link>` loads it. */
+export type ReadServedStylesheet = (href: string) => NativeStylesheet | undefined;
 
 const stylesheetsOf = (
 	requests: ReadonlyArray<string>,
@@ -135,6 +137,7 @@ export async function compileNativeComponent(input: {
 	/** In an app build: every page's route, so links and `navigate()` are checked and resolved against them. */
 	readonly manifest?: RouteManifest;
 	readonly readStylesheet?: ReadStylesheet;
+	readonly readServedStylesheet?: ReadServedStylesheet;
 	/** The app config's `device` section (usage text per feature). */
 	readonly device?: DeviceAppConfig;
 	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
@@ -248,11 +251,18 @@ export async function compileNativeComponent(input: {
 		}
 		if (Object.keys(linked).length > 0) compiled = await compileTsrxModule({ ...rootInput, importedModuleInterfaces: linked });
 	}
+	const linkedSheets: NativeStylesheet[] = [];
+	const linkStylesheet = (href: string): boolean => {
+		const sheet = input.readServedStylesheet?.(href);
+		if (sheet) linkedSheets.push(sheet);
+		return sheet !== undefined;
+	};
 	let native: NativeViewArtifact;
 	let keyHandlers = false;
 	for (;;) {
 		native = createNativeViewPayload(compiled.semanticGraph, {
 			...(keyHandlers ? { keyHandlers } : {}),
+			linkStylesheet,
 			...(route
 				? {
 						route: {
@@ -299,7 +309,7 @@ export async function compileNativeComponent(input: {
 		native.features,
 		input.device,
 	);
-	const sheets = stylesheets.filter(
+	const sheets = [...stylesheets, ...linkedSheets].filter(
 		(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
 	);
 	const authored = [...importedStyles, ...compiled.publicRenderPlan.styleScopes];
@@ -403,6 +413,7 @@ export async function compileNativeApp(input: {
 	readonly document?: { readonly filename: string; readonly source: string };
 	readonly readModule?: Parameters<typeof compileNativeComponent>[0]['readModule'];
 	readonly readStylesheet?: ReadStylesheet;
+	readonly readServedStylesheet?: ReadServedStylesheet;
 	/** The app config's `device` section (usage text per feature), for every page. */
 	readonly device?: DeviceAppConfig;
 	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
@@ -452,6 +463,7 @@ export async function compileNativeApp(input: {
 			manifest,
 			...(input.readModule ? { readModule: input.readModule } : {}),
 			...(input.readStylesheet ? { readStylesheet: input.readStylesheet } : {}),
+			...(input.readServedStylesheet ? { readServedStylesheet: input.readServedStylesheet } : {}),
 			...(input.device ? { device: input.device } : {}),
 			...(input.target ? { target: input.target } : {}),
 			icons,
