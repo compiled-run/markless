@@ -1,0 +1,29 @@
+{
+	"rung": 147,
+	"name": "a part's state written while rendering from a prop that follows state: written again when the prop's value changes, and a handler's own write to it stays while the value does not",
+	"steps": [
+		{
+			"visible": ["Follows", "Count 0", "Box off"]
+		},
+		{
+			"do": { "tap": "Add" },
+			"visible": ["Count 1", "Box off"],
+			"absent": ["Count 0"]
+		},
+		{
+			"do": { "tap": "Add" },
+			"visible": ["Count 2", "Box on"],
+			"absent": ["Count 1", "Box off"]
+		},
+		{
+			"do": { "tap": "Box on" },
+			"visible": ["Box off", "Count 2"],
+			"absent": ["Box on"]
+		},
+		{
+			"do": { "tap": "Add" },
+			"visible": ["Count 3", "Box off"],
+			"absent": ["Count 2", "Box on"]
+		}
+	]
+}

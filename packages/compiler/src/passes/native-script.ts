@@ -195,7 +195,10 @@ var fn = function (id) {
 	if (!functions[id]) load(owners[id]);
 	return functions[id];
 };
+// A cell still undefined on the web reads so here until something writes it; a write, even of null, is reported.
+var unset = {}, forced = {};
 var slotValue = function (slot) {
+	if (unset[slot]) return undefined;
 	if (Object.prototype.hasOwnProperty.call(cells, slot)) return cells[slot];
 	var at = slot.indexOf('@');
 	return at < 0 ? undefined : cells[slot.slice(0, at)];
@@ -204,7 +207,13 @@ var cellProperty = function (target, name, slot) {
 	Object.defineProperty(target, name, {
 		enumerable: true,
 		get: function () { return slotValue(slot); },
-		set: function (value) { cells[slot] = value; },
+		set: function (value) {
+			if (unset[slot]) {
+				delete unset[slot];
+				forced[slot] = true;
+			}
+			cells[slot] = value;
+		},
 	});
 };
 var frameOf = function (bindings) {
@@ -218,6 +227,10 @@ var frameOf = function (bindings) {
 			Object.defineProperty(names, name, { enumerable: true, value: object });
 		} else if ('elements' in binding) Object.defineProperty(names, name, { enumerable: true, value: elementsOf(binding.elements) });
 		else if ('object' in binding) Object.defineProperty(names, name, { enumerable: true, value: frameOf(binding.object) });
+		else if ('method' in binding) {
+			var method = binding.method, own = binding.frame;
+			Object.defineProperty(names, name, { enumerable: true, value: function () { return fn(method)(frameOf(own)).apply(this, arguments); } });
+		}
 		else if ('shared' in binding) {
 			var shared = frameOf(binding.shared);
 			Object.defineProperty(names, name, { enumerable: true, value: function () { return shared; } });
@@ -297,6 +310,9 @@ var begin = function (entry) {
 	elementFacts = entry.elements || {};
 	proxies = {};
 	cells = join(entry.cells, entry.nonFinite);
+	unset = {};
+	forced = {};
+	(entry.unset || []).forEach(function (slot) { unset[slot] = true; });
 	before = {};
 	for (var slot in cells) before[slot] = stable(cells[slot]);
 	host.out = { timers: [], clears: [], requests: [], aborts: [], logs: [], commands: [] };
@@ -437,7 +453,7 @@ g.__markless[id] = {
 	leave: function () {
 		var writes = [];
 		for (var slot in cells) {
-			if (stable(cells[slot]) === before[slot]) continue;
+			if (stable(cells[slot]) === before[slot] && !forced[slot]) continue;
 			var given = JSON.parse(JSON.stringify(split(cells[slot] === undefined ? null : cells[slot])));
 			writes.push(given.nonFinite.length > 0 ? [slot, given.json, given.nonFinite] : [slot, given.json]);
 		}
