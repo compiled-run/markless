@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": -908,
+			"reason": "G16 now runs each load at 4x CPU with no made-up hover reaching the page, so it measures the same code every run (ten CI jobs, 30 loads per bench page, one value each); the old anchors came from runs that included a hover at (0,0) and a modulepreload race",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": -352,
+			"reason": "G16 now runs each load at 4x CPU with no made-up hover reaching the page, so it measures the same code every run (ten CI jobs, 30 loads per bench page, one value each); the old anchors came from runs that included a hover at (0,0) and a modulepreload race",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": -459,
+			"reason": "G16 now runs each load at 4x CPU with no made-up hover reaching the page, so it measures the same code every run (ten CI jobs, 30 loads per bench page, one value each); the old anchors came from runs that included a hover at (0,0) and a modulepreload race",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": -215,
+			"reason": "G16 now measures docs / at 25710 chars as the lowest of three loads in all ten proof jobs and the PR run; accept drops moves under 256 as noise, so this entry sets the anchor to that measured value by hand rather than leave 215 chars of room",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -1227,
+			"reason": "G16 now runs each load at 4x CPU with no made-up hover reaching the page, so it measures the same code every run (ten CI jobs, 30 loads per bench page, one value each); the old anchors came from runs that included a hover at (0,0) and a modulepreload race",
+			"date": "2026-11-20"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": -712,
+			"reason": "G16 now runs each load at 4x CPU with no made-up hover reaching the page, so it measures the same code every run (ten CI jobs, 30 loads per bench page, one value each); the old anchors came from runs that included a hover at (0,0) and a modulepreload race",
+			"date": "2026-11-20"
+		}
+	]
+}

@@ -149,8 +149,10 @@ export type SemanticScriptFunction = {
 	/** Each use of its first parameter (the event), as the member path read off it (`['target', 'value']`; empty: whole). */
 	readonly event?: ReadonlyArray<{ readonly path: ReadonlyArray<string>; readonly span: SourceSpan }>;
 	readonly globals: ReadonlyArray<SemanticScriptGlobal>;
-	/** Framework imports it uses (`navigate`), which are not JavaScript a script can run. */
+	/** Framework imports it uses that are not JavaScript a script can run. */
 	readonly framework: ReadonlyArray<{ readonly name: string; readonly source: string; readonly span: SourceSpan }>;
+	/** Each place it reaches `navigate` from `@markless/router`, which the host's route table stands in for. */
+	readonly navigates: ReadonlyArray<SourceSpan>;
 	readonly span: SourceSpan;
 	/** Constructs the engine cannot run as written (an `enum`), from type erasure. */
 	readonly unsupported: ReadonlyArray<{ readonly construct: string; readonly span: SourceSpan }>;
@@ -172,6 +174,7 @@ export type SemanticScriptStatement = {
 	/** Names it uses that a script leaves out (a component, top-level framework state). */
 	readonly dropped: ReadonlyArray<{ readonly name: string; readonly span: SourceSpan }>;
 	readonly framework: ReadonlyArray<{ readonly name: string; readonly source: string; readonly span: SourceSpan }>;
+	readonly navigates: ReadonlyArray<SourceSpan>;
 	readonly unsupported: ReadonlyArray<{ readonly construct: string; readonly span: SourceSpan }>;
 };
 
@@ -319,6 +322,8 @@ export type SemanticComponentPropBinding =
 			readonly definitionSpans?: ReadonlyArray<SourceSpan>;
 			/** A callback's body as statements, collected for native builds only (`nativeFacts`). */
 			readonly nativeStatements?: ReadonlyArray<SemanticHandlerStatement>;
+			/** The name each callback parameter binds (`''` for a pattern), where `parameters` holds its source text. */
+			readonly nativeParameters?: ReadonlyArray<string>;
 			/** An opaque prop's value as a tree, collected for native builds only (`nativeFacts`). */
 			readonly nativeExpression?: SemanticExpression;
 			// `@catch (error, reset)` reset names a callback prop's own source calls, with the boundary each resets.

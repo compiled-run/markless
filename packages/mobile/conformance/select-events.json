@@ -1,0 +1,543 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:size",
+				"name": "size",
+				"initial": "m"
+			},
+			{
+				"id": "state:fired",
+				"name": "fired",
+				"initial": "nothing"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Sizes"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "select",
+				"parent": "h0",
+				"attributes": {
+					"aria-label": "Size"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "option",
+				"parent": "h2",
+				"attributes": {
+					"value": "s"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Small"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "option",
+				"parent": "h2",
+				"attributes": {
+					"value": "m",
+					"selected": ""
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Medium"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "option",
+				"parent": "h2",
+				"attributes": {
+					"value": "l"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Large"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "select",
+				"parent": "h0",
+				"attributes": {
+					"aria-label": "Copy"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "option",
+				"parent": "h6",
+				"attributes": {
+					"value": "s"
+				},
+				"bindings": [
+					{
+						"property": "selected",
+						"value": {
+							"binary": "===",
+							"left": {
+								"template": [
+									"",
+									{
+										"cell": "state:size"
+									}
+								]
+							},
+							"right": {
+								"template": [
+									"",
+									{
+										"literal": "s"
+									}
+								]
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Small copy"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "option",
+				"parent": "h6",
+				"attributes": {
+					"value": "m"
+				},
+				"bindings": [
+					{
+						"property": "selected",
+						"value": {
+							"binary": "===",
+							"left": {
+								"template": [
+									"",
+									{
+										"cell": "state:size"
+									}
+								]
+							},
+							"right": {
+								"template": [
+									"",
+									{
+										"literal": "m"
+									}
+								]
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h8:text0",
+				"parent": "h8",
+				"parts": [
+					{
+						"text": "Medium copy"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "option",
+				"parent": "h6",
+				"attributes": {
+					"value": "l"
+				},
+				"bindings": [
+					{
+						"property": "selected",
+						"value": {
+							"binary": "===",
+							"left": {
+								"template": [
+									"",
+									{
+										"cell": "state:size"
+									}
+								]
+							},
+							"right": {
+								"template": [
+									"",
+									{
+										"literal": "l"
+									}
+								]
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h9:text0",
+				"parent": "h9",
+				"parts": [
+					{
+						"text": "Large copy"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h10",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h10:text0",
+				"parent": "h10",
+				"parts": [
+					{
+						"text": "Reset"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h11",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h11:text0",
+				"parent": "h11",
+				"parts": [
+					{
+						"text": "Size is "
+					},
+					{
+						"cell": "state:size"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h12",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h12:text0",
+				"parent": "h12",
+				"parts": [
+					{
+						"text": "Fired "
+					},
+					{
+						"cell": "state:fired"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "input",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h10",
+				"event": "activate",
+				"handler": "handler:event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:size",
+						"value": {
+							"event": "value"
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:fired",
+						"value": {
+							"template": [
+								"input ",
+								{
+									"event": "value"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:size",
+						"value": {
+							"literal": "m"
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Sizes"
+		],
+		[
+			"h3:text0",
+			"Small"
+		],
+		[
+			"h4:text0",
+			"Medium"
+		],
+		[
+			"h5:text0",
+			"Large"
+		],
+		[
+			"h7:text0",
+			"Small copy"
+		],
+		[
+			"h8:text0",
+			"Medium copy"
+		],
+		[
+			"h9:text0",
+			"Large copy"
+		],
+		[
+			"h10:text0",
+			"Reset"
+		],
+		[
+			"h11:text0",
+			"Size is m"
+		],
+		[
+			"h12:text0",
+			"Fired nothing"
+		]
+	],
+	"initialSelections": [
+		[
+			"h3",
+			false
+		],
+		[
+			"h4",
+			true
+		],
+		[
+			"h5",
+			false
+		],
+		[
+			"h7",
+			false
+		],
+		[
+			"h8",
+			true
+		],
+		[
+			"h9",
+			false
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "choose",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h11:text0",
+					"value": "Size is l"
+				},
+				{
+					"op": "text",
+					"node": "h12:text0",
+					"value": "Fired input l"
+				},
+				{
+					"op": "property",
+					"node": "h4",
+					"name": "selected",
+					"value": false
+				},
+				{
+					"op": "property",
+					"node": "h5",
+					"name": "selected",
+					"value": true
+				},
+				{
+					"op": "property",
+					"node": "h8",
+					"name": "selected",
+					"value": false
+				},
+				{
+					"op": "property",
+					"node": "h9",
+					"name": "selected",
+					"value": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "choose",
+				"host": "h5"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "choose",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h11:text0",
+					"value": "Size is s"
+				},
+				{
+					"op": "text",
+					"node": "h12:text0",
+					"value": "Fired input s"
+				},
+				{
+					"op": "property",
+					"node": "h3",
+					"name": "selected",
+					"value": true
+				},
+				{
+					"op": "property",
+					"node": "h5",
+					"name": "selected",
+					"value": false
+				},
+				{
+					"op": "property",
+					"node": "h7",
+					"name": "selected",
+					"value": true
+				},
+				{
+					"op": "property",
+					"node": "h9",
+					"name": "selected",
+					"value": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h10"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h11:text0",
+					"value": "Size is m"
+				},
+				{
+					"op": "property",
+					"node": "h7",
+					"name": "selected",
+					"value": false
+				},
+				{
+					"op": "property",
+					"node": "h8",
+					"name": "selected",
+					"value": true
+				}
+			]
+		}
+	]
+}

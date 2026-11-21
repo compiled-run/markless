@@ -1,5 +1,8 @@
 import type { NativeScript, NativeScriptService } from '@markless/serializer';
-import { NATIVE_SCRIPT_POINTER_FIELDS } from '@markless/serializer/native-view';
+import {
+	NATIVE_SCRIPT_POINTER_FIELDS,
+	NATIVE_SCRIPT_SUBMITTED_FORM,
+} from '@markless/serializer/native-view';
 
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
 export type NativeScriptModuleInput = {
@@ -12,7 +15,7 @@ export type NativeScriptModuleInput = {
 // Installed once per engine and shared by every payload's script; each entry's output buffer is the running script's.
 const HOST_SERVICES = String.raw`var host = g.__marklessHost;
 if (!host) {
-	host = g.__marklessHost = { out: null, timers: {}, nextTimer: 1, requests: {}, nextRequest: 1, seed: null, counter: 0 };
+	host = g.__marklessHost = { out: null, timers: {}, nextTimer: 1, requests: {}, nextRequest: 1, nextRun: 1, seed: null, counter: 0 };
 	var output = function () {
 		if (!host.out) throw new Error('a host service was used outside a handler');
 		return host.out;
@@ -166,8 +169,197 @@ if (!host) {
 			return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20);
 		},
 	};
+	// The web's URL parser for a path (WHATWG): dot segments removed, the path percent-encode set encoded.
+	var encodePath = function (path) {
+		var out = '';
+		for (var index = 0; index < path.length; index++) {
+			var code = path.charCodeAt(index);
+			var char = path.charAt(index);
+			if (code >= 0xd800 && code <= 0xdbff && index + 1 < path.length) {
+				var low = path.charCodeAt(index + 1);
+				if (low >= 0xdc00 && low <= 0xdfff) {
+					out += encodeURIComponent(char + path.charAt(++index));
+					continue;
+				}
+			}
+			if (code >= 0xd800 && code <= 0xdfff) out += '%EF%BF%BD';
+			else if (code <= 0x20 || code >= 0x7f || '"<>^\x60{}'.indexOf(char) >= 0) out += encodeURIComponent(char);
+			else out += char;
+		}
+		return out;
+	};
+	var resolvePath = function (text, here) {
+		var path = text === '' ? here : text.charAt(0) === '/' ? text : here.slice(0, here.lastIndexOf('/') + 1) + text;
+		var segments = path.split('/');
+		var kept = [];
+		for (var index = 1; index < segments.length; index++) {
+			var segment = segments[index];
+			var lower = segment.toLowerCase();
+			var last = index === segments.length - 1;
+			if (segment === '..' || lower === '.%2e' || lower === '%2e.' || lower === '%2e%2e') {
+				kept.pop();
+				if (last) kept.push('');
+			} else if (segment === '.' || lower === '%2e') {
+				if (last) kept.push('');
+			} else kept.push(segment);
+		}
+		return encodePath('/' + kept.join('/'));
+	};
+	var decodeSegment = function (segment) {
+		try { return decodeURIComponent(segment); } catch (error) { return segment; }
+	};
+	// The router's match: routes in its order, a [param] takes one segment (URL-decoded, as a phone keeps params), a [...rest] the rest.
+	var matchRoute = function (path, routes) {
+		var request = path.length > 1 && path.charAt(path.length - 1) === '/' ? path.slice(0, -1) : path;
+		var parts = request === '/' ? [] : request.slice(1).split('/');
+		for (var index = 0; index < routes.length; index++) {
+			var pattern = routes[index];
+			var segments = pattern === '/' ? [] : pattern.slice(1).split('/');
+			var rest = -1;
+			for (var at = 0; at < segments.length; at++) if (segments[at].indexOf('[...') === 0) rest = at;
+			if (rest < 0 ? segments.length !== parts.length : parts.length <= rest) continue;
+			var params = {};
+			var matched = true;
+			for (var at = 0; at < segments.length && matched; at++) {
+				var segment = segments[at];
+				if (at === rest) break;
+				if (segment.charAt(0) === '[') params[segment.slice(1, -1)] = decodeSegment(parts[at]);
+				else if (segment !== decodeSegment(parts[at])) matched = false;
+			}
+			if (matched) return { route: pattern, params: params };
+		}
+		return null;
+	};
+	host.navigate = function (href, options) {
+		var place = host.place;
+		if (!place || !host.out) throw new Error('navigate() runs in an event handler');
+		var given = String(href);
+		var text = given.replace(/^[\u0000- ]+|[\u0000- ]+$/g, '').replace(/[\t\n\r]/g, '').replace(/\\/g, '/');
+		if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(text) || text.slice(0, 2) === '//')
+			return Promise.reject(new Error('navigate() to ' + given + ' leaves the app, and a phone app has no browser to load it in'));
+		var hash = '';
+		var search = '';
+		var at = text.indexOf('#');
+		if (at >= 0) { hash = text.slice(at); text = text.slice(0, at); }
+		at = text.indexOf('?');
+		if (at >= 0) { search = text.slice(at); text = text.slice(0, at); }
+		if (search === '?') search = '';
+		var path = resolvePath(text, place.path);
+		// The router keeps the page shown for its own path and query; a '#/' hash names a client route.
+		var same = function (a, b) { return a.split('/').map(decodeSegment).join('/') === b.split('/').map(decodeSegment).join('/'); };
+		if (same(path, place.path) && search === '' && hash.slice(0, 2) !== '#/') return Promise.resolve();
+		var match = matchRoute(path, place.routes);
+		if (!match) return Promise.reject(new Error('navigate() to ' + given + ': ' + path + ' is not a page of this app'));
+		if (match.route.indexOf('[...') >= 0)
+			return Promise.reject(new Error('navigate() to ' + given + ' opens ' + match.route + ', a catch-all page, which a phone does not open yet'));
+		host.out.navigate = { route: match.route, params: match.params, replace: !!(options && options.replace) };
+		return Promise.resolve();
+	};
 	g.window = g.self = g;
 	host.Response = Response;
+	// The HTML structured clone, as Chromium runs it, for an engine that has none.
+	if (typeof g.structuredClone !== 'function') {
+		var cloneFailed = function (what) {
+			var message = "Failed to execute 'structuredClone' on 'Window': " + what + ' could not be cloned.';
+			if (typeof g.DOMException === 'function') return new g.DOMException(message, 'DataCloneError');
+			var error = new Error(message);
+			error.name = 'DataCloneError';
+			return error;
+		};
+		var ERRORS = ['Error', 'EvalError', 'RangeError', 'ReferenceError', 'SyntaxError', 'TypeError', 'URIError'];
+		var tag = function (value) { return Object.prototype.toString.call(value).slice(8, -1); };
+		g.structuredClone = function structuredClone(value) {
+			if (arguments.length === 0)
+				throw new TypeError("Failed to execute 'structuredClone' on 'Window': 1 argument required, but only 0 present.");
+			var memory = new Map();
+			var copy = function (input) {
+				var type = typeof input;
+				if (type === 'symbol' || type === 'function') throw cloneFailed(String(input));
+				if (input === null || type !== 'object') return input;
+				if (memory.has(input)) return memory.get(input);
+				// The host's own objects stand for the web's platform objects, which do not clone.
+				if (input instanceof host.Form) throw cloneFailed('HTMLFormElement object');
+				if (typeof g.FormData === 'function' && input instanceof g.FormData) throw cloneFailed('FormData object');
+				var kind = tag(input), output;
+				if (kind === 'Boolean') output = Object(Boolean.prototype.valueOf.call(input));
+				else if (kind === 'Number') output = Object(Number.prototype.valueOf.call(input));
+				else if (kind === 'String') output = Object(String.prototype.valueOf.call(input));
+				else if (kind === 'BigInt') output = Object(BigInt.prototype.valueOf.call(input));
+				else if (kind === 'Date') output = new Date(input.getTime());
+				else if (kind === 'RegExp') output = new RegExp(input.source, input.flags);
+				else if (kind === 'ArrayBuffer') output = input.slice(0);
+				else if (ArrayBuffer.isView(input)) {
+					var buffer = copy(input.buffer);
+					output = kind === 'DataView'
+						? new DataView(buffer, input.byteOffset, input.byteLength)
+						: new input.constructor(buffer, input.byteOffset, input.length);
+				} else if (kind === 'Map') {
+					output = new Map();
+					memory.set(input, output);
+					input.forEach(function (entry, key) { output.set(copy(key), copy(entry)); });
+					return output;
+				} else if (kind === 'Set') {
+					output = new Set();
+					memory.set(input, output);
+					input.forEach(function (entry) { output.add(copy(entry)); });
+					return output;
+				} else if (kind === 'Error') {
+					var name = ERRORS.indexOf(input.name) >= 0 ? input.name : 'Error';
+					var own = Object.getOwnPropertyDescriptor(input, 'message');
+					output = own && 'value' in own ? new g[name](String(own.value)) : new g[name]();
+					if (typeof input.stack === 'string') output.stack = input.stack;
+				} else if (kind === 'Array' || kind === 'Object' || kind === 'Arguments') {
+					output = kind === 'Array' ? new Array(input.length) : {};
+					memory.set(input, output);
+					Object.keys(input).forEach(function (key) { output[key] = copy(input[key]); });
+					return output;
+				} else throw cloneFailed(kind + ' object');
+				memory.set(input, output);
+				return output;
+			};
+			return copy(value);
+		};
+	}
+	// The form a submit handler's event names: only FormData reads it, as its entries when the form was sent.
+	host.Form = function (entries) { Object.defineProperty(this, 'entries', { value: entries }); };
+	if (typeof g.FormData !== 'function') {
+		var FormData = function FormData(form, submitter) {
+			if (!(this instanceof FormData)) throw new TypeError("Failed to construct 'FormData': Please use the 'new' operator");
+			if (submitter !== undefined && submitter !== null) throw new TypeError("FormData on a phone does not read a submitter yet");
+			if (form !== undefined && !(form instanceof host.Form))
+				throw new TypeError("Failed to construct 'FormData': parameter 1 is not of type 'HTMLFormElement'.");
+			this.list = form ? form.entries.map(function (entry) { return [String(entry[0]), String(entry[1])]; }) : [];
+		};
+		var named = function (data, name) { return data.list.filter(function (entry) { return entry[0] === String(name); }); };
+		FormData.prototype.get = function (name) { var found = named(this, name); return found.length ? found[0][1] : null; };
+		FormData.prototype.getAll = function (name) { return named(this, name).map(function (entry) { return entry[1]; }); };
+		FormData.prototype.has = function (name) { return named(this, name).length > 0; };
+		FormData.prototype.append = function (name, value) { this.list.push([String(name), String(value)]); };
+		FormData.prototype['delete'] = function (name) { this.list = this.list.filter(function (entry) { return entry[0] !== String(name); }); };
+		FormData.prototype.set = function (name, value) {
+			var at = -1;
+			for (var index = 0; index < this.list.length; index++) if (this.list[index][0] === String(name)) { at = index; break; }
+			if (at < 0) return this.append(name, value);
+			this.list[at] = [String(name), String(value)];
+			var kept = this.list.slice(0, at + 1);
+			this.list = kept.concat(this.list.slice(at + 1).filter(function (entry) { return entry[0] !== String(name); }));
+		};
+		FormData.prototype.forEach = function (fn, that) {
+			var self = this;
+			this.list.slice().forEach(function (entry) { fn.call(that, entry[1], entry[0], self); });
+		};
+		var iterate = function (data, pick) {
+			var list = data.list.slice(), at = 0;
+			var it = { next: function () { return at < list.length ? { value: pick(list[at++]), done: false } : { value: undefined, done: true }; } };
+			it[Symbol.iterator] = function () { return it; };
+			return it;
+		};
+		FormData.prototype.entries = function () { return iterate(this, function (entry) { return [entry[0], entry[1]]; }); };
+		FormData.prototype.keys = function () { return iterate(this, function (entry) { return entry[0]; }); };
+		FormData.prototype.values = function () { return iterate(this, function (entry) { return entry[1]; }); };
+		FormData.prototype[Symbol.iterator] = FormData.prototype.entries;
+		g.FormData = FormData;
+	}
 }`;
 
 // One payload's script: its modules, its functions, and the entry points a host calls (`enter`, then `leave`).
@@ -231,9 +423,26 @@ var frameOf = function (bindings) {
 		else if ('shared' in binding) {
 			var shared = frameOf(binding.shared);
 			Object.defineProperty(names, name, { enumerable: true, value: function () { return shared; } });
+		} else if ('callback' in binding) {
+			// A parent's function prop: its own names are this frame's under '<name>.'.
+			var prefix = name + '.', own = {};
+			Object.keys(bindings).forEach(function (other) {
+				if (other.indexOf(prefix) === 0) own[other.slice(prefix.length)] = bindings[other];
+			});
+			Object.defineProperty(names, name, {
+				enumerable: true,
+				value: function () { return fn(binding.callback)(frameOf(own)).apply(this, arguments); },
+			});
 		} else Object.defineProperty(names, name, { enumerable: true, value: binding.value });
 	});
 	return names;
+};
+// The page's path as the web's address bar has it: its route pattern with the params it opened with.
+var pathOf = function (pattern, params) {
+	if (pattern === '/') return '/';
+	return pattern.split('/').map(function (segment) {
+		return segment.charAt(0) === '[' ? encodeURIComponent(params[segment.slice(1, -1)]) : segment;
+	}).join('/');
 };
 // An element is a proxy that offers only what the host answers: the attributes it has now, whether it holds another
 // element, and the commands a handler's data can run. No tree walking, no selectors, no layout.
@@ -278,7 +487,8 @@ var begin = function (entry) {
 	(entry.unset || []).forEach(function (slot) { unset[slot] = true; });
 	before = {};
 	for (var slot in cells) before[slot] = JSON.stringify(cells[slot]);
-	host.out = { timers: [], clears: [], requests: [], aborts: [], logs: [], commands: [] };
+	host.out = { timers: [], clears: [], requests: [], aborts: [], logs: [], commands: [], pending: [], settled: [], navigate: null };
+	host.place = navigation && entry.kind !== 'compute' ? { routes: navigation.routes, path: pathOf(navigation.here, entry.params || {}) } : null;
 	host.seed = entry.seed || null;
 	host.counter = 0;
 };
@@ -290,8 +500,9 @@ var fail = function (slot, error) {
 			message: error && error.message !== undefined ? String(error.message) : String(error),
 		};
 };
-var eventOf = function (given) {
-	var target = { value: given.value === undefined ? '' : given.value, checked: given.checked === true };
+var eventOf = function (given, frame) {
+	var entries = frame[${JSON.stringify(NATIVE_SCRIPT_SUBMITTED_FORM)}];
+	var target = entries ? new host.Form(entries) : { value: given.value === undefined ? '' : given.value, checked: given.checked === true };
 	var event = {
 		type: given.type,
 		target: target,
@@ -369,8 +580,15 @@ g.__markless[id] = {
 		if (entry.kind === 'dispatch') {
 			var settled = function (error) { fail(entry['catch'], error); };
 			try {
-				var result = fn(entry.fn)(frameOf(entry.frame))(eventOf(entry.event));
-				if (result && typeof result.then === 'function') result.then(null, settled);
+				var frame = frameOf(entry.frame);
+				var result = fn(entry.fn)(frame)(eventOf(entry.event, frame));
+				if (result && typeof result.then === 'function') {
+					// The host keeps a submitted form busy from this entry until the entry the promise settles in.
+					var run = host.nextRun++;
+					host.out.pending.push(run);
+					var done = function () { host.out.settled.push(run); };
+					result.then(done, function (error) { settled(error); done(); });
+				}
 			} catch (error) {
 				settled(error);
 			}
@@ -421,7 +639,9 @@ g.__markless[id] = {
 		}
 		var out = host.out;
 		host.out = null;
-		return JSON.stringify({ writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands });
+		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands, pending: out.pending, settled: out.settled };
+		if (out.navigate) left.navigate = out.navigate;
+		return JSON.stringify(left);
 	},
 };`;
 
@@ -444,6 +664,8 @@ function contentId(text: string): string {
 export function nativeScriptOf(
 	modules: ReadonlyArray<NativeScriptModuleInput>,
 	services: ReadonlyArray<NativeScriptService>,
+	/** For `navigate()`: the page's route pattern, and the app's route patterns in the router's order. */
+	navigation?: { readonly here: string; readonly routes: ReadonlyArray<string> },
 ): NativeScript {
 	const owners: Record<string, number> = {};
 	const definitions = modules.map((module, index) => {
@@ -462,6 +684,7 @@ export function nativeScriptOf(
 	const body = [
 		'var modules = [];',
 		`var owners = ${JSON.stringify(owners)};`,
+		`var navigation = ${JSON.stringify(navigation ?? null)};`,
 		...definitions,
 		ENTRIES,
 	].join('\n');

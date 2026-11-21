@@ -255,6 +255,8 @@ public final class NativeRuntime {
 	/// A field's text a person typed since its `value` binding last changed it.
 	private var edited: [String: String] = [:]
 	private var running: [String: [Submission]] = [:]
+	/// Submissions held by a script promise not settled yet, by the engine's run number.
+	private var scriptRuns: [Int: Submission] = [:]
 	private var timers: [String: (ops: [NativeOp], context: Context)] = [:]
 	private var timerCount = 0
 	/// Every non-row checkbox and radio button, in payload order.
@@ -374,6 +376,12 @@ public final class NativeRuntime {
 
 	private func shownOverlays() throws -> [String] {
 		try overlayNodes.filter { node in try !instances(of: node).isEmpty && attributeNow(node.id, "hidden") == nil }.map(\.id)
+	}
+
+	/// A hint (a tooltip, a hovercard) carries `overlay-hint` beside `overlay`, as authored.
+	private func isHint(_ overlay: String) -> Bool {
+		guard case let .element(_, attributes, _) = nodesById[overlay]?.kind else { return false }
+		return attributes[OverlayProtocol.hintAttribute] != nil
 	}
 
 	/// An overlay is modal when it or an element inside it has `aria-modal="true"`, bound or else static.
@@ -592,6 +600,7 @@ public final class NativeRuntime {
 			case let .fields(fields):
 				return (binding.name, .object([("fields", .object(try fields.map { ($0.name, .string(try slot(of: $0.cell, in: scope))) }))]))
 			case let .value(expr): return (binding.name, .object([("value", try evaluate(expr, in: scope).json)]))
+			case let .callback(fn): return (binding.name, .object([("callback", .string(fn))]))
 			case let .elements(expr): return (binding.name, .object([("elements", try evaluate(expr, in: scope).json)]))
 			case let .object(members): return (binding.name, .object([("object", try frame(of: members, in: scope))]))
 			case let .shared(members): return (binding.name, .object([("shared", try frame(of: members, in: scope))]))
@@ -635,24 +644,28 @@ public final class NativeRuntime {
 		return .object(facts)
 	}
 
-	/// Every current value by slot (the page's cells in payload order, then row slots), and a seed when `crypto` is used.
+	/// Every current value by slot (the page's cells in payload order, then row slots), a seed when `crypto` is used, and
+	/// the route params when `navigate` is.
 	private func entryCells() -> [(String, JSONValue)] {
 		let ids = Set(payload.cells.map(\.id))
 		let cells = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0.json) } }
 			+ values.keys.filter { !ids.contains($0) }.sorted().map { ($0, values[$0]!.json) }
 		let crypto = payload.script?.services.contains(.crypto) == true
+		let navigate = payload.script?.services.contains(.navigate) == true
 		return [("cells", .object(cells))]
 			+ (unset.isEmpty ? [] : [("unset", .array(unset.sorted().map { .string($0) }))])
 			+ (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
+			+ (navigate ? [("params", .object(params.map { ($0.name, .string($0.value)) }))] : [])
 	}
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
-	private func enter(_ entry: [(String, JSONValue)]) throws -> [NativeJournalEntry] {
+	private func enter(_ entry: [(String, JSONValue)], submission: Submission? = nil) throws -> [NativeJournalEntry] {
 		let text = try scriptHost.unwrap().entry { () throws -> String in
 			_ = try callScript("enter", .object(entry + entryCells()))
 			return try callScript("leave")
 		}
-		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(required: ["writes", "aborts", "timers", "clears", "requests", "logs"], optional: ["commands"])
+		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave")
+			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["commands", "navigate"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
 			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
@@ -668,6 +681,17 @@ public final class NativeRuntime {
 			let pair = try line.array()
 			guard pair.count == 2 else { throw line.fail("a log line is [level, text]") }
 			scriptHost?.log(try pair[0].string(), try pair[1].string())
+		}
+		// A submit handler's promise keeps its submission running until the entry it settles in, as the web keeps the form busy.
+		for run in try result["pending"].array() {
+			guard let submission else { continue }
+			submission.pending += 1
+			scriptRuns[try wholeNumber(run)] = submission
+		}
+		for run in try result["settled"].array() {
+			guard let kept = scriptRuns.removeValue(forKey: try wholeNumber(run)) else { continue }
+			kept.pending -= 1
+			settle(kept)
 		}
 		let aborts = try result["aborts"].array().map { NativeJournalEntry.abort(id: try wholeNumber($0)) }
 		let clears = try result["clears"].array().map { NativeJournalEntry.clearTimer(timer: "\(scriptTimer)\(try wholeNumber($0))") }
@@ -697,7 +721,10 @@ public final class NativeRuntime {
 			if name == "focus" { focused = node }
 			return .command(node: node, command: name, preventScroll: try parts[2].bool())
 		}
-		return aborts + clears + timers + requests + commands
+		guard result.has("navigate") else { return aborts + clears + timers + requests + commands }
+		let opened = try result["navigate"].object(["route", "params", "replace"])
+		let params = try opened["params"].keys().map { NativeRouteParam(name: $0, value: try opened["params"].field($0).string()) }
+		return aborts + clears + timers + requests + commands + [.navigate(route: try opened["route"].string(), params: params, replace: try opened["replace"].bool())]
 	}
 
 	/// Tells the engine which async values are shown and what they read, when that moved; it starts and aborts runs.
@@ -746,6 +773,7 @@ public final class NativeRuntime {
 		switch (kind, inner) {
 		case let ("slot", .string(slot)): return slotValue(slot)
 		case let ("fields", .object(slots)): return .array(slots.map { if case let .string(slot) = $0.1 { slotValue(slot) } else { .null } })
+		case ("callback", _): return .null
 		case let ("object", .object(members)), let ("shared", .object(members)): return .array(members.map { readFrame($0.1) })
 		case ("method", _):
 			guard let frame = fields.first(where: { $0.0 == "frame" })?.1, case let .object(members) = frame else { return .null }
@@ -1155,10 +1183,15 @@ public final class NativeRuntime {
 				let instance = try options(of: select).first(where: { $0.id == action.host })
 			else { throw RuntimeError(reason: "\(action.host) is not a shown option of a select") }
 			return try change(host: nil) {
-				if try self.attributeNow(select, "disabled") == nil, try self.attribute(of: option, "disabled", in: instance.scope) == nil {
-					self.chosenNow = action.host
-				}
-				return []
+				guard try self.attributeNow(select, "disabled") == nil, try self.attribute(of: option, "disabled", in: instance.scope) == nil
+				else { return [] }
+				self.chosenNow = action.host
+				// A choice that changes the select fires its input handler, as the web does, with the option's value.
+				let was = try self.options(of: select).first(where: { self.selectedness[$0.id] == true })?.id
+				guard was != action.host, let bound = self.payload.events.first(where: { $0.host == select && $0.event == .input }) else { return [] }
+				self.eventValue = try self.value(of: instance)
+				defer { self.eventValue = nil }
+				return try self.run(self.handlers[bound.handler] ?? [], in: instance.scope)
 			}
 		}
 		if action.event == .timer, let timer = action.timer, timer.hasPrefix(scriptTimer) {
@@ -1298,8 +1331,9 @@ public final class NativeRuntime {
 			if action.event == .pointerdown {
 				raise(.pointerover, action.host, nil)
 				crossing(.pointerenter, action.host, nil, nil)
-				// The behaviour's document listener hears the press: the topmost overlay it landed outside is told.
-				if let top = self.stack.last, !self.contains(top, action.host), let dismiss = handlerOf(top, .dismiss) {
+				// The behaviour's document listener hears the press: the topmost hint and the topmost other overlay it landed outside are told.
+				for top in [self.stack.last(where: self.isHint), self.stack.last(where: { !self.isHint($0) })] {
+					guard let top, !self.contains(top, action.host), let dismiss = handlerOf(top, .dismiss) else { continue }
 					runs.append((dismiss.handler, [.reason: .string("outside-press"), .pressTarget: .string(action.host)]))
 				}
 				raise(.pointerdown, action.host, nil)
@@ -1463,7 +1497,7 @@ public final class NativeRuntime {
 				let frame = try frame(of: bindings, in: scope)
 				calls.append(contentsOf: try enter(
 					[("kind", .string("dispatch")), ("fn", .string(fn)), ("frame", frame), ("elements", try elementFacts(frame)), ("event", event)]
-						+ (try catchCell.map { [("catch", JSONValue.string(try slot(of: $0, in: scope)))] } ?? [])))
+						+ (try catchCell.map { [("catch", JSONValue.string(try slot(of: $0, in: scope)))] } ?? []), submission: submission))
 			}
 		}
 		return calls
@@ -1570,6 +1604,20 @@ public final class NativeRuntime {
 		try seedRows()
 		try follow()
 		calls += try syncAsync()
+		// An overlay becoming shown supersedes every shown hint it is not inside, before it joins the stack.
+		let shownFirst = try shownOverlays()
+		var working = stackBefore.filter(shownFirst.contains)
+		for newcomer in shownFirst where !stackBefore.contains(newcomer) {
+			for hint in working where isHint(hint) && !contains(hint, newcomer) {
+				guard let dismiss = payload.events.first(where: { $0.host == hint && $0.event == .dismiss }) else { continue }
+				eventFields = [.reason: .string("superseded"), .pressTarget: .null]
+				defer { eventFields = nil }
+				let taken = try run(handlers[dismiss.handler] ?? [], in: .empty)
+				if case .navigate? = taken.first { return taken }
+				calls.append(contentsOf: taken)
+			}
+			working.append(newcomer)
+		}
 		let shownNow = try shownOverlays()
 		let released = stackBefore.filter { !shownNow.contains($0) }
 		let enlisted = shownNow.filter { !stackBefore.contains($0) }

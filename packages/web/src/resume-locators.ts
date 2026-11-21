@@ -163,14 +163,15 @@ export function materializeElementHandles(
 		const element = elementsByHostId.get(handle.hostNodeId);
 		if (element) register(handle.hostNodeId, handle, element);
 	}
-	// Row members are walked, never filed: a repeat's rows ARE its parent's
-	// element children, so insert, remove and reorder need no bookkeeping.
+	// Row members come from the list's runtime: the rows on screen.
 	function rowMembers(id: string): ResumeDomElement[] {
 		const members: ResumeDomElement[] = [];
 		for (const handle of rowHandles) {
 			if (handle.handleId !== id && handle.name !== id) continue;
 			const parent = elementsByHostId.get(handle.repeat.parentHostNodeId);
-			for (const rowRoot of parent?.childNodes ?? []) {
+			const onScreen = parent?.__marklessRepeatRows?.get(handle.repeat.id);
+			// Until its list wires, the parent's elements as served.
+			for (const rowRoot of onScreen ? onScreen() : (parent?.childNodes ?? [])) {
 				if (rowRoot.nodeType !== 1) continue;
 				const member = marklessElementAt(rowRoot, handle.hostPath);
 				if (member) members.push(member);
