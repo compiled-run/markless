@@ -2,9 +2,9 @@ appId: ${APP_ID}
 name: 10-url-route
 ---
 - launchApp:
-      clearState: true
-      arguments:
-          route: /apple
+    clearState: true
+    arguments:
+      route: /apple
 - assertVisible: Fruit apple
 - assertVisible: Go to pear
 - assertNotVisible: Fruit pear

@@ -39,7 +39,7 @@ export async function caseVector(entry: (typeof CONFORMANCE_CASES)[number]) {
 		throw new Error(`${entry.fixture}: ${real.diagnostics.map((d) => d.message).join('; ')}`);
 	const marked = (await compile(CONFORMANCE_ENGINE_MARKERS)).payload!;
 	return {
-		...nativeConformance(real.payload, entry.actions, entry.params, entry.preferredLanguages, entry.now, CONFORMANCE_SCRIPT_HOST()),
+		...nativeConformance(real.payload, entry.actions, entry.params, entry.preferredLanguages, entry.now, CONFORMANCE_SCRIPT_HOST(), entry.layout),
 		payload: marked,
 	};
 }

@@ -1,0 +1,264 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "StyleSlots",
+		"cells": [
+			{
+				"id": "state:at",
+				"name": "at",
+				"initial": 25
+			},
+			{
+				"id": "state:rank",
+				"name": "rank",
+				"initial": 1
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "div",
+				"parent": "h0",
+				"style": [
+					"--at: ",
+					{
+						"slot": "slot:h1#0"
+					},
+					"%; order: ",
+					{
+						"slot": "slot:h1#1"
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Thumb"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Move"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Same"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Later"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:at",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:at"
+							},
+							"right": {
+								"literal": 12.25
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:rank",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:rank"
+							},
+							"right": {
+								"literal": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:rank",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:rank"
+							},
+							"right": {
+								"literal": 2
+							}
+						}
+					}
+				]
+			}
+		],
+		"slots": [
+			{
+				"id": "slot:h1#0",
+				"value": {
+					"binary": "/",
+					"left": {
+						"call": "Math.round",
+						"arguments": [
+							{
+								"binary": "*",
+								"left": {
+									"cell": "state:at"
+								},
+								"right": {
+									"literal": 10
+								}
+							}
+						]
+					},
+					"right": {
+						"literal": 10
+					}
+				}
+			},
+			{
+				"id": "slot:h1#1",
+				"value": {
+					"call": "Math.floor",
+					"arguments": [
+						{
+							"cell": "state:rank"
+						}
+					]
+				},
+				"integer": true
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Thumb"
+		],
+		[
+			"h2:text0",
+			"Move"
+		],
+		[
+			"h3:text0",
+			"Same"
+		],
+		[
+			"h4:text0",
+			"Later"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "slot",
+					"slot": "slot:h1#0",
+					"value": 37.3
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "slot",
+					"slot": "slot:h1#1",
+					"value": 3
+				}
+			]
+		}
+	]
+}

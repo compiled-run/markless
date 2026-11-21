@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: r101-inline-text
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Inline text
 - assertVisible: Plain, strong, em, b and i text
 - assertVisible: An abbr, a cite, a dfn and a var
@@ -10,15 +10,15 @@ name: r101-inline-text
 - assertVisible: H2O and E = mc2
 - assertVisible: Liked by 1 reader so far
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - assertVisible: She said “hello”
+    when:
+      platform: iOS
+    commands:
+      - assertVisible: She said “hello”
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - assertVisible: She said “hello”
+    when:
+      platform: Android
+    commands:
+      - assertVisible: She said “hello”
 - tapOn: Like
 - assertNotVisible: Liked by 1 reader so far
 - assertVisible: Liked by 2 readers so far

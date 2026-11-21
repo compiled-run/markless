@@ -2,9 +2,9 @@ appId: ${APP_ID}
 name: u30-text-keys
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Labels
-- assertVisible: '0 tags: none'
+- assertVisible: "0 tags: none"
 - assertVisible: Removed 0
 - assertVisible: Sent nothing
 - tapOn: Tag
@@ -12,24 +12,24 @@ name: u30-text-keys
 - inputText: red
 - hideKeyboard
 - assertVisible: red
-- assertVisible: '0 tags: none'
+- assertVisible: "0 tags: none"
 - assertVisible: Removed 0
 - assertVisible: red
 - tapOn: Tag
 - pressKey: Enter
-- assertNotVisible: '0 tags: none'
-- assertVisible: ''
-- assertVisible: '1 tags: red'
+- assertNotVisible: "0 tags: none"
+- assertVisible: ""
+- assertVisible: "1 tags: red"
 - assertVisible: Removed 0
-- assertNotVisible: '0 tags: none'
-- assertVisible: ''
+- assertNotVisible: "0 tags: none"
+- assertVisible: ""
 - tapOn: Tag
 - pressKey: Backspace
 - assertNotVisible: Removed 0
-- assertVisible: '1 tags: red'
+- assertVisible: "1 tags: red"
 - assertVisible: Removed 1
 - assertNotVisible: Removed 0
-- assertVisible: ''
+- assertVisible: ""
 - tapOn: Message
 - eraseText
 - inputText: hello
@@ -41,8 +41,8 @@ name: u30-text-keys
 - tapOn: Message
 - pressKey: Enter
 - assertNotVisible: Sent nothing
-- assertVisible: ''
+- assertVisible: ""
 - assertVisible: Sent hello
-- assertVisible: '1 tags: red'
+- assertVisible: "1 tags: red"
 - assertNotVisible: Sent nothing
-- assertVisible: ''
+- assertVisible: ""

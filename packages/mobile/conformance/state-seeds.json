@@ -1,0 +1,353 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:names",
+				"name": "names",
+				"initial": null,
+				"seed": {
+					"script": "fn:0",
+					"bindings": {}
+				},
+				"unset": true
+			},
+			{
+				"id": "state:first",
+				"name": "first",
+				"initial": null,
+				"seed": {
+					"member": {
+						"cell": "state:names"
+					},
+					"property": "0"
+				},
+				"unset": true
+			},
+			{
+				"id": "state:total",
+				"name": "total",
+				"initial": 2
+			},
+			{
+				"id": "component-edge:0/state:count",
+				"name": "count",
+				"initial": null,
+				"seed": {
+					"binary": "*",
+					"left": {
+						"cell": "state:total"
+					},
+					"right": {
+						"literal": 10
+					}
+				},
+				"unset": true
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "h1",
+				"parent": "h1",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Seeds"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h1"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"expr": {
+							"method": "join",
+							"target": {
+								"cell": "state:names"
+							},
+							"arguments": [
+								{
+									"literal": ", "
+								}
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h1"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "First "
+					},
+					{
+						"cell": "state:first"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "p",
+				"parent": "h1"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Total "
+					},
+					{
+						"cell": "state:total"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "button",
+				"parent": "h1"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Grow total"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "button",
+				"parent": "h1"
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Add kiwi"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "button",
+				"parent": "h1"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h0:text0",
+				"parent": "component-edge:0/h0",
+				"parts": [
+					{
+						"text": "Tally "
+					},
+					{
+						"cell": "component-edge:0/state:count"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h6",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h7",
+				"event": "activate",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "component-edge:0/h0",
+				"event": "activate",
+				"handler": "handler:component-edge:0/event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:total",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:total"
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:names",
+						"value": {
+							"array": [
+								{
+									"spread": true,
+									"value": {
+										"cell": "state:names"
+									}
+								},
+								{
+									"spread": false,
+									"value": {
+										"literal": "Kiwi"
+									}
+								}
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:0/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "component-edge:0/state:count",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "component-edge:0/state:count"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "cd2f28da2a360c20",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nconst FRUIT = ['pear', 'fig', 'plum'];\nfunction titled(word) {\n return word.charAt(0).toUpperCase() + word.slice(1);\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn function () {\nreturn (FRUIT.map((word) => titled(word)));\n};\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"cd2f28da2a360c20\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h2:text0",
+			"Seeds"
+		],
+		[
+			"h3:text0",
+			"Pear, Fig, Plum"
+		],
+		[
+			"h4:text0",
+			"First Pear"
+		],
+		[
+			"h5:text0",
+			"Total 2"
+		],
+		[
+			"h6:text0",
+			"Grow total"
+		],
+		[
+			"h7:text0",
+			"Add kiwi"
+		],
+		[
+			"component-edge:0/h0:text0",
+			"Tally 20"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h5:text0",
+					"value": "Total 3"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h0"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h0:text0",
+					"value": "Tally 21"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h7"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Pear, Fig, Plum, Kiwi"
+				}
+			]
+		}
+	]
+}

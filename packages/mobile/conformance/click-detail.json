@@ -1,0 +1,176 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "ClickDetail",
+		"cells": [
+			{
+				"id": "state:last",
+				"name": "last",
+				"initial": "No click yet"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Press here"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Press by script"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"cell": "state:last"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"last": {
+								"cell": "state:last"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:1",
+						"type": "click",
+						"bindings": {
+							"spot": {
+								"elements": {
+									"literal": "h1"
+								}
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "86097fe1a8d2ea87",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n let marks = '';\n for (let press = 0; press < event.detail; press++) marks += '*';\n __s.last = event.detail === 0 ? 'Count 0, no press' : `Count ${event.detail} ${marks}`;\n});\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => __s.spot?.click());\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"86097fe1a8d2ea87\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Press here"
+		],
+		[
+			"h2:text0",
+			"Press by script"
+		],
+		[
+			"h3:text0",
+			"No click yet"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Count 1 *"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Count 0, no press"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Count 1 *"
+				}
+			]
+		}
+	]
+}

@@ -55,13 +55,15 @@ export type ProofRung = {
 	readonly manifest: DeviceManifest;
 };
 
-/** The app config, one per app, beside the app's rung folders: `{ "device": { "usage": { "<feature>": "<text>" } } }`. */
+/** The app config, one per app, in an app rung folder or beside the rung folders of a ladder: `{ "device": { "usage": { "<feature>": "<text>" } } }`. */
 const APP_CONFIG = 'app.json';
 
-/** The config of the app a rung folder belongs to; empty when the app has none. */
+/** The config of the app a rung folder is (its own app.json) or belongs to (one beside it); empty when the app has none. */
 export function readAppConfig(rungDir: string): { readonly device?: DeviceAppConfig } {
-	const file = join(dirname(rungDir), APP_CONFIG);
-	return existsSync(file)
+	const file = [join(rungDir, APP_CONFIG), join(dirname(rungDir), APP_CONFIG)].find((path) =>
+		existsSync(path),
+	);
+	return file
 		? (JSON.parse(readFileSync(file, 'utf8')) as { readonly device?: DeviceAppConfig })
 		: {};
 }
@@ -135,7 +137,7 @@ export function compileRungApp(
 					},
 				}
 			: {}),
-		readModule: readRelativeModule,
+		readModule: readWorkspaceModule,
 		readStylesheet: readRelativeStylesheet,
 		readServedStylesheet: servedReader(dir),
 	});
@@ -383,7 +385,10 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				PROOF_PAYLOAD_PATH,
 				new TextEncoder().encode(payloads[platform]),
 			]);
-			if (build.styles.some((style) => style.cssText.length > 0) || build.stylesheets.length > 0) {
+			if (
+				build.styles.some((style) => style.cssText.length > 0) ||
+				build.stylesheets.length > 0
+			) {
 				// Dragon lays out one input for both phones, so both must build the same views.
 				if (
 					payloads.ios !== undefined &&

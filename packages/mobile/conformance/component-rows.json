@@ -1,0 +1,200 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:reads",
+				"name": "reads",
+				"initial": 0
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "h1",
+				"parent": "h2",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Guide"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h1",
+				"element": "ul",
+				"parent": "h2",
+				"defaultStyle": {
+					"indent": 40,
+					"marker": "disc"
+				}
+			},
+			{
+				"kind": "repeat",
+				"id": "component-edge:1/repeat:0",
+				"parent": "component-edge:1/h1",
+				"list": {
+					"script": "fn:0",
+					"bindings": {
+						"wide": {
+							"value": {
+								"literal": true
+							}
+						}
+					}
+				},
+				"key": [
+					"title"
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/component-edge:0/h0",
+				"element": "li",
+				"parent": "component-edge:1/h1",
+				"row": "component-edge:1/repeat:0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/component-edge:0/h0:text0",
+				"parent": "component-edge:1/component-edge:0/h0",
+				"parts": [
+					{
+						"expr": {
+							"member": {
+								"item": "component-edge:1/repeat:0"
+							},
+							"property": "title"
+						}
+					},
+					{
+						"text": ": "
+					},
+					{
+						"expr": {
+							"member": {
+								"item": "component-edge:1/repeat:0"
+							},
+							"property": "count"
+						}
+					},
+					{
+						"text": " pages"
+					}
+				],
+				"row": "component-edge:1/repeat:0"
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h2"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Read "
+					},
+					{
+						"cell": "state:reads"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:reads",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:reads"
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "d75e0e76a90b2fc6",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nconst NAV = [{ kind: 'section', title: 'Start', pages: ['Install', 'First app'] }, { kind: 'link', title: 'Blog', pages: [] }, { kind: 'section', title: 'Guides', pages: ['State', 'Lists', 'Forms'] }];\nconst SECTIONS = NAV.flatMap((entry) => (entry.kind === 'section' ? [entry] : []));\nfunctions[\"fn:0\"] = function (__s) {\nconst rows = (section) => ({ title: __s.wide ? section.title.toUpperCase() : section.title, count: section.pages.length });\nconst sections = SECTIONS.map(rows);\nreturn function () {\nreturn (sections);\n};\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"d75e0e76a90b2fc6\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h3:text0",
+			"Guide"
+		],
+		[
+			"component-edge:1/component-edge:0/h0:text0@START",
+			"START: 2 pages"
+		],
+		[
+			"component-edge:1/component-edge:0/h0:text0@GUIDES",
+			"GUIDES: 3 pages"
+		],
+		[
+			"h4:text0",
+			"Read 0"
+		]
+	],
+	"initialRows": [
+		[
+			"component-edge:1/repeat:0",
+			[
+				"START",
+				"GUIDES"
+			]
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Read 1"
+				}
+			]
+		}
+	]
+}

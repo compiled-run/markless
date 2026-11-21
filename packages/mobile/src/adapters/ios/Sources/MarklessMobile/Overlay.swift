@@ -49,7 +49,7 @@ final class OverlayHost {
 		reportsTouches = payload.nodes.contains { node in
 			if case let .element(_, attributes, _) = node.kind { return attributes[OverlayProtocol.attribute] != nil }
 			return false
-		} || payload.events.contains { $0.event.isPointer }
+		} || payload.events.contains { $0.event.isPointer } || payload.tapPoints
 		reportsMoves = payload.events.contains { event in
 			[.pointermove, .pointerover, .pointerout, .pointerenter, .pointerleave].contains(event.event)
 		}

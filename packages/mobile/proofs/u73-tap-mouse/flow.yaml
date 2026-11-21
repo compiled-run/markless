@@ -1,0 +1,41 @@
+appId: ${APP_ID}
+name: u73-tap-mouse
+---
+- launchApp:
+    clearState: true
+- assertVisible: Fruit stand
+- assertVisible: Apples
+- assertVisible: Pears
+- assertVisible: Pointing at nothing
+- assertVisible: Moved off nothing
+- assertVisible: Pressed 0 times
+- tapOn: Apples
+- assertNotVisible: Pointing at nothing
+- assertNotVisible: Pressed 0 times
+- assertVisible: Pointing at Apples
+- assertVisible: Moved off nothing
+- assertVisible: Pressed 1 times
+- assertNotVisible: Pointing at nothing
+- assertNotVisible: Pressed 0 times
+- tapOn: Pears
+- assertNotVisible: Pointing at Apples
+- assertNotVisible: Moved off nothing
+- assertVisible: Pointing at Pears
+- assertVisible: Moved off Apples
+- assertVisible: Pressed 2 times
+- assertNotVisible: Pointing at Apples
+- assertNotVisible: Moved off nothing
+- tapOn: Pears
+- assertNotVisible: Pressed 2 times
+- assertVisible: Pointing at Pears
+- assertVisible: Moved off Apples
+- assertVisible: Pressed 3 times
+- assertNotVisible: Pressed 2 times
+- tapOn: Apples
+- assertNotVisible: Pointing at Pears
+- assertNotVisible: Moved off Apples
+- assertVisible: Pointing at Apples
+- assertVisible: Moved off Pears
+- assertVisible: Pressed 4 times
+- assertNotVisible: Pointing at Pears
+- assertNotVisible: Moved off Apples

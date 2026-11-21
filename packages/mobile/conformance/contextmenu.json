@@ -1,0 +1,369 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "ContextMenu",
+		"cells": [
+			{
+				"id": "state:picked",
+				"name": "picked",
+				"initial": "none"
+			},
+			{
+				"id": "state:log",
+				"name": "log",
+				"initial": ""
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"cell": "state:picked"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "ul",
+				"parent": "h0",
+				"defaultStyle": {
+					"indent": 40,
+					"marker": "disc"
+				}
+			},
+			{
+				"kind": "repeat",
+				"id": "repeat:0",
+				"parent": "h2",
+				"list": {
+					"array": [
+						{
+							"spread": false,
+							"value": {
+								"literal": "Apple"
+							}
+						},
+						{
+							"spread": false,
+							"value": {
+								"literal": "Pear"
+							}
+						}
+					]
+				},
+				"key": []
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "li",
+				"parent": "h2",
+				"row": "repeat:0"
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "span",
+				"parent": "h3",
+				"defaultStyle": {
+					"flow": "inline"
+				},
+				"row": "repeat:0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"expr": {
+							"item": "repeat:0"
+						}
+					}
+				],
+				"row": "repeat:0"
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "div",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Pad"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"cell": "state:log"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "contextmenu",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "contextmenu",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h5",
+				"event": "contextmenu",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"binary": "+",
+							"left": {
+								"binary": "+",
+								"left": {
+									"binary": "+",
+									"left": {
+										"binary": "+",
+										"left": {
+											"cell": "state:log"
+										},
+										"right": {
+											"literal": " list:"
+										}
+									},
+									"right": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"event": "target"
+											},
+											"right": {
+												"event": "currentTarget"
+											}
+										},
+										"whenTrue": {
+											"literal": "self"
+										},
+										"whenFalse": {
+											"literal": "inner"
+										}
+									}
+								},
+								"right": {
+									"literal": "@"
+								}
+							},
+							"right": {
+								"event": "timeStamp"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:picked",
+						"value": {
+							"binary": "+",
+							"left": {
+								"binary": "+",
+								"left": {
+									"binary": "+",
+									"left": {
+										"binary": "+",
+										"left": {
+											"item": "repeat:0"
+										},
+										"right": {
+											"literal": " at "
+										}
+									},
+									"right": {
+										"event": "clientX"
+									}
+								},
+								"right": {
+									"literal": ","
+								}
+							},
+							"right": {
+								"event": "clientY"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "contextmenu",
+						"bindings": {
+							"log": {
+								"cell": "state:log"
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "9da0f46e65227336",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n for (const part of [event.clientX, event.clientY]) __s.log = __s.log + ' pad:' + part;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"9da0f46e65227336\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"none"
+		],
+		[
+			"h4:text0@Apple",
+			"Apple"
+		],
+		[
+			"h4:text0@Pear",
+			"Pear"
+		],
+		[
+			"h5:text0",
+			"Pad"
+		],
+		[
+			"h6:text0",
+			""
+		]
+	],
+	"initialRows": [
+		[
+			"repeat:0",
+			[
+				"Apple",
+				"Pear"
+			]
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "contextmenu",
+				"host": "h4@Apple",
+				"x": 40,
+				"y": 120,
+				"time": 900
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": "Apple at 40,120"
+				},
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": " list:inner@900"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "contextmenu",
+				"host": "h2",
+				"x": 10,
+				"y": 5,
+				"time": 1500
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": " list:inner@900 list:self@1500"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "contextmenu",
+				"host": "h5",
+				"x": 52.5,
+				"y": 300,
+				"time": 2000
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": " list:inner@900 list:self@1500 pad:52.5 pad:300"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "contextmenu",
+				"host": "h4@Pear",
+				"x": 41,
+				"y": 160,
+				"time": 2600
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": "Pear at 41,160"
+				},
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": " list:inner@900 list:self@1500 pad:52.5 pad:300 list:inner@2600"
+				}
+			]
+		}
+	]
+}

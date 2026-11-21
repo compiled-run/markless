@@ -1,0 +1,223 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "RowElementFacts",
+		"cells": [
+			{
+				"id": "state:rows",
+				"name": "rows",
+				"initial": [
+					{
+						"id": "a",
+						"name": "Ada"
+					},
+					{
+						"id": "b",
+						"name": "Bo"
+					}
+				]
+			},
+			{
+				"id": "state:seen",
+				"name": "seen",
+				"initial": ""
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "ul",
+				"parent": "h0",
+				"defaultStyle": {
+					"indent": 40,
+					"marker": "disc"
+				}
+			},
+			{
+				"kind": "repeat",
+				"id": "repeat:0",
+				"parent": "h1",
+				"list": {
+					"cell": "state:rows"
+				},
+				"key": [
+					"id"
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "li",
+				"parent": "h1",
+				"bindings": [
+					{
+						"attribute": "data-name",
+						"value": {
+							"member": {
+								"item": "repeat:0"
+							},
+							"property": "name"
+						}
+					}
+				],
+				"row": "repeat:0"
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "span",
+				"parent": "h2",
+				"defaultStyle": {
+					"flow": "inline"
+				},
+				"row": "repeat:0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"expr": {
+							"member": {
+								"item": "repeat:0"
+							},
+							"property": "name"
+						}
+					}
+				],
+				"row": "repeat:0"
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"cell": "state:seen"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "pointerdown",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "pointerdown",
+						"bindings": {
+							"seen": {
+								"cell": "state:seen"
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "3b8a87b15bdbaddd",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n __s.seen = `pressed ${event.currentTarget.getAttribute('data-name')}`;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"3b8a87b15bdbaddd\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h3:text0@a",
+			"Ada"
+		],
+		[
+			"h3:text0@b",
+			"Bo"
+		],
+		[
+			"h4:text0",
+			""
+		]
+	],
+	"initialAttributes": [
+		[
+			"h2@a",
+			"data-name",
+			"Ada"
+		],
+		[
+			"h2@b",
+			"data-name",
+			"Bo"
+		]
+	],
+	"initialRows": [
+		[
+			"repeat:0",
+			[
+				"a",
+				"b"
+			]
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h2@b"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "pressed Bo"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h2@b"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h2@a"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "pressed Ada"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h2@a"
+			},
+			"journal": []
+		}
+	]
+}

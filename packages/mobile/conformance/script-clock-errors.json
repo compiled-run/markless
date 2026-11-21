@@ -1,0 +1,214 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "ClockAndErrors",
+		"cells": [
+			{
+				"id": "state:report",
+				"name": "report",
+				"initial": ""
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Clock"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Missing"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Other"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"cell": "state:report"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"report": {
+								"cell": "state:report"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:1",
+						"type": "click",
+						"bindings": {
+							"report": {
+								"cell": "state:report"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:2",
+						"type": "click",
+						"bindings": {
+							"report": {
+								"cell": "state:report"
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "ca7d4e2aee0f031a",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0,\"fn:2\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction elapsedRuns() {\n const start = performance.now();\n const later = performance.now();\n return typeof start === 'number' && later >= start ? 'steady' : 'stepped back';\n}\nfunction caught(name) {\n try {\n  throw new DOMException('no such pointer', name);\n } catch (error) {\n  if (!(error instanceof DOMException) || error.name !== 'NotFoundError') return 'rethrown';\n  return error instanceof Error ? `${error.name}: ${error.message}` : 'not an error';\n }\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => (__s.report = elapsedRuns()));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => (__s.report = caught('NotFoundError')));\n};\nfunctions[\"fn:2\"] = function (__s) {\nreturn (() => (__s.report = caught('InvalidStateError')));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"ca7d4e2aee0f031a\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Clock"
+		],
+		[
+			"h2:text0",
+			"Missing"
+		],
+		[
+			"h3:text0",
+			"Other"
+		],
+		[
+			"h4:text0",
+			""
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "steady"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "NotFoundError: no such pointer"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "rethrown"
+				}
+			]
+		}
+	]
+}

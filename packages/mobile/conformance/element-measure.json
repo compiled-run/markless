@@ -1,0 +1,289 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "TrackMeasure",
+		"cells": [
+			{
+				"id": "state:value",
+				"name": "value",
+				"initial": 0
+			},
+			{
+				"id": "state:report",
+				"name": "report",
+				"initial": ""
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "div",
+				"parent": "h0",
+				"attributes": {
+					"class": "track"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "div",
+				"parent": "h0",
+				"attributes": {
+					"dir": "rtl",
+					"class": "track"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Quarter"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Quarter flipped"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Size"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"cell": "state:value"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"cell": "state:report"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h5",
+				"event": "activate",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"value": {
+								"cell": "state:value"
+							},
+							"track": {
+								"elements": {
+									"literal": "h1"
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:1",
+						"type": "click",
+						"bindings": {
+							"value": {
+								"cell": "state:value"
+							},
+							"flipped": {
+								"elements": {
+									"literal": "h2"
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:2",
+						"type": "click",
+						"bindings": {
+							"report": {
+								"cell": "state:report"
+							},
+							"track": {
+								"elements": {
+									"literal": "h1"
+								}
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "6d403cd069860702",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0,\"fn:2\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction isRightToLeft(track) {\n return window.getComputedStyle(track).direction === 'rtl';\n}\nfunction percentAt(track, along) {\n if (!track) return -1;\n track.setPointerCapture(1);\n const box = track.getBoundingClientRect();\n const fraction = Math.min(1, Math.max(0, (along - box.left) / box.width));\n return Math.round((isRightToLeft(track) ? 1 - fraction : fraction) * 100);\n}\nfunction size(item) {\n if (!item) return 'none';\n const box = item.getBoundingClientRect();\n return `${box.width}x${box.height} at ${box.x},${box.y}; ends ${box.right},${box.bottom}`;\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => (__s.value = percentAt(__s.track, 100)));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => (__s.value = percentAt(__s.flipped, 100)));\n};\nfunctions[\"fn:2\"] = function (__s) {\nreturn (() => (__s.report = size(__s.track)));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"6d403cd069860702\");\n",
+			"services": []
+		}
+	},
+	"layout": {
+		"h1": {
+			"x": 20,
+			"y": 40,
+			"width": 320,
+			"height": 24,
+			"direction": "ltr"
+		},
+		"h2": {
+			"x": 20,
+			"y": 80,
+			"width": 320,
+			"height": 24,
+			"direction": "rtl"
+		}
+	},
+	"initial": [
+		[
+			"h3:text0",
+			"Quarter"
+		],
+		[
+			"h4:text0",
+			"Quarter flipped"
+		],
+		[
+			"h5:text0",
+			"Size"
+		],
+		[
+			"h6:text0",
+			"0"
+		],
+		[
+			"h7:text0",
+			""
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "25"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "75"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h7:text0",
+					"value": "320x24 at 20,40; ends 340,64"
+				}
+			]
+		}
+	]
+}

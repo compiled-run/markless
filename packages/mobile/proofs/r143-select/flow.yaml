@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: r143-select
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Nothing sent
 - assertVisible: Home
 - assertVisible: Small
@@ -21,7 +21,7 @@ name: r143-select
 - assertNotVisible: Large
 - tapOn: Tag
 - tapOn:
-      text: Work
+    text: Work
 - assertVisible: Work
 - assertNotVisible: Home
 - assertVisible: Work
@@ -32,7 +32,7 @@ name: r143-select
 - assertNotVisible: Large
 - tapOn: Size
 - tapOn:
-      text: Large
+    text: Large
 - assertVisible: Large
 - assertNotVisible: Small
 - assertVisible: Large

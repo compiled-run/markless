@@ -81,14 +81,19 @@ var pathOf = function (pattern, params) {
 	}).join('/');
 };
 // An element is a proxy that offers only what the host answers: the attributes it has now, whether it holds another
-// element, and the commands a handler's data can run. No tree walking, no selectors, no layout.
+// element, its box and direction as the host measured them when the entry began, and the commands a handler's data can
+// run. No tree walking, no selectors.
 var elementFacts = {};
+var BODY = "#body";
 var proxies = {};
+// Which element holds each touch, as this entry's own capture calls left it; the host's facts answer the rest.
+var captured = {};
 var elementOf = function (id) {
 	if (typeof id !== 'string') return id;
 	if (id === "#unbound") return undefined;
 	if (proxies[id]) return proxies[id];
 	var facts = function () {
+		if (id === BODY) return { attributes: {}, ancestors: [] };
 		if (!elementFacts[id]) throw new Error('the host described no element ' + id);
 		return elementFacts[id];
 	};
@@ -103,14 +108,50 @@ var elementOf = function (id) {
 			return node === id || (!!elementFacts[node] && elementFacts[node].ancestors.indexOf(id) >= 0);
 		},
 		focus: function (options) { command('focus', !!(options && options.preventScroll)); },
+		click: function () { host.out.raises.push({ node: id, type: 'click', bubbles: true }); },
+		dispatchEvent: function (event) {
+			var raised = { node: id, type: String(event.type), bubbles: event.bubbles === true };
+			if (event.detail !== null && typeof event.detail === 'object' && typeof event.detail.reason === 'string')
+				raised.reason = event.detail.reason;
+			if (event.relatedTarget && typeof event.relatedTarget.__node === 'string') raised.relatedTarget = event.relatedTarget.__node;
+			['pointerId', 'pointerType', 'isPrimary', 'button', 'buttons', 'clientX', 'clientY', 'key'].forEach(function (field) {
+				if (field in event) raised[field] = event[field];
+			});
+			host.out.raises.push(raised);
+			return !event.defaultPrevented;
+		},
+		hasPointerCapture: function (pointerId) {
+			return pointerId in captured ? captured[pointerId] === id : (facts().captures || []).indexOf(pointerId) >= 0;
+		},
+		setPointerCapture: function (pointerId) { captured[pointerId] = id; host.out.commands.push([id, 'setPointerCapture', pointerId]); },
+		releasePointerCapture: function (pointerId) {
+			if (proxy.hasPointerCapture(pointerId)) captured[pointerId] = null;
+			host.out.commands.push([id, 'releasePointerCapture', pointerId]);
+		},
 		scrollIntoView: function () { command('scrollIntoView', false); },
 		showModal: function () { command('showModal', false); },
 		close: function () { command('close', false); },
 		getBoundingClientRect: function () {
-			throw new Error('getBoundingClientRect() asks the host to measure while JavaScript waits, which a phone does not answer');
+			var box = facts().box;
+			if (!box) throw new Error('the host measured no box for ' + id);
+			return { x: box.x, y: box.y, left: box.x, top: box.y, width: box.width, height: box.height, right: box.x + box.width, bottom: box.y + box.height };
 		},
 	};
+	var tag = (typeof classes === 'object' && classes[id.split('@')[0]]) || 'HTMLElement';
+	if (g[tag] && g[tag].__dom) Object.setPrototypeOf(proxy, g[tag].prototype);
 	Object.defineProperty(proxy, '__node', { value: id });
+	Object.defineProperty(proxy, '__style', {
+		value: function () {
+			var direction = facts().direction || 'ltr';
+			return {
+				direction: direction,
+				getPropertyValue: function (name) {
+					if (name === 'direction') return direction;
+					throw new Error('a phone answers only an element\'s direction from getComputedStyle(), not ' + name);
+				},
+			};
+		},
+	});
 	proxies[id] = proxy;
 	return proxy;
 };
@@ -152,15 +193,19 @@ var stable = function (value) {
 var begin = function (entry) {
 	elementFacts = entry.elements || {};
 	proxies = {};
+	captured = {};
 	cells = join(entry.cells, entry.nonFinite);
 	unset = {};
 	forced = {};
 	(entry.unset || []).forEach(function (slot) { unset[slot] = true; });
 	before = {};
 	for (var slot in cells) before[slot] = stable(cells[slot]);
-	host.out = { timers: [], clears: [], requests: [], aborts: [], calls: [], logs: [], commands: [], pending: [], settled: [], navigate: null };
+	host.out = { timers: [], clears: [], requests: [], aborts: [], calls: [], logs: [], commands: [], pending: [], settled: [], raises: [], navigate: null };
 	host.place = navigation && entry.kind !== 'compute' ? { routes: navigation.routes, path: pathOf(navigation.here, entry.params || {}) } : null;
 	host.seed = entry.seed || null;
+	host.focused = entry.focused || null;
+	for (var known in entry.focusElements || {}) if (!elementFacts[known]) elementFacts[known] = entry.focusElements[known];
+	host.focus = function () { return elementOf(host.focused || BODY); };
 	host.counter = 0;
 };
 var fail = function (slot, error) {
@@ -174,17 +219,35 @@ var fail = function (slot, error) {
 var eventOf = function (given, frame) {
 	var entries = frame["submitted form"];
 	var target = entries ? new host.Form(entries) : { value: given.value === undefined ? '' : given.value, checked: given.checked === true };
+	var detail;
+	if (given.detail !== null && typeof given.detail === 'object') {
+		detail = { reason: given.detail.reason };
+		// Escape has no press: the key is absent, as on the web.
+		if (given.detail.pressTarget != null) detail.pressTarget = elementOf(given.detail.pressTarget);
+	}
 	var event = {
 		type: given.type,
+		detail: detail,
 		target: target,
 		currentTarget: target,
 		key: given.key,
+		isTrusted: given.isTrusted !== false,
 		isComposing: false,
 		defaultPrevented: false,
 		preventDefault: function () { this.defaultPrevented = true; },
 		stopPropagation: function () {},
 	};
-	["button","buttons","clientX","clientY","pointerId","pointerType","isPrimary","timeStamp"].forEach(function (field) { if (field in given) event[field] = given[field]; });
+	["button","buttons","clientX","clientY","pointerId","pointerType","isPrimary","timeStamp","detail","shiftKey","ctrlKey","altKey","metaKey","key"].forEach(function (field) { if (field in given) event[field] = given[field]; });
+	// A dismiss's detail is an object whose pressTarget is an element; a click's detail is its press count.
+	if (detail) event.detail = detail;
+	if (typeof given.pointerType === 'string') {
+		event.pressure = event.buttons > 0 ? 0.5 : 0;
+		event.getCoalescedEvents = function () { return event.type === 'pointermove' ? [event] : []; };
+	}
+	if (given.nodes)
+		["target","currentTarget","relatedTarget"].forEach(function (field) {
+			event[field] = given.nodes[field] == null ? null : elementOf(given.nodes[field]);
+		});
 	// A paste carries the pasted plain text, as the edit menu's paste does.
 	if ('text' in given)
 		event.clipboardData = { getData: function (type) { return type === 'text' || type === 'text/plain' ? given.text : ''; } };
@@ -321,7 +384,7 @@ g.__markless[id] = {
 		}
 		var out = host.out;
 		host.out = null;
-		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands, pending: out.pending, settled: out.settled };
+		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands, pending: out.pending, settled: out.settled, raises: out.raises };
 		if (out.calls.length > 0) left.calls = out.calls;
 		if (out.prevented) left.prevented = true;
 		if (out.navigate) left.navigate = out.navigate;

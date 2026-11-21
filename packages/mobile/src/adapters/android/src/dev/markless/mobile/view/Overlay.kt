@@ -4,10 +4,13 @@ import android.app.Activity
 import android.content.Context
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.FrameLayout
@@ -24,11 +27,21 @@ import kotlin.math.roundToInt
  * The overlay stack on screen. A modal overlay is lifted into a top layer above the page and the bars, with the page behind
  * hidden from TalkBack; a non-modal one stays in place. While any is open the back gesture is its Escape. When the page has an
  * overlay or a pointer handler, each finger on the screen is reported to the runtime as a touch on the innermost element
- * under it: `pointerdown`, `pointermove`, then `pointerup`, or `pointercancel` once a scroll view takes it.
+ * under it: `pointerdown`, `pointermove`, then `pointerup`, or `pointercancel` once a scroll view takes it. When the page has
+ * a `contextmenu` handler, one finger held still for the system's long-press time raises `contextmenu` on the element under
+ * it, as Chrome on Android does, and the tap it would have ended in does not follow.
  */
 internal class Overlays(private val host: MarklessHost, private val context: Context, private val dpr: Double) {
 	private val reportsTouches = host.payload.nodes.any { it is Node.Element && OVERLAY_ATTRIBUTE in it.attributes } ||
-		host.payload.events.any { it.event.pointer }
+		host.payload.events.any { it.event.pointer } || host.payload.tapPoints
+
+	private val pressesLong = host.payload.events.any { it.event == EventName.ContextMenu }
+	private val longPress = Handler(Looper.getMainLooper())
+	private val slop = ViewConfiguration.get(context).scaledTouchSlop
+	/** Where the finger that may become a long press went down, in window px, while it may still become one. */
+	private var pressedAt: Pair<Float, Float>? = null
+	/** A long press raised `contextmenu` in this gesture, so its lift reaches the views as a cancel, not a tap. */
+	private var pressedLong = false
 
 	private val appeared = SystemClock.uptimeMillis()
 	/** The next touch's number: from 1 for each screen, one more for each new touch, as Chrome on Android numbers them. */
@@ -114,9 +127,46 @@ internal class Overlays(private val host: MarklessHost, private val context: Con
 		lifted = null
 	}
 
-	/** Called with every touch in window coordinates before the views see it; nothing is consumed. */
-	fun touch(event: MotionEvent) {
-		if (!reportsTouches) return
+	/** Called with every touch in window coordinates before the views see it; true when a long press took the gesture, so its lift must not tap. */
+	fun touch(event: MotionEvent): Boolean {
+		if (reportsTouches) report(event)
+		if (pressesLong) holdOrRelease(event)
+		val tookGesture = pressedLong
+		if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) pressedLong = false
+		return tookGesture
+	}
+
+	private fun holdOrRelease(event: MotionEvent) {
+		when (event.actionMasked) {
+			MotionEvent.ACTION_DOWN -> {
+				pressedLong = false
+				val x = event.x
+				val y = event.y
+				pressedAt = x to y
+				longPress.removeCallbacksAndMessages(null)
+				longPress.postDelayed({ raiseLongPress(x, y) }, ViewConfiguration.getLongPressTimeout().toLong())
+			}
+			MotionEvent.ACTION_MOVE -> pressedAt?.let { (x, y) ->
+				if (Math.abs(event.x - x) > slop || Math.abs(event.y - y) > slop) releaseLongPress()
+			}
+			else -> releaseLongPress()
+		}
+	}
+
+	private fun releaseLongPress() {
+		pressedAt = null
+		longPress.removeCallbacksAndMessages(null)
+	}
+
+	private fun raiseLongPress(x: Float, y: Float) {
+		pressedAt = null
+		val target = hit(x.roundToInt(), y.roundToInt()) ?: return
+		pressedLong = true
+		val point = TouchPoint(x = x / dpr, y = y / dpr, time = (SystemClock.uptimeMillis() - appeared).toDouble())
+		host.apply(host.runtime.dispatch(target, EventName.ContextMenu, point = point))
+	}
+
+	private fun report(event: MotionEvent) {
 		lastTime = event.eventTime
 		when (event.actionMasked) {
 			MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
@@ -146,6 +196,7 @@ internal class Overlays(private val host: MarklessHost, private val context: Con
 
 	/** Sends `pointercancel` for every finger that is down; their later moves and lifts are not reported. */
 	fun cancelTouches() {
+		releaseLongPress()
 		val cancelled = fingers.values.toList()
 		fingers.clear()
 		for (finger in cancelled) if (report(EventName.PointerCancel, hit(finger.x.roundToInt(), finger.y.roundToInt()) ?: continue, finger)) return

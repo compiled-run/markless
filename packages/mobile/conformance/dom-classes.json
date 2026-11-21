@@ -1,0 +1,291 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "DomClasses",
+		"cells": [
+			{
+				"id": "state:seen",
+				"name": "seen",
+				"initial": ""
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "input",
+				"parent": "h0",
+				"attributes": {
+					"name": "q"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Field"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Button"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Note"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Make"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"cell": "state:seen"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h5",
+				"event": "activate",
+				"handler": "handler:event:3"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"seen": {
+								"cell": "state:seen"
+							},
+							"field": {
+								"elements": {
+									"literal": "h1"
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:1",
+						"type": "click",
+						"bindings": {
+							"seen": {
+								"cell": "state:seen"
+							},
+							"press": {
+								"elements": {
+									"literal": "h2"
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:2",
+						"type": "click",
+						"bindings": {
+							"seen": {
+								"cell": "state:seen"
+							},
+							"note": {
+								"elements": {
+									"literal": "h6"
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:3",
+						"type": "click",
+						"bindings": {
+							"seen": {
+								"cell": "state:seen"
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "50be18768491009c",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0,\"fn:2\":0,\"fn:3\":0};\nvar classes = {\"h0\":\"HTMLElement\",\"h1\":\"HTMLInputElement\",\"h2\":\"HTMLButtonElement\",\"h3\":\"HTMLButtonElement\",\"h4\":\"HTMLButtonElement\",\"h5\":\"HTMLButtonElement\",\"h6\":\"HTMLParagraphElement\"};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction kindOf(target) {\n if (target instanceof HTMLInputElement) return 'a text field';\n if (target instanceof HTMLButtonElement) return 'a button';\n if (target instanceof SVGElement) return 'a drawing';\n if (target instanceof HTMLElement) return 'an element';\n return 'nothing';\n}\nfunction made() {\n try {\n  return String(new HTMLElement());\n } catch (error) {\n  return error instanceof TypeError ? 'not constructible' : 'constructible';\n }\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => (__s.seen = kindOf(__s.field)));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => (__s.seen = kindOf(__s.press)));\n};\nfunctions[\"fn:2\"] = function (__s) {\nreturn (() => (__s.seen = kindOf(__s.note)));\n};\nfunctions[\"fn:3\"] = function (__s) {\nreturn (() => (__s.seen = made()));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"50be18768491009c\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h2:text0",
+			"Field"
+		],
+		[
+			"h3:text0",
+			"Button"
+		],
+		[
+			"h4:text0",
+			"Note"
+		],
+		[
+			"h5:text0",
+			"Make"
+		],
+		[
+			"h6:text0",
+			""
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "a text field"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "a button"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "an element"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "not constructible"
+				}
+			]
+		}
+	]
+}

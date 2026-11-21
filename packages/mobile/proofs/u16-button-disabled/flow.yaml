@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u16-button-disabled
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Disabled
 - assertVisible: Send
 - assertVisible: Lock

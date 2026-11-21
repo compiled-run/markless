@@ -1,0 +1,26 @@
+{
+	"rung": 192,
+	"name": "A style value that follows state, as a length: the marker's top in px, laid out again on the phone by Dragon's plan",
+	"steps": [
+		{
+			"visible": ["Length slot", "Row one", "Row two", "Marker", "Lower", "Drop 20"],
+			"placed": ["Marker", "Row one", "Row two"]
+		},
+		{
+			"do": {
+				"tap": "Lower"
+			},
+			"visible": ["Drop 90"],
+			"absent": ["Drop 20"],
+			"placed": ["Row one", "Marker", "Row two"]
+		},
+		{
+			"do": {
+				"tap": "Lower"
+			},
+			"visible": ["Drop 160"],
+			"absent": ["Drop 90"],
+			"placed": ["Row one", "Row two", "Marker"]
+		}
+	]
+}

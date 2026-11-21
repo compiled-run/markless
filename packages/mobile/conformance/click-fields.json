@@ -1,0 +1,245 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:last",
+				"name": "last",
+				"initial": "No click yet"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Clicks"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Tap here"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Click it by script"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"cell": "state:last"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"last": {
+								"cell": "state:last"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:1",
+						"type": "click",
+						"bindings": {
+							"spot": {
+								"elements": {
+									"literal": "h2"
+								}
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "4b454e949a3763d2",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n const how = event.isTrusted ? 'Tapped' : 'Scripted';\n const where = event.clientX > 0 && event.clientY > 0 ? 'at a point' : 'at 0, 0';\n const keys = event.shiftKey || event.ctrlKey || event.altKey || event.metaKey ? 'with a key' : 'no key held';\n __s.last = `${how} ${where}, ${keys}`;\n});\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => __s.spot?.click());\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"4b454e949a3763d2\");\n",
+			"services": []
+		},
+		"tapPoints": true
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Clicks"
+		],
+		[
+			"h2:text0",
+			"Tap here"
+		],
+		[
+			"h3:text0",
+			"Click it by script"
+		],
+		[
+			"h4:text0",
+			"No click yet"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h2",
+				"pointerId": 1,
+				"x": 40,
+				"y": 120,
+				"time": 1000
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h2",
+				"pointerId": 1,
+				"x": 44,
+				"y": 122,
+				"time": 1080
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Tapped at a point, no key held"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h3",
+				"pointerId": 2,
+				"x": 60,
+				"y": 200,
+				"time": 2000
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h3",
+				"pointerId": 2,
+				"x": 60,
+				"y": 200,
+				"time": 2080
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Scripted at 0, 0, no key held"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Tapped at 0, 0, no key held"
+				}
+			]
+		}
+	]
+}

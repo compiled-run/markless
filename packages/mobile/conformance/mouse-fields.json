@@ -1,0 +1,227 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "MouseFields",
+		"cells": [
+			{
+				"id": "state:x",
+				"name": "x",
+				"initial": 0
+			},
+			{
+				"id": "state:buttons",
+				"name": "buttons",
+				"initial": -1
+			},
+			{
+				"id": "state:moves",
+				"name": "moves",
+				"initial": 0
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Press"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Lift"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"cell": "state:x"
+					},
+					{
+						"text": " "
+					},
+					{
+						"cell": "state:buttons"
+					},
+					{
+						"text": " "
+					},
+					{
+						"cell": "state:moves"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "mousedown",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h1",
+				"event": "mousemove",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h2",
+				"event": "mouseup",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:x",
+						"value": {
+							"event": "clientX"
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:buttons",
+						"value": {
+							"event": "buttons"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:moves",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "state:moves"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:buttons",
+						"value": {
+							"event": "buttons"
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Press"
+		],
+		[
+			"h2:text0",
+			"Lift"
+		],
+		[
+			"h3:text0",
+			"0 -1 0"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h1",
+				"x": 30,
+				"y": 12
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h1",
+				"x": 30,
+				"y": 12
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "30 1 1"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h2",
+				"x": 44,
+				"y": 50
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h2",
+				"x": 44,
+				"y": 50
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "30 0 1"
+				}
+			]
+		}
+	]
+}

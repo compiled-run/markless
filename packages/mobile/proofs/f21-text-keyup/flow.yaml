@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: f21-text-keyup
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Chips
 - assertVisible: Removed 0
 - tapOn: Chip
@@ -23,11 +23,11 @@ name: f21-text-keyup
 - tapOn: Chip
 - pressKey: Backspace
 - assertNotVisible: Backspace left \[a\]
-- assertVisible: ''
+- assertVisible: ""
 - assertVisible: Backspace left \[\]
 - assertVisible: Removed 0
 - assertNotVisible: Backspace left \[a\]
-- assertVisible: ''
+- assertVisible: ""
 - tapOn: Chip
 - pressKey: Backspace
 - assertNotVisible: Removed 0

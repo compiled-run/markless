@@ -1,0 +1,409 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:open",
+				"name": "open",
+				"initial": false,
+				"styled": true
+			},
+			{
+				"id": "state:last",
+				"name": "last",
+				"initial": "nothing yet"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Dismiss"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Guide"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Last "
+					},
+					{
+						"cell": "state:last"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "div",
+				"parent": "h0",
+				"attributes": {
+					"role": "dialog",
+					"overlay": ""
+				},
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "state:open"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "p",
+				"parent": "h4"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Step one"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h4",
+				"event": "dismiss",
+				"handler": "handler:event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:open",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:open"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "dismiss",
+						"bindings": {
+							"opener": {
+								"elements": {
+									"literal": "h2"
+								}
+							},
+							"last": {
+								"cell": "state:last"
+							},
+							"open": {
+								"cell": "state:open"
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "972e4a4e26fe4d22",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n const detail = event.detail;\n const pressed = detail.pressTarget;\n const onOpener = pressed !== undefined && __s.opener !== undefined && __s.opener.contains(pressed);\n __s.last = onOpener ? `${detail.reason} on Guide` : detail.reason;\n if (!onOpener) __s.open = false;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"972e4a4e26fe4d22\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Dismiss"
+		],
+		[
+			"h2:text0",
+			"Guide"
+		],
+		[
+			"h3:text0",
+			"Last nothing yet"
+		],
+		[
+			"h5:text0",
+			"Step one"
+		]
+	],
+	"initialAttributes": [
+		[
+			"h4",
+			"hidden",
+			""
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:open",
+					"value": true
+				},
+				{
+					"op": "attribute",
+					"node": "h4",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "overlay",
+					"node": "h4",
+					"open": true,
+					"modal": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h5"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h5"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:open",
+					"value": false
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Last outside-press"
+				},
+				{
+					"op": "attribute",
+					"node": "h4",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "overlay",
+					"node": "h4",
+					"open": false,
+					"modal": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h3"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:open",
+					"value": true
+				},
+				{
+					"op": "attribute",
+					"node": "h4",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "overlay",
+					"node": "h4",
+					"open": true,
+					"modal": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Last outside-press on Guide"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h2"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:open",
+					"value": false
+				},
+				{
+					"op": "attribute",
+					"node": "h4",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "overlay",
+					"node": "h4",
+					"open": false,
+					"modal": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:open",
+					"value": true
+				},
+				{
+					"op": "attribute",
+					"node": "h4",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "overlay",
+					"node": "h4",
+					"open": true,
+					"modal": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "dismiss",
+				"host": "h4",
+				"reason": "escape"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:open",
+					"value": false
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Last escape"
+				},
+				{
+					"op": "attribute",
+					"node": "h4",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "overlay",
+					"node": "h4",
+					"open": false,
+					"modal": false
+				}
+			]
+		}
+	]
+}

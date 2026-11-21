@@ -1,0 +1,261 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:log",
+				"name": "log",
+				"initial": "none"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Pointer"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "div",
+				"parent": "h0",
+				"attributes": {
+					"data-name": "Card"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h2",
+				"attributes": {
+					"data-name": "Title"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Title"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h2",
+				"attributes": {
+					"data-name": "Body"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Body"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Reset"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Last "
+					},
+					{
+						"cell": "state:log"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "pointerover",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h5",
+				"event": "activate",
+				"handler": "handler:event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "pointerover",
+						"bindings": {
+							"log": {
+								"cell": "state:log"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:log",
+						"value": {
+							"literal": "none"
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "6a163ccaf6e8ba9c",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n const names = [];\n for (const element of [event.target, event.currentTarget]) names.push((element).getAttribute('data-name') ?? '?');\n const came = event.relatedTarget;\n const card = event.currentTarget;\n __s.log = `${names.join(' in ')} from ${came !== null && card.contains(came) ? 'inside' : 'outside'}`;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"6a163ccaf6e8ba9c\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Pointer"
+		],
+		[
+			"h3:text0",
+			"Title"
+		],
+		[
+			"h4:text0",
+			"Body"
+		],
+		[
+			"h5:text0",
+			"Reset"
+		],
+		[
+			"h6:text0",
+			"Last none"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "Last Title in Card from outside"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h3"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h5"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h5"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "Last none"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "Last Body in Card from outside"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h4"
+			},
+			"journal": []
+		}
+	]
+}

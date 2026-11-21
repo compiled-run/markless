@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: 07e-children-fallback
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Days
 - assertVisible: Monday
 - assertVisible: Taps 0

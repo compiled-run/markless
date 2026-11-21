@@ -1,0 +1,256 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "PointerPressure",
+		"cells": [
+			{
+				"id": "state:down",
+				"name": "down",
+				"initial": "No press"
+			},
+			{
+				"id": "state:moved",
+				"name": "moved",
+				"initial": "No move"
+			},
+			{
+				"id": "state:up",
+				"name": "up",
+				"initial": "Not lifted"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "div",
+				"parent": "h0"
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h1"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Drag across this whole line to read the pressure"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"cell": "state:down"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"cell": "state:moved"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"cell": "state:up"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "pointerdown",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h1",
+				"event": "pointermove",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h1",
+				"event": "pointerup",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h1",
+				"event": "pointercancel",
+				"handler": "handler:event:3"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "pointerdown",
+						"bindings": {
+							"down": {
+								"cell": "state:down"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:1",
+						"type": "pointermove",
+						"bindings": {
+							"moved": {
+								"cell": "state:moved"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:2",
+						"type": "pointerup",
+						"bindings": {
+							"up": {
+								"cell": "state:up"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:3",
+						"type": "pointercancel",
+						"bindings": {
+							"up": {
+								"cell": "state:up"
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "126813901b286502",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0,\"fn:2\":0,\"fn:3\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n __s.down = event.pressure > 0 && event.pressure <= 1 ? 'Pressed with pressure' : `Pressure ${event.pressure}`;\n});\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn ((event) => {\n if (event.buttons > 0) __s.moved = event.getCoalescedEvents().length > 0 ? 'Coalesced moves' : 'No coalesced';\n});\n};\nfunctions[\"fn:2\"] = function (__s) {\nreturn ((event) => (__s.up = `Lifted at ${event.pressure}`));\n};\nfunctions[\"fn:3\"] = function (__s) {\nreturn ((event) => (__s.up = `Lifted at ${event.pressure}`));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"126813901b286502\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h2:text0",
+			"Drag across this whole line to read the pressure"
+		],
+		[
+			"h3:text0",
+			"No press"
+		],
+		[
+			"h4:text0",
+			"No move"
+		],
+		[
+			"h5:text0",
+			"Not lifted"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h1",
+				"x": 10,
+				"y": 10
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Pressed with pressure"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointermove",
+				"host": "h1",
+				"x": 60,
+				"y": 10
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Coalesced moves"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h1",
+				"x": 60,
+				"y": 10
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h5:text0",
+					"value": "Lifted at 0"
+				}
+			]
+		}
+	]
+}

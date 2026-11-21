@@ -215,7 +215,8 @@ function mirror(
 		payload.nodes.flatMap((node) => {
 			if (node.kind !== 'element') return [];
 			const bound = attributes.get(`${node.id}\0aria-label`);
-			const label = bound !== undefined ? bound : (node.attributes?.['aria-label'] ?? null);
+			const label =
+				bound !== undefined ? bound : (node.attributes?.['aria-label'] ?? node.drawing?.label ?? null);
 			return label !== null && shownNode(node.id) ? [[node.id, label] as const] : [];
 		});
 	// The element a text names: a labelled element, or the element holding that text (a row instance keeps its key).
@@ -368,7 +369,11 @@ function walkApp(
 			if (!cell.device) continue;
 			if (cell.device !== 'location.access')
 				throw new Error(`no fake ${cell.device} in an app`);
-			for (const entry of runtime.dispatch({ event: 'device', cell: cell.id, value: 'granted' }))
+			for (const entry of runtime.dispatch({
+				event: 'device',
+				cell: cell.id,
+				value: 'granted',
+			}))
 				shown.apply(entry, -1);
 		}
 		for (const task of runtime.tasks())
@@ -380,7 +385,12 @@ function walkApp(
 				shown.apply(entry, -1);
 	};
 	const open = (screen: NativeScreen) => {
-		const shown = mirror(pageOf(screen.route), screen.runtime, new Map(), styled.has(screen.route));
+		const shown = mirror(
+			pageOf(screen.route),
+			screen.runtime,
+			new Map(),
+			styled.has(screen.route),
+		);
 		wake(screen, shown);
 		return shown;
 	};
@@ -512,12 +522,29 @@ function walk(
 					error: { name: 'NotAllowedError', message: 'Location was refused' },
 				});
 	const services = scriptServices();
+	// With no layout engine here, each element is one full-width row below the last, as unstyled blocks fall.
+	const rows = payload.nodes.filter((node) => node.kind === 'element').map((node) => node.id);
+	const stacked = (id: string) => {
+		const row = rows.indexOf(id.split('@')[0]!);
+		return row < 0
+			? null
+			: { x: 0, y: row * 24, width: 390, height: 24, direction: 'ltr' as const };
+	};
 	// The device's clock: a second passes between a person's actions.
 	let clock = Date.now();
 	/** The text field that has the keyboard, if any. */
 	let focused: string | undefined;
 	const start = () => {
-		const r = createNativeRuntime(payload, store, params, undefined, () => clock, services.host);
+		const r = createNativeRuntime(
+			payload,
+			store,
+			params,
+			undefined,
+			() => clock,
+			services.host,
+			undefined,
+			stacked,
+		);
 		for (const cell of payload.cells)
 			if (cell.device)
 				r.dispatch({ event: 'device', cell: cell.id, value: deviceValue(cell.device) });
@@ -657,6 +684,8 @@ function walk(
 		const label =
 			attribute('aria-label') ??
 			(node.element === 'img' ? (node.attributes?.alt ?? null) : null) ??
+			// An svg's text reads as the svg's, as the browser exposes it.
+			node.drawing?.label ??
 			(labelledBy === null
 				? null
 				: labelledBy
@@ -796,8 +825,10 @@ function walk(
 						payload.cells.some((cell) => cell.object === object && cell.device === name)
 					)
 						answered.push(() => setObject(object, name, value));
-			} else if (entry.op === 'timer') timers.push({ timer: entry.timer, due: at + entry.ms });
-			else if (entry.op === 'clearTimer') timers = timers.filter((timer) => timer.timer !== entry.timer);
+			} else if (entry.op === 'timer')
+				timers.push({ timer: entry.timer, due: at + entry.ms });
+			else if (entry.op === 'clearTimer')
+				timers = timers.filter((timer) => timer.timer !== entry.timer);
 			else if (entry.op === 'invalid') invalid = entry.message;
 			else if (entry.op === 'text') texts.set(entry.node, entry.value);
 			else if (entry.op === 'dialog') openDialogs.set(entry.node, entry.open);
@@ -813,8 +844,7 @@ function walk(
 				if (followsDefault) shownDefaults.set(entry.node, entry.value);
 				else properties.set(entry.node, entry.value);
 				typed.delete(entry.node);
-			}
-			else if (entry.op === 'navigate') {
+			} else if (entry.op === 'navigate') {
 				// One page per rung: a navigation opens this page again with the link's params.
 				expect(entry.route, `step ${index}: the link's route`).toBe(payload.route?.pattern);
 				runtime = createNativeRuntime(payload, store, entry.params);
@@ -963,14 +993,14 @@ function walk(
 		} else if (action && 'swipe' in action && action.swipe === 'up') openSheet(index);
 		else if (action && 'swipe' in action) {
 			// Scrolling changes what is on screen, not what the page holds; the devices and the web judge the screen.
-		}
-		else if (action && 'scrollTo' in action) {
+		} else if (action && 'scrollTo' in action) {
 			openSheet(index);
 			if (!shownTexts().some(([, text]) => text === action.scrollTo))
 				throw new Error(`step ${index}: "${action.scrollTo}" is not in the open sheet`);
 		} else if (action && ('escape' in action || 'pressBackdrop' in action)) {
 			const top = runtime.overlays().at(-1)?.[0];
-			if (!top) throw new Error(`step ${index}: no overlay is open to ${Object.keys(action)[0]}`);
+			if (!top)
+				throw new Error(`step ${index}: no overlay is open to ${Object.keys(action)[0]}`);
 			apply(
 				'escape' in action
 					? runtime.dispatch({ event: 'dismiss', host: top, reason: 'escape' })
@@ -1018,6 +1048,28 @@ function walk(
 			for (let n = 1; n <= moves; n++) out.push(...touch('pointermove', n));
 			out.push(...touch(action.drag.scrolls ? 'pointercancel' : 'pointerup', moves));
 			apply(out, index);
+		} else if (action && 'longPress' in action) {
+			const host = elementReading(action.longPress);
+			if (!host)
+				throw new Error(`step ${index}: nothing reads "${action.longPress}" to press`);
+			// A held finger goes down and up; between them Android's host raises contextmenu, as Chrome does, and iOS's none.
+			const at = { pointerId: 1, x: 100, y: 300 };
+			apply(
+				[
+					...runtime.dispatch({ event: 'pointerdown', host, ...at, time: 0 }),
+					...(target === 'android'
+						? runtime.dispatch({
+								event: 'contextmenu',
+								host,
+								x: at.x,
+								y: at.y,
+								time: 500,
+							})
+						: []),
+					...runtime.dispatch({ event: 'pointerup', host, ...at, time: 600 }),
+				],
+				index,
+			);
 		} else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
@@ -1055,12 +1107,12 @@ function walk(
 				else typed.set(host, text);
 			}
 			// A tap is a touch going down and up on what it lands on, then the activation of the nearest element around it
-			// that handles a press, as on a phone.
+			// that handles a press, as on a phone; it lands inside the screen, never at its corner.
 			const touched =
 				'tap' in action
 					? [
-							...runtime.dispatch({ event: 'pointerdown', host }),
-							...runtime.dispatch({ event: 'pointerup', host }),
+							...runtime.dispatch({ event: 'pointerdown', host, x: 1, y: 1 }),
+							...runtime.dispatch({ event: 'pointerup', host, x: 1, y: 1 }),
 						]
 					: [];
 			apply(touched, index);
@@ -1081,8 +1133,7 @@ function walk(
 			const returns = payload.events.some(
 				(event) => event.host === host && event.event === 'enter',
 			);
-			// A row's copy (`<node>@<key>`) is not in the tree by that id: it activates as itself.
-			const activates = !!pressed || host.includes('@');
+			const activates = !!pressed;
 			if ('tap' in action && !activates && touched.length === 0)
 				throw new Error(`step ${index}: "${name}" is not a control and the press changed nothing`);
 			// A field takes the keyboard when typed into, and gives it up when anything else is tapped: its focus and blur run.
@@ -1171,16 +1222,28 @@ function walk(
 	}
 	// What a host raises once the screen is drawn: `idle` for every element due one, `visible` for each above the fold.
 	function raiseLoadEvents(index: number) {
-		const foldText = belowFold === undefined ? undefined : [...texts].find(([, text]) => text === belowFold)?.[0];
-		const foldNode = foldText === undefined ? -1 : payload.nodes.findIndex((node) => node.id === nodeOf.get(foldText.split('@')[0]!)?.parent);
+		const foldText =
+			belowFold === undefined
+				? undefined
+				: [...texts].find(([, text]) => text === belowFold)?.[0];
+		const foldNode =
+			foldText === undefined
+				? -1
+				: payload.nodes.findIndex(
+						(node) => node.id === nodeOf.get(foldText.split('@')[0]!)?.parent,
+					);
 		const aboveFold = (instance: string) =>
-			foldNode < 0 || payload.nodes.findIndex((node) => node.id === instance.split('@')[0]) < foldNode;
+			foldNode < 0 ||
+			payload.nodes.findIndex((node) => node.id === instance.split('@')[0]) < foldNode;
 		for (;;) {
 			const idle = runtime.due('idle')[0];
 			const visible = runtime.due('visible').find(aboveFold);
 			const host = idle ?? visible;
 			if (host === undefined) return;
-			apply(runtime.dispatch({ event: idle === undefined ? 'visible' : 'idle', host }), index);
+			apply(
+				runtime.dispatch({ event: idle === undefined ? 'visible' : 'idle', host }),
+				index,
+			);
 		}
 	}
 	function check(index: number, step: LadderStep) {
@@ -1290,7 +1353,9 @@ test.each(
 		).toBe(REFUSED_RUNGS.has(folder));
 		if (build.payload === null) {
 			// Every refusal is named; a keyboard-only handler left out is a warning beside them, never the reason.
-			expect(build.diagnostics.some((diagnostic) => diagnostic.severity === 'error')).toBe(true);
+			expect(build.diagnostics.some((diagnostic) => diagnostic.severity === 'error')).toBe(
+				true,
+			);
 			const refusalCodes = new Set<string>([
 				NATIVE_UNSUPPORTED,
 				...Object.values(NATIVE_REFUSALS).map((refusal) => refusal.code),
@@ -1335,7 +1400,10 @@ test.each([...navRungFolders(), ...styleRungFolders(), ...sheetStyleRungFolders(
 	'%s: the app payload walks the steps as a stack of screens',
 	async (folder) => {
 		const rung = readRung(folder);
-		const build = await compileRungApp(join(proofsDir, folder), readAppConfig(join(proofsDir, folder)));
+		const build = await compileRungApp(
+			join(proofsDir, folder),
+			readAppConfig(join(proofsDir, folder)),
+		);
 		expect(
 			build.diagnostics.map((diagnostic) => `${diagnostic.page}: ${diagnostic.message}`),
 		).toEqual([]);

@@ -57,6 +57,57 @@ if (!host) {
 		signal.listeners.slice().forEach(function (fn) { fn.call(signal, event); });
 	};
 	if (typeof g.queueMicrotask !== 'function') g.queueMicrotask = function (fn) { Promise.resolve().then(fn); };
+	// Events a script makes and dispatches on an element: the host raises them on that element once the script returns.
+	var EventBase = function (type, init) {
+		init = init || {};
+		this.type = String(type);
+		this.bubbles = init.bubbles === true;
+		this.cancelable = init.cancelable === true;
+		this.defaultPrevented = false;
+		this.isTrusted = false;
+		this.target = null;
+		this.currentTarget = null;
+	};
+	EventBase.prototype.preventDefault = function () { if (this.cancelable) this.defaultPrevented = true; };
+	EventBase.prototype.stopPropagation = function () {};
+	var eventKind = function (parent, fields) {
+		var Kind = function (type, init) {
+			parent.call(this, type, init);
+			for (var name in fields) this[name] = init && init[name] !== undefined ? init[name] : fields[name];
+		};
+		Kind.prototype = Object.create(parent.prototype);
+		return Kind;
+	};
+	g.Event = EventBase;
+	g.CustomEvent = eventKind(EventBase, { detail: null });
+	g.MouseEvent = eventKind(EventBase, { detail: 0, button: 0, buttons: 0, clientX: 0, clientY: 0, relatedTarget: null });
+	g.PointerEvent = eventKind(g.MouseEvent, { pointerId: 0, pointerType: '', isPrimary: false, pressure: 0 });
+	g.KeyboardEvent = eventKind(EventBase, { key: '', code: '', repeat: false, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false });
+	// The DOM's interfaces, so an element proxy answers instanceof as the browser's element does; none can be constructed.
+	var domClasses = {"Node":null,"Element":"Node","HTMLElement":"Element","SVGElement":"Element","HTMLAnchorElement":"HTMLElement","HTMLAudioElement":"HTMLElement","HTMLQuoteElement":"HTMLElement","HTMLBodyElement":"HTMLElement","HTMLBRElement":"HTMLElement","HTMLButtonElement":"HTMLElement","HTMLCanvasElement":"HTMLElement","HTMLDetailsElement":"HTMLElement","HTMLDialogElement":"HTMLElement","HTMLDivElement":"HTMLElement","HTMLDListElement":"HTMLElement","HTMLFieldSetElement":"HTMLElement","HTMLFormElement":"HTMLElement","HTMLHeadingElement":"HTMLElement","HTMLHRElement":"HTMLElement","HTMLIFrameElement":"HTMLElement","HTMLImageElement":"HTMLElement","HTMLInputElement":"HTMLElement","HTMLLabelElement":"HTMLElement","HTMLLegendElement":"HTMLElement","HTMLLIElement":"HTMLElement","HTMLOListElement":"HTMLElement","HTMLOptionElement":"HTMLElement","HTMLOutputElement":"HTMLElement","HTMLParagraphElement":"HTMLElement","HTMLPreElement":"HTMLElement","HTMLProgressElement":"HTMLElement","HTMLSelectElement":"HTMLElement","HTMLSpanElement":"HTMLElement","SVGSVGElement":"SVGElement","HTMLTableElement":"HTMLElement","HTMLTableSectionElement":"HTMLElement","HTMLTableCellElement":"HTMLElement","HTMLTextAreaElement":"HTMLElement","HTMLTimeElement":"HTMLElement","HTMLTableRowElement":"HTMLElement","HTMLUListElement":"HTMLElement","HTMLVideoElement":"HTMLElement"};
+	var defineClass = function (name) {
+		if (Object.prototype.hasOwnProperty.call(g, name) && g[name].__dom) return g[name];
+		var parent = domClasses[name] ? defineClass(domClasses[name]) : null;
+		var Class = function () { throw new TypeError('Illegal constructor'); };
+		if (parent) Class.prototype = Object.create(parent.prototype);
+		Object.defineProperty(Class, '__dom', { value: true });
+		Object.defineProperty(Class, 'name', { value: name });
+		g[name] = Class;
+		return Class;
+	};
+	for (var domName in domClasses) defineClass(domName);
+	if (typeof g.performance !== 'object' || typeof g.performance.now !== 'function') {
+		var origin = Date.now(), last = 0;
+		// Date.now() can step back when the device clock is set; elapsed time never does.
+		g.performance = { timeOrigin: origin, now: function () { return (last = Math.max(last, Date.now() - origin)); } };
+	}
+	if (typeof g.DOMException !== 'function') {
+		g.DOMException = function DOMException(message, name) {
+			this.message = message === undefined ? '' : String(message);
+			this.name = name === undefined ? 'Error' : String(name);
+		};
+		g.DOMException.prototype = Object.create(Error.prototype, { constructor: { value: g.DOMException, writable: true, configurable: true } });
+	}
 	var Headers = function (pairs) {
 		this.get = function (name) {
 			var key = String(name).toLowerCase(), found = [];
@@ -282,7 +333,13 @@ if (!host) {
 		if (!deviceCalls[call].object) host.devices[device] = callsOn(device, null);
 	});
 	host.deviceObject = callsOn;
+	g.getComputedStyle = function (element) {
+		if (!element || typeof element.__style !== 'function') throw new TypeError('getComputedStyle() takes an element');
+		return element.__style();
+	};
 	g.window = g.self = g;
+	// The page's one member a phone answers: the focused element (the body when none is), which the build allows alone.
+	g.document = { get activeElement() { return host.focus(); } };
 	host.Response = Response;
 	// The HTML structured clone, as Chromium runs it, for an engine that has none.
 	if (typeof g.structuredClone !== 'function') {

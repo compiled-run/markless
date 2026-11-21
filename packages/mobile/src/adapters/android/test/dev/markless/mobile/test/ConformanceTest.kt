@@ -3,6 +3,7 @@ package dev.markless.mobile.test
 import dev.markless.mobile.core.AppPayload
 import dev.markless.mobile.core.AppRuntime
 import dev.markless.mobile.core.AttributeValue
+import dev.markless.mobile.core.ElementBox
 import dev.markless.mobile.core.EventName
 import dev.markless.mobile.core.Js
 import dev.markless.mobile.core.MemoryStore
@@ -129,6 +130,12 @@ private fun runVector(file: File) {
 	val now = (vector["now"] as? Json.Num)?.value
 	TestScriptHost().use { host ->
 		val runtime = if (now == null) Runtime(payload, params = params, preferredLanguages = languages, scriptHost = host) else Runtime(payload, params = params, preferredLanguages = languages, now = { now }, scriptHost = host)
+		val layout = vector["layout"]?.obj("layout")?.mapValues { (id, box) ->
+			val b = box.obj("layout.$id")
+			fun number(key: String) = (b[key] as? Json.Num)?.value ?: throw IllegalStateException("layout.$id.$key is not a number")
+			ElementBox(number("x"), number("y"), number("width"), number("height"), (b["direction"] as? Json.Str)?.value == "rtl")
+		}
+		if (layout != null) runtime.measure = { layout[it] }
 		runVector(file, vector, runtime)
 		if (payload.script == null) check("${file.name} starts no engine", !host.started) { "a payload without a script started the engine" }
 	}
@@ -320,6 +327,9 @@ private fun pointerDecoding() {
 	check("decodes every pointer field, captures and the capture op", decoded.getOrNull()?.handlers?.single()?.ops?.size == fields.size + 2) { decoded.exceptionOrNull().toString() }
 	for (name in listOf("pointerdown", "pointermove", "pointerup", "pointercancel", "pointerover", "pointerout", "pointerenter", "pointerleave"))
 		check("decodes the $name event", runCatching { Payload.decode(page(read("clientX"), event = name).toByteArray()) }.isSuccess) { "" }
+	val placed = Runtime(Payload.decode(page("""{"op":"assign","cell":"c","value":{"event":"clientX"}}""", event = "contextmenu").toByteArray()))
+	val at = placed.dispatch("h0", EventName.ContextMenu, point = TouchPoint(x = 30.5, y = 4.0)).joinToString(",") { it.toJson() }
+	check("a contextmenu handler reads the long press's place", at == """{"op":"text","node":"h0:text0","value":"30.5"}""") { at }
 	refuses("a pointer event on a text", page(read("clientX"), host = "h0:text0"), "names no element")
 	refuses("an unknown pointer field", page(read("offsetX")), "unknown event \"offsetX\"")
 	refuses("captures without a pointer", page(read("clientX", """{"captures":{"event":"target"}}""")), "is missing \"pointer\"")
@@ -599,6 +609,7 @@ private fun appStyle(fixtures: File) {
 	val bySize = runCatching { widthBands.band(dark = false, widthPx = 1080.0, heightPx = 2203.0, scale = 2.625) }.exceptionOrNull()
 	check("a width band needs Dragon's lookup, which the JVM test does not link", Bands.library == null && bySize is MarklessDecodeError && bySize.message!!.contains("needs Dragon's band lookup")) { "error was: $bySize" }
 	refusesApp("an unknown version", text.replace("markless.native-app-style/0", "markless.native-app-style/9"), "unknown app style version")
+	refusesApp("slots on a route without a plan", text.replace("\"pattern\":", "\"slots\":[{\"id\":\"slot:h0#0\",\"initial\":25}],\"pattern\":"), "has slots but no layout plan")
 	refusesApp("a write index out of range", text.replace(Regex("\"writes\":\\s*\\d+(\\s*)}"), "\"writes\":99999$1}"), "not an index of the app's write lists")
 	refusesApp("an unknown route field", text.replace(Regex("\"pattern\":\\s*\"/help\""), "\"pattern\":\"/help\",\"extra\":1"), "unknown field \"extra\"")
 }
@@ -669,6 +680,44 @@ private fun overlays() {
 	refuses("focused other than true", payload.replace("{\"focusOrigin\":{\"literal\":\"h1\"}}", "{\"focused\":false}"), "focused must be true")
 }
 
+/** A style slot journals its new value; the plan's layout gets slot values and its moved write numbers patch the export. */
+private fun styleSlots() {
+	val payload = """{"version":"markless.native-view/0","component":"C","cells":[{"id":"c","name":"c","initial":1}],"slots":[{"id":"slot:x","value":{"binary":"*","left":{"cell":"c"},"right":{"literal":10}},"integer":true}],"nodes":[{"kind":"element","id":"h0","element":"div","parent":null,"style":["--x: ",{"slot":"slot:x"},"%"]},{"kind":"element","id":"h1","element":"button","parent":"h0"},{"kind":"element","id":"h2","element":"button","parent":"h0"},{"kind":"element","id":"h3","element":"button","parent":"h0"}],"events":[{"host":"h1","event":"activate","handler":"up"},{"host":"h2","event":"activate","handler":"same"},{"host":"h3","event":"activate","handler":"half"}],"handlers":[{"id":"up","ops":[{"op":"assign","cell":"c","value":{"binary":"+","left":{"cell":"c"},"right":{"literal":1}}}]},{"id":"same","ops":[{"op":"assign","cell":"c","value":{"cell":"c"}}]},{"id":"half","ops":[{"op":"assign","cell":"c","value":{"literal":0.25}}]}]}"""
+	val r = Runtime(Payload.decode(payload.toByteArray()), MemoryStore())
+	check("slots start at their values", r.slots() == listOf("slot:x" to 10.0)) { "${r.slots()}" }
+	val up = r.dispatch("h1", EventName.Activate).joinToString(",") { it.toJson() }
+	check("a slot whose value changed is journalled", up == """{"op":"slot","slot":"slot:x","value":20}""") { up }
+	val same = r.dispatch("h2", EventName.Activate).joinToString(",") { it.toJson() }
+	check("a slot whose value is the same is not", same == "") { same }
+	val half = runCatching { r.dispatch("h3", EventName.Activate) }.exceptionOrNull()?.message
+	check("an integer slot refuses a fraction", half == "style slot slot:x is 2.5, not a whole number") { "$half" }
+	refuses("a style hole naming no slot", payload.replace("{\"slot\":\"slot:x\"}", "{\"slot\":\"slot:y\"}"), "unknown slot \"slot:y\"")
+	refuses("a slot reading an unknown cell", payload.replace("\"left\":{\"cell\":\"c\"},\"right\":{\"literal\":10}", "\"left\":{\"cell\":\"d\"},\"right\":{\"literal\":10}"), "slot \"slot:x\" reads unknown cell \"d\"")
+
+	fun hex(v: Double) = "\"${java.lang.Long.toHexString(v.toRawBits()).padStart(16, '0')}\""
+	val export = """{"schema":"dragon.native-style-export/1","slots":[{"id":"slot:x","initial":10,"integer":true}],"targets":{"android":{"backend":"android-views","viewport":{"width":100,"height":100},"dpr":2,"states":[],"initial":0,"next":[[]],"assignments":[{"values":{},"nodes":[{"id":"h0","parent":null,"kind":"element","frame":{"x":0,"y":0,"width":10,"height":10},"writes":[{"kind":"background-color","color":{"r":1,"g":2,"b":3,"alpha":255}}]}]}],"plan":{"version":"dragon.markless-plan/1"}}}}"""
+	val style = StyleExport.decode(export.toByteArray())
+	check("export slots decode", style.slots.map { it.id to it.initial } == listOf("slot:x" to 10.0) && style.slots[0].integer) { "${style.slots}" }
+	var given: Json? = null
+	fun layout(path: String) = { line: String ->
+		given = Json.parse(line).obj("line")["slots"]
+		val zero = hex(0.0)
+		"""["ok",[$zero,$zero,$zero,$zero],[["h0",[$zero,$zero,${hex(10.0)},${hex(10.0)}],null,null,null,null]],[["h0","background-color",$path,${hex(200.0)}]]]"""
+	}
+	val laid = style.laidOut(100.0, 100.0, 2.0, layout("[\"color\",\"g\"]"), listOf(20.0))
+	check("the layout line carries each slot's bit pattern", given == Json.Arr(listOf(Json.Str(hex(20.0).trim('"'))))) { "$given" }
+	val writes = laid.assignments[0].byId.getValue("h0").writes
+	check("a moved channel patches its write", writes == listOf(StyleWrite.BackgroundColor(Rgba(1, 200, 3, 255)))) { "$writes" }
+	val bad = runCatching { style.laidOut(100.0, 100.0, 2.0, layout("[\"colour\",\"g\"]"), listOf(20.0)) }.exceptionOrNull()?.message
+	check("a write path the host cannot write is refused by name", bad != null && "h0" in bad && "background-color" in bad && "[\"colour\",\"g\"]" in bad) { "$bad" }
+	val count = runCatching { style.laidOut(100.0, 100.0, 2.0, layout("[\"color\",\"g\"]")) }.exceptionOrNull()?.message
+	check("a layout without the slot values is refused", count != null && "1 slots" in count) { "$count" }
+	val plain = StyleExport.decode(export.replace(",\"plan\":{\"version\":\"dragon.markless-plan/1\"}", "").replace("\"slots\":[{\"id\":\"slot:x\",\"initial\":10,\"integer\":true}],", "").toByteArray())
+	check("an export without slots has none", plain.slots.isEmpty()) { "${plain.slots}" }
+	val unplanned = runCatching { StyleExport.decode(export.replace(",\"plan\":{\"version\":\"dragon.markless-plan/1\"}", "").toByteArray()) }.exceptionOrNull()?.message
+	check("an export with slots needs a plan", unplanned != null && "no layout plan" in unplanned) { "$unplanned" }
+}
+
 /** The S21 rung's app style and payload as the harness builds them (proofs/s21-styled-rows, Dragon branch cw/markless-rows). */
 private fun rowStyles(fixtures: File) {
 	val style = StyleExport.decodeApp(File(fixtures, "s21-styled-rows.native-app-style.json").readBytes()).getValue("/")
@@ -721,6 +770,7 @@ fun main(args: Array<String>) {
 	rowStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	rowPressedStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
+	styleSlots()
 	val dirs = args.map(::File)
 	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)
 	val files = dirs.flatMap { d -> d.listFiles { f -> f.name.endsWith(".json") }?.sortedBy { it.name } ?: error("no vector directory $d") }

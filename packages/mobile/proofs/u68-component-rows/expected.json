@@ -1,0 +1,17 @@
+{
+	"rung": 178,
+	"name": "A @for whose rows are a component gets a list data cannot build from JavaScript when the screen opens, as the web renders it",
+	"steps": [
+		{
+			"visible": ["Guide", "START: 2 pages", "GUIDES: 3 pages", "Read 0"],
+			"absent": ["Blog: 0 pages"]
+		},
+		{
+			"do": {
+				"tap": "Read 0"
+			},
+			"visible": ["Read 1", "START: 2 pages", "GUIDES: 3 pages"],
+			"absent": ["Read 0", "Blog: 0 pages"]
+		}
+	]
+}

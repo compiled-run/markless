@@ -2,20 +2,20 @@ appId: ${APP_ID}
 name: 15-long-list
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Long list
 - assertVisible: Row 1
 - assertNotVisible: Reached 1
 - assertNotVisible: Row 480
 - assertNotVisible: End of list
 - repeat:
-      times: 80
-      while:
-          notVisible: Reached 0
-      commands:
-          - swipe:
-                start: 50%, 80%
-                end: 50%, 25%
+    times: 80
+    while:
+      notVisible: Reached 0
+    commands:
+      - swipe:
+          start: 50%, 80%
+          end: 50%, 25%
 - assertVisible: End of list
 - assertVisible: Row 480
 - assertNotVisible: Long list

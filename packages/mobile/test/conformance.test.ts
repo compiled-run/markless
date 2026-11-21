@@ -85,6 +85,32 @@ describe('native conformance vectors', () => {
 		expect(deep.initial.stack).toEqual(['/', '/orders', '/orders/42']);
 	});
 
+	it('contextmenu: a long press reaches the element pressed, then each element it is inside, with its place', () => {
+		const vectors = committed('contextmenu.json') as ReturnType<typeof nativeConformance>;
+		expect(vectors.steps.map((step) => step.journal)).toEqual([
+			[
+				{ op: 'text', node: 'h1:text0', value: 'Apple at 40,120' },
+				{ op: 'text', node: 'h6:text0', value: ' list:inner@900' },
+			],
+			[{ op: 'text', node: 'h6:text0', value: ' list:inner@900 list:self@1500' }],
+			[
+				{
+					op: 'text',
+					node: 'h6:text0',
+					value: ' list:inner@900 list:self@1500 pad:52.5 pad:300',
+				},
+			],
+			[
+				{ op: 'text', node: 'h1:text0', value: 'Pear at 41,160' },
+				{
+					op: 'text',
+					node: 'h6:text0',
+					value: ' list:inner@900 list:self@1500 pad:52.5 pad:300 list:inner@2600',
+				},
+			],
+		]);
+	});
+
 	it('journals only the text nodes whose string changed, in document order', () => {
 		const runtime = createNativeRuntime({
 			version: 'markless.native-view/0',

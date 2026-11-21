@@ -1,0 +1,486 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:count",
+				"name": "count",
+				"initial": 0
+			},
+			{
+				"id": "state:hover",
+				"name": "hover",
+				"initial": "none"
+			},
+			{
+				"id": "state:open",
+				"name": "open",
+				"initial": true,
+				"styled": true
+			},
+			{
+				"id": "state:closed",
+				"name": "closed",
+				"initial": "not yet"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Raised"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Plus"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Count "
+					},
+					{
+						"cell": "state:count"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Click Plus"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "div",
+				"parent": "h0"
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "p",
+				"parent": "h5"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Hover "
+					},
+					{
+						"cell": "state:hover"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Hover by script"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "div",
+				"parent": "h0",
+				"attributes": {
+					"overlay": ""
+				},
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "state:open"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "p",
+				"parent": "h8"
+			},
+			{
+				"kind": "text",
+				"id": "h9:text0",
+				"parent": "h9",
+				"parts": [
+					{
+						"text": "Panel"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h10",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h10:text0",
+				"parent": "h10",
+				"parts": [
+					{
+						"text": "Closed "
+					},
+					{
+						"cell": "state:closed"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h11",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h11:text0",
+				"parent": "h11",
+				"parts": [
+					{
+						"text": "Close by script"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h5",
+				"event": "pointerover",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h7",
+				"event": "activate",
+				"handler": "handler:event:3"
+			},
+			{
+				"host": "h8",
+				"event": "dismiss",
+				"handler": "handler:event:4"
+			},
+			{
+				"host": "h11",
+				"event": "activate",
+				"handler": "handler:event:5"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:count",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:count"
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"plus": {
+								"elements": {
+									"literal": "h2"
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:hover",
+						"value": {
+							"template": [
+								"",
+								{
+									"if": {
+										"binary": "===",
+										"left": {
+											"event": "pointerType"
+										},
+										"right": {
+											"literal": ""
+										}
+									},
+									"whenTrue": {
+										"literal": "script"
+									},
+									"whenFalse": {
+										"event": "pointerType"
+									}
+								},
+								" over"
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:1",
+						"type": "click",
+						"bindings": {
+							"box": {
+								"elements": {
+									"literal": "h5"
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:4",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:closed",
+						"value": {
+							"event": "reason"
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:open",
+						"value": {
+							"literal": false
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:5",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:2",
+						"type": "click",
+						"bindings": {
+							"panel": {
+								"elements": {
+									"literal": "h8"
+								}
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "fbd31eb9bb4f861f",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0,\"fn:2\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => __s.plus?.click());\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => {\n __s.box?.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));\n});\n};\nfunctions[\"fn:2\"] = function (__s) {\nreturn (() => __s.panel?.dispatchEvent(new CustomEvent('dismiss', { detail: { reason: 'escape' } })));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"fbd31eb9bb4f861f\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Raised"
+		],
+		[
+			"h2:text0",
+			"Plus"
+		],
+		[
+			"h3:text0",
+			"Count 0"
+		],
+		[
+			"h4:text0",
+			"Click Plus"
+		],
+		[
+			"h6:text0",
+			"Hover none"
+		],
+		[
+			"h7:text0",
+			"Hover by script"
+		],
+		[
+			"h9:text0",
+			"Panel"
+		],
+		[
+			"h10:text0",
+			"Closed not yet"
+		],
+		[
+			"h11:text0",
+			"Close by script"
+		]
+	],
+	"initialAttributes": [
+		[
+			"h8",
+			"hidden",
+			null
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h11"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:open",
+					"value": false
+				},
+				{
+					"op": "attribute",
+					"node": "h8",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "text",
+					"node": "h10:text0",
+					"value": "Closed escape"
+				},
+				{
+					"op": "overlay",
+					"node": "h8",
+					"open": false,
+					"modal": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Count 1"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h7"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "Hover script over"
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,35 @@
+appId: ${APP_ID}
+name: u63-script-events
+---
+- launchApp:
+    clearState: true
+- assertVisible: Raised
+- assertVisible: Plus
+- assertVisible: Count 0
+- assertVisible: Hover none
+- assertVisible: Panel
+- assertVisible: Closed not yet
+- assertNotVisible: Count 1
+- assertNotVisible: Hover script over
+- assertNotVisible: Closed escape
+- tapOn: Close by script
+- assertVisible: Closed escape
+- assertNotVisible: Panel
+- assertNotVisible: Closed not yet
+- assertVisible: Count 0
+- assertVisible: Hover none
+- assertVisible: Closed escape
+- assertNotVisible: Panel
+- assertNotVisible: Closed not yet
+- tapOn: Click Plus
+- assertNotVisible: Count 0
+- assertVisible: Count 1
+- assertVisible: Hover none
+- assertVisible: Closed escape
+- assertNotVisible: Count 0
+- tapOn: Hover by script
+- assertNotVisible: Hover none
+- assertVisible: Count 1
+- assertVisible: Hover script over
+- assertVisible: Closed escape
+- assertNotVisible: Hover none
