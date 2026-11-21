@@ -1663,6 +1663,8 @@ export function createNativeViewPayload(
 	};
 
 	const widgetRoots = new Map<string, string | undefined>();
+	/** Each app-wide shared() definition's one instance on this screen. */
+	const appInstances = new Map<string, SharedInstance>();
 	/** The component that roots a definition's widgets: the first in its module whose body seeds it. */
 	const widgetRoot = (definition: SemanticSharedDefinition): string | undefined => {
 		if (widgetRoots.has(definition.id)) return widgetRoots.get(definition.id);
@@ -1733,7 +1735,22 @@ export function createNativeViewPayload(
 				continue;
 			}
 			if (definition.scope !== 'subtree') {
-				refuse(`${definition.name}: shared() with scope \`${definition.scope ?? 'app'}\``);
+				const scopeName = definition.scope ?? 'app';
+				// One instance for the whole screen, which every component joins, as the web's module-level one.
+				if (scopeName === 'app' && !options.routes) {
+					const instance =
+						appInstances.get(definition.id) ??
+						createInstance(definition, module, 'app/', undefined);
+					appInstances.set(definition.id, instance);
+					subtree.set(definition.id, instance);
+					objects.set(use.localName, { kind: 'instance', instance });
+					continue;
+				}
+				refuse(
+					scopeName === 'app'
+						? `${definition.name}: an app-wide shared() in an app with pages, which each page's screen would hold apart`
+						: `${definition.name}: shared() with scope \`${scopeName}\``,
+				);
 				continue;
 			}
 			// As on the web, each rendered copy of the definition's root component starts a widget of its own (a checkbox inside
