@@ -2382,7 +2382,7 @@ export function Forms() @{
 		<form onSubmit={(event) => { if (sent === '') return; event.preventDefault(); }}>
 			<button>Send</button>
 		</form>
-		<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget, null).get('x')); }}>
+		<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget, event.submitter).get('x')); }}>
 			<input type="email" name="x" />
 			<input name="code" pattern="[0-9]+" />
 			<input type="radio" name={sent} />
@@ -2393,7 +2393,7 @@ export function Forms() @{
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toEqual([
-			'the submit handler builds FormData with a submitter, which a native build does not read yet',
+			'the submit handler reads `event.submitter`, which a submit on a phone does not have',
 			'the <form> h1 has no onSubmit handler: the web sends it to its action and loads the answer (or sends a POST to an API route in place), and a phone app has no server or page to load',
 			'the submit handler on the <form> h4 does not call `event.preventDefault()` on every path before it awaits or returns: the web then sends the form to its action and loads a new page, which a phone app has no server or page for',
 			'the <input> h7 in the <form> h6 is an <input type="email">, which no native host draws or checks yet',
@@ -2570,8 +2570,8 @@ export function Waits() @{
 		]);
 	});
 
-	it('names an await that cannot be lowered: inside an if, in an expression, or failing outside a catch', async () => {
-		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+	it('names an await that cannot be lowered: inside an if, in an expression, or failing outside a catch, when handlers are data only', async () => {
+		const source = `import { state } from '@markless/core';
 function later(wait: number) {
 	return new Promise<string>((resolve, reject) => {
 		setTimeout(() => reject(new Error('late')), wait);
@@ -2584,13 +2584,19 @@ export function Waits() @{
 		<form onSubmit={async (event) => { event.preventDefault(); status = 'x' + (await later(1)); }}><button>B</button></form>
 		<form onSubmit={async (event) => { event.preventDefault(); status = await later(1); }}><button>C</button></form>
 	</main>
-}`);
+}`;
+		const { payload, diagnostics } = await nativeView(source, dataOnly);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toEqual([
 			'the submit handler awaits inside an `if`, a loop or a called function; a native build awaits only at the top of a handler or of its `try`',
 			'the submit handler awaits inside an expression; a native build awaits only the whole value of a statement',
 			'the submit handler awaits a promise that can fail outside a `try` with a `catch`; on the web the failure shows in the nearest @catch, which a native build has no lowering for yet',
 		]);
+		const scripted = await nativeView(source);
+		expect(scripted.diagnostics).toEqual([]);
+		expect(
+			scripted.payload!.handlers.flatMap((handler) => handler.ops.filter((op) => op.op === 'script')),
+		).toHaveLength(3);
 	});
 
 	it('ticks a checkbox or radio button before its click, input and change handlers, and reads its checkedness', async () => {
@@ -2644,6 +2650,93 @@ export function Ticks() @{
 					{ op: 'assign', cell: 'state:note', value: { literal: 'S' } },
 				],
 			},
+		]);
+	});
+	it('runs a submit handler that cancels first as JavaScript, with its form for FormData and its parent\'s function prop', async () => {
+		const form = (handler: string) => `import { state } from '@markless/core';
+function stamp(title: string): string {
+	return JSON.stringify({ title, at: (35).toString(36) });
+}
+function Editor({ onSave }: { readonly onSave: (title: string) => void }) @{
+	<form onSubmit={${handler}}>
+		<input name="title" />
+		<button type="submit">Save</button>
+	</form>
+}
+export function App() @{
+	let saved = state('none');
+	<main>
+		<Editor onSave={(title) => { saved = stamp(title); }} />
+		<p>{saved}</p>
+	</main>
+}`;
+		const cancels = await nativeView(
+			form(`(event) => {
+			event.preventDefault();
+			onSave(JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))));
+		}`),
+		);
+		expect(cancels.diagnostics).toEqual([]);
+		expect(cancels.payload?.handlers[0]?.ops).toEqual([
+			{
+				op: 'script',
+				fn: 'fn:0',
+				type: 'submit',
+				bindings: {
+					onSave: { callback: 'fn:1' },
+					'onSave.saved': { cell: 'state:saved' },
+					'submitted form': { value: { formData: 'component-edge:0/h0' } },
+				},
+			},
+		]);
+		expect(cancels.payload?.script?.source).toContain('__s.onSave(');
+
+		const late = await nativeView(
+			form(`(event) => {
+			const data = new FormData(event.currentTarget);
+			if (data.has('title')) event.preventDefault();
+			onSave(JSON.stringify(Object.fromEntries(data)));
+		}`),
+		);
+		expect(late.payload).toBeNull();
+		expect(late.diagnostics.map((d) => d.message)).toContain(
+			'the submit handler runs as JavaScript only when it calls `event.preventDefault()` first, outside any branch, as the web then never sends the form',
+		);
+
+		const awaited = await nativeView(
+			form(`async (event) => {
+			event.preventDefault();
+			await Promise.resolve();
+			onSave(String(new FormData(event.currentTarget).get('title')));
+		}`),
+		);
+		expect(awaited.diagnostics).toEqual([]);
+		expect(awaited.payload?.handlers[0]?.ops).toMatchObject([{ op: 'script', type: 'submit' }]);
+
+		const elsewhere = await nativeView(`import { state } from '@markless/core';
+export function App() @{
+	let size = state(0);
+	<button onClick={() => (size = [...new FormData()].length + JSON.stringify(size).length)}>{size}</button>
+}`);
+		expect(elsewhere.diagnostics.map((d) => d.message)).toContain(
+			'the click handler uses `FormData`: an HTML form, which a phone does not have',
+		);
+	});
+	it('binds a typed callback parameter by its name, as data', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function Pick({ onPick }: { readonly onPick: (value: string) => void }) @{
+	<button onClick={() => onPick('tea')}>Pick</button>
+}
+export function App() @{
+	let chosen = state('');
+	<main>
+		<Pick onPick={(value: string) => (chosen = value)} />
+		<p>{chosen}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.handlers[0]?.ops).toEqual([
+			{ op: 'assign', cell: 'state:chosen', value: { literal: 'tea' } },
 		]);
 	});
 });
@@ -3277,11 +3370,25 @@ ${markup}
 		expect(payload!.forms![0]!.fields).toEqual([{ node: 'h1', kind: 'select' }]);
 	});
 
+	it("runs a select's input handler when a choice changes it, reading the chosen value", async () => {
+		const { payload, diagnostics } = await nativeView(
+			page(`	<main>
+		<select onInput={(event) => (sent = event.target.value)}>
+			<option value="a">A</option>
+			<option value="b">B</option>
+		</select>
+	</main>`),
+		);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.events).toEqual([{ host: 'h1', event: 'input', handler: expect.any(String) }]);
+		expect(payload!.handlers[0]!.ops).toEqual([{ op: 'assign', cell: 'state:sent', value: { event: 'value' } }]);
+	});
+
 	it('refuses by name what a native select does not draw or run yet', async () => {
 		const { payload, diagnostics } = await nativeView(
 			page(`	<main>
 		<select multiple onChange={() => (sent = 'x')}><option>A</option></select>
-		<select value={size}><option>B</option><hr /></select>
+		<select value={size}><option selected>B</option><hr /></select>
 		<select><option><b>C</b></option></select>
 		<option>Loose</option>
 		<form onSubmit={(event) => { event.preventDefault(); sent = 'y'; }}>

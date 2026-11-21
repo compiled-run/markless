@@ -164,7 +164,9 @@ export type NativeScriptBinding =
 	/** A shared object's method: the script function `method` returns, run over its own `bindings` when called. */
 	| { readonly method: string; readonly bindings: Readonly<Record<string, NativeScriptBinding>> }
 	/** A `shared()` accessor (`selectState`): a function that returns that object. */
-	| { readonly shared: Readonly<Record<string, NativeScriptBinding>> };
+	| { readonly shared: Readonly<Record<string, NativeScriptBinding>> }
+	/** A function a parent passed as a prop: the script function `callback`, its own names bound as `<name>.<its name>`. */
+	| { readonly callback: string };
 
 export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>;
 
@@ -1063,6 +1065,7 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		setInterval: 'timers',
 		clearInterval: 'timers',
 		queueMicrotask: 'engine',
+		structuredClone: 'engine',
 		console: 'console',
 		fetch: 'fetch',
 		crypto: 'crypto',
@@ -1085,6 +1088,9 @@ export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> =
 	['currentTarget', 'value'],
 	['currentTarget', 'checked'],
 ];
+
+/** A submit handler's binding for its form's entries now, which its event's `target` and `currentTarget` carry for FormData. */
+export const NATIVE_SCRIPT_SUBMITTED_FORM = 'submitted form';
 
 /** What a touch adds to a script pointer handler's event: its plain values. The elements it names reach only data handlers. */
 export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [

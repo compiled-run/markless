@@ -1,0 +1,16 @@
+appId: ${APP_ID}
+name: j43-structured-clone
+---
+- launchApp:
+    clearState: true
+- assertVisible: Clone
+- assertVisible: Check
+- assertVisible: Not checked
+- tapOn: Check
+- assertNotVisible: Not checked
+- assertVisible: "Ada: draft\\+checked, original draft, date copied"
+- assertNotVisible: Not checked
+- tapOn: Clone a function
+- assertNotVisible: "Ada: draft\\+checked, original draft, date copied"
+- assertVisible: "Refused: DataCloneError"
+- assertNotVisible: "Ada: draft\\+checked, original draft, date copied"

@@ -1,0 +1,593 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:drink",
+				"name": "drink",
+				"initial": "none",
+				"styled": true,
+				"domain": [
+					"none",
+					"tea",
+					"coffee"
+				]
+			},
+			{
+				"id": "state:cups",
+				"name": "cups",
+				"initial": 0
+			},
+			{
+				"id": "state:wifi",
+				"name": "wifi",
+				"initial": false,
+				"styled": true
+			},
+			{
+				"id": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.checked",
+				"name": "toggle.checked",
+				"initial": false,
+				"styled": true
+			},
+			{
+				"id": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.disabled",
+				"name": "toggle.disabled",
+				"initial": false
+			},
+			{
+				"id": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.required",
+				"name": "toggle.required",
+				"initial": false
+			},
+			{
+				"id": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.invalid",
+				"name": "toggle.invalid",
+				"initial": false
+			},
+			{
+				"id": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.name",
+				"name": "toggle.name",
+				"initial": ""
+			},
+			{
+				"id": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.value",
+				"name": "toggle.value",
+				"initial": "on"
+			},
+			{
+				"id": "component-edge:3/shared:packages/headless/components/src/toolbar/toolbar.tsrx#toolbarState/state:toolbar.orientation",
+				"name": "toolbar.orientation",
+				"initial": "horizontal"
+			},
+			{
+				"id": "component-edge:3/shared:packages/headless/components/src/toolbar/toolbar.tsrx#toolbarState/state:toolbar.vertical",
+				"name": "toolbar.vertical",
+				"initial": false
+			},
+			{
+				"id": "component-edge:3/shared:packages/headless/components/src/toolbar/toolbar.tsrx#toolbarState/state:toolbar.horizontal",
+				"name": "toolbar.horizontal",
+				"initial": true
+			},
+			{
+				"id": "component-edge:3/shared:packages/headless/components/src/toolbar/toolbar.tsrx#toolbarState/state:toolbar.mounted",
+				"name": "toolbar.mounted",
+				"initial": false
+			},
+			{
+				"id": "component-edge:3/shared:packages/headless/components/src/toolbar/toolbar.tsrx#toolbarState/state:toolbar.active",
+				"name": "toolbar.active",
+				"initial": 0
+			},
+			{
+				"id": "component-edge:3/shared:packages/headless/components/src/toolbar/toolbar.tsrx#toolbarState/state:toolbar.entered",
+				"name": "toolbar.entered",
+				"initial": false
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Typed callbacks"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "div",
+				"parent": "h0"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h1",
+				"element": "button",
+				"parent": "component-edge:0/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h1:text0",
+				"parent": "component-edge:0/h1",
+				"parts": [
+					{
+						"text": "Tea"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h2",
+				"element": "button",
+				"parent": "component-edge:0/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h2:text0",
+				"parent": "component-edge:0/h2",
+				"parts": [
+					{
+						"text": "Coffee"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Drink "
+					},
+					{
+						"cell": "state:drink"
+					},
+					{
+						"text": ", cups "
+					},
+					{
+						"cell": "state:cups"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h0",
+				"element": "div",
+				"parent": "h0",
+				"bindings": [
+					{
+						"attribute": "ui-checked",
+						"value": {
+							"cell": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.checked"
+						}
+					},
+					{
+						"attribute": "ui-disabled",
+						"value": {
+							"cell": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.disabled"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:2/h3",
+				"element": "label",
+				"parent": "component-edge:1/h0",
+				"bindings": [
+					{
+						"attribute": "for",
+						"value": {
+							"literal": "component-edge:3/h1"
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:2/h3:text0",
+				"parent": "component-edge:2/h3",
+				"parts": [
+					{
+						"text": "Wi-Fi"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/h1",
+				"element": "button",
+				"parent": "component-edge:1/h0",
+				"attributes": {
+					"type": "button",
+					"role": "switch"
+				},
+				"bindings": [
+					{
+						"attribute": "tabindex",
+						"value": {
+							"if": {
+								"binary": "===",
+								"left": {
+									"cell": "component-edge:3/shared:packages/headless/components/src/toolbar/toolbar.tsrx#toolbarState/state:toolbar.mounted"
+								},
+								"right": {
+									"literal": true
+								}
+							},
+							"whenTrue": {
+								"unary": "-",
+								"value": {
+									"literal": 1
+								}
+							},
+							"whenFalse": {
+								"literal": null
+							}
+						}
+					},
+					{
+						"attribute": "aria-checked",
+						"value": {
+							"if": {
+								"cell": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.checked"
+							},
+							"whenTrue": {
+								"literal": "true"
+							},
+							"whenFalse": {
+								"literal": "false"
+							}
+						}
+					},
+					{
+						"attribute": "aria-disabled",
+						"value": {
+							"if": {
+								"cell": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.disabled"
+							},
+							"whenTrue": {
+								"literal": "true"
+							},
+							"whenFalse": {
+								"literal": "false"
+							}
+						}
+					},
+					{
+						"attribute": "aria-invalid",
+						"value": {
+							"if": {
+								"cell": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.invalid"
+							},
+							"whenTrue": {
+								"literal": "true"
+							},
+							"whenFalse": {
+								"literal": "false"
+							}
+						}
+					},
+					{
+						"attribute": "ui-checked",
+						"value": {
+							"cell": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.checked"
+						}
+					},
+					{
+						"attribute": "ui-disabled",
+						"value": {
+							"cell": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.disabled"
+						}
+					},
+					{
+						"attribute": "disabled",
+						"value": {
+							"cell": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.disabled"
+						}
+					},
+					{
+						"attribute": "aria-labelledby",
+						"value": {
+							"literal": "component-edge:2/h3"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:4/h2",
+				"element": "span",
+				"parent": "component-edge:3/h1",
+				"defaultStyle": {
+					"flow": "inline"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"cell": "state:wifi"
+							},
+							"whenTrue": {
+								"literal": "Wi-Fi is on"
+							},
+							"whenFalse": {
+								"literal": "Wi-Fi is off"
+							}
+						}
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:0/h1",
+				"event": "activate",
+				"handler": "handler:component-edge:0/event:0"
+			},
+			{
+				"host": "component-edge:0/h2",
+				"event": "activate",
+				"handler": "handler:component-edge:0/event:1"
+			},
+			{
+				"host": "component-edge:3/h1",
+				"event": "activate",
+				"handler": "handler:component-edge:3/event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:0/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:drink",
+						"value": {
+							"literal": "tea"
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:cups",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:cups"
+							},
+							"right": {
+								"member": {
+									"literal": "tea"
+								},
+								"property": "length"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:0/event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:drink",
+						"value": {
+							"literal": "coffee"
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:cups",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:cups"
+							},
+							"right": {
+								"member": {
+									"literal": "coffee"
+								},
+								"property": "length"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:3/event:0",
+				"ops": [
+					{
+						"op": "if",
+						"test": {
+							"cell": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.disabled"
+						},
+						"whenTrue": [],
+						"whenFalse": [
+							{
+								"op": "assign",
+								"cell": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.checked",
+								"value": {
+									"binary": "!==",
+									"left": {
+										"cell": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.checked"
+									},
+									"right": {
+										"literal": true
+									}
+								}
+							},
+							{
+								"op": "assign",
+								"cell": "state:wifi",
+								"value": {
+									"cell": "component-edge:1/shared:packages/headless/components/src/toggle/toggle.tsrx#toggleState/state:toggle.checked"
+								}
+							}
+						]
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Typed callbacks"
+		],
+		[
+			"component-edge:0/h1:text0",
+			"Tea"
+		],
+		[
+			"component-edge:0/h2:text0",
+			"Coffee"
+		],
+		[
+			"h2:text0",
+			"Drink none, cups 0"
+		],
+		[
+			"component-edge:2/h3:text0",
+			"Wi-Fi"
+		],
+		[
+			"h3:text0",
+			"Wi-Fi is off"
+		]
+	],
+	"initialAttributes": [
+		[
+			"component-edge:1/h0",
+			"ui-checked",
+			null
+		],
+		[
+			"component-edge:1/h0",
+			"ui-disabled",
+			null
+		],
+		[
+			"component-edge:2/h3",
+			"for",
+			"component-edge:3/h1"
+		],
+		[
+			"component-edge:3/h1",
+			"tabindex",
+			null
+		],
+		[
+			"component-edge:3/h1",
+			"aria-checked",
+			"false"
+		],
+		[
+			"component-edge:3/h1",
+			"aria-disabled",
+			"false"
+		],
+		[
+			"component-edge:3/h1",
+			"aria-invalid",
+			"false"
+		],
+		[
+			"component-edge:3/h1",
+			"ui-checked",
+			null
+		],
+		[
+			"component-edge:3/h1",
+			"ui-disabled",
+			null
+		],
+		[
+			"component-edge:3/h1",
+			"disabled",
+			null
+		],
+		[
+			"component-edge:3/h1",
+			"aria-labelledby",
+			"component-edge:2/h3"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h1"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:drink",
+					"value": "tea"
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Drink tea, cups 3"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h2"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:drink",
+					"value": "coffee"
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Drink coffee, cups 9"
+				}
+			]
+		}
+	]
+}

@@ -255,6 +255,8 @@ public final class NativeRuntime {
 	/// A field's text a person typed since its `value` binding last changed it.
 	private var edited: [String: String] = [:]
 	private var running: [String: [Submission]] = [:]
+	/// Submissions held by a script promise not settled yet, by the engine's run number.
+	private var scriptRuns: [Int: Submission] = [:]
 	private var timers: [String: (ops: [NativeOp], context: Context)] = [:]
 	private var timerCount = 0
 	/// Every non-row checkbox and radio button, in payload order.
@@ -592,6 +594,7 @@ public final class NativeRuntime {
 			case let .fields(fields):
 				return (binding.name, .object([("fields", .object(try fields.map { ($0.name, .string(try slot(of: $0.cell, in: scope))) }))]))
 			case let .value(expr): return (binding.name, .object([("value", try evaluate(expr, in: scope).json)]))
+			case let .callback(fn): return (binding.name, .object([("callback", .string(fn))]))
 			case let .elements(expr): return (binding.name, .object([("elements", try evaluate(expr, in: scope).json)]))
 			case let .object(members): return (binding.name, .object([("object", try frame(of: members, in: scope))]))
 			case let .shared(members): return (binding.name, .object([("shared", try frame(of: members, in: scope))]))
@@ -647,12 +650,12 @@ public final class NativeRuntime {
 	}
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
-	private func enter(_ entry: [(String, JSONValue)]) throws -> [NativeJournalEntry] {
+	private func enter(_ entry: [(String, JSONValue)], submission: Submission? = nil) throws -> [NativeJournalEntry] {
 		let text = try scriptHost.unwrap().entry { () throws -> String in
 			_ = try callScript("enter", .object(entry + entryCells()))
 			return try callScript("leave")
 		}
-		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(required: ["writes", "aborts", "timers", "clears", "requests", "logs"], optional: ["commands"])
+		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["commands"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
 			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
@@ -668,6 +671,17 @@ public final class NativeRuntime {
 			let pair = try line.array()
 			guard pair.count == 2 else { throw line.fail("a log line is [level, text]") }
 			scriptHost?.log(try pair[0].string(), try pair[1].string())
+		}
+		// A submit handler's promise keeps its submission running until the entry it settles in, as the web keeps the form busy.
+		for run in try result["pending"].array() {
+			guard let submission else { continue }
+			submission.pending += 1
+			scriptRuns[try wholeNumber(run)] = submission
+		}
+		for run in try result["settled"].array() {
+			guard let kept = scriptRuns.removeValue(forKey: try wholeNumber(run)) else { continue }
+			kept.pending -= 1
+			settle(kept)
 		}
 		let aborts = try result["aborts"].array().map { NativeJournalEntry.abort(id: try wholeNumber($0)) }
 		let clears = try result["clears"].array().map { NativeJournalEntry.clearTimer(timer: "\(scriptTimer)\(try wholeNumber($0))") }
@@ -746,6 +760,7 @@ public final class NativeRuntime {
 		switch (kind, inner) {
 		case let ("slot", .string(slot)): return slotValue(slot)
 		case let ("fields", .object(slots)): return .array(slots.map { if case let .string(slot) = $0.1 { slotValue(slot) } else { .null } })
+		case ("callback", _): return .null
 		case let ("object", .object(members)), let ("shared", .object(members)): return .array(members.map { readFrame($0.1) })
 		case ("method", _):
 			guard let frame = fields.first(where: { $0.0 == "frame" })?.1, case let .object(members) = frame else { return .null }
@@ -1149,10 +1164,15 @@ public final class NativeRuntime {
 				let instance = try options(of: select).first(where: { $0.id == action.host })
 			else { throw RuntimeError(reason: "\(action.host) is not a shown option of a select") }
 			return try change(host: nil) {
-				if try self.attributeNow(select, "disabled") == nil, try self.attribute(of: option, "disabled", in: instance.scope) == nil {
-					self.chosenNow = action.host
-				}
-				return []
+				guard try self.attributeNow(select, "disabled") == nil, try self.attribute(of: option, "disabled", in: instance.scope) == nil
+				else { return [] }
+				self.chosenNow = action.host
+				// A choice that changes the select fires its input handler, as the web does, with the option's value.
+				let was = try self.options(of: select).first(where: { self.selectedness[$0.id] == true })?.id
+				guard was != action.host, let bound = self.payload.events.first(where: { $0.host == select && $0.event == .input }) else { return [] }
+				self.eventValue = try self.value(of: instance)
+				defer { self.eventValue = nil }
+				return try self.run(self.handlers[bound.handler] ?? [], in: instance.scope)
 			}
 		}
 		if action.event == .timer, let timer = action.timer, timer.hasPrefix(scriptTimer) {
@@ -1457,7 +1477,7 @@ public final class NativeRuntime {
 				let frame = try frame(of: bindings, in: scope)
 				calls.append(contentsOf: try enter(
 					[("kind", .string("dispatch")), ("fn", .string(fn)), ("frame", frame), ("elements", try elementFacts(frame)), ("event", event)]
-						+ (try catchCell.map { [("catch", JSONValue.string(try slot(of: $0, in: scope)))] } ?? [])))
+						+ (try catchCell.map { [("catch", JSONValue.string(try slot(of: $0, in: scope)))] } ?? []), submission: submission))
 			}
 		}
 		return calls
