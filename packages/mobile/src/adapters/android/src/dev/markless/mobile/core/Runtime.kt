@@ -2,8 +2,9 @@ package dev.markless.mobile.core
 
 class MarklessRuntimeError(message: String) : RuntimeException(message)
 
-/** The overlay protocol of `@markless/web/overlay-protocol`: the marker attribute and what makes an overlay modal. */
+/** The overlay protocol of `@markless/web/overlay-protocol`: the marker attribute, the hint mark, and what makes an overlay modal. */
 const val OVERLAY_ATTRIBUTE = "overlay"
+const val OVERLAY_HINT_ATTRIBUTE = "overlay-hint"
 const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
 const val OVERLAY_MODAL_VALUE = "true"
 
@@ -530,12 +531,14 @@ class Runtime(
 		return facts.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value}" }
 	}
 
-	/** Every current value by slot, and the seed `crypto` draws from when the script uses it. */
+	/** Every current value by slot, the seed `crypto` draws from when the script uses it, and the route params for `navigate`. */
 	private fun entryCells(): String = buildString {
 		append(",\"cells\":")
 		append(values.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonValue(it.value)}" })
 		if (unset.isNotEmpty()) append(",\"unset\":${unset.sorted().joinToString(",", "[", "]") { jsonString(it) }}")
 		if (payload.script?.services?.contains("crypto") == true) scriptHost?.seed()?.let { append(",\"seed\":${jsonString(it)}") }
+		if (payload.script?.services?.contains("navigate") == true)
+			append(",\"params\":" + params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" })
 	}
 
 	/** Submissions held by a script promise not settled yet, by the engine's run number. */
@@ -599,7 +602,16 @@ class Runtime(
 				}
 				if (command == "focus") focused = node
 				JournalEntry.Command(node, command, (parts[2] as? Json.Bool)?.value == true)
-			}
+			} +
+			listOfNotNull(result["navigate"]?.let { n ->
+				val o = n.obj("leave().navigate")
+				o.only(setOf("route", "params", "replace"), "leave().navigate")
+				JournalEntry.Navigate(
+					o.field("route", "leave().navigate").str("leave().navigate.route"),
+					o.field("params", "leave().navigate").obj("leave().navigate.params").mapValues { it.value.str("a route param") },
+					(o.field("replace", "leave().navigate") as? Json.Bool)?.value ?: throw MarklessDecodeError("leave().navigate.replace must be a boolean"),
+				)
+			})
 	}
 
 
@@ -933,6 +945,9 @@ class Runtime(
 	}
 
 	/** Every shown branch's chosen arm. */
+	/** A branch's style state: the arm it shows ("0", "1", …, or "none"); null while it is not shown. */
+	fun styleArm(branch: String): JsValue? = arms().firstOrNull { it.first == branch }?.let { JsValue.Str(it.second?.toString() ?: "none") }
+
 	fun arms(): List<Pair<String, Int?>> = payload.nodes.filterIsInstance<Node.Branch>().flatMap { b -> instances(b).map { it.id to armOf(b, it.scope) } }
 
 	/** Every shown list's row keys, in order. */
@@ -974,6 +989,9 @@ class Runtime(
 
 	private fun shownOverlays(): List<String> =
 		overlayNodes.filter { instances(it).isNotEmpty() && attributeNow(it.id, "hidden") == null }.map { it.id }
+
+	/** Whether [overlay] is a hint (a tooltip, a hovercard): `overlay-hint` beside `overlay`, as authored. */
+	private fun isHint(overlay: String): Boolean = (byId[overlay] as? Node.Element)?.attributes?.containsKey(OVERLAY_HINT_ATTRIBUTE) == true
 
 	/** Whether [overlay] or an element inside it has `aria-modal="true"`, its bound value first, else its static one. */
 	fun isModal(overlay: String): Boolean = payload.nodes.any { n ->
@@ -1139,10 +1157,11 @@ class Runtime(
 			if (event == EventName.PointerDown) {
 				raise(EventName.PointerOver, host)
 				crossing(EventName.PointerEnter, host, null, null)
-				// The overlay behaviour's document listener hears the press: the topmost overlay it landed outside is told.
-				val top = stack.lastOrNull()
-				if (top != null && !contains(top, host))
+				// The overlay behaviour's document listener hears the press: the topmost hint and the topmost other overlay it landed outside are told.
+				for (top in listOf(stack.lastOrNull { isHint(it) }, stack.lastOrNull { !isHint(it) })) {
+					if (top == null || contains(top, host)) continue
 					handlerFor(top, EventName.Dismiss)?.let { runs.add(it to mapOf("reason" to JsValue.Str("outside-press"), "pressTarget" to JsValue.Str(host))) }
+				}
 				raise(EventName.PointerDown, host)
 				return@change flush() ?: calls
 			}
@@ -1379,7 +1398,19 @@ class Runtime(
 		resetChangedRows(signaturesBefore)
 		seedRows()
 		follow()
-		val synced = calls + syncAsync()
+		val synced = (calls + syncAsync()).toMutableList()
+		// An overlay becoming shown supersedes every shown hint it is not inside, before it joins the stack.
+		val shownFirst = shownOverlays()
+		val working = stackBefore.filter { it in shownFirst }.toMutableList()
+		for (newcomer in shownFirst.filter { it !in stackBefore }) {
+			for (hint in working.filter { isHint(it) && !contains(it, newcomer) }) {
+				val handler = handlerFor(hint, EventName.Dismiss)?.let { handlers[it] } ?: continue
+				val taken = withFields(mapOf("reason" to JsValue.Str("superseded"), "pressTarget" to JsValue.Null)) { run(handler.ops, Scope.EMPTY) }
+				if (taken.firstOrNull() is JournalEntry.Navigate) return taken
+				synced.addAll(taken)
+			}
+			working.add(newcomer)
+		}
 		val shownNow = shownOverlays()
 		val released = stackBefore.filter { it !in shownNow }
 		val enlisted = shownNow.filter { it !in stackBefore }

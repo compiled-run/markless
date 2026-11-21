@@ -8,6 +8,7 @@ public let nativeDocumentBody = "#body"
 /// The overlay behaviour's names, as `packages/web/src/overlay-protocol.ts` spells them.
 public enum OverlayProtocol {
 	public static let attribute = "overlay"
+	public static let hintAttribute = "overlay-hint"
 	public static let modalAttribute = "aria-modal"
 	public static let modalValue = "true"
 }

@@ -229,6 +229,76 @@ URL itself answers the whole document.
   value, so the first frame already shows it. See "Where an instance lives" in
   `specs/framework/03-state-graph.md`.
 
+### Fetching ahead of a click
+
+The router may fetch a linked page's fragment, and preload its code, before
+the click. `router({ prefetch })` sets when, as plain data (`RouterPrefetch` in
+`packages/router/src/vite/prefetch-policy.ts`). Each trigger runs on `'all'`
+networks, `'fast'` ones, or `'none'`:
+
+- `intent` (default `'all'`): a mouse resting on a link, keyboard focus, a
+  press or a touch. The visitor has shown intent, and the fetch is the one the
+  click needs, so it runs on slow links too.
+- `viewport` (default `'none'`): every page link while it is on screen, the one
+  nearest the pointer (else the viewport's centre) first, as links scroll in.
+- `idle` (default `'fast'`): once the page is idle, up to six page links on
+  screen.
+- `concurrency` (default 2): viewport and idle fetches in flight at once; the
+  rest wait for a free slot. Intent fetches are outside it: a hover or press
+  never waits for a slot, and guesses still arriving are cancelled to make
+  room for it.
+- `budget` (default 2 MiB, `FRAGMENT_GUESS_BUDGET_BYTES`): wire bytes viewport
+  and idle fetches may spend per page shown, counted from each response's
+  declared length, else from Resource Timing or the bytes read. Once spent, they stop until the
+  next page is shown; intent still fetches. Intent's own fetches never count;
+  a guess that intent or a click adopts keeps what it already counted. Every
+  guess counts what it received however it ends (finished, stopped for size,
+  cancelled, failed), so the budget can be passed by at most the guesses in
+  flight when it runs out: `concurrency` times 256 KiB of an uncompressed page
+  with no declared length, or 4 MiB decoded of a compressed one. A guess
+  cancelled to make room for intent is not guessed again on that page. A
+  migrated site sets it from what
+  its original spent before a click.
+- Tools read two performance marks (`PREFETCH_MARKS`): `markless:prefetch-budget-spent`
+  once per page shown when its budget runs out, or when guessing starts with a
+  budget of 0 (`detail: { page, bytes }`, `page` the pathname only), and
+  `markless:prefetch-skipped` once per page shown when guessing it would do is
+  ruled out (`detail: { page, reason: 'save-data' | 'hidden' | 'network', triggers }`).
+- Guessing reads only two things from navigation: a navigation started, and a
+  page is shown; the swap module's own navigation phase stays its own (#569).
+- The viewport trigger observes the page's page links when a page is shown,
+  and links the page adds later once it is idle after a click or key press.
+
+A network is fast when the browser reports no slower link than
+`effectiveType: '4g'` (or reports nothing) and the page's own downloads
+crossed it at Slow 4G speed (250 kB/s) or better; with too few bytes measured
+to tell, only a browser reporting `'4g'` counts as fast.
+`prefetch: false` (or `'none'`) fetches nothing early.
+
+Never early, whatever the config says: under Save-Data, in a hidden tab, to an
+endpoint path, or to a link marked `prefetch={false}`. A mouse press is the
+click starting, not a guess, so with intent on (any level) it fetches its page
+even under Save-Data or on a slow link; a touch does not, since it may begin a
+scroll. A link marked
+`prefetch="intent"` is left out of the viewport and idle triggers; one marked
+`prefetch="viewport"` is fetched on screen even with the viewport trigger off
+(on fast links then). A click, Back or Forward cancels every early fetch still
+arriving except its own page's, and drops queued ones, so none competes with
+the navigation. A viewport or idle fetch stops once its page passes 256 KiB on
+the wire (4 MiB decoded when a compressed answer declares no length), and that
+page is left for intent. The viewport trigger's code is a bridge file of its
+own, loaded only when the config or a link on the page asks for links in view.
+A page cancelled before it arrived may be fetched ahead again. Pages fetched
+ahead are kept as text (a guess's document is parsed only when a click or
+intent wants it) for 30 s, and up to 8 Mi characters of text in all, the
+oldest to arrive dropped first (`FRAGMENT_HELD_CHARS`).
+
+Guessing (the viewport and idle triggers) has one state per tab: paused while
+a navigation is on its way, then for each page shown: shown, armed at the
+main thread's first idle moment after it (nothing is guessed, and no guess
+code runs, in the page's load), and watching once the idle scan ran. A swap, or a navigation cancelled by a click on the page shown or by
+Back or Forward to it, arms it again for the page that is shown.
+
 ### Kept parts
 
 A part of the page that both pages render alike stays on screen across an in-place navigation, as
