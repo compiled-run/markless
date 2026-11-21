@@ -1191,6 +1191,8 @@ export type NativeViewOptions = {
 	 * as the web's router answers that path with the app's `pages/404.tsrx`.
 	 */
 	readonly notFound?: string;
+	/** Routes of the app whose page did not build: a link to one opens the not-found page when there is one, else does nothing. */
+	readonly unbuilt?: ReadonlySet<string>;
 	/** Matches a path written in `navigate()` against the app's routes, as the router matches a URL. */
 	readonly resolvePath?: (
 		path: string,
@@ -2442,6 +2444,8 @@ export function createNativeViewPayload(
 		}
 		return Object.fromEntries(entries);
 	};
+	/** A link to a page that did not build when the app has no not-found page: the tap leads nowhere. */
+	const NO_ROUTE: { route: string; params: Record<string, string | NativeExpr> } = { route: '', params: {} };
 	/** A link or `navigate()` target as a route pattern and params, checked against the app's routes when they are known. */
 	/** A path inside the app (`/logout`), not another site (`//cdn.example`, `https://…`): only it falls to the not-found page. */
 	const inApp = (start: string | NativeExpr | undefined) =>
@@ -2451,6 +2455,8 @@ export function createNativeViewPayload(
 		params: Record<string, string | NativeExpr>,
 		span: SourceSpan | undefined,
 	): { route: string; params: Record<string, string | NativeExpr> } | null => {
+		if (options.unbuilt?.has(pattern))
+			return options.notFound ? linkRoute(options.notFound, {}, span) : NO_ROUTE;
 		const known =
 			options.routes?.find((route) => route.pattern === pattern) ??
 			(pattern === options.notFound ? { pattern, params: [] } : undefined);
@@ -6176,6 +6182,7 @@ export function createNativeViewPayload(
 						...place,
 					});
 					if (projection) lowerChunk(projection, id, place, scope);
+					if (route === NO_ROUTE) continue;
 					const handler = `handler:${id}`;
 					events.push({ host: id, event: 'activate', handler });
 					handlers.push({
@@ -8639,7 +8646,7 @@ export function createNativeViewPayload(
 			return [];
 		}
 		const route = linkRoute(matched.pattern, matched.params, span);
-		return route
+		return route && route !== NO_ROUTE
 			? [{ op: 'navigate', ...route, ...(replace ? { replace: true as const } : {}) }]
 			: [];
 	}
@@ -9116,8 +9123,15 @@ export function createNativeViewPayload(
 			if (node.kind !== 'element' || node.element !== 'a') continue;
 			if (events.some((event) => event.host === node.id && event.event === 'activate'))
 				continue;
-			const route = linkedRoute(node);
-			if (!route) continue;
+			const linked = linkedRoute(node);
+			// A page that did not build: its links open the not-found page, or nothing, as a <Link>'s do.
+			const route =
+				linked && options.unbuilt?.has(linked.route)
+					? options.notFound
+						? { route: options.notFound, params: {} }
+						: NO_ROUTE
+					: linked;
+			if (!route || route === NO_ROUTE) continue;
 			const handler = `handler:${node.id}/link`;
 			events.push({ host: node.id, event: 'activate', handler });
 			handlers.push({ id: handler, ops: [{ op: 'navigate', ...route }] });

@@ -227,6 +227,8 @@ export type LadderRung = {
 	readonly route?: string;
 	/** The path the app opens at; `/` when absent. */
 	readonly start?: string;
+	/** Pages under `pages/` the phones do not build, each refused by name: the app builds without them, and a link to one opens the not-found page. */
+	readonly refusedPages?: readonly string[];
 	/**
 	 * The text of the first element the screens and the browser leave below the first screen. The reference runtime has no
 	 * layout, so it raises `visible` only for elements before that one in document order.
