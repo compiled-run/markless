@@ -1667,6 +1667,8 @@ export function createNativeViewPayload(
 	const widgetRoots = new Map<string, string | undefined>();
 	/** Each app-wide shared() definition's one instance on this screen. */
 	const appInstances = new Map<string, SharedInstance>();
+	/** The cells of those instances: the app holds them across its pages. */
+	const appCells = new Set<string>();
 	/** The component that roots a definition's widgets: the first in its module whose body seeds it. */
 	const widgetRoot = (definition: SemanticSharedDefinition): string | undefined => {
 		if (widgetRoots.has(definition.id)) return widgetRoots.get(definition.id);
@@ -1739,20 +1741,18 @@ export function createNativeViewPayload(
 			if (definition.scope !== 'subtree') {
 				const scopeName = definition.scope ?? 'app';
 				// One instance for the whole screen, which every component joins, as the web's module-level one.
-				if (scopeName === 'app' && !options.routes) {
+				if (scopeName === 'app') {
+					const before = cells.length;
 					const instance =
 						appInstances.get(definition.id) ??
 						createInstance(definition, module, 'app/', undefined);
+					for (const cell of cells.slice(before)) appCells.add(cell.id);
 					appInstances.set(definition.id, instance);
 					subtree.set(definition.id, instance);
 					objects.set(use.localName, { kind: 'instance', instance });
 					continue;
 				}
-				refuse(
-					scopeName === 'app'
-						? `${definition.name}: an app-wide shared() in an app with pages, which each page's screen would hold apart`
-						: `${definition.name}: shared() with scope \`${scopeName}\``,
-				);
+				refuse(`${definition.name}: shared() with scope \`${scopeName}\``);
 				continue;
 			}
 			// As on the web, each rendered copy of the definition's root component starts a widget of its own (a checkbox inside
@@ -8120,6 +8120,7 @@ export function createNativeViewPayload(
 			...(undefinedFirst.has(cell.id) && !cell.row && cell.initial === null
 				? { unset: true as const }
 				: {}),
+			...(appCells.has(cell.id) ? { app: true as const } : {}),
 		})),
 		nodes,
 		events,

@@ -561,6 +561,8 @@ public struct NativeCell: Equatable, Sendable {
 	public var unset = false
 	/// Written while rendering from a value that follows state: at mount, and again whenever that value changes.
 	public var follows: NativeExpr? = nil
+	/// A cell of an app-wide `shared()`: the app holds one value for every page (`NativeAppSession`).
+	public var app = false
 }
 
 public struct NativeEvent: Equatable, Sendable {
@@ -616,7 +618,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "domain", "device", "task", "async", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "domain", "device", "task", "async", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows", "app"])
 			if field.has("clock"), try !field["clock"].bool() {
 				throw PayloadError(path: try field["clock"].path, reason: "clock is only ever true")
 			}
@@ -650,7 +652,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 				first: field.has("first") ? try decodeExpr(try field["first"]) : nil,
 				rebuiltBy: field.has("rebuiltBy") ? try field["rebuiltBy"].array().map(decodeExpr) : nil,
 				unset: field.has("unset"),
-				follows: field.has("follows") ? try decodeExpr(try field["follows"]) : nil)
+				follows: field.has("follows") ? try decodeExpr(try field["follows"]) : nil,
+				app: field.has("app") ? try field["app"].bool() : false)
 		}
 		let nodes = try fields["nodes"].array().map { node -> NativeNode in
 			let kind = try node.field("kind").string()

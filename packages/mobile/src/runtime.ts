@@ -253,6 +253,8 @@ export type NativeRuntime = {
 	readonly start: () => ReadonlyArray<NativeJournalEntry>;
 	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
 	readonly leave: () => ReadonlyArray<NativeJournalEntry>;
+	/** The screen shows again after Back: it takes the app's values of its app-wide cells that a page above it changed. */
+	readonly resume: () => ReadonlyArray<NativeJournalEntry>;
 };
 
 /** How the runtime gets a script engine and the bytes `crypto` draws from; a host owns both. */
@@ -573,6 +575,8 @@ export function createNativeRuntime(
 	now: () => number = Date.now,
 	/** Where a page with JavaScript handlers gets its engine; started on first use, never for a page without a script. */
 	scriptHost?: NativeScriptHost,
+	/** The app's values of its app-wide `shared()` cells, one for every page: read at mount and on `resume`, written on every change. */
+	session: Map<string, Value> = new Map(),
 ): NativeRuntime {
 	const base: NativeScope = {
 		...EMPTY_SCOPE,
@@ -601,13 +605,20 @@ export function createNativeRuntime(
 			cell.id,
 			cell.clock
 				? now()
-				: cell.storage && store.has(cell.storage.key)
+				: cell.app && session.has(cell.id)
+					? session.get(cell.id)!
+					: cell.storage && store.has(cell.storage.key)
 					? store.get(cell.storage.key)!
 					: cell.initial,
 		]),
 	);
 	for (const cell of payload.cells)
-		if (cell.unset && !(cell.storage && store.has(cell.storage.key))) unset.add(cell.id);
+		if (cell.unset && !(cell.storage && store.has(cell.storage.key)) && !(cell.app && session.has(cell.id)))
+			unset.add(cell.id);
+	const appCells = payload.cells.filter((cell) => cell.app).map((cell) => cell.id);
+	const keepApp = () => {
+		for (const cell of appCells) if (!unset.has(cell)) session.set(cell, values.get(cell)!);
+	};
 	const storageKeys = new Map(
 		payload.cells.flatMap((cell) =>
 			cell.storage ? [[cell.id, cell.storage.key] as const] : [],
@@ -1600,6 +1611,13 @@ export function createNativeRuntime(
 		engineStarts: () => engineStarts,
 		logs: () => logs,
 		start: () => (asyncCells.length === 0 ? [] : change(undefined, undefined, () => [])),
+		resume: () =>
+			appCells.some((cell) => session.has(cell) && !Object.is(session.get(cell), values.get(cell)))
+				? change(undefined, undefined, () => {
+						for (const cell of appCells) if (session.has(cell)) values.set(cell, session.get(cell)!);
+						return [];
+					})
+				: [],
 		leave: () =>
 			asyncSent === null
 				? []
@@ -2345,6 +2363,7 @@ export function createNativeRuntime(
 			const afterTitle = title();
 			// A field whose binding wrote it shows that value now, not what was typed before.
 			for (const entry of nodes) if (entry.op === 'property') edited.delete(entry.node);
+			keepApp();
 			return [
 				...styles,
 				...nodes,

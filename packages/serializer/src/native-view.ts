@@ -705,6 +705,11 @@ export type NativeViewPayload = {
 		readonly name: string;
 		readonly initial: NativeValue;
 		readonly storage?: { readonly key: string };
+		/**
+		 * A cell of an app-wide `shared()`: the app holds one value for every page. A screen starts from the app's value,
+		 * writes its changes back, and takes the app's value again when it shows after Back (`resume`).
+		 */
+		readonly app?: true;
 		/** A class or `ui-*` attribute binding reads this cell, so Dragon's export has a state for it; its changes are journalled as `state`. */
 		readonly styled?: true;
 		/** A styled string cell's every value, its first value first, so Dragon lays out one assignment per value. */

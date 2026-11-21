@@ -1347,6 +1347,17 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'app-shared',
+		app: 'proofs/n11-app-shared',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'activate', host: 'component-edge:2' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'back' },
+		],
+	},
+	{
 		name: 'navigation-replace',
 		app: 'proofs/n3-navigate',
 		open: '/',
