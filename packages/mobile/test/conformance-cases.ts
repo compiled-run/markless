@@ -41,6 +41,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A component's `value={prop}` that never changes leaves the typed text in the field.
+		name: 'component-input-value',
+		fixture: 'proofs/u120-component-input-value/App.tsrx',
+		actions: [
+			{ event: 'input', host: 'component-edge:0/h0', value: 'Groceries' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
 		// A class that follows state keeps the module's style scope class around it, as the web writes it.
 		name: 'class-scope',
 		fixture: 'proofs/r161-class-scope/App.tsrx',
@@ -800,6 +809,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h7' },
 			{ event: 'activate', host: 'h6' },
 			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
+		name: 'radio-follows',
+		fixture: 'proofs/r163-radio-follows/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'component-edge:4/h5' },
+			{ event: 'activate', host: 'component-edge:7/h5' },
 		],
 	},
 	{

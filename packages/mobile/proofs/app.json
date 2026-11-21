@@ -1,4 +1,5 @@
 {
+	"origin": "http://127.0.0.1:28761",
 	"device": {
 		"usage": {
 			"location": "Shows where you are on this screen.",

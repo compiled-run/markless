@@ -342,7 +342,7 @@ function mirror(
 				`step ${index}: the journal left an attribute stale`,
 			).toEqual(attributes);
 			expect(
-				new Map(runtime.properties().map(([node, , value]) => [node, value])),
+				new Map(runtime.fields()),
 				`step ${index}: the journal left a field stale`,
 			).toEqual(properties);
 			expect(runtime.title(), `step ${index}: the journal left the title stale`).toBe(title);
@@ -1339,7 +1339,7 @@ function walk(
 			`step ${index}: the journal left a checkbox stale`,
 		).toEqual(checks);
 		expect(
-			new Map(runtime.properties().map(([node, , value]) => [node, value])),
+			new Map(runtime.fields()),
 			`step ${index}: the journal left a field stale`,
 		).toEqual(properties);
 		expect(
