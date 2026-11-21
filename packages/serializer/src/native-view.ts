@@ -143,6 +143,12 @@ export type NativeExpr =
 	| { readonly focusOrigin: NativeExpr }
 	/** Whether the value is an element (`value instanceof HTMLElement`). */
 	| { readonly isElement: NativeExpr }
+	/**
+	 * The element `drawn` (a node id in an `@if` arm) if it was on screen when this run began, else null: a handle bound
+	 * inside an arm, which the web binds only once the arm is drawn, so a write in the same handler that opens the arm
+	 * does not bind it yet.
+	 */
+	| { readonly drawn: string }
 	/** A computed whose body runs in the script engine: function `script` of the payload's script, called with `bindings`. */
 	| { readonly script: string; readonly bindings: NativeScriptBindings };
 
@@ -151,6 +157,9 @@ export type NativeExpr =
  * element has focus, and `element.ownerDocument.body`) is this id, which no node has.
  */
 export const NATIVE_DOCUMENT_BODY = '#body';
+
+/** A handle whose element is not on the page, as JavaScript on the phone receives it: it reads as `undefined`, as on the web. */
+export const NATIVE_UNBOUND_HANDLE = '#unbound';
 
 /**
  * What the names of a script function mean, resolved where it runs: a cell it may write (inside a list row the host reads
@@ -198,6 +207,9 @@ export type NativeScript = {
 /** Every cell an expression reads. */
 export function nativeExprCells(expr: NativeExpr, into = new Set<string>()): Set<string> {
 	if ('cell' in expr) into.add(expr.cell);
+	// A script binding's `fields` names the cells of a state object the script reads.
+	if ('fields' in expr && expr.fields && typeof expr.fields === 'object')
+		for (const cell of Object.values(expr.fields as Record<string, unknown>)) if (typeof cell === 'string') into.add(cell);
 	for (const child of Object.values(expr)) {
 		if (Array.isArray(child)) {
 			for (const item of child)
@@ -427,6 +439,11 @@ export type NativeNode = NativePlace &
 				 * announced, after the screen reader's current speech when polite; `atomic` reads the whole region, else the changed text.
 				 */
 				readonly live?: { readonly politeness: 'polite' | 'assertive'; readonly atomic: boolean };
+				/**
+				 * A live region whose `role`, `aria-live` or `aria-atomic` follows state: its politeness (`'polite'`,
+				 * `'assertive'` or null for none) and atomicity now, which the host evaluates each time it speaks.
+				 */
+				readonly liveFollows?: { readonly politeness: NativeExpr; readonly atomic: NativeExpr };
 				/** Attributes fixed at build time (`class` carries the component's scope class); absent when none. */
 				readonly attributes?: Readonly<Record<string, string>>;
 				/** The device object a `camera` element shows (`<base.camera el={cam} />`). */

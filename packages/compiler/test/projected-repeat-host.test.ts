@@ -245,3 +245,17 @@ for (const spelling of Object.keys(spellings) as ReadonlyArray<keyof typeof spel
 		expect(repeat?.ownerHostNodeId).toBeUndefined();
 	});
 }
+
+for (const spelling of Object.keys(spellings) as ReadonlyArray<keyof typeof spellings>) {
+	test(`@for under an ${spelling} root tag whose child has no interface here: left out of the placed repeats, kept as unplaced`, async () => {
+		const consumer = await compileTsrxModule({
+			filename: 'src/page.tsrx',
+			source: pageWith(spelling, constructs['@for'], false),
+			symbols: [],
+		});
+		expect(consumer.semanticGraph.keyedRepeats).toEqual([]);
+		expect(consumer.semanticGraph.unplacedProjectedRepeats?.map((repeat) => repeat.collectionSource)).toEqual([
+			'box.rows',
+		]);
+	});
+}

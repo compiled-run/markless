@@ -1,0 +1,22 @@
+appId: ${APP_ID}
+name: r161-class-scope
+---
+- launchApp:
+      clearState: true
+- assertVisible: Notes
+- assertVisible: Door shut
+- assertVisible: Quiet note
+- assertVisible: Toggle door
+- assertNotVisible: Door open
+- assertNotVisible: Loud note
+- tapOn: Toggle door
+- assertVisible: Door open
+- assertNotVisible: Door shut
+- assertVisible: Door open
+- assertVisible: Quiet note
+- assertNotVisible: Door shut
+- tapOn: Toggle loud
+- assertNotVisible: Quiet note
+- assertVisible: Loud note
+- assertVisible: Door open
+- assertNotVisible: Quiet note

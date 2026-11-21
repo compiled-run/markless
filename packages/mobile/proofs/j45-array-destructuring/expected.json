@@ -1,0 +1,12 @@
+{
+	"rung": "J45",
+	"name": "array destructuring in a component body names each index of the value, skipping holes",
+	"steps": [
+		{
+			"visible": ["Files", "app.ts", "page.ts", "only.ts", "No third file after only.ts"],
+			"absent": ["skip.ts", "No third file after app.ts", "Picked page.ts"]
+		},
+		{ "do": { "tap": "page.ts" }, "visible": ["Picked page.ts"], "absent": ["skip.ts", "Picked only.ts"] },
+		{ "do": { "tap": "only.ts" }, "visible": ["Picked only.ts", "Picked page.ts"], "absent": ["skip.ts"] }
+	]
+}

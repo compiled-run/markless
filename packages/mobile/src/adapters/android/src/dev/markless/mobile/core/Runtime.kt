@@ -326,6 +326,16 @@ class Runtime(
 			Expr.Focused -> JsValue.Str(focused ?: NATIVE_DOCUMENT_BODY)
 			is Expr.FocusOrigin -> (eval(e.overlay) as? JsValue.Str)?.let { o -> origins[o.value]?.let(JsValue::Str) } ?: JsValue.Null
 			is Expr.IsElement -> JsValue.Bool((eval(e.value) as? JsValue.Str)?.let { isElement(it.value) } ?: false)
+			is Expr.Drawn -> {
+				val chosen = drawnArms ?: arms().toMap()
+				var at = byId[e.node]?.arm
+				var shown = true
+				while (at != null && shown) {
+					shown = chosen.containsKey(at.branch) && chosen[at.branch] == at.index
+					at = byId[at.branch]?.arm
+				}
+				if (shown) JsValue.Str(e.node) else JsValue.Null
+			}
 			is Expr.Captures -> {
 				val node = eval(e.node)
 				val pointer = eval(e.pointer)
@@ -962,6 +972,8 @@ class Runtime(
 	private fun invalidity(field: Field): String? {
 		val (node, kind) = field
 		if (kind == FieldKind.Hidden || kind == FieldKind.Select || !isShown(elementOf(node)) || attributeNow(node, "disabled") != null) return null
+		// A readonly text field is barred from constraint validation.
+		if (kind == FieldKind.Text && attributeNow(node, "readonly") != null) return null
 		// A radio button is missing its value when any button of its group is required and none is checked.
 		val required = if (kind == FieldKind.Radio) groupOf(node).any { attributeNow(it.id, "required") != null } else attributeNow(node, "required") != null
 		val absent = required && when (kind) {
@@ -1017,6 +1029,8 @@ class Runtime(
 	fun isDialogOpen(id: String): Boolean = dialogs[id] == true
 
 	private var focused: String? = null
+	/** The arms on screen when the running action began; null between actions, when what shows is what the cells say. */
+	private var drawnArms: Map<String, Int?>? = null
 	/** The overlay stack, topmost last, and the focus each overlay was shown from. */
 	private var stack: List<String> = emptyList()
 	private val origins = HashMap<String, String>()
@@ -1448,7 +1462,8 @@ class Runtime(
 		val focusBefore = focused
 		val stackBefore = stack
 		val signaturesBefore = rowSignatures()
-		val calls = apply()
+		drawnArms = beforeArms
+		val calls = try { apply() } finally { drawnArms = null }
 		if (calls.firstOrNull() is JournalEntry.Navigate) return calls
 		// A row that left takes its state with it; a later row with the same key starts from the first values.
 		val kept = rows().flatMap { (list, keys) -> keys.map { "$list\u0000$it" } }.toSet()

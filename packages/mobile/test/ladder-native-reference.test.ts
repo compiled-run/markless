@@ -24,7 +24,7 @@ import {
 	type NativeRuntime,
 	type NativeScreen,
 } from '../src/index.ts';
-import { compileRungApp, readAppConfig, readWorkspaceModule } from '../src/harness/rung.ts';
+import { compileRungApp, readAppConfig, readWorkspaceModule, servedReader } from '../src/harness/rung.ts';
 import { echoText } from '../src/harness/echo-server.ts';
 import { nativeMaxLength, nativeRangeValue } from '@markless/serializer/native-view';
 import { nodeScriptHost } from '../src/node-engine.ts';
@@ -1155,6 +1155,13 @@ function walk(
 								? []
 								: runtime.dispatch({ event: 'enter', host });
 			apply(dispatched, index);
+			// A focus() a handler asks for gives a text field the keyboard, as the host does: its focus handler runs.
+			for (const entry of dispatched)
+				if (entry.op === 'command' && entry.command === 'focus' && entry.node !== focused) {
+					if (focused && handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
+					focused = entry.node;
+					if (handles(entry.node, 'focus')) apply(runtime.dispatch({ event: 'focus', host: entry.node }), index);
+				}
 			if ('erase' in action) keyedUp('Backspace');
 			else if ('submit' in action) keyedUp('Enter');
 		}
@@ -1270,6 +1277,7 @@ test.each(
 			source: readFileSync(filename, 'utf8'),
 			...(page ? { page } : {}),
 			readModule: readWorkspaceModule,
+			readServedStylesheet: servedReader(join(proofsDir, folder)),
 			...readAppConfig(join(proofsDir, folder)),
 			target,
 		});

@@ -39,6 +39,25 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A class that follows state keeps the module's style scope class around it, as the web writes it.
+		name: 'class-scope',
+		fixture: 'proofs/r161-class-scope/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		// A class a helper computes in JavaScript, with the style scope around it.
+		name: 'class-script',
+		fixture: 'proofs/r154-class-script/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
 		name: 'switches',
 		fixture: 'test/fixtures/Switches.tsrx',
 		actions: [
@@ -1336,6 +1355,47 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'pointerup', host: 'h2', pointerId: 1, x: 52.5, y: 118, time: 1032 },
 			{ event: 'pointerdown', host: 'h2', pointerId: 2, x: 30, y: 100, time: 2000 },
 			{ event: 'pointercancel', host: 'h2', pointerId: 2, x: 30, y: 90, time: 2016 },
+		],
+	},
+	{
+		// A handle bound inside an @if arm: the element only while the arm is drawn, so not in the press that opens it.
+		name: 'arm-handle',
+		fixture: 'proofs/j44-arm-handle/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'focus', host: 'h3' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'focus', host: 'h3' },
+		],
+	},
+	{
+		// A readonly text field: submitted, but left out of the checks a submit runs, so its `required` stops nothing.
+		name: 'readonly-field',
+		fixture: 'proofs/j48-readonly-field/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'input', host: 'h3', value: 'SAVE10' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		// Live regions whose aria-live and role follow state: the payload carries their politeness as expressions.
+		name: 'live-follows',
+		fixture: 'test/fixtures/LiveFollows.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h5' },
 		],
 	},
 	{
