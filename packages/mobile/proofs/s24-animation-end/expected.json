@@ -1,0 +1,16 @@
+{
+	"rung": "S24",
+	"name": "A styled element's animationend handler runs when its CSS animation ends, as the web runs it",
+	"steps": [
+		{
+			"visible": ["Notice", "Your changes were saved", "Notice open"],
+			"absent": ["Closed by fold"],
+			"title": "Notice"
+		},
+		{
+			"do": { "tap": "Dismiss" },
+			"visible": ["Closed by fold"],
+			"absent": ["Your changes were saved", "Notice open"]
+		}
+	]
+}

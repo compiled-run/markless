@@ -55,6 +55,7 @@ import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.Runtime
 import dev.markless.mobile.core.Scope
 import dev.markless.mobile.core.Store
+import dev.markless.mobile.style.AnimationRun
 import dev.markless.mobile.style.Assignment
 import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.StyleExport
@@ -227,6 +228,18 @@ class MarklessHost(
 	}
 
 	private val page: Layout? = style?.let { Layout(it, everyCell = true) }
+	/** The page's transitions and animations, run by Dragon's animator while they run, one display frame at a time. */
+	private val animation: AnimationRun? = page?.let { p -> style?.takeIf { it.anim != null }?.let { s -> planAnimation?.let { run -> AnimationRun(s, p.assignment, run) } } }
+	private var lastFrameNanos = 0L
+	private var framing = false
+	private val animationFrame = object : android.view.Choreographer.FrameCallback {
+		override fun doFrame(frameTimeNanos: Long) {
+			framing = false
+			if (lastFrameNanos != 0L) animation?.advanced((frameTimeNanos - lastFrameNanos) / 1_000_000.0)
+			lastFrameNanos = frameTimeNanos
+			runAnimation()
+		}
+	}
 
 	/** The system sheet whose content each payload node is, if any. */
 	private val sheetOf: Map<String, String?> = HashMap<String, String?>().apply {
@@ -589,6 +602,8 @@ class MarklessHost(
 			laidOutFor?.let { (w, h) -> layOutAt(w, h, rowsMoved = true) }
 		}
 		onJournal?.invoke(journal)
+		page?.let { animation?.moved(it.assignment) }
+		runAnimation()
 		scheduleLoadEvents()
 	}
 
@@ -1537,8 +1552,39 @@ class MarklessHost(
 		}
 	}
 
+	/** Runs Dragon's animator up to now: dispatches each animation event a handler listens for, and asks for the next frame while an animation or transition runs. */
+	private fun runAnimation() {
+		val run = animation ?: return
+		val (w, h) = laidOutFor ?: return
+		val (fired, busy) = run.next(dpr, w / dpr, h / dpr)
+		if (busy && !framing) {
+			framing = true
+			android.view.Choreographer.getInstance().postFrameCallback(animationFrame)
+		} else if (!busy) lastFrameNanos = 0L
+		for (e in fired) {
+			if (events[e.node.substringBefore('@')].orEmpty().none { it.event == e.event }) continue
+			apply(runtime.dispatch(e.node, e.event, e.name, elapsedTime = e.elapsedTime))
+		}
+	}
+
 	companion object {
 		const val TAG = "MarklessHost"
+
+		/** Dragon's translated `runMarklessAnimation`, when the app is built with an engine that has it. */
+		val planAnimation: ((String) -> String)? = try {
+			val run = Class.forName("dev.dragon.layout.HarnessKt").getMethod("harness_runMarklessAnimation", String::class.java)
+			({ line: String ->
+				try {
+					run.invoke(null, line) as String
+				} catch (e: java.lang.reflect.InvocationTargetException) {
+					throw e.cause ?: e
+				}
+			})
+		} catch (_: ClassNotFoundException) {
+			null
+		} catch (_: NoSuchMethodException) {
+			null
+		}
 
 		/** Dragon's translated `runMarklessLayout`, when the app is built with Dragon's engine; without it a page keeps the size it was exported at. */
 		val planLayout: ((String) -> String)? = try {

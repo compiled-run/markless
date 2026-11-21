@@ -77,6 +77,9 @@ const bindsValue = (nodeOf: ReadonlyMap<string, NativeViewPayload['nodes'][numbe
 };
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
 const REFUSED_RUNGS = new Set(['y4-sheet-beside-drawer', 'j7-page-refused']);
+// Rungs whose later steps wait on CSS animation events, which only Dragon's animator on the phones (and the browser) runs: this
+// walk checks their launch screen, and the phones and the web column check every step.
+const ANIMATED_RUNGS = new Set(['s24-animation-end']);
 
 /**
  * The script services as a phone's host provides them, on a clock that moves only when a step waits: a timer fires once
@@ -1340,7 +1343,7 @@ test.each([...navRungFolders(), ...styleRungFolders(), ...sheetStyleRungFolders(
 		).toEqual([]);
 		walkApp(
 			build.payload!,
-			rung.steps,
+			ANIMATED_RUNGS.has(folder) ? rung.steps.slice(0, 1) : rung.steps,
 			rung.start ?? '/',
 			new Set(build.styleInputs.map((input) => input.pattern)),
 			rung.location,
