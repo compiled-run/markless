@@ -3865,8 +3865,10 @@ export function createNativeViewPayload(
 				if (scope.locals.has(expression.name)) return { local: expression.name };
 				const bound = scope.args.get(expression.name);
 				if (bound) return bound;
-				if (expression.name === 'Infinity') return { nonFinite: 'Infinity' };
-				if (expression.name === 'NaN') return { nonFinite: 'NaN' };
+				if (expression.name === 'Infinity')
+					return { nonFinite: 'Infinity' };
+				if (expression.name === 'NaN')
+					return { nonFinite: 'NaN' };
 				if (scope.opaque === expression.name || scope.carried?.name === expression.name)
 					return refuse(`${what} reads its event`);
 				if (scope.deviceObjects.has(expression.name))
