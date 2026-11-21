@@ -23,6 +23,8 @@ public final class MarklessViewController: UIViewController {
 	private var laidOutFor: (size: CGSize, slots: [Double])?
 	/// Each style slot's current number, by slot id: what Dragon's plan lays the page out with.
 	private var slotValues: [String: Double] = [:]
+	/// The texts at mount, which the style export laid out: a later layout checks the export against them, not the texts now.
+	private var mountTexts: [(node: String, text: String)] = []
 	/// How long the last layout at the screen's size took, in milliseconds (Dragon's layout of every assignment and the views' move).
 	private var layoutMilliseconds: Double?
 	private let fonts: [String: Data]
@@ -159,6 +161,7 @@ public final class MarklessViewController: UIViewController {
 		slotValues = Dictionary(try runtime.slots().map { ($0.slot, $0.value) }, uniquingKeysWith: { $1 })
 		let dark = traitCollection.userInterfaceStyle == .dark
 		let texts = try runtime.texts()
+		mountTexts = texts
 		layout = try style.map { try $0.resolve(for: payload, initialTexts: texts, value: runtime.value(of:), arm: runtime.styleArm(of:), dark: dark) }
 		var sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:]
 		for sheet in style?.sheets ?? [] {
@@ -338,7 +341,7 @@ public final class MarklessViewController: UIViewController {
 				rows: style.planRepeats.isEmpty ? nil : try style.shownRows(payload, runtime: runtime),
 				rowsLayout: { DragonPlan.rowsLayout($0, shape: shape) })
 			let now = try relaid.resolve(
-				for: payload, initialTexts: try runtime.texts(), value: runtime.value(of:), dark: traitCollection.userInterfaceStyle == .dark)
+				for: payload, initialTexts: mountTexts, value: runtime.value(of:), dark: traitCollection.userInterfaceStyle == .dark)
 			try tree.relayout(now)
 			layout = now
 			laidOutFor = (size, slots)
