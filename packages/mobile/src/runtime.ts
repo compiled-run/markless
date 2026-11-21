@@ -2063,6 +2063,7 @@ export function createNativeRuntime(
 							...(text === undefined ? {} : { value: text }),
 							...(typeof eventValue === 'object' && eventValue.key !== undefined ? { key: eventValue.key } : {}),
 							...(typeof eventValue === 'object' && eventValue.text !== undefined ? { text: eventValue.text } : {}),
+							...(typeof eventValue === 'object' && eventValue.detail !== undefined ? { detail: eventValue.detail } : {}),
 							...Object.fromEntries(touch),
 						},
 						...(op.catch ? { catch: slotOf(op.catch, scope) } : {}),

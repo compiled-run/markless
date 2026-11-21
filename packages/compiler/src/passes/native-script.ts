@@ -552,6 +552,7 @@ var eventOf = function (given, frame) {
 		target: target,
 		currentTarget: target,
 		key: given.key,
+		detail: given.detail === undefined ? 0 : given.detail,
 		isComposing: false,
 		defaultPrevented: false,
 		preventDefault: function () { this.defaultPrevented = true; },

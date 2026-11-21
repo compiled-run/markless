@@ -1212,6 +1212,7 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> = [
 	['type'],
 	['key'],
+	['detail'],
 	['isComposing'],
 	['clipboardData', 'getData'],
 	['defaultPrevented'],

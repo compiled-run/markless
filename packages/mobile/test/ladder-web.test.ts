@@ -245,7 +245,7 @@ async function act(page: Page, step: LadderStep) {
 		await ('tap' in action ? target.click() : target.dblclick());
 	} else if ('type' in action) {
 		const field = page.getByRole('textbox', { name: action.type.field, exact: true });
-		await field.fill('');
+		if (!action.type.append) await field.fill('');
 		await field.pressSequentially(action.type.text);
 	} else if ('submit' in action)
 		await page.getByRole('textbox', { name: action.submit, exact: true }).press('Enter');

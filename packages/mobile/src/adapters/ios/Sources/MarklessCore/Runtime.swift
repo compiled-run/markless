@@ -1562,7 +1562,7 @@ public final class NativeRuntime {
 				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
 			case let .script(fn, type, bindings, catchCell):
 				let touch = touchFields.compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
-				let typed = [NativeEventField.key, .text].compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
+				let typed = [NativeEventField.key, .text, .detail].compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
 				let event: JSONValue = .object([("type", .string(type))] + ((eventValue ?? targetText).map { [("value", JSONValue.string($0))] } ?? []) + typed + touch)
 				let frame = try frame(of: bindings, in: scope)
 				calls.append(contentsOf: try enter(
