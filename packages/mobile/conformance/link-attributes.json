@@ -19,7 +19,10 @@
 							"name": "choice",
 							"initial": "apple",
 							"styled": true,
-							"domain": ["apple", "pear"]
+							"domain": [
+								"apple",
+								"pear"
+							]
 						}
 					],
 					"nodes": [

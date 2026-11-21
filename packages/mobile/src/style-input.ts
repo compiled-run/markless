@@ -1,6 +1,10 @@
-import type { NativeArmPlace, NativeViewPayload } from '@markless/serializer';
+import type { NativeArmPlace, NativeExpr, NativeViewPayload } from '@markless/serializer';
 import { fontFaceSources } from '@markless/compiler/native';
-import { isNativeStyleStateAttribute, nativeExprCells } from '@markless/serializer/native-view';
+import {
+	isNativeStyleStateAttribute,
+	NATIVE_NO_ARM,
+	nativeExprCells,
+} from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeBuild, NativeStylesheet } from './compile.ts';
 import { createNativeRuntime, evaluateWithScript, formatNativeValue } from './runtime.ts';
@@ -44,6 +48,7 @@ export type NativeStyleInput = {
 				/** A markup ancestor of a sheet's content: there for its selectors and inheritance, with no box of its own. */
 				readonly boxless?: true;
 				readonly arm?: NativeArmPlace;
+				readonly row?: string;
 		  }
 		| {
 				readonly kind: 'text';
@@ -56,6 +61,7 @@ export type NativeStyleInput = {
 					readonly value: string;
 				}>;
 				readonly arm?: NativeArmPlace;
+				readonly row?: string;
 		  }
 	>;
 	/** The stylesheets the page imports (unscoped, in import order), then every shown component's scoped CSS. */
@@ -65,6 +71,14 @@ export type NativeStyleInput = {
 		readonly cell: string;
 		readonly domain: ReadonlyArray<NativeStyleValue>;
 		readonly initial: NativeStyleValue;
+		/** A state each row of this list holds for itself: which of the values its `class` or `ui-*` binding can give it has. */
+		readonly row?: string;
+	}>;
+	/** Each keyed `@for` whose rows hold nodes, with the element its rows hang from and the arm it sits in. */
+	readonly repeats?: ReadonlyArray<{
+		readonly id: string;
+		readonly parent: string | null;
+		readonly arm?: NativeArmPlace;
 	}>;
 	/** A system sheet's content at one resting height: the content area's size per target, in CSS px. */
 	readonly viewports?: ReturnType<typeof sheetViewports>;
@@ -73,6 +87,54 @@ export type NativeStyleInput = {
 	 * stylesheet's file. Written to disk with `file` relative to the input file (`nativeStyleInputAt`).
 	 */
 	readonly fonts?: ReadonlyArray<{ readonly url: string; readonly file: string }>;
+	/**
+	 * Each `@if` or `@try` whose arms hold styled nodes, as a state Dragon compiles: the arm it shows (`"0"`, `"1"`, …, or
+	 * NATIVE_NO_ARM when it shows none), the arm at mount, and the arm it sits in. A node's `arm` names its innermost one.
+	 */
+	readonly branches?: ReadonlyArray<{
+		readonly id: string;
+		readonly domain: ReadonlyArray<string>;
+		readonly initial: string;
+		readonly arm?: NativeArmPlace;
+	}>;
+};
+
+/**
+ * The values a row's `class` or `ui-*` binding can give, as the web writes them (null: absent), when the binding is literals
+ * chosen by conditions; undefined when it can give a value the build cannot list.
+ */
+export function rowAttributeOptions(
+	name: string,
+	expr: NativeExpr,
+): ReadonlyArray<string | null> | undefined {
+	if ('literal' in expr) return [marklessAttributeValue(name, expr.literal)];
+	if ('if' in expr) {
+		const whenTrue = rowAttributeOptions(name, expr.whenTrue);
+		const whenFalse = rowAttributeOptions(name, expr.whenFalse);
+		return whenTrue && whenFalse ? [...new Set([...whenTrue, ...whenFalse])] : undefined;
+	}
+	return undefined;
+}
+
+/** Whether an expression reads what differs from row to row: a row's item or a row's own state. */
+export function readsRow(payload: NativeViewPayload, tree: unknown): boolean {
+	const rowCells = new Set(payload.cells.flatMap((cell) => (cell.row ? [cell.id] : [])));
+	const reads = (at: unknown): boolean =>
+		Array.isArray(at)
+			? at.some(reads)
+			: at !== null &&
+				typeof at === 'object' &&
+				('item' in at ||
+					('cell' in at && rowCells.has((at as { cell: string }).cell)) ||
+					Object.values(at).some(reads));
+	return reads(tree);
+}
+
+/** The arms a branch can show, as its style state's values: one per arm, and NATIVE_NO_ARM when it can show none. */
+export const branchDomain = (branch: Extract<PayloadNode, { kind: 'branch' }>): string[] => {
+	const arms = Array.from({ length: branch.arms }, (_, index) => String(index));
+	const none = branch.test ? branch.arms < 2 : !(branch.tests ?? []).includes(null);
+	return none ? [...arms, NATIVE_NO_ARM] : arms;
 };
 
 const URL_ROOT = 'https://markless.invalid/';
@@ -228,9 +290,12 @@ export function nativeStyleInput(
 	// What a script computes at the first render is laid out too: Dragon measures the text it gives. A route param reads as ''.
 	const host = payload.script ? nodeScriptHost() : undefined;
 	const params = Object.fromEntries((payload.route?.params ?? []).map((name) => [name, '']));
-	const initial = new Map(
-		createNativeRuntime(payload, new Map(), params, undefined, undefined, host).texts(),
-	);
+	const mounted = createNativeRuntime(payload, new Map(), params, undefined, undefined, host);
+	const initial = new Map(mounted.texts());
+	// A row's text is laid out once, as the row a phone copies: the first row's at mount, else one letter, so Dragon makes the text a box a phone fills per row.
+	const rowText = (id: string): string =>
+		[...initial].find(([instance]) => instance.startsWith(`${id}@`))?.[1] || 'x';
+	const shownArms = new Map(mounted.arms());
 	const evaluateAt = host
 		? evaluateWithScript(payload, host)
 		: evaluateWithScript(payload, {
@@ -238,7 +303,7 @@ export function nativeStyleInput(
 					throw new Error('no script');
 				},
 			});
-	const states = payload.cells.flatMap((cell): NativeStyleInput['states'][number][] => {
+	const states: NativeStyleInput['states'][number][] = payload.cells.flatMap((cell): NativeStyleInput['states'][number][] => {
 		if (!cell.styled || (cells && !cells.has(cell.id))) return [];
 		if (typeof cell.initial === 'boolean')
 			return [{ cell: cell.id, domain: [false, true], initial: cell.initial }];
@@ -248,6 +313,27 @@ export function nativeStyleInput(
 			`${cell.name} decides a class or a ui-* attribute, but not every value it can hold is known at build time; Dragon needs a finite domain`,
 		);
 	});
+	// A row's class or ui-* attribute its item decides: a state per row over the values it can give, by their index.
+	const rowOptions = new Map<string, { node: string; attribute: string; options: ReadonlyArray<string | null> }>();
+	for (const node of nodes) {
+		if (node.kind !== 'element' || !node.row) continue;
+		for (const binding of node.bindings ?? []) {
+			if (!('attribute' in binding)) continue;
+			if (binding.attribute !== 'class' && !isNativeStyleStateAttribute(binding.attribute)) continue;
+			if (!readsRow(payload, binding.value)) continue;
+			const options = rowAttributeOptions(binding.attribute, binding.value);
+			if (options) rowOptions.set(`${node.id}#${binding.attribute}`, { node: node.id, attribute: binding.attribute, options });
+		}
+	}
+	states.push(
+		...[...rowOptions].map(([cell, { node, options }]) => ({
+			cell,
+			domain: options.map((_, index) => String(index)),
+			initial: '0',
+			row: nodes.find((candidate) => candidate.id === node)!.row!,
+		})),
+	);
+	const rowOptionOf = (node: string, attribute: string) => rowOptions.get(`${node}#${attribute}`);
 	const combinations: Record<string, NativeStyleValue>[] = states.reduce<
 		Record<string, NativeStyleValue>[]
 	>(
@@ -258,6 +344,31 @@ export function nativeStyleInput(
 		[{}],
 	);
 	const initialCells = new Map(payload.cells.map((cell) => [cell.id, cell.initial]));
+	// A branch an outer arm hides keeps a value no box reads, since each arm inside it also needs that outer arm: its first.
+	const repeats = nodes.flatMap((node) =>
+		node.kind === 'repeat' && !node.row
+			? [
+					{
+						id: node.id,
+						parent: sheet && node.parent === sheet.id ? sheet.parent : node.parent,
+						...(node.arm ? { arm: node.arm } : {}),
+					},
+				]
+			: [],
+	);
+	const branches = nodes.flatMap((node) => {
+		if (node.kind !== 'branch' || node.row) return [];
+		const domain = branchDomain(node);
+		const shown = shownArms.get(node.id);
+		return [
+			{
+				id: node.id,
+				domain,
+				initial: shown === undefined ? domain[0]! : shown === null ? NATIVE_NO_ARM : String(shown),
+				...(node.arm ? { arm: node.arm } : {}),
+			},
+		];
+	});
 	// A node in an arm not shown at mount still gets laid out: its literals and its cells' first values (an expression reads as '').
 	const unshownText = (
 		parts: Extract<NativeViewPayload['nodes'][number], { kind: 'text' }>['parts'],
@@ -275,7 +386,8 @@ export function nativeStyleInput(
 		version: NATIVE_STYLE_INPUT_VERSION,
 		component: payload.component,
 		nodes: nodes.flatMap((node): NativeStyleInput['nodes'][number][] => {
-			const place = node.arm ? { arm: node.arm } : {};
+			// A row's nodes name their list: Dragon refuses them by name until rows are laid out on the phone.
+			const place = { ...(node.arm ? { arm: node.arm } : {}), ...(node.row ? { row: node.row } : {}) };
 			if (node.kind === 'branch' || node.kind === 'repeat') return [];
 			if (node.kind === 'sheet')
 				throw new Error(
@@ -321,7 +433,7 @@ export function nativeStyleInput(
 						kind: 'text',
 						id: node.id,
 						parent: sheet && parent === sheet.id ? sheet.parent! : parent,
-						text: initial.get(node.id) ?? unshownText(node.parts),
+						text: node.row ? rowText(node.id) : (initial.get(node.id) ?? unshownText(node.parts)),
 						...(textByState.some((entry) => entry.value !== textByState[0]!.value)
 							? { textByState }
 							: {}),
@@ -336,8 +448,14 @@ export function nativeStyleInput(
 				expr: Parameters<typeof evaluateAt>[0],
 				when: Record<string, NativeStyleValue>,
 			) => evaluateAt(expr, new Map([...initialCells, ...Object.entries(when)]));
+			const byRow = (attribute: string, when: Record<string, NativeStyleValue>) => {
+				const own = rowOptionOf(node.id, attribute);
+				return own ? { value: own.options[Number(when[`${node.id}#${attribute}`])] ?? null } : undefined;
+			};
 			const classByState = classBinding
 				? combinations.map((when) => {
+						const row = byRow('class', when);
+						if (row) return { when, value: row.value };
 						const value = evaluate(classBinding.value, when);
 						return {
 							when,
@@ -356,6 +474,7 @@ export function nativeStyleInput(
 				const byState = combinations.map((when) => ({
 					when,
 					value:
+						byRow(binding.attribute, when)?.value ??
 						marklessAttributeValue(binding.attribute, evaluate(binding.value, when)) ??
 						null,
 				}));
@@ -381,5 +500,7 @@ export function nativeStyleInput(
 		css: [...stylesheets, ...styles].map((style) => style.cssText).join('\n'),
 		states,
 		...(fonts.length > 0 ? { fonts } : {}),
+		...(branches.length > 0 ? { branches } : {}),
+		...(repeats.length > 0 ? { repeats } : {}),
 	};
 }

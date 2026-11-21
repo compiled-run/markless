@@ -1178,6 +1178,18 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'script-navigate',
+		app: 'proofs/j16-script-navigate',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'back' },
+		],
+	},
+	{
 		name: 'script-app',
 		app: 'proofs/j6-engine-on-demand',
 		open: '/',
