@@ -1,0 +1,23 @@
+{
+	"rung": 195,
+	"name": "A style value that follows state, as a colour: rgb() channels of a swatch and its text, drawn again on the phone from Dragon's plan",
+	"steps": [
+		{
+			"visible": ["Colour slot", "Swatch", "Warmer", "Warm 40"]
+		},
+		{
+			"do": {
+				"tap": "Warmer"
+			},
+			"visible": ["Warm 140"],
+			"absent": ["Warm 40"]
+		},
+		{
+			"do": {
+				"tap": "Warmer"
+			},
+			"visible": ["Warm 240"],
+			"absent": ["Warm 140"]
+		}
+	]
+}

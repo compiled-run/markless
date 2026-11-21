@@ -115,6 +115,98 @@ export type NativeViewArtifact = {
 
 type ElementBindings = NonNullable<Extract<NativeNode, { kind: 'element' }>['bindings']>;
 
+/** A `style` value as the web gets it: text, and holes that are numbers computed while the app runs (Dragon's typed slots). */
+type StylePart = string | { readonly hole: NativeExpr; readonly integer: boolean };
+const NUMBER_CALLS: ReadonlySet<string> = new Set([
+	'Number',
+	'Math.abs',
+	'Math.floor',
+	'Math.max',
+	'Math.min',
+	'Math.round',
+]);
+const WHOLE_CALLS: ReadonlySet<string> = new Set(['Math.floor', 'Math.round']);
+const isText = (e: NativeExpr): boolean =>
+	('literal' in e && typeof e.literal === 'string') || 'template' in e;
+/** Whether an expression can only be a number or a value read while the app runs (the runtime refuses a slot that is not a number). */
+function mayBeNumber(e: NativeExpr): boolean {
+	if ('literal' in e) return typeof e.literal === 'number';
+	if ('template' in e || 'array' in e || 'object' in e || 'lambda' in e) return false;
+	if ('unary' in e) return e.unary === '-' || e.unary === '+';
+	if ('binary' in e)
+		return e.binary === '+'
+			? mayBeNumber(e.left) && mayBeNumber(e.right)
+			: e.binary === '-' || e.binary === '*' || e.binary === '/' || e.binary === '%';
+	if ('call' in e) return NUMBER_CALLS.has(e.call);
+	if ('method' in e) return e.method === 'indexOf' || e.method === 'findIndex';
+	if ('if' in e) return mayBeNumber(e.whenTrue) && mayBeNumber(e.whenFalse);
+	if ('logical' in e) return mayBeNumber(e.left) && mayBeNumber(e.right);
+	return true;
+}
+/** Text that is one of fixed texts chosen by state, as a template or `+` writes it (never `undefined`, which it would spell). */
+const isChosenString = (e: NativeExpr): boolean =>
+	('literal' in e && typeof e.literal === 'string') ||
+	('if' in e && isChosenString(e.whenTrue) && isChosenString(e.whenFalse)) ||
+	('template' in e &&
+		e.template.every((part) => typeof part === 'string' || isChosenString(part))) ||
+	('binary' in e && e.binary === '+' && isChosenString(e.left) && isChosenString(e.right));
+/** A value that is one of fixed texts, or absent, chosen by state: Dragon lays out each, as it does a class that follows state. */
+const isChosenText = (e: NativeExpr): boolean =>
+	isChosenString(e) ||
+	('literal' in e && e.literal === null) ||
+	('if' in e && isChosenText(e.whenTrue) && isChosenText(e.whenFalse));
+/**
+ * A style value's text and number holes: literal text, templates and `+` with text on one side join into text; a part
+ * that can only be a number is a hole. Anything else is null: its text is not known when the app is built.
+ */
+function stylePartsOf(e: NativeExpr): StylePart[] | null {
+	if ('literal' in e)
+		return typeof e.literal === 'string'
+			? [e.literal]
+			: typeof e.literal === 'number'
+				? [String(e.literal)]
+				: null;
+	if ('template' in e) {
+		const out: StylePart[] = [];
+		for (const part of e.template) {
+			const inner = typeof part === 'string' ? [part] : stylePartsOf(part);
+			if (!inner) return null;
+			out.push(...inner);
+		}
+		return out;
+	}
+	if ('binary' in e && e.binary === '+' && (isText(e.left) || isText(e.right))) {
+		const left = stylePartsOf(e.left);
+		const right = stylePartsOf(e.right);
+		return left && right ? [...left, ...right] : null;
+	}
+	if (!mayBeNumber(e)) return null;
+	const whole =
+		('call' in e && WHOLE_CALLS.has(e.call)) || ('literal' in e && Number.isInteger(e.literal));
+	return [{ hole: e, integer: whole }];
+}
+
+/** Literal text joined, empty text dropped. */
+const joinedStyle = (parts: StylePart[] | null): StylePart[] | null =>
+	parts?.reduce<StylePart[]>((joined, part) => {
+		const last = joined.at(-1);
+		if (typeof part === 'string' && typeof last === 'string')
+			joined[joined.length - 1] = last + part;
+		else if (part !== '') joined.push(part);
+		return joined;
+	}, []) ?? null;
+/** A style that is a template with holes while a condition has one value and empty text while it has the other. */
+function styleCaseOf(
+	e: NativeExpr,
+): { readonly test: NativeExpr; readonly value: boolean; readonly parts: StylePart[] } | null {
+	if (!('if' in e)) return null;
+	const empty = (x: NativeExpr) => 'literal' in x && x.literal === '';
+	const whenTrue = empty(e.whenFalse) ? joinedStyle(stylePartsOf(e.whenTrue)) : null;
+	if (whenTrue) return { test: e.if, value: true, parts: whenTrue };
+	const whenFalse = empty(e.whenTrue) ? joinedStyle(stylePartsOf(e.whenFalse)) : null;
+	return whenFalse ? { test: e.if, value: false, parts: whenFalse } : null;
+}
+
 /** Refusals of markup a phone cannot show, each with its own code so a person or a tool can act on it. */
 export const NATIVE_REFUSALS = {
 	element: {
@@ -4937,6 +5029,16 @@ export function createNativeViewPayload(
 		readonly keys: ReadonlyArray<string | undefined>;
 	}[] = [];
 
+	/** Each element's `style` that follows state, by element id, as text and number holes. */
+	const styleParts = new Map<string, StylePart[]>();
+	const caseOf = new Map<string, NonNullable<ReturnType<typeof styleCaseOf>>>();
+	const styleCases: { readonly id: string; readonly value: NativeExpr }[] = [];
+	const slots: {
+		readonly id: string;
+		readonly value: NativeExpr;
+		readonly integer?: true;
+		readonly when?: { readonly case: string; readonly value: boolean };
+	}[] = [];
 	const bindingsOf = (
 		host: string,
 		outer: Scope,
@@ -4947,6 +5049,24 @@ export function createNativeViewPayload(
 			const scope = readScope(read, outer);
 			const target = read.target;
 			if (target.kind === 'text') return [];
+			if (target.kind === 'style') {
+				const value = exprOf(read.expression, 'the `style` attribute', scope);
+				if (!value) return [];
+				const given = joinedStyle(stylePartsOf(value));
+				// A style that is one hole and no text is text the build cannot see (a helper's return), never a bare number.
+				const parts = given?.some((part) => typeof part === 'string') ? given : null;
+				const styleCase = parts || isChosenText(value) ? null : styleCaseOf(value);
+				if (parts) styleParts.set(outer.prefix + host, parts);
+				else if (isChosenText(value)) return [{ attribute: 'style', value }];
+				else if (styleCase) {
+					styleParts.set(outer.prefix + host, styleCase.parts);
+					caseOf.set(outer.prefix + host, styleCase);
+				} else
+					refuse(
+						'a `style` that follows state whose text is not known when the app is built (only numbers in it may follow state)',
+					);
+				return [];
+			}
 			if (target.kind === 'attribute' && skip.has(target.name)) return [];
 			// A checkbox's checkedness and mixed look are its state, not attributes: a form reads `checked`.
 			if (
@@ -5681,6 +5801,31 @@ export function createNativeViewPayload(
 					item.span,
 					place.row,
 				);
+				const parts = styleParts.get(id);
+				if (parts && place.row !== undefined)
+					refuse(
+						'a `style` that follows state inside a @for row, which Dragon lays out once for every row',
+					);
+				const styleCase = place.row === undefined ? caseOf.get(id) : undefined;
+				const styleWhen = styleCase && { case: `case:${id}`, value: styleCase.value };
+				if (styleCase && styleWhen)
+					styleCases.push({ id: styleWhen.case, value: styleCase.test });
+				const style =
+					parts && place.row === undefined
+						? parts.map((part) => {
+								if (typeof part === 'string') return part;
+								const slot = `slot:${id}#${slots.length}`;
+								slots.push({
+									id: slot,
+									value: part.hole,
+									...(part.integer ? { integer: true as const } : {}),
+									...(styleWhen ? { when: styleWhen } : {}),
+								});
+								return { slot };
+							})
+						: undefined;
+				if (style && 'style' in attributes)
+					refuse('a `style` that is both fixed and follows state on one element');
 				nodes.push({
 					kind: 'element',
 					id,
@@ -5690,6 +5835,8 @@ export function createNativeViewPayload(
 						? { attributes: submitInput ? unlabelled : attributes }
 						: {}),
 					...(bindings.length > 0 ? { bindings } : {}),
+					...(style ? { style } : {}),
+					...(styleWhen ? { styleWhen } : {}),
 					...(defaultStyle ? { defaultStyle } : {}),
 					...(drawing ? { drawing } : {}),
 					...live,
@@ -8841,6 +8988,8 @@ export function createNativeViewPayload(
 		events,
 		handlers,
 		...(title ? { title } : {}),
+		...(slots.length > 0 ? { slots } : {}),
+		...(styleCases.length > 0 ? { styleCases } : {}),
 		...(objects.length > 0 ? { objects } : {}),
 		...(forms.length > 0 ? { forms, valueMissing: NATIVE_VALUE_MISSING_BY_LOCALE } : {}),
 		...(lengthLimited ? { tooLong: NATIVE_TOO_LONG_BY_LOCALE } : {}),

@@ -1,5 +1,5 @@
 {
-	"rung": 196,
+	"rung": 216,
 	"name": "a JavaScript click handler reads event.detail: 1 for a tap, 0 for a click a script raised",
 	"steps": [
 		{

@@ -539,6 +539,13 @@ export type NativeNode = NativePlace &
 					| { readonly attribute: string; readonly value: NativeExpr }
 					| { readonly property: NativeProperty; readonly value: NativeExpr }
 				>;
+				/**
+				 * A `style` that follows state: its text with each number the app computes as a hole naming one of the payload's
+				 * `slots`. Dragon resolves what each slot moves at build time; the host lays out again when a slot's value changes.
+				 */
+				readonly style?: ReadonlyArray<string | { readonly slot: string }>;
+				/** The `style` is `style` only while this style case (the payload's `styleCases`) has `value`, and empty text otherwise. */
+				readonly styleWhen?: { readonly case: string; readonly value: boolean };
 		  }
 		| {
 				readonly kind: 'text';
@@ -975,6 +982,22 @@ export type NativeViewPayload = {
 	}>;
 	/** The page's `<title>`, as text parts: what the system navigation bar shows for this screen. */
 	readonly title?: ReadonlyArray<NativeTextPart>;
+	/**
+	 * The numbers styles read while the app runs (an element's `style` holes): each a number expression of state, journalled
+	 * as `slot` when it changes. `integer` when it only ever gives whole numbers; another value is a runtime error.
+	 */
+	readonly slots?: ReadonlyArray<{
+		readonly id: string;
+		readonly value: NativeExpr;
+		readonly integer?: true;
+		/** Evaluated only while this style case has `value`; otherwise the slot keeps its last value (0 before the first). */
+		readonly when?: { readonly case: string; readonly value: boolean };
+	}>;
+	/**
+	 * Conditions a style follows (an element's `styleWhen`): each is whether its test is truthy now, journalled as `state`
+	 * when it changes, so the host moves to Dragon's assignment for it as it does for a styled cell.
+	 */
+	readonly styleCases?: ReadonlyArray<{ readonly id: string; readonly value: NativeExpr }>;
 	/** Forms a `submit` op can submit; absent when there are none. */
 	readonly forms?: ReadonlyArray<NativeForm>;
 	/**
@@ -1339,6 +1362,8 @@ export type NativeJournalEntry =
 	  }
 	/** A styled cell's new value: the host moves to Dragon's next style assignment (`next[a][s][v]`) and applies it. */
 	| { readonly op: 'state'; readonly cell: string; readonly value: NativeValue }
+	/** A style slot's new value: the host lays the page out again with it through Dragon's plan (`runMarklessLayout`'s `slots`). */
+	| { readonly op: 'slot'; readonly slot: string; readonly value: number }
 	/**
 	 * A list's new row order: the host removes rows whose key left, builds new rows from current values and moves the
 	 * rest into this order. Entries for nodes inside rows name the instance as `<node>@<key>`.
@@ -1404,12 +1429,16 @@ export const PLATFORM_PIECES_NAMESPACE = 'native';
 
 /**
  * Bound attributes that reach Dragon in every combination of the styled states, besides `class`: the ones a selector keys
- * state off (`[ui-open]`, `[aria-expanded]`), `hidden`, whose UA rule Dragon applies, and `disabled`, which selects `:disabled`
- * and Chrome's disabled colours in Dragon. Others (`value`) stay out of the style input, since Dragon does not model their
+ * state off (`[ui-open]`, `[aria-expanded]`), `hidden`, whose UA rule Dragon applies, `disabled`, which selects `:disabled`
+ * and Chrome's disabled colours in Dragon, and a `style` that is one of fixed texts chosen by state. Others (`value`) stay out of the style input, since Dragon does not model their
  * rendering effect.
  */
 export const isNativeStyleStateAttribute = (name: string): boolean =>
-	name === 'hidden' || name === 'disabled' || name === 'role' || /^(ui|aria|data)-/.test(name);
+	name === 'hidden' ||
+	name === 'disabled' ||
+	name === 'role' ||
+	name === 'style' ||
+	/^(ui|aria|data)-/.test(name);
 
 /** ECMAScript's own globals, which every engine a host runs has (JavaScriptCore, Hermes); `eval` is left out. */
 export const NATIVE_SCRIPT_LANGUAGE_GLOBALS: ReadonlyArray<string> = [

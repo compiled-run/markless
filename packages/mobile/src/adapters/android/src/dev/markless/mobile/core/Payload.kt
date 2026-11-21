@@ -121,6 +121,21 @@ data class ArmPlace(val branch: String, val index: Int)
 /** An attribute that follows state, or (when [property]) an input's `value`, `checked` or `indeterminate`, or an option's `selected`. */
 data class Binding(val name: String, val value: Expr, val property: Boolean = false)
 
+/** A number styles read while the app runs, journalled as `slot` when it changes; [integer] when only whole numbers are allowed. */
+data class StyleSlot(val id: String, val value: Expr, val integer: Boolean = false, val whenCase: StyleWhen? = null)
+
+/** A slot evaluated, or a style shown, only while style case [case] has [value]; a hidden slot keeps its last value (0 before the first). */
+data class StyleWhen(val case: String, val value: Boolean)
+
+/** A condition a style follows: whether [value] is truthy, journalled as `state` when it changes. */
+data class StyleCase(val id: String, val value: Expr)
+
+/** A piece of a `style` that follows state: its text, or a hole naming one of the payload's slots. */
+sealed interface StylePiece {
+	data class Text(val text: String) : StylePiece
+	data class Hole(val slot: String) : StylePiece
+}
+
 sealed interface Node {
 	val id: String
 	val parent: String?
@@ -129,7 +144,7 @@ sealed interface Node {
 	val row: String?
 
 	/** [obj]: the device object a `camera` element shows. */
-	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null, val obj: String? = null, val defaultStyle: DefaultStyle? = null, val drawing: Drawing? = null, val live: Live? = null, val liveFollows: LiveFollows? = null) : Node
+	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null, val obj: String? = null, val defaultStyle: DefaultStyle? = null, val drawing: Drawing? = null, val live: Live? = null, val liveFollows: LiveFollows? = null, val style: List<StylePiece>? = null, val styleWhen: StyleWhen? = null) : Node
 	/** [parent] is null for text at the top of the page. */
 	data class Text(override val id: String, override val parent: String?, val parts: List<TextPart>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
 	/** An `@if` with [test] (arm 0 while truthy, arm 1 otherwise), or a chain with [tests]: the first truthy arm, else the `null` arm. */
@@ -459,13 +474,17 @@ data class Payload(
 	val script: ScriptSource? = null,
 	/** A click handler reads where its tap landed, so the host reports touches even with no pointer handler. */
 	val tapPoints: Boolean = false,
+	/** The numbers element styles read, in the order a change journals them. */
+	val slots: List<StyleSlot> = emptyList(),
+	/** The conditions element styles follow, in payload order. */
+	val styleCases: List<StyleCase> = emptyList(),
 ) {
 	companion object {
 		fun decode(bytes: ByteArray): Payload = decode(Json.parse(bytes))
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "numberMessages", "typeMismatch", "script", "tapPoints"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "numberMessages", "typeMismatch", "script", "tapPoints", "slots", "styleCases"), "payload")
 			val route = root["route"]?.obj("payload.route")?.let { r ->
 				r.only(setOf("pattern", "params"), "payload.route")
 				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
@@ -537,6 +556,30 @@ data class Payload(
 				if (digits.length != 10) throw MarklessDecodeError("$what.digits is not ten digits")
 				locale to NumberMessages(text("underflow"), text("overflow"), text("step"), text("stepOne"), text("badInput"), digits, mo["decimal"]?.str("$what.decimal") ?: ".")
 			} ?: emptyMap()
+			val styleCases = root["styleCases"]?.arr("payload.styleCases")?.mapIndexed { n, v ->
+				val what = "payload.styleCases[$n]"
+				val o = v.obj(what)
+				o.only(setOf("id", "value"), what)
+				StyleCase(o.field("id", what).str("$what.id"), expr(o.field("value", what), "$what.value"))
+			} ?: emptyList()
+			val caseIds = HashSet<String>()
+			for (c in styleCases) {
+				if (!caseIds.add(c.id)) throw MarklessDecodeError("duplicate style case \"${c.id}\"")
+				for (cell in cellsOf(c.value)) if (cell !in cellIds) throw MarklessDecodeError("style case \"${c.id}\" reads unknown cell \"$cell\"")
+			}
+			val slots = root["slots"]?.arr("payload.slots")?.mapIndexed { n, v ->
+				val what = "payload.slots[$n]"
+				val o = v.obj(what)
+				o.only(setOf("id", "value", "integer", "when"), what)
+				val integer = o["integer"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.integer must be true") else true } ?: false
+				StyleSlot(o.field("id", what).str("$what.id"), expr(o.field("value", what), "$what.value"), integer, o["when"]?.let { styleWhen(it, "$what.when", caseIds) })
+			} ?: emptyList()
+			val slotIds = HashSet<String>()
+			for (s in slots) {
+				if (!slotIds.add(s.id)) throw MarklessDecodeError("duplicate slot \"${s.id}\"")
+				for (c in cellsOf(s.value)) if (c !in cellIds) throw MarklessDecodeError("slot \"${s.id}\" reads unknown cell \"$c\"")
+			}
+			for (node in nodes) if (node is Node.Element) for (p in node.style.orEmpty()) if (p is StylePiece.Hole && p.slot !in slotIds) throw MarklessDecodeError("node \"${node.id}\"'s style names unknown slot \"${p.slot}\"")
 			val typeMismatch = root["typeMismatch"]?.obj("payload.typeMismatch")?.entries?.associateTo(LinkedHashMap()) { (locale, m) ->
 				val mo = m.obj("payload.typeMismatch.$locale")
 				val keys = listOf("noAt", "emptyLocal", "emptyDomain", "invalidLocal", "invalidDomain", "invalidDots", "other")
@@ -551,11 +594,12 @@ data class Payload(
 				ScriptSource(o.field("id", "payload.script").str("payload.script.id"), o.field("source", "payload.script").str("payload.script.source"), services)
 			}
 			if (script == null) {
-				val runsScript = cells.any { it.async != null || it.seed?.let(::hasScript) == true } || handlers.any { h -> scriptOps(h.ops) } || nodes.any { n -> readsOf(n).any(::hasScript) } || title.orEmpty().any { it is TextPart.Value && hasScript(it.expr) }
+				val runsScript = cells.any { it.async != null || it.seed?.let(::hasScript) == true } || handlers.any { h -> scriptOps(h.ops) } || nodes.any { n -> readsOf(n).any(::hasScript) } || title.orEmpty().any { it is TextPart.Value && hasScript(it.expr) } || slots.any { hasScript(it.value) } || styleCases.any { hasScript(it.value) }
 				if (runsScript) throw MarklessDecodeError("a script op or computed in a payload with no script")
 			}
+			for (node in nodes) if (node is Node.Element) node.styleWhen?.let { if (it.case !in caseIds) throw MarklessDecodeError("node \"${node.id}\"'s style names unknown style case \"${it.case}\"") }
 			val tapPoints = root["tapPoints"]?.let { it == Json.Bool(true) || throw MarklessDecodeError("payload.tapPoints is true when present") } ?: false
-			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, numberMessages, typeMismatch, script, tapPoints)
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, numberMessages, typeMismatch, script, tapPoints, slots, styleCases)
 		}
 
 		private fun readsOf(node: Node): List<Expr> = when (node) {
@@ -912,12 +956,30 @@ data class Payload(
 			return Drawing(viewBox, o["width"]?.num("$what.width"), o["height"]?.num("$what.height"), shapes, em, o["label"]?.str("$what.label"), aspect)
 		}
 
+		private fun styleWhen(v: Json, what: String, caseIds: Set<String>?): StyleWhen {
+			val o = v.obj(what)
+			o.only(setOf("case", "value"), what)
+			val case = o.field("case", what).str("$what.case")
+			if (caseIds != null && case !in caseIds) throw MarklessDecodeError("$what names unknown style case \"$case\"")
+			val value = o.field("value", what)
+			if (value !is Json.Bool) throw MarklessDecodeError("$what.value is not a boolean")
+			return StyleWhen(case, value.value)
+		}
+
+		private fun stylePieces(v: Json, what: String): List<StylePiece> = v.arr(what).mapIndexed { n, p ->
+			if (p is Json.Str) StylePiece.Text(p.value) else {
+				val o = p.obj("$what[$n]")
+				o.only(setOf("slot"), "$what[$n]")
+				StylePiece.Hole(o.field("slot", "$what[$n]").str("$what[$n].slot"))
+			}
+		}
+
 		private fun node(v: Json, what: String): Node {
 			val o = v.obj(what)
 			val id = o.field("id", what).str("$what.id")
 			return when (val kind = o.field("kind", what).str("$what.kind")) {
 				"element" -> {
-					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm", "row", "object", "defaultStyle", "drawing", "live", "liveFollows"), what)
+					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm", "row", "object", "defaultStyle", "drawing", "live", "liveFollows", "style", "styleWhen"), what)
 					val parent = o.field("parent", what)
 					val attributes = o["attributes"]?.obj("$what.attributes")?.mapValues { (k, v) -> v.str("$what.attributes.$k") } ?: emptyMap()
 					val bindings = o["bindings"]?.arr("$what.bindings")?.mapIndexed { n, b ->
@@ -931,7 +993,7 @@ data class Payload(
 							Binding(bo.field("attribute", what).str("$what.bindings[$n].attribute"), value)
 						}
 					} ?: emptyList()
-					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what), rowPlace(o, what), o["object"]?.str("$what.object"), o["defaultStyle"]?.let { defaultStyle(it, "$what.defaultStyle") }, o["drawing"]?.let { drawing(it, "$what.drawing") }, o["live"]?.let { live(it, "$what.live") }, o["liveFollows"]?.let { liveFollows(it, "$what.liveFollows") })
+					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what), rowPlace(o, what), o["object"]?.str("$what.object"), o["defaultStyle"]?.let { defaultStyle(it, "$what.defaultStyle") }, o["drawing"]?.let { drawing(it, "$what.drawing") }, o["live"]?.let { live(it, "$what.live") }, o["liveFollows"]?.let { liveFollows(it, "$what.liveFollows") }, o["style"]?.let { stylePieces(it, "$what.style") }, o["styleWhen"]?.let { styleWhen(it, "$what.styleWhen", null) })
 				}
 				"text" -> {
 					o.only(setOf("kind", "id", "parent", "parts", "arm", "row"), what)

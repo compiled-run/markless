@@ -319,6 +319,10 @@ export type NativeRuntime = {
 	readonly engineStarts: () => number;
 	/** What the script wrote to `console`, in order, as `[level, text]`. */
 	readonly logs: () => ReadonlyArray<readonly [level: string, text: string]>;
+	/** Each style slot's number now, in the payload's order: what the host lays the page out with. */
+	readonly slots: () => ReadonlyArray<readonly [slot: string, value: number]>;
+	/** Whether each style case's test holds now, in the payload's order: which of Dragon's assignments the style is in. */
+	readonly styleCases: () => ReadonlyArray<readonly [styleCase: string, value: boolean]>;
 	/** Starts the async values the script computes, once the screen is built; the host applies its journal as an action's. */
 	readonly start: () => ReadonlyArray<NativeJournalEntry>;
 	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
@@ -1550,6 +1554,25 @@ export function createNativeRuntime(
 		);
 	const attributes = () =>
 		bound('attribute', (name, value) => marklessAttributeValue(name, value));
+	// A slot is a number Dragon's layout takes; anything else is refused here, as no layout of it was proven.
+	const caseValues = () =>
+		(payload.styleCases ?? []).map((styleCase) => [styleCase.id, Boolean(evaluate(styleCase.value))] as const);
+	// A slot whose style case does not show its text keeps its last value: its expression may not hold then (`point.x`).
+	const keptSlots = new Map<string, number>();
+	const slotValues = () => {
+		const cases = new Map(caseValues());
+		return (payload.slots ?? []).map((slot) => {
+			if (slot.when && cases.get(slot.when.case) !== slot.when.value)
+				return [slot.id, keptSlots.get(slot.id) ?? 0] as const;
+			const value = evaluate(slot.value);
+			if (typeof value !== 'number' || !Number.isFinite(value))
+				throw new Error(`style slot ${slot.id} is ${JSON.stringify(value)}, not a finite number`);
+			if (slot.integer && !Number.isInteger(value))
+				throw new Error(`style slot ${slot.id} is ${value}, not a whole number`);
+			keptSlots.set(slot.id, value);
+			return [slot.id, value] as const;
+		});
+	};
 	/** Text fields with no `value` binding whose text a handler wrote (`field.value = text`): their text is journalled too. */
 	const written = new Set<string>();
 	const properties = () => {
@@ -2041,6 +2064,8 @@ export function createNativeRuntime(
 			})),
 		engineStarts: () => engineStarts,
 		logs: () => logs,
+		slots: slotValues,
+		styleCases: caseValues,
 		start: () => (asyncCells.length === 0 ? [] : change(undefined, undefined, () => [])),
 		resume: () =>
 			appCells.some(
@@ -2761,6 +2786,8 @@ export function createNativeRuntime(
 		{
 			seedRows();
 			const cellsBefore = new Map(values);
+			const slotsBefore = new Map(slotValues());
+			const casesBefore = new Map(caseValues());
 			const beforeTexts = new Map(texts());
 			const beforeAttributes = keyed(attributes());
 			const beforeMarks = marks();
@@ -2865,11 +2892,19 @@ export function createNativeRuntime(
 			const afterArms = new Map(arms());
 			const afterRows = new Map(rows());
 			const afterSheets = new Map(sheets());
-			const styles = payload.cells.flatMap((cell): NativeJournalEntry[] =>
-				cell.styled && cellsBefore.get(cell.id) !== values.get(cell.id)
-					? [{ op: 'state', cell: cell.id, value: values.get(cell.id)! }]
-					: [],
-			);
+			const styles = [
+				...payload.cells.flatMap((cell): NativeJournalEntry[] =>
+					cell.styled && cellsBefore.get(cell.id) !== values.get(cell.id)
+						? [{ op: 'state', cell: cell.id, value: values.get(cell.id)! }]
+						: [],
+				),
+				...caseValues().flatMap(([styleCase, value]): NativeJournalEntry[] =>
+					casesBefore.get(styleCase) === value ? [] : [{ op: 'state', cell: styleCase, value }],
+				),
+				...slotValues().flatMap(([slot, value]): NativeJournalEntry[] =>
+					Object.is(slotsBefore.get(slot), value) ? [] : [{ op: 'slot', slot, value }],
+				),
+			];
 			// A node shown before and after journals its change; a new arm or row is built from current values instead.
 			const nodes = payload.nodes.flatMap((node): NativeJournalEntry[] => {
 				if (node.kind === 'repeat')

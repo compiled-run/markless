@@ -721,6 +721,26 @@ public struct NativeCell: Equatable, Sendable {
 	public var app = false
 }
 
+/// A number a style reads while the app runs: Dragon's layout takes it, so it must be finite (and whole when `integer`).
+public struct NativeSlot: Equatable, Sendable {
+	public let id: String
+	public let value: NativeExpr
+	public let integer: Bool
+	/// Evaluated only while this style case has this value; otherwise the slot keeps its last value (0 before the first).
+	public var when: NativeStyleWhen? = nil
+}
+
+public struct NativeStyleWhen: Equatable, Sendable {
+	public let styleCase: String
+	public let value: Bool
+}
+
+/// A condition a style follows: whether its test is truthy, journalled as `state` when it changes.
+public struct NativeStyleCase: Equatable, Sendable {
+	public let id: String
+	public let value: NativeExpr
+}
+
 public struct NativeEvent: Equatable, Sendable {
 	public let host: String
 	public let event: NativeEventName
@@ -751,6 +771,10 @@ public struct NativeViewPayload: Equatable, Sendable {
 	public var tooLong: [(locale: String, message: NativeTooLong)] = []
 	/// What the web says when a number field is out of range, off its step or holds no number, by locale, in payload order.
 	public var numberMessages: [(locale: String, messages: NativeNumberMessages)] = []
+	/// The numbers element styles read, in payload order: each journalled as `slot` when it changes.
+	public var slots: [NativeSlot] = []
+	/// The conditions element styles follow, in payload order.
+	public var styleCases: [NativeStyleCase] = []
 	/// What the web says when an email field holds no email address, by locale, in payload order.
 	public var typeMismatch: [(locale: String, message: NativeEmailMismatch)] = []
 
@@ -758,7 +782,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		a.component == b.component && a.route == b.route && a.cells == b.cells && a.nodes == b.nodes && a.events == b.events
 			&& a.handlers == b.handlers && a.title == b.title && a.objects == b.objects && a.forms == b.forms && a.valueMissing.map(\.locale) == b.valueMissing.map(\.locale)
 			&& a.valueMissing.map(\.messages) == b.valueMissing.map(\.messages) && a.tooLong.map(\.locale) == b.tooLong.map(\.locale)
-			&& a.tooLong.map(\.message) == b.tooLong.map(\.message) && a.script == b.script && a.tapPoints == b.tapPoints
+			&& a.tooLong.map(\.message) == b.tooLong.map(\.message) && a.script == b.script && a.tapPoints == b.tapPoints && a.slots == b.slots && a.styleCases == b.styleCases
 			&& a.numberMessages.map(\.locale) == b.numberMessages.map(\.locale) && a.numberMessages.map(\.messages) == b.numberMessages.map(\.messages)
 			&& a.typeMismatch.map(\.locale) == b.typeMismatch.map(\.locale) && a.typeMismatch.map(\.message) == b.typeMismatch.map(\.message)
 	}
@@ -773,10 +797,31 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "numberMessages", "typeMismatch", "script", "tapPoints"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "numberMessages", "typeMismatch", "script", "tapPoints", "slots", "styleCases"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
+		}
+		let styleCases: [NativeStyleCase] = fields.has("styleCases") ? try fields["styleCases"].array().map { styleCase in
+			let f = try styleCase.object(["id", "value"])
+			return NativeStyleCase(id: try f["id"].string(), value: try decodeExpr(try f["value"]))
+		} : []
+		let caseIds = Set(styleCases.map(\.id))
+		guard caseIds.count == styleCases.count else { throw PayloadError(path: "payload.styleCases", reason: "a style case is listed twice") }
+		let styleWhen = { (reader: Reader) throws -> NativeStyleWhen in
+			let w = try reader.object(["case", "value"])
+			let styleCase = try w["case"].string()
+			guard caseIds.contains(styleCase) else { throw PayloadError(path: reader.path, reason: "names unknown style case \(styleCase)") }
+			return NativeStyleWhen(styleCase: styleCase, value: try w["value"].bool())
+		}
+		let slots: [NativeSlot] = fields.has("slots") ? try fields["slots"].array().map { slot in
+			let f = try slot.object(required: ["id", "value"], optional: ["integer", "when"])
+			if f.has("integer"), try !f["integer"].bool() { throw PayloadError(path: try f["integer"].path, reason: "integer is only ever true") }
+			return NativeSlot(id: try f["id"].string(), value: try decodeExpr(try f["value"]), integer: f.has("integer"), when: f.has("when") ? try styleWhen(try f["when"]) : nil)
+		} : []
+		var slotIds = Set<String>()
+		for slot in slots where !slotIds.insert(slot.id).inserted {
+			throw PayloadError(path: "payload.slots", reason: "duplicate slot \(slot.id)")
 		}
 		let cells = try fields["cells"].array().map { cell in
 			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "domain", "device", "task", "async", "object", "row", "clock", "first", "rebuiltBy", "seed", "arm", "unset", "follows", "app", "nonFinite"])
@@ -823,12 +868,20 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let place = ["arm", "row"]
 			switch kind {
 			case "element":
-				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing", "live", "liveFollows"] + place)
+				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing", "live", "liveFollows", "style", "styleWhen"] + place)
 				var attributes: [String: String] = [:]
 				if field.has("attributes") {
 					let reader = try field["attributes"]
 					for key in try reader.keys() { attributes[key] = try reader.field(key).string() }
 				}
+				// Dragon's style export already carries what each hole moves; the payload's copy is its input, checked here and not kept.
+				if field.has("style") {
+					for part in try field["style"].array() where !part.isString {
+						let slot = try part.object(["slot"])["slot"].string()
+						guard slotIds.contains(slot) else { throw PayloadError(path: part.path, reason: "names unknown slot \(slot)") }
+					}
+				}
+				if field.has("styleWhen") { _ = try styleWhen(try field["styleWhen"]) }
 				let bindings: [NativeBinding] = field.has("bindings") ? try field["bindings"].array().map { binding -> NativeBinding in
 					if try binding.keys().contains("property") {
 						let b = try binding.object(["property", "value"])
@@ -1066,7 +1119,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		var payload = NativeViewPayload(
 			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers,
 			title: fields.has("title") ? try decodeParts(try fields["title"]) : nil,
-			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong, typeMismatch: typeMismatch,
+			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong, slots: slots, styleCases: styleCases, typeMismatch: typeMismatch,
 			script: fields.has("script") ? try decodeScript(try fields["script"]) : nil)
 		if fields.has("numberMessages") {
 			let reader = try fields["numberMessages"]
@@ -1424,6 +1477,12 @@ public struct NativeViewPayload: Equatable, Sendable {
 			for case let .script(_, _, bindings, catchCell) in handler.ops where !(bindings.flatMap(\.cells) + (catchCell.map { [$0] } ?? [])).allSatisfy(cellIds.contains) {
 				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) runs a script with an unknown cell")
 			}
+		}
+		for slot in slots where !slot.value.cells.allSatisfy(cellIds.contains) {
+			throw PayloadError(path: "payload.slots", reason: "slot \(slot.id) reads an unknown cell")
+		}
+		for styleCase in styleCases where !styleCase.value.cells.allSatisfy(cellIds.contains) {
+			throw PayloadError(path: "payload.styleCases", reason: "style case \(styleCase.id) reads an unknown cell")
 		}
 		for cell in cells {
 			if let async = cell.async, !async.bindings.flatMap(\.cells).allSatisfy(cellIds.contains) {

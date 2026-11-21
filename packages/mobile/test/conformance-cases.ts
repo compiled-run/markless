@@ -69,6 +69,25 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'style-slots',
+		fixture: 'test/fixtures/StyleSlots.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'style-cases',
+		fixture: 'test/fixtures/StyleCases.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
 		name: 'switches',
 		fixture: 'test/fixtures/Switches.tsrx',
 		actions: [
