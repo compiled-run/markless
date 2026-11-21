@@ -1,0 +1,17 @@
+appId: ${APP_ID}
+name: j47-projected-for
+---
+- launchApp:
+    clearState: true
+- assertVisible: Help
+- assertVisible: When does it ship\?
+- assertVisible: How do I return it\?
+- assertNotVisible: Within two working days\.
+- assertNotVisible: Start a return from your orders\.
+- tapOn: How do I return it\?
+- assertVisible: Start a return from your orders\.
+- assertVisible: Start a return from your orders\.
+- assertNotVisible: Within two working days\.
+- tapOn: When does it ship\?
+- assertVisible: Within two working days\.
+- assertVisible: Within two working days\.

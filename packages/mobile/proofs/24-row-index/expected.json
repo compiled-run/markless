@@ -1,0 +1,17 @@
+{
+	"rung": 24,
+	"name": "A @for row reads its index: its number follows its place as rows are reordered and dropped",
+	"steps": [
+		{ "visible": ["Ranked", "1. Fig", "2. Kiwi", "3. Lime"], "absent": ["1. Lime"] },
+		{
+			"do": { "tap": "Reverse" },
+			"visible": ["1. Lime", "2. Kiwi", "3. Fig"],
+			"absent": ["1. Fig", "3. Lime"]
+		},
+		{
+			"do": { "tap": "Drop the first" },
+			"visible": ["1. Kiwi", "2. Fig"],
+			"absent": ["1. Lime", "3. Fig", "2. Kiwi"]
+		}
+	]
+}

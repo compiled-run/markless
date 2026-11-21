@@ -1,0 +1,47 @@
+appId: ${APP_ID}
+name: 26-sheet-in-arm
+---
+- launchApp:
+      clearState: true
+- assertVisible: Product
+- assertVisible: Picked none
+- assertVisible: Load
+- assertNotVisible: Mug
+- assertNotVisible: Choose size
+- assertNotVisible: Sizes
+- tapOn: Load
+- assertVisible: Mug
+- assertVisible: Choose size
+- assertVisible: Mug
+- assertVisible: Choose size
+- assertVisible: Unload
+- assertNotVisible: Sizes
+- tapOn: Choose size
+- assertVisible: Sizes
+- assertVisible: Sizes
+- assertVisible: Large
+- assertVisible: Remove product
+- tapOn: Large
+- assertNotVisible: Sizes
+- assertVisible: Picked large
+- assertVisible: Choose size
+- assertNotVisible: Sizes
+- assertNotVisible: Picked none
+- tapOn: Choose size
+- assertVisible: Sizes
+- assertVisible: Sizes
+- assertVisible: Remove product
+- tapOn: Remove product
+- assertNotVisible: Sizes
+- assertVisible: Load
+- assertVisible: Picked large
+- assertNotVisible: Sizes
+- assertNotVisible: Mug
+- assertNotVisible: Choose size
+- tapOn: Load
+- assertVisible: Sizes
+- assertNotVisible: Load
+- assertVisible: Sizes
+- assertVisible: Large
+- assertVisible: Remove product
+- assertNotVisible: Load

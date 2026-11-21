@@ -11,6 +11,7 @@ import {
 	DEVICE_TARGET_FACTS,
 	NATIVE_FACT_COLLECTORS,
 	nativeUnsupported,
+	selectorAttributes,
 	type NativeViewArtifact,
 } from '@markless/compiler/native';
 import {
@@ -22,11 +23,17 @@ import { iconSourceTransform, type IconsOptions } from '@markless/icons/vite';
 import type { NativeAppPayload, NativeViewPayload } from '@markless/serializer';
 import { uiIconsOptions } from '@markless/ui-tools';
 import {
-	isNativeStyleStateAttribute,
 	NATIVE_APP_VERSION,
 	NATIVE_NOT_FOUND_ROUTE,
 } from '@markless/serializer/native-view';
-import { booleanCellsOf, nativeStyleInputs, readsRow, rowAttributeOptions, type NativeStyleInput } from './style-input.ts';
+import {
+	booleanCellsOf,
+	nativeStyleInputs,
+	nativeStyleRowAttribute,
+	readsRow,
+	rowAttributeOptions,
+	type NativeStyleInput,
+} from './style-input.ts';
 import type { NativeDeviceFeature } from '@markless/serializer/native-device';
 import { deviceManifest, type DeviceAppConfig, type DeviceManifest } from './permissions.ts';
 
@@ -52,6 +59,8 @@ export type NativeStylesheet = { readonly file: string; readonly cssText: string
 
 /** Reads a stylesheet a module imports for its effect (`./app.css`); the caller owns file access. */
 export type ReadStylesheet = (specifier: string, importer: string) => NativeStylesheet | undefined;
+/** A stylesheet the app serves at `href` (`/static/news.css`, from its public folder), as a `<link>` loads it. */
+export type ReadServedStylesheet = (href: string) => NativeStylesheet | undefined;
 
 const stylesheetsOf = (
 	requests: ReadonlyArray<string>,
@@ -128,6 +137,7 @@ export async function compileNativeComponent(input: {
 	/** In an app build: every page's route, so links and `navigate()` are checked and resolved against them. */
 	readonly manifest?: RouteManifest;
 	readonly readStylesheet?: ReadStylesheet;
+	readonly readServedStylesheet?: ReadServedStylesheet;
 	/** The app config's `device` section (usage text per feature). */
 	readonly device?: DeviceAppConfig;
 	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
@@ -241,9 +251,16 @@ export async function compileNativeComponent(input: {
 		}
 		if (Object.keys(linked).length > 0) compiled = await compileTsrxModule({ ...rootInput, importedModuleInterfaces: linked });
 	}
+	const linkedSheets: NativeStylesheet[] = [];
+	const linkStylesheet = (href: string): boolean => {
+		const sheet = input.readServedStylesheet?.(href);
+		if (sheet) linkedSheets.push(sheet);
+		return sheet !== undefined;
+	};
 	let native: NativeViewArtifact;
 	for (;;) {
 		native = createNativeViewPayload(compiled.semanticGraph, {
+			linkStylesheet,
 			...(route
 				? {
 						route: {
@@ -285,7 +302,7 @@ export async function compileNativeComponent(input: {
 		native.features,
 		input.device,
 	);
-	const sheets = stylesheets.filter(
+	const sheets = [...stylesheets, ...linkedSheets].filter(
 		(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
 	);
 	const authored = [...importedStyles, ...compiled.publicRenderPlan.styleScopes];
@@ -302,7 +319,13 @@ export async function compileNativeComponent(input: {
 	const styles = [...importedStyles, ...built, ...compiled.publicRenderPlan.styleScopes].filter(
 		(style, index, all) => all.findIndex((other) => other.scopeId === style.scopeId) === index,
 	);
-	const unstyled = native.payload ? unstyledOnly(native.payload, native.elementSources, styled) : [];
+	const unstyled = native.payload
+		? unstyledOnly(
+				native.payload,
+				native.elementSources,
+				styled ? [...sheets, ...styles].map((style) => style.cssText) : [],
+			)
+		: [];
 	return {
 		payload: errors.length > 0 || usage.length > 0 || unstyled.length > 0 ? null : native.payload,
 		styles,
@@ -318,9 +341,10 @@ export async function compileNativeComponent(input: {
 function unstyledOnly(
 	payload: NativeViewPayload,
 	sources: NativeViewArtifact['elementSources'],
-	styled: boolean,
+	css: ReadonlyArray<string>,
 ): CompilerDiagnostic[] {
-	if (!styled) return [];
+	if (!css.some((text) => text.length > 0)) return [];
+	const tested = new Set(css.flatMap((text) => [...selectorAttributes(text)]));
 	return payload.nodes.flatMap((node) => {
 		if (node.kind !== 'element') return [];
 		const span = sources.get(node.id)?.span;
@@ -334,7 +358,7 @@ function unstyledOnly(
 		if (!node.row) return [];
 		return (node.bindings ?? []).flatMap((binding) =>
 			'attribute' in binding &&
-			(binding.attribute === 'class' || isNativeStyleStateAttribute(binding.attribute)) &&
+			nativeStyleRowAttribute(binding.attribute, tested) &&
 			readsRow(payload, binding.value) &&
 			!rowAttributeOptions(binding.attribute, binding.value, booleanCellsOf(payload))
 				? [
@@ -382,6 +406,7 @@ export async function compileNativeApp(input: {
 	readonly document?: { readonly filename: string; readonly source: string };
 	readonly readModule?: Parameters<typeof compileNativeComponent>[0]['readModule'];
 	readonly readStylesheet?: ReadStylesheet;
+	readonly readServedStylesheet?: ReadServedStylesheet;
 	/** The app config's `device` section (usage text per feature), for every page. */
 	readonly device?: DeviceAppConfig;
 	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
@@ -431,6 +456,7 @@ export async function compileNativeApp(input: {
 			manifest,
 			...(input.readModule ? { readModule: input.readModule } : {}),
 			...(input.readStylesheet ? { readStylesheet: input.readStylesheet } : {}),
+			...(input.readServedStylesheet ? { readServedStylesheet: input.readServedStylesheet } : {}),
 			...(input.device ? { device: input.device } : {}),
 			...(input.target ? { target: input.target } : {}),
 			icons,
@@ -444,7 +470,11 @@ export async function compileNativeApp(input: {
 			(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
 		);
 		const styled = sheets.length > 0 || build.styles.some((style) => style.cssText.length > 0);
-		const unstyled = unstyledOnly(build.payload, build.elementSources, styled);
+		const unstyled = unstyledOnly(
+			build.payload,
+			build.elementSources,
+			[...sheets, ...build.styles].map((style) => style.cssText),
+		);
 		if (unstyled.length > 0) {
 			diagnostics.push(...unstyled.map((diagnostic) => ({ ...diagnostic, page: page.page })));
 			continue;
