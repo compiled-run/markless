@@ -893,6 +893,34 @@ export function Page() @{
 		]);
 	});
 
+	it("takes a prop the root was not given as its default, so null there is null and not undefined", async () => {
+		const source = (param: string) => `import { shared, state } from '@markless/core';
+export const barState = shared(() => {
+	const bar = state({ value: null as number | null });
+	return { ...bar };
+}, { scope: 'subtree' });
+function BarRoot({ ${param}, children }: { value?: number | null; children?: unknown }) @{
+	const bar = barState();
+	bar.value = value;
+	<div>{children}</div>
+}
+function BarText() @{
+	const bar = barState();
+	<p>{bar.value === null ? 'indeterminate' : 'set'}</p>
+}
+export function Page() @{
+	<BarRoot><BarText /></BarRoot>
+}`;
+		const given = await nativeView(source('value = null'), dataOnly);
+		expect(given.diagnostics).toEqual([]);
+		expect(given.payload?.cells.find((cell) => cell.name === 'bar.value')).toMatchObject({ initial: null });
+		expect(given.payload?.cells.find((cell) => cell.name === 'bar.value')?.unset).toBeUndefined();
+		const bare = await nativeView(source('value'), dataOnly);
+		expect(bare.diagnostics.map((d) => d.message)).toContain(
+			'a text expression compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null',
+		);
+	});
+
 	it("reads an input event's target as the field typed into, whose value is the typed text, only in that handler", async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function textOf(from: EventTarget | null): string {

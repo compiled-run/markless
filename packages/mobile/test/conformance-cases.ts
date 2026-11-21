@@ -482,6 +482,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A root given no value holds its default (null, not undefined), which its part then writes.
+		name: 'absent-default',
+		fixture: 'proofs/u84-absent-default/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:1/h3' },
+			{ event: 'activate', host: 'component-edge:1/h3' },
+		],
+	},
+	{
 		name: 'by-id',
 		fixture: 'test/fixtures/ById.tsrx',
 		actions: [

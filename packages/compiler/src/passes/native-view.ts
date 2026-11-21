@@ -1953,11 +1953,16 @@ export function createNativeViewPayload(
 			);
 			return;
 		}
-		// A prop the root was not given is `undefined` there too; any other value replaces the first one.
+		// A prop the root was not given is `undefined` there too, unless its default says otherwise; any other value replaces the first one.
+		const fallback =
+			statement.value.kind === 'read'
+				? scope.module.componentFacts.get(scope.component)?.native?.propDefaults[statement.value.name]
+				: undefined;
 		const absent =
 			statement.value.kind === 'read' &&
 			isPropName(statement.value.name, scope) &&
-			!propOf(statement.value.name, scope);
+			!propOf(statement.value.name, scope) &&
+			(!fallback || (fallback.kind === 'literal' && fallback.undefined === true));
 		if (absent) undefinedFirst.add(cell);
 		else undefinedFirst.delete(cell);
 		setInitial(cell, folded.value);

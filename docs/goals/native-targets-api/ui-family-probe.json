@@ -260,7 +260,7 @@
 		"diagnostics": [
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `activeLocale`'s `if` test uses `typeof` other than compared with 'string', 'number' or 'boolean'; a native value does not tell undefined from null",
 			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/numberbox/numberbox-math.ts uses `document`: the web page, which a phone does not have",
-			"MARKLESS_NATIVE_UNSUPPORTED: the function `formatNumber`'s `if` test compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null",
+			"MARKLESS_NATIVE_UNSUPPORTED: the function `currencyScale` uses a TryStatement, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null"
 		]
 	},
@@ -290,9 +290,6 @@
 	"progress": {
 		"payload": false,
 		"diagnostics": [
-			"MARKLESS_NATIVE_UNSUPPORTED: progressState.reported compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null",
-			"MARKLESS_NATIVE_UNSUPPORTED: progressState.valueText compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null",
-			"MARKLESS_NATIVE_UNSUPPORTED: progressState.status compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null",
 			"MARKLESS_NATIVE_UNSUPPORTED: a style binding"
 		]
 	},
