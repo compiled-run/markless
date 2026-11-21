@@ -15,18 +15,6 @@ private let conformanceDirectory: URL = {
 	return url.appendingPathComponent("conformance")
 }()
 
-/// A vector's JSON with the engine text put back where the writer left markers (conformance/engine/*.js).
-private func vectorData(_ file: URL) throws -> Data {
-	var text = try String(contentsOf: file, encoding: .utf8)
-	for (marker, name) in [("/*markless-engine:services*/", "services.js"), ("/*markless-engine:entries*/", "entries.js")] where text.contains(marker) {
-		var engine = try String(contentsOf: conformanceDirectory.appendingPathComponent("engine").appendingPathComponent(name), encoding: .utf8)
-		if engine.hasSuffix("\n") { engine.removeLast() }
-		let quoted = String(decoding: try JSONEncoder().encode(engine), as: UTF8.self)
-		text = text.replacingOccurrences(of: marker, with: String(quoted.dropFirst().dropLast()))
-	}
-	return Data(text.utf8)
-}
-
 private func allVectorFiles() throws -> [URL] {
 	try FileManager.default.contentsOfDirectory(at: conformanceDirectory, includingPropertiesForKeys: nil)
 		.filter { $0.pathExtension == "json" }
@@ -34,7 +22,7 @@ private func allVectorFiles() throws -> [URL] {
 }
 
 private func versionOf(_ file: URL) throws -> String? {
-	guard case let .object(fields) = try JSONValue.parse(vectorData(file)) else { return nil }
+	guard case let .object(fields) = try JSONValue.parse(ConformanceEngine.vectorData(file)) else { return nil }
 	if case let .string(version)? = fields.first(where: { $0.0 == "version" })?.1 { return version }
 	return nil
 }
@@ -49,7 +37,7 @@ private func appVectorFiles() throws -> [URL] { try allVectorFiles().filter { tr
 /// The stack after each action: its paths, the top screen's title and texts, as `nativeAppConformance` writes them.
 @Test(arguments: try appVectorFiles())
 func reproducesAppConformanceVector(file: URL) throws {
-	guard case let .object(fields) = try JSONValue.parse(vectorData(file)) else { Issue.record("vector is not an object"); return }
+	guard case let .object(fields) = try JSONValue.parse(ConformanceEngine.vectorData(file)) else { Issue.record("vector is not an object"); return }
 	let field = { (key: String) -> JSONValue? in fields.first { $0.0 == key }?.1 }
 	#expect(fields.map(\.0) == ["version", "app", "open"] + (field("started") == nil ? [] : ["started"]) + ["initial", "steps"])
 	guard case let .string(open)? = field("open") else { Issue.record("open is not a path"); return }
@@ -88,7 +76,7 @@ func reproducesAppConformanceVector(file: URL) throws {
 
 @Test(arguments: try vectorFiles())
 func reproducesConformanceVector(file: URL) throws {
-	let vector = try JSONValue.parse(vectorData(file))
+	let vector = try JSONValue.parse(ConformanceEngine.vectorData(file))
 	guard case let .object(fields) = vector else { Issue.record("vector is not an object"); return }
 	let field = { (key: String) -> JSONValue? in fields.first { $0.0 == key }?.1 }
 	let known = ["version", "payload", "params", "preferredLanguages", "now", "initial", "initialChecks", "initialSelections", "initialAttributes", "initialProperties", "initialArms", "initialRows", "initialSheets", "tasks", "start", "steps", "leave"]
@@ -217,7 +205,7 @@ func reproducesConformanceVector(file: URL) throws {
 /// A page whose handlers are all data never starts the engine; a script page starts the app's one engine on first use.
 @Test func engineStartsOnFirstScriptUseOnly() throws {
 	let file = conformanceDirectory.appendingPathComponent("script-app.json")
-	guard case let .object(fields) = try JSONValue.parse(vectorData(file)) else { Issue.record("vector is not an object"); return }
+	guard case let .object(fields) = try JSONValue.parse(ConformanceEngine.vectorData(file)) else { Issue.record("vector is not an object"); return }
 	let host = conformanceScriptHost()
 	let stack = try NativeAppStack(app: try NativeAppPayload.decode(try #require(fields.first { $0.0 == "app" }?.1)), path: "/", scriptHost: host)
 	_ = try stack.dispatch(NativeAction(event: .activate, host: "h3"))

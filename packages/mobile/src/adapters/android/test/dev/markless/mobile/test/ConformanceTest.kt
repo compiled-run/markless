@@ -26,6 +26,7 @@ import dev.markless.mobile.core.ScrollRange
 import dev.markless.mobile.core.ScrollRect
 import dev.markless.mobile.core.scrollIntoView
 import dev.markless.mobile.core.jsonString
+import dev.markless.mobile.core.ConformanceEngine
 import dev.markless.mobile.core.jsonValue
 import dev.markless.mobile.core.num
 import dev.markless.mobile.core.obj
@@ -112,16 +113,9 @@ private fun touchOf(action: Map<String, Json>): TouchPoint? {
 	return TouchPoint(n("pointerId", 1.0), n("x", 0.0), n("y", 0.0), n("time", 0.0))
 }
 
-/** A vector's JSON with the engine text put back where the writer left markers (the files in conformance/engine, beside the vector). */
-private fun vectorBytes(file: File): ByteArray {
-	var text = file.readText()
-	for ((marker, name) in listOf("/*markless-engine:services*/" to "services.js", "/*markless-engine:entries*/" to "entries.js")) {
-		if (marker !in text) continue
-		val engine = File(File(file.parentFile, "engine"), name).readText().removeSuffix("\n")
-		text = text.replace(marker, jsonString(engine).removeSurrounding("\""))
-	}
-	return text.toByteArray()
-}
+/** A vector's JSON with the engine text put back from conformance/engine, beside the vector. */
+private fun vectorBytes(file: File): ByteArray =
+	ConformanceEngine.put(file.readText()) { name -> File(File(file.parentFile, "engine"), name).readText() }.toByteArray()
 
 /** One `markless.native-conformance/0` vector: the mounted texts must read `initial`, then each action's journal must match, byte for byte. */
 private fun runVector(file: File) {

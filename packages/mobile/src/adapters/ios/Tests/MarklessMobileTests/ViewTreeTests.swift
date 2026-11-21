@@ -14,7 +14,7 @@ private let mobilePackage: URL = {
 private func counterPayload() throws -> Data { try vectorPayload("counter") }
 
 private func vectorPayload(_ name: String) throws -> Data {
-	guard case let .object(fields) = try JSONValue.parse(Data(contentsOf: mobilePackage.appendingPathComponent("conformance/\(name).json"))),
+	guard case let .object(fields) = try JSONValue.parse(ConformanceEngine.vectorData(mobilePackage.appendingPathComponent("conformance/\(name).json"))),
 		let payload = fields.first(where: { $0.0 == "payload" })?.1
 	else { throw HostError("no payload in the counter vector") }
 	return Data(payload.jsonText.utf8)
@@ -296,7 +296,7 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) {
 	var url = URL(fileURLWithPath: #filePath)
 	for _ in 0..<6 { url.deleteLastPathComponent() }
-	guard case let .object(fields) = try JSONValue.parse(Data(contentsOf: url.appendingPathComponent("conformance/attributes.json"))),
+	guard case let .object(fields) = try JSONValue.parse(ConformanceEngine.vectorData(url.appendingPathComponent("conformance/attributes.json"))),
 		let json = fields.first(where: { $0.0 == "payload" })?.1
 	else { throw PayloadError(path: "vector", reason: "no payload") }
 	let payload = try NativeViewPayload.decode(json)
