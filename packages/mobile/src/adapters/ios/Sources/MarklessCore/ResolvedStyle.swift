@@ -154,8 +154,13 @@ extension StyleExport {
 			guard case .branch = node.kind, node.row == nil else { return nil }
 			return node.id
 		})
+		// A row's class or ui-* values (`<node>#<attribute>`) and each @if or @try inside a row style only the rows, which take their own.
+		let inRows = Set(payload.nodes.compactMap { $0.row == nil ? nil : $0.id })
+		let rowStates = Set(states.map(\.key).filter { key in
+			inRows.contains(key) || key.lastIndex(of: "#").map { inRows.contains(String(key[..<$0])) } == true
+		})
 		let stateCells = try states.map { state in
-			if state.key == StyleBands.state { return state.key }
+			if state.key == StyleBands.state || rowStates.contains(state.key) { return state.key }
 			let named = (styledCells + branches.sorted()).filter(state.names)
 			guard named.count == 1 else { throw styleError("style state \(state.key) names \(named.count) styled cells or branches of the payload") }
 			return named[0]
@@ -164,6 +169,8 @@ extension StyleExport {
 			throw styleError("the payload's styled cell \(unstyled) has no state in the style export")
 		}
 		let current = try stateCells.enumerated().map { index, cell in
+			// The page keeps the template's value for a state of each row.
+			if rowStates.contains(cell) { return assignments[initial].values[cell] ?? states[index].domain[0] }
 			// A branch no arm around it shows keeps a value no box reads: its first.
 			if branches.contains(cell) { return try arm(cell) ?? states[index].domain[0] }
 			guard cell == StyleBands.state else { return try value(cell) }

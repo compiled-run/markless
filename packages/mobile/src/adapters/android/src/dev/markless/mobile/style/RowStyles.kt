@@ -22,6 +22,12 @@ fun rowAttributeOptions(name: String, expr: Expr): List<String?>? = when (expr) 
 	else -> null
 }
 
+/** The export's states of each row: a row's class or ui-* values (`<node>#<attribute>`) and each @if or @try inside a row. */
+fun StyleExport.rowStates(payload: Payload): Set<String> {
+	val inRows = payload.nodes.filter { it.row != null }.map { it.id }.toSet()
+	return states.map { it.key }.filter { key -> key in inRows || key.substringBeforeLast('#', "") in inRows }.toSet()
+}
+
 /**
  * The rows each list of the page shows now, for laying the page out at assignment k: each row's key, the assignment its own
  * states (the value its `class` or `ui-*` binding gives) reach from k, and its texts by the template's text node id.
