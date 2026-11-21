@@ -1335,8 +1335,8 @@ final class ViewTree {
 			case (.input, _) where element == "select":
 				// A select's input handler runs when a choice lands, from the runtime's choose.
 				continue
-			case (.idle, _), (.visible, _), (.dismiss, _), (.close, _), (_, _) where event.event.isPointer:
-				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host, close by the runtime.
+			case (.idle, _), (.visible, _), (.dismiss, _), (.close, _), (.keydown, _), (_, _) where event.event.isPointer:
+				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host, close and a keydown off a text field by the runtime.
 				continue
 			default:
 				throw HostError("\(event.event.rawValue) on <\(element)> \(id) has no iOS control event yet")

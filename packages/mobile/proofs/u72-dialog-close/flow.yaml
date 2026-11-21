@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u72-dialog-close
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Rename
 - assertVisible: Rename file
 - assertVisible: Closed 0 times

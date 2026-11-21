@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u75-svg-aspect
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Banner fit
 - assertVisible: Change fit
 - assertVisible: Stretched

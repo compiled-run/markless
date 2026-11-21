@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u87-script-keys
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: No key yet
 - assertVisible: Send Home
 - assertVisible: Send End

@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u85-projected-arms
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Narrow box
 - assertVisible: Volume
 - assertVisible: Check

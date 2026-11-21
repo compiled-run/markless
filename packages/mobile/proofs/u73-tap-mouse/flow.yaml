@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u73-tap-mouse
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Fruit stand
 - assertVisible: Apples
 - assertVisible: Pears

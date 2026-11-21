@@ -605,12 +605,13 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
-		// A JavaScript handler's performance.now(): a number of milliseconds that never goes back.
-		name: 'performance-now',
-		fixture: 'proofs/u88-performance-now/App.tsrx',
+		// A JavaScript pointer handler's pressure (0.5 while the finger is down, 0 once it lifts) and coalesced moves.
+		name: 'pointer-pressure',
+		fixture: 'proofs/u89-pointer-pressure/App.tsrx',
 		actions: [
-			{ event: 'activate', host: 'h1' },
-			{ event: 'activate', host: 'h1' },
+			{ event: 'pointerdown', host: 'h1', x: 10, y: 10 },
+			{ event: 'pointermove', host: 'h1', x: 60, y: 10 },
+			{ event: 'pointerup', host: 'h1', x: 60, y: 10 },
 		],
 	},
 	{

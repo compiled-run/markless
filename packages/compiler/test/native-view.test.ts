@@ -4345,13 +4345,13 @@ export function Drag() @{
 
 	it('refuses by name a field a touch does not report yet', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
-export function Pressure() @{
+export function Tilt() @{
 	let p = state(0);
-	<div onPointermove={(event) => (p = event.pressure)}>{p}</div>
+	<div onPointermove={(event) => (p = event.tiltX)}>{p}</div>
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
-			'the pointermove handler reads `event.pressure`, which a touch on a phone does not have',
+			'the pointermove handler reads `event.tiltX`, which a touch on a phone does not have',
 		]);
 	});
 });

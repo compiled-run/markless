@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: r135-idle
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Idle 1
 - assertVisible: More
 - assertNotVisible: Idle 0

@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u74-svg-text
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Sales chart
 - assertVisible: Next quarter
 - assertVisible: Sales up 12%

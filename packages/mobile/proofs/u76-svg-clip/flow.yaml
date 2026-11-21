@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u76-svg-clip
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Moon phase
 - assertVisible: Next phase
 - assertVisible: Half moon

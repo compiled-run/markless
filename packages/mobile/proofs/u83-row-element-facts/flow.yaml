@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u83-row-element-facts
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Ada
 - assertVisible: Bo
 - assertNotVisible: pressed Ada

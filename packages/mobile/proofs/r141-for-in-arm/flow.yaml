@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: r141-for-in-arm
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Show list
 - assertVisible: List hidden
 - assertVisible: 1 in the list

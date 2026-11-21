@@ -1460,7 +1460,6 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		console: 'console',
 		fetch: 'fetch',
 		crypto: 'crypto',
-		performance: 'engine',
 		Event: 'engine',
 		CustomEvent: 'engine',
 		MouseEvent: 'engine',
@@ -1505,6 +1504,13 @@ export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [
 	'isPrimary',
 	'timeStamp',
 ];
+
+/**
+ * What a script pointer handler's event works out in the engine, as a phone browser's touch has it: `pressure` is 0.5
+ * while the finger is down and 0 otherwise (a screen that reports no pressure), and `getCoalescedEvents()` gives the
+ * move itself (nothing for any other type).
+ */
+export const NATIVE_SCRIPT_POINTER_ENGINE_FIELDS: ReadonlyArray<string> = ['pressure', 'getCoalescedEvents'];
 
 /**
  * What a tap's click adds to a script click handler's event, as a phone browser fills it: where the touch ended, no

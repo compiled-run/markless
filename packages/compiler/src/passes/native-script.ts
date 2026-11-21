@@ -76,11 +76,6 @@ if (!host) {
 		signal.listeners.slice().forEach(function (fn) { fn.call(signal, event); });
 	};
 	if (typeof g.queueMicrotask !== 'function') g.queueMicrotask = function (fn) { Promise.resolve().then(fn); };
-	if (typeof g.performance !== 'object' || g.performance === null || typeof g.performance.now !== 'function') {
-		var timeOrigin = Date.now();
-		var latest = 0;
-		g.performance = { timeOrigin: timeOrigin, now: function () { latest = Math.max(latest, Date.now() - timeOrigin); return latest; } };
-	}
 	// Events a script makes and dispatches on an element: the host raises them on that element once the script returns.
 	var EventBase = function (type, init) {
 		init = init || {};
@@ -105,7 +100,7 @@ if (!host) {
 	g.Event = EventBase;
 	g.CustomEvent = eventKind(EventBase, { detail: null });
 	g.MouseEvent = eventKind(EventBase, { detail: 0, button: 0, buttons: 0, clientX: 0, clientY: 0, relatedTarget: null });
-	g.PointerEvent = eventKind(g.MouseEvent, { pointerId: 0, pointerType: '', isPrimary: false });
+	g.PointerEvent = eventKind(g.MouseEvent, { pointerId: 0, pointerType: '', isPrimary: false, pressure: 0 });
 	g.KeyboardEvent = eventKind(EventBase, { key: '', code: '', repeat: false, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false });
 	// The DOM's interfaces, so an element proxy answers instanceof as the browser's element does; none can be constructed.
 	var domClasses = ${JSON.stringify(NATIVE_SCRIPT_DOM_CLASSES)};
@@ -588,6 +583,10 @@ var eventOf = function (given, frame) {
 		stopPropagation: function () {},
 	};
 	${JSON.stringify([...new Set([...NATIVE_SCRIPT_POINTER_FIELDS, ...NATIVE_SCRIPT_CLICK_FIELDS, ...NATIVE_SCRIPT_KEY_FIELDS])])}.forEach(function (field) { if (field in given) event[field] = given[field]; });
+	if (typeof given.pointerType === 'string') {
+		event.pressure = event.buttons > 0 ? 0.5 : 0;
+		event.getCoalescedEvents = function () { return event.type === 'pointermove' ? [event] : []; };
+	}
 	if (given.nodes)
 		${JSON.stringify(NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS)}.forEach(function (field) {
 			event[field] = given.nodes[field] == null ? null : elementOf(given.nodes[field]);

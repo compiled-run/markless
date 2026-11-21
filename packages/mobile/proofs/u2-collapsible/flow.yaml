@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u2-collapsible
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Collapsible
 - assertVisible: Shipping
 - assertVisible: Changes 0

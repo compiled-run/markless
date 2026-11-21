@@ -31,6 +31,7 @@ import {
 	NATIVE_SCRIPT_CLICK_FIELDS,
 	NATIVE_SCRIPT_EVENT_MEMBERS,
 	NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS,
+	NATIVE_SCRIPT_POINTER_ENGINE_FIELDS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	NATIVE_SCRIPT_SUBMITTED_FORM,
 	NATIVE_SCRIPT_GLOBAL_OBJECTS,
@@ -6526,6 +6527,7 @@ export function createNativeViewPayload(
 				continue;
 			}
 			if (touch && NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS.includes(read.path[0] ?? '')) continue;
+			if (touch && !mouse && read.path.length === 1 && NATIVE_SCRIPT_POINTER_ENGINE_FIELDS.includes(read.path[0]!)) continue;
 			const known = NATIVE_SCRIPT_EVENT_MEMBERS.some(
 				(members) =>
 					members.every(

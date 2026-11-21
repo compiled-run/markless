@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u31-field-text
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Trip
 - assertVisible: Nothing saved
 - tapOn: Save

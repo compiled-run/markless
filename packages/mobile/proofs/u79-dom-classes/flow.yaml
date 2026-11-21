@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u79-dom-classes
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Field
 - assertVisible: Button
 - assertVisible: Note

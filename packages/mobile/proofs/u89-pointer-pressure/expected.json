@@ -1,0 +1,14 @@
+{
+	"rung": 206,
+	"name": "a JavaScript pointer handler reads a touch's pressure (above 0 while down, 0 once lifted) and its coalesced moves",
+	"steps": [
+		{
+			"visible": ["Drag me", "No press", "No move", "Not lifted"]
+		},
+		{
+			"do": { "drag": { "on": "Drag me", "direction": "right" } },
+			"visible": ["Pressed with pressure", "Coalesced moves", "Lifted at 0"],
+			"absent": ["No press", "No move", "Not lifted", "No coalesced"]
+		}
+	]
+}

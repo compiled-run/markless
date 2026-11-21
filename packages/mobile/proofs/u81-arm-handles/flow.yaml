@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u81-arm-handles
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Toggle
 - assertVisible: Count
 - assertNotVisible: Extra

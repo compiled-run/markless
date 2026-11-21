@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u26-table
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Files
 - assertVisible: README\.md
 - assertVisible: LICENSE

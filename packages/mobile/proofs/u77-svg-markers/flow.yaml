@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u77-svg-markers
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Route map
 - assertVisible: Turn route
 - assertVisible: Both ways

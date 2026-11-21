@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: s1-page-styles
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Your plants
 - assertVisible: Three need water today\.
 - assertVisible: Open care guide
@@ -17,16 +17,16 @@ name: s1-page-styles
 - assertNotVisible: Your plants
 - assertVisible: Care
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertVisible: Your plants
 - assertNotVisible: Watering
 - assertVisible: Plants

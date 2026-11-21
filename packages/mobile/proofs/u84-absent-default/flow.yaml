@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u84-absent-default
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Upload waiting
 - assertVisible: Upload \+10
 - assertNotVisible: Upload at 10

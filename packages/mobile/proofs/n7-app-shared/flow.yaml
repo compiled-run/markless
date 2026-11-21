@@ -2,41 +2,41 @@ appId: ${APP_ID}
 name: n7-app-shared
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Player
-- assertVisible: 'Paused: Harbour Lights'
+- assertVisible: "Paused: Harbour Lights"
 - assertVisible: Play or pause
 - assertVisible: Now playing
-- assertNotVisible: 'Playing: Harbour Lights'
+- assertNotVisible: "Playing: Harbour Lights"
 - assertNotVisible: Track
 - assertVisible: Home
 - tapOn: Play or pause
-- assertVisible: 'Playing: Harbour Lights'
-- assertNotVisible: 'Paused: Harbour Lights'
-- assertVisible: 'Playing: Harbour Lights'
-- assertNotVisible: 'Paused: Harbour Lights'
+- assertVisible: "Playing: Harbour Lights"
+- assertNotVisible: "Paused: Harbour Lights"
+- assertVisible: "Playing: Harbour Lights"
+- assertNotVisible: "Paused: Harbour Lights"
 - tapOn: Now playing
 - assertVisible: Now playing
 - assertVisible: Track
-- assertVisible: 'Playing: Harbour Lights'
+- assertVisible: "Playing: Harbour Lights"
 - assertVisible: Toggle here
 - assertNotVisible: Player
-- assertNotVisible: 'Paused: Harbour Lights'
+- assertNotVisible: "Paused: Harbour Lights"
 - assertVisible: Now playing
 - tapOn: Toggle here
-- assertVisible: 'Paused: Harbour Lights'
-- assertNotVisible: 'Playing: Harbour Lights'
-- assertVisible: 'Paused: Harbour Lights'
+- assertVisible: "Paused: Harbour Lights"
+- assertNotVisible: "Playing: Harbour Lights"
+- assertVisible: "Paused: Harbour Lights"
 - assertVisible: Track
-- assertNotVisible: 'Playing: Harbour Lights'
+- assertNotVisible: "Playing: Harbour Lights"
 - swipe:
-      start: 1%, 50%
-      end: 85%, 50%
-      duration: 400
+    start: 1%, 50%
+    end: 85%, 50%
+    duration: 400
 - assertNotVisible: Track
 - assertVisible: Home
 - assertVisible: Player
-- assertVisible: 'Paused: Harbour Lights'
+- assertVisible: "Paused: Harbour Lights"
 - assertNotVisible: Track
-- assertNotVisible: 'Playing: Harbour Lights'
+- assertNotVisible: "Playing: Harbour Lights"
 - assertVisible: Home

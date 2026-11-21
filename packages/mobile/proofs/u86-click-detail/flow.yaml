@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u86-click-detail
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Press here
 - assertVisible: Press by script
 - assertVisible: No click yet

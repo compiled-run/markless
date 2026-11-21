@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u80-object-spread
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: a Ada x
 - assertVisible: b Bo y
 - assertVisible: first Ada x
