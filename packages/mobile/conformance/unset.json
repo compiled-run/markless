@@ -7,12 +7,14 @@
 			{
 				"id": "state:note.text",
 				"name": "note.text",
-				"initial": null
+				"initial": null,
+				"unset": true
 			},
 			{
 				"id": "component-edge:0/shared:src/unset.tsrx#pickState/state:pick.chosen",
 				"name": "pick.chosen",
-				"initial": null
+				"initial": null,
+				"unset": true
 			},
 			{
 				"id": "component-edge:0/shared:src/unset.tsrx#pickState/state:pick.count",

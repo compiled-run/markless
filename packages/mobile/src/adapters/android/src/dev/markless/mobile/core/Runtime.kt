@@ -206,6 +206,10 @@ class Runtime(
 	private val scriptHost: ScriptHost? = null,
 ) {
 	private val opened = now()
+	private val computed = HashMap<String, JsValue>()
+	private var computedCells: String? = null
+	/** Cells still `undefined` on the web: a script reads them so until one is written. */
+	private val unset = HashSet<String>().apply { for (c in payload.cells) if (c.unset && c.storageKey?.let(store::get) == null) add(c.id) }
 	private val values = LinkedHashMap<String, JsValue>().apply { for (c in payload.cells) put(c.id, if (c.clock) JsValue.Num(opened) else c.storageKey?.let(store::get) ?: c.initial) }
 	/** `idle` and `visible` handlers that ran, by `<event>\u0000<instance>`; an instance that leaves the screen is forgotten. */
 	private val fired = HashSet<String>()
@@ -270,6 +274,27 @@ class Runtime(
 	}
 
 	/** A row's state with a `first` takes it once, from the row's item, when the row is built. */
+	/** Each following cell's last value of what it follows: the write runs again only when that value changes, as on the web. */
+	private val followed = HashMap<String, JsValue>()
+
+	private fun follow() {
+		repeat(payload.cells.size + 1) {
+			var moved = false
+			for (c in payload.cells) {
+				val follows = c.follows ?: continue
+				val now = evaluate(follows, Scope.EMPTY)
+				if (followed[c.id] == now) continue
+				followed[c.id] = now
+				if ((values[c.id] ?: JsValue.Null) == now) continue
+				values[c.id] = now
+				unset.remove(c.id)
+				moved = true
+			}
+			if (!moved) return
+		}
+		throw MarklessRuntimeError("following cells kept changing each other")
+	}
+
 	private fun seedRows() {
 		for (cell in payload.cells) {
 			val row = cell.row ?: continue
@@ -355,11 +380,20 @@ class Runtime(
 			}
 			is Expr.Call -> Js.call(e.name, e.arguments.map(::eval), now)
 			is Expr.Script -> {
-				val entry = "{\"kind\":\"compute\",\"fn\":${jsonString(e.fn)},\"frame\":${frameOf(e.bindings, scope)},\"elements\":${elementFacts(e.bindings, scope)}${entryCells()}}"
-				val started = System.nanoTime()
-				val value = JsValue.fromJson(Json.parse(scriptCall("enter", entry)))
-				onScriptEntry?.invoke(System.nanoTime() - started)
-				value
+				val cells = entryCells()
+				// As on the web, a computed is not run again while nothing it reads has changed.
+				if (cells != computedCells) {
+					computed.clear()
+					computedCells = cells
+				}
+				val entry = "{\"kind\":\"compute\",\"fn\":${jsonString(e.fn)},\"frame\":${frameOf(e.bindings, scope)},\"elements\":${elementFacts(e.bindings, scope)}$cells}"
+				computed[entry] ?: run {
+					val started = System.nanoTime()
+					val value = JsValue.fromJson(Json.parse(scriptCall("enter", entry)))
+					onScriptEntry?.invoke(System.nanoTime() - started)
+					computed[entry] = value
+					value
+				}
 			}
 		}
 	}
@@ -412,6 +446,7 @@ class Runtime(
 		data class Elements(val value: JsValue) : Bound
 		data class Object(val members: Map<String, Bound>) : Bound
 		data class Shared(val members: Map<String, Bound>) : Bound
+		data class Method(val fn: String, val members: Map<String, Bound>) : Bound
 	}
 
 	private fun bind(bindings: Map<String, ScriptBinding>, scope: Scope): Map<String, Bound> = bindings.mapValuesTo(LinkedHashMap()) { (_, b) ->
@@ -422,6 +457,7 @@ class Runtime(
 			is ScriptBinding.Elements -> Bound.Elements(evaluate(b.value, scope))
 			is ScriptBinding.Object -> Bound.Object(bind(b.members, scope))
 			is ScriptBinding.Shared -> Bound.Shared(bind(b.members, scope))
+			is ScriptBinding.Method -> Bound.Method(b.fn, bind(b.members, scope))
 		}
 	}
 
@@ -433,6 +469,7 @@ class Runtime(
 			is Bound.Elements -> "{\"elements\":${jsonValue(b.value)}}"
 			is Bound.Object -> "{\"object\":${frameJson(b.members)}}"
 			is Bound.Shared -> "{\"shared\":${frameJson(b.members)}}"
+			is Bound.Method -> "{\"method\":${jsonString(b.fn)},\"frame\":${frameJson(b.members)}}"
 		}
 	}
 
@@ -450,6 +487,7 @@ class Runtime(
 			is Bound.Elements -> jsonValue(b.value)
 			is Bound.Object -> readFrame(b.members)
 			is Bound.Shared -> readFrame(b.members)
+			is Bound.Method -> readFrame(b.members)
 		}
 	}
 
@@ -463,7 +501,7 @@ class Runtime(
 			val key = if ('@' in id) id.substring(id.indexOf('@')) else ""
 			val node = elementOf(id.substringBefore('@'))
 			val names = LinkedHashSet<String>(node.attributes.keys.sorted()).apply { addAll(node.bindings.filter { !it.property }.map { it.name }) }
-			val attributes = names.mapNotNull { name -> attributeNow(node.id, name)?.let { "${jsonString(name)}:${jsonString(it)}" } }
+			val attributes = names.mapNotNull { name -> attributeNow(id, name)?.let { "${jsonString(name)}:${jsonString(it)}" } }
 			val ancestors = ArrayList<String>()
 			var up = node.parent
 			while (up != null) {
@@ -480,6 +518,7 @@ class Runtime(
 				}
 				is ScriptBinding.Object -> visit(b.members)
 				is ScriptBinding.Shared -> visit(b.members)
+				is ScriptBinding.Method -> visit(b.members)
 				else -> {}
 			}
 		}
@@ -492,6 +531,7 @@ class Runtime(
 	private fun entryCells(): String = buildString {
 		append(",\"cells\":")
 		append(values.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonValue(it.value)}" })
+		if (unset.isNotEmpty()) append(",\"unset\":${unset.sorted().joinToString(",", "[", "]") { jsonString(it) }}")
 		if (payload.script?.services?.contains("crypto") == true) scriptHost?.seed()?.let { append(",\"seed\":${jsonString(it)}") }
 	}
 
@@ -511,6 +551,7 @@ class Runtime(
 			if (payload.cells.none { it.id == cell }) throw MarklessRuntimeError("the script wrote unknown cell $cell")
 			val v = JsValue.fromJson(pair[1])
 			values[slot] = v
+			unset.remove(slot)
 			storageKeys[cell]?.let { store.set(it, v) }
 		}
 		for (l in list("logs")) {
@@ -687,9 +728,10 @@ class Runtime(
 
 	/** An attribute as the web has it now: a binding's value as written, else the attribute the element was built with. */
 	fun attributeNow(id: String, name: String): String? {
-		val e = elementOf(id)
-		val binding = e.bindings.firstOrNull { !it.property && it.name == name }
-		return if (binding != null) attribute(binding) else e.attributes[name]
+		val e = elementOf(id.substringBefore('@'))
+		val binding = e.bindings.firstOrNull { !it.property && it.name == name } ?: return e.attributes[name]
+		// A row's copy (`<node>@<key>`) reads its own row.
+		return attribute(binding, if (id == e.id) Scope.EMPTY else instances(e).firstOrNull { it.id == id }?.scope ?: Scope.EMPTY)
 	}
 
 	private fun propertyBinding(id: String, name: String) = elementOf(id).bindings.firstOrNull { it.property && it.name == name }
@@ -918,22 +960,20 @@ class Runtime(
 	// An element marked `overlay` joins the stack while its `hidden` binding shows it; one with no such binding never does.
 	private val overlayNodes = payload.nodes.filterIsInstance<Node.Element>().filter { e -> e.row == null && OVERLAY_ATTRIBUTE in e.attributes && e.bindings.any { !it.property && it.name == "hidden" } }
 
-	private fun shownOverlays(): List<String> {
-		val now = attributes().associate { (n, a, v) -> (n to a) to v }
-		return overlayNodes.filter { instances(it).isNotEmpty() && (it.id to "hidden") in now && now[it.id to "hidden"] == null }.map { it.id }
-	}
+	private fun shownOverlays(): List<String> =
+		overlayNodes.filter { instances(it).isNotEmpty() && attributeNow(it.id, "hidden") == null }.map { it.id }
 
 	/** Whether [overlay] or an element inside it has `aria-modal="true"`, its bound value first, else its static one. */
-	fun isModal(overlay: String): Boolean {
-		val now = attributes().associate { (n, a, v) -> (n to a) to v }
-		return payload.nodes.any { n ->
-			if (n !is Node.Element || !contains(overlay, n.id)) return@any false
-			val key = n.id to OVERLAY_MODAL_ATTRIBUTE
-			(if (key in now) now[key] else n.attributes[OVERLAY_MODAL_ATTRIBUTE]) == OVERLAY_MODAL_VALUE
-		}
+	fun isModal(overlay: String): Boolean = payload.nodes.any { n ->
+		if (n !is Node.Element || !contains(overlay, n.id)) return@any false
+		// A row's copies are keyed by row, so a row element is read as it was built.
+		(if (n.row != null) n.attributes[OVERLAY_MODAL_ATTRIBUTE] else attributeNow(n.id, OVERLAY_MODAL_ATTRIBUTE)) == OVERLAY_MODAL_VALUE
 	}
 
 	init {
+		// Rows take their first values, and following cells theirs, before anything reads them, the overlays shown at mount included.
+		seedRows()
+		follow()
 		stack = shownOverlays()
 		for (o in stack) origins[o] = NATIVE_DOCUMENT_BODY
 	}
@@ -956,7 +996,7 @@ class Runtime(
 	 * ([EventName.touch], at [point]) raises the browser's pointer events, after a `dismiss` of the topmost overlay when a
 	 * `pointerdown` lands outside it.
 	 */
-	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null, point: TouchPoint? = null, detail: Int? = null): List<JournalEntry> {
+	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null, detail: Int? = null, point: TouchPoint? = null): List<JournalEntry> {
 		if (event == EventName.Choose) {
 			val option = byId[host.substringBefore('@')] as? Node.Element
 			val select = option?.parent
@@ -1173,6 +1213,7 @@ class Runtime(
 		val cell = then.catch ?: return emptyList()
 		return change(null, null) {
 			values[cell] = JsValue.Obj(linkedMapOf("name" to JsValue.Str(name), "message" to JsValue.Str(message)))
+			unset.remove(cell)
 			emptyList()
 		}
 	}
@@ -1238,6 +1279,16 @@ class Runtime(
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
 				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope, listOfNotNull(pressed))},\"event\":$event$catch"))
 			}
+			Op.PreventDefault -> calls.add(JournalEntry.PreventDefault)
+			is Op.FieldText -> {
+				val node = evaluate(op.node, scope)
+				if (node == JsValue.Null) continue
+				if (node !is JsValue.Str || !isElement(node.value)) throw MarklessRuntimeError("a field text written to a value that is not an element")
+				val value = evaluate(op.value, scope)
+				val text = if (value == JsValue.Null) "" else Js.toStr(value)
+				edited[node.value] = text
+				calls.add(JournalEntry.Property(node.value, "value", text))
+			}
 			is Op.Reset -> {
 				op.catch?.let { values[it] = JsValue.Null }
 				for (cell in op.cells) {
@@ -1247,10 +1298,10 @@ class Runtime(
 					if (state == JsValue.Str("error") || (state == JsValue.Str("value") && error != null && error != JsValue.Null)) retry.add(slot(cell, scope))
 				}
 			}
-			Op.PreventDefault -> calls.add(JournalEntry.PreventDefault)
 			is Op.Assign -> {
 				val v = evaluate(op.value, scope)
 				values[slot(op.cell, scope)] = v
+				unset.remove(op.cell)
 				storageKeys[op.cell]?.let { store.set(it, v) }
 			}
 		}
@@ -1260,7 +1311,7 @@ class Runtime(
 	/** A live device value changed: writes its device cell and returns the journal. */
 	fun device(cell: String, value: JsValue): List<JournalEntry> {
 		if (payload.cells.none { it.id == cell && it.device != null }) throw MarklessRuntimeError("\"$cell\" is not a device cell")
-		return change(null, null) { values[cell] = value; emptyList() }
+		return change(null, null) { values[cell] = value; unset.remove(cell); emptyList() }
 	}
 
 	/** A device call answered: the task cell takes `{ state: 'value', value }`. */
@@ -1273,7 +1324,7 @@ class Runtime(
 
 	private fun settleWith(cell: String, value: JsValue): List<JournalEntry> {
 		if (payload.cells.none { it.id == cell && it.task != null }) throw MarklessRuntimeError("\"$cell\" is not a task cell")
-		return change(null, null) { values[cell] = value; emptyList() }
+		return change(null, null) { values[cell] = value; unset.remove(cell); emptyList() }
 	}
 
 	/** The calls a host starts at mount, one per task cell. */
@@ -1306,12 +1357,6 @@ class Runtime(
 		val signaturesBefore = rowSignatures()
 		val calls = apply()
 		if (calls.firstOrNull() is JournalEntry.Navigate) return calls
-		val synced = calls + syncAsync()
-		val shownNow = shownOverlays()
-		val released = stackBefore.filter { it !in shownNow }
-		val enlisted = shownNow.filter { it !in stackBefore }
-		stack = stackBefore.filter { it in shownNow } + enlisted
-		for (o in enlisted) origins[o] = focusBefore ?: NATIVE_DOCUMENT_BODY
 		// A row that left takes its state with it; a later row with the same key starts from the first values.
 		val kept = rows().flatMap { (list, keys) -> keys.map { "$list\u0000$it" } }.toSet()
 		values.keys.removeAll { slot ->
@@ -1320,6 +1365,13 @@ class Runtime(
 		}
 		resetChangedRows(signaturesBefore)
 		seedRows()
+		follow()
+		val synced = calls + syncAsync()
+		val shownNow = shownOverlays()
+		val released = stackBefore.filter { it !in shownNow }
+		val enlisted = shownNow.filter { it !in stackBefore }
+		stack = stackBefore.filter { it in shownNow } + enlisted
+		for (o in enlisted) origins[o] = focusBefore ?: NATIVE_DOCUMENT_BODY
 		forgetHidden()
 		val afterTexts = texts().toMap()
 		val afterAttributes = boundAttributes().associate { (n, a, v) -> (n to a) to v }
