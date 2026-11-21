@@ -807,7 +807,11 @@ class Runtime(
 	/** Every non-row checkbox and radio button, in payload order. */
 	private val ticked = payload.nodes.filterIsInstance<Node.Element>().filter { it.element == "input" && it.row == null && it.attributes["type"].let { t -> t == "checkbox" || t == "radio" } }
 
-	private fun checkedBinding(id: String): Boolean? = propertyBinding(id, "checked")?.let { Js.truthy(evaluate(it.value)) }
+	/** A box an arm hides is not built yet, so its binding (which may read what the arm's test guards) is not read. */
+	private fun checkedBinding(id: String): Boolean? {
+		if (byId[id]?.let { !isShown(it) } == true) return null
+		return propertyBinding(id, "checked")?.let { Js.truthy(evaluate(it.value)) }
+	}
 
 	/** Each checkbox's and radio button's checkedness: its `checked` binding sets it, as does a person's tick. */
 	private val checkedness = LinkedHashMap<String, Boolean>().apply { for (n in ticked) put(n.id, checkedBinding(n.id) ?: ("checked" in n.attributes)) }

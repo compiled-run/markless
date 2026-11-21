@@ -1,0 +1,406 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:task",
+				"name": "task",
+				"initial": null,
+				"unset": true
+			},
+			{
+				"id": "state:box",
+				"name": "box",
+				"initial": "untouched"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Task"
+					}
+				]
+			},
+			{
+				"kind": "branch",
+				"id": "branch-site:0",
+				"parent": "h0",
+				"test": {
+					"cell": "state:task"
+				},
+				"arms": 2
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "label",
+				"parent": "h0",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "input",
+				"parent": "h2",
+				"attributes": {
+					"type": "checkbox",
+					"aria-label": "Done"
+				},
+				"bindings": [
+					{
+						"property": "checked",
+						"value": {
+							"member": {
+								"cell": "state:task"
+							},
+							"property": "done"
+						}
+					}
+				],
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"expr": {
+							"member": {
+								"cell": "state:task"
+							},
+							"property": "title"
+						}
+					}
+				],
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "No task"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Load done"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Load open"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Clear"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h8:text0",
+				"parent": "h8",
+				"parts": [
+					{
+						"text": "Box: "
+					},
+					{
+						"cell": "state:box"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h5",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h6",
+				"event": "activate",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h7",
+				"event": "activate",
+				"handler": "handler:event:3"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:h3/tick"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:task",
+						"value": {
+							"object": [
+								[
+									"title",
+									{
+										"literal": "Water plants"
+									}
+								],
+								[
+									"done",
+									{
+										"literal": true
+									}
+								]
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:task",
+						"value": {
+							"object": [
+								[
+									"title",
+									{
+										"literal": "Feed cat"
+									}
+								],
+								[
+									"done",
+									{
+										"literal": false
+									}
+								]
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:task",
+						"value": {
+							"literal": null
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:h3/tick",
+				"ops": [
+					{
+						"op": "tick",
+						"node": "h3"
+					},
+					{
+						"op": "assign",
+						"cell": "state:box",
+						"value": {
+							"if": {
+								"checked": "h3"
+							},
+							"whenTrue": {
+								"literal": "ticked"
+							},
+							"whenFalse": {
+								"literal": "cleared"
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		["h1:text0", "Task"],
+		["h4:text0", "No task"],
+		["h5:text0", "Load done"],
+		["h6:text0", "Load open"],
+		["h7:text0", "Clear"],
+		["h8:text0", "Box: untouched"]
+	],
+	"initialArms": [["branch-site:0", 1]],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 0
+				},
+				{
+					"op": "property",
+					"node": "h3",
+					"name": "checked",
+					"value": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h8:text0",
+					"value": "Box: cleared"
+				},
+				{
+					"op": "property",
+					"node": "h3",
+					"name": "checked",
+					"value": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h7"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 1
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 0
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h8:text0",
+					"value": "Box: ticked"
+				},
+				{
+					"op": "property",
+					"node": "h3",
+					"name": "checked",
+					"value": true
+				}
+			]
+		}
+	]
+}
