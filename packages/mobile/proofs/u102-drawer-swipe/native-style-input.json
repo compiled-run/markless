@@ -1,0 +1,2507 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "App",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "mk-er1rvx"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-er1rvx"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Side drawer"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-er1rvx"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Closed 0 times"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0/h0",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"ui-orientation": "horizontal"
+			},
+			"attributesByState": {
+				"ui-open": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					}
+				],
+				"ui-closed": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					}
+				],
+				"ui-start": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					}
+				],
+				"ui-dragging": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					}
+				]
+			}
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:1/h1",
+			"element": "button",
+			"parent": "component-edge:0/h0",
+			"attributes": {
+				"type": "button",
+				"aria-haspopup": "dialog",
+				"aria-controls": "component-edge:4/h3"
+			},
+			"attributesByState": {
+				"aria-expanded": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": "true"
+					}
+				],
+				"ui-open": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					}
+				],
+				"ui-closed": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					}
+				]
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:1/h1:text0",
+			"parent": "component-edge:1/h1",
+			"text": "Open the panel"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:2/h2",
+			"element": "div",
+			"parent": "component-edge:0/h0",
+			"attributes": {
+				"class": "mk-1magx0q",
+				"ui-backdrop": "",
+				"overlay": "",
+				"ui-orientation": "horizontal"
+			},
+			"attributesByState": {
+				"hidden": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					}
+				],
+				"ui-open": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					}
+				],
+				"ui-closed": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					}
+				],
+				"ui-start": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					}
+				]
+			}
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:3/h6",
+			"element": "button",
+			"parent": "component-edge:2/h2",
+			"attributes": {
+				"type": "button"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:3/h6:text0",
+			"parent": "component-edge:3/h6",
+			"text": "Close the panel"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:4/h3",
+			"element": "div",
+			"parent": "component-edge:2/h2",
+			"attributes": {
+				"class": "mk-1ln8cwd panel mk-er1rvx",
+				"role": "dialog",
+				"ui-content": "",
+				"ui-orientation": "horizontal"
+			},
+			"attributesByState": {
+				"aria-modal": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": "true"
+					}
+				],
+				"ui-open": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					}
+				],
+				"ui-closed": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					}
+				],
+				"ui-start": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					}
+				],
+				"ui-dragging": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": false,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start": true,
+							"component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging": true
+						},
+						"value": ""
+					}
+				]
+			},
+			"styleTemplate": [
+				"--offset: ",
+				{
+					"slot": "slot:component-edge:4/h3#0"
+				}
+			]
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:4/h3:text0",
+			"parent": "component-edge:4/h3",
+			"text": "Swipe this panel away"
+		}
+	],
+	"css": "@layer markless {\n\t\t\t\t[ui-backdrop].mk-1magx0q { position: fixed; inset: 0; }\n\t\t\t}\n@layer markless {\n\t\t\t\t[ui-content].mk-1ln8cwd {\n\t\t\t\t\tposition: fixed;\n\t\t\t\t\tinset-inline: 0;\n\t\t\t\t\tinset-block: auto 0;\n\t\t\t\t\ttranslate: 0 calc(var(--offset, 0) * 100%);\n\t\t\t\t\t/* The browser must not claim the pan before the family sees it, and a\n\t\t\t\t\t   swipe that runs out of drawer must not rubber-band the page behind -\n\t\t\t\t\t   the iOS webview failure. A scroll region inside the drawer sets its\n\t\t\t\t\t   own touch-action, because this one reaches its descendants. */\n\t\t\t\t\ttouch-action: none;\n\t\t\t\t\toverscroll-behavior: contain;\n\t\t\t\t}\n\t\t\t\t[ui-content][ui-start].mk-1ln8cwd {\n\t\t\t\t\tinset-block: 0 auto;\n\t\t\t\t\ttranslate: 0 calc(var(--offset, 0) * -100%);\n\t\t\t\t}\n\t\t\t\t[ui-content][ui-orientation=horizontal].mk-1ln8cwd {\n\t\t\t\t\tinset-block: 0;\n\t\t\t\t\tinset-inline: auto 0;\n\t\t\t\t\ttranslate: calc(var(--offset, 0) * 100%) 0;\n\t\t\t\t}\n\t\t\t\t[ui-content][ui-orientation=horizontal][ui-start].mk-1ln8cwd {\n\t\t\t\t\tinset-inline: 0 auto;\n\t\t\t\t\ttranslate: calc(var(--offset, 0) * -100%) 0;\n\t\t\t\t}\n\t\t\t\t/* `inset-inline` is logical and `translate` is physical, so the inline\n\t\t\t\t   axis needs the page's direction to agree on which way is out. */\n\t\t\t\t[ui-content][ui-orientation=horizontal].mk-1ln8cwd:dir(rtl) {\n\t\t\t\t\ttranslate: calc(var(--offset, 0) * -100%) 0;\n\t\t\t\t}\n\t\t\t\t[ui-content][ui-orientation=horizontal][ui-start].mk-1ln8cwd:dir(rtl) {\n\t\t\t\t\ttranslate: calc(var(--offset, 0) * 100%) 0;\n\t\t\t\t}\n\t\t\t}\n.panel.mk-er1rvx {\n\t\t\t\twidth: 60%;\n\t\t\t\tbackground: #f3efff;\n\t\t\t\tborder-left: 4px solid #6a4fd8;\n\t\t\t\tpadding: 24px;\n\t\t\t}",
+	"states": [
+		{
+			"cell": "component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.open",
+			"domain": [
+				false,
+				true
+			],
+			"initial": false
+		},
+		{
+			"cell": "component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.modal",
+			"domain": [
+				false,
+				true
+			],
+			"initial": true
+		},
+		{
+			"cell": "component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.start",
+			"domain": [
+				false,
+				true
+			],
+			"initial": false
+		},
+		{
+			"cell": "component-edge:0/shared:packages/headless/components/src/drawer/drawer.tsrx#drawerState/state:drawer.dragging",
+			"domain": [
+				false,
+				true
+			],
+			"initial": false
+		}
+	],
+	"slots": [
+		{
+			"id": "slot:component-edge:4/h3#0",
+			"initial": 0
+		}
+	]
+}

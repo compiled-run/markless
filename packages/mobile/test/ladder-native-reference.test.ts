@@ -76,7 +76,7 @@ const bindsValue = (nodeOf: ReadonlyMap<string, NativeViewPayload['nodes'][numbe
 	return node?.kind === 'element' && (node.bindings ?? []).some((binding) => 'property' in binding && binding.property === 'value');
 };
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
-const REFUSED_RUNGS = new Set(['y4-sheet-beside-drawer', 'j7-page-refused']);
+const REFUSED_RUNGS = new Set(['j7-page-refused']);
 
 /**
  * The script services as a phone's host provides them, on a clock that moves only when a step waits: a timer fires once

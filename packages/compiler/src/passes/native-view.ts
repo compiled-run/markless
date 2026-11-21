@@ -3108,6 +3108,19 @@ export function createNativeViewPayload(
 		return value;
 	}
 
+	/** Whether a `style` value is being lowered, where a helper returning one template keeps its text around number holes. */
+	let readingStyle = false;
+	/** Whether the call's own source is one `return` of a template literal, as the analyzer read the function. */
+	const returnsTemplate = (found: ModuleFunction | undefined): boolean => {
+		const [only, ...more] = found?.fn.native.statements ?? [];
+		return more.length === 0 && only?.kind === 'return' && only.value.kind === 'template';
+	};
+	/** A template whose holes are each a number the build can see, not a script value that may be text. */
+	const numberHoles = (value: NativeExpr): boolean =>
+		'template' in value &&
+		value.template.every(
+			(part) => typeof part === 'string' || (!('script' in part) && mayBeNumber(part)),
+		);
 	/** Whether a call to an app function the data path cannot evaluate runs in the script instead: in a submit or change handler. */
 	let handlerCallsScript = false;
 	/** The script functions that call an app function for a handler: each such value runs once where it is written. */
@@ -4703,7 +4716,24 @@ export function createNativeViewPayload(
 						inlining.delete(key);
 					}
 				};
-				if (!handlerCallsScript) return evaluate();
+				if (!handlerCallsScript) {
+					if (!readingStyle || !returnsTemplate(found)) return evaluate();
+					const data = attempt(evaluate);
+					if (!data.failed) return data.value;
+					data.rollBack();
+					// A style helper's one returned template keeps its text; a call in a hole that data cannot spell runs as JavaScript.
+					handlerCallsScript = true;
+					const holed = attempt(() => {
+						try {
+							return evaluate();
+						} finally {
+							handlerCallsScript = false;
+						}
+					});
+					if (!holed.failed && holed.value && numberHoles(holed.value)) return holed.value;
+					holed.rollBack();
+					return evaluate();
+				}
 				// The outermost call runs whole in the script, so a value its body uses twice is computed once.
 				const asData = <T>(run: () => T): T => {
 					handlerCallsScript = false;
@@ -5074,7 +5104,13 @@ export function createNativeViewPayload(
 			const target = read.target;
 			if (target.kind === 'text') return [];
 			if (target.kind === 'style') {
-				const value = exprOf(read.expression, 'the `style` attribute', scope);
+				readingStyle = true;
+				let value: NativeExpr | null;
+				try {
+					value = exprOf(read.expression, 'the `style` attribute', scope);
+				} finally {
+					readingStyle = false;
+				}
 				if (!value) return [];
 				const given = joinedStyle(stylePartsOf(value));
 				// A style that is one hole and no text is text the build cannot see (a helper's return), never a bare number.
