@@ -6,6 +6,9 @@ export type ExecResult = {
 	readonly stderr: string;
 };
 
+/** A command that did not end in its `timeoutMs`; it was killed. */
+export class ExecTimeout extends Error {}
+
 export type ExecOptions = {
 	readonly cwd?: string;
 	readonly env?: NodeJS.ProcessEnv;
@@ -29,7 +32,7 @@ export function exec(
 			? setTimeout(() => {
 					child.kill('SIGKILL');
 					reject(
-						new Error(
+						new ExecTimeout(
 							`${command} ${args.join(' ')} timed out after ${options.timeoutMs} ms`,
 						),
 					);

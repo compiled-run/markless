@@ -529,7 +529,7 @@ function walk(
 	// A closed <dialog> shows nothing (the UA's dialog:not([open]) rule); the journal opens and closes it.
 	const openDialogs = new Map(runtime.dialogs());
 	const chosen = new Map(runtime.arms());
-	// What the platform's sheets show: changed only by `sheet` entries and by the platform closing one.
+	// What the platform's sheets show: changed by `sheet` entries, by the arm a sheet is in, and by the platform closing one.
 	const sheetOpen = new Map(runtime.sheets());
 	const inClosedSheet = (id: string): boolean => {
 		const parent = nodeOf.get(id)?.parent;
@@ -831,6 +831,10 @@ function walk(
 				for (const [node, checked] of runtime.checks())
 					if (inArm(node, entry.node)) checks.set(node, checked);
 				for (const id of typed.keys()) if (inArm(id, entry.node)) typed.delete(id);
+				// A sheet leaves with its arm, closed; one that comes is built open or closed as its state says.
+				for (const node of sheetOpen.keys()) if (inArm(node, entry.node)) sheetOpen.delete(node);
+				for (const [node, open] of runtime.sheets())
+					if (inArm(node, entry.node)) sheetOpen.set(node, open);
 			} else if (entry.op === 'sheet') sheetOpen.set(entry.node, entry.open);
 			const scripted = services.answer(entry);
 			if (scripted) answered.push(() => runtime.dispatch(scripted));
@@ -1049,7 +1053,7 @@ function walk(
 			if ('tap' in action && !activates && touched.length === 0)
 				throw new Error(`step ${index}: "${name}" is not a control and the press changed nothing`);
 			// A field takes the keyboard when typed into, and gives it up when anything else is tapped: its focus and blur run.
-			const handles = (node: string, event: 'input' | 'focus' | 'blur' | 'keydown') =>
+			const handles = (node: string, event: 'input' | 'focus' | 'blur' | 'keydown' | 'keyup') =>
 				payload.events.some((candidate) => candidate.host === node.split('@')[0] && candidate.event === event);
 			if ('type' in action && focused !== host) {
 				if (focused && handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
@@ -1074,7 +1078,28 @@ function walk(
 				apply(journal, index);
 				return journal.some((entry) => entry.op === 'preventDefault');
 			};
-			if ('type' in action) for (const key of action.type.text) keyed(key);
+			// A key's keyup runs after what the key did, or after its keydown left that out.
+			const keyedUp = (key: string) => {
+				if (handles(host, 'keyup')) apply(runtime.dispatch({ event: 'keyup', host, key }), index);
+			};
+			// With a keyup handler, typing is key by key, each key's edit between its keydown and its keyup, as on the web.
+			const byKey = 'type' in action && handles(host, 'keyup');
+			if ('type' in action && !byKey) for (const key of action.type.text) keyed(key);
+			if (byKey) {
+				// The field was erased before typing; keys past its maxlength still go down and up, and edit nothing.
+				const kept = [...text!];
+				let sofar = '';
+				for (const key of action.type.text) {
+					const prevented = keyed(key);
+					if (!prevented && [...sofar].length < kept.length) {
+						sofar += kept[[...sofar].length];
+						if (properties.has(host)) properties.set(host, sofar);
+						else typed.set(host, sofar);
+						if (handles(host, 'input')) apply(runtime.dispatch({ event: 'input', host, value: sofar }), index);
+					}
+					keyedUp(key);
+				}
+			}
 			// A double tap is two presses, the second counted 2.
 			if ('doubleTap' in action)
 				apply(runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 1 }), index);
@@ -1086,7 +1111,7 @@ function walk(
 					: 'doubleTap' in action
 						? runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 2 })
 					: 'type' in action
-						? handles(host, 'input')
+						? handles(host, 'input') && !byKey
 							? runtime.dispatch({ event: 'input', host, value: text! })
 							: []
 						: 'erase' in action
@@ -1097,6 +1122,8 @@ function walk(
 								? []
 								: runtime.dispatch({ event: 'enter', host });
 			apply(dispatched, index);
+			if ('erase' in action) keyedUp('Backspace');
+			else if ('submit' in action) keyedUp('Enter');
 		}
 		raiseLoadEvents(index);
 		check(index, step);

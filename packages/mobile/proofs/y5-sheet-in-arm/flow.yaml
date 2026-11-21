@@ -1,0 +1,38 @@
+appId: ${APP_ID}
+name: y5-sheet-in-arm
+---
+- launchApp:
+      clearState: true
+- assertVisible: Colours
+- assertVisible: Picked nothing
+- assertVisible: Show choices
+- assertNotVisible: Choose a colour
+- assertNotVisible: Pick one
+- tapOn: Show choices
+- assertVisible: Choose a colour
+- assertNotVisible: Show choices
+- assertVisible: Choose a colour
+- assertVisible: Hide choices
+- assertNotVisible: Pick one
+- assertNotVisible: Show choices
+- tapOn: Choose a colour
+- assertVisible: Pick one
+- assertVisible: Pick one
+- assertVisible: Red
+- assertVisible: Put away
+- tapOn: Put away
+- assertNotVisible: Pick one
+- assertVisible: Show choices
+- assertNotVisible: Pick one
+- assertNotVisible: Choose a colour
+- assertNotVisible: Hide choices
+- tapOn: Show choices
+- assertVisible: Pick one
+- assertVisible: Pick one
+- assertVisible: Red
+- tapOn: Red
+- assertNotVisible: Pick one
+- assertVisible: Picked red
+- assertVisible: Hide choices
+- assertNotVisible: Pick one
+- assertNotVisible: Picked nothing

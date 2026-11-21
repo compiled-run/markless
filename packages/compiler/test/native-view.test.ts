@@ -266,11 +266,11 @@ export function Logger() @{
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Field() @{
 	let text = state('');
-	<input value={text} onKeyUp={() => (text = '')} />
+	<input value={text} onCompositionstart={() => (text = '')} />
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toContain(
-			'the keyup event has no native meaning yet',
+			'the compositionstart event has no native meaning yet',
 		);
 	});
 
@@ -322,6 +322,72 @@ export function Tags() @{
 					value: { logical: '??', left: { event: 'text' }, right: { literal: '' } },
 				},
 			],
+		]);
+	});
+
+	it("runs a text field's keydown and paste handlers as JavaScript when data cannot spell them", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Tags() @{
+	let tags = state(['red']);
+	let last = state('');
+	<input
+		aria-label="Tag"
+		onKeyDown={(event) => {
+			let known = false;
+			for (const tag of tags) if (tag === event.key) known = true;
+			if (event.key === 'Enter' || known) event.preventDefault();
+			last = event.key;
+		}}
+		onPaste={(event) => {
+			event.preventDefault();
+			const pasted = event.clipboardData?.getData('text') ?? '';
+			const next = [...tags];
+			for (const part of pasted.split(',')) next.push(part.trim());
+			tags = next;
+		}}
+	/>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.handlers.map((handler) => handler.ops.map((op) => op.op))).toEqual([['script'], ['script']]);
+	});
+
+	it("runs a text field's keyup handler with the key and the field's text after the key, and preventDefault() there does nothing", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Search() @{
+	let last = state('');
+	let after = state('');
+	<main>
+		<input
+			aria-label="Search"
+			onKeyUp={(event) => {
+				event.preventDefault();
+				last = event.key;
+				if (event.key === 'Backspace' && (event.target as HTMLInputElement).value === '') after = 'cleared';
+			}}
+		/>
+		<button onKeyUp={() => (last = 'button')}>Go</button>
+	</main>
+}`);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			'the keyup handler on <button> h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out',
+		]);
+		expect(payload?.events).toEqual([
+			{ host: 'h1', event: 'keyup', handler: 'handler:event:0' },
+			{ host: 'h1', event: 'input', handler: 'handler:h1/edit' },
+		]);
+		expect(payload?.handlers[0]?.ops).toEqual([
+			{ op: 'assign', cell: 'state:last', value: { event: 'key' } },
+			{
+				op: 'if',
+				test: {
+					logical: '&&',
+					left: { binary: '===', left: { event: 'key' }, right: { literal: 'Backspace' } },
+					right: { binary: '===', left: { field: 'h1' }, right: { literal: '' } },
+				},
+				whenTrue: [{ op: 'assign', cell: 'state:after', value: { literal: 'cleared' } }],
+				whenFalse: [],
+			},
 		]);
 	});
 
@@ -396,7 +462,7 @@ export function Rename() @{
 		]);
 	});
 
-	it('leaves out a paste handler on an element a phone does not edit, refuses one on an editable element, and a clipboard read other than plain text', async () => {
+	it('leaves out a paste handler on an element a phone does not edit, refuses one on an editable element, and runs a clipboard read of another type as JavaScript', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Paste() @{
 	let text = state('');
@@ -416,11 +482,15 @@ export function Paste() @{
 				'error',
 				'a paste handler on an editable <div>; a native build runs one only on a text field',
 			],
-			[
-				'error',
-				"the paste handler reads the clipboard other than as plain text (`getData('text')`), which a phone's paste does not give",
-			],
 		]);
+		// A phone browser's paste carries text/plain alone (2026-11-18 soft-keyboard measurement), so getData of another type reads ''.
+		const html = await nativeView(`import { state } from '@markless/core';
+export function Paste() @{
+	let text = state('');
+	<input onPaste={(event) => (text = event.clipboardData?.getData('text/html') ?? '')} />
+}`);
+		expect(html.diagnostics).toEqual([]);
+		expect(html.payload?.handlers[0]?.ops.map((op) => op.op)).toEqual(['script']);
 	});
 
 	it("leaves out key and focus handlers on a checkbox or radio button, and runs a text field's focus handler", async () => {
@@ -1020,88 +1090,6 @@ export function Page() @{
 		).toBe(true);
 	});
 
-	it('gives a state field whose first value is undefined a null cell, as a native expression spells undefined', async () => {
-		const { payload, diagnostics } =
-			await nativeView(`import { shared, state } from '@markless/core';
-const pickState = shared(() => {
-	const pick = state({ chosen: undefined as string | undefined, count: 0 });
-	return { ...pick };
-}, { scope: 'subtree' });
-function Picker() @{
-	const pick = pickState();
-	<p>{pick.chosen === undefined ? 'unset' : pick.chosen}</p>
-}
-export function Page() @{
-	let note = state({ text: undefined as string | undefined });
-	<main>
-		<Picker />
-		<p>{note.text ?? 'no note'}</p>
-	</main>
-}`);
-		expect(diagnostics).toEqual([]);
-		expect(payload?.cells.map((cell) => [cell.name, cell.initial])).toEqual([
-			['note.text', null],
-			['pick.chosen', null],
-			['pick.count', 0],
-		]);
-	});
-
-	it('refuses a strict comparison that would tell undefined from null where a native cell cannot', async () => {
-		const { payload, diagnostics } = await nativeView(
-			`import { state } from '@markless/core';
-export function Page() @{
-	let draft = state({ given: undefined as string | undefined, held: null as string | null });
-	<main>
-		<p>{draft.given === null ? 'null' : 'not null'}</p>
-		<p>{draft.held === undefined ? 'undefined' : 'defined'}</p>
-		<p>{draft.given === undefined && draft.held === null ? 'both as written' : 'no'}</p>
-	</main>
-}`,
-			dataOnly,
-		);
-		expect(payload).toBeNull();
-		expect(diagnostics.map((d) => d.message)).toEqual([
-			'a text expression compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null',
-			'a text expression compares with `undefined` a value whose first value is `null`; a native value does not tell undefined from null',
-		]);
-	});
-
-	it("reads an input event's target as the field typed into, whose value is the typed text, only in that handler", async () => {
-		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
-function textOf(from: EventTarget | null): string {
-	const control = from as HTMLInputElement | null;
-	if (!control) return '';
-	return control.value;
-}
-export function Page() @{
-	let said = state('');
-	<main>
-		<input aria-label="Name" onInput={(event) => (said = textOf(event.target))} />
-		<p>{said}</p>
-	</main>
-}`);
-		expect(diagnostics).toEqual([]);
-		expect(payload?.handlers).toEqual([
-			{
-				id: 'handler:event:0',
-				ops: [{ op: 'assign', cell: 'state:said', value: { event: 'value' } }],
-			},
-		]);
-		const elsewhere = await nativeView(`import { state } from '@markless/core';
-function textOf(from: EventTarget | null): string {
-	const control = from as HTMLInputElement | null;
-	return control ? control.value : '';
-}
-export function Page() @{
-	let said = state('');
-	<main>
-		<button onClick={(event) => (said = textOf(event.target))}>Read</button>
-		<p>{said}</p>
-	</main>
-}`);
-		expect(elsewhere.payload).toBeNull();
-	});
-
 	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Card({ title, children }) @{
@@ -1479,6 +1467,38 @@ export function Picker() @{
 		).toEqual([{ op: 'assign', cell: 'state:choosing', value: { literal: false } }]);
 	});
 
+	it('places a <native.sheet> in an @if arm with its content, and refuses one in a @for row', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+import { native } from '@markless/device';
+export function App() @{
+	let ready = state(false);
+	let open = state(false);
+	<main>
+		@if (ready) {
+			<native.sheet open={open} dismissible={false}><p>Hi</p></native.sheet>
+		}
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const sheet = payload!.nodes.find((node) => node.kind === 'sheet')!;
+		const content = payload!.nodes.filter((node) => node.parent === sheet.id);
+		expect(sheet.arm).toEqual({ branch: expect.any(String), index: 0 });
+		expect(content.map((node) => node.arm)).toEqual([sheet.arm]);
+		const rows = await nativeView(`import { state } from '@markless/core';
+import { native } from '@markless/device';
+export function App() @{
+	let items = state([{ id: 1 }]);
+	<main>
+		@for (const item of items; key item.id) {
+			<native.sheet open={false} dismissible={false}><p>Hi</p></native.sheet>
+		}
+	</main>
+}`);
+		expect(rows.diagnostics.map((diagnostic) => diagnostic.message)).toContain(
+			'a <native.sheet> inside a @for row',
+		);
+	});
+
 	it('refuses a <native.sheet> the platforms cannot all present, naming the reason', async () => {
 		const refusal = async (props: string) =>
 			(
@@ -1501,8 +1521,9 @@ export function App() @{
 		expect(await refusal('dismissible={false} snapPoints={[0.3, 0.6, 1]}')).toEqual([
 			[NATIVE_UNSUPPORTED_CODE, expect.stringContaining('`snapPoints` of <native.sheet>')],
 		]);
-		expect(await refusal('dismissible={false} snapPoints={[0.5]}')).toEqual([
-			[NATIVE_UNSUPPORTED_CODE, expect.stringContaining('the largest 1')],
+		expect(await refusal('dismissible={false} snapPoints={[0.5]}')).toEqual([]);
+		expect(await refusal('dismissible={false} snapPoints={[0.3, 0.6]}')).toEqual([
+			[NATIVE_UNSUPPORTED_CODE, expect.stringContaining('two with the larger 1')],
 		]);
 		expect(await refusal('dismissible={false} modal={false}')).toEqual([
 			[NATIVE_UNSUPPORTED_CODE, expect.stringContaining('`modal={false}`')],

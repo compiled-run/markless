@@ -242,5 +242,5 @@ export async function installProofApp(
 		writeFileSync(join(app, path), bytes);
 	}
 	await exec('codesign', ['--force', '--sign', '-', app]);
-	await exec('xcrun', ['simctl', 'install', simulator.udid, app]);
+	await exec('xcrun', ['simctl', 'install', simulator.udid, app], { timeoutMs: 300_000 });
 }
