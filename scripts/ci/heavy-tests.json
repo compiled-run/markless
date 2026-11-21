@@ -193,6 +193,7 @@
 		"packages/router/test/vite/storage-child-production.test.ts",
 		"packages/router/test/vite/storage-key-across-modules.test.ts",
 		"packages/router/test/vite/stream-arm-adopted.test.ts",
+		"packages/router/test/vite/streamed-first-interaction.test.ts",
 		"packages/router/test/vite/stream-settle-failure.test.ts",
 		"packages/router/test/vite/submit-hold-preload.test.ts",
 		"packages/router/test/vite/top-level-control-flow.test.ts",
