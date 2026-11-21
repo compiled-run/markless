@@ -273,6 +273,15 @@ async function act(page: Page, step: LadderStep) {
 		await slider.press(action.slide.to === 'max' ? 'End' : 'Home');
 	}
 	else if ('appearance' in action) await page.emulateMedia({ colorScheme: action.appearance });
+	else if ('orientation' in action) {
+		const { width, height } = page.viewportSize()!;
+		const [short, long] = width < height ? [width, height] : [height, width];
+		await page.setViewportSize(
+			action.orientation === 'portrait'
+				? { width: short, height: long }
+				: { width: long, height: short },
+		);
+	}
 	else if ('swipe' in action && action.swipe !== 'up') {
 		const { from, to, until } = action.swipe;
 		for (let turn = 0; turn < (until ? SWIPES_UNTIL : 1); turn++) {
@@ -290,6 +299,10 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 		if ((await onScreenCount(page, text)) === 0) failed.push(`"${text}" is not on screen`);
 	for (const text of step.absent ?? [])
 		if ((await onScreenCount(page, text)) > 0) failed.push(`"${text}" is on screen`);
+	for (const text of step.hidden ?? []) {
+		if ((await shown(page, text).count()) === 0) failed.push(`"${text}" is not on the page`);
+		else if ((await onScreenCount(page, text)) > 0) failed.push(`"${text}" is on screen`);
+	}
 	for (const text of step.offScreen ?? []) {
 		if ((await shown(page, text).count()) === 0) failed.push(`"${text}" is not on the page`);
 		else if ((await onScreenCount(page, text)) > 0) failed.push(`"${text}" is on screen`);

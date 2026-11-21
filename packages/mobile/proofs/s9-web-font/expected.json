@@ -1,0 +1,14 @@
+{
+	"rung": "S9",
+	"name": "An author web font (Lato, @font-face, regular and bold .ttf) for headings and body, drawn in that face on the web, iOS and Android",
+	"steps": [
+		{
+			"visible": [
+				"Tide almanac",
+				"Lato for the body, regular weight",
+				"Waffles, quays and fjords"
+			],
+			"title": "Almanac"
+		}
+	]
+}

@@ -7,7 +7,9 @@
 			{
 				"id": "state:word",
 				"name": "word",
-				"initial": "apple"
+				"initial": "apple",
+				"styled": true,
+				"domain": ["apple", "banana", "cherry", "missing"]
 			},
 			{
 				"id": "task:computed:entry",
@@ -520,6 +522,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:word",
+					"value": "banana"
+				},
+				{
 					"op": "text",
 					"node": "h2:text0",
 					"value": "Asked: banana"
@@ -537,6 +544,11 @@
 				"host": "h4"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:word",
+					"value": "cherry"
+				},
 				{
 					"op": "text",
 					"node": "h2:text0",
@@ -577,6 +589,11 @@
 				"host": "h5"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:word",
+					"value": "missing"
+				},
 				{
 					"op": "text",
 					"node": "h2:text0",
@@ -630,6 +647,11 @@
 				"host": "h3"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:word",
+					"value": "banana"
+				},
 				{
 					"op": "text",
 					"node": "h2:text0",
@@ -700,6 +722,11 @@
 				"host": "h4"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:word",
+					"value": "cherry"
+				},
 				{
 					"op": "text",
 					"node": "h2:text0",
