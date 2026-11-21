@@ -626,6 +626,12 @@ function walk(
 						.join(' '));
 		return label !== null && shownNode(node.id) ? [[id, label] as const] : [];
 	};
+	// A text field by its accessible name, as the web finds a textbox: a control named the same (a preview button) is not one.
+	const fieldReading = (text: string) =>
+		labels().find(([id, label]) => {
+			const element = nodeOf.get(id.split('@')[0]!);
+			return label === text && element?.kind === 'element' && (element.element === 'input' || element.element === 'textarea');
+		})?.[0] ?? elementReading(text);
 	const elementReading = (text: string) => {
 		const labelled = labels().find(([, label]) => label === text)?.[0];
 		if (labelled) return labelled;
@@ -753,8 +759,10 @@ function walk(
 			else if (entry.op === 'property' && entry.name === 'selected')
 				selected.set(entry.node, entry.value);
 			else if (entry.op === 'property') {
-				if (bindsValue(nodeOf, entry.node)) properties.set(entry.node, entry.value);
-				else shownDefaults.set(entry.node, entry.value);
+				const node = nodeOf.get(entry.node.split('@')[0]!);
+				const followsDefault = node?.kind === 'element' && node.element === 'textarea' && !bindsValue(nodeOf, entry.node);
+				if (followsDefault) shownDefaults.set(entry.node, entry.value);
+				else properties.set(entry.node, entry.value);
 				typed.delete(entry.node);
 			}
 			else if (entry.op === 'navigate') {
@@ -979,7 +987,7 @@ function walk(
 						: 'erase' in action
 							? action.erase
 							: action.submit;
-			const host = elementReading(name);
+			const host = 'tap' in action || 'doubleTap' in action ? elementReading(name) : fieldReading(name);
 			if (!host)
 				throw new Error(
 					`step ${index}: nothing reads "${name}" to ${'tap' in action ? 'tap' : 'type into'}`,
@@ -1097,7 +1105,7 @@ function walk(
 	function check(index: number, step: LadderStep) {
 		expect(invalid, `step ${index}: the message of a blocked submit`).toBe(step.invalid);
 		for (const [field, value] of Object.entries(step.fields ?? {})) {
-			const host = elementReading(field);
+			const host = fieldReading(field);
 			expect(host && fieldText(host), `step ${index}: the field "${field}"`).toBe(value);
 		}
 		if (step.calls) expect(calls, `step ${index}: the device calls made`).toEqual(step.calls);

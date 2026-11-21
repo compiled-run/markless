@@ -116,14 +116,15 @@ export async function compileNativeComponent(input: {
 		: undefined;
 	if (input.page && !route) throw new Error(`${input.page} is not a page the router routes`);
 	const readModule = withJsonModules(input.readModule);
-	const compiled = await compileTsrxModule({
+	const rootInput = {
 		filename: input.filename,
 		source: input.source,
 		symbols: [],
 		nativeFacts: NATIVE_FACT_COLLECTORS,
-		target: input.target ?? 'native',
+		target: input.target ?? ('native' as const),
 		deviceTargetFacts: DEVICE_TARGET_FACTS,
-	});
+	};
+	let compiled = await compileTsrxModule(rootInput);
 	const importedStyles: NativeBuild['styles'][number][] = [];
 	const stylesheets = stylesheetsOf(
 		compiled.publicRenderPlan.stylesheetImports,
@@ -184,6 +185,31 @@ export async function compileNativeComponent(input: {
 		interfaces.set(file, graph);
 		return graph;
 	};
+	// A shared() accessor the app reaches through a package's barrel (`calendar.state()` from `@markless/ui`) resolves
+	// against the interfaces of the modules the barrel re-exports, as the web build links them: the app is analyzed
+	// again with those, following only the names it imports.
+	if (compiled.semanticGraph.diagnostics.some((diagnostic) => diagnostic.code === 'MARKLESS_SHARED_CALL_UNRESOLVED')) {
+		const linked: Record<string, ModuleGraphInterfaceArtifact> = {};
+		const follow = async (file: string, names: ReadonlySet<string> | null, seen: Set<string>): Promise<void> => {
+			if (seen.has(file)) return;
+			seen.add(file);
+			const surface = (await analyze(file, new Set())).moduleGraphInterface;
+			linked[file] = surface;
+			for (const reexport of surface.reexports ?? []) {
+				if (names && reexport.exportName !== '*' && !names.has(reexport.exportName)) continue;
+				const target = resolve(reexport.source, file);
+				if (target) await follow(target, reexport.exportName === '*' ? names : null, seen);
+			}
+		};
+		for (const entry of compiled.semanticGraph.moduleImports) {
+			if (entry.typeOnly || entry.source.startsWith('.')) continue;
+			const file = resolve(entry.source, input.filename);
+			if (!file) continue;
+			await follow(file, entry.kind === 'named' ? new Set([entry.importedName ?? entry.localName]) : null, new Set());
+			linked[entry.source] = linked[file]!;
+		}
+		if (Object.keys(linked).length > 0) compiled = await compileTsrxModule({ ...rootInput, importedModuleInterfaces: linked });
+	}
 	let native: NativeViewArtifact;
 	for (;;) {
 		native = createNativeViewPayload(compiled.semanticGraph, {

@@ -1,0 +1,29 @@
+{
+	"rung": 143,
+	"name": "select: the trigger opens the list and lands focus on an option through JavaScript reading element proxies; a tapped option is chosen and the list closes",
+	"steps": [
+		{
+			"visible": ["Order", "Favorite Fruit", "Choose a Fruit"],
+			"absent": ["Apple", "Banana", "Cherry"]
+		},
+		{
+			"do": {
+				"tap": "Choose a Fruit"
+			},
+			"visible": ["Apple", "Banana", "Cherry"]
+		},
+		{
+			"do": {
+				"tap": "Banana"
+			},
+			"visible": ["Choose a Fruit"],
+			"absent": ["Apple", "Banana", "Cherry"]
+		},
+		{
+			"do": {
+				"tap": "Choose a Fruit"
+			},
+			"visible": ["Apple", "Banana", "Cherry"]
+		}
+	]
+}

@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 338,
+	total: 339,
 	guided: 55,
 	groups: [
 		{
@@ -1762,6 +1762,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a list count has no answer markless_roster_count_unresolved a markless runtime error from @markless/web.',
+				},
+				{
+					code: 'MARKLESS_JOINED_KEYS_REBUILD_UNAVAILABLE',
+					title: 'A list keyed by joined fields needs Vite’s app builder',
+					chip: 'error',
+					kind: 'build error',
+					guided: false,
+					words: 'a list keyed by joined fields needs vite’s app builder markless_joined_keys_rebuild_unavailable a markless build tooling error from @markless/bundler.',
 				},
 				{
 					code: 'MARKLESS_REPEAT_ROW_COMPONENT_EMPTY',

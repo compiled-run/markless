@@ -4,7 +4,11 @@ import type {
 	ProtocolStatePayload,
 	ProtocolViewPayload,
 } from '@markless/serializer';
-import type { ProtocolSharedScope, RenderedPayloadScripts } from '@markless/serializer';
+import type {
+	ProtocolRepeatKeyParts,
+	ProtocolSharedScope,
+	RenderedPayloadScripts,
+} from '@markless/serializer';
 import type { CompilerDiagnostic, SourceSpan } from './diagnostics.ts';
 
 export type { CompilerDiagnostic, DiagnosticSuggestion, SourceSpan } from './diagnostics.ts';
@@ -1037,6 +1041,8 @@ export type SemanticKeyedRepeat = {
 	// Empty means the item ITSELF is the key (`key row`), which a list of scalars
 	// is; `indexKey` is what says a row has no data identity at all.
 	readonly keyPath: ReadonlyArray<string>;
+	// A key joined from the item's fields; `keyPath` is then empty and is not the key.
+	readonly keyParts?: ProtocolRepeatKeyParts;
 	readonly indexKey?: true;
 	// A @for inside another @for's row renders once per enclosing row.
 	readonly enclosingRepeatId?: string;
@@ -2175,6 +2181,7 @@ export type RenderDataRepeat = {
 	readonly collectionSource?: string;
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly keyPath: ReadonlyArray<string>;
+	readonly keyParts?: ProtocolRepeatKeyParts;
 	// Set only for `key row`: the empty path means read the item itself, not that
 	// the row is unkeyed. A position key stays a semantic-graph fact.
 	readonly itemKey?: true;
@@ -2347,6 +2354,7 @@ export type LoweredWriteThrough = {
 export type LoweredRowItem = {
 	readonly itemName: string;
 	readonly keyPath: ReadonlyArray<string> | null;
+	readonly keyParts?: ProtocolRepeatKeyParts;
 	readonly itemPath: ReadonlyArray<string>;
 	readonly enclosing?: LoweredRowItem;
 };
@@ -2430,6 +2438,7 @@ export type PayloadKeyedRepeat = {
 	readonly collectionGraphNodeId: string;
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly keyPath: ReadonlyArray<string>;
+	readonly keyParts?: ProtocolRepeatKeyParts;
 	// See SemanticKeyedRepeat: set only for a repeat inside another repeat's row.
 	readonly enclosingRepeatId?: string;
 	readonly enclosingItemPath?: ReadonlyArray<string>;
@@ -2711,6 +2720,7 @@ export type SymbolResolverPlan = {
 export type RowLocalStep = {
 	readonly rowIndex: number;
 	readonly keyPath: ReadonlyArray<string>;
+	readonly keyParts?: ProtocolRepeatKeyParts;
 	readonly indexKey?: true;
 	readonly graphNodeId?: string;
 	readonly collectionPath?: ReadonlyArray<string>;
@@ -3204,6 +3214,8 @@ export type RuntimeDemandMapArtifact = {
 	readonly nestedRecordModuleIds?: ReadonlyArray<string>;
 	readonly unknownRecordModuleIds: ReadonlyArray<string>;
 	readonly firstUsePage?: RuntimeDemandMapFirstUsePage;
+	/** A `@for` of this module is keyed by `keyParts`, so the app's browser runtime must join keys; absent otherwise. */
+	readonly joinedRepeatKeys?: true;
 };
 
 export type RuntimeDemandMapsArtifact = Record<RuntimeDemandClass, RuntimeDemandMapArtifact>;

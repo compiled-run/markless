@@ -8416,6 +8416,7 @@ function rowItemPathCall(write: LoweredStateWrite, row: LoweredRowItem): Emissio
 		literalNode(row.itemName),
 		row.keyPath ? stringArrayNode(row.keyPath) : literalNode(null),
 		stringArrayNode(row.itemPath),
+		...(row.keyParts ? [jsonValueNode(row.keyParts)] : []),
 	]);
 }
 

@@ -7647,6 +7647,27 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_JOINED_KEYS_REBUILD_UNAVAILABLE',
+		title: 'A list keyed by joined fields needs Vite’s app builder',
+		area: 'internal',
+		packageName: '@markless/bundler',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/bundler.',
+		printed: [
+			'MARKLESS_JOINED_KEYS_REBUILD_UNAVAILABLE: a @for here is keyed by fields joined into a string, which needs a second client build with the key-joining runtime, and this build ran without the builder that runs it. Build with `vite build` (or createBuilder().buildApp()).',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/bundler/src/vite/index.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/vite/index.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY',
 		title: 'Each row of this list must render an element',
 		area: 'lists',
@@ -10133,15 +10154,15 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: '@for key must identify the item stably: a Markless build error.',
 		printed: [
-			'MARKLESS_REPEAT_KEY_UNSTABLE: key <keySource> does not derive identity from <itemName> or an explicit index alias. Row state, event wiring, and DOM reuse follow the key, so rows of <collectionSource> could not be matched with themselves reliably.',
+			"MARKLESS_REPEAT_KEY_UNSTABLE: key <keySource> is not built from <itemName> alone. A key may be the item (`key <itemName>`), a path on it (`key <itemName>.id`), a template literal or string + join of such paths (key `${<itemName>.id}:${<itemName>.size}`), or the row's position (`index i; key i`). Row state, event wiring, and DOM reuse follow the key, and the browser computes each row's key without loading page code, so a key that calls a function or reads anything besides the row item cannot match rows of <collectionSource> with themselves.",
 			'The key is the stable identity root for a repeated graph scope across reorder, insert, delete, and resume; a value that is not derived from the item or its position cannot identify anything.',
-			'Key by a stable field of <itemName>, such as `key <itemName>.id`, or key by position with `index i; key i` when state should follow the slot.',
+			'Key by a stable field of <itemName>, such as `key <itemName>.id`, join fields into one string when no single field is unique, or key by position with `index i; key i` when state should follow the slot. A key a function computes can be stored on each item as a field.',
 			'https://markless.dev/errors/MARKLESS_REPEAT_KEY_UNSTABLE',
 		],
 		structured: true,
 		why: 'The key is the stable identity root for a repeated graph scope across reorder, insert, delete, and resume; a value that is not derived from the item or its position cannot identify anything.',
 		suggestion:
-			'Key by a stable field of <itemName>, such as `key <itemName>.id`, or key by position with `index i; key i` when state should follow the slot.',
+			'Key by a stable field of <itemName>, such as `key <itemName>.id`, join fields into one string when no single field is unique, or key by position with `index i; key i` when state should follow the slot. A key a function computes can be stored on each item as a field.',
 		sources: [
 			{
 				id: 'f0',
