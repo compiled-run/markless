@@ -1,0 +1,10 @@
+{
+	"rung": 146,
+	"name": "timebox: a known time shows on the locale's clock; a state the family leaves undefined reads as undefined in JavaScript on a phone, as on the web, so an en-US clock shows 2 PM",
+	"steps": [
+		{
+			"visible": ["Meeting", "Start time", "2", "30", "PM"],
+			"absent": ["14"]
+		}
+	]
+}

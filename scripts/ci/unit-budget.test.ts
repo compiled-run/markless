@@ -3,7 +3,18 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { attribute, describePeak, processLabel, suiteKey } from './unit-budget.mjs';
+import { holdsSlotForFile } from './in-worker-builds.ts';
+import {
+	attribute,
+	describePeak,
+	processLabel,
+	readSlots,
+	recordSample,
+	SLOT_HELD_SHARE,
+	SLOT_HOLDER_FAIL_MB,
+	SLOT_HOLDER_STALE_MB,
+	suiteKey,
+} from './unit-budget.mjs';
 
 const script = resolve(import.meta.dirname, 'unit-budget.mjs');
 const scratch: string[] = [];
@@ -23,6 +34,10 @@ type Shard = {
 	exitCode?: number;
 	platform?: string;
 	fileMs?: Record<string, number>;
+	fileUnslottedPeaksMb?: Record<string, number>;
+	filePeaksMb?: Record<string, number>;
+	wallS?: number;
+	wholeFileSlotS?: number;
 };
 
 const measurementsDir = (shards: Shard[]) => {
@@ -643,5 +658,139 @@ describe('peak attribution', () => {
 		expect(
 			processLabel(['/usr/bin/node', '/repo/test/support/fixture-build-child.ts', '{}']),
 		).toBe('node fixture-build-child.ts');
+	});
+});
+
+describe('memory held outside the build slot', () => {
+	const big = 'packages/a/test/big.test.ts';
+	const heavyFile = (slotHolders: { test: string }[]) => {
+		const dir = mkdtempSync(join(tmpdir(), 'unit-budget-heavy-'));
+		scratch.push(dir);
+		const path = join(dir, 'heavy-tests.json');
+		writeFileSync(
+			path,
+			JSON.stringify({ inWorkerBuilds: { tests: [] }, slotHolders: { tests: slotHolders } }),
+		);
+		return path;
+	};
+	const changedFile = (files: string[]) => {
+		const dir = mkdtempSync(join(tmpdir(), 'unit-budget-changed-'));
+		scratch.push(dir);
+		const path = join(dir, 'changed.txt');
+		writeFileSync(path, files.join('\n'));
+		return path;
+	};
+	const checkWith = (
+		shard1: Partial<Shard>,
+		{ holders = [], changed }: { holders?: { test: string }[]; changed?: string[] } = {},
+	) =>
+		run(
+			'check',
+			'--budget',
+			budgetFile(anchored),
+			'--measurements',
+			measurementsDir([
+				{ shard: '1/2', cpuS: 100, peakRssMb: 2000, ...shard1 },
+				{ shard: '2/2', cpuS: 200, peakRssMb: 1500 },
+			]),
+			'--heavy',
+			heavyFile(holders),
+			...(changed ? ['--changed', changedFile(changed)] : []),
+		);
+	const over = { fileUnslottedPeaksMb: { [big]: SLOT_HOLDER_FAIL_MB + 1 } };
+
+	test('fails for a file the change touches when it is over the line, naming it and both ways out', () => {
+		const result = checkWith(over, { changed: [big] });
+		expect(result.status).toBe(1);
+		expect(result.output).toContain(
+			`::error::${big} held ${SLOT_HOLDER_FAIL_MB + 1} MB outside the build slot (shard 1/2, run 42)`,
+		);
+		expect(result.output).toContain('list it under "slotHolders"');
+		expect(result.output).toContain('or make it keep less outside the slot');
+	});
+
+	test('only reports a file the change did not touch, however far over', () => {
+		const result = checkWith(over, { changed: ['packages/other/src/x.ts'] });
+		expect(result.status).toBe(0);
+		expect(result.output).toContain(`::warning::${big} held ${SLOT_HOLDER_FAIL_MB + 1} MB`);
+		expect(result.output).toContain('files over the 1024 MB slot line without holding the slot: 1');
+	});
+
+	test('fails nothing without a changed-file set', () => {
+		expect(checkWith(over).status).toBe(0);
+	});
+
+	test('a touched file between the line and the noise margin is reported, not failed', () => {
+		const result = checkWith(
+			{ fileUnslottedPeaksMb: { [big]: SLOT_HOLDER_FAIL_MB } },
+			{ changed: [big] },
+		);
+		expect(result.status).toBe(0);
+		expect(result.output).toContain(`::warning::${big} held ${SLOT_HOLDER_FAIL_MB} MB`);
+	});
+
+	test('a listed file passes', () => {
+		expect(checkWith(over, { holders: [{ test: big }], changed: [big] }).status).toBe(0);
+	});
+
+	test('a listed file far under the line is stale: reported, and failed when touched', () => {
+		const light = { fileMs: { [big]: 1000 }, filePeaksMb: { [big]: SLOT_HOLDER_STALE_MB - 1 } };
+		const untouched = checkWith(light, { holders: [{ test: big }], changed: [] });
+		expect(untouched.status).toBe(0);
+		expect(untouched.output).toContain(`::warning::stale: ${big} is listed under "slotHolders"`);
+		expect(checkWith(light, { holders: [{ test: big }], changed: [big] }).status).toBe(1);
+	});
+
+	test('reports the share of a shard under whole-file holds, and fails a list change past the ceiling', () => {
+		const serial = { wallS: 100, wholeFileSlotS: 100 * SLOT_HELD_SHARE + 1 };
+		const result = checkWith(serial, { changed: [] });
+		expect(result.status).toBe(0);
+		expect(result.output).toContain('shard 1/2 ran 51 s of its 100 s under a whole-file slot hold (51%, ceiling 50%)');
+		expect(checkWith(serial, { changed: ['scripts/ci/heavy-tests.json'] }).status).toBe(1);
+	});
+
+	test('reads which files hold a slot and whether one is held for a whole file', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'unit-budget-slots-'));
+		scratch.push(dir);
+		mkdirSync(join(dir, '0'));
+		writeFileSync(join(dir, '0', 'pid'), '20');
+		writeFileSync(join(dir, '0', 'held'), 'file');
+		mkdirSync(join(dir, '1'));
+		const fileOf = new Map([
+			[10, 'packages/a/test/a.test.ts'],
+			[20, 'packages/b/test/b.test.ts'],
+		]);
+		const reading = readSlots(dir, fileOf);
+		expect([...reading.holding]).toEqual(['packages/b/test/b.test.ts']);
+		expect(reading.wholeFile).toBe(true);
+		expect(readSlots(join(dir, 'missing'), fileOf)).toEqual({ holding: new Set(), wholeFile: false });
+	});
+
+	test('a file that held a slot at either read of a sample is not charged with memory outside it', () => {
+		const state = { filePeaks: new Map(), unslottedPeaks: new Map(), wholeFileHeldSamples: 0 };
+		const groups = [
+			{ file: 'packages/a/test/build.test.ts', mb: 1500, parts: {} },
+			{ file: 'packages/b/test/sweep.test.ts', mb: 1200, parts: {} },
+			{ file: '(no test file: vitest main process, pnpm, the wrapper)', mb: 900, parts: {} },
+		];
+		const none = { holding: new Set<string>(), wholeFile: false };
+		recordSample(state, groups, { holding: new Set(['packages/a/test/build.test.ts']), wholeFile: false }, none);
+		recordSample(state, groups, none, { holding: new Set(), wholeFile: true });
+		expect(state.filePeaks.get('packages/a/test/build.test.ts')).toBe(1500);
+		expect([...state.unslottedPeaks]).toEqual([
+			['packages/b/test/sweep.test.ts', 1200],
+			['packages/a/test/build.test.ts', 1500],
+		]);
+		expect(state.wholeFileHeldSamples).toBe(1);
+	});
+
+	test('the setup file holds the slot for files under inWorkerBuilds and slotHolders', () => {
+		const manifest = {
+			inWorkerBuilds: { scope: [], tests: [{ test: 'a.test.ts', why: '' }] },
+			slotHolders: { why: '', tests: [{ test: 'b.test.ts', peakMb: 2000, run: '1', why: '' }] },
+		};
+		expect(holdsSlotForFile(manifest, 'a.test.ts')).toBe(true);
+		expect(holdsSlotForFile(manifest, 'b.test.ts')).toBe(true);
+		expect(holdsSlotForFile(manifest, 'c.test.ts')).toBe(false);
 	});
 });
