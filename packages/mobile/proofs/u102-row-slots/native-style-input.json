@@ -85,7 +85,7 @@
 			"text": "Lift beta"
 		}
 	],
-	"css": ".list.mk-1qvhcwu {\n\t\t\t\tdisplay: flex;\n\t\t\t\tflex-direction: column;\n\t\t\t\tmargin: 0 12px;\n\t\t\t\tpadding: 0;\n\t\t\t\tlist-style: none;\n\t\t\t}\n\t\t\t.item.mk-1qvhcwu {\n\t\t\t\theight: 40px;\n\t\t\t\tfont-size: 16px;\n\t\t\t\tbackground: #edf2f4;\n\t\t\t}\n\t\t\t.tap.mk-1qvhcwu {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin: 12px;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tpadding: 10px 18px;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffd166;\n\t\t\t\tcolor: #22223b;\n\t\t\t}",
+	"css": ".list.mk-1qvhcwu {\n\t\t\t\tdisplay: flex;\n\t\t\t\tflex-direction: column;\n\t\t\t\tmargin: 0 12px;\n\t\t\t\tpadding: 0;\n\t\t\t\tlist-style: none;\n\t\t\t}\n\t\t\t.item.mk-1qvhcwu {\n\t\t\t\theight: 40px;\n\t\t\t\tfont-size: 16px;\n\t\t\t\tbackground: #edf2f4;\n\t\t\t}\n\t\t\t.name.mk-1qvhcwu {\n\t\t\t\tdisplay: block;\n\t\t\t}\n\t\t\t.tap.mk-1qvhcwu {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin: 12px;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tpadding: 10px 18px;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffd166;\n\t\t\t\tcolor: #22223b;\n\t\t\t}",
 	"states": [],
 	"slots": [
 		{

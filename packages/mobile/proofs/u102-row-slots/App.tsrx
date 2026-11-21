@@ -19,6 +19,9 @@ export default function App() @{
 				font-size: 16px;
 				background: #edf2f4;
 			}
+			.name {
+				display: block;
+			}
 			.tap {
 				display: block;
 				margin: 12px;
