@@ -1343,6 +1343,47 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A handle bound inside an @if arm: the element only while the arm is drawn, so not in the press that opens it.
+		name: 'arm-handle',
+		fixture: 'proofs/j44-arm-handle/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'focus', host: 'h3' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'focus', host: 'h3' },
+		],
+	},
+	{
+		// A readonly text field: submitted, but left out of the checks a submit runs, so its `required` stops nothing.
+		name: 'readonly-field',
+		fixture: 'proofs/j48-readonly-field/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'input', host: 'h3', value: 'SAVE10' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		// Live regions whose aria-live and role follow state: the payload carries their politeness as expressions.
+		name: 'live-follows',
+		fixture: 'test/fixtures/LiveFollows.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
 		// A system sheet in an @if arm: open only while the arm is shown, closed with it, open again when it comes back.
 		name: 'sheet-in-arm-shop',
 		fixture: 'proofs/26-sheet-in-arm/App.tsrx',
