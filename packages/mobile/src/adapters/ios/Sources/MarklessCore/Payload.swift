@@ -260,6 +260,8 @@ public enum NativeEventName: String, Sendable {
 	case pointerdown, pointermove, pointerup, pointercancel
 	/// Raised by the runtime around a touch; a host never sends them.
 	case pointerover, pointerout, pointerenter, pointerleave
+	/// A long press, as Chrome on Android raises `contextmenu`; Safari on iOS raises none, so this host never sends it.
+	case contextmenu
 
 	/// The pointer events a page's handlers may listen for.
 	public var isPointer: Bool {
