@@ -67,6 +67,7 @@
 		"packages/bundler/test/failed-build-compile-store.test.ts",
 		"packages/bundler/test/fixture-builds.test.ts",
 		"packages/bundler/test/interaction-closures-build.test.ts",
+		"packages/bundler/test/joined-repeat-keys-build.test.ts",
 		"packages/bundler/test/kernel-placed-rows-fixture.test.ts",
 		"packages/bundler/test/music-player-csr-budget.test.ts",
 		"packages/bundler/test/music-player-ssr-budget.test.ts",
@@ -87,6 +88,7 @@
 		"packages/bundler/test/server-chunk-size.test.ts",
 		"packages/bundler/test/ssr-action-scoped-lean-fixture.test.ts",
 		"packages/bundler/test/ssr-arm-attribute-fixture.test.ts",
+		"packages/bundler/test/ssr-arm-nested-rows-fixture.test.ts",
 		"packages/bundler/test/ssr-body-local-rows-fixture.test.ts",
 		"packages/bundler/test/ssr-browser-hmr-program-reload.test.ts",
 		"packages/bundler/test/ssr-browser-hmr.test.ts",
@@ -155,15 +157,15 @@
 		"packages/router/test/vite/lookup-table-imports.test.ts",
 		"packages/router/test/vite/many-interactions.test.ts",
 		"packages/router/test/vite/mdx-row-arm-popover.test.ts",
-		"packages/router/test/vite/modal-in-if-arm.test.ts",
-		"packages/router/test/vite/overlay-dismiss.test.ts",
 		"packages/router/test/vite/migration-defects.test.ts",
 		"packages/router/test/vite/migration-shapes.test.ts",
+		"packages/router/test/vite/modal-in-if-arm.test.ts",
 		"packages/router/test/vite/native-packing-build.test.ts",
 		"packages/router/test/vite/navigation-release.test.ts",
 		"packages/router/test/vite/navigation-restyle.test.ts",
 		"packages/router/test/vite/navigation-stream.test.ts",
 		"packages/router/test/vite/one-server-module.test.ts",
+		"packages/router/test/vite/overlay-dismiss.test.ts",
 		"packages/router/test/vite/page-http.test.ts",
 		"packages/router/test/vite/page-region.test.ts",
 		"packages/router/test/vite/page-url-prop.test.ts",
@@ -173,6 +175,7 @@
 		"packages/router/test/vite/prerender-build.test.ts",
 		"packages/router/test/vite/prerender-stale-output.test.ts",
 		"packages/router/test/vite/preset-client-output.test.ts",
+		"packages/router/test/vite/repeat-key-from-fields.test.ts",
 		"packages/router/test/vite/resume-first-gestures.test.ts",
 		"packages/router/test/vite/route-bound-kept-part.test.ts",
 		"packages/router/test/vite/route-href-build.test.ts",
@@ -199,6 +202,7 @@
 		"packages/web/test/early-stream-events.test.ts",
 		"packages/web/test/native-census.test.ts",
 		"packages/web/test/served-census.test.ts",
+		"scripts/ci/build-slots-dir.test.ts",
 		"scripts/test-utils/built-server.test.ts"
 	],
 	"declared": [
@@ -259,6 +263,10 @@
 				"why": "checks the compile store on disk at the moment the build's promise settles in this process"
 			},
 			{
+				"test": "packages/bundler/test/joined-repeat-keys-build.test.ts",
+				"why": "reads the build's in-memory output (write: false) through plugins written in the test, which cannot cross a process boundary"
+			},
+			{
 				"test": "packages/bundler/test/nested-child-compile-error.test.ts",
 				"why": "builds one entry with marklessClient (write: false) for its compile diagnostic; buildFixture builds whole apps with markless() and router(), and races it against a timeout in this process"
 			},
@@ -297,6 +305,149 @@
 			{
 				"test": "packages/bundler/test/transform-memos-released.test.ts",
 				"why": "reads the compiler's in-process transform memos from a plugin"
+			}
+		]
+	},
+	"slotHolders": {
+		"why": "A listed test kept more memory outside the build slot than scripts/ci/unit-budget.mjs allows (SLOT_HOLDER_MB), measured by CI's unit budget (peakMb in that run), or came within the 90th-percentile swing of it. It holds a build slot for its whole run (scripts/ci/in-worker-build-slot.ts), so no build overlaps it. Pages in the shared Chromium of global setup are charged to no file, so they count toward no entry.",
+		"tests": [
+			{
+				"test": "packages/analyzer/test/project-graph.test.ts",
+				"peakMb": 1633,
+				"run": "44705540466",
+				"why": "builds the analyzer project graph of the repo in its worker and spawns app builds"
+			},
+			{
+				"test": "packages/bundler/test/arm-flip-same-task.test.ts",
+				"peakMb": 1406,
+				"run": "44705540466",
+				"why": "builds through execFile, outside the build slot; its pages run in the shared Chromium, charged to no file"
+			},
+			{
+				"test": "packages/bundler/test/build-determinism.test.ts",
+				"peakMb": 1449,
+				"run": "44705540466",
+				"why": "runs `pnpm --dir <demo> build` through execFile, outside the build slot"
+			},
+			{
+				"test": "packages/bundler/test/build-emit-burst.test.ts",
+				"peakMb": 1451,
+				"run": "44705540466",
+				"why": "builds through execFile, outside the build slot"
+			},
+			{
+				"test": "packages/bundler/test/computed-chain-growth.test.ts",
+				"peakMb": 1278,
+				"run": "44711088992",
+				"why": "builds through execFile, outside the build slot"
+			},
+			{
+				"test": "packages/bundler/test/fixture-builds.test.ts",
+				"peakMb": 1209,
+				"run": "44711088992",
+				"why": "builds the bundler fixtures through execFile, outside the build slot"
+			},
+			{
+				"test": "packages/bundler/test/kernel-placed-rows-fixture.test.ts",
+				"peakMb": 1638,
+				"run": "44705540466",
+				"why": "builds through execFile, outside the build slot and serves the app; its pages run in the shared Chromium, charged to no file"
+			},
+			{
+				"test": "packages/bundler/test/music-player-csr-budget.test.ts",
+				"peakMb": 1599,
+				"run": "44705540466",
+				"why": "builds the music-player demo under its own demo lock, not the build slot, and serves it"
+			},
+			{
+				"test": "packages/bundler/test/music-player-ssr-budget.test.ts",
+				"peakMb": 1745,
+				"run": "44705540466",
+				"why": "builds the music-player demo under its own demo lock, not the build slot, and serves it"
+			},
+			{
+				"test": "packages/bundler/test/render-order-sweep.test.ts",
+				"peakMb": 1425,
+				"run": "44721932991",
+				"why": "runs its census of every @markless/ui scenario in child processes, each with its own Vite dev server, outside the build slot (#981)"
+			},
+			{
+				"test": "packages/bundler/test/ssr-arm-attribute-fixture.test.ts",
+				"peakMb": 1277,
+				"run": "44705540466",
+				"why": "builds through execFile, outside the build slot, and serves its app; its pages run in the shared Chromium, charged to no file"
+			},
+			{
+				"test": "packages/bundler/test/ssr-arm-nested-rows-fixture.test.ts",
+				"peakMb": 1475,
+				"run": "44721932991",
+				"why": "builds through execFile, outside the build slot, and serves its app; its pages run in the shared Chromium, charged to no file"
+			},
+			{
+				"test": "packages/bundler/test/ssr-constant-props-fixture.test.ts",
+				"peakMb": 1302,
+				"run": "44705540466",
+				"why": "builds through execFile, outside the build slot, and serves its app; its pages run in the shared Chromium, charged to no file"
+			},
+			{
+				"test": "packages/bundler/test/ssr-idle-fixture.test.ts",
+				"peakMb": 1318,
+				"run": "44721518685",
+				"why": "builds through execFile, outside the build slot, and serves its app; its pages run in the shared Chromium, charged to no file"
+			},
+			{
+				"test": "packages/bundler/test/ssr-imported-rows-fixture.test.ts",
+				"peakMb": 1280,
+				"run": "44721518685",
+				"why": "builds through execFile, outside the build slot, and serves its app; its pages run in the shared Chromium, charged to no file"
+			},
+			{
+				"test": "packages/bundler/test/ssr-nested-rows-fixture.test.ts",
+				"peakMb": 1283,
+				"run": "44721518685",
+				"why": "builds through execFile, outside the build slot, and serves its app; its pages run in the shared Chromium, charged to no file"
+			},
+			{
+				"test": "packages/bundler/test/ssr-prerender-wake-fixture.test.ts",
+				"peakMb": 1506,
+				"run": "44705540466",
+				"why": "builds through execFile, outside the build slot and serves the app; its pages run in the shared Chromium, charged to no file"
+			},
+			{
+				"test": "packages/bundler/test/ssr-row-outer-read-fixture.test.ts",
+				"peakMb": 1500,
+				"run": "44705540466",
+				"why": "builds and serves its fixture; its pages run in the shared Chromium, charged to no file"
+			},
+			{
+				"test": "packages/cli/test/starter-build.test.ts",
+				"peakMb": 1543,
+				"run": "44705540466",
+				"why": "creates, builds and serves a starter app through the CLI in child processes, outside the build slot"
+			},
+			{
+				"test": "packages/mobile/test/phone-runner.test.ts",
+				"peakMb": 1682,
+				"run": "44705540466",
+				"why": "builds the analyzer project graph in its worker"
+			},
+			{
+				"test": "packages/router/test/navigation-chunk.test.ts",
+				"peakMb": 1719,
+				"run": "44705540466",
+				"why": "runs `pnpm --filter @markless/fixture-router build` through execFile, outside the build slot"
+			},
+			{
+				"test": "packages/router/test/package-build.test.ts",
+				"peakMb": 1695,
+				"run": "44705540466",
+				"why": "runs `pnpm exec vp pack` on @markless/router through execFile, outside the build slot"
+			},
+			{
+				"test": "packages/vitest-browser/test/ssr-module-cache-rerun.test.ts",
+				"peakMb": 1400,
+				"run": "44705540466",
+				"why": "runs a vitest browser project through execFile, outside the build slot"
 			}
 		]
 	}

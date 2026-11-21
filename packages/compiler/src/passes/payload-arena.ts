@@ -183,6 +183,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 				collectionGraphNodeId: collection.graphNodeId,
 				collectionPath: collection.path,
 				keyPath: repeat.keyPath,
+				...(repeat.keyParts ? { keyParts: repeat.keyParts } : {}),
 				...(nested?.enclosingRepeatId ? { enclosingRepeatId: nested.enclosingRepeatId } : {}),
 				...(nested?.enclosingItemPath ? { enclosingItemPath: nested.enclosingItemPath } : {}),
 				...(rowElementHandles.length > 0 ? { rowElementHandles } : {}),

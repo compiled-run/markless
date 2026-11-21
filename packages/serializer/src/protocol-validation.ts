@@ -533,6 +533,19 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 		assertOptionalStringField(repeat, 'collectionGraphNodeId', context);
 		assertStringArrayField(repeat, 'collectionPath', context);
 		assertStringArrayField(repeat, 'keyPath', context);
+		if (
+			repeat.keyParts !== undefined &&
+			(!Array.isArray(repeat.keyParts) ||
+				!repeat.keyParts.every(
+					(part: unknown) =>
+						typeof part === 'string' ||
+						(Array.isArray(part) && part.every((segment) => typeof segment === 'string')),
+				))
+		)
+			throw invalidPayloadShapeError(
+				'markless/view',
+				`Invalid ${context}: expected keyParts of text and string paths when present.`,
+			);
 		if (repeat.indexKey !== undefined && repeat.indexKey !== true)
 			throw invalidPayloadShapeError(
 				'markless/view',
@@ -569,6 +582,7 @@ function assertOptionalEnclosingRow(record: Record<string, unknown>, context: st
 	if (enclosingRow === undefined) return;
 	assertRecordShape(enclosingRow, context);
 	assertStringField(enclosingRow, 'repeatId', context);
+	if (enclosingRow.prefix !== undefined) assertStringField(enclosingRow, 'prefix', context);
 	assertElementAddressField(enclosingRow, 'parentHostPath', context);
 	assertOptionalStringArrayField(enclosingRow, 'itemPath', context);
 	if (enclosingRow.arm !== undefined) {

@@ -95,6 +95,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'list-key-from-fields',
+		fixture: 'test/fixtures/JoinedKeys.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h0@b-1' },
+			{ event: 'activate', host: 'component-edge:0/h0@b-1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'component-edge:0/h0@a-1' },
+			{ event: 'activate', host: 'h6@b-2' },
+		],
+	},
+	{
 		name: 'components',
 		fixture: 'proofs/07-child-component/App.tsrx',
 		actions: [
@@ -451,6 +463,135 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'quiet-default',
+		fixture: 'test/fixtures/QuietDefault.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h1' },
+		],
+	},
+	{
+		name: 'notes',
+		fixture: 'test/fixtures/Notes.tsrx',
+		actions: [
+			{ event: 'input', host: 'h1', value: 'First line\nSecond line' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'input', host: 'h1', value: 'Again' },
+		],
+	},
+	{
+		name: 'projected',
+		fixture: 'test/fixtures/Projected.tsrx',
+		actions: [{ event: 'activate', host: 'h6' }],
+	},
+	{
+		name: 'live',
+		fixture: 'test/fixtures/Live.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h8' },
+			{ event: 'activate', host: 'h8' },
+			{ event: 'activate', host: 'h9' },
+			{ event: 'activate', host: 'h10' },
+		],
+	},
+	{
+		name: 'row-seed',
+		fixture: 'test/fixtures/RowSeed.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h0@a' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'component-edge:0/h0@c' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'component-edge:0/h0@b' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'component-edge:0/h0@c' },
+		],
+	},
+	{
+		name: 'factory-handles',
+		fixture: 'test/fixtures/FactoryHandles.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h2' },
+			{ event: 'activate', host: 'component-edge:2/h2' },
+		],
+	},
+	{
+		name: 'hidden-select',
+		fixture: 'test/fixtures/HiddenSelect.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'field-focus',
+		fixture: 'test/fixtures/FieldFocus.tsrx',
+		actions: [
+			{ event: 'focus', host: 'h1' },
+			{ event: 'blur', host: 'h1' },
+			{ event: 'focus', host: 'h2' },
+			{ event: 'blur', host: 'h2' },
+			{ event: 'focus', host: 'h1' },
+		],
+	},
+	{
+		name: 'rename',
+		fixture: 'test/fixtures/Rename.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'input', host: 'h2', value: 'Final' },
+			{ event: 'keydown', host: 'h2', key: 'Enter' },
+			{ event: 'activate', host: 'h1' },
+		],
+	},
+	{
+		name: 'press-count',
+		fixture: 'test/fixtures/PressCount.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h1', detail: 1 },
+			{ event: 'activate', host: 'h1', detail: 2 },
+			{ event: 'activate', host: 'h1', detail: 3 },
+		],
+	},
+	{
+		name: 'field-text',
+		fixture: 'test/fixtures/FieldText.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'focus', host: 'h1' },
+			{ event: 'keydown', host: 'h1', key: 'B' },
+			{ event: 'input', host: 'h1', value: 'Bea' },
+			{ event: 'keydown', host: 'h1', key: 'Enter' },
+			{ event: 'blur', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+		],
+	},
+	{
+		name: 'text-keys',
+		fixture: 'test/fixtures/TextKeys.tsrx',
+		actions: [
+			{ event: 'keydown', host: 'h1', key: 'a' },
+			{ event: 'input', host: 'h1', value: 'a' },
+			{ event: 'keydown', host: 'h1', key: 'Unidentified' },
+			{ event: 'input', host: 'h1', value: 'ab' },
+			{ event: 'keydown', host: 'h1', key: 'Enter' },
+			{ event: 'keydown', host: 'h1', key: 'Unidentified' },
+			{ event: 'input', host: 'h1', value: 'c' },
+			{ event: 'keydown', host: 'h1', key: 'Backspace' },
+			{ event: 'input', host: 'h1', value: '' },
+			{ event: 'keydown', host: 'h1', key: 'Backspace' },
+			{ event: 'paste', host: 'h1', text: 'x,y' },
+			{ event: 'input', host: 'h2', value: 'hi' },
+			{ event: 'keydown', host: 'h2', key: 'Enter' },
+			{ event: 'keydown', host: 'h2', key: 'Enter' },
+			{ event: 'input', host: 'h2', value: '\n' },
+		],
+	},
+	{
 		name: 'commands',
 		fixture: 'test/fixtures/Commands.tsrx',
 		actions: [
@@ -502,6 +643,58 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h4' },
 			{ event: 'idle', host: 'h1' },
 			{ event: 'visible', host: 'h3@a' },
+		],
+	},
+	{
+		name: 'element-proxies',
+		fixture: 'test/fixtures/OptionFocus.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'element-proxies-shared',
+		fixture: 'test/fixtures/SharedOptions.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'component-edge:1/h4' },
+			{ event: 'activate', host: 'component-edge:0/h0' },
+		],
+	},
+	{
+		name: 'shared-methods',
+		fixture: 'test/fixtures/SharedMonth.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'activate', host: 'component-edge:2/h2' },
+			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'component-edge:2/h2' },
+		],
+	},
+	{
+		name: 'script-unset',
+		fixture: 'test/fixtures/UnsetFirst.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
+		name: 'follows',
+		fixture: 'proofs/u38-follows/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'activate', host: 'h5' },
 		],
 	},
 	{

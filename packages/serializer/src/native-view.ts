@@ -4,6 +4,7 @@ import {
 	type NativeDeviceObject,
 	type NativeDeviceValue,
 } from './native-device.ts';
+import type { ProtocolRepeatKeyParts } from './protocol.ts';
 
 // The target-neutral view a native host builds retained views from: no HTML, no DOM positions, no script.
 export const NATIVE_VIEW_VERSION = 'markless.native-view/0';
@@ -108,9 +109,12 @@ export type NativeExpr =
 	/**
 	 * What the event that runs the handler carries: an `input` handler's field text after the edit
 	 * (`event.currentTarget.value`); a `dismiss` handler's `event.detail.reason` and `event.detail.pressTarget` (an element,
-	 * or null for Escape); a pointer handler's fields, as a phone's browser reports a touch (`NativePointerField`).
+	 * or null for Escape); a pointer handler's fields, as a phone's browser reports a touch (`NativePointerField`); a text
+	 * field's `keydown` handler's `event.key`, as the phone's browser gives it for its on-screen keyboard; a `paste`
+	 * handler's pasted plain text (`event.clipboardData.getData('text')`); a click handler's `event.detail`, how many presses
+	 * in a row on the element (a double tap's second press is 2).
 	 */
-	| { readonly event: 'value' | 'reason' | 'pressTarget' | NativePointerField }
+	| { readonly event: 'value' | 'reason' | 'pressTarget' | 'key' | 'text' | 'detail' | NativePointerField }
 	/** Whether the element `node` has captured the pointer `pointer` (`node.hasPointerCapture(pointer)`). */
 	| { readonly captures: NativeExpr; readonly pointer: NativeExpr }
 	/**
@@ -122,6 +126,8 @@ export type NativeExpr =
 	| { readonly formData: string }
 	/** A checkbox's or radio button's checkedness now: what its `checked` binding last set, or a person's tick since. */
 	| { readonly checked: string }
+	/** A text field's text now (`field.value`): what a person typed since, else its `value` binding, else its `value` attribute. */
+	| { readonly field: string }
 	/** The element that has focus (`document.activeElement`), or the document body when none has. */
 	| { readonly focused: true }
 	/** Whether the element `node` is `within` or inside it (`within.contains(node)`); false when either is not an element. */
@@ -146,7 +152,19 @@ export const NATIVE_DOCUMENT_BODY = '#body';
 export type NativeScriptBinding =
 	| { readonly cell: string }
 	| { readonly fields: Readonly<Record<string, string>> }
-	| { readonly value: NativeExpr };
+	| { readonly value: NativeExpr }
+	/**
+	 * An element (its node id) or an array of them, which the function reads through proxies: `getAttribute`,
+	 * `hasAttribute`, `contains`, and the commands `focus` and `scrollIntoView`. The host answers each read from the
+	 * entry's `elements`: the attributes each element has now and the elements it is inside.
+	 */
+	| { readonly elements: NativeExpr }
+	/** A family's shared object, member by member. */
+	| { readonly object: Readonly<Record<string, NativeScriptBinding>> }
+	/** A shared object's method: the script function `method` returns, run over its own `bindings` when called. */
+	| { readonly method: string; readonly bindings: Readonly<Record<string, NativeScriptBinding>> }
+	/** A `shared()` accessor (`selectState`): a function that returns that object. */
+	| { readonly shared: Readonly<Record<string, NativeScriptBinding>> };
 
 export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>;
 
@@ -279,12 +297,14 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	abbr: { flow: 'inline' },
 	time: { flow: 'inline' },
 	data: { flow: 'inline' },
+	output: { flow: 'inline' },
 	bdi: { flow: 'inline' },
 	bdo: { flow: 'inline' },
 	wbr: { flow: 'inline' },
 	br: { flow: 'break' },
 	button: {},
 	input: {},
+	textarea: {},
 	a: {},
 	img: {},
 	audio: {},
@@ -372,6 +392,11 @@ export type NativeNode = NativePlace &
 				readonly defaultStyle?: NativeDefaultStyle;
 				/** On an `<svg>`: what it draws. Its shapes are not nodes. */
 				readonly drawing?: NativeDrawing;
+				/**
+				 * A live region (`aria-live`, `role="status"`, `"alert"` or `"log"`, `<output>`): a change to the text inside is
+				 * announced, after the screen reader's current speech when polite; `atomic` reads the whole region, else the changed text.
+				 */
+				readonly live?: { readonly politeness: 'polite' | 'assertive'; readonly atomic: boolean };
 				/** Attributes fixed at build time (`class` carries the component's scope class); absent when none. */
 				readonly attributes?: Readonly<Record<string, string>>;
 				/** The device object a `camera` element shows (`<base.camera el={cam} />`). */
@@ -411,6 +436,8 @@ export type NativeNode = NativePlace &
 				readonly key: ReadonlyArray<string>;
 				/** `key i` on the index: a row's key is its position (`"0"`, `"1"`), and `key` is empty. */
 				readonly byIndex?: true;
+				/** A key joined from the item's fields, as the web joins it; `key` is then empty and is not the key. */
+				readonly keyParts?: ProtocolRepeatKeyParts;
 		  }
 		| {
 				/**
@@ -447,9 +474,17 @@ export type NativeProperty = 'value' | 'checked' | 'indeterminate' | 'selected';
  * after it left, it is a new one): `idle` at the first moment the host is idle after the screen's first frame (or after
  * the element appears), `visible` the first time any of the element is on the screen.
  */
+/**
+ * `focus` and `blur` are a text field's: it took the keyboard, or gave it up. `keydown` and `paste` are a text field's too:
+ * a key of the on-screen keyboard, and a paste from its edit menu.
+ */
 export type NativeEventName =
 	| 'activate'
 	| 'input'
+	| 'focus'
+	| 'blur'
+	| 'keydown'
+	| 'paste'
 	| 'dismiss'
 	| 'cancel'
 	| 'enter'
@@ -559,6 +594,13 @@ export type NativeOp =
 			readonly command: NativeCommand;
 			readonly preventScroll?: true;
 	  }
+	/** `event.preventDefault()` in a text field's `keydown` or `paste` handler: the host leaves out what the key or paste does. */
+	| { readonly op: 'preventDefault' }
+	/**
+	 * `field.value = text` on a text field: its text becomes `value` (as a string), as if typed but with no input event; the
+	 * journal's `property` entry carries it to the field. `node` is a fixed id or an expression giving one (null: nothing).
+	 */
+	| { readonly op: 'fieldText'; readonly node: string | NativeExpr; readonly value: NativeExpr }
 	/**
 	 * Submits `form` as the web does when `submitter` is pressed, or the return key submits it with no submit button (null):
 	 * nothing when the submitter is disabled; then, unless the form has `novalidate` or the submitter `formnovalidate`,
@@ -615,7 +657,8 @@ export type NativeOp =
 	| { readonly op: 'reset'; readonly cells: ReadonlyArray<string>; readonly catch?: string };
 
 /** Element commands a host runs. */
-export type NativeCommand = 'focus' | 'scrollIntoView';
+/** `select` selects a text field's whole text, as `field.select()` does. */
+export type NativeCommand = 'focus' | 'scrollIntoView' | 'select';
 
 export type NativeViewPayload = {
 	readonly version: typeof NATIVE_VIEW_VERSION;
@@ -660,10 +703,30 @@ export type NativeViewPayload = {
 		 */
 		readonly row?: string;
 		/**
+		 * On a row's state: its first value as an expression of the row's item, taken once when the row is built (a family part
+		 * in a row seeds its state from a prop the row passes); `initial` is then never read.
+		 */
+		readonly first?: NativeExpr;
+		/**
+		 * On a row's state: the values the row passes to the part that owns it, read from the row's item. As on the web, when
+		 * one changes the part is built again: the row's state starts over from its first values.
+		 */
+		readonly rebuiltBy?: ReadonlyArray<NativeExpr>;
+		/**
 		 * The clock when the screen opened, in milliseconds since 1970 (UTC): the host writes it at mount, before the first
 		 * build, as a page's render reads the clock when it is served; `initial` is never shown.
 		 */
 		readonly clock?: true;
+		/**
+		 * Its first value is `undefined` on the web, which `initial` spells as null: a script reads it as `undefined` until
+		 * something writes it.
+		 */
+		readonly unset?: true;
+		/**
+		 * Written while rendering from a value that follows state (a root's `checkbox.checked = checked`): the host writes it
+		 * at mount and again whenever that value changes, as the web runs the write again.
+		 */
+		readonly follows?: NativeExpr;
 	}>;
 	/** Document order: a parent comes before its children, siblings in authored order. */
 	readonly nodes: ReadonlyArray<NativeNode>;
@@ -799,6 +862,8 @@ export type NativeJournalEntry =
 			readonly command: NativeCommand;
 			readonly preventScroll?: true;
 	  }
+	/** The `keydown` or `paste` handler called `preventDefault()`: the host does not delete, break the line, return or paste. */
+	| { readonly op: 'preventDefault' }
 	/** A `<dialog>` opened in the top layer or closed (by an op, or by the host's back gesture as a `cancel`). */
 	| { readonly op: 'dialog'; readonly node: string; readonly open: boolean }
 	/** A submit stopped: the host moves focus to `node` as `focus()` would and shows `message` until the next action. */

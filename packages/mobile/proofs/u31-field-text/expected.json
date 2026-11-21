@@ -1,0 +1,14 @@
+{
+	"rung": 139,
+	"name": "a handler reads a text field's text through its handle: what a person typed, or the value it was built with",
+	"steps": [
+		{ "visible": ["Trip", "Nothing saved"] },
+		{ "do": { "tap": "Save" }, "visible": ["Saved Lima"], "absent": ["Nothing saved"] },
+		{
+			"do": { "type": { "field": "City", "text": "Oslo" } },
+			"visible": ["Saved Lima"],
+			"fields": { "City": "Oslo" }
+		},
+		{ "do": { "tap": "Save" }, "visible": ["Saved Oslo"], "absent": ["Saved Lima"] }
+	]
+}

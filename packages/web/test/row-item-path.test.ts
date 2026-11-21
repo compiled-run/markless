@@ -26,6 +26,25 @@ test('finds the row element by identity, then by key after the list reordered', 
 	).toEqual(['items', '0', 'v']);
 });
 
+test('a row keyed by a string joined from its fields finds its element by that key once the item is a copy', () => {
+	const list = [
+		{ sku: 'tee', size: 's' },
+		{ sku: 'tee', size: 'm' },
+	];
+	const parts = [['sku'], ':', ['size']];
+	const copy = { sku: 'tee', size: 'm' };
+	expect(marklessRowItemPath(contextOver(list, copy), 'n', ['items'], 'entry', [], ['qty'], parts)).toEqual([
+		'items',
+		'1',
+		'qty',
+	]);
+	list.reverse();
+	expect(marklessRowItemPath(contextOver(list, copy), 'n', ['items'], 'entry', [], [], parts)).toEqual([
+		'items',
+		'0',
+	]);
+});
+
 test('a row keyed by position finds its element by identity only', () => {
 	const item = { v: 1 };
 	expect(

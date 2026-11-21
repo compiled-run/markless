@@ -78,6 +78,17 @@ installs an app and drives Maestro (`src/harness/{ios,android,maestro}.ts`, `src
 If you changed that code, restart the runner from your checkout before you submit, or run the harness directly as
 before (`pnpm --filter @markless/mobile proof ...`).
 
+The runner keeps its own checkout on `origin/main`. Every minute it fetches `origin/main`. When the checkout is behind,
+it starts no new job, lets every job already under way finish, and then does three things:
+
+- moves the checkout to `origin/main`;
+- runs `pnpm install --frozen-lockfile`;
+- hands its phones to a runner started from the new code.
+
+The phones keep running through the handover. A failed install puts the checkout back where it was. The runner never
+moves a checkout that is somebody's work: one on a branch other than `main`, one with uncommitted changes, or one with
+commits `origin/main` lacks. It logs why it left such a checkout alone.
+
 A rung that fetches (`server: 'echo'` in its `expected.json`) reaches the test's echo server, which the runner serves on
 `127.0.0.1:28761` while a chunk holding such a rung runs, and closes after, so a web test or the harness can take the port
 between jobs; on Android the chunk forwards that port to the emulator (`adb reverse`).
