@@ -500,11 +500,16 @@ export function evaluateWithScript(
 						]),
 					);
 				const frame = frameOf(bindings);
+				// A cell `undefined` on the web at first is still so here: no caller gives it a value of its own.
+				const unset = payload.cells
+					.filter((cell) => cell.unset && (values.get(cell.id) ?? null) === null)
+					.map((cell) => cell.id);
 				const entry = {
 					kind: 'compute',
 					fn,
 					frame,
 					cells: Object.fromEntries(values),
+					...(unset.length > 0 ? { unset } : {}),
 					...(host.seed ? { seed: host.seed() } : {}),
 				};
 				return JSON.parse(
