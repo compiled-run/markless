@@ -2517,6 +2517,59 @@ export function Save() @{
 		expect(submit).toHaveLength(2);
 	});
 
+	it('settles a promise whose executor hands its own resolve or reject to setTimeout, after the delay', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Waits() @{
+	let status = state('Idle');
+	<main>
+		<form
+			onSubmit={async (event) => {
+				event.preventDefault();
+				status = 'Saving';
+				await new Promise((done) => setTimeout(done));
+				status = 'Saved';
+			}}
+		>
+			<button>Save</button>
+		</form>
+		<form
+			onSubmit={async (event) => {
+				event.preventDefault();
+				try {
+					await new Promise<void>((finish, fail) => {
+						setTimeout(fail, 40);
+					});
+					status = 'kept';
+				} catch {
+					status = 'failed';
+				}
+			}}
+		>
+			<button>Fail</button>
+		</form>
+		<p>{status}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const handler = (id: string) => payload!.handlers.find((entry) => entry.id === id)!.ops;
+		expect(handler('handler:event:0')).toEqual([
+			{ op: 'assign', cell: 'state:status', value: { literal: 'Saving' } },
+			{
+				op: 'after',
+				ms: { literal: 0 },
+				capture: [],
+				ops: [{ op: 'assign', cell: 'state:status', value: { literal: 'Saved' } }],
+			},
+		]);
+		expect(handler('handler:event:1')).toMatchObject([
+			{
+				op: 'after',
+				ms: { literal: 40 },
+				ops: [{ op: 'assign', cell: 'state:status', value: { literal: 'failed' } }],
+			},
+		]);
+	});
+
 	it('names an await that cannot be lowered: inside an if, in an expression, or failing outside a catch', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function later(wait: number) {

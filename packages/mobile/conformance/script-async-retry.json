@@ -7,7 +7,12 @@
 			{
 				"id": "state:word",
 				"name": "word",
-				"initial": "missing"
+				"initial": "missing",
+				"styled": true,
+				"domain": [
+					"missing",
+					"apple"
+				]
 			},
 			{
 				"id": "state:tries",
@@ -649,6 +654,11 @@
 				"host": "h4"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:word",
+					"value": "apple"
+				},
 				{
 					"op": "text",
 					"node": "h3:text0",

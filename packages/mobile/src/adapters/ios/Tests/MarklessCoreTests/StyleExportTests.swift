@@ -35,6 +35,15 @@ private func exportText(_ edit: (String) -> String = { $0 }) -> Data { Data(edit
 	#expect(layout.styles.count == decoded.nodes.count)
 }
 
+@Test func acceptsDragonsTextLinesWhichCoreTextDoesNotNeed() throws {
+	let (decoded, texts) = try payload()
+	let lines = "\"lines\": [{ \"top\": 0, \"baseline\": 70, \"runs\": [{ \"face\": \"Ahem\", \"size\": 60, \"glyphs\": [1, 2], \"xs\": [0, 60] }] }],\n     \"text\": \"Counter\""
+	let edited = exportText { $0.replacingOccurrences(of: "\"text\": \"Counter\"", with: lines) }
+	#expect(edited != counterExport)
+	let layout = try StyleExport.decode(edited).resolve(for: decoded, initialTexts: texts, value: noCells)
+	#expect(layout.styles["h1:text0"]?.frame == Frame(x: 0, y: 0, width: 284.953125 / 3, height: 29))
+}
+
 @Test(arguments: [
 	("\"kind\": \"font\"", "\"kind\": \"letter-spacing\"", "unknown style write kind \"letter-spacing\""),
 	("dragon.native-style-export/0", "dragon.native-style-export/2", "unsupported schema"),
@@ -129,4 +138,14 @@ private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) 
 	#expect(export.assignments.count == 1)
 	#expect(export.notReady?.contains("analysis-only") == true)
 	#expect(export.assignments[0].nodes.contains { $0.isText })
+}
+
+@Test func readsTheSchemeEachAssignmentIsDrawnInAndRefusesAnUnknownOne() throws {
+	let url = try #require(Bundle.module.url(forResource: "Fixtures/ms-text.native-style", withExtension: "json"))
+	let text = String(decoding: try Data(contentsOf: url), as: UTF8.self)
+	let dark = text.replacingOccurrences(of: "\"values\": {},", with: "\"values\": {}, \"colorScheme\": \"dark\",")
+	#expect(dark != text)
+	#expect(try StyleExport.decode(Data(dark.utf8)).assignments.count == 1)
+	let other = text.replacingOccurrences(of: "\"values\": {},", with: "\"values\": {}, \"colorScheme\": \"sepia\",")
+	#expect(throws: PayloadError.self) { try StyleExport.decode(Data(other.utf8)) }
 }

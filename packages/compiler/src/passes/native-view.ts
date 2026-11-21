@@ -18,6 +18,7 @@ import type {
 import { PROTOCOL_IDLE_EVENT_NAME, PROTOCOL_VISIBLE_EVENT_NAME } from '@markless/serializer';
 import {
 	isNativeStyleStateAttribute,
+	nativeExprCells,
 	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
 	NATIVE_DATA_SCRIPT_TYPES,
@@ -1016,7 +1017,6 @@ const isScalar = (value: unknown): value is NativeScalar | null =>
 	typeof value === 'boolean' ||
 	(typeof value === 'number' && Number.isFinite(value));
 
-/** Every cell an expression reads. */
 /** Whether an expression reads a row's item. */
 function readsItem(expr: NativeExpr): boolean {
 	if (!expr || typeof expr !== 'object') return false;
@@ -1068,17 +1068,7 @@ function findsHolder(loop: Extract<SemanticFunctionStatement, { kind: 'each' }>)
 	);
 }
 
-function cellsOf(expr: NativeExpr, into = new Set<string>()): Set<string> {
-	if ('cell' in expr) into.add(expr.cell);
-	for (const child of Object.values(expr)) {
-		if (Array.isArray(child)) {
-			for (const item of child)
-				if (item && typeof item === 'object')
-					cellsOf((Array.isArray(item) ? item[1] : item) as NativeExpr, into);
-		} else if (child && typeof child === 'object') cellsOf(child as NativeExpr, into);
-	}
-	return into;
-}
+const cellsOf = nativeExprCells;
 
 const BUILTIN_CALLS: Readonly<Record<string, (...args: never[]) => unknown>> = {
 	String,
@@ -6351,6 +6341,13 @@ export function createNativeViewPayload(
 				return { ops, returns: true };
 			}
 			if (statement.kind === 'return') return { ops, returns: true };
+			if (statement.kind === 'await' && statement.value.kind === 'apply') {
+				const imported = scope.module.imports.get(statement.value.callee);
+				if (imported?.source === '@markless/router' && imported.importedName === 'navigate') {
+					ops.push(...navigateOps(statement.value.arguments, what, span));
+					continue;
+				}
+			}
 			const awaited = awaitOf(statement);
 			if (awaited === null) {
 				refuse(
@@ -6739,6 +6736,20 @@ export function createNativeViewPayload(
 				}
 				if (first.callee === 'setTimeout') {
 					const [callback, ms, ...more] = first.arguments;
+					const handedOn =
+						callback?.kind === 'read' &&
+						(callback.name === names.resolve || callback.name === names.reject)
+							? callback.name
+							: undefined;
+					if (handedOn !== undefined && more.length === 0) {
+						const delay = ms ? exprOf(ms, what, scope) : { literal: 0 };
+						if (!delay || !nothingAfter()) return null;
+						const settles: Settle =
+							handedOn === names.resolve
+								? { resolve: { literal: null } }
+								: { reject: { literal: null } };
+						return { after: delay, capture: [], settles };
+					}
 					if (
 						callback?.kind !== 'function' ||
 						callback.parameters.length > 0 ||
@@ -7533,11 +7544,54 @@ export function createNativeViewPayload(
 		op.node = element.id;
 	}
 
-	// Dragon lays out one style assignment per combination of these: every cell a class reads, and every true/false cell
-	// an attribute Dragon receives per state reads (`[ui-open]`, `[hidden]`).
+	// Dragon lays out one style assignment per combination of these: every cell a class reads, and every cell an attribute
+	// Dragon receives per state reads (`[ui-open]`, `[hidden]`) whose values are all known: true/false, or strings.
 	// A cell no handler writes keeps its first value, so it adds no assignment.
 	const written = writesOf(handlers.flatMap((handler) => handler.ops));
 	for (const cell of cells) if (cell.follows) written.add(cell.id);
+	const assigned = new Map<string, NativeExpr[]>();
+	// JavaScript can write any value, so a cell a script op may write has no domain known at build time.
+	const scriptWritten = new Set<string>();
+	const collectAssigned = (ops: ReadonlyArray<NativeOp>) => {
+		for (const op of ops) {
+			if (op.op === 'assign')
+				assigned.set(op.cell, [...(assigned.get(op.cell) ?? []), op.value]);
+			else if (op.op === 'if') {
+				collectAssigned(op.whenTrue);
+				collectAssigned(op.whenFalse);
+			} else if (op.op === 'call' && op.after) collectAssigned(op.after.ops);
+			else if (op.op === 'script') writesOf([op], scriptWritten);
+		}
+	};
+	collectAssigned(handlers.flatMap((handler) => handler.ops));
+	const changesOnlyByHandlers = (cell: NativeViewPayload['cells'][number]) =>
+		!cell.storage && !cell.device && !cell.task && !cell.object && !cell.row && !cell.follows;
+	/** A string cell's values when every one is known at build time: its first value, then each literal or unwritten cell assigned to it. */
+	const stringDomain = (id: string): string[] | undefined => {
+		const cell = cells[cellIndex.get(id) ?? -1];
+		if (
+			!cell ||
+			typeof cell.initial !== 'string' ||
+			!changesOnlyByHandlers(cell) ||
+			scriptWritten.has(id)
+		)
+			return undefined;
+		const values = [cell.initial];
+		for (const value of assigned.get(id) ?? []) {
+			const known =
+				'literal' in value
+					? value.literal
+					: 'cell' in value &&
+						  !written.has(value.cell) &&
+						  changesOnlyByHandlers(cells[cellIndex.get(value.cell) ?? -1] ?? cell)
+						? initialOf(value.cell)
+						: undefined;
+			if (typeof known !== 'string') return undefined;
+			if (!values.includes(known)) values.push(known);
+		}
+		return values;
+	};
+	const styledDomains = new Map<string, string[]>();
 	const styledCells = new Set<string>();
 	// A row's state has a value per row, which one style assignment per combination of states cannot follow.
 	const rowCells = new Set(cells.flatMap((cell) => (cell.row ? [cell.id] : [])));
@@ -7550,7 +7604,30 @@ export function createNativeViewPayload(
 					for (const cell of cellsOf(binding.value))
 						if (written.has(cell) && typeof initialOf(cell) === 'boolean')
 							styledCells.add(cell);
+						else if (written.has(cell)) {
+							const domain = stringDomain(cell);
+							if (domain) {
+								styledCells.add(cell);
+								styledDomains.set(cell, domain);
+							}
+						}
 			}
+	// A cell a text reads, when every value it can hold is known: Dragon lays the text out at each value, so a longer string
+	// is not drawn in the frame of the first one.
+	for (const node of nodes)
+		if (node.kind === 'text' && !node.row)
+			for (const part of node.parts) {
+				if ('text' in part) continue;
+				for (const cell of 'cell' in part ? [part.cell] : cellsOf(part.expr))
+					if (written.has(cell) && typeof initialOf(cell) === 'boolean')
+						styledCells.add(cell);
+					else if (written.has(cell) && stringDomain(cell)) styledCells.add(cell);
+			}
+	for (const id of styledCells)
+		if (!styledDomains.has(id) && typeof initialOf(id) === 'string') {
+			const domain = stringDomain(id);
+			if (domain) styledDomains.set(id, domain);
+		}
 
 	const script = buildScript();
 	return done({
@@ -7562,7 +7639,12 @@ export function createNativeViewPayload(
 		cells: cells.map((cell) => ({
 			...cell,
 			...(styledCells.has(cell.id) && !rowCells.has(cell.id)
-				? { styled: true as const }
+				? {
+						styled: true as const,
+						...(styledDomains.has(cell.id)
+							? { domain: styledDomains.get(cell.id)! }
+							: {}),
+					}
 				: {}),
 			...(undefinedFirst.has(cell.id) && !cell.row && cell.initial === null
 				? { unset: true as const }

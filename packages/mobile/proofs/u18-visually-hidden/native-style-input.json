@@ -1,0 +1,101 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "App",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "mk-z50oh2"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-z50oh2"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Hidden text"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "card mk-z50oh2"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "p",
+			"parent": "h2",
+			"attributes": {
+				"class": "mk-z50oh2"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Shown above"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0/h0",
+			"element": "span",
+			"parent": "h2",
+			"attributes": {
+				"style": "clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px;"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:0/h0:text0",
+			"parent": "component-edge:0/h0",
+			"text": "Read by the screen reader only"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "p",
+			"parent": "h2",
+			"attributes": {
+				"class": "mk-z50oh2"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Taps 0"
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"class": "tap mk-z50oh2"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Tap"
+		}
+	],
+	"css": ".card.mk-z50oh2 {\n\t\t\t\tpadding: 12px;\n\t\t\t\tmargin: 12px 0;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tbackground: #e9ecef;\n\t\t\t\tcolor: #22223b;\n\t\t\t}\n\t\t\t.tap.mk-z50oh2 {\n\t\t\t\tdisplay: block;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tpadding: 10px 18px;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffd166;\n\t\t\t\tcolor: #22223b;\n\t\t\t}",
+	"states": []
+}

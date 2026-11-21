@@ -1,11 +1,11 @@
 {
 	"perPage": {
-		"/": 10587,
-		"/help": 14435,
-		"/settings": 58117
+		"/": 42949,
+		"/help": 41211,
+		"/settings": 146164
 	},
-	"perPageTotal": 83139,
-	"app": 54104,
+	"perPageTotal": 230324,
+	"app": 201317,
 	"targets": {
 		"ios": {
 			"writeLists": 28,

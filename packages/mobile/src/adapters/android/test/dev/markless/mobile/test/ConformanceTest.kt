@@ -31,8 +31,14 @@ import dev.markless.mobile.core.num
 import dev.markless.mobile.core.obj
 import dev.markless.mobile.core.str
 import dev.markless.mobile.style.BAND_KEY
+import dev.markless.mobile.style.BandAtom
+import dev.markless.mobile.style.BandComparison
+import dev.markless.mobile.style.Bands
 import dev.markless.mobile.style.Rgba
+import dev.markless.mobile.style.GlyphRun
 import dev.markless.mobile.style.StyleExport
+import dev.markless.mobile.style.SystemFace
+import dev.markless.mobile.style.TextLine
 import dev.markless.mobile.style.StyleWrite
 import java.io.File
 import kotlin.system.exitProcess
@@ -352,6 +358,73 @@ private fun styleExport(fixtures: File) {
 	refusesStyle("an unknown schema", text.replace("native-style-export/0", "native-style-export/9"), "unknown style export schema")
 }
 
+private fun dashedBorders(fixtures: File) {
+	val text = File(fixtures, "u17-borders-dashed.native-style.json").readText()
+	val export = runCatching { StyleExport.decode(text.toByteArray()) }
+	check("decodes the u17 export's border operations", export.isSuccess) { export.exceptionOrNull().toString() }
+	export.getOrNull()?.let { e ->
+		val byId = e.assignments[0].byId
+		check("a dashed box carries Dragon's fills", (byId["h2"]?.borderOps?.ops?.count { it.op == "fill" } ?: 0) > 20) { "${byId["h2"]?.borderOps}" }
+		check("a dotted box carries dots", byId["h3"]?.borderOps?.ops?.any { it.op == "dot" } == true) { "${byId["h3"]?.borderOps}" }
+		check("a solid box carries none", byId["h5"]?.borderOps == null) { "${byId["h5"]?.borderOps}" }
+	}
+	val err = try { StyleExport.decode(text.replace("\"op\": \"dot\"", "\"op\": \"arc\"").toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
+	check("style export refuses an unknown border operation", err?.contains("unknown border operation \"arc\"") == true) { "error was: $err" }
+}
+
+private fun textLines(fixtures: File) {
+	val text = File(fixtures, "u17-borders-dashed.native-style.json").readText()
+	val run = """{ "face": "sha256:ab", "size": 39.37, "glyphs": [65, 1501], "xs": [0, 26.048019409179688] }"""
+	fun withLines(lines: String) = text.replace("\"text\": \"Borders\",", "\"text\": \"Borders\", \"lines\": $lines,")
+	val good = withLines("""[{ "top": -0.1875, "baseline": 37.8125, "runs": [$run] }]""")
+	check("the fixture gains lines", good != text) { "" }
+	val decoded = runCatching { StyleExport.decode(good.toByteArray()) }
+	check("decodes a text node's lines", decoded.isSuccess) { decoded.exceptionOrNull().toString() }
+	decoded.getOrNull()?.let { e ->
+		val lines = e.assignments[0].byId["h1:text0"]?.lines
+		check("a line keeps Dragon's glyphs, xs and baseline", lines == listOf(TextLine(-0.1875, 37.8125, listOf(GlyphRun("sha256:ab", 39.37, listOf(65, 1501), listOf(0.0, 26.048019409179688)))))) { "$lines" }
+		check("a text node without lines has none", e.assignments[0].byId["h2:text0"]?.lines == null) { "${e.assignments[0].byId["h2:text0"]?.lines}" }
+	}
+	fun refusesLines(name: String, changed: String, fragment: String) {
+		val err = try { StyleExport.decode(changed.toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
+		check("style export refuses $name", err != null && err.contains(fragment)) { "error was: $err" }
+	}
+	refusesLines("lines that are not a list", withLines("{}"), "lines must be an array")
+	refusesLines("a line with an unknown field", withLines("""[{ "top": 0, "baseline": 1, "runs": [], "width": 3 }]"""), "unknown field")
+	refusesLines("a line without a baseline", withLines("""[{ "top": 0, "runs": [] }]"""), "baseline")
+	refusesLines("a run with fewer xs than glyphs", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "face": "sha256:ab", "size": 10, "glyphs": [1, 2], "xs": [0] }] }]"""), "one x per glyph")
+	refusesLines("an empty run", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "face": "sha256:ab", "size": 10, "glyphs": [], "xs": [] }] }]"""), "at least one glyph")
+	refusesLines("a fractional glyph id", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "face": "sha256:ab", "size": 10, "glyphs": [1.5], "xs": [0] }] }]"""), "not a glyph id")
+	refusesLines("a glyph id past 16 bits", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "face": "sha256:ab", "size": 10, "glyphs": [70000], "xs": [0] }] }]"""), "not a glyph id")
+	refusesLines("a zero size", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "face": "sha256:ab", "size": 0, "glyphs": [1], "xs": [0] }] }]"""), "not a positive size")
+	refusesLines("a run without a face", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "size": 10, "glyphs": [1], "xs": [0] }] }]"""), "face")
+	refusesLines("lines on an element", text.replace("\"text\": null,", "\"text\": null, \"lines\": [],"), "only a framed text node has lines")
+}
+
+private fun systemFonts(fixtures: File) {
+	val text = File(fixtures, "u17-borders-dashed.native-style.json").readText()
+	val roboto = """{ "file": "Roboto-Regular.ttf", "index": 0, "axes": { "ital": 0, "wdth": 100, "wght": 700 }, "sha256": "9ca9" }"""
+	fun withFaces(faces: String) = text.replaceFirst("\n \"fonts\": [", "\n \"systemFonts\": $faces,\n \"fonts\": [")
+	val good = withFaces("""[{ "id": "system:system-ui:700", "ios": { "face": { "kind": "system", "weight": 0.4, "design": "default" } }, "android": $roboto }]""")
+	check("the fixture gains system fonts", good != text) { "" }
+	val decoded = runCatching { StyleExport.decode(good.toByteArray()) }
+	check("decodes the system fonts", decoded.isSuccess) { decoded.exceptionOrNull().toString() }
+	check("a system face keeps its file, index and axes", decoded.getOrNull()?.systemFaces == mapOf("system:system-ui:700" to SystemFace("Roboto-Regular.ttf", 0, mapOf("ital" to 0.0, "wdth" to 100.0, "wght" to 700.0)))) { "${decoded.getOrNull()?.systemFaces}" }
+	check("an export without system fonts has none", StyleExport.decode(text.toByteArray()).systemFaces.isEmpty()) { "" }
+	fun refuses(name: String, faces: String, fragment: String) {
+		val err = try { StyleExport.decode(withFaces(faces).toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
+		check("style export refuses $name", err != null && err.contains(fragment)) { "error was: $err" }
+	}
+	refuses("system fonts that are not a list", "{}", "systemFonts must be an array")
+	refuses("a system face without an Android face", """[{ "id": "system:serif:400", "ios": {} }]""", "has no android face")
+	refuses("a system face id that is not one", """[{ "id": "sha256:ab", "android": $roboto }]""", "not a system face id")
+	refuses("a system face listed twice", """[{ "id": "system:serif:400", "android": $roboto }, { "id": "system:serif:400", "android": $roboto }]""", "twice")
+	refuses("a path for a file", """[{ "id": "system:serif:400", "android": { "file": "../etc/x.ttf", "index": 0, "axes": {}, "sha256": "a" } }]""", "not a file name")
+	refuses("an unknown field", """[{ "id": "system:serif:400", "android": { "file": "a.ttf", "index": 0, "axes": {}, "sha256": "a", "weight": 4 } }]""", "unknown field")
+	refuses("a fractional face index", """[{ "id": "system:serif:400", "android": { "file": "a.ttf", "index": 0.5, "axes": {}, "sha256": "a" } }]""", "not a face index")
+	refuses("an axis tag that is not four letters", """[{ "id": "system:serif:400", "android": { "file": "a.ttf", "index": 0, "axes": { "weight": 4 }, "sha256": "a" } }]""", "four-letter axis tag")
+}
+
 private fun ops() {
 	val payload = """{"version":"markless.native-view/0","component":"C","cells":[{"id":"n","name":"n","initial":0,"storage":{"key":"visits"}},{"id":"s","name":"s","initial":"a"}],"nodes":[{"kind":"element","id":"h0","element":"div","parent":null,"attributes":{"class":"x mk-1"}},{"kind":"text","id":"h0:text0","parent":"h0","parts":[{"cell":"n"},{"text":"/"},{"expr":{"template":["<",{"cell":"s"},">"]}}]},{"kind":"element","id":"h1","element":"button","parent":"h0"},{"kind":"element","id":"h2","element":"button","parent":"h0"}],"events":[{"host":"h1","event":"activate","handler":"t"},{"host":"h2","event":"activate","handler":"same"}],"handlers":[{"id":"t","ops":[{"op":"assign","cell":"n","value":{"binary":"+","left":{"unary":"+","value":{"cell":"n"}},"right":{"literal":1}}},{"op":"assign","cell":"s","value":{"binary":"+","left":{"cell":"s"},"right":{"cell":"n"}}}]},{"id":"same","ops":[{"op":"assign","cell":"s","value":{"cell":"s"}}]}]}"""
 	val decoded = Payload.decode(payload.toByteArray())
@@ -512,7 +585,11 @@ private fun appStyle(fixtures: File) {
 		check("app style refuses $name", err != null && err.contains(fragment)) { "error was: $err" }
 	}
 	// The fixture may be compact or formatted: each edit allows whitespace after a colon.
-	refusesApp("an atom of another media feature", text.replace(Regex("\"feature\":\\s*\"prefers-color-scheme\""), "\"feature\":\"width\""), "@media (width) is not implemented on Android")
+	val widthBands = Bands(listOf(BandAtom("width", "none", listOf(BandComparison("ge", 600.0, 0.0, 0.0)))), listOf(listOf(false), listOf(true)))
+	val byScheme = runCatching { widthBands.band(dark = false) }.exceptionOrNull()
+	check("a width band needs the page's size", byScheme is MarklessDecodeError && byScheme.message!!.contains("needs the page's size")) { "error was: $byScheme" }
+	val bySize = runCatching { widthBands.band(dark = false, widthPx = 1080.0, heightPx = 2203.0, scale = 2.625) }.exceptionOrNull()
+	check("a width band needs Dragon's lookup, which the JVM test does not link", Bands.library == null && bySize is MarklessDecodeError && bySize.message!!.contains("needs Dragon's band lookup")) { "error was: $bySize" }
 	refusesApp("an unknown version", text.replace("markless.native-app-style/0", "markless.native-app-style/9"), "unknown app style version")
 	refusesApp("a write index out of range", text.replace(Regex("\"writes\":\\s*\\d+(\\s*)}"), "\"writes\":99999$1}"), "not an index of the app's write lists")
 	refusesApp("an unknown route field", text.replace(Regex("\"pattern\":\\s*\"/help\""), "\"pattern\":\"/help\",\"extra\":1"), "unknown field \"extra\"")
@@ -595,6 +672,9 @@ fun main(args: Array<String>) {
 	styleExport(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	appStyle(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	appCanvas(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	dashedBorders(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	textLines(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	systemFonts(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	sheetStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	val dirs = args.map(::File)
