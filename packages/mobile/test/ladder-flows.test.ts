@@ -57,6 +57,7 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		57,
 		144,
 		145,
+		148,
 		201,
 		'J1',
 		'J2',
@@ -71,6 +72,7 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		'J13',
 		'J14',
 		'J15',
+		'J17',
 		'J19',
 		'J41',
 		'J42',
@@ -104,6 +106,12 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		137,
 		141,
 		143,
+		147,
+		150,
+		151,
+		152,
+		153,
+		160,
 		'T1',
 		101,
 		102,
@@ -142,10 +150,12 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		148,
 		171,
 		198,
+		199,
 		101,
 		102,
 		103,
 		104,
+		105,
 	]);
 	for (const folder of rungFolders())
 		expect(existsSync(join(proofsDir, folder, 'App.tsrx'))).toBe(true);
@@ -189,6 +199,7 @@ test('the navigation ladder has one app folder per rung, in rung order', () => {
 		'N2',
 		'N3',
 		'N4',
+		'N5',
 		'N10',
 		138,
 		139,
@@ -218,6 +229,7 @@ test('the styles ladder has one app folder per rung, in rung order', () => {
 		'S15',
 		'S20',
 		'S21',
+		'S23',
 	]);
 	for (const folder of styleRungFolders())
 		expect(existsSync(join(proofsDir, folder, 'pages'))).toBe(true);

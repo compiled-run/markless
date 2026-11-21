@@ -320,6 +320,28 @@ test('keyed repeat enclosing row round-trips and refuses a malformed shape', () 
 		).toThrow(/keyedRepeat\[1\]\.enclosingRow/);
 });
 
+// A nested repeat's enclosing list is prefix + repeatId, held in the same record set: the page, a branch's served arm or an @try arm.
+test('keyed repeat enclosing row must name a list in its record set', () => {
+	const list = (id: string, enclosingRow?: object) => ({ id, parentHostNodeId: 'c0:h0', ...(enclosingRow && { enclosingRow }), collectionPath: [], keyPath: ['id'], itemName: 'item', rowElementCount: 1, rowEvents: [] });
+	const state: ProtocolStatePayload = { version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] };
+	const base = { version: ASYNC_PROTOCOL_VERSION, locators: [], events: [], domUpdates: [], behaviors: [], elementHandles: [], asyncBoundaries: [] };
+	const decode = (view: object) => () => decodePayloadScripts(renderPayloadScripts({ state, view: { ...base, ...view } as never }));
+	const outer = list('c0:repeat:0');
+	const inner = list('c0:repeat:1', { repeatId: 'repeat:0', prefix: 'c0:', parentHostPath: [] });
+	const arm = { locators: [], events: [], domUpdates: [], behaviors: [], elementHandles: [], keyedRepeats: [outer, inner], branches: [] };
+	const anchor = (index: number) => ({ strategy: 'dom-order-comment', index });
+	const branch = { id: 'branch-site:0', startAnchor: anchor(0), endAnchor: anchor(1), symbolId: 'symbol:0', testReads: [], escalates: true, servedArmRecords: arm, takenArm: 0 };
+	const boundary = { id: 'async:0', runnerGraphNodeId: null, initiallyServedArm: 0, startAnchor: anchor(2), endAnchor: anchor(3), asyncReads: [], armRecords: [arm, { ...arm, keyedRepeats: [] }] };
+
+	expect(decode({ keyedRepeats: [outer, inner] })).not.toThrow();
+	expect(decode({ keyedRepeats: [], branches: [branch] })).not.toThrow();
+	expect(decode({ keyedRepeats: [], asyncBoundaries: [boundary] })).not.toThrow();
+	// A missed prefix: the set holds only a list with the same authored id.
+	expect(decode({ keyedRepeats: [list('repeat:0'), inner] })).toThrow(/c0:repeat:1: its enclosingRow names c0:repeat:0/);
+	// The enclosing list in another record set does not count.
+	expect(decode({ keyedRepeats: [outer], branches: [{ ...branch, servedArmRecords: { ...arm, keyedRepeats: [inner] } }] })).toThrow(/not a list in its record set/);
+});
+
 // A composed row's prop routes cross the wire on its record and are refused malformed.
 test('keyed repeat prop routes round-trip and refuse a malformed shape', () => {
 	const repeat = {

@@ -1,0 +1,140 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 379,
+			"reason": "an arm commit reads each page-held list collection before its first await, skipping the arm's own cells and computeds, and passes a typed paint snapshot, so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010): 16061 -> 16440 B rendered",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 182,
+			"reason": "the wiring takes a typed paint snapshot and adopts painted rows under its collections, dropping each entry once used (#1010): 22695 -> 22877 B rendered",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 379,
+			"reason": "an arm commit reads each page-held list collection before its first await, skipping the arm's own cells and computeds, and passes a typed paint snapshot, so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010): 16061 -> 16440 B rendered",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 182,
+			"reason": "the wiring takes a typed paint snapshot and adopts painted rows under its collections, dropping each entry once used (#1010): 22695 -> 22877 B rendered",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-async-wiring"
+			],
+			"delta": 382,
+			"reason": "G10: an arm commit reads each page-held list collection before its first await, skipping the arm's own cells and computeds, and passes a typed paint snapshot, so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010): 16058 -> 16440 B rendered",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 167,
+			"reason": "G10: the wiring takes a typed paint snapshot and adopts painted rows under its collections, dropping each entry once used (#1010): 22710 -> 22877 B rendered",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 22,
+			"reason": "vite-csr measured on main with #982 plus this PR's paint snapshot bytes: 27872 -> 27894 B gzip (#1010)",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 4,
+			"reason": "vite-plus measured on main with #982 plus this PR's paint snapshot bytes: 7335 -> 7339 B gzip (#1010)",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 22,
+			"reason": "vite-plus measured on main with #982 plus this PR's paint snapshot bytes: 27073 -> 27095 B gzip (#1010)",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 66,
+			"reason": "G16: the queue build (main + #982 + #989 + this PR) downloads 96735 B gzip at load against 96669 B measured on 57eead6c9f; the +66 B is this PR's paint snapshot bytes in resume-async-wiring and resume-keyed-repeats composing with #982 (#1010)",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 66,
+			"reason": "G16: the queue build (main + #982 + #989 + this PR) downloads 96735 B gzip at load against 96669 B measured on 57eead6c9f; the +66 B is this PR's paint snapshot bytes in resume-async-wiring and resume-keyed-repeats composing with #982 (#1010)",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 66,
+			"reason": "G16: the queue build (main + #982 + #989 + this PR) downloads 96735 B gzip at load against 96669 B measured on 57eead6c9f; the +66 B is this PR's paint snapshot bytes in resume-async-wiring and resume-keyed-repeats composing with #982 (#1010)",
+			"date": "2026-11-21"
+		}
+	]
+}

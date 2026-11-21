@@ -17,6 +17,9 @@ import {
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	nativeLocale,
 	nativeMaxLength,
+	nativeEmailMismatch,
+	nativeRangeValue,
+	nativeEmailValue,
 	nativeTooLongMessage,
 } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
@@ -38,6 +41,8 @@ export type NativeAction =
 	| { readonly event: 'choose'; readonly host: string }
 	/** The field's whole text after an edit. */
 	| { readonly event: 'input'; readonly host: string; readonly value: string }
+	/** A range input let go after its value moved (the web's `change`), with the value it holds. */
+	| { readonly event: 'commit'; readonly host: string; readonly value: string }
 	/** A key of the on-screen keyboard in a text field, before it edits the text; `key` as the phone's browser names it. */
 	| { readonly event: 'keydown'; readonly host: string; readonly key: string }
 	/** A paste into a text field from its edit menu, before the text goes in. */
@@ -183,7 +188,7 @@ export type NativeRuntime = {
 	readonly arms: () => ReadonlyArray<readonly [node: string, index: number | null]>;
 	/** Every shown list's row keys, in order. */
 	readonly rows: () => ReadonlyArray<readonly [node: string, keys: ReadonlyArray<string>]>;
-	/** Every system sheet and whether its `open` is truthy. */
+	/** Every system sheet shown (its arm, if any, showing) and whether its `open` is truthy. */
 	readonly sheets: () => ReadonlyArray<readonly [node: string, open: boolean]>;
 	/** Every shown checkbox's and radio button's checkedness. */
 	readonly checks: () => ReadonlyArray<readonly [node: string, checked: boolean]>;
@@ -424,6 +429,7 @@ export function evaluateNativeExpr(
 			.join('');
 	if ('member' in expr) {
 		const value = evaluate(expr.member);
+		if (expr.optional && value === null) return null;
 		if ((typeof value === 'string' || Array.isArray(value)) && expr.property === 'length')
 			return value.length;
 		const index = Number(expr.property);
@@ -1137,10 +1143,26 @@ export function createNativeRuntime(
 	};
 	const propertyBinding = (id: string, name: string) =>
 		elementOf(id).bindings?.find((one) => 'property' in one && one.property === name);
+	/** Whether a `<textarea>` shows its default value now: nobody edited it and no `value` property sets it. */
+	const followsDefault = (id: string): boolean => {
+		const node = elementOf(id.split('@')[0]!);
+		return (
+			node.element === 'textarea' &&
+			!edited.has(id) &&
+			propertyBinding(node.id, 'value') === undefined
+		);
+	};
 	const textOf = (id: string): string => {
-		if (edited.has(id)) return edited.get(id)!;
 		const binding = propertyBinding(id, 'value');
-		return binding ? String(evaluate(binding.value) ?? '') : (attributeNow(id, 'value') ?? '');
+		const text = edited.has(id)
+			? edited.get(id)!
+			: binding
+				? String(evaluate(binding.value) ?? '')
+				: (attributeNow(id, 'value') ?? '');
+		// A range keeps a number in its range and on its step, whatever it is given.
+		return attributeNow(id, 'type') === 'range'
+			? nativeRangeValue(text, attributeNow(id, 'min'), attributeNow(id, 'max'), attributeNow(id, 'step'))
+			: text;
 	};
 	const ticked = payload.nodes.flatMap((node) =>
 		node.kind === 'element' &&
@@ -1305,6 +1327,12 @@ export function createNativeRuntime(
 	const missing = messages[nativeLocale(preferredLanguages, Object.keys(messages))];
 	const tooLongMessages = payload.tooLong ?? {};
 	const tooLong = tooLongMessages[nativeLocale(preferredLanguages, Object.keys(tooLongMessages))];
+	const mismatchMessages = payload.typeMismatch ?? {};
+	const mismatch =
+		mismatchMessages[nativeLocale(preferredLanguages, Object.keys(mismatchMessages))];
+	/** A text field's value as the web keeps it: an email field drops line breaks and trims its ends. */
+	const valueOf = (node: string) =>
+		attributeNow(node, 'type') === 'email' ? nativeEmailValue(textOf(node)) : textOf(node);
 	function entriesOf(id: string): Value {
 		const form = forms.get(id);
 		if (!form) throw new Error(`${id} is not a form`);
@@ -1318,7 +1346,7 @@ export function createNativeRuntime(
 				const chosen = chosenOf(node);
 				return chosen ? [[name, optionValue(chosen)]] : [];
 			}
-			return [[name, kind === 'hidden' ? (attributeNow(node, 'value') ?? '') : textOf(node)]];
+			return [[name, kind === 'hidden' ? (attributeNow(node, 'value') ?? '') : valueOf(node)]];
 		});
 	}
 	/** Why a field stops a submit, as the web says it, or undefined when it does not. */
@@ -1334,11 +1362,16 @@ export function createNativeRuntime(
 			kind === 'radio'
 				? groupOf(node).every((member) => !checkedOf(member.id))
 				: kind === 'text'
-					? textOf(node) === ''
+					? valueOf(node) === ''
 					: !checkedOf(node);
 		if (required && absent()) {
 			if (!missing) throw new Error(`the payload has no message for a ${kind} missing its value`);
 			return missing[kind as 'text' | 'checkbox' | 'radio'];
+		}
+		if (kind === 'text' && attributeNow(node, 'type') === 'email') {
+			if (!mismatch) throw new Error('the payload has no message for an email field');
+			const message = nativeEmailMismatch(mismatch, valueOf(node));
+			if (message !== undefined) return message;
 		}
 		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		const max = kind === 'text' ? nativeMaxLength(attributeNow(node, 'maxlength')) : undefined;
@@ -1390,7 +1423,9 @@ export function createNativeRuntime(
 		);
 	const sheets = () =>
 		payload.nodes.flatMap((node) =>
-			node.kind === 'sheet' ? [[node.id, Boolean(evaluate(node.open))] as const] : [],
+			node.kind === 'sheet' && shown(node)
+				? [[node.id, Boolean(evaluate(node.open))] as const]
+				: [],
 		);
 	const keyed = <T>(list: ReadonlyArray<readonly [string, string, T]>) =>
 		new Map(list.map(([node, name, value]) => [`${node}\0${name}`, value]));
@@ -1737,7 +1772,8 @@ export function createNativeRuntime(
 				.find((shown) => shown.id === action.host);
 			if (!instance) throw new Error(`${action.host} is not shown`);
 			const scope = instance.scope;
-			const edit = action.event === 'input' ? action.value : undefined;
+			const edit =
+				action.event === 'input' || action.event === 'commit' ? action.value : undefined;
 			const eventValue: string | NativeEventFields | undefined =
 				action.event === 'keydown'
 					? { key: action.key }
@@ -2091,8 +2127,9 @@ export function createNativeRuntime(
 						: [];
 				}
 				if (node.kind === 'sheet') {
-					const open = afterSheets.get(node.id)!;
-					return beforeSheets.get(node.id) !== open
+					const before = beforeSheets.get(node.id);
+					const open = afterSheets.get(node.id);
+					return before !== undefined && open !== undefined && before !== open
 						? [{ op: 'sheet', node: node.id, open }]
 						: [];
 				}
@@ -2143,6 +2180,17 @@ export function createNativeRuntime(
 											name,
 											value: afterAttributes.get(key)!,
 										},
+										// A field nobody edited shows its `value` attribute, as the web's default value.
+										...(name === 'value' && followsDefault(id)
+											? [
+													{
+														op: 'property' as const,
+														node: id,
+														name: 'value' as const,
+														value: afterAttributes.get(key) ?? '',
+													},
+												]
+											: []),
 									]
 								: [
 										{

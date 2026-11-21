@@ -1,0 +1,47 @@
+{
+	"rung": 105,
+	"name": "A system sheet in an @if arm closes when its arm leaves and opens again when it comes back still open",
+	"steps": [
+		{
+			"visible": ["Colours", "Picked nothing", "Show choices"],
+			"absent": ["Choose a colour", "Pick one"]
+		},
+		{
+			"do": { "tap": "Show choices" },
+			"visible": ["Choose a colour", "Hide choices"],
+			"absent": ["Pick one", "Show choices"]
+		},
+		{
+			"do": { "tap": "Choose a colour" },
+			"visible": ["Pick one", "Red", "Put away"]
+		},
+		{
+			"do": { "tap": "Put away" },
+			"visible": ["Show choices"],
+			"absent": ["Pick one", "Choose a colour", "Hide choices"]
+		},
+		{
+			"do": { "tap": "Show choices" },
+			"visible": ["Pick one", "Red"]
+		},
+		{
+			"do": { "tap": "Red" },
+			"visible": ["Picked red", "Hide choices"],
+			"absent": ["Pick one", "Picked nothing"]
+		}
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": ["Colours", "Picked nothing", "Show choices"],
+				"absent": ["Choose a colour", "Pick one"]
+			},
+			{
+				"do": { "tap": "Show choices" },
+				"visible": ["Choose a colour", "Hide choices"],
+				"absent": ["Pick one", "Show choices"]
+			}
+		],
+		"absentFromOutput": ["Pick one", "Put away"]
+	}
+}
