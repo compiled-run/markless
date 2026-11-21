@@ -103,8 +103,8 @@ async function serveRung(
 	}
 	// Components a rung imports live in proofs/lib, which a page reaches as `../lib/...` from pages/ here too.
 	await cp(join(proofsDir, 'lib'), join(root, 'lib'), { recursive: true });
-	// An app rung may bring its own components, stylesheets, served files and document (whose stylesheet imports reach every page).
-	for (const own of ['lib', 'styles', 'public'])
+	// An app rung may bring its own components, stylesheets, served files, API routes and document (whose stylesheet imports reach every page).
+	for (const own of ['lib', 'styles', 'public', 'api'])
 		if (existsSync(join(proofsDir, folder, own)))
 			await cp(join(proofsDir, folder, own), join(root, own), { recursive: true });
 	if (existsSync(join(proofsDir, folder, 'document.tsrx')))
@@ -119,6 +119,8 @@ async function serveRung(
 		join(root, 'node_modules/@markless/ui'),
 		'dir',
 	);
+	// The server an app rung's api/ routes run in, as the router's build imports it.
+	await symlink(join(packagesRoot, 'router/node_modules/nitro'), join(root, 'node_modules/nitro'), 'dir');
 	// The third-party package the script ladder imports (J2), as the mobile package depends on it.
 	await symlink(
 		join(packagesRoot, 'mobile/node_modules/scule'),
