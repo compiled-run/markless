@@ -216,6 +216,26 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	#expect(views.labels["h3:text0"]?.text == "Hello Bo")
 }
 
+@MainActor @Test func aRangeIsASliderOnItsStepsThatSendsTheValueItLandsOn() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("range"), store: MemoryStore())
+	let views = try tree(controller)
+	let built = views.elements["h2"]
+	let slider = try #require(built as? RangeSlider, "h2 is \(String(describing: built.map { type(of: $0) }))")
+	controller.view.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+	controller.view.layoutIfNeeded()
+	#expect(slider.frame.width >= 129, "frame \(slider.frame)")
+	#expect(slider.frame.height >= 31, "frame \(slider.frame)")
+	#expect(slider.number == 5)
+	#expect(slider.accessibilityLabel == "Volume")
+	#expect(slider.accessibilityValue == "5")
+	var sent: [String] = []
+	slider.onInput = { sent.append($0) }
+	slider.accessibilityIncrement()
+	slider.accessibilityIncrement()
+	#expect(slider.number == 7)
+	#expect(sent == ["6", "7"])
+}
+
 @MainActor @Test func rowsAreBuiltRemovedAndMovedNotRebuilt() throws {
 	let controller = try MarklessViewController(payload: vectorPayload("list"), store: MemoryStore())
 	let views = try tree(controller)

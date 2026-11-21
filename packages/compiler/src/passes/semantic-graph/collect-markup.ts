@@ -749,7 +749,10 @@ function emitTextareaValue(
 	const literal = staticAttributeValue('value', value, expression);
 	if (literal) {
 		const text = attributeText('value', literal.value);
-		if (text !== null) append(builder, escapeHtml(text));
+		if (text === null || text === '') return;
+		append(builder, escapeHtml(text));
+		if (NATIVE_FACTS)
+			builder.texts?.push({ coordinate: { kind: 'child-index', path: [...path, 0] }, text });
 		return;
 	}
 	if (!expression) return;
@@ -1240,6 +1243,9 @@ function emitDynamicHost(
 			cardinality: 'zero-or-one',
 			nullishTag: 'omit',
 			tag: expressionResidue(tagExpression, context, repeat, builder.componentName),
+			...(NATIVE_FACTS && context.nativeFacts
+				? { nativeTag: nativeCollectors(context.nativeFacts).expression(tagExpression as never) }
+				: {}),
 			staticAttributes,
 			attributeSlots,
 			childChunkId,

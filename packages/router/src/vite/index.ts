@@ -69,7 +69,9 @@ import {
 	STYLESHEET_KEY_ATTRIBUTE,
 	runFragmentNavigation,
 	startFragmentNavigation,
+	watchViewport,
 } from './fragment-navigation.ts';
+import { prefetches, prefetchPolicy, type RouterPrefetch } from './prefetch-policy.ts';
 import { fragmentRequestModule } from './nitro-fragment-requests.ts';
 import {
 	brotliCopiesPlugin,
@@ -114,6 +116,19 @@ import {
 	type LinkBridgeModule,
 } from './runtime/create-server-entry.ts';
 import { LINK_BRIDGE_DIR } from './runtime/link-bridge-module.ts';
+
+export {
+	PREFETCH_DEFAULTS,
+	PREFETCH_LINK_CHOICES,
+	PREFETCH_MARKS,
+	PREFETCH_NETWORKS,
+	PREFETCH_TRIGGERS,
+	type PrefetchLinkChoice,
+	type PrefetchNetworks,
+	type PrefetchTrigger,
+	type RouterPrefetch,
+	type RouterPrefetchOptions,
+} from './prefetch-policy.ts';
 
 // The compiler refuses browser code that reads these page props: they hold request data.
 const PAGE_SERVER_ONLY_PROPS = [
@@ -186,11 +201,13 @@ export interface MarklessRouterOptions {
 	mode?: 'path' | 'hash';
 	nitro?: boolean;
 	/**
-	 * `false` downloads nothing for a link before it is clicked: no prefetch on hover, press,
-	 * focus or idle. Links still navigate. `<Link prefetch={false}>` does the same for one link.
-	 * Prefetches only ever request page routes, with a `Purpose: prefetch` header; endpoints are never prefetched.
+	 * When a linked page is fetched before its click. `false` (or `'none'`) fetches nothing early; links still navigate.
+	 * An object sets each trigger (`intent`, `viewport`, `idle`) to `'all'`, `'fast'` or `'none'` networks.
+	 * Defaults: `{ intent: 'all', viewport: 'none', idle: 'fast', concurrency: 2 }`.
+	 * Prefetches only ever request page routes, with a `Purpose: prefetch` header; endpoints are never prefetched,
+	 * and nothing is prefetched under Save-Data or in a hidden tab. `<Link prefetch={false}>` turns one link off.
 	 */
-	prefetch?: boolean;
+	prefetch?: RouterPrefetch;
 }
 
 export function router(options: MarklessRouterOptions = {}): PluginOption[] {
@@ -1298,7 +1315,7 @@ async function routerOptionsSource(
 }
 
 function linkIntentEnabled(options: MarklessRouterOptions): boolean {
-	return options.prefetch !== false;
+	return prefetches(prefetchPolicy(options.prefetch));
 }
 
 function entryPathSource(
@@ -1363,6 +1380,8 @@ function linkBridgeFilesPlugin(
 					fragmentNavigationSource: minifiedFragmentNavigationSource(),
 					fragmentNavigationRunSource:
 						minifiedFragmentNavigationSource(runFragmentNavigation),
+					fragmentNavigationViewportSource:
+						minifiedFragmentNavigationSource(watchViewport),
 					prefetch: options.prefetch,
 					documentNavigation: documentNavigationFor(documentSource),
 					routeFileIds: bundledPageFileIds(chunks, root),
@@ -1425,7 +1444,10 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`  fragmentEntryPath,`,
 		`  fragmentNavigationSource: ${JSON.stringify(minifiedFragmentNavigationSource())},`,
 		`  fragmentNavigationRunSource: ${JSON.stringify(minifiedFragmentNavigationSource(runFragmentNavigation))},`,
-		...(options.prefetch === false ? ['  prefetch: false,'] : []),
+		`  fragmentNavigationViewportSource: ${JSON.stringify(minifiedFragmentNavigationSource(watchViewport))},`,
+		...(options.prefetch === undefined
+			? []
+			: [`  prefetch: ${JSON.stringify(options.prefetch)},`]),
 		`  routeModulePreloads,`,
 		`  routeSsrModulePreloads,`,
 		`  routeResumeModules,`,

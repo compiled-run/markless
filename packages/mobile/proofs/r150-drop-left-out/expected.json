@@ -1,0 +1,8 @@
+{
+	"rung": 150,
+	"name": "Drop handlers are left out on phones, and the page around them still works",
+	"steps": [
+		{ "visible": ["Upload", "Nothing picked", "Pick a photo"], "absent": ["Picked a photo"] },
+		{ "do": { "tap": "Pick a photo" }, "visible": ["Picked a photo"], "absent": ["Nothing picked"] }
+	]
+}
