@@ -5,7 +5,13 @@ import { execFileSync } from 'node:child_process';
 import { readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { chromium, type Page } from '@playwright/test';
-import { nativeNumberMessage, nativeTooLongMessage, type NativeNumberMessages } from '@markless/serializer/native-view';
+import {
+	nativeEmailMismatch,
+	nativeNumberMessage,
+	nativeTooLongMessage,
+	type NativeEmailMismatch,
+	type NativeNumberMessages,
+} from '@markless/serializer/native-view';
 
 const executable = chromium.executablePath();
 const app = join(dirname(executable), '..', '..');
@@ -50,6 +56,20 @@ const numberTemplate = (message: string, values: Record<string, string>, locale:
 	}
 	return text;
 };
+const emailMismatch: Record<string, NativeEmailMismatch> = {};
+/** An email field's message for `value`, with `part` (which the message quotes) written back as `{name}`. */
+const emailMessage = async (page: Page, value: string, part: string, name: string) => {
+	const message = await page.evaluate((typed) => {
+		const field = document.getElementById('email') as HTMLInputElement;
+		field.value = typed;
+		return field.validationMessage;
+	}, value);
+	if (part !== '' && message.split(part).length !== 2)
+		throw new Error(`expected ${JSON.stringify(part)} once in ${JSON.stringify(message)}`);
+	return part === '' ? message : message.replace(part, `{${name}}`);
+};
+/** Values whose messages a recorded table must reproduce, beyond the ones it is recorded from. */
+const EMAIL_CHECKS = ['abc', '@x', 'a@', 'a,b@c', 'a@b_c', 'a@b..c', 'a@b-', 'a@@b', 'ü@b', 'a@b'];
 /** The message for an edited field of `length` characters whose maxlength is `max`. */
 const tooLongMessage = async (page: Page, max: number, length: number) => {
 	await page.setContent(`<input id="long" maxlength="${max}">`);
@@ -76,13 +96,32 @@ try {
 		const browser = await chromium.launch({ channel: 'chromium' });
 		const page = await browser.newPage();
 		await page.setContent(
-			'<input id="text" required><input id="checkbox" type="checkbox" required><input id="radio" type="radio" name="group" required>',
+			'<input id="text" required><input id="checkbox" type="checkbox" required><input id="radio" type="radio" name="group" required><input id="email" type="email">',
 		);
 		const [text, checkbox, radio] = await page.evaluate(() =>
 			['text', 'checkbox', 'radio'].map(
 				(id) => (document.getElementById(id) as HTMLInputElement).validationMessage,
 			),
 		);
+		// ǂ is a character neither part of an address allows, and qqzz text no message spells.
+		const email: NativeEmailMismatch = {
+			noAt: await emailMessage(page, 'qqzz', 'qqzz', 'value'),
+			emptyLocal: await emailMessage(page, '@qqzz', '@qqzz', 'value'),
+			emptyDomain: await emailMessage(page, 'qqzz@', 'qqzz@', 'value'),
+			invalidLocal: await emailMessage(page, 'qǂz@b', 'ǂ', 'symbol'),
+			invalidDomain: await emailMessage(page, 'a@qǂz', 'ǂ', 'symbol'),
+			invalidDots: await emailMessage(page, 'a@.qqzz', '.qqzz', 'domain'),
+			other: await emailMessage(page, 'a@-b', '', ''),
+		};
+		for (const value of EMAIL_CHECKS) {
+			const chromium = await emailMessage(page, value, '', '');
+			const ours = nativeEmailMismatch(email, value) ?? '';
+			if (ours !== chromium)
+				throw new Error(
+					`${locale}: ${JSON.stringify(value)} gives ${JSON.stringify(ours)}, Chromium ${JSON.stringify(chromium)}`,
+				);
+		}
+		emailMismatch[locale] = email;
 		const wide = await tooLongMessage(page, 1234, 56789);
 		const narrow = await tooLongMessage(page, 10, 100);
 		const underflow = await numberMessage(page, 'min="1234"', { set: '5' });
@@ -149,5 +188,5 @@ writeFileSync(
 			const version = browser.version();
 			await browser.close();
 			return `Chromium ${version}`;
-		})}; do not edit.\n\nimport type { NativeNumberMessages, NativeTooLong } from './native-view.ts';\n\n/** Chromium's \`validationMessage\` for a required field with no value, by the language Chromium shows its own text in. */\nexport const NATIVE_VALUE_MISSING_BY_LOCALE: Readonly<Record<string, { readonly text: string; readonly checkbox: string; readonly radio: string }>> = ${JSON.stringify(table, null, '\t')};\n\n/** Chromium's \`validationMessage\` for a text field a person edited to longer than its maxlength, with \`{max}\` and \`{length}\` for the numbers. */\nexport const NATIVE_TOO_LONG_BY_LOCALE: Readonly<Record<string, NativeTooLong>> = ${JSON.stringify(tooLong, null, '\t')};\n\n/** Chromium's \`validationMessage\` for a number field out of its range, off its step, or holding text that is no number, with \`{min}\`, \`{max}\`, \`{low}\`, \`{high}\` and \`{value}\` for the numbers. */\nexport const NATIVE_NUMBER_MESSAGES_BY_LOCALE: Readonly<Record<string, NativeNumberMessages>> = ${JSON.stringify(numbers, null, '\t')};\n`,
+		})}; do not edit.\n\nimport type { NativeEmailMismatch, NativeNumberMessages, NativeTooLong } from './native-view.ts';\n\n/** Chromium's \`validationMessage\` for a required field with no value, by the language Chromium shows its own text in. */\nexport const NATIVE_VALUE_MISSING_BY_LOCALE: Readonly<Record<string, { readonly text: string; readonly checkbox: string; readonly radio: string }>> = ${JSON.stringify(table, null, '\t')};\n\n/** Chromium's \`validationMessage\` for a text field a person edited to longer than its maxlength, with \`{max}\` and \`{length}\` for the numbers. */\nexport const NATIVE_TOO_LONG_BY_LOCALE: Readonly<Record<string, NativeTooLong>> = ${JSON.stringify(tooLong, null, '\t')};\n\n/** Chromium's \`validationMessage\` for a number field out of its range, off its step, or holding text that is no number, with \`{min}\`, \`{max}\`, \`{low}\`, \`{high}\` and \`{value}\` for the numbers. */\nexport const NATIVE_NUMBER_MESSAGES_BY_LOCALE: Readonly<Record<string, NativeNumberMessages>> = ${JSON.stringify(numbers, null, '\t')};\n\n/** Chromium's \`validationMessage\` for an email field whose value is not an email address, one per reason. */\nexport const NATIVE_EMAIL_MISMATCH_BY_LOCALE: Readonly<Record<string, NativeEmailMismatch>> = ${JSON.stringify(emailMismatch, null, '\t')};\n`,
 );

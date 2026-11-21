@@ -1,0 +1,9 @@
+{
+	"rung": 151,
+	"name": "Optional chaining reads null through as the web does: a missing object ends the whole chain",
+	"steps": [
+		{ "visible": ["Profile", "Name: nobody", "City: unknown"], "absent": ["Name: Sam"] },
+		{ "do": { "tap": "Sign in" }, "visible": ["Name: Sam", "City: Lyon"], "absent": ["Name: nobody"] },
+		{ "do": { "tap": "Sign out" }, "visible": ["Name: nobody", "City: unknown"], "absent": ["Name: Sam"] }
+	]
+}

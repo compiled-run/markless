@@ -210,6 +210,92 @@ if (!host) {
 			return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20);
 		},
 	};
+	// The web's URL parser for a path (WHATWG): dot segments removed, the path percent-encode set encoded.
+	var encodePath = function (path) {
+		var out = '';
+		for (var index = 0; index < path.length; index++) {
+			var code = path.charCodeAt(index);
+			var char = path.charAt(index);
+			if (code >= 0xd800 && code <= 0xdbff && index + 1 < path.length) {
+				var low = path.charCodeAt(index + 1);
+				if (low >= 0xdc00 && low <= 0xdfff) {
+					out += encodeURIComponent(char + path.charAt(++index));
+					continue;
+				}
+			}
+			if (code >= 0xd800 && code <= 0xdfff) out += '%EF%BF%BD';
+			else if (code <= 0x20 || code >= 0x7f || '"<>^\x60{}'.indexOf(char) >= 0) out += encodeURIComponent(char);
+			else out += char;
+		}
+		return out;
+	};
+	var resolvePath = function (text, here) {
+		var path = text === '' ? here : text.charAt(0) === '/' ? text : here.slice(0, here.lastIndexOf('/') + 1) + text;
+		var segments = path.split('/');
+		var kept = [];
+		for (var index = 1; index < segments.length; index++) {
+			var segment = segments[index];
+			var lower = segment.toLowerCase();
+			var last = index === segments.length - 1;
+			if (segment === '..' || lower === '.%2e' || lower === '%2e.' || lower === '%2e%2e') {
+				kept.pop();
+				if (last) kept.push('');
+			} else if (segment === '.' || lower === '%2e') {
+				if (last) kept.push('');
+			} else kept.push(segment);
+		}
+		return encodePath('/' + kept.join('/'));
+	};
+	var decodeSegment = function (segment) {
+		try { return decodeURIComponent(segment); } catch (error) { return segment; }
+	};
+	// The router's match: routes in its order, a [param] takes one segment (URL-decoded, as a phone keeps params), a [...rest] the rest.
+	var matchRoute = function (path, routes) {
+		var request = path.length > 1 && path.charAt(path.length - 1) === '/' ? path.slice(0, -1) : path;
+		var parts = request === '/' ? [] : request.slice(1).split('/');
+		for (var index = 0; index < routes.length; index++) {
+			var pattern = routes[index];
+			var segments = pattern === '/' ? [] : pattern.slice(1).split('/');
+			var rest = -1;
+			for (var at = 0; at < segments.length; at++) if (segments[at].indexOf('[...') === 0) rest = at;
+			if (rest < 0 ? segments.length !== parts.length : parts.length <= rest) continue;
+			var params = {};
+			var matched = true;
+			for (var at = 0; at < segments.length && matched; at++) {
+				var segment = segments[at];
+				if (at === rest) break;
+				if (segment.charAt(0) === '[') params[segment.slice(1, -1)] = decodeSegment(parts[at]);
+				else if (segment !== decodeSegment(parts[at])) matched = false;
+			}
+			if (matched) return { route: pattern, params: params };
+		}
+		return null;
+	};
+	host.navigate = function (href, options) {
+		var place = host.place;
+		if (!place || !host.out) throw new Error('navigate() runs in an event handler');
+		var given = String(href);
+		var text = given.replace(/^[\u0000- ]+|[\u0000- ]+$/g, '').replace(/[\t\n\r]/g, '').replace(/\\/g, '/');
+		if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(text) || text.slice(0, 2) === '//')
+			return Promise.reject(new Error('navigate() to ' + given + ' leaves the app, and a phone app has no browser to load it in'));
+		var hash = '';
+		var search = '';
+		var at = text.indexOf('#');
+		if (at >= 0) { hash = text.slice(at); text = text.slice(0, at); }
+		at = text.indexOf('?');
+		if (at >= 0) { search = text.slice(at); text = text.slice(0, at); }
+		if (search === '?') search = '';
+		var path = resolvePath(text, place.path);
+		// The router keeps the page shown for its own path and query; a '#/' hash names a client route.
+		var same = function (a, b) { return a.split('/').map(decodeSegment).join('/') === b.split('/').map(decodeSegment).join('/'); };
+		if (same(path, place.path) && search === '' && hash.slice(0, 2) !== '#/') return Promise.resolve();
+		var match = matchRoute(path, place.routes);
+		if (!match) return Promise.reject(new Error('navigate() to ' + given + ': ' + path + ' is not a page of this app'));
+		if (match.route.indexOf('[...') >= 0)
+			return Promise.reject(new Error('navigate() to ' + given + ' opens ' + match.route + ', a catch-all page, which a phone does not open yet'));
+		host.out.navigate = { route: match.route, params: match.params, replace: !!(options && options.replace) };
+		return Promise.resolve();
+	};
 	g.window = g.self = g;
 	host.Response = Response;
 	// The HTML structured clone, as Chromium runs it, for an engine that has none.
@@ -392,6 +478,13 @@ var frameOf = function (bindings) {
 	});
 	return names;
 };
+// The page's path as the web's address bar has it: its route pattern with the params it opened with.
+var pathOf = function (pattern, params) {
+	if (pattern === '/') return '/';
+	return pattern.split('/').map(function (segment) {
+		return segment.charAt(0) === '[' ? encodeURIComponent(params[segment.slice(1, -1)]) : segment;
+	}).join('/');
+};
 // An element is a proxy that offers only what the host answers: the attributes it has now, whether it holds another
 // element, and the commands a handler's data can run. No tree walking, no selectors, no layout.
 var elementFacts = {};
@@ -460,7 +553,8 @@ var begin = function (entry) {
 	(entry.unset || []).forEach(function (slot) { unset[slot] = true; });
 	before = {};
 	for (var slot in cells) before[slot] = JSON.stringify(cells[slot]);
-	host.out = { timers: [], clears: [], requests: [], aborts: [], logs: [], commands: [], pending: [], settled: [], raises: [] };
+	host.out = { timers: [], clears: [], requests: [], aborts: [], logs: [], commands: [], pending: [], settled: [], raises: [], navigate: null };
+	host.place = navigation && entry.kind !== 'compute' ? { routes: navigation.routes, path: pathOf(navigation.here, entry.params || {}) } : null;
 	host.seed = entry.seed || null;
 	host.counter = 0;
 };
@@ -616,7 +710,9 @@ g.__markless[id] = {
 		}
 		var out = host.out;
 		host.out = null;
-		return JSON.stringify({ writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands, pending: out.pending, settled: out.settled, raises: out.raises });
+		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands, pending: out.pending, settled: out.settled, raises: out.raises };
+		if (out.navigate) left.navigate = out.navigate;
+		return JSON.stringify(left);
 	},
 };`;
 
@@ -641,6 +737,8 @@ export function nativeScriptOf(
 	services: ReadonlyArray<NativeScriptService>,
 	/** Each element's DOM interface by node id, given when the script names one of the DOM's classes. */
 	classes?: Readonly<Record<string, string>>,
+	/** For `navigate()`: the page's route pattern, and the app's route patterns in the router's order. */
+	navigation?: { readonly here: string; readonly routes: ReadonlyArray<string> },
 ): NativeScript {
 	const owners: Record<string, number> = {};
 	const definitions = modules.map((module, index) => {
@@ -660,6 +758,7 @@ export function nativeScriptOf(
 		'var modules = [];',
 		`var owners = ${JSON.stringify(owners)};`,
 		...(classes ? [`var classes = ${JSON.stringify(classes)};`] : []),
+		`var navigation = ${JSON.stringify(navigation ?? null)};`,
 		...definitions,
 		ENTRIES,
 	].join('\n');

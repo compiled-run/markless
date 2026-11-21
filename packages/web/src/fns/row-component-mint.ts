@@ -866,6 +866,7 @@ function ownerProjectionView(
 }
 
 // A minted row has no render above it to qualify ids spelled in its owner's module, so they take its prefix here.
+// Branches pass through unprefixed: an owner's list in an @if arm makes the row unbuildable; a row component's own arm list is unverified (such rows ignore their handlers).
 function ownerRecordsInPageSpace<R extends { readonly state: ProtocolStatePayload; readonly view: ProtocolViewPayload }>(
 	rendered: R,
 	owner: { readonly symbolPrefix: string; readonly edge?: OwningSurfaceEdge; readonly edgePrefix?: string },
@@ -973,10 +974,7 @@ function ownerRecordsInPageSpace<R extends { readonly state: ProtocolStatePayloa
 				? {
 						keyedRepeats: view.keyedRepeats.map((repeat) => ({
 							...repeat,
-							id: ownerHostPrefix + repeat.id,
-							...(repeat.enclosingRow && {
-								enclosingRow: { ...repeat.enclosingRow, prefix: ownerHostPrefix + (repeat.enclosingRow.prefix ?? '') },
-							}),
+							...instanceScope.marklessPrefixedRepeatId(repeat, ownerHostPrefix),
 							parentHostNodeId: ownerHostPrefix + repeat.parentHostNodeId,
 							rowEvents: repeat.rowEvents.map((event) => ({
 								...event,

@@ -1,0 +1,41 @@
+{
+	"rung": "N5",
+	"name": "A link or navigate() to a path no route matches opens the app's 404 page, as the web's router answers it",
+	"web": {
+		"consoleErrors": [
+			"Failed to load resource: the server responded with a status of 404 ()",
+			"Failed to load resource: the server responded with a status of 404 ()"
+		]
+	},
+	"steps": [
+		{
+			"visible": ["Account", "Log out", "Settings"],
+			"absent": ["Nothing here"],
+			"title": "Home"
+		},
+		{
+			"do": {
+				"tap": "Log out"
+			},
+			"visible": ["Nothing here"],
+			"absent": ["Account"],
+			"title": "Not found"
+		},
+		{
+			"do": {
+				"back": "button"
+			},
+			"visible": ["Account", "Settings"],
+			"absent": ["Nothing here"],
+			"title": "Home"
+		},
+		{
+			"do": {
+				"tap": "Settings"
+			},
+			"visible": ["Nothing here"],
+			"absent": ["Account"],
+			"title": "Not found"
+		}
+	]
+}

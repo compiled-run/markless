@@ -65,15 +65,55 @@ export async function distinctControls(page) {
 	);
 }
 
+// Linux headless Chromium keeps its pointer at (0,0) and hovers whatever lays out there, racing the page's own listeners.
+function dropHover() {
+	for (const type of [
+		'pointerover',
+		'pointerenter',
+		'pointermove',
+		'pointerout',
+		'pointerleave',
+		'mouseover',
+		'mouseenter',
+		'mousemove',
+		'mouseout',
+		'mouseleave',
+	])
+		addEventListener(type, (event) => event.stopImmediatePropagation(), { capture: true });
+}
+
+// Runs before the page's own load listeners: the head modulepreloads with no resource entry yet when load fires.
+function countLatePreloads() {
+	addEventListener(
+		'load',
+		() => {
+			globalThis.__marklessLatePreloads = [
+				...document.head.querySelectorAll('link[rel="modulepreload"]'),
+			].filter((link) => !performance.getEntriesByName(link.href, 'resource').length).length;
+		},
+		{ once: true },
+	);
+}
+
 /**
  * Opens a fresh page with the benchmark page agent, JS request tracking, and optional coverage.
- * `phase` splits requests into load / input windows.
+ * `phase` splits requests into load / input windows. `untouched` is for a visit that sends no input: no page
+ * listener sees a pointer or mouse hover or move event the browser makes up, and `latePreloads()` reads how many
+ * head modulepreloads had not arrived when the load event fired. `cpuSlowdown` throttles the page's CPU by that factor.
  */
-export async function openPage(browser, { coverage = false } = {}) {
+export async function openPage(browser, { coverage = false, untouched = false, cpuSlowdown = 1 } = {}) {
 	const context = await browser.newContext({ viewport: VIEWPORT, serviceWorkers: 'block' });
 	await context.addInitScript(pageAgent);
+	if (untouched) {
+		await context.addInitScript(dropHover);
+		await context.addInitScript(countLatePreloads);
+	}
 	const page = await context.newPage();
 	const cov = coverage ? await startCoverage(context, page) : null;
+	if (cpuSlowdown > 1)
+		await (await context.newCDPSession(page)).send('Emulation.setCPUThrottlingRate', {
+			rate: cpuSlowdown,
+		});
 	const state = {
 		phase: 'load',
 		js: { load: [], input: [] },
@@ -153,6 +193,9 @@ export async function openPage(browser, { coverage = false } = {}) {
 			await quiet();
 			await sleep(ms);
 			await quiet();
+		},
+		latePreloads() {
+			return page.evaluate(() => globalThis.__marklessLatePreloads);
 		},
 		async close() {
 			await cov?.stop();

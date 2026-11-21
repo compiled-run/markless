@@ -23,6 +23,9 @@ import {
 	nativeNumberProblem,
 	nativeNumberValue,
 	nativeMaxLength,
+	nativeEmailMismatch,
+	nativeRangeValue,
+	nativeEmailValue,
 	nativeTooLongMessage,
 } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
@@ -45,6 +48,8 @@ export type NativeAction =
 	| { readonly event: 'choose'; readonly host: string }
 	/** The field's whole text after an edit. */
 	| { readonly event: 'input'; readonly host: string; readonly value: string }
+	/** A range input let go after its value moved (the web's `change`), with the value it holds. */
+	| { readonly event: 'commit'; readonly host: string; readonly value: string }
 	/** A key of the on-screen keyboard in a text field, before it edits the text; `key` as the phone's browser names it. */
 	| { readonly event: 'keydown'; readonly host: string; readonly key: string }
 	/** A paste into a text field from its edit menu, before the text goes in. */
@@ -501,6 +506,7 @@ export function evaluateNativeExpr(
 			.join('');
 	if ('member' in expr) {
 		const value = evaluate(expr.member);
+		if (expr.optional && value === null) return null;
 		if ((typeof value === 'string' || Array.isArray(value)) && expr.property === 'length')
 			return value.length;
 		const index = Number(expr.property);
@@ -807,6 +813,7 @@ export function createNativeRuntime(
 		...(script?.services.includes('crypto') && scriptHost?.seed
 			? { seed: scriptHost.seed() }
 			: {}),
+		...(script?.services.includes('navigate') ? { params } : {}),
 	});
 	/** One engine entry, then what it asked for: its writes land in cells; timers, clears and requests become entries. */
 	/** Submissions held by a script promise not settled yet, by the engine's run number. */
@@ -828,6 +835,11 @@ export function createNativeRuntime(
 				readonly request: Extract<NativeJournalEntry, { op: 'fetch' }>['request'];
 			}>;
 			readonly logs: ReadonlyArray<readonly [string, string]>;
+			readonly navigate?: {
+				readonly route: string;
+				readonly params: Readonly<Record<string, string>>;
+				readonly replace: boolean;
+			};
 			readonly commands?: ReadonlyArray<
 				| readonly [string, 'focus' | 'scrollIntoView' | 'showModal' | 'close', boolean]
 				| readonly [string, 'setPointerCapture' | 'releasePointerCapture', number]
@@ -897,6 +909,16 @@ export function createNativeRuntime(
 				return [{ op: 'command', node, command, ...(preventScroll ? { preventScroll: true as const } : {}) }];
 			}),
 			...raised,
+			...(result.navigate
+				? [
+						{
+							op: 'navigate',
+							route: result.navigate.route,
+							params: result.navigate.params,
+							...(result.navigate.replace ? { replace: true as const } : {}),
+						} satisfies NativeJournalEntry,
+					]
+				: []),
 		];
 	};
 	/** How deep events raised from JavaScript may nest (a handler that raises one that raises another...). */
@@ -1331,10 +1353,26 @@ export function createNativeRuntime(
 	};
 	const propertyBinding = (id: string, name: string) =>
 		elementOf(id).bindings?.find((one) => 'property' in one && one.property === name);
+	/** Whether a `<textarea>` shows its default value now: nobody edited it and no `value` property sets it. */
+	const followsDefault = (id: string): boolean => {
+		const node = elementOf(id.split('@')[0]!);
+		return (
+			node.element === 'textarea' &&
+			!edited.has(id) &&
+			propertyBinding(node.id, 'value') === undefined
+		);
+	};
 	const textOf = (id: string): string => {
-		if (edited.has(id)) return edited.get(id)!;
 		const binding = propertyBinding(id, 'value');
-		return binding ? String(evaluate(binding.value) ?? '') : (attributeNow(id, 'value') ?? '');
+		const text = edited.has(id)
+			? edited.get(id)!
+			: binding
+				? String(evaluate(binding.value) ?? '')
+				: (attributeNow(id, 'value') ?? '');
+		// A range keeps a number in its range and on its step, whatever it is given.
+		return attributeNow(id, 'type') === 'range'
+			? nativeRangeValue(text, attributeNow(id, 'min'), attributeNow(id, 'max'), attributeNow(id, 'step'))
+			: text;
 	};
 	const ticked = payload.nodes.flatMap((node) =>
 		node.kind === 'element' &&
@@ -1505,6 +1543,12 @@ export function createNativeRuntime(
 	const tooLong = tooLongMessages[nativeLocale(preferredLanguages, Object.keys(tooLongMessages))];
 	const numberMessageSets = payload.numberMessages ?? {};
 	const numberMessages = numberMessageSets[nativeLocale(preferredLanguages, Object.keys(numberMessageSets))];
+	const mismatchMessages = payload.typeMismatch ?? {};
+	const mismatch =
+		mismatchMessages[nativeLocale(preferredLanguages, Object.keys(mismatchMessages))];
+	/** A text field's value as the web keeps it: an email field drops line breaks and trims its ends. */
+	const valueOf = (node: string) =>
+		attributeNow(node, 'type') === 'email' ? nativeEmailValue(textOf(node)) : textOf(node);
 	function entriesOf(id: string): Value {
 		const form = forms.get(id);
 		if (!form) throw new Error(`${id} is not a form`);
@@ -1519,7 +1563,7 @@ export function createNativeRuntime(
 				return chosen ? [[name, optionValue(chosen)]] : [];
 			}
 			if (kind === 'number') return [[name, nativeNumberValue(textOf(node))]];
-			return [[name, kind === 'hidden' ? (attributeNow(node, 'value') ?? '') : textOf(node)]];
+			return [[name, kind === 'hidden' ? (attributeNow(node, 'value') ?? '') : valueOf(node)]];
 		});
 	}
 	/** Why a field stops a submit, as the web says it, or undefined when it does not. */
@@ -1535,7 +1579,7 @@ export function createNativeRuntime(
 			kind === 'radio'
 				? groupOf(node).every((member) => !checkedOf(member.id))
 				: kind === 'text' || kind === 'number'
-					? textOf(node) === ''
+					? valueOf(node) === ''
 					: !checkedOf(node);
 		if (required && absent()) {
 			if (!missing) throw new Error(`the payload has no message for a ${kind} missing its value`);
@@ -1551,6 +1595,11 @@ export function createNativeRuntime(
 			if (!problem) return undefined;
 			if (!numberMessages) throw new Error('the payload has no messages for a number field');
 			return nativeNumberMessage(numberMessages[problem.message], numberMessages, 'values' in problem ? problem.values : {});
+		}
+		if (kind === 'text' && attributeNow(node, 'type') === 'email') {
+			if (!mismatch) throw new Error('the payload has no message for an email field');
+			const message = nativeEmailMismatch(mismatch, valueOf(node));
+			if (message !== undefined) return message;
 		}
 		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		const max = kind === 'text' ? nativeMaxLength(attributeNow(node, 'maxlength')) : undefined;
@@ -2059,7 +2108,8 @@ export function createNativeRuntime(
 				.find((shown) => shown.id === action.host);
 			if (!instance) throw new Error(`${action.host} is not shown`);
 			const scope = instance.scope;
-			const edit = action.event === 'input' ? action.value : undefined;
+			const edit =
+				action.event === 'input' || action.event === 'commit' ? action.value : undefined;
 			const eventValue: string | NativeEventFields | undefined =
 				action.event === 'keydown'
 					? { key: action.key }
@@ -2513,6 +2563,17 @@ export function createNativeRuntime(
 											name,
 											value: afterAttributes.get(key)!,
 										},
+										// A field nobody edited shows its `value` attribute, as the web's default value.
+										...(name === 'value' && followsDefault(id)
+											? [
+													{
+														op: 'property' as const,
+														node: id,
+														name: 'value' as const,
+														value: afterAttributes.get(key) ?? '',
+													},
+												]
+											: []),
 									]
 								: [
 										{

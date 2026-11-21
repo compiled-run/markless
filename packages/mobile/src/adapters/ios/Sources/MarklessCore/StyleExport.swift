@@ -92,6 +92,13 @@ public struct StyleNode: Sendable {
 	public let scrollRange: ScrollOffsetRange?
 	/// Only on a framed text node: its lines as Dragon laid them out, glyph for glyph.
 	public let lines: [TextLine]?
+
+	/// The node with no box: a list's template, which only its rows' copies show.
+	func hidden() -> StyleNode {
+		StyleNode(
+			id: id, parent: parent, isText: isText, isAnonymous: isAnonymous, text: text, frame: nil, borderWidths: nil, writes: writes,
+			borderOps: nil, scrollRange: nil, lines: nil)
+	}
 }
 
 /// A style state of Dragon's export: the cell it follows (by key) and the values it can take.
@@ -238,6 +245,8 @@ public struct StyleExport: Sendable {
 	public var plan: String?
 	/// Per assignment: each Dragon id the plan's geometry names, with the export's id for it (empty: no ids differ).
 	public var planNames: [[String: String]] = []
+	/// Each list whose rows the phone lays out: the box its rows hang from and the Dragon ids of one row's top boxes, in order.
+	public var planRepeats: [PlanRepeat] = []
 
 	/// Reads the target this host renders, by Dragon target name (`ios`) and the backend it must have been lowered for.
 	public static func decode(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> StyleExport {
@@ -310,13 +319,13 @@ public struct StyleExport: Sendable {
 				try raw(f, "readiness"), try raw(f, "states"), try raw(f, "initial"), ("assignments", .array(assignments)), try raw(f, "next"),
 			]
 			if f.has("bands") { page.append(("bands", try f["bands"].value)) }
-			for key in ["plan", "planNames"] where f.has(key) { page.append((key, try f[key].value)) }
+			for key in ["plan", "planNames", "planRepeats"] where f.has(key) { page.append((key, try f[key].value)) }
 			return try decodeTarget(try Reader(.object(page), at: reader.path), perState: true, fonts: fonts, backend: backend)
 		}
 		for route in try targetFields["routes"].array() {
 			let f = try route.object(
 				required: ["pattern", "component", "compiler", "readiness", "states", "initial", "next", "assignments"],
-				optional: ["bands", "sheets", "plan", "planNames"])
+				optional: ["bands", "sheets", "plan", "planNames", "planRepeats"])
 			let pattern = try f["pattern"].string()
 			_ = (try f["component"].string(), try f["compiler"].string())
 			guard routes[pattern] == nil else { throw route.fail("route \(pattern) is listed twice") }
@@ -402,7 +411,7 @@ public struct StyleExport: Sendable {
 	) throws -> StyleExport {
 		let targetFields = try chosen.object(
 			required: perState ? ["backend", "viewport", "dpr", "states", "initial", "assignments", "next"] : ["backend", "viewport", "dpr", "nodes"],
-			optional: perState ? ["readiness", "bands", "plan", "planNames"] : [])
+			optional: perState ? ["readiness", "bands", "plan", "planNames", "planRepeats"] : [])
 		var notReady: String?
 		if targetFields.has("readiness") {
 			let readiness = try targetFields["readiness"]
@@ -518,19 +527,49 @@ public struct StyleExport: Sendable {
 				throw perAssignment.fail("names \(style.planNames.count) assignments; the export has \(assignments.count)")
 			}
 		}
+		if targetFields.has("planRepeats") {
+			style.planRepeats = try targetFields["planRepeats"].array().map { r in
+				let f = try r.object(required: ["id", "parent", "template"], optional: [])
+				let template = try f["template"].array().map { try $0.string() }
+				guard !template.isEmpty else { throw r.fail("a row has at least one box") }
+				return PlanRepeat(id: try f["id"].string(), parent: try f["parent"].string(), template: template)
+			}
+		}
 		return style
 	}
 
 	/// This export laid out again by Dragon's plan for a page `width` x `height` points at `scale`: every assignment's frames,
 	/// border widths, text lines, dashed borders and scroll ranges, in this screen's device pixels. `layout` is Dragon's
 	/// translated `runMarklessLayout`. Without a plan the export is returned as it is.
-	public func laidOut(width: Double, height: Double, scale: Double, layout: (String) -> String) throws -> StyleExport {
+	public func laidOut(
+		width: Double, height: Double, scale: Double, layout: (String) -> String,
+		rows: ((Int) throws -> [String: [LaidOutRow]])? = nil, rowsLayout: ((String) -> String)? = nil
+	) throws -> StyleExport {
 		guard let plan else { return self }
 		var out = self
 		var pages: [ScrollOffsetRange?] = []
 		out.assignments = try assignments.indices.map { k in
-			let line = "{\"assignment\":\(k),\"dpr\":\(JSONValue.number(scale).jsonText),\"viewport\":{\"width\":\(JSONValue.number(width).jsonText),\"height\":\(JSONValue.number(height).jsonText)},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":\(plan)}"
-			let result = try Reader(JSONValue.parse(Data(layout(line).utf8)), at: "plan layout")
+			let names = k < planNames.count ? planNames[k] : [:]
+			let dragonId = Dictionary(names.map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+			let shown = !planRepeats.isEmpty ? try rows?(k) : nil
+			var line = "{\"assignment\":\(k),\"dpr\":\(JSONValue.number(scale).jsonText),\"viewport\":{\"width\":\(JSONValue.number(width).jsonText),\"height\":\(JSONValue.number(height).jsonText)},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":\(plan)"
+			if let shown {
+				let lists = planRepeats.map { r -> JSONValue in
+					.object([
+						("parent", .string(r.parent)), ("template", .array(r.template.map { .string($0) })),
+						("rows", .array((shown[r.id] ?? []).map { row in
+							.object([
+								("key", .string(row.key)), ("assignment", .number(Double(row.assignment))),
+								("texts", .array(row.texts.sorted { $0.key < $1.key }.map { .array([.string(dragonId[$0.key] ?? $0.key), .string($0.value)]) })),
+							])
+						})),
+					])
+				}
+				line += ",\"rows\":\(JSONValue.array(lists).jsonText)"
+			}
+			line += "}"
+			guard shown == nil || rowsLayout != nil else { throw PayloadError(path: "plan layout", reason: "a page with rows needs Dragon's rows layout") }
+			let result = try Reader(JSONValue.parse(Data((shown == nil ? layout(line) : rowsLayout!(line)).utf8)), at: "plan layout")
 			let parts = try result.array()
 			guard parts.count == 3, try parts[0].string() == "ok" else {
 				throw PayloadError(path: "plan layout", reason: "Dragon's layout at \(width) x \(height) points and \(scale)x failed: \(result.value.jsonText)")
@@ -538,14 +577,49 @@ public struct StyleExport: Sendable {
 			let bits = { (reader: Reader) throws -> JSONValue in try planNumbers(reader.value) }
 			let page = try parts[1].array()
 			pages.append(page.count == 3 ? nil : try StyleExport.decodeRange(Reader(.object(zip(["minX", "maxX", "minY", "maxY"], try page.map { try bits($0) }).map { ($0, $1) }), at: parts[1].path)))
-			let names = k < planNames.count ? planNames[k] : [:]
 			var geometry: [String: Reader] = [:]
 			for node in try parts[2].array() {
 				let id = try node.array()[0].string()
-				geometry[names[id] ?? id] = node
+				// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
+				if let at = id.firstIndex(of: "@") {
+					let base = String(id[..<at])
+					geometry["\(names[base] ?? base)\(id[at...])"] = node
+				} else {
+					geometry[names[id] ?? id] = node
+				}
 			}
 			let assignment = assignments[k]
-			let nodes = try assignment.nodes.map { node -> StyleNode in
+			// The template of each list: one row's nodes, which no view shows; each row is a copy of them laid out here.
+			var template: [String: (list: PlanRepeat, top: Bool)] = [:]
+			if shown != nil {
+				for r in planRepeats {
+					let tops = Set(r.template.map { names[$0] ?? $0 })
+					for node in assignment.nodes {
+						var at: String? = node.id
+						while let id = at, !tops.contains(id) { at = assignment.nodes.first { $0.id == id }?.parent }
+						if at != nil { template[node.id] = (r, tops.contains(node.id)) }
+					}
+				}
+			}
+			var withRows: [StyleNode] = []
+			for node in assignment.nodes {
+				guard let (list, top) = template[node.id], let shown else {
+					withRows.append(node)
+					continue
+				}
+				withRows.append(node.hidden())
+				for row in shown[list.id] ?? [] {
+					guard let own = assignments[row.assignment].nodes.first(where: { $0.id == node.id }) else {
+						throw PayloadError(path: "plan layout", reason: "assignment \(row.assignment) has no node \(node.id) for row \(row.key)")
+					}
+					withRows.append(StyleNode(
+						id: "\(node.id)@\(row.key)", parent: top ? node.parent : node.parent.map { "\($0)@\(row.key)" },
+						isText: own.isText, isAnonymous: own.isAnonymous, text: own.isText ? (row.texts[node.id] ?? own.text) : own.text,
+						frame: own.frame, borderWidths: own.borderWidths, writes: own.writes, borderOps: own.borderOps, scrollRange: own.scrollRange,
+						lines: own.lines))
+				}
+			}
+			let nodes = try withRows.map { node -> StyleNode in
 				guard node.frame != nil else { return node }
 				guard let g = geometry[node.id] else { throw PayloadError(path: "plan layout", reason: "Dragon's layout has no box for \(node.id)") }
 				let f = try g.array()
@@ -733,5 +807,25 @@ public struct StyleExport: Sendable {
 	private static func decodeColor(_ reader: Reader) throws -> RGBA {
 		let c = try reader.object(["r", "g", "b", "alpha"])
 		return RGBA(r: try c["r"].number(), g: try c["g"].number(), b: try c["b"].number(), alpha: try c["alpha"].number())
+	}
+}
+
+/// A list whose rows a phone lays out (Dragon's `planRepeats`): the box its rows hang from and one row's top boxes, by Dragon id.
+public struct PlanRepeat: Sendable, Equatable {
+	public let id: String
+	public let parent: String
+	public let template: [String]
+}
+
+/// A row a page shows now: its key, the assignment its own states reach from the page's, and its texts by text node id.
+public struct LaidOutRow: Sendable, Equatable {
+	public let key: String
+	public let assignment: Int
+	public let texts: [String: String]
+
+	public init(key: String, assignment: Int, texts: [String: String]) {
+		self.key = key
+		self.assignment = assignment
+		self.texts = texts
 	}
 }

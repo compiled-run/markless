@@ -92,15 +92,17 @@ export function startFragmentNavigation(
 		if (d.readyState === 'complete') start();
 		else w.addEventListener('load', start, { once: true });
 	});
+	const connection = (
+		w.navigator as Navigator & {
+			connection?: { effectiveType?: string; saveData?: boolean };
+		}
+	).connection;
+	// Set once the page's own downloads are measured; until then the browser's report stands in.
+	let fast: boolean | undefined;
 	// Idle downloads need evidence of a fast link: the rate the page's own downloads crossed it at, a lower bound on its speed.
 	host.__marklessFragmentIdle = landed.then(() => {
 		const intent = intentOf();
 		if (!intent) return false;
-		const connection = (
-			w.navigator as Navigator & {
-				connection?: { effectiveType?: string; saveData?: boolean };
-			}
-		).connection;
 		let bytes = 0;
 		const spans: [number, number][] = [];
 		for (const entry of [
@@ -118,10 +120,10 @@ export function startFragmentNavigation(
 			reach = Math.max(reach, to);
 		}
 		if (bytes && (busy === 0 || (bytes / busy) * 1000 >= intent.idleBytesPerSecond))
-			return true;
-		if (bytes >= intent.idleMeasuredBytes) return false;
+			return (fast = true);
+		if (bytes >= intent.idleMeasuredBytes) return (fast = false);
 		// Too few bytes crossed the link to tell round trips from bandwidth: only a browser reporting a fast connection says so.
-		return connection?.effectiveType === '4g' && connection.saveData !== true;
+		return (fast = connection?.effectiveType === '4g' && connection.saveData !== true);
 	});
 	const scrolled = new Set<Element>();
 	const arriving = new Map<string, Promise<unknown>>();
@@ -171,9 +173,20 @@ export function startFragmentNavigation(
 	const here = (url: URL) =>
 		url.pathname + url.search === w.location.pathname + w.location.search;
 	// A press, or a mouse resting on a link, fetches its page and code at once, alongside the run half.
-	const press = (anchor: HTMLAnchorElement) => {
+	// A mouse press starts the click itself, so Save-Data does not hold it back: only guesses wait.
+	const press = (anchor: HTMLAnchorElement, clicking = false) => {
 		const intent = intentOf();
 		if (!intent || phase & PRESSED || anchor.getAttribute(intent.prefetchAttribute) === 'none')
+			return;
+		// Save-Data and a hidden tab fetch nothing early; 'fast' intent waits for a fast link.
+		if (
+			!intent.intent ||
+			(!clicking &&
+				(connection?.saveData ||
+					d.visibilityState === 'hidden' ||
+					(intent.intent < 2 &&
+						!(fast !== false && (!connection || connection.effectiveType === '4g')))))
+		)
 			return;
 		const url = followed(anchor);
 		const code = url && routes[url.pathname];
@@ -246,7 +259,12 @@ export function startFragmentNavigation(
 			if (!anchor) return;
 			// A router link is taken ahead of page handlers; a plain anchor after them, once its click reaches the document.
 			if (event.type !== 'click') {
-				if (event.type !== 'pointerover') press(anchor);
+				if (event.type !== 'pointerover')
+					press(
+						anchor,
+						event.type === 'pointerdown' &&
+							(event as PointerEvent).pointerType !== 'touch',
+					);
 				void wake(event);
 			} else if (anchor.hasAttribute(linkAttributeOf())) early(event);
 			else
@@ -297,6 +315,8 @@ export function startFragmentNavigation(
 export type FragmentIntent = {
 	// The swap module and the files it statically imports.
 	readonly code: readonly string[];
+	// Which networks hover, focus and press fetch on: 0 none, 1 fast, 2 all.
+	readonly intent: number;
 	readonly hoverDwellMs: number;
 	readonly requestPrefix: string;
 	readonly prefetchAttribute: string;
@@ -339,6 +359,8 @@ export function runFragmentNavigation(
 	scrolled: Set<Element>,
 	arriving: Map<string, Promise<unknown>>,
 	early: FragmentEarly | undefined,
+	// Loads the viewport tier's code; the build passes it only to apps that may fetch links in view.
+	loadViewport?: () => Promise<typeof watchViewport>,
 ): FragmentNavigationApi {
 	const w = d.defaultView as Window & typeof globalThis;
 	const host = d as Document & {
@@ -351,6 +373,17 @@ export function runFragmentNavigation(
 			connection?: { effectiveType?: string; saveData?: boolean };
 		}
 	).connection;
+	const [intentLevel, viewportLevel, idleLevel] = config.prefetchOn;
+	let fast: boolean | undefined;
+	// A level: 0 never, 1 on a fast link, 2 on any; Save-Data and a hidden tab fetch nothing early.
+	// Fast: the browser reports no slower link, and the page's own downloads did not measure it slow.
+	const onNetwork = (level: number) =>
+		level > 1 ||
+		(level === 1 &&
+			fast !== false &&
+			(connection ? connection.effectiveType === '4g' : config.idleWithoutConnectionInfo));
+	const allows = (level: number) =>
+		!connection?.saveData && d.visibilityState !== 'hidden' && onNetwork(level);
 	const pageKey = (url: URL) => url.pathname + url.search;
 	// Pages this tab already fetched, for any reason: the idle tier never downloads one again; a hover or a press still does.
 	const fetched = new Set<string>();
@@ -518,21 +551,15 @@ export function runFragmentNavigation(
 		}
 	};
 	const parse = (url: string, text: string): FragmentFetched => {
-		const at = text.indexOf(config.regionEndMarker);
-		const prefix = at === -1 ? text : text.slice(0, at);
-		const doc = parseAsLoaded(prefix);
-		preloadStyles(doc);
-		return {
-			url,
-			prefix,
-			doc,
-			tail: at === -1 ? '' : text.slice(at + config.regionEndMarker.length),
-		};
+		const fetched = fragmentOf(url, text);
+		void fetched.doc;
+		return fetched;
 	};
 	// An unused prefetch reads the rest of its response itself, so it frees its connection as soon as the server is done.
 	const drain = (
 		reader: ReadableStreamDefaultReader<Uint8Array>,
 		closed: () => void,
+		read: (bytes: number) => void,
 	): ReadableStreamDefaultReader<Uint8Array> => {
 		const chunks: Uint8Array[] = [];
 		let ended = false;
@@ -545,6 +572,7 @@ export function runFragmentNavigation(
 		void (async () => {
 			for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
 				chunks.push(chunk.value);
+				read(chunk.value.byteLength);
 				wake();
 			}
 		})().then(end, end);
@@ -558,19 +586,91 @@ export function runFragmentNavigation(
 			cancel: () => reader.cancel(),
 		} as ReadableStreamDefaultReader<Uint8Array>;
 	};
-	// One request: the destination's region document and its resume payload, parsed on arrival (no script runs), so the click only swaps.
-	// budget: an idle fetch stops once the page's region passes this many bytes, leaving that page to intent.
+	// A fetch ahead of a click: GUESS (idle or viewport, under the byte budget) or WANTED (intent or a click),
+	// then ARRIVED once its response ends or GONE once dropped. One phase per entry, moved only by `move`.
+	const GUESS = 0,
+		WANTED = 1,
+		ARRIVED = 2,
+		GONE = 3;
+	// A move the lifecycle does not allow throws in development; in production it is reported and the state recovers.
+	const illegal = (message: string) => {
+		const error = new Error(`Markless router: ${message}.`);
+		if (config.strictMoves) throw error;
+		w.setTimeout(() => {
+			throw error;
+		});
+	};
+	const move = (entry: FragmentPrefetch, next: number) => {
+		if (entry.phase === next) return;
+		if (entry.phase === GONE || (entry.phase === ARRIVED && next !== GONE) || next < entry.phase)
+			return illegal(`no prefetch move from ${entry.phase} to ${next}`);
+		entry.phase = next;
+	};
+	// A guess keeps its response as text; the document is parsed when a click or intent wants it.
+	const fragmentOf = (
+		url: string,
+		text: string,
+		rest?: ReadableStreamDefaultReader<Uint8Array>,
+	): FragmentFetched => {
+		const at = text.indexOf(config.regionEndMarker);
+		const prefix = at === -1 ? text : text.slice(0, at);
+		let doc: Document | undefined;
+		return {
+			url,
+			prefix,
+			tail: at === -1 ? '' : text.slice(at + config.regionEndMarker.length),
+			rest,
+			get doc() {
+				if (!doc) {
+					doc = parseAsLoaded(prefix);
+					preloadStyles(doc);
+				}
+				return doc;
+			},
+		};
+	};
+	// One request: the destination's region document and its resume payload, read as it arrives (no script runs), so the click only swaps.
 	const request = (
 		url: URL,
 		speculative: boolean | 'idle',
 		started?: FragmentEarly,
-		budget = Infinity,
 	): FragmentPrefetch => {
-		fetched.add(pageKey(url));
+		const key = pageKey(url);
+		fetched.add(key);
 		const controller = started?.controller ?? new AbortController();
+		// A guess's bytes count against the budget of the page it was guessed from, however it ends:
+		// its declared length, else what Resource Timing saw, else the bytes it read before it stopped.
+		const page = speculative === 'idle' ? speculation.page : -1;
+		let counted = false;
+		let target: URL | undefined;
+		let bytes = 0;
+		const spend = (wire: number) => {
+			if (counted) return;
+			counted = true;
+			if (speculation.page !== page) return;
+			const before = speculation.spent;
+			speculation.spent += wire;
+			// Tools tell "the budget was spent" apart from "never guessed" by this mark, once per page shown.
+			if (before < config.guessBudget && speculation.spent >= config.guessBudget)
+				w.performance.mark(config.prefetchMarks[0], {
+					detail: { page: location.pathname, bytes: speculation.spent },
+				});
+		};
+		// finished: Resource Timing will record the transfer, a few tasks after the body ends; wait for it briefly.
+		const received = (finished = false, tries = 0): void => {
+			if (page < 0 || counted) return;
+			const timing = target && w.performance.getEntriesByName(target.href).at(-1);
+			const wire = (timing as PerformanceResourceTiming | undefined)?.transferSize;
+			if (!wire && finished && tries < 5)
+				return void w.setTimeout(() => {
+					received(true, tries + 1);
+					pumpIdle();
+				}, 20);
+			spend(wire || bytes);
+		};
 		const read = async (): Promise<FragmentFetched> => {
 			const prefix = config.requestPrefix;
-			const target = new URL(url.href);
+			target = new URL(url.href);
 			target.hash = '';
 			target.pathname = prefix + target.pathname;
 			const response = await (started?.response ??
@@ -598,25 +698,41 @@ export function runFragmentNavigation(
 				throw new Error('MARKLESS_ROUTER_FRAGMENT_UNAVAILABLE: redirected');
 			finalUrl.pathname = finalUrl.pathname.slice(prefix.length);
 			finalUrl.hash = url.hash;
+			// A guess stops past the budget in wire bytes: a declared length is that, an uncompressed body counts as it reads.
 			const declared = Number(response.headers.get('content-length') ?? 0);
-			if (declared > budget) throw new Error('MARKLESS_ROUTER_FRAGMENT_OVER_IDLE_BUDGET');
+			// Too big by its own declaration: stopped before its body comes, so it counts only what it received.
+			if (entry.phase === GUESS && declared > config.idleFragmentBytes) {
+				controller.abort();
+				throw new Error('MARKLESS_ROUTER_FRAGMENT_OVER_IDLE_BUDGET');
+			}
+			if (declared) spend(declared);
+			const limit = declared
+				? Infinity
+				: response.headers.get('content-encoding')
+					? config.idleFragmentDecodedBytes
+					: config.idleFragmentBytes;
 			const reader = response.body.getReader();
 			const decoder = new TextDecoder();
 			let text = '';
-			let bytes = 0;
 			for (;;) {
-				if (text.includes(config.regionEndMarker))
-					return {
-						...parse(finalUrl.href, text),
-						rest: speculative ? drain(reader, closed) : reader,
-					};
+				if (text.includes(config.regionEndMarker)) {
+					const arrived = fragmentOf(
+						finalUrl.href,
+						text,
+						speculative ? drain(reader, closed, (more) => (bytes += more)) : reader,
+					);
+					if (entry.phase === WANTED) void arrived.doc;
+					return hold(entry, arrived, text.length);
+				}
 				const chunk = await reader.read();
 				if (chunk.done) {
 					closed();
-					return parse(finalUrl.href, text + decoder.decode());
+					const arrived = fragmentOf(finalUrl.href, text + decoder.decode());
+					if (!speculative) void arrived.doc;
+					return hold(entry, arrived, text.length);
 				}
 				bytes += chunk.value.byteLength;
-				if (bytes > budget) {
+				if (entry.phase === GUESS && bytes > limit) {
 					void reader.cancel();
 					throw new Error('MARKLESS_ROUTER_FRAGMENT_OVER_IDLE_BUDGET');
 				}
@@ -624,48 +740,85 @@ export function runFragmentNavigation(
 			}
 		};
 		const closed = () => {
-			entry.open = false;
+			if (entry.phase < ARRIVED) move(entry, ARRIVED);
+			received(true);
 			queueMicrotask(pumpIdle);
 		};
 		const entry: FragmentPrefetch = {
 			at: started?.at ?? w.performance.now(),
 			writes: state.writes,
-			result: read(),
-			open: true,
-			abort: () => {
-				closed();
+			phase: speculative === 'idle' ? GUESS : WANTED,
+			result: undefined as unknown as Promise<FragmentFetched>,
+			want: () => {
+				if (entry.phase !== GUESS) return;
+				move(entry, WANTED);
+				entry.result.then(
+					(arrived) => arrived.doc,
+					() => {},
+				);
+			},
+			// again: a click dropped it before it arrived, so the next page may guess it again; a guess
+			// dropped to make room for intent stays fetched for this page, or it would be downloaded in a loop.
+			abort: (again = false) => {
+				if (again && entry.phase < ARRIVED) fetched.delete(key);
+				received();
+				move(entry, GONE);
 				controller.abort();
+				queueMicrotask(pumpIdle);
 			},
 		};
-		entry.result.catch(closed);
+		(entry as { result: Promise<FragmentFetched> }).result = read();
+		entry.result.catch(() => {
+			received();
+			if (entry.phase !== GONE) move(entry, GONE);
+			queueMicrotask(pumpIdle);
+		});
 		return entry;
 	};
-	// An unused prefetch still streaming holds a connection: drop it once stale, and keep only a few open,
-	// or an HTTP/1.1 origin's per-host connection limit stalls the next click behind them.
-	const prefetch = (
-		url: URL,
-		code = true,
-		started?: FragmentEarly,
-		budget = Infinity,
-		idle = false,
-	) => {
+	const inFlight = (entry: FragmentPrefetch) => entry.phase < ARRIVED;
+	// Pages fetched ahead are kept as text up to config.heldChars in all; past it the earliest started go first.
+	const sizes = new WeakMap<FragmentPrefetch, number>();
+	const hold = (entry: FragmentPrefetch, arrived: FragmentFetched, size: number) => {
+		sizes.set(entry, size);
+		let held = 0;
+		for (const other of state.prefetches.values()) held += sizes.get(other) ?? 0;
+		for (const [key, other] of state.prefetches) {
+			if (held <= config.heldChars) break;
+			if (other === entry || !sizes.has(other)) continue;
+			held -= sizes.get(other)!;
+			state.prefetches.delete(key);
+			other.abort();
+		}
+		return arrived;
+	};
+	const prefetch = (url: URL, code = true, started?: FragmentEarly, idle = false) => {
 		const key = pageKey(url);
 		// A hover timer can fire after its link's page is already shown.
 		if (!config.prefetch || key === state.shown) return;
 		const existing = state.prefetches.get(key);
 		// An idle-fetched page still needs its code on intent, or the swap fetches it a round late.
-		if (existing && fresh(existing, w.performance.now()))
-			return void (code && preloadCode(url, false));
-		existing?.abort();
-		const open = [...state.prefetches].filter(([, entry]) => entry.open);
-		for (const [stale, entry] of open.slice(
-			0,
-			Math.max(0, open.length + 1 - config.prefetchConnections),
-		)) {
-			state.prefetches.delete(stale);
-			entry.abort();
+		if (existing && fresh(existing, w.performance.now())) {
+			if (code) {
+				existing.want();
+				preloadCode(url, false);
+			}
+			return;
 		}
-		const entry = request(url, idle ? 'idle' : true, started, budget);
+		existing?.abort();
+		// Intent is the visitor's own choice: guesses still arriving make room for it, and a click drops them all.
+		if (!idle) {
+			const guesses = [...state.prefetches].filter(([, entry]) => entry.phase === GUESS);
+			let wanted = 0;
+			for (const entry of state.prefetches.values()) if (entry.phase === WANTED) wanted += 1;
+			for (const [other, entry] of guesses.slice(
+				0,
+				Math.max(0, guesses.length + wanted + 1 - config.prefetchConnections),
+			)) {
+				state.prefetches.delete(other);
+				entry.abort();
+			}
+		}
+		const entry = request(url, idle ? 'idle' : true, started);
 		// A page over the idle budget is left for a hover or a press to fetch whole.
 		entry.result.catch(() => {
 			if (state.prefetches.get(key) === entry) state.prefetches.delete(key);
@@ -674,7 +827,7 @@ export function runFragmentNavigation(
 		expire(key, entry);
 		if (code) preloadCode(url, false);
 	};
-	// The timer holds a stamp, not the entry, so a page taken or dropped early frees its parsed document at once.
+	// The timer holds a stamp, not the entry, so a page taken or dropped early frees its text at once.
 	const stamps = new WeakMap<FragmentPrefetch, number>();
 	let stamped = 0;
 	const expire = (key: string, entry: FragmentPrefetch) => {
@@ -687,55 +840,157 @@ export function runFragmentNavigation(
 			current.abort();
 		}, config.prefetchTtlMs);
 	};
-	// Idle tier, fast unmetered connections only: fetch the HTML of a few links in view and preload their code, one round.
-	let scanning = false;
+	// What the page shown may still fetch ahead, one state moved only by `speculate`: PAUSED while a navigation
+	// is on its way, then for each page shown SHOWN, ARMED at its first idle moment, and WATCHING once the idle scan ran.
+	const PAUSED = 0,
+		SHOWN = 1,
+		ARMED = 2,
+		WATCHING = 3;
+	// spent: wire bytes the page shown has guessed so far, against config.guessBudget.
+	let speculation = { phase: PAUSED, page: 0, spent: 0 };
+	const speculate = (phase: number, page = speculation.page) => {
+		if (page === speculation.page && phase !== PAUSED && phase !== speculation.phase + 1) {
+			illegal(`no speculation move from ${speculation.phase} to ${phase}`);
+			phase = PAUSED;
+		}
+		speculation = { phase, page, spent: page === speculation.page ? speculation.spent : 0 };
+	};
 	let idleQueue: URL[] = [];
-	// Idle fetches wait for a free connection rather than cancel one another.
+	const unfetched = (url: URL) =>
+		!state.prefetches.has(pageKey(url)) && !fetched.has(pageKey(url));
+	// Idle and viewport guesses share the app's concurrency and wait for a free slot rather than cancel one another.
 	const pumpIdle = () => {
-		while (idleQueue.length) {
+		if (speculation.phase < ARMED) return;
+		for (;;) {
+			if (speculation.spent >= config.guessBudget) return;
 			let open = 0;
-			for (const entry of state.prefetches.values()) if (entry.open) open += 1;
+			for (const entry of state.prefetches.values()) if (inFlight(entry)) open += 1;
 			if (open >= config.prefetchConnections) return;
-			const url = idleQueue.shift()!;
-			if (state.prefetches.has(pageKey(url)) || fetched.has(pageKey(url))) continue;
-			prefetch(url, false, undefined, config.idleFragmentBytes, true);
+			let url: URL | undefined;
+			while (!url && idleQueue.length && allows(idleLevel)) {
+				const next = idleQueue.shift()!;
+				if (unfetched(next)) url = next;
+			}
+			url ??= viewport?.next();
+			if (!url) return;
+			prefetch(url, false, undefined, true);
 			// Low priority and never evaluated: a modulepreload only fills the cache before a press.
 			preloadCode(url, true);
 		}
 	};
-	const rescan = () => {
-		if (!state.idleDownloads || scanning) return;
-		scanning = true;
-		const run = () => {
-			scanning = false;
-			const visible = new Map<string, URL>();
-			for (const anchor of d.querySelectorAll('a[href]')) {
-				const url = eligible(anchor);
-				// Only destinations the server listed as pages: a dead link is never fetched speculatively.
-				if (!url || !state.routes[url.pathname]) continue;
-				const box = anchor.getBoundingClientRect();
-				if (!box.width || box.bottom < 0 || box.top > w.innerHeight) continue;
-				if (box.right < 0 || box.left > w.innerWidth) continue;
-				const hit = d.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
-				if (!hit || (hit !== anchor && !anchor.contains(hit))) continue;
-				visible.set(pageKey(url), url);
+	// Its own file, loaded once the app's config or a link on the page asks for links in view.
+	let viewport: FragmentViewport | undefined;
+	let viewportLoad: Promise<FragmentViewport> | undefined;
+	const startViewport = () =>
+		(viewportLoad ??= loadViewport!().then(
+			(watch) =>
+				(viewport = watch(
+					d,
+					config.prefetchAttribute,
+					viewportLevel,
+					(anchor) => {
+						const url = eligible(anchor);
+						return url && state.routes[url.pathname] ? url : undefined;
+					},
+					(url, level) => unfetched(url) && allows(level),
+					() => previous,
+					pumpIdle,
+				)),
+		));
+	d.addEventListener('visibilitychange', () => d.visibilityState === 'visible' && pumpIdle());
+	// Links the page adds later (an opened menu, a longer list) join the viewport tier once the page is idle again.
+	const more = () =>
+		viewport &&
+		speculation.phase >= ARMED &&
+		(w.requestIdleCallback ?? w.setTimeout)(
+			() => speculation.phase >= ARMED && viewport?.watch(true),
+		);
+	for (const type of ['click', 'keyup']) d.addEventListener(type, more, { passive: true });
+	// A click or Back/Forward pauses guessing and cancels every fetch still arriving but its own page's, so none competes with it.
+	const settle = (key: string) => {
+		speculate(PAUSED);
+		idleQueue = [];
+		viewport?.stop();
+		for (const [other, entry] of state.prefetches)
+			if (other !== key && inFlight(entry)) {
+				state.prefetches.delete(other);
+				entry.abort(true);
 			}
-			idleQueue = [];
-			for (const [key, url] of visible)
+	};
+	// A page is shown: after a swap, or when a navigation was cancelled and the page it left stays.
+	const rescan = () => {
+		speculate(SHOWN, speculation.page + 1);
+		const page = speculation.page;
+		const current = () => speculation.page === page;
+		void (host.__marklessFragmentIdle ?? Promise.resolve(false)).then((measured) => {
+			fast = measured;
+			// A click since this page was shown has paused guessing; its own swap or cancel arms it again.
+			if (!current() || speculation.phase !== SHOWN) return;
+			// Guessing waits for the main thread's first idle moment after the page is shown: nothing runs in its load.
+			const arm = () => {
+				if (!current() || speculation.phase !== SHOWN) return;
+				speculate(ARMED);
+				// Guessing that this page would do but the visitor's settings or link rule out is marked, once, with why.
+				const would = (viewportLevel ? ['viewport'] : []).concat(idleLevel ? ['idle'] : []);
+				const reason = connection?.saveData
+					? 'save-data'
+					: d.visibilityState === 'hidden'
+						? 'hidden'
+						: would.some((trigger) => !onNetwork(trigger === 'idle' ? idleLevel : viewportLevel))
+							? 'network'
+							: '';
+				if (would.length && reason)
+					w.performance.mark(config.prefetchMarks[1], {
+						detail: { page: location.pathname, reason, triggers: would },
+					});
+				// A budget of 0 is spent before anything starts: the same mark tells a tool so.
+				else if (would.length && !config.guessBudget)
+					w.performance.mark(config.prefetchMarks[0], {
+						detail: { page: location.pathname, bytes: 0 },
+					});
 				if (
-					idleQueue.length < config.idleFragments &&
-					!state.prefetches.has(key) &&
-					!fetched.has(key)
+					loadViewport &&
+					(viewportLevel || d.querySelector(`a[href][${config.prefetchAttribute}="viewport"]`))
 				)
-					idleQueue.push(url);
-			pumpIdle();
-		};
-		void (host.__marklessFragmentIdle ?? Promise.resolve(false)).then((fast) => {
-			if (!fast) return void (scanning = false);
-			if (w.requestIdleCallback) w.requestIdleCallback(run, { timeout: 3000 });
-			else w.setTimeout(run, 500);
+					startViewport().then(
+						(started) => current() && speculation.phase >= ARMED && started.watch(),
+						() => {},
+					);
+				if (!idleLevel || !onNetwork(idleLevel)) return;
+				speculate(WATCHING);
+				const visible = new Map<string, URL>();
+				for (const anchor of d.querySelectorAll('a[href]')) {
+					const url = eligible(anchor);
+					// Only destinations the server listed as pages: a dead link is never fetched speculatively.
+					if (!url || !state.routes[url.pathname]) continue;
+					if (anchor.getAttribute(config.prefetchAttribute) === 'intent') continue;
+					const box = anchor.getBoundingClientRect();
+					if (!box.width || box.bottom < 0 || box.top > w.innerHeight) continue;
+					if (box.right < 0 || box.left > w.innerWidth) continue;
+					const hit = d.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+					if (!hit || (hit !== anchor && !anchor.contains(hit))) continue;
+					visible.set(pageKey(url), url);
+				}
+				idleQueue = [];
+				for (const url of visible.values())
+					if (idleQueue.length < config.idleFragments && unfetched(url)) idleQueue.push(url);
+				pumpIdle();
+			};
+			if (w.requestIdleCallback) w.requestIdleCallback(arm, { timeout: 3000 });
+			else w.setTimeout(arm, 500);
 		});
 	};
+	// A navigation that ends without a swap leaves the page it started from shown, so guessing resumes for it.
+	const resume = () => speculation.phase === PAUSED && rescan();
+	// A navigation that threw swapped nothing: the page it started from is still shown.
+	const failed = (error: unknown) => {
+		resume();
+		w.setTimeout(() => {
+			throw error;
+		});
+	};
+	// A page left for a document load and brought back from the back/forward cache shows again.
+	w.addEventListener('pageshow', (event) => (event as PageTransitionEvent).persisted && resume());
 	const fresh = (entry: FragmentPrefetch, now: number) =>
 		entry.writes === state.writes &&
 		now - entry.at < config.prefetchTtlMs &&
@@ -753,11 +1008,6 @@ export function runFragmentNavigation(
 		request,
 		prefetch,
 		parse,
-		idleDownloads:
-			config.prefetch &&
-			(connection
-				? connection.effectiveType === '4g' && connection.saveData !== true
-				: config.idleWithoutConnectionInfo),
 		rescan,
 		scrolled,
 		arriving,
@@ -797,6 +1047,8 @@ export function runFragmentNavigation(
 
 	// Intent: press, touch and keyboard focus fetch at once. A mouse fetches once it rests on a link:
 	// a pointer crossing a list of links on its way somewhere never rests on the ones it crosses.
+	const intend = (url: URL, clicking = false) =>
+		(clicking ? intentLevel > 0 : allows(intentLevel)) && prefetch(url);
 	let restTimer = 0;
 	let resting = '';
 	let previous: { x: number; y: number; t: number } | undefined;
@@ -823,12 +1075,12 @@ export function runFragmentNavigation(
 		const url = eligible(anchorOf(event));
 		if (!url) return;
 		// Moves arrive about once a frame, so resting means no move for longer than the last gap.
-		if (creeping) return prefetch(url);
+		if (creeping) return intend(url);
 		resting = url.href;
 		restTimer = w.setTimeout(
 			() => {
 				resting = '';
-				prefetch(url);
+				intend(url);
 			},
 			Math.max(config.hoverDwellMs, gap * 1.5),
 		);
@@ -839,7 +1091,11 @@ export function runFragmentNavigation(
 		stopRest();
 		const anchor = anchorOf(event);
 		const url = eligible(anchor);
-		if (url) prefetch(url);
+		if (url)
+			intend(
+				url,
+				event.type === 'pointerdown' && (event as PointerEvent).pointerType !== 'touch',
+			);
 		if (url || eligible(anchor, true)) void load();
 	};
 	for (const type of ['pointerdown', 'touchstart', 'focusin'])
@@ -853,21 +1109,25 @@ export function runFragmentNavigation(
 		// A link to the page already shown keeps it, scroll and state included, as client routers do.
 		if (pageKey(url) === pageKey(new URL(location.href))) {
 			state.stops = (state.stops ?? 0) + 1;
+			resume();
 			d.dispatchEvent(new CustomEvent(config.renderedEvent));
 			return true;
 		}
+		settle(pageKey(url));
 		const replace = anchor.hasAttribute(config.replaceAttribute);
 		const manual = anchor.getAttribute(config.scrollAttribute) === 'manual';
 		const stops = state.stops;
 		const swap = (entry: FragmentEntryModule) =>
-			entry.navigate(
-				d,
-				url,
-				replace ? 'replace' : 'push',
-				manual ? 'manual' : 'reset',
-				stops,
-				askedAt,
-			);
+			entry
+				.navigate(
+					d,
+					url,
+					replace ? 'replace' : 'push',
+					manual ? 'manual' : 'reset',
+					stops,
+					askedAt,
+				)
+				.catch(failed);
 		if (loaded) void swap(loaded);
 		else
 			load().then(swap, () => {
@@ -896,12 +1156,13 @@ export function runFragmentNavigation(
 	const traverse = (event: PopStateEvent) => {
 		state.stops = (state.stops ?? 0) + 1;
 		const url = new URL(location.href);
-		if (url.hash.startsWith('#/') || pageKey(url) === state.shown) return;
+		if (url.hash.startsWith('#/') || pageKey(url) === state.shown) return void resume();
+		settle(pageKey(url));
 		const saved = (
 			event.state as { __marklessFragment?: { x: number; y: number; id?: string } } | null
 		)?.__marklessFragment;
 		load().then(
-			(entry) => entry.navigate(d, url, 'traverse', saved ?? { x: 0, y: 0 }),
+			(entry) => entry.navigate(d, url, 'traverse', saved ?? { x: 0, y: 0 }).catch(failed),
 			() => location.reload(),
 		);
 	};
@@ -911,6 +1172,84 @@ export function runFragmentNavigation(
 		else if (event && event.type !== 'popstate') press(event);
 	};
 	return { traverse, replay, go };
+}
+
+export type FragmentViewport = {
+	// Observes the page's page links; with `more`, only links added since, keeping those already seen.
+	readonly watch: (more?: boolean) => void;
+	readonly stop: () => void;
+	// The wanted link in view nearest the pointer, else the viewport's centre.
+	readonly next: () => URL | undefined;
+};
+
+// Serialized into the run half's bridge file only for apps that fetch links in view (must not reference anything outside its own body).
+export function watchViewport(
+	d: Document,
+	prefetchAttribute: string,
+	level: number,
+	candidate: (anchor: Element) => URL | undefined,
+	wanted: (url: URL, level: number) => boolean,
+	pointer: () => { readonly x: number; readonly y: number } | undefined,
+	pump: () => void,
+): FragmentViewport {
+	const w = d.defaultView as Window & typeof globalThis;
+	// Each link in view with its page, level and where it was when it came into view: picking never re-measures.
+	const inView = new Map<Element, readonly [URL, number, number, number]>();
+	const levels = new WeakMap<Element, readonly [URL, number]>();
+	let observer: IntersectionObserver | undefined;
+	const stop = () => {
+		observer?.disconnect();
+		observer = undefined;
+		inView.clear();
+	};
+	const watch = (more = false) => {
+		if (!more) stop();
+		if (!w.IntersectionObserver) return;
+		const own = (observer ??= new w.IntersectionObserver((entries) => {
+			if (observer !== own) return;
+			for (const entry of entries) {
+				const known = entry.isIntersecting && levels.get(entry.target);
+				const box = entry.boundingClientRect;
+				if (known)
+					inView.set(entry.target, [
+						known[0],
+						known[1],
+						box.left + box.width / 2,
+						box.top + box.height / 2,
+					]);
+				else inView.delete(entry.target);
+			}
+			pump();
+		}));
+		for (const anchor of d.querySelectorAll(
+			level ? 'a[href]' : `a[href][${prefetchAttribute}="viewport"]`,
+		)) {
+			if (more && levels.has(anchor)) continue;
+			const asked = anchor.getAttribute(prefetchAttribute);
+			const linkLevel = asked === 'viewport' ? Math.max(level, 1) : asked === 'intent' ? 0 : level;
+			const url = linkLevel ? candidate(anchor) : undefined;
+			if (!url) continue;
+			levels.set(anchor, [url, linkLevel]);
+			own.observe(anchor);
+		}
+	};
+	const next = () => {
+		const at = pointer();
+		const x = at?.x ?? w.innerWidth / 2;
+		const y = at?.y ?? w.innerHeight / 2;
+		let nearest: Element | undefined;
+		let distance = Infinity;
+		for (const [anchor, [url, linkLevel, left, top]] of inView) {
+			if (!wanted(url, linkLevel)) continue;
+			const away = Math.hypot(left - x, top - y);
+			if (away < distance) [nearest, distance] = [anchor, away];
+		}
+		if (!nearest) return;
+		const [url] = inView.get(nearest)!;
+		inView.delete(nearest);
+		return url;
+	};
+	return { watch, stop, next };
 }
 
 // A fragment fetch asks for the page path under this prefix, so a cache keyed on the URL, or a host rewrite that drops the query, keeps it apart from the page.
@@ -941,9 +1280,18 @@ export const FRAGMENT_HOVER_DWELL_MS = 20;
 export const FRAGMENT_PREFETCH_TTL_MS = 30_000;
 // Unused prefetches still streaming their @pending pieces; older ones are cancelled past this.
 export const FRAGMENT_PREFETCH_CONNECTIONS = 2;
+// Wire bytes viewport and idle fetches may spend per page shown: about what the Next.js original of the shadcn docs prefetched (1.5 MB).
+export const FRAGMENT_GUESS_BUDGET_BYTES = 2 * 1024 * 1024;
+/** Performance marks a tool can read: the page's guess budget ran out; guessing was ruled out (detail.reason). */
+export const PREFETCH_MARKS = ['markless:prefetch-budget-spent', 'markless:prefetch-skipped'] as const;
 export const FRAGMENT_IDLE_FRAGMENTS = 6;
-// An idle fetch of a page whose region runs past this many bytes stops there; the page is fetched on intent instead.
+// Characters of page text kept for pages fetched ahead: 8 MB as one-byte strings, 16 MB if a page has text outside Latin-1.
+// Parsed documents (pages intent wanted, the page shown) are not counted.
+export const FRAGMENT_HELD_CHARS = 8 * 1024 * 1024;
+// An idle or viewport fetch of a page past this many bytes on the wire stops there; the page is fetched on intent instead.
 export const FRAGMENT_IDLE_FRAGMENT_BYTES = 256 * 1024;
+// A compressed fragment with no declared length counts its decoded bytes: docs-site fragments measured 10x to 25x smaller on the wire.
+export const FRAGMENT_IDLE_FRAGMENT_DECODED_BYTES = 4 * 1024 * 1024;
 // Just above Lighthouse's Slow 4G (1.6 Mbit/s).
 export const FRAGMENT_IDLE_BYTES_PER_SECOND = 250_000;
 export const FRAGMENT_IDLE_MEASURED_BYTES = 64 * 1024;

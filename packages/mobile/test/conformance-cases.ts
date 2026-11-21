@@ -408,6 +408,79 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// Each of Chromium's reasons an email field stops a submit, then a value it keeps without its line break and spaces.
+		name: 'email',
+		fixture: 'proofs/f10-email/App.tsrx',
+		actions: [
+			{ event: 'input', host: 'h3', value: 'abc' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: '@x' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'a@' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'a,b@c' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'a@b_c' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'a@b..c' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: 'a@b-' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h3', value: ' sam@exam\nple.com ' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'email-japanese',
+		fixture: 'proofs/f10-email/App.tsrx',
+		preferredLanguages: ['ja-JP'],
+		actions: [
+			{ event: 'input', host: 'h3', value: 'a@b..c' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		// `?.` ends the chain at a null object, past the `?.` too (`user?.home.city`), as JavaScript does.
+		name: 'optional-chain',
+		fixture: 'proofs/r151-optional-chain/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		// One polymorphic component built as a <p> and as a <div>, each with its own click and state.
+		name: 'dynamic-tag',
+		fixture: 'proofs/r152-dynamic-tag/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'component-edge:1/h0' },
+		],
+	},
+	{
+		// A slider's moves set its value on its step and in its range; the app sets it back.
+		name: 'range',
+		fixture: 'proofs/r153-range/App.tsrx',
+		actions: [
+			{ event: 'input', host: 'h2', value: '10' },
+			{ event: 'commit', host: 'h2', value: '10' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'input', host: 'h2', value: '7' },
+		],
+	},
+	{
+		// A textarea shows its text and follows it until it is edited; its form sends what it holds.
+		name: 'textarea-default',
+		fixture: 'proofs/r160-textarea-submit/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'input', host: 'h2', value: 'Mine\nand more' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+		],
+	},
+	{
 		name: 'forms',
 		fixture: 'test/fixtures/Forms.tsrx',
 		actions: [
@@ -1468,6 +1541,18 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'back' },
 			{ event: 'activate', host: 'h6' },
 			{ event: 'activate', host: 'h5' },
+			{ event: 'back' },
+		],
+	},
+	{
+		name: 'script-navigate',
+		app: 'proofs/j16-script-navigate',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h3' },
 			{ event: 'back' },
 		],
 	},

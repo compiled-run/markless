@@ -187,6 +187,26 @@ function semanticNodeOf(semantic: ModuleSemantics, node: AnyNode): AnyNode | und
 	return undefined;
 }
 
+/** Framework functions a phone's script runs, as the host service that stands in for each (`globalThis.__marklessHost.<name>`). */
+const HOST_FUNCTIONS: Readonly<Record<string, ReadonlyArray<string>>> = {
+	'@markless/router': ['navigate'],
+};
+
+/** The host service a framework import stands for in a script, or undefined when a script cannot run it. */
+function hostFunctionOf(entry: {
+	readonly kind: string;
+	readonly specifier: string;
+	readonly name?: string | null;
+}): AnyNode | undefined {
+	if (
+		entry.kind !== 'named' ||
+		!entry.name ||
+		!HOST_FUNCTIONS[entry.specifier]?.includes(entry.name)
+	)
+		return undefined;
+	return member(member(identifier('globalThis'), '__marklessHost'), entry.name);
+}
+
 /** The import record a binding comes from, when it is a value import. */
 function importOf(semantic: ModuleSemantics, binding: Binding) {
 	if (!binding.has(BindingFlags.Import) || binding.has(BindingFlags.TypeImport)) return undefined;
@@ -357,6 +377,7 @@ export function scriptFunctionOf(
 	const viaState = new Map<number, Binding>();
 	const names = new Map<string, { name: string; written: boolean; span: SourceSpan }>();
 	const framework: { name: string; source: string; span: SourceSpan }[] = [];
+	const navigates: SourceSpan[] = [];
 	const globals: SemanticScriptGlobal[] = [];
 	const replaced = new Map<AnyNode, AnyNode>();
 	const unsupported: { construct: string; span: SourceSpan }[] = [];
@@ -378,6 +399,12 @@ export function scriptFunctionOf(
 			if (declared && parts.some((other) => within(declared as never, other as never)))
 				continue;
 			const entry = importOf(semantic, binding);
+			const service = entry && hostFunctionOf(entry);
+			if (service) {
+				replaced.set(node, service);
+				navigates.push(spanOf(node as never, filename));
+				continue;
+			}
 			if (entry?.specifier.startsWith(FRAMEWORK_PREFIX)) {
 				framework.push({
 					name: reference.name,
@@ -490,6 +517,7 @@ export function scriptFunctionOf(
 		...(eventBinding ? { event: eventReads } : {}),
 		globals,
 		framework,
+		navigates,
 		span: spanOf(root as never, filename),
 		unsupported,
 	};
@@ -528,6 +556,7 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 		const globals: SemanticScriptGlobal[] = [];
 		const dropped: { name: string; span: SourceSpan }[] = [];
 		const framework: { name: string; source: string; span: SourceSpan }[] = [];
+		const navigates: SourceSpan[] = [];
 		const unsupported: { construct: string; span: SourceSpan }[] = [];
 		const dead = deadIn(node);
 		for (const reference of semantic.references) {
@@ -540,6 +569,12 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 				continue;
 			}
 			const entry = importOf(semantic, binding);
+			const service = entry && hostFunctionOf(entry);
+			if (service) {
+				replaced.set(at, service);
+				navigates.push(spanOf(at as never, filename));
+				continue;
+			}
 			if (entry?.specifier.startsWith(FRAMEWORK_PREFIX)) {
 				framework.push({
 					name: reference.name,
@@ -571,6 +606,7 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 			globals,
 			dropped,
 			framework,
+			navigates,
 			unsupported,
 		});
 	};
@@ -789,6 +825,7 @@ export function scriptFactsOf(source: string, filename: string) {
 				imports: imported ? [{ slot: imported.index, name: imported.name }] : [],
 				globals: [],
 				framework: [],
+				navigates: [],
 				span,
 				unsupported: [],
 			};

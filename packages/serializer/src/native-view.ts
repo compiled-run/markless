@@ -87,7 +87,12 @@ export type NativeExpr =
 	 * `length` of a string or array, an array's element at an index (`"0"`, `"1"`: null past its end, as `undefined` on
 	 * the web), or an own property of an object; anything else is a runtime error.
 	 */
-	| { readonly member: NativeExpr; readonly property: string }
+	| {
+			readonly member: NativeExpr;
+			readonly property: string;
+			/** In an optional chain (`a?.b`): a null object gives null, as JavaScript gives undefined. */
+			readonly optional?: true;
+	  }
 	/** An array's element at an index computed while the app runs: null when it is not an integer inside the array. */
 	| { readonly at: NativeExpr; readonly of: NativeExpr }
 	| { readonly array: ReadonlyArray<{ readonly spread: boolean; readonly value: NativeExpr }> }
@@ -178,9 +183,10 @@ export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>
 
 /**
  * Host services a payload's script uses, so a host provides only those: timers (`setTimeout` and the rest, through
- * `timer` entries), `fetch` (through `fetch` entries), `console`, and `crypto.randomUUID` (from a `seed` the host passes).
+ * `timer` entries), `fetch` (through `fetch` entries), `console`, `crypto.randomUUID` (from a `seed` the host passes),
+ * and `navigate` from @markless/router (through a `navigate` entry; the host passes the page's route `params`).
  */
-export type NativeScriptService = 'timers' | 'fetch' | 'console' | 'crypto';
+export type NativeScriptService = 'timers' | 'fetch' | 'console' | 'crypto' | 'navigate';
 
 /** The JavaScript a payload's `script` ops and script computeds run, in the platform's engine, started on first use. */
 export type NativeScript = {
@@ -210,6 +216,8 @@ export type NativeTextPart =
 
 /** Where a node sits when it belongs to one arm of an `@if`: shown only while that arm is chosen. */
 export type NativeArmPlace = { readonly branch: string; readonly index: number };
+/** A branch's style state when it shows no arm (an `@if` with no `@else` whose test fails); otherwise its arm's index. */
+export const NATIVE_NO_ARM = 'none';
 
 /** Where a node sits: in an `@if` arm, or in a list row (`row` names the `repeat` node). */
 export type NativePlace = { readonly arm?: NativeArmPlace; readonly row?: string };
@@ -591,6 +599,8 @@ export type NativeEventName =
 	| 'submit'
 	| 'idle'
 	| 'visible'
+	/** A range input let go after its value moved: the web's `change` on it. */
+	| 'commit'
 	| NativePointerEventName
 	| NativeMouseEventName;
 
@@ -895,6 +905,8 @@ export type NativeViewPayload = {
 	readonly tooLong?: Readonly<Record<string, NativeTooLong>>;
 	/** What the web says when a number field is out of its range, off its step or holds no number, by language; present when a form has one. */
 	readonly numberMessages?: Readonly<Record<string, NativeNumberMessages>>;
+	/** What the web says when an email field holds no email address, by language; present when a form has an email field. */
+	readonly typeMismatch?: Readonly<Record<string, NativeEmailMismatch>>;
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	readonly script?: NativeScript;
 	/** A click handler reads where its tap landed: the host reports touches even with no pointer handler, as a browser fires them. */
@@ -902,6 +914,9 @@ export type NativeViewPayload = {
 };
 
 export const NATIVE_APP_VERSION = 'markless.native-app/0';
+
+/** The route an app payload carries its `pages/404.tsrx` under: where a link to a path no route matches opens, as on the web. */
+export const NATIVE_NOT_FOUND_ROUTE = '/404';
 
 /** An app of several routes: each route's page, in the router's match order (static before `[param]` segments). */
 export type NativeAppPayload = {
@@ -1030,6 +1045,104 @@ export function nativeMaxLength(attribute: string | null | undefined): number | 
 	return value;
 }
 
+/**
+ * Chromium's `validationMessage` for an email field whose value is not an email address, one per reason: `{value}` is the
+ * whole value, `{symbol}` the first character not allowed, `{domain}` the part after the `@`.
+ */
+export type NativeEmailMismatch = {
+	readonly noAt: string;
+	readonly emptyLocal: string;
+	readonly emptyDomain: string;
+	readonly invalidLocal: string;
+	readonly invalidDomain: string;
+	readonly invalidDots: string;
+	readonly other: string;
+};
+
+/** An email field's value as the web keeps it: line breaks dropped, then ASCII whitespace trimmed from both ends. */
+export function nativeEmailValue(typed: string): string {
+	return typed.replace(/[\r\n]/g, '').replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/g, '');
+}
+
+const EMAIL_LOCAL = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]$/;
+const EMAIL_LABEL = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
+
+/**
+ * Why an email field's value (as {@link nativeEmailValue} keeps it) is not an email address, in Chromium's words, or
+ * undefined when it is one or is empty. Validity is HTML's valid e-mail address; the reason is the first of Chromium's
+ * checks the value fails.
+ */
+export function nativeEmailMismatch(
+	messages: NativeEmailMismatch,
+	value: string,
+): string | undefined {
+	if (value === '') return undefined;
+	const at = value.indexOf('@');
+	const local = at < 0 ? value : value.slice(0, at);
+	const domain = at < 0 ? '' : value.slice(at + 1);
+	if (
+		at > 0 &&
+		[...local].every((character) => EMAIL_LOCAL.test(character)) &&
+		domain.split('.').every((label) => EMAIL_LABEL.test(label))
+	)
+		return undefined;
+	const fill = (message: string, symbol = '') =>
+		message.replace(/\{(value|symbol|domain)\}/g, (_, name: string) =>
+			name === 'value' ? value : name === 'domain' ? domain : symbol,
+		);
+	if (at < 0) return fill(messages.noAt);
+	if (at === 0) return fill(messages.emptyLocal);
+	if (domain === '') return fill(messages.emptyDomain);
+	const inLocal = [...local].find((character) => !EMAIL_LOCAL.test(character));
+	if (inLocal !== undefined) return fill(messages.invalidLocal, inLocal);
+	const inDomain = [...domain].find((character) => !/^[a-zA-Z0-9.-]$/.test(character));
+	if (inDomain !== undefined) return fill(messages.invalidDomain, inDomain);
+	if (domain.startsWith('.') || domain.endsWith('.') || domain.includes('..'))
+		return fill(messages.invalidDots);
+	return fill(messages.other);
+}
+
+/** A number as HTML parses a range input's attributes: a valid floating-point number, else undefined. */
+const rangeNumber = (text: string | null | undefined): number | undefined =>
+	text != null && /^-?(\d+(\.\d+)?|\.\d+)([eE][-+]?\d+)?$/.test(text) ? Number(text) : undefined;
+
+/** The decimal places a number is written with, so stepped values print as the browser writes them. */
+const decimals = (value: number): number => {
+	const [, fraction = '', exponent = '0'] = /^-?\d*(?:\.(\d+))?(?:e([-+]?\d+))?$/.exec(String(value)) ?? [];
+	return Math.max(0, fraction.length - Number(exponent));
+};
+
+/**
+ * A range input's value as the web keeps it, from its `value`, `min`, `max` and `step` attributes: `min` 0 and `max`
+ * 100 by default (a `max` below `min` is `min`); a value that is not a number is the midpoint; it is clamped into the
+ * range and moved to the nearest step from `min` (the greater of two as near), staying at or below `max`.
+ */
+export function nativeRangeValue(
+	value: string | null | undefined,
+	min: string | null | undefined,
+	max: string | null | undefined,
+	step: string | null | undefined,
+): string {
+	const low = rangeNumber(min) ?? 0;
+	const high = Math.max(low, rangeNumber(max) ?? 100);
+	const any = step?.trim().toLowerCase() === 'any';
+	const stepNumber = rangeNumber(step);
+	const size = any ? undefined : stepNumber !== undefined && stepNumber > 0 ? stepNumber : 1;
+	let number = rangeNumber(value) ?? low + (high - low) / 2;
+	number = Math.min(high, Math.max(low, number));
+	if (size !== undefined) {
+		// In whole units of the finest written place, as the browser's decimal arithmetic reads them.
+		const places = Math.max(decimals(low), decimals(size), decimals(number));
+		const unit = 10 ** places;
+		const whole = (n: number) => Math.round(n * unit);
+		const stepUnits = whole(size);
+		let steps = Math.floor((whole(number) - whole(low)) / stepUnits + 0.5);
+		while (steps > 0 && whole(low) + steps * stepUnits > whole(high)) steps--;
+		number = (whole(low) + steps * stepUnits) / unit;
+	}
+	return String(number);
+}
+
 /** A form's submittable fields and submit buttons, each in tree order. */
 export type NativeForm = {
 	readonly node: string;
@@ -1046,6 +1159,7 @@ export type NativeFieldKind = 'text' | 'number' | 'checkbox' | 'radio' | 'hidden
 
 export {
 	NATIVE_NUMBER_MESSAGES_BY_LOCALE,
+	NATIVE_EMAIL_MISMATCH_BY_LOCALE,
 	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
 } from './native-validation-messages.ts';

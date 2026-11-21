@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // One chunk on one phone, started by the runner through the machine queue: build (or reuse) the shell around the job's
 // host, run the host's own tests (remembered per source set), then install and run each rung's flow.
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildAndroidShell, installProofApk } from '../harness/android.ts';
@@ -30,6 +31,14 @@ const [job, chunkName, device, reinstall] = process.argv.slice(2);
 if (!job || !chunkName || !device)
 	throw new Error('usage: run-chunk.ts <job dir> <chunk> <device> [reinstall-driver]');
 const spec = readJson<JobSpec>(join(job, 'job.json'))!;
+// The shells take Dragon's engine from the checkout the job's styles were compiled with, as long as it has not moved since.
+if (spec.dragon) {
+	const head = execFileSync('git', ['-C', spec.dragon.dir, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+	if (head !== spec.dragon.commit)
+		throw new Error(`the job's Dragon checkout ${spec.dragon.dir} moved from ${spec.dragon.commit} to ${head} after the submit; submit again`);
+	process.env.MARKLESS_DRAGON_DIR = spec.dragon.dir;
+	if (spec.dragon.zig) process.env.MARKLESS_ZIG = spec.dragon.zig;
+}
 const chunk = readJson<Chunk>(chunkFile(job, chunkName))!;
 const platform: ProofPlatform = chunk.platform;
 const mobile = bundleMobile(job);
