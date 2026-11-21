@@ -19,7 +19,7 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": -1,
+			"delta": -7,
 			"reason": "#977: a list nested in a row the runtime just built adopts no rows from it; +135 B in resume-keyed-repeats",
 			"date": "2026-11-21"
 		},
@@ -42,7 +42,7 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": -7,
+			"delta": 6,
 			"reason": "#977: a list nested in a row the runtime just built adopts no rows from it; +135 B in resume-keyed-repeats",
 			"date": "2026-11-21"
 		},
@@ -54,7 +54,7 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 1,
+			"delta": 3,
 			"reason": "#977: a list nested in a row the runtime just built adopts no rows from it; +135 B in resume-keyed-repeats",
 			"date": "2026-11-21"
 		}

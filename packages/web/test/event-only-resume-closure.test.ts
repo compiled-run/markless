@@ -157,10 +157,12 @@ const resumeOnDemandEntries = [
 // ancestor (1,000 rows, cell no handler owns: 1,000 rows walked -> 1): 37,236 -> 37,431 raw, in resume-keyed-repeats.ts.
 // 2026-11-20: each wired list publishes the rows it has on screen and withdraws them when disposed, so a handle bound in
 // rows beside other elements holds the rows only (it held every child of the parent): 37,431 -> 37,812 raw, in resume-keyed-repeats.ts.
+// 2026-11-20: rows an arm painted are adopted under the collections a typed paint snapshot read before the commit's first
+// await, so a value landing while the arm wires reconciles over them: 37,745 -> 37,983 raw, the snapshot type and lookup.
 // 2026-11-21: a list nested in a row the runtime just built adopts no rows from that row (#977, an added outer row showed
-// none of its inner rows): 37,812 -> 37,867 raw, a `built` flag passed from the row mint to the nested list in
-// resume-keyed-repeats.ts.
-const sourceByteLimit = 37867;
+// none of its inner rows): 37,983 -> 38,105 raw, a `built` flag passed from the row mint to the nested list in
+// resume-keyed-repeats.ts and fns/nested-repeats.ts.
+const sourceByteLimit = 38105;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',
