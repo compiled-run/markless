@@ -165,7 +165,7 @@
 	"anchors": {
 		"calibrationS": 1.314,
 		"cpuS": 3032.4,
-		"peakRssMb": 3976,
+		"peakRssMb": 3779,
 		"models": {
 			"factors": {
 				"AMD EPYC 7763 64-Core Processor": 1.048,
@@ -199,19 +199,19 @@
 		"shards": {
 			"1/3": {
 				"cpuS": 947.4,
-				"peakRssMb": 3913,
+				"peakRssMb": 3416,
 				"suite": 1073.7,
 				"typical": 958
 			},
 			"2/3": {
 				"cpuS": 1025.8,
-				"peakRssMb": 3976,
+				"peakRssMb": 3779,
 				"suite": 960.8,
 				"typical": 1047.5
 			},
 			"3/3": {
 				"cpuS": 1059.2,
-				"peakRssMb": 3554,
+				"peakRssMb": 3601,
 				"suite": 935.4,
 				"typical": 1054.3
 			}
@@ -1394,6 +1394,56 @@
 				"44823525942"
 			],
 			"reason": "added test work since #896: the median of the 8 green landed merge-queue runs from 2026-11-20 07:00 to 21:47 (44706606841 to 44823525942) read +1.8% to +6.9% (median +5.2%) against 2730.7 CPU-s. By each test file's host-normalised duration, 135 CPU-s of the drift is tests the merged PRs added: new router and bundler fixture-build tests from #909, #912, #910, #921, #913, #917, #919, #925, #924, #944 and #958 (8 to 14 CPU-s each), the render-order sweep's census moved into child processes for memory (#981, +21 CPU-s), and #958's additions to yardstick-web-defects (+10.9 CPU-s). No merged change made existing tests slower beyond #981's stated trade. Margin unchanged at ±8.9%; memory anchors unchanged (most of these runs predate #985 removing the shard memory overlap)"
+		},
+		{
+			"date": "2026-11-21",
+			"change": "anchors",
+			"from": {
+				"cpuS": 3032.4,
+				"peakRssMb": 3976
+			},
+			"to": {
+				"cpuS": 3032.4,
+				"peakRssMb": 3779
+			},
+			"runs": [
+				"44799314968",
+				"44808576155",
+				"44808580048",
+				"44823525942",
+				"44823527099",
+				"44835846291",
+				"44835846878",
+				"44842852131",
+				"44842854427",
+				"44849370113",
+				"44851329134",
+				"44857856954",
+				"44857858388",
+				"44863583901",
+				"44863585210",
+				"44863586284",
+				"44866496824",
+				"44869203781",
+				"44870813250",
+				"44872802840",
+				"44873311917",
+				"44877511492",
+				"44880604320",
+				"44882140579",
+				"44883678192",
+				"44886787940",
+				"44886789438",
+				"44886790489",
+				"44888319188",
+				"44893091237",
+				"44893226498",
+				"44898017974",
+				"44898019261",
+				"44902773557",
+				"44904330708"
+			],
+			"reason": "memory only, down: #985 (files over 1 GB outside the build slot take the slot) removed the shard memory overlap that gave #998 its 4,144-4,442 MB high mode. Across the 35 green landed merge-queue runs from #985 (2026-11-20 19:08Z) to 2026-11-21 12:31Z the largest shard peak read 3,672-3,968 MB (median 3,790), against a band of 3,662-4,290 MB around 3,976, so pull request runs at 3,607-3,660 MB failed as a stale anchor. Per-shard medians 3,416 / 3,779 / 3,601 MB; 3,779 MB puts every reading since #985 (35 landed, 96 other) inside the unchanged ±7.9% band (3,480-4,077) and lowers the ceiling from 4,290 to 4,077 MB; CPU anchors unchanged (main median +1.6% against 3,032.4 CPU-s)"
 		}
 	],
 	"models": {
