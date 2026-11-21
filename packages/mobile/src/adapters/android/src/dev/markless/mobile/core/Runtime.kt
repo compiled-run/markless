@@ -447,6 +447,7 @@ class Runtime(
 		data class Slot(val slot: String) : Bound
 		data class Fields(val fields: Map<String, String>) : Bound
 		data class Value(val value: JsValue) : Bound
+		data class Callback(val fn: String) : Bound
 		data class Elements(val value: JsValue) : Bound
 		data class Object(val members: Map<String, Bound>) : Bound
 		data class Shared(val members: Map<String, Bound>) : Bound
@@ -458,6 +459,7 @@ class Runtime(
 			is ScriptBinding.Cell -> Bound.Slot(slot(b.cell, scope))
 			is ScriptBinding.Fields -> Bound.Fields(b.fields.mapValuesTo(LinkedHashMap()) { slot(it.value, scope) })
 			is ScriptBinding.Value -> Bound.Value(evaluate(b.value, scope))
+			is ScriptBinding.Callback -> Bound.Callback(b.fn)
 			is ScriptBinding.Elements -> Bound.Elements(evaluate(b.value, scope))
 			is ScriptBinding.Object -> Bound.Object(bind(b.members, scope))
 			is ScriptBinding.Shared -> Bound.Shared(bind(b.members, scope))
@@ -470,6 +472,7 @@ class Runtime(
 			is Bound.Slot -> "{\"slot\":${jsonString(b.slot)}}"
 			is Bound.Fields -> "{\"fields\":${b.fields.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}}"
 			is Bound.Value -> "{\"value\":${jsonValue(b.value)}}"
+			is Bound.Callback -> "{\"callback\":${jsonString(b.fn)}}"
 			is Bound.Elements -> "{\"elements\":${jsonValue(b.value)}}"
 			is Bound.Object -> "{\"object\":${frameJson(b.members)}}"
 			is Bound.Shared -> "{\"shared\":${frameJson(b.members)}}"
@@ -488,6 +491,7 @@ class Runtime(
 			is Bound.Slot -> jsonValue(nullish(values[b.slot]) ?: nullish(values[b.slot.substringBefore('@')]) ?: JsValue.Null)
 			is Bound.Fields -> b.fields.values.joinToString(",", "[", "]") { jsonValue(values[it] ?: values[it.substringBefore('@')] ?: JsValue.Null) }
 			is Bound.Value -> jsonValue(b.value)
+			is Bound.Callback -> "null"
 			is Bound.Elements -> jsonValue(b.value)
 			is Bound.Object -> readFrame(b.members)
 			is Bound.Shared -> readFrame(b.members)
@@ -541,8 +545,11 @@ class Runtime(
 		if (payload.script?.services?.contains("crypto") == true) scriptHost?.seed()?.let { append(",\"seed\":${jsonString(it)}") }
 	}
 
+	/** Submissions held by a script promise not settled yet, by the engine's run number. */
+	private val scriptRuns = HashMap<Int, Submission>()
+
 	/** One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries, in that order. */
-	private fun enter(fields: String): List<JournalEntry> {
+	private fun enter(fields: String, submission: Submission? = null): List<JournalEntry> {
 		val entry = "{$fields${entryCells()}}"
 		val started = System.nanoTime()
 		scriptCall("enter", entry)
@@ -567,6 +574,12 @@ class Runtime(
 			logs.add(level to text)
 			onScriptLog?.invoke(level, text)
 		}
+		// A submit handler's promise keeps its submission running until the entry it settles in, as the web keeps the form busy.
+		for (run in list("pending")) if (submission != null) {
+			submission.pending++
+			scriptRuns[id(run)] = submission
+		}
+		for (run in list("settled")) scriptRuns.remove(id(run))?.let { it.pending--; settled(it) }
 		val raised = ArrayList<JournalEntry>()
 		for (event in result["raises"]?.arr("leave().raises") ?: emptyList()) {
 			val taken = raise(event.obj("leave().raises[]"))
@@ -1069,8 +1082,13 @@ class Runtime(
 			if (option?.element != "option" || select == null) throw MarklessRuntimeError("\"$host\" is not an option of a select")
 			val instance = optionsOf(select).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")
 			return change(null, null) {
-				if (attributeNow(select, "disabled") == null && attributeIn(option, "disabled", instance.scope) == null) chosenNow = host
-				emptyList()
+				if (attributeNow(select, "disabled") != null || attributeIn(option, "disabled", instance.scope) != null) return@change emptyList()
+				chosenNow = host
+				// A choice that changes the select fires its input handler, as the web does, with the option's value.
+				val was = optionsOf(select).firstOrNull { selectedness[it.id] == true }?.id
+				val handler = handlerFor(select, EventName.Input)?.let { handlers[it] }
+				if (was == host || handler == null) emptyList()
+				else withFields(mapOf("value" to JsValue.Str(optionValue(instance)))) { run(handler.ops, instance.scope) }
 			}
 		}
 		if (detail != null && event != EventName.Activate) throw MarklessRuntimeError("a ${event.wire} event carries no press count")
@@ -1342,7 +1360,7 @@ class Runtime(
 				val nodes = named?.let { n -> ",\"nodes\":" + n.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value?.let(::jsonString) ?: "null"}" } } ?: ""
 				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$touch$nodes}"
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
-				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope, named?.values?.filterNotNull().orEmpty())},\"event\":$event$catch"))
+				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope, named?.values?.filterNotNull().orEmpty())},\"event\":$event$catch", submission))
 			}
 			Op.PreventDefault -> calls.add(JournalEntry.PreventDefault)
 			is Op.FieldText -> {
