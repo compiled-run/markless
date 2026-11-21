@@ -7,6 +7,7 @@ import { buildAndroidShell, installProofApk } from '../harness/android.ts';
 import { iosHostTests, androidHostTests, describeHostTests } from '../harness/host-tests.ts';
 import { exec } from '../harness/exec.ts';
 import { buildIosShell, installProofApp } from '../harness/ios.ts';
+import { simctl, SimulatorStuck } from '../harness/simctl.ts';
 import { runFlow } from '../harness/maestro.ts';
 import type { ProofPlatform } from '../harness/proof-app.ts';
 import { androidTools, cacheRoot } from '../harness/tools.ts';
@@ -119,8 +120,7 @@ try {
 			let installError: string | undefined;
 			try {
 				// A rung that switched to dark leaves the phone dark for the next job's rungs: each starts light.
-				if (platform === 'ios')
-					await exec('xcrun', ['simctl', 'ui', device, 'appearance', 'light']);
+				if (platform === 'ios') await simctl(['ui', device, 'appearance', 'light']);
 				else
 					await exec(tools!.adb, ['-s', device, 'shell', 'cmd', 'uimode', 'night', 'no']);
 				await install(rung, dir);
@@ -134,6 +134,8 @@ try {
 						`tcp:${ECHO_SERVER_PORT}`,
 					]);
 			} catch (error) {
+				// A stuck simulator fails every rung left, so the queue moves on and the runner restarts it.
+				if (error instanceof SimulatorStuck) throw error;
 				installError = error instanceof Error ? error.message : String(error);
 			}
 			const installSeconds = seconds(installStarted);
