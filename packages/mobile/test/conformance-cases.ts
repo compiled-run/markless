@@ -1240,6 +1240,17 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h5' },
 		],
 	},
+	{
+		// Live regions whose aria-live and role follow state: the payload carries their politeness as expressions.
+		name: 'live-follows',
+		fixture: 'test/fixtures/LiveFollows.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
 ];
 
 /** Each committed navigation vector file: a navigation rung's app, the path it opens at and the actions it records. */

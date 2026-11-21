@@ -818,7 +818,7 @@ export function Page() @{
 		);
 	});
 
-	it('marks live regions as ARIA defines them, and refuses one whose politeness follows state', async () => {
+	it('marks live regions as ARIA defines them, and one whose politeness follows state as following it', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Page() @{
 	let open = state(false);
@@ -849,9 +849,8 @@ export function Page() @{
 	let paused = state(false);
 	<div aria-live={paused ? 'off' : 'polite'}>news</div>
 }`);
-		expect(dynamic.diagnostics.map((d) => d.message)).toContain(
-			'the `aria-live` of a <div> follows state; a native host makes a live region when it builds the view',
-		);
+		expect(dynamic.diagnostics).toEqual([]);
+		expect(dynamic.payload!.nodes.find((node) => node.kind === 'element' && node.element === 'div')).toHaveProperty('liveFollows');
 	});
 
 	it('runs only the side of &&, || and ?? that a left side known when the app is built leaves to run', async () => {
@@ -994,6 +993,31 @@ export function Page() @{
 		expect(JSON.stringify(either.payload?.handlers[0]?.ops)).toContain(
 			JSON.stringify({ logical: '??', left: { drawn: first!.id }, right: { drawn: second!.id } }),
 		);
+	});
+
+	it('makes a live region whose aria-live or role follows state, outside a row, with its politeness as an expression', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let paused = state(false);
+	<main>
+		<p aria-live={paused ? 'off' : 'polite'}>Slide</p>
+		<button onClick={() => (paused = !paused)}>Pause</button>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const region = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'p');
+		expect(region).toMatchObject({ liveFollows: { politeness: expect.any(Object), atomic: expect.any(Object) } });
+		expect(region).not.toHaveProperty('live');
+		const rows = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let items = state([{ id: 'a', bad: false }]);
+	<ul>
+		@for (const item of items; key item.id) {
+			<li role={item.bad ? 'alert' : 'status'}>{item.id}</li>
+		}
+	</ul>
+}`);
+		expect(rows.diagnostics.map((d) => d.message).join('\n')).toContain('in a @for row whose `role`, `aria-live` or `aria-atomic` follows state');
 	});
 
 	it("folds a shared state's first value that reads module constants", async () => {

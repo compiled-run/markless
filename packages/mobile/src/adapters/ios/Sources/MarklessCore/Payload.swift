@@ -164,6 +164,8 @@ public struct NativeNode: Equatable, Sendable {
 	public var drawing: NativeDrawing? = nil
 	/// A live region: a change to the text inside is announced.
 	public var live: NativeLive? = nil
+	/// A live region whose `role`, `aria-live` or `aria-atomic` follows state: its politeness and atomicity, evaluated when it speaks.
+	public var liveFollows: NativeLiveFollows? = nil
 
 	public var isElement: Bool { if case .element = kind { true } else { false } }
 	public var isText: Bool { if case .text = kind { true } else { false } }
@@ -654,7 +656,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let place = ["arm", "row"]
 			switch kind {
 			case "element":
-				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing", "live"] + place)
+				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing", "live", "liveFollows"] + place)
 				var attributes: [String: String] = [:]
 				if field.has("attributes") {
 					let reader = try field["attributes"]
@@ -676,7 +678,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 					object: field.has("object") ? try field["object"].string() : nil,
 					defaultStyle: field.has("defaultStyle") ? try decodeDefaultStyle(try field["defaultStyle"]) : nil,
 					drawing: field.has("drawing") ? try decodeDrawing(try field["drawing"]) : nil,
-					live: field.has("live") ? try decodeLive(try field["live"]) : nil)
+					live: field.has("live") ? try decodeLive(try field["live"]) : nil,
+					liveFollows: field.has("liveFollows") ? try decodeLiveFollows(try field["liveFollows"]) : nil)
 			case "text":
 				let field = try node.object(required: ["kind", "id", "parent", "parts"], optional: place)
 				let parts = try decodeParts(try field["parts"])
@@ -936,6 +939,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 		let politeness = try live["politeness"].string()
 		guard ["polite", "assertive"].contains(politeness) else { throw PayloadError(path: reader.path, reason: "unknown politeness \"\(politeness)\"") }
 		return NativeLive(assertive: politeness == "assertive", atomic: try live["atomic"].bool())
+	}
+
+	private static func decodeLiveFollows(_ reader: Reader) throws -> NativeLiveFollows {
+		let live = try reader.object(["politeness", "atomic"])
+		return NativeLiveFollows(politeness: try decodeExpr(try live["politeness"]), atomic: try decodeExpr(try live["atomic"]))
 	}
 
 	private static func decodeDrawing(_ reader: Reader) throws -> NativeDrawing {
@@ -1384,6 +1392,17 @@ public struct NativeDeviceObject: Equatable, Sendable {
 public struct NativeLive: Sendable, Equatable {
 	public let assertive: Bool
 	public let atomic: Bool
+
+	public init(assertive: Bool, atomic: Bool) {
+		self.assertive = assertive
+		self.atomic = atomic
+	}
+}
+
+/// A live region's politeness (`"polite"`, `"assertive"` or null) and atomicity as expressions over the attributes that follow state.
+public struct NativeLiveFollows: Sendable, Equatable {
+	public let politeness: NativeExpr
+	public let atomic: NativeExpr
 }
 
 /// One piece of a key joined from a row's fields: fixed text, or the value at a path on the item, as a template literal writes it.

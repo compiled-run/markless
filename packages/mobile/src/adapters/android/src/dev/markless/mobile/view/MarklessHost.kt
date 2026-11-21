@@ -800,7 +800,7 @@ class MarklessHost(
 				else -> continue
 			}
 			views[inst.id] = view
-			(node as? Node.Element)?.live?.let { view.accessibilityLiveRegion = if (it.assertive) View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE else View.ACCESSIBILITY_LIVE_REGION_POLITE }
+			(node as? Node.Element)?.let { liveRegion(it, view) }
 			built[inst.id] = inst
 			val parentId = parentOf(inst)
 			val outer = if (parentId != null) views[parentId] else pageBox
@@ -1144,6 +1144,21 @@ class MarklessHost(
 		return view
 	}
 
+	/** How TalkBack speaks a change inside the element: as built, or, when its live attributes follow state, as they read now. */
+	private fun liveRegion(node: Node.Element, view: View) {
+		val follows = node.liveFollows
+		val assertive = if (follows != null) when ((runtime.evaluate(follows.politeness) as? JsValue.Str)?.value) {
+			"assertive" -> true
+			"polite" -> false
+			else -> null
+		} else node.live?.assertive
+		view.accessibilityLiveRegion = when (assertive) {
+			true -> View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE
+			false -> View.ACCESSIBILITY_LIVE_REGION_POLITE
+			null -> View.ACCESSIBILITY_LIVE_REGION_NONE
+		}
+	}
+
 	/** Attributes per the contract's Android mapping; `class` reaches views only through Dragon's style states, and any other attribute is ignored. */
 	private fun attribute(id: String, name: String, value: String?) {
 		val view = view(id)
@@ -1151,6 +1166,7 @@ class MarklessHost(
 		if (value == null) current.remove(name) else current[name] = value
 		if (id in inert && (name == "aria-hidden" || name == "hidden")) return
 		if (view is RangeBar && name in RangeBar.SHAPE) view.show(current)
+		if (name == "role" || name == "aria-live") (payload.nodes.firstOrNull { it.id == id.substringBefore('@') } as? Node.Element)?.takeIf { it.liveFollows != null }?.let { liveRegion(it, view) }
 		when (name) {
 			// A label names its control, so TalkBack reads it there and not a second time on the label; a press on it activates the control.
 			"for" -> if (value != null) {

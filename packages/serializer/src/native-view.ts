@@ -429,6 +429,11 @@ export type NativeNode = NativePlace &
 				 * announced, after the screen reader's current speech when polite; `atomic` reads the whole region, else the changed text.
 				 */
 				readonly live?: { readonly politeness: 'polite' | 'assertive'; readonly atomic: boolean };
+				/**
+				 * A live region whose `role`, `aria-live` or `aria-atomic` follows state: its politeness (`'polite'`,
+				 * `'assertive'` or null for none) and atomicity now, which the host evaluates each time it speaks.
+				 */
+				readonly liveFollows?: { readonly politeness: NativeExpr; readonly atomic: NativeExpr };
 				/** Attributes fixed at build time (`class` carries the component's scope class); absent when none. */
 				readonly attributes?: Readonly<Record<string, string>>;
 				/** The device object a `camera` element shows (`<base.camera el={cam} />`). */

@@ -658,10 +658,17 @@ final class ViewTree {
 		let suffix = at.map { String(text[$0...]) } ?? ""
 		var parent = nodes[base]?.parent
 		while let id = parent, let node = nodes[id] {
-			if node.live != nil { return id + suffix }
+			if node.live != nil || node.liveFollows != nil { return id + suffix }
 			parent = node.parent
 		}
 		return nil
+	}
+
+	/// How a live region speaks now: as built, or, when its attributes follow state, as they read at this moment.
+	private func liveNow(_ node: String) -> NativeLive? {
+		guard let follows = nodes[node]?.liveFollows else { return nodes[node]?.live }
+		guard case let .string(politeness) = try? runtime.evaluate(follows.politeness) else { return nil }
+		return NativeLive(assertive: politeness == "assertive", atomic: (try? runtime.evaluate(follows.atomic)) == .bool(true))
 	}
 
 	/// Each live region a journal changed, spoken once: whole when atomic, else the text that changed.
@@ -674,7 +681,7 @@ final class ViewTree {
 		}
 		for region in order {
 			let base = region.split(separator: "@").first.map(String.init) ?? region
-			guard let live = nodes[base]?.live, let view = elements[region] ?? paragraphs[region]?.view else { continue }
+			guard let live = liveNow(base), let view = elements[region] ?? paragraphs[region]?.view else { continue }
 			let spoken = live.atomic ? text(within: view) : changed[region, default: []].joined(separator: " ")
 			if !spoken.isEmpty { announce(spoken, live.assertive) }
 		}

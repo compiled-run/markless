@@ -393,6 +393,45 @@ const isNativeValue = (value: unknown): value is NativeValue =>
 		Object.values(value as object).every(isNativeValue));
 
 /** Every value an attribute expression can write, when each comes from a literal in it; undefined when one may not. */
+/** An attribute's text as the web writes a bound value: `false` and nullish leave it out, `true` writes "true". */
+function attributeText(value: NativeExpr): NativeExpr {
+	return {
+		if: { logical: '||', left: { binary: '===', left: value, right: { literal: false } }, right: { binary: '===', left: value, right: { literal: null } } },
+		whenTrue: { literal: null },
+		whenFalse: { if: { binary: '===', left: value, right: { literal: true } }, whenTrue: { literal: 'true' }, whenFalse: { call: 'String', arguments: [value] } },
+	};
+}
+
+/**
+ * A live region's politeness (`'polite'`, `'assertive'` or null) and atomicity as ARIA defines them from `role`,
+ * `aria-live` and `aria-atomic`, for an element whose attributes follow state: the host evaluates them when it speaks.
+ */
+function liveRuleOf(
+	element: string,
+	attribute: (name: string) => NativeExpr,
+): { readonly politeness: NativeExpr; readonly atomic: NativeExpr } {
+	const is = (value: NativeExpr, text: string | null): NativeExpr => ({ binary: '===', left: value, right: { literal: text } });
+	const choose = (test: NativeExpr, whenTrue: NativeExpr, whenFalse: NativeExpr): NativeExpr => ({ if: test, whenTrue, whenFalse });
+	const role = attribute('role');
+	const live = attribute('aria-live');
+	const atomic = attribute('aria-atomic');
+	const implicit: NativeExpr = {
+		logical: '||',
+		left: { logical: '||', left: is(role, 'status'), right: is(role, 'alert') },
+		right: element === 'output' ? is(role, null) : { literal: false },
+	};
+	const politeness = choose(
+		{ logical: '||', left: is(live, 'polite'), right: is(live, 'assertive') },
+		live,
+		choose(
+			is(live, 'off'),
+			{ literal: null },
+			choose(is(role, 'alert'), { literal: 'assertive' }, choose({ logical: '||', left: implicit, right: is(role, 'log') }, { literal: 'polite' }, { literal: null })),
+		),
+	);
+	return { politeness, atomic: choose(is(atomic, null), implicit, is(atomic, 'true')) };
+}
+
 function writtenValuesOf(expr: NativeExpr): Set<string> | undefined {
 	if ('literal' in expr)
 		return new Set(
@@ -3137,25 +3176,36 @@ export function createNativeViewPayload(
 		attributes: Readonly<Record<string, string>>,
 		bindings: ReadonlyArray<{ readonly attribute: string } | { readonly property: string }>,
 		span: SourceSpan | undefined,
-	): NonNullable<Extract<NativeNode, { kind: 'element' }>['live']> | undefined => {
+		row: string | undefined,
+	): Pick<Extract<NativeNode, { kind: 'element' }>, 'live' | 'liveFollows'> => {
 		const LIVE_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
 			role: new Set(['status', 'alert', 'log']),
 			'aria-live': new Set(['polite', 'assertive']),
 			'aria-atomic': new Set(['true', 'false']),
 		};
-		for (const [name, live] of Object.entries(LIVE_VALUES)) {
-			const bound = bindings.find(
+		const boundTo = (name: string) =>
+			bindings.find(
 				(binding): binding is { readonly attribute: string; readonly value: NativeExpr } =>
 					'attribute' in binding && binding.attribute === name,
 			);
-			if (!bound) continue;
+		const follows = Object.entries(LIVE_VALUES).some(([name, live]) => {
+			const bound = boundTo(name);
+			if (!bound) return false;
 			const values = writtenValuesOf(bound.value);
-			if (values && ![...values].some((value) => live.has(value))) continue;
-			refuse(
-				`the \`${name}\` of a <${element}> follows state; a native host makes a live region when it builds the view`,
-				span,
-			);
-			return undefined;
+			return !values || [...values].some((value) => live.has(value));
+		});
+		if (follows) {
+			if (row !== undefined) {
+				refuse(
+					`a <${element}> in a @for row whose \`role\`, \`aria-live\` or \`aria-atomic\` follows state; a native host makes such a live region only outside a row`,
+					span,
+				);
+				return {};
+			}
+			return { liveFollows: liveRuleOf(element, (name) => {
+				const bound = boundTo(name);
+				return bound ? attributeText(bound.value) : { literal: attributes[name] ?? null };
+			}) };
 		}
 		const role = attributes['role'];
 		const implicit =
@@ -3171,12 +3221,12 @@ export function createNativeViewPayload(
 						: implicit || role === 'log'
 							? 'polite'
 							: undefined;
-		if (!politeness) return undefined;
+		if (!politeness) return {};
 		const atomic =
 			attributes['aria-atomic'] === undefined
 				? implicit
 				: attributes['aria-atomic'] === 'true';
-		return { politeness, atomic };
+		return { live: { politeness, atomic } };
 	};
 	/** Whether a click on the element does nothing on the web beyond its handlers, so `preventDefault()` there changes nothing. */
 	const clickHasNoDefault = (id: string): boolean => {
@@ -5094,7 +5144,7 @@ export function createNativeViewPayload(
 						);
 				}
 				const { value: label, ...unlabelled } = attributes;
-				const live = liveRegionOf(element ?? '*', attributes, bindings, item.span);
+				const live = liveRegionOf(element ?? '*', attributes, bindings, item.span, place.row);
 				nodes.push({
 					kind: 'element',
 					id,
@@ -5106,7 +5156,7 @@ export function createNativeViewPayload(
 					...(bindings.length > 0 ? { bindings } : {}),
 					...(defaultStyle ? { defaultStyle } : {}),
 					...(drawing ? { drawing } : {}),
-					...(live ? { live } : {}),
+					...live,
 					...place,
 				});
 				if (submitInput && label !== undefined) {
