@@ -1,0 +1,14 @@
+appId: ${APP_ID}
+name: r150-drop-left-out
+---
+- launchApp:
+    clearState: true
+- assertVisible: Upload
+- assertVisible: Nothing picked
+- assertVisible: Pick a photo
+- assertNotVisible: Picked a photo
+- tapOn: Pick a photo
+- assertVisible: Picked a photo
+- assertNotVisible: Nothing picked
+- assertVisible: Picked a photo
+- assertNotVisible: Nothing picked

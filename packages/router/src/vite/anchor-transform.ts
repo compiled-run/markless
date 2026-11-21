@@ -8,11 +8,14 @@ import { discoverPageFiles, type RouteTypegenFileSystem } from './route-typegen.
 import {
 	LINK_ATTRIBUTE,
 	PREFETCH_ATTRIBUTE,
+	PREFETCH_LINK_CHOICES,
 	REPLACE_ATTRIBUTE,
+	type PrefetchLinkChoice,
 	SCROLL_ATTRIBUTE,
 } from '../link-attributes.ts';
 
 const ROUTE_HREF_HELPER_ID = 'virtual:markless-router/route-href';
+const PREFETCH_HELPER = '__marklessPrefetchAttribute';
 const JSX_FILE_FILTER = /\.(?:[jt]sx|tsrx)(?:$|\?)/;
 const VIRTUAL_MODULE_ID = /^\0/;
 const REWRITE_CACHE_LIMIT = 2048;
@@ -144,7 +147,11 @@ function lowerRouterLinks(code: string, ast: Node): string {
 			}
 		}
 	});
-	return applyEdits(code, edits);
+	const lowered = applyEdits(code, edits);
+	// No line break, so every line the build reports in this file is the line written.
+	return edits.some((edit) => edit.text.includes(PREFETCH_HELPER))
+		? `import { ${PREFETCH_HELPER} } from "@markless/router";${lowered}`
+		: lowered;
 }
 
 /**
@@ -174,14 +181,15 @@ function prefetchEdit(code: string, attribute: Node): Edit {
 	const value = node(attribute.value)!;
 	const literal = jsxExpression(value) ?? value;
 	if (['Literal', 'StringLiteral', 'BooleanLiteral'].includes(literal.type ?? '')) {
-		return literal.value === false
-			? { ...rangeOf(attribute), text: `${PREFETCH_ATTRIBUTE}="none"` }
-			: { ...attributeRemovalRange(code, attribute), text: '' };
+		if (literal.value === false)
+			return { ...rangeOf(attribute), text: `${PREFETCH_ATTRIBUTE}="none"` };
+		if (PREFETCH_LINK_CHOICES.includes(literal.value as PrefetchLinkChoice))
+			return { ...rangeOf(attribute), text: `${PREFETCH_ATTRIBUTE}="${literal.value}"` };
+		return { ...attributeRemovalRange(code, attribute), text: '' };
 	}
-	const expression = `(${slice(code, jsxExpression(value) ?? value)})`;
 	return {
 		...rangeOf(attribute),
-		text: `${PREFETCH_ATTRIBUTE}={${expression} === false ? 'none' : undefined}`,
+		text: `${PREFETCH_ATTRIBUTE}={${PREFETCH_HELPER}(${slice(code, jsxExpression(value) ?? value)})}`,
 	};
 }
 

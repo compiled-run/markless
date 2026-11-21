@@ -65,7 +65,8 @@ async function install(page: Page): Promise<void> {
 			writes: number;
 			expires?: number;
 			result: Promise<unknown>;
-			open: boolean;
+			phase: number;
+			want: () => void;
 			abort: () => void;
 		};
 		type Request = {
@@ -154,10 +155,11 @@ async function install(page: Page): Promise<void> {
 					at: performance.now(),
 					writes: state.writes,
 					result,
-					open: true,
+					phase: 1,
+					want: () => {},
 					abort: () => {
 						log.push(`abort ${key}`);
-						entry.open = false;
+						entry.phase = 3;
 						const aborted = new DOMException('aborted', 'AbortError');
 						reject(aborted);
 						try {

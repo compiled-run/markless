@@ -151,8 +151,10 @@ export type SemanticScriptFunction = {
 	/** Each use of its first parameter (the event), as the member path read off it (`['target', 'value']`; empty: whole). */
 	readonly event?: ReadonlyArray<{ readonly path: ReadonlyArray<string>; readonly span: SourceSpan }>;
 	readonly globals: ReadonlyArray<SemanticScriptGlobal>;
-	/** Framework imports it uses (`navigate`), which are not JavaScript a script can run. */
+	/** Framework imports it uses that are not JavaScript a script can run. */
 	readonly framework: ReadonlyArray<{ readonly name: string; readonly source: string; readonly span: SourceSpan }>;
+	/** Each place it reaches `navigate` from `@markless/router`, which the host's route table stands in for. */
+	readonly navigates: ReadonlyArray<SourceSpan>;
 	readonly span: SourceSpan;
 	/** Constructs the engine cannot run as written (an `enum`), from type erasure. */
 	readonly unsupported: ReadonlyArray<{ readonly construct: string; readonly span: SourceSpan }>;
@@ -174,6 +176,7 @@ export type SemanticScriptStatement = {
 	/** Names it uses that a script leaves out (a component, top-level framework state). */
 	readonly dropped: ReadonlyArray<{ readonly name: string; readonly span: SourceSpan }>;
 	readonly framework: ReadonlyArray<{ readonly name: string; readonly source: string; readonly span: SourceSpan }>;
+	readonly navigates: ReadonlyArray<SourceSpan>;
 	readonly unsupported: ReadonlyArray<{ readonly construct: string; readonly span: SourceSpan }>;
 };
 
@@ -1522,7 +1525,13 @@ export type SemanticExpression =
 			readonly alternate: SemanticExpression;
 	  }
 	| { readonly kind: 'template'; readonly parts: ReadonlyArray<string | SemanticExpression> }
-	| { readonly kind: 'member'; readonly object: SemanticExpression; readonly property: string }
+	/** `optional`: the read is in an optional chain at or after a `?.`, so a nullish object gives undefined. */
+	| {
+			readonly kind: 'member';
+			readonly object: SemanticExpression;
+			readonly property: string;
+			readonly optional?: true;
+	  }
 	/** `object[index]` with an index that is not a literal. */
 	| {
 			readonly kind: 'index';
@@ -2008,6 +2017,8 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				readonly cardinality: 'zero-or-one';
 				readonly nullishTag: 'omit';
 				readonly tag: SemanticMarkupResidue;
+				/** Native builds only: the tag as a tree a native build folds for each use. */
+				readonly nativeTag?: SemanticExpression;
 				readonly staticAttributes: Readonly<Record<string, string>>;
 				readonly attributeSlots: ReadonlyArray<
 					| {

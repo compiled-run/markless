@@ -273,6 +273,7 @@ public final class NativeRuntime {
 	private var chosenNow: String?
 	private let missing: NativeValueMissing?
 	private let tooLong: NativeTooLong?
+	private let emailMismatch: NativeEmailMismatch?
 	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
 	public private(set) var dialogs: [String: Bool]
 	/// Where a page with a script gets its engine; asked only when a script op runs or a script computed is read.
@@ -335,6 +336,8 @@ public final class NativeRuntime {
 		missing = payload.valueMissing.first { $0.locale == locale }?.messages
 		let tooLongLocale = nativeLocale(preferredLanguages, payload.tooLong.map(\.locale))
 		tooLong = payload.tooLong.first { $0.locale == tooLongLocale }?.message
+		let mismatchLocale = nativeLocale(preferredLanguages, payload.typeMismatch.map(\.locale))
+		emailMismatch = payload.typeMismatch.first { $0.locale == mismatchLocale }?.message
 		dialogs = Dictionary(uniqueKeysWithValues: payload.nodes.compactMap { node in
 			if case let .element(element, _, _) = node.kind, element == "dialog" { return (node.id, false) }
 			return nil
@@ -548,6 +551,9 @@ public final class NativeRuntime {
 				case let .expr(inner): return try evaluate(inner).text
 				}
 			}.joined())
+		case let .optionalMember(inner, property):
+			if case .null = try evaluate(inner) { return .null }
+			return try evaluate(.member(inner, property))
 		case let .member(inner, property):
 			let value = try evaluate(inner)
 			switch value {
@@ -645,15 +651,18 @@ public final class NativeRuntime {
 		return .object(facts)
 	}
 
-	/// Every current value by slot (the page's cells in payload order, then row slots), and a seed when `crypto` is used.
+	/// Every current value by slot (the page's cells in payload order, then row slots), a seed when `crypto` is used, and
+	/// the route params when `navigate` is.
 	private func entryCells() -> [(String, JSONValue)] {
 		let ids = Set(payload.cells.map(\.id))
 		let cells = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0.json) } }
 			+ values.keys.filter { !ids.contains($0) }.sorted().map { ($0, values[$0]!.json) }
 		let crypto = payload.script?.services.contains(.crypto) == true
+		let navigate = payload.script?.services.contains(.navigate) == true
 		return [("cells", .object(cells))]
 			+ (unset.isEmpty ? [] : [("unset", .array(unset.sorted().map { .string($0) }))])
 			+ (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
+			+ (navigate ? [("params", .object(params.map { ($0.name, .string($0.value)) }))] : [])
 	}
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
@@ -667,7 +676,8 @@ public final class NativeRuntime {
 			_ = try callScript("enter", .object(entry + focus + entryCells()))
 			return try callScript("leave")
 		}
-		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["commands"])
+		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave")
+			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["commands", "navigate"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
 			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
@@ -723,7 +733,10 @@ public final class NativeRuntime {
 			if name == "focus" { focused = node }
 			return .command(node: node, command: name, preventScroll: try parts[2].bool())
 		}
-		return aborts + clears + timers + requests + commands
+		guard result.has("navigate") else { return aborts + clears + timers + requests + commands }
+		let opened = try result["navigate"].object(["route", "params", "replace"])
+		let params = try opened["params"].keys().map { NativeRouteParam(name: $0, value: try opened["params"].field($0).string()) }
+		return aborts + clears + timers + requests + commands + [.navigate(route: try opened["route"].string(), params: params, replace: try opened["replace"].bool())]
 	}
 
 	/// Tells the engine which async values are shown and what they read, when that moved; it starts and aborts runs.
@@ -914,9 +927,13 @@ public final class NativeRuntime {
 	}
 
 	private func textOf(field id: String) throws -> String {
-		if let typed = edited[id] { return typed }
-		if let binding = try propertyBinding(id, "value") { return textOf(try evaluate(binding.value)) }
-		return try attributeNow(id, "value") ?? ""
+		let text: String
+		if let typed = edited[id] { text = typed }
+		else if let binding = try propertyBinding(id, "value") { text = textOf(try evaluate(binding.value)) }
+		else { text = try attributeNow(id, "value") ?? "" }
+		// A range keeps a number in its range and on its step, whatever it is given.
+		guard try attributeNow(id, "type") == "range" else { return text }
+		return nativeRangeValue(text, min: try attributeNow(id, "min"), max: try attributeNow(id, "max"), step: try attributeNow(id, "step"))
 	}
 
 	private func checkedBinding(_ id: String) throws -> Bool? {
@@ -1073,12 +1090,18 @@ public final class NativeRuntime {
 			switch field.kind {
 			case .checkbox, .radio: return try isChecked(field.node) ? [name, try attributeNow(field.node, "value") ?? "on"] : nil
 			case .hidden: return [name, try attributeNow(field.node, "value") ?? ""]
-			case .text: return [name, try textOf(field: field.node)]
+			case .text: return [name, try valueOf(field: field.node)]
 			case .select:
 				guard let chosen = try options(of: field.node).first(where: { selectedness[$0.id] == true }) else { return nil }
 				return [name, try value(of: chosen)]
 			}
 		}
+	}
+
+	/// A text field's value as the web keeps it: an email field drops line breaks and trims its ends.
+	private func valueOf(field node: String) throws -> String {
+		let text = try textOf(field: node)
+		return try attributeNow(node, "type") == "email" ? NativeEmailMismatch.value(text) : text
 	}
 
 	/// The first field that stops a submit and what the web says about it, or nil when none does.
@@ -1102,7 +1125,7 @@ public final class NativeRuntime {
 		if required {
 			let absent = switch field.kind {
 			case .radio: try group(of: field.node).allSatisfy { !(try isChecked($0.id)) }
-			case .text: try textOf(field: field.node) == ""
+			case .text: try valueOf(field: field.node) == ""
 			default: !(try isChecked(field.node))
 			}
 			if absent {
@@ -1113,6 +1136,10 @@ public final class NativeRuntime {
 				default: return missing.text
 				}
 			}
+		}
+		if field.kind == .text, try attributeNow(field.node, "type") == "email" {
+			guard let emailMismatch else { throw RuntimeError(reason: "the payload has no message for an email field") }
+			if let message = emailMismatch.message(for: try valueOf(field: field.node)) { return message }
 		}
 		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		guard field.kind == .text, let max = nativeMaxLength(try attributeNow(field.node, "maxlength")), let typed = edited[field.node],
@@ -1148,6 +1175,12 @@ public final class NativeRuntime {
 			guard case .branch = node.kind else { return [] }
 			return try instances(of: node).map { ($0.id, try arm(of: node.id, in: $0.scope)) }
 		}
+	}
+
+	/// A branch's style state: the arm it shows ("0", "1", …, or "none"); nil while it is not shown.
+	public func styleArm(of branch: String) throws -> NativeValue? {
+		guard let shown = try arms().first(where: { $0.node == branch }) else { return nil }
+		return .string(shown.index.map(String.init) ?? "none")
 	}
 
 	/// Every shown list's row keys, in order.
@@ -1243,7 +1276,7 @@ public final class NativeRuntime {
 		let scope = instance.scope
 		// A press focuses the control it presses, as the browser does.
 		if action.event == .activate { focused = action.host }
-		eventValue = action.event == .input ? action.value ?? "" : nil
+		eventValue = action.event == .input || action.event == .commit ? action.value ?? "" : nil
 		edit = eventValue
 		switch action.event {
 		case .keydown: eventFields = [.key: .string(action.value ?? "")]
@@ -1654,14 +1687,18 @@ public final class NativeRuntime {
 					guard let before = beforeTexts[instance.id], let after = afterTexts[instance.id], before != after else { return nil }
 					return .text(node: instance.id, value: after)
 				}
-			case let .element(_, _, bindings):
+			case let .element(element, _, bindings):
 				let opened: [NativeJournalEntry] = dialogs[node.id].flatMap { open in open != dialogsBefore[node.id] ? [.dialog(node: node.id, open: open)] : nil } ?? []
+				// A textarea nobody edited and no `value` property sets shows its `value` attribute, as the web's default value.
+				let followsDefault = element == "textarea" && !bindings.contains { $0.isProperty && $0.name == "value" }
 				return try opened + instances(of: node).flatMap { instance in
-					bindings.compactMap { binding -> NativeJournalEntry? in
+					bindings.flatMap { binding -> [NativeJournalEntry] in
 						let key = "\(instance.id)\u{0}\(binding.name)"
 						let (before, after) = binding.isProperty ? (beforeProperties, afterProperties) : (beforeAttributes, afterAttributes)
-						guard let old = before[key], let new = after[key], old != new else { return nil }
-						return binding.isProperty ? .property(node: instance.id, name: binding.name, value: new ?? "") : .attribute(node: instance.id, name: binding.name, value: new)
+						guard let old = before[key], let new = after[key], old != new else { return [] }
+						if binding.isProperty { return [.property(node: instance.id, name: binding.name, value: new ?? "")] }
+						let shown: [NativeJournalEntry] = followsDefault && binding.name == "value" && edited[instance.id] == nil ? [.property(node: instance.id, name: "value", value: new ?? "")] : []
+						return [.attribute(node: instance.id, name: binding.name, value: new)] + shown
 					}
 				}
 			}

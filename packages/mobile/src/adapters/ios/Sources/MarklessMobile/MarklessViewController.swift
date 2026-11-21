@@ -151,10 +151,10 @@ public final class MarklessViewController: UIViewController {
 		}
 		let dark = traitCollection.userInterfaceStyle == .dark
 		let texts = try runtime.texts()
-		layout = try style.map { try $0.resolve(for: payload, initialTexts: texts, value: runtime.value(of:), dark: dark) }
+		layout = try style.map { try $0.resolve(for: payload, initialTexts: texts, value: runtime.value(of:), arm: runtime.styleArm(of:), dark: dark) }
 		var sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:]
 		for sheet in style?.sheets ?? [] {
-			sheetLayouts[sheet.node] = try style!.resolveSheet(sheet.node, for: payload, initialTexts: texts, value: runtime.value(of:), dark: dark)
+			sheetLayouts[sheet.node] = try style!.resolveSheet(sheet.node, for: payload, initialTexts: texts, value: runtime.value(of:), arm: runtime.styleArm(of:), dark: dark)
 		}
 		bands = layout?.bands ?? sheetLayouts.values.joined().lazy.compactMap(\.layout.bands).first
 		band = try bands.map(bandNow)
@@ -236,6 +236,7 @@ public final class MarklessViewController: UIViewController {
 			let journal = try journalOf()
 			for case let .title(value) in journal { navigationItem.title = value }
 			try tree?.apply(journal.filter(\.isForViews))
+			if movesRows(journal) { layOutAtScreenSize(rowsMoved: true) }
 			try runCalls(journal)
 		} catch {
 			fatalError("Markless iOS host: \(error)")
@@ -298,15 +299,31 @@ public final class MarklessViewController: UIViewController {
 
 	/// With Dragon's plan, the page lays out at the size it is shown at, as a browser does: on first show, after a rotation and
 	/// whenever the window changes size. The page area is the safe area, which the page scroll view keeps its content inside.
-	private func layOutAtScreenSize() {
+	/// Whether a journal changed what a styled list's rows lay out: its rows, a row's text or an attribute of a row's copy.
+	private func movesRows(_ journal: [NativeJournalEntry]) -> Bool {
+		guard let style, !style.planRepeats.isEmpty else { return false }
+		return journal.contains { entry in
+			switch entry {
+			case .rows: return true
+			case let .text(node, _), let .attribute(node, _, _): return node.contains("@")
+			default: return false
+			}
+		}
+	}
+
+	private func layOutAtScreenSize(rowsMoved: Bool = false) {
 		#if canImport(DragonPlan)
 		guard let style, style.plan != nil, let tree else { return }
 		let size = view.safeAreaLayoutGuide.layoutFrame.size
-		guard size.width > 0, size.height > 0, size != laidOutFor else { return }
+		guard size.width > 0, size.height > 0, rowsMoved || size != laidOutFor else { return }
 		let started = CFAbsoluteTimeGetCurrent()
 		do {
+			let scale = Double(traitCollection.displayScale)
+			let shape = coreTextRowShaper(faces: style.systemFaces, dpr: scale)
 			let relaid = try style.laidOut(
-				width: Double(size.width), height: Double(size.height), scale: Double(traitCollection.displayScale), layout: DragonPlan.layout)
+				width: Double(size.width), height: Double(size.height), scale: scale, layout: DragonPlan.layout,
+				rows: style.planRepeats.isEmpty ? nil : try style.shownRows(payload, runtime: runtime),
+				rowsLayout: { DragonPlan.rowsLayout($0, shape: shape) })
 			let now = try relaid.resolve(
 				for: payload, initialTexts: try runtime.texts(), value: runtime.value(of:), dark: traitCollection.userInterfaceStyle == .dark)
 			try tree.relayout(now)
@@ -407,6 +424,7 @@ public final class MarklessViewController: UIViewController {
 			prevented = journal.contains(.preventDefault)
 			for case let .title(value) in journal { navigationItem.title = value }
 			try tree?.apply(journal.filter(\.isForViews))
+			if movesRows(journal) { layOutAtScreenSize(rowsMoved: true) }
 			try runCalls(journal)
 			paintCanvas()
 		} catch {

@@ -43,6 +43,11 @@ export type JobSpec = {
 	readonly host: 'adapters' | 'stub';
 	/** A rerun of failures: each platform runs only the rungs that failed on it, so the job is not a proof by itself. */
 	readonly onlyOn?: Readonly<Partial<Record<ProofPlatform, ReadonlyArray<string>>>>;
+	/**
+	 * The Dragon checkout the styles were compiled with and its commit: the shells are built with its translated engine too, so a
+	 * page lays out on the phone with the Dragon its styles came from. `zig`: MARKLESS_ZIG at submit, for Dragon's shaper.
+	 */
+	readonly dragon?: { readonly dir: string; readonly commit: string; readonly zig?: string };
 };
 
 /** The rungs a job runs on one platform, in the order it named them. */

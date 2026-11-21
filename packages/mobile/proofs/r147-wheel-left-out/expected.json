@@ -1,0 +1,9 @@
+{
+	"rung": 147,
+	"name": "A wheel handler is left out on phones, and the page around it still works",
+	"steps": [
+		{ "visible": ["Slides", "Slide 1", "Next slide"], "absent": ["Slide 2"] },
+		{ "do": { "tap": "Next slide" }, "visible": ["Slide 2"], "absent": ["Slide 1"] },
+		{ "do": { "tap": "Next slide" }, "visible": ["Slide 3"], "absent": ["Slide 2"] }
+	]
+}
