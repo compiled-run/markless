@@ -1,0 +1,905 @@
+{
+	"packages/bundler/src/bound-resolver.ts#adaptImportedCaptureResolver": {
+		"replace": 2,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/async-import-wrappers.ts#<module>": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/bundle-graph.ts#runtimeModuleIdFromOrigin": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/byte-attribution.ts#<module>": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/byte-attribution.ts#classifyShippedModule": {
+		"replace": 1,
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/byte-attribution.ts#runtimeModuleKey": {
+		"replace": 2,
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/byte-attribution.ts#withoutQueryValues": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/chunk-ast.ts#parsedFor": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/chunking.ts#fileBasenamePattern": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/content-hash-names.ts#basename": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/content-hash-names.ts#basenameMatcher": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/content-hash-names.ts#encodeHash": {
+		"replace": 1,
+		"replaceAll": 2,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/content-hash-names.ts#escapeRegExp": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/content-hash-names.ts#hashedName": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/content-hash-names.ts#importMapScript": {
+		"replaceAll": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/content-hash-names.ts#insertImportMapScript": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/content-hash-names.ts#moduleSourceFile": {
+		"replace": 2,
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/content-hash-names.ts#renameChunksToContentHashes": {
+		"replace": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/content-hash-names.ts#scanReferences": {
+		"search-splice": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/content-hash-names.ts#specifyChunkReferences": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/content-hash-names.ts#unmappedChunkSpecifiers": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/deferred-runtime.ts#deferredRuntimePacks": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/execution-sizes.ts#<module>": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/execution-sizes.ts#canonicalizeContentHashSpecifiers": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/execution-sizes.ts#chunkModuleLogId": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/execution-sizes.ts#stripExecutionLogHookCalls": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/execution-sizes.ts#workspaceModuleLogId": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/head-links.ts#compactAttribute": {
+		"replaceAll": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/head-links.ts#headLinkTag": {
+		"replaceAll": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/head-links.ts#injectHeadLinks": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/lazy-module-facades.ts#buildPathIdentifierPrefixes": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/lazy-module-facades.ts#namespaceObjectEdits": {
+		"search-splice": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/lazy-module-facades.ts#strip": {
+		"replaceAll": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/machine-paths.ts#asIdentifier": {
+		"replace": 2,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/machine-paths.ts#rootRelativeRegionComments": {
+		"replace": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/machine-paths.ts#withoutMachinePaths": {
+		"replaceAll": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/namespace-lazy-loads.ts#<module>": {
+		"RegExp": 3,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/namespace-lazy-loads.ts#namespaceLoadTexts": {
+		"RegExp": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/namespace-lazy-loads.ts#namespaceObjects": {
+		"search-splice": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/preload-cleanup.ts#<module>": {
+		"RegExp": 1,
+		"replaceAll": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/preload-cleanup.ts#escapeRegExp": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/preload-cleanup.ts#findVitePreloadHelperInitChain": {
+		"RegExp": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/preload-cleanup.ts#findVitePreloadHelperModule": {
+		"search-splice": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/preload-cleanup.ts#stripAsyncEmptyPreloadWrappers": {
+		"search-splice": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/preload-cleanup.ts#stripDirectEmptyPreloadWrappers": {
+		"search-splice": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/preload-cleanup.ts#stripUnusedVitePreloadHelper": {
+		"search-splice": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/prerender.ts#elementOrdinalAt": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/prerender.ts#emitPrerenderedPage": {
+		"replace": 2,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/prerender.ts#escapeArmId": {
+		"replace": 3,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/prerender.ts#expandRegion": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/prerender.ts#planArmEmission": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/prerender.ts#reconstruct": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/prerender.ts#substituteHoles": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/route-pack-groups.ts#lazyStartupPackName": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/route-pack-groups.ts#packOfPart": {
+		"replace": 1,
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/route-pack-groups.ts#packOfPiece": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/route-pack-groups.ts#planRoutePackGroups": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/route-pack-groups.ts#routesOf": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/route-pack-groups.ts#startupPackOfLazy": {
+		"replace": 1,
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/short-export-names.ts#baseOf": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/short-export-names.ts#namedInStrings": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/symbol-bundles.ts#symbolBundleVirtualModuleSourceFile": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/symbol-facade-cleanup.ts#collapseGeneratedSymbolInitExports": {
+		"search-splice": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/symbol-facade-cleanup.ts#compactDirectSymbolLoadersInCode": {
+		"search-splice": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/symbol-facade-cleanup.ts#directSymbolLoaderBranchRE": {
+		"RegExp": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/symbol-facade-cleanup.ts#escapeRegExp": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/symbol-facade-cleanup.ts#identifierNameRE": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/symbol-facade-cleanup.ts#identifierRenamer": {
+		"replace": 1,
+		"RegExp": 1,
+		"search-splice": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/symbol-facade-cleanup.ts#parseDirectSymbolLoaderBranches": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/symbol-facade-cleanup.ts#relativeChunkSpecifier": {
+		"replaceAll": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/symbol-facade-cleanup.ts#rewriteDynamicImportSpecifiers": {
+		"replace": 2,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/symbol-table.ts#<module>": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/symbol-table.ts#compactSymbolManifestTables": {
+		"replace": 2,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/symbol-table.ts#escapeRegExp": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/symbol-table.ts#hasLiteralLoader": {
+		"replace": 1,
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/symbol-table.ts#namespacePickReaches": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/symbol-table.ts#packLoaderReaches": {
+		"RegExp": 2,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/symbol-table.ts#parseStringArray": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/symbol-table.ts#relativeChunkSpecifier": {
+		"replaceAll": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/symbol-table.ts#rewriteSymbolVirtualStrings": {
+		"replace": 2,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/dev-error/index.ts#escapeHtml": {
+		"replaceAll": 5,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/dev-error/index.ts#renderMarklessDevErrorDocument": {
+		"replaceAll": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/dev-error/index.ts#sourcePosition": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/execution-log.ts#requalifyExecutionLogModuleHook": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/inline-resumer.ts#compileDeferFactorySource": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/inline-resumer.ts#parameterizedPrerenderInlineResumerSource": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/module-id.ts#<module>": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/module-id.ts#rootRelativeId": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/module-id.ts#symbolExecutionLogId": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/module-metadata-registry.ts#compileFailure": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/module-metadata-registry.ts#invalidateSourceSymbolClaims": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/optimized-deps.ts#applyAlias": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/rebound-symbol-route.ts#boundEntry": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/source-module.ts#emitLoadSymbol": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/source-module.ts#emitPublicRenderModule": {
+		"replace": 2,
+		"kind": "edits-generated-source"
+	},
+	"packages/bundler/src/source-module.ts#emitQueuedResumeContainerEvent": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/source-module.ts#emitSourceModule": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/source-module.ts#rewriteSymbolModuleExport": {
+		"replace": 2,
+		"kind": "edits-generated-source"
+	},
+	"packages/bundler/src/source-module.ts#singleQuoted": {
+		"replace": 3,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/source-module.ts#symbolVirtualModuleSourceFile": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/template-dynamic-imports.ts#templateImportEdit": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/transform.ts#formatSourcePosition": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/transform.ts#marklessVirtualModuleSourceFile": {
+		"replace": 1,
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/transform.ts#prerenderDataModuleSource": {
+		"replace": 1,
+		"kind": "edits-generated-source"
+	},
+	"packages/bundler/src/trigger-groups.ts#emitPrerenderTriggerGroupModule": {
+		"replaceAll": 1,
+		"kind": "edits-generated-source"
+	},
+	"packages/bundler/src/trigger-groups.ts#triggerGroupVirtualModuleSourceFile": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/virtual-ids.ts#devBrowserVirtualModuleUrl": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/virtual-ids.ts#executionLogRuntimeModuleId": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/virtual-ids.ts#normalizeVirtualId": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/virtual-ids.ts#virtualModuleSourceForLoad": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/vite/browser-node-guard.ts#<module>": {
+		"RegExp": 2,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/vite/browser-node-guard.ts#displayId": {
+		"replace": 2,
+		"replaceAll": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/vite/browser-node-guard.ts#escape": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/vite/browser-node-guard.ts#lineAndColumn": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/vite/dev-prerender.ts#renderHtml": {
+		"replace": 2,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/vite/hmr.ts#fetchedModuleNode": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/vite/hmr.ts#injectDevClients": {
+		"replace": 2,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/vite/separate-client-build.ts#parseInlineConfig": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/artifact-helpers/graph-paths.ts#optionalMemberReadSource": {
+		"replaceAll": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/artifact-helpers/graph-paths.ts#splitStaticGraphPath": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/ast/tsrx.ts#escapeAttribute": {
+		"replaceAll": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/ast/tsrx.ts#escapeHtml": {
+		"replaceAll": 3,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/ast/tsrx.ts#jsxTextValue": {
+		"replace": 3,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/compile-module.ts#templateRuleBroken": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/component-edge-instance.ts#componentEdgeIndex": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/diagnostics.ts#applyMarklessAllowDirectives": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/bound-row-table.ts#decodeBoundRow": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/foreign-scope.ts#sharedDefinitionFilename": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/link/attribution.ts#executionAttributionRouteKey": {
+		"replace": 2,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/payload-arena.ts#literalStringValue": {
+		"replace": 2,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/protocol-view.ts#branchArmField": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/protocol-view.ts#handlersRead": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/protocol-view.ts#rowBranchIsRow": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/public-render/authored-strip.ts#stripAuthoredStatements": {
+		"replace": 2,
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/public-render/projection-text.ts#<module>": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/public-render/projection-text.ts#projectionTextContent": {
+		"replaceAll": 2,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/public-render/render-body.ts#renderValuePreludeLines": {
+		"RegExp": 1,
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/public-render/residue-reader.ts#emitClientResidueReader": {
+		"replace": 1,
+		"kind": "edits-generated-source"
+	},
+	"packages/compiler/src/passes/public-render/residue-reader.ts#instanceMemberReads": {
+		"RegExp": 1,
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/public-render/residue-reader.ts#references": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/public-render/runtime-helpers.ts#emitCatalogHelperImports": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/public-render/shared-seed-pass.ts#seedingComponents": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/public-render/shared.ts#carriesFallbackCells": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/public-render/shared.ts#referencesIdentifier": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/public-render/shared.ts#rendersAdoptedComputed": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/public-render/shared.ts#resolveOwners": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/public-render/ssr-module.ts#emitPublicSsrRenderModule": {
+		"replaceAll": 1,
+		"kind": "edits-generated-source"
+	},
+	"packages/compiler/src/passes/row-mint.ts#memberReads": {
+		"RegExp": 1,
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/semantic-graph/collect-elements.ts#joinTextParts": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/semantic-graph/collect-elements.ts#textExpressionTarget": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/semantic-graph/collect-markup.ts#readsSharedInstance": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/semantic-graph/collect-shared.ts#interfaceForSource": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/semantic-graph/collect-shared.ts#namesIdentifier": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/semantic-graph/collect-shared.ts#sharedDefinitionIdOf": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/semantic-graph/strip-sync-policy-calls.ts#removableCallSpan": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/semantic-graph/style-object.ts#escapeTemplateText": {
+		"replace": 3,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/semantic-graph/style-object.ts#hyphenateStyleName": {
+		"replace": 2,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/state-lowering.ts#blankUntil": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/state-lowering.ts#escapeRegExp": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/state-lowering.ts#hasDynamicBracketSegment": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/state-lowering.ts#propsOnlyReads": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/state-lowering.ts#referencesIdentifier": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/state-lowering.ts#sourceContainsIdentifier": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/symbol-modules.ts#armTextEscape": {
+		"replaceAll": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/symbol-modules.ts#constantAttributeHtml": {
+		"replaceAll": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/symbol-modules.ts#pushText": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/symbol-modules.ts#renderChunkParts": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/symbol-modules.ts#symbolExportName": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/symbol-resolver.ts#escapeRegExp": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/symbol-resolver.ts#handlerContainsAssignment": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/symbol-resolver.ts#handlerContainsWrite": {
+		"RegExp": 3,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/symbol-resolver.ts#replaceMethodCalls": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/symbol-resolver.ts#sharedMethodSource": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/passes/symbol-resolver.ts#sourceReferencesIdentifier": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/type-service.ts#emitFragment": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/compiler/src/type-service.ts#finalizeSourceMapMarkers": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/index.ts#escapeHtml": {
+		"replaceAll": 4,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/navigate.ts#navigate": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/navigate.ts#withoutHash": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/request-files.ts#escapeRegExp": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/request-files.ts#findDefaultFunctionExport": {
+		"RegExp": 2,
+		"kind": "edits-generated-source"
+	},
+	"packages/router/src/request-files.ts#localizeDefaultExport": {
+		"replace": 1,
+		"search-splice": 1,
+		"kind": "edits-generated-source"
+	},
+	"packages/router/src/route-manifest.ts#matchRoutePathname": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/typescript-plugin/index.ts#getConfiguredProjectRoot": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/entries/fragment-entry.ts#fallback": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/entries/route-href.ts#__marklessRouteHref": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/fragment-navigation.ts#parse": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/fragment-navigation.ts#parseAsLoaded": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/fragment-navigation.ts#read": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/index.ts#configureServer": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/index.ts#escapeRegExp": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/index.ts#handler": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/index.ts#jsStringLiteralContent": {
+		"replaceAll": 5,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/index.ts#minifiedFragmentNavigationSource": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/index.ts#patchDocumentStylesheetsInBundle": {
+		"replace": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/router/src/vite/index.ts#patchRoutePreloadsInBundle": {
+		"replace": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/router/src/vite/index.ts#routeScopedDynamicImports": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/index.ts#routerConfigPlugin": {
+		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/index.ts#writeBundle": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/mdx.ts#isEmptyMdxExpression": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/nitro-cloudflare.ts#glob": {
+		"RegExp": 1,
+		"replace": 2,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/nitro-cloudflare.ts#pruneRenderedPages": {
+		"replace": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/router/src/vite/nitro-cloudflare.ts#servedAsFile": {
+		"replace": 2,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/nitro-compressed-assets.ts#buildStart": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/nitro-compressed-assets.ts#escapeRegExp": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/runtime/create-server-entry.ts#escapeHtml": {
+		"replaceAll": 4,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/runtime/create-server-entry.ts#escapeInlineScript": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/runtime/create-server-entry.ts#escapeScriptJson": {
+		"replaceAll": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/runtime/create-server-entry.ts#fillDocumentChildren": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/runtime/create-server-entry.ts#fragmentBridgeFor": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/runtime/create-server-entry.ts#headContentStart": {
+		"search-splice": 1,
+		"kind": "edits-rendered-html"
+	},
+	"packages/router/src/vite/runtime/create-server-entry.ts#insertHeadHtml": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/runtime/create-server-entry.ts#insertHeadModulePreloads": {
+		"search-splice": 1,
+		"kind": "edits-rendered-html"
+	},
+	"packages/router/src/vite/runtime/create-server-entry.ts#takeHeadModulePreloads": {
+		"replace": 1,
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/runtime/create-server-entry.ts#unescapeHtmlAttribute": {
+		"replaceAll": 4,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/runtime/link-bridge-module.ts#linkBridgeModulePath": {
+		"replace": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/runtime/mdx-route.ts#islandScopedGraphNodeId": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/runtime/mdx-route.ts#mdxHtmlCensus": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/runtime/page-region.ts#fragmentPage": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/runtime/page-region.ts#innermostOpenTag": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/runtime/page-region.ts#placePage": {
+		"search-splice": 1,
+		"kind": "unreviewed"
+	}
+}
