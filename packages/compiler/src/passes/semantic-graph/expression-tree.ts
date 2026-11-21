@@ -1,5 +1,5 @@
 import type { AnyNode } from '../../ast/nodes.ts';
-import { asNodes, getIdentifierName } from '../../ast/nodes.ts';
+import { asNodes, getIdentifierName, isNode } from '../../ast/nodes.ts';
 import type {
 	NativeFactCollectors,
 	SemanticComponentNativeFacts,
@@ -918,6 +918,14 @@ export function componentNativeFactsOf(
 							continue;
 						locals[String(local.name)] = { kind: 'member', object: value, property: String(key.name) };
 					}
+					continue;
+				}
+				if (id?.type === 'ArrayPattern' && statement.kind === 'const') {
+					const value = expressionTreeOf(init);
+					(Array.isArray(id.elements) ? id.elements : []).forEach((element: unknown, index) => {
+						if (isNode(element) && element.type === 'Identifier' && typeof element.name === 'string')
+							locals[element.name] = { kind: 'member', object: value, property: String(index) };
+					});
 					continue;
 				}
 				if (id?.type !== 'Identifier' || typeof id.name !== 'string') continue;

@@ -200,6 +200,11 @@ class PlatformDevice(private val activity: Activity) : NativeDevice {
 					answer(DeviceOutcome.Error("Error", "The share sheet failed"))
 				}
 			}
+			"browser.open" -> {
+				val url = (arguments.firstOrNull() as? JsValue.Str)?.value ?: throw MarklessHostError("browser.open needs a URL")
+				activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+				settle?.invoke(DeviceOutcome.Value(JsValue.Null))
+			}
 			"settings.open" -> {
 				// Its own task: coming back to the app shows the app, without a launch mode that would break a stack of screens.
 				activity.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", activity.packageName, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))

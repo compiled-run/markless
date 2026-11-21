@@ -21,6 +21,15 @@ class MarklessField(context: Context) : EditText(context) {
 	var onKeyUp: ((String) -> Unit)? = null
 	var onPaste: ((String) -> Boolean)? = null
 	private var enterAt = 0L
+	private val editingKeys = keyListener
+
+	/** `readonly`: the field takes focus and selection but no typing, and brings up no keyboard, as Chrome's does. */
+	var readOnly = false
+		set(value) {
+			field = value
+			keyListener = if (value) null else editingKeys
+			showSoftInputOnFocus = !value
+		}
 
 	/** The key's keydown, then [edit] unless the handler prevented it, then its keyup; answers whether it was prevented. */
 	private fun press(key: String, edit: () -> Boolean): Boolean {

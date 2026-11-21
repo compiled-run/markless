@@ -383,6 +383,10 @@ public final class PlatformDevice: NSObject, NativeDevice, CLLocationManagerDele
 			}
 			let title: String? = if case let .string(text)? = fields.get("title") { text } else { nil }
 			share(ShareItem(url: url, title: title)) { settle?($0) }
+		case ("browser.open", nil):
+			guard case let .string(link)? = arguments.first, let url = URL(string: link) else { throw HostError("browser.open needs a URL") }
+			UIApplication.shared.open(url)
+			settle?(.value(.null))
 		case ("settings.open", nil):
 			guard let url = URL(string: UIApplication.openSettingsURLString) else { throw HostError("this device has no Settings link") }
 			UIApplication.shared.open(url)

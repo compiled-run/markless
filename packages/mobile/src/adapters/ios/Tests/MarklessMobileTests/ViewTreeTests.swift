@@ -516,4 +516,24 @@ private func scrollingCounterExport() throws -> Data {
 	#expect(box.contentOffset.y == 200)
 	#expect(views.page.contentOffset.y + inset == 100)
 }
+
+@MainActor @Test func aLiveRegionWhoseAttributesFollowStateSpeaksAsTheyReadNow() throws {
+	var spoken: [(text: String, assertive: Bool)] = []
+	let controller = try MarklessViewController(payload: vectorPayload("live-follows"), store: MemoryStore())
+	let views = try tree(controller)
+	views.announce = { spoken.append(($0, $1)) }
+	// aria-live="polite" while playing: the next slide is read.
+	controller.perform(NativeAction(event: .activate, host: "h3"))
+	#expect(spoken.map(\.text) == ["Slide 2"])
+	#expect(spoken.first?.assertive == false)
+	// aria-live="off" once paused: nothing is read.
+	spoken = []
+	controller.perform(NativeAction(event: .activate, host: "h4"))
+	controller.perform(NativeAction(event: .activate, host: "h3"))
+	#expect(spoken.isEmpty)
+	// role="alert" once it fails: read at once, whole.
+	controller.perform(NativeAction(event: .activate, host: "h5"))
+	#expect(spoken.map(\.text) == ["Upload failed"])
+	#expect(spoken.first?.assertive == true)
+}
 #endif

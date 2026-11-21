@@ -11,6 +11,7 @@ import { parsePhone, transitionPhone, type PhoneState } from '../src/runner/pool
 import {
 	checkoutFacts,
 	jobStarted,
+	describeCheckout,
 	planRefresh,
 	transitionRefresh,
 	type CheckoutFacts,
@@ -282,6 +283,18 @@ describe("the runner's checkout", () => {
 			branch: 'main',
 		});
 		expect(planRefresh({ ...behind, upstream: behind.head })).toEqual({ kind: 'current' });
+	});
+
+	it("says in the runner's status whether its checkout follows origin/main, and why one is kept behind", () => {
+		expect(describeCheckout({ ...behind, upstream: behind.head }, 0)).toBe(
+			'runner checkout aaaaaaaaa: on origin/main',
+		);
+		expect(describeCheckout(behind, 3)).toBe(
+			'runner checkout aaaaaaaaa: 3 commits behind origin/main; the runner moves there between jobs',
+		);
+		expect(describeCheckout({ ...behind, headInUpstream: false }, 120)).toBe(
+			'runner checkout aaaaaaaaa: 120 commits behind origin/main and stays there (aaaaaaaaa has commits origin/main does not); jobs build with this harness, so move it by hand',
+		);
 	});
 
 	it("never moves a checkout that is somebody's work", () => {

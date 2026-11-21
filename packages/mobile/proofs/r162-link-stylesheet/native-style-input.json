@@ -1,0 +1,60 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "App",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "headline"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Linked styles"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Visits 0"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"class": "go"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Visit"
+		}
+	],
+	"css": ".page {\n\tpadding: 24px;\n\tbackground: #eef3ff;\n}\n.headline {\n\tfont-size: 30px;\n\tfont-weight: 700;\n\tcolor: #1a2a6c;\n}\n.go {\n\tdisplay: block;\n\tfont-family: inherit;\n\tmargin-top: 16px;\n\tpadding: 12px 20px;\n\tborder: 2px solid #1a2a6c;\n\tborder-radius: 12px;\n\tbackground: #ffd166;\n\tcolor: #1a2a6c;\n\tfont-size: 18px;\n}\n",
+	"states": []
+}
