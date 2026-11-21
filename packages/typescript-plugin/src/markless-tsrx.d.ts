@@ -318,9 +318,10 @@ declare namespace __MarklessTypeService {
 		/**
 		 * `false` keeps the router from requesting this page before the click. Omit it
 		 * and a link to one of your pages is requested early when the reader hovers it,
-		 * or at idle when it is in view.
+		 * or at idle when it is in view. `'intent'` fetches it early only on hover, focus
+		 * or a press; `'viewport'` fetches it while it is in view.
 		 */
-		prefetch?: boolean;
+		prefetch?: boolean | 'intent' | 'viewport';
 		/** Fills the brackets of a route pattern `href`, as in `href="/blog/[slug]" params={{ slug }}`. */
 		params?: Readonly<Record<string, unknown>>;
 	};

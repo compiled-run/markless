@@ -8,8 +8,8 @@ const val OVERLAY_HINT_ATTRIBUTE = "overlay-hint"
 const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
 const val OVERLAY_MODAL_VALUE = "true"
 
-/** The events that carry a string: an `input` the field's text, a `keydown` or `keyup` its key, a `paste` the pasted text. */
-private val VALUED = setOf(EventName.Input, EventName.Keydown, EventName.Keyup, EventName.Paste)
+/** The events that carry a string: an `input` or `commit` the field's text, a `keydown` or `keyup` its key, a `paste` the pasted text. */
+private val VALUED = setOf(EventName.Input, EventName.Commit, EventName.Keydown, EventName.Keyup, EventName.Paste)
 
 sealed interface JournalEntry {
 	val node: String
@@ -356,6 +356,7 @@ class Runtime(
 			is Expr.Member -> {
 				val v = eval(e.value)
 				when {
+					e.optional && v == JsValue.Null -> JsValue.Null
 					v is JsValue.Str && e.property == "length" -> JsValue.Num(v.value.length.toDouble())
 					v is JsValue.Arr && e.property == "length" -> JsValue.Num(v.items.size.toDouble())
 					v is JsValue.Arr && Js.element(v, e.property) != null -> Js.element(v, e.property)!!
@@ -763,7 +764,11 @@ class Runtime(
 	private fun propertyBinding(id: String, name: String) = elementOf(id).bindings.firstOrNull { it.property && it.name == name }
 
 	/** A text field's text: what was typed since its binding last wrote it, else its `value` binding, else its `value` attribute. */
-	fun textOf(id: String): String = edited[id] ?: propertyBinding(id, "value")?.let(::property) ?: attributeNow(id, "value") ?: ""
+	fun textOf(id: String): String {
+		val text = edited[id] ?: propertyBinding(id, "value")?.let(::property) ?: attributeNow(id, "value") ?: ""
+		// A range keeps a number in its range and on its step, whatever it is given.
+		return if (attributeNow(id, "type") == "range") nativeRangeValue(text, attributeNow(id, "min"), attributeNow(id, "max"), attributeNow(id, "step")) else text
+	}
 
 	/** Every non-row checkbox and radio button, in payload order. */
 	private val ticked = payload.nodes.filterIsInstance<Node.Element>().filter { it.element == "input" && it.row == null && it.attributes["type"].let { t -> t == "checkbox" || t == "radio" } }
@@ -886,6 +891,10 @@ class Runtime(
 
 	private val missing: ValueMissing? = payload.valueMissing[nativeLocale(preferredLanguages, payload.valueMissing.keys)]
 	private val tooLong: TooLong? = payload.tooLong[nativeLocale(preferredLanguages, payload.tooLong.keys)]
+	private val emailMismatch: EmailMismatch? = payload.typeMismatch[nativeLocale(preferredLanguages, payload.typeMismatch.keys)]
+
+	/** A text field's value as the web keeps it: an email field drops line breaks and trims its ends. */
+	private fun valueOf(node: String): String = textOf(node).let { if (attributeNow(node, "type") == "email") emailValue(it) else it }
 
 	private fun entriesOf(id: String): JsValue {
 		val form = forms[id] ?: throw MarklessRuntimeError("\"$id\" is not a form")
@@ -896,7 +905,7 @@ class Runtime(
 			val value = when (kind) {
 				FieldKind.Checkbox, FieldKind.Radio -> if (checkedOf(node)) attributeNow(node, "value") ?: "on" else continue
 				FieldKind.Hidden -> attributeNow(node, "value") ?: ""
-				FieldKind.Text -> textOf(node)
+				FieldKind.Text -> valueOf(node)
 				FieldKind.Select -> optionsOf(node).firstOrNull { selectedness[it.id] == true }?.let(::optionValue) ?: continue
 			}
 			out.add(JsValue.Arr(mutableListOf(JsValue.Str(name), JsValue.Str(value))))
@@ -919,15 +928,17 @@ class Runtime(
 		val required = if (kind == FieldKind.Radio) groupOf(node).any { attributeNow(it.id, "required") != null } else attributeNow(node, "required") != null
 		val absent = required && when (kind) {
 			FieldKind.Radio -> groupOf(node).none { checkedOf(it.id) }
-			FieldKind.Text -> textOf(node) == ""
+			FieldKind.Text -> valueOf(node) == ""
 			else -> !checkedOf(node)
 		}
 		if (absent) {
 			val messages = missing ?: throw MarklessRuntimeError("the payload has no message for a ${kind.wire} missing its value")
 			return when (kind) { FieldKind.Radio -> messages.radio; FieldKind.Checkbox -> messages.checkbox; else -> messages.text }
 		}
-		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		if (kind != FieldKind.Text) return null
+		if (attributeNow(node, "type") == "email")
+			(emailMismatch ?: throw MarklessRuntimeError("the payload has no message for an email field")).message(valueOf(node))?.let { return it }
+		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		val max = nativeMaxLength(attributeNow(node, "maxlength")) ?: return null
 		val typed = edited[node] ?: return null
 		if (typed.length <= max) return null
@@ -1078,14 +1089,14 @@ class Runtime(
 		// A press focuses the control it presses, as the browser does.
 		if (event == EventName.Activate) focused = host
 		val carried = when (event) {
-			EventName.Input -> value?.let { mapOf("value" to JsValue.Str(it)) }
+			EventName.Input, EventName.Commit -> value?.let { mapOf("value" to JsValue.Str(it)) }
 			// A key's or paste's script handler reads the field's text then as `event.target.value`.
 			EventName.Keydown, EventName.Keyup -> mapOf("key" to JsValue.Str(value!!), "value" to JsValue.Str(textOf(host)))
 			EventName.Paste -> mapOf("text" to JsValue.Str(value!!), "value" to JsValue.Str(textOf(host)))
 			EventName.Activate -> mapOf("detail" to JsValue.Num((detail ?: 1).toDouble()))
 			else -> null
 		}
-		return change(host, if (event == EventName.Input) value else null) {
+		return change(host, if (event == EventName.Input || event == EventName.Commit) value else null) {
 			withFields(carried) { run(handler.ops, scope) }
 		}
 	}
@@ -1446,7 +1457,12 @@ class Runtime(
 				val key = inst.id to binding.name
 				if (binding.property) {
 					if (key in beforeProperties && key in afterProperties && beforeProperties[key] != afterProperties[key]) journal.add(JournalEntry.Property(inst.id, binding.name, afterProperties.getValue(key)))
-				} else if (key in beforeAttributes && key in afterAttributes && beforeAttributes[key] != afterAttributes[key]) journal.add(JournalEntry.Attribute(inst.id, binding.name, afterAttributes[key]))
+				} else if (key in beforeAttributes && key in afterAttributes && beforeAttributes[key] != afterAttributes[key]) {
+					journal.add(JournalEntry.Attribute(inst.id, binding.name, afterAttributes[key]))
+					// A textarea nobody edited and no `value` property sets shows its `value` attribute, as the web's default value.
+					if (binding.name == "value" && node.element == "textarea" && inst.id !in edited && node.bindings.none { it.property && it.name == "value" })
+						journal.add(JournalEntry.Property(inst.id, "value", afterAttributes[key] ?: ""))
+				}
 				}
 			}
 		}

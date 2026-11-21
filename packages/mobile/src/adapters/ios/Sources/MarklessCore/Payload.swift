@@ -45,6 +45,8 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case template([NativeTemplatePart])
 	/// `length` of a string or array, or an own property of an object.
 	case member(NativeExpr, String)
+	/// A member read in an optional chain (`a?.b`): null when the object is null, as JavaScript gives undefined.
+	case optionalMember(NativeExpr, String)
 	/// An array's element at an index computed while the app runs; null when it is not an integer inside the array.
 	case at(NativeExpr, of: NativeExpr)
 	case array([NativeArrayItem])
@@ -83,7 +85,7 @@ public indirect enum NativeExpr: Equatable, Sendable {
 		switch self {
 		case let .cell(cell): return [cell]
 		case .literal, .event, .focused, .local, .item, .routeParams, .formData, .checked, .field: return []
-		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
+		case let .unary(_, inner), let .member(inner, _), let .optionalMember(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
 		case let .contains(within, node): return within.cells + node.cells
 		case let .captures(node, pointer): return node.cells + pointer.cells
 		case let .array(items): return items.flatMap(\.value.cells)
@@ -237,6 +239,8 @@ public enum NativeEventName: String, Sendable {
 	case enter
 	/// A form's, run only by a `submit` op.
 	case submit
+	/// A range input let go after its value moved: the web's `change` on it.
+	case commit
 	/// A `timer` journal entry's time has come.
 	case timer
 	/// The host is idle after the element appeared; once for each shown instance.
@@ -330,6 +334,97 @@ public struct NativeTooLong: Equatable, Sendable {
 		func write(_ value: Int) -> String { String(String(value).map { digits[Int(String($0))!] }) }
 		return text.replacingOccurrences(of: "{max}", with: write(max)).replacingOccurrences(of: "{length}", with: write(length))
 	}
+}
+
+/// Chromium's message for an email field whose value is not an email address, one per reason: `{value}` is the whole value,
+/// `{symbol}` the first character not allowed, `{domain}` the part after the `@`.
+public struct NativeEmailMismatch: Equatable, Sendable {
+	public let noAt, emptyLocal, emptyDomain, invalidLocal, invalidDomain, invalidDots, other: String
+
+	/// An email field's value as the web keeps it: line breaks dropped, then ASCII whitespace trimmed from both ends.
+	public static func value(_ typed: String) -> String {
+		let whitespace: Set<Unicode.Scalar> = ["\t", "\n", "\u{0C}", "\r", " "]
+		var scalars = Array(typed.unicodeScalars.filter { $0 != "\n" && $0 != "\r" })
+		while let first = scalars.first, whitespace.contains(first) { scalars.removeFirst() }
+		while let last = scalars.last, whitespace.contains(last) { scalars.removeLast() }
+		return String(String.UnicodeScalarView(scalars))
+	}
+
+	private static func isAlphanumeric(_ s: Unicode.Scalar) -> Bool { s.isASCII && (("a"..."z").contains(s) || ("A"..."Z").contains(s) || ("0"..."9").contains(s)) }
+	private static func isLocal(_ s: Unicode.Scalar) -> Bool { isAlphanumeric(s) || ".!#$%&'*+/=?^_`{|}~-".unicodeScalars.contains(s) }
+	private static func isLabel(_ label: Substring) -> Bool {
+		let s = Array(label.unicodeScalars)
+		guard (1...63).contains(s.count), isAlphanumeric(s.first!), isAlphanumeric(s.last!) else { return false }
+		return s.allSatisfy { isAlphanumeric($0) || $0 == "-" }
+	}
+
+	/// Why `value` (as ``value(_:)`` keeps it) is not an email address, in Chromium's words, or nil when it is one or is empty.
+	public func message(for value: String) -> String? {
+		if value.isEmpty { return nil }
+		let at = value.firstIndex(of: "@")
+		let local = at.map { value[..<$0] } ?? Substring(value)
+		let domain = at.map { value[value.index(after: $0)...] } ?? ""
+		if let at, at != value.startIndex, local.unicodeScalars.allSatisfy(Self.isLocal),
+			domain.split(separator: ".", omittingEmptySubsequences: false).allSatisfy(Self.isLabel) { return nil }
+		func fill(_ message: String, _ symbol: String = "") -> String {
+			var out = ""
+			var rest = Substring(message)
+			while let open = rest.firstIndex(of: "{") {
+				out += rest[..<open]
+				let tail = rest[open...]
+				if tail.hasPrefix("{value}") { out += value; rest = tail.dropFirst(7) }
+				else if tail.hasPrefix("{symbol}") { out += symbol; rest = tail.dropFirst(8) }
+				else if tail.hasPrefix("{domain}") { out += domain; rest = tail.dropFirst(8) }
+				else { out += "{"; rest = tail.dropFirst() }
+			}
+			return out + rest
+		}
+		guard let at else { return fill(noAt) }
+		if at == value.startIndex { return fill(emptyLocal) }
+		if domain.isEmpty { return fill(emptyDomain) }
+		if let bad = local.unicodeScalars.first(where: { !Self.isLocal($0) }) { return fill(invalidLocal, String(bad)) }
+		if let bad = domain.unicodeScalars.first(where: { !(Self.isAlphanumeric($0) || $0 == "." || $0 == "-") }) { return fill(invalidDomain, String(bad)) }
+		if domain.hasPrefix(".") || domain.hasSuffix(".") || domain.contains("..") { return fill(invalidDots) }
+		return fill(other)
+	}
+}
+
+/// A range input's value as the web keeps it (`nativeRangeValue` in @markless/serializer): `min` 0 and `max` 100 by default
+/// (a `max` below `min` is `min`); a value that is not a number is the midpoint; clamped into the range and moved to the
+/// nearest step from `min` (the greater of two as near), at or below `max`; written as JavaScript writes the number.
+public func nativeRangeValue(_ value: String?, min: String?, max: String?, step: String?) -> String {
+	func number(_ text: String?) -> Double? {
+		guard let text, text.range(of: #"^-?(\d+(\.\d+)?|\.\d+)([eE][-+]?\d+)?$"#, options: .regularExpression) != nil else { return nil }
+		return Double(text)
+	}
+	func places(_ n: Double) -> Int {
+		let written = jsNumber(n)
+		let parts = written.components(separatedBy: "e")
+		let mantissa = parts[0].components(separatedBy: ".")
+		let fraction = mantissa.count > 1 ? mantissa[1].count : 0
+		let exponent = parts.count > 1 ? Int(parts[1]) ?? 0 : 0
+		return Swift.max(0, fraction - exponent)
+	}
+	let low = number(min) ?? 0
+	let high = Swift.max(low, number(max) ?? 100)
+	let any = step?.trimmingCharacters(in: .whitespaces).lowercased() == "any"
+	let size: Double? = any ? nil : (number(step).flatMap { $0 > 0 ? $0 : nil } ?? 1)
+	var value = Swift.min(high, Swift.max(low, number(value) ?? low + (high - low) / 2))
+	if let size {
+		let unit = pow(10, Double(Swift.max(places(low), places(size), places(value))))
+		func whole(_ n: Double) -> Double { (n * unit).rounded() }
+		let stepUnits = whole(size)
+		var steps = ((whole(value) - whole(low)) / stepUnits + 0.5).rounded(.down)
+		while steps > 0 && whole(low) + steps * stepUnits > whole(high) { steps -= 1 }
+		value = (whole(low) + steps * stepUnits) / unit
+	}
+	return jsNumber(value)
+}
+
+/// A number as JavaScript's `String(n)` writes it for the values a range takes: whole numbers without a fraction.
+func jsNumber(_ n: Double) -> String {
+	if n == n.rounded(), abs(n) < 1e21 { return String(Int64(n)) }
+	return "\(n)"
 }
 
 /// A `maxlength` attribute's limit, by HTML's rules for parsing non-negative integers; nil (no limit) when it has none.
@@ -492,12 +587,15 @@ public struct NativeViewPayload: Equatable, Sendable {
 	public let valueMissing: [(locale: String, messages: NativeValueMissing)]
 	/// What the web says when a text field a person edited is longer than its `maxlength`, by locale, in payload order.
 	public var tooLong: [(locale: String, message: NativeTooLong)] = []
+	/// What the web says when an email field holds no email address, by locale, in payload order.
+	public var typeMismatch: [(locale: String, message: NativeEmailMismatch)] = []
 
 	public static func == (a: NativeViewPayload, b: NativeViewPayload) -> Bool {
 		a.component == b.component && a.route == b.route && a.cells == b.cells && a.nodes == b.nodes && a.events == b.events
 			&& a.handlers == b.handlers && a.title == b.title && a.objects == b.objects && a.forms == b.forms && a.valueMissing.map(\.locale) == b.valueMissing.map(\.locale)
 			&& a.valueMissing.map(\.messages) == b.valueMissing.map(\.messages) && a.tooLong.map(\.locale) == b.tooLong.map(\.locale)
-			&& a.tooLong.map(\.message) == b.tooLong.map(\.message) && a.script == b.script
+			&& a.tooLong.map(\.message) == b.tooLong.map(\.message) && a.typeMismatch.map(\.locale) == b.typeMismatch.map(\.locale)
+			&& a.typeMismatch.map(\.message) == b.typeMismatch.map(\.message) && a.script == b.script
 	}
 	/// The JavaScript the page's script ops and computeds run; absent when every handler is data.
 	public var script: NativeScript? = nil
@@ -508,7 +606,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "script"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "typeMismatch", "script"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
@@ -779,6 +877,16 @@ public struct NativeViewPayload: Equatable, Sendable {
 				return (locale, NativeTooLong(text: try m["text"].string(), digits: digits))
 			}
 		}() : []
+		let typeMismatch: [(locale: String, message: NativeEmailMismatch)] = fields.has("typeMismatch") ? try {
+			let reader = try fields["typeMismatch"]
+			return try reader.keys().map { locale in
+				let m = try reader.field(locale).object(["noAt", "emptyLocal", "emptyDomain", "invalidLocal", "invalidDomain", "invalidDots", "other"])
+				return (locale, NativeEmailMismatch(
+					noAt: try m["noAt"].string(), emptyLocal: try m["emptyLocal"].string(), emptyDomain: try m["emptyDomain"].string(),
+					invalidLocal: try m["invalidLocal"].string(), invalidDomain: try m["invalidDomain"].string(),
+					invalidDots: try m["invalidDots"].string(), other: try m["other"].string()))
+			}
+		}() : []
 		let route: NativeRoute? = fields.has("route") ? try {
 			let r = try fields["route"].object(["pattern", "params"])
 			return NativeRoute(pattern: try r["pattern"].string(), params: try r["params"].array().map { try $0.string() })
@@ -786,7 +894,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		let payload = NativeViewPayload(
 			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers,
 			title: fields.has("title") ? try decodeParts(try fields["title"]) : nil,
-			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong,
+			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong, typeMismatch: typeMismatch,
 			script: fields.has("script") ? try decodeScript(try fields["script"]) : nil)
 		try payload.check()
 		return payload
@@ -963,6 +1071,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 				return .expr(try decodeExpr(part))
 			})
 		case ["member", "property"]: return .member(try decodeExpr(try field("member")), try field("property").string())
+		case ["member", "optional", "property"]:
+			guard try field("optional").bool() else { throw PayloadError(path: reader.path + ".optional", reason: "optional is only ever true") }
+			return .optionalMember(try decodeExpr(try field("member")), try field("property").string())
 		case ["at", "of"]: return .at(try decodeExpr(try field("at")), of: try decodeExpr(try field("of")))
 		case ["array"]:
 			return .array(try field("array").array().map { item in

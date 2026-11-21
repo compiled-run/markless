@@ -7932,6 +7932,42 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_NATIVE_DROP_ONLY',
+		title: 'A drop handler is left out of the native build',
+		area: 'internal',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error-or-warning',
+		description: 'A drop handler is left out of the native build: a Markless build error.',
+		printed: [
+			'MARKLESS_NATIVE_DROP_ONLY: <what> runs only while something is dragged onto it; native hosts take no drops yet, so it is left out',
+			'A phone raises drag and drop events only when something is dragged onto the page from another app.',
+			'https://markless.dev/errors/MARKLESS_NATIVE_DROP_ONLY',
+		],
+		structured: true,
+		why: 'A phone raises drag and drop events only when something is dragged onto the page from another app.',
+		allow: [
+			{
+				id: 'l0',
+				runs: [
+					{
+						id: 'r0',
+						text: '// markless-allow MARKLESS_NATIVE_DROP_ONLY: the reason you accept it',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
+					},
+				],
+			},
+		],
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/native-view.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/native-view.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_NATIVE_ELEMENT',
 		title: 'This element has no native view yet',
 		area: 'internal',
@@ -8000,6 +8036,43 @@ export const errorEntries: readonly ErrorEntry[] = [
 					{
 						id: 'r0',
 						text: '// markless-allow MARKLESS_NATIVE_KEYBOARD_ONLY: the reason you accept it',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
+					},
+				],
+			},
+		],
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/native-view.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/native-view.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_NATIVE_MOUSE_ONLY',
+		title: 'A mouse-only handler is left out of the native build',
+		area: 'internal',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error-or-warning',
+		description:
+			'A mouse-only handler is left out of the native build: a Markless build error.',
+		printed: [
+			'MARKLESS_NATIVE_MOUSE_ONLY: <what> runs only from a mouse or trackpad on a phone; native hosts have none yet, so it is left out',
+			'A touch on iOS and Android scrolls and swipes without raising wheel events.',
+			'https://markless.dev/errors/MARKLESS_NATIVE_MOUSE_ONLY',
+		],
+		structured: true,
+		why: 'A touch on iOS and Android scrolls and swipes without raising wheel events.',
+		allow: [
+			{
+				id: 'l0',
+				runs: [
+					{
+						id: 'r0',
+						text: '// markless-allow MARKLESS_NATIVE_MOUSE_ONLY: the reason you accept it',
 						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 					},
 				],

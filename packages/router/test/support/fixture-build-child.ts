@@ -15,7 +15,11 @@ try {
 			? { configFile: build.configFile }
 			: {
 					configFile: false,
-					plugins: [...(build.ui ? [ui()] : []), markless(build.markless), router()],
+					plugins: [
+						...(build.ui ? [ui()] : []),
+						markless(build.markless),
+						router(build.router),
+					],
 				}),
 		...(build.nitro && { nitro: build.nitro }),
 		...(build.build && { build: build.build }),

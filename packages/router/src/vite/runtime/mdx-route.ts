@@ -1,6 +1,8 @@
 import {
 	marklessInstanceScopedLoadSymbol,
 	marklessIslandSpacedSymbol,
+	marklessPrefixedRepeatId,
+	marklessPrefixedRepeatParents,
 } from '../../../../web/src/fns/instance-scope.ts';
 import { marklessThen } from '../../../../web/src/ssr-data/awaitable.ts';
 import { marklessWhenLoaded, PACK_RESIDENT } from '../../../../web/src/fns/resident-load.ts';
@@ -938,9 +940,8 @@ function islandScopedFamilyRecord(
 ): MdxFamilyRecord {
 	const { child, island } = context;
 	const mapped: Record<string, unknown> = { ...record };
-	if (typeof record.id === 'string') mapped.id = child.hostPrefix + record.id;
-	const enclosingRow = record.enclosingRow as { readonly prefix?: string } | undefined;
-	if (enclosingRow) mapped.enclosingRow = { ...enclosingRow, prefix: child.hostPrefix + (enclosingRow.prefix ?? '') };
+	if (typeof record.id === 'string')
+		Object.assign(mapped, marklessPrefixedRepeatId(record as { readonly id: string }, child.hostPrefix));
 	for (const key of MDX_HOST_ID_KEYS)
 		if (typeof record[key] === 'string') mapped[key] = child.hostPrefix + record[key];
 	for (const key of MDX_SYMBOL_ID_KEYS)
@@ -968,6 +969,7 @@ function islandScopedFamilyRecord(
 		if (isFamilyRecord(anchor) && anchor.strategy === MDX_PAGE_ANCHOR_STRATEGY)
 			mapped[key] = { ...anchor, index: context.commentOffset + Number(anchor.index) };
 	}
+	Object.assign(mapped, marklessPrefixedRepeatParents(record as { readonly repeatParents?: ReadonlyArray<{ readonly repeatId: string }> }, child.hostPrefix));
 	if (isFamilyRecord(record.rowTemplate))
 		mapped.rowTemplate = islandScopedRowTemplate(record.rowTemplate, island);
 	// A minted row reads through the owning component's reader, which spells ids without the island's segment.

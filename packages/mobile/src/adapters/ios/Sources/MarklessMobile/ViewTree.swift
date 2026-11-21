@@ -1013,10 +1013,20 @@ final class ViewTree {
 					control.accessibilityTraits = staticAttributes["type"] == "checkbox" ? [.button, .toggleButton] : .button
 					ticks[id] = (staticAttributes["type"] == "radio", try runtime.isChecked(id))
 					view = control
+				} else if element == "input", staticAttributes["type"] == "range" {
+					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
+					view = RangeSlider()
 				} else if element == "input" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					let field = TextField()
 					field.lengthLimit = LengthLimit { [weak self] in nativeMaxLength(self?.attributes[id]?["maxlength"]) }
+					// Safari gives an email field the email keyboard with no capitals or corrections.
+					if staticAttributes["type"] == "email" {
+						field.keyboardType = .emailAddress
+						field.textContentType = .emailAddress
+						field.autocapitalizationType = .none
+						field.autocorrectionType = .no
+					}
 					field.addAction(UIAction { [weak self, weak field] _ in
 						self?.dismissMessage()
 						field?.resignFirstResponder()
@@ -1100,7 +1110,7 @@ final class ViewTree {
 					let text = try bound.map { binding in
 						let value = try runtime.evaluate(binding.value, in: context.scope)
 						return value == .null ? "" : value.text
-					} ?? staticAttributes["value"]
+					} ?? current["value"]
 					if let area = view as? TextArea { area.text = text ?? "" } else { (view as? UITextField)?.text = text }
 				}
 				var childIndex = 0
@@ -1186,6 +1196,10 @@ final class ViewTree {
 				// An element that is not a button (a list row): a tap anywhere in it, its text included, presses it.
 				view.isUserInteractionEnabled = true
 				view.addGestureRecognizer(ActivateGesture { taps in onAction(NativeAction(event: .activate, host: id, detail: taps)) })
+			case let (.input, slider as RangeSlider):
+				slider.onInput = { value in onAction(NativeAction(event: .input, host: id, value: value)) }
+			case let (.commit, slider as RangeSlider):
+				slider.onCommit = { value in onAction(NativeAction(event: .commit, host: id, value: value)) }
 			case let (.input, field as UITextField):
 				field.addAction(
 					UIAction { [weak field] _ in onAction(NativeAction(event: .input, host: id, value: field?.text ?? "")) },
@@ -1257,7 +1271,9 @@ final class ViewTree {
 	private func applyAttributes(_ id: String, _ view: UIView) {
 		let current = attributes[id] ?? [:]
 		if view is AbsentField { return }
-		if let audio = view as? AudioButton {
+		if let slider = view as? RangeSlider {
+			slider.show(current)
+		} else if let audio = view as? AudioButton {
 			audio.isHidden = current["controls"] == nil
 			audio.update(source: current["src"], label: current["aria-label"])
 		} else if let button = view as? UIButton {
@@ -1730,6 +1746,131 @@ final class TopLayerView: UIView {
 /// Stops typing at a field's `maxlength` as the web does: an insertion is cut to fit, never through a surrogate pair, while
 /// text the app sets is kept whole. Text an input method is still composing is left to it.
 @MainActor
+/// `<input type="range">`: a track and a round thumb drawn as Safari draws an unstyled range input, on the input's steps,
+/// its value kept as the web keeps it (`nativeRangeValue`). A drag reports the value it lands on once, as the web's input
+/// event does while the thumb crosses a step; VoiceOver adjusts it a step at a time.
+final class RangeSlider: UIControl {
+	var onInput: ((String) -> Void)?
+	/// Called when a drag or tap ends with the value moved since it began, as the web's `change`.
+	var onCommit: ((String) -> Void)?
+	private var startValue = ""
+	private var attributes: [String: String] = [:]
+	private var reported = ""
+	private var low = 0.0
+	private var high = 100.0
+	private var value = 50.0
+	private let track = CALayer()
+	private let fill = CALayer()
+	private let thumb = CALayer()
+	private static let thumbSize: CGFloat = 24
+
+	override init(frame: CGRect) {
+		super.init(frame: frame)
+		track.backgroundColor = UIColor.systemGray4.cgColor
+		track.cornerRadius = 2
+		fill.backgroundColor = UIColor.systemBlue.cgColor
+		fill.cornerRadius = 2
+		thumb.backgroundColor = UIColor.white.cgColor
+		thumb.cornerRadius = Self.thumbSize / 2
+		thumb.shadowColor = UIColor.black.cgColor
+		thumb.shadowOpacity = 0.3
+		thumb.shadowRadius = 2
+		thumb.shadowOffset = CGSize(width: 0, height: 1)
+		for part in [track, fill, thumb] { layer.addSublayer(part) }
+		isAccessibilityElement = true
+		accessibilityTraits = .adjustable
+		// The stacking layout would squeeze it to nothing; it keeps a thumb's height.
+		setContentCompressionResistancePriority(.required, for: .vertical)
+		heightAnchor.constraint(greaterThanOrEqualToConstant: 31).isActive = true
+		addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(dragged(_:))))
+		addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(dragged(_:))))
+	}
+
+	required init?(coder: NSCoder) { fatalError("RangeSlider is built in code") }
+
+	/// Chrome's unstyled range input is 129 px wide.
+	override var intrinsicContentSize: CGSize { CGSize(width: 129, height: 31) }
+
+	private func valueOf(_ raw: String?) -> String {
+		nativeRangeValue(raw, min: attributes["min"], max: attributes["max"], step: attributes["step"])
+	}
+
+	/// Takes the input's attributes: its range, its step and the value the page gives it.
+	func show(_ current: [String: String]) {
+		attributes = current
+		low = Double(valueOf(current["min"] ?? "0")) ?? 0
+		high = Double(valueOf(current["max"] ?? "100")) ?? 100
+		reported = valueOf(current["value"])
+		value = Double(reported) ?? low
+		isEnabled = current["disabled"] == nil
+		accessibilityLabel = current["aria-label"]
+		setNeedsLayout()
+	}
+
+	override func layoutSubviews() {
+		super.layoutSubviews()
+		CATransaction.begin()
+		CATransaction.setDisableActions(true)
+		let inset = Self.thumbSize / 2
+		let line = CGRect(x: inset, y: bounds.midY - 2, width: Swift.max(0, bounds.width - 2 * inset), height: 4)
+		track.frame = line
+		let fraction = high > low ? CGFloat((value - low) / (high - low)) : 0
+		let x = line.minX + line.width * fraction
+		fill.frame = CGRect(x: line.minX, y: line.minY, width: x - line.minX, height: line.height)
+		thumb.frame = CGRect(x: x - inset, y: bounds.midY - inset, width: Self.thumbSize, height: Self.thumbSize)
+		CATransaction.commit()
+	}
+
+	@objc private func dragged(_ gesture: UIGestureRecognizer) {
+		guard isEnabled else { return }
+		if gesture.state == .began || (gesture is UITapGestureRecognizer && gesture.state == .ended) { startValue = reported }
+		defer {
+			if gesture.state == .ended || gesture.state == .cancelled, reported != startValue {
+				startValue = reported
+				onCommit?(reported)
+			}
+		}
+		let inset = Self.thumbSize / 2
+		let width = Swift.max(1, bounds.width - 2 * inset)
+		let fraction = Swift.min(1, Swift.max(0, (gesture.location(in: self).x - inset) / width))
+		land(on: valueOf(String(low + (high - low) * Double(fraction))))
+	}
+
+	private func land(on landed: String) {
+		value = Double(landed) ?? value
+		setNeedsLayout()
+		guard landed != reported else { return }
+		reported = landed
+		onInput?(landed)
+	}
+
+	/// VoiceOver moves the thumb a step: the step, or a hundredth of the range for `step="any"`.
+	private var stepSize: Double {
+		let step = attributes["step"]?.trimmingCharacters(in: .whitespaces)
+		if step?.lowercased() == "any" { return (high - low) / 100 }
+		return step.flatMap(Double.init).flatMap { $0 > 0 ? $0 : nil } ?? 1
+	}
+
+	/// VoiceOver reads the value the input holds.
+	override var accessibilityValue: String? {
+		get { reported }
+		set {}
+	}
+
+	/// A VoiceOver step is a move that ends at once, as a keyboard step on the web raises input and then change.
+	private func step(by delta: Double) {
+		let before = reported
+		land(on: valueOf(String(value + delta)))
+		if reported != before { onCommit?(reported) }
+	}
+
+	override func accessibilityIncrement() { step(by: stepSize) }
+	override func accessibilityDecrement() { step(by: -stepSize) }
+
+	/// The value as a number, for the host's tests.
+	var number: Double { value }
+}
+
 final class LengthLimit: NSObject, UITextFieldDelegate {
 	private let limit: () -> Int?
 

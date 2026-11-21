@@ -5,8 +5,10 @@ import {
 import {
 	LINK_ATTRIBUTE,
 	PREFETCH_ATTRIBUTE,
+	PREFETCH_LINK_CHOICES,
 	REPLACE_ATTRIBUTE,
 	SCROLL_ATTRIBUTE,
+	type PrefetchLinkChoice,
 } from './link-attributes.ts';
 import { IN_PLACE_LOCATION_HEADER, IN_PLACE_REQUEST_HEADER } from '@markless/web/fns/in-place-headers';
 import { HTML_ATTRIBUTES_SLOT } from './route-dom.ts';
@@ -84,8 +86,10 @@ export interface LinkNavigationProps {
 	 * `false`: nothing for this link downloads before it is clicked. Only page routes are ever
 	 * prefetched (with a `Purpose: prefetch` header), never `/api` endpoints; set `false` on a link to
 	 * a page whose GET has side effects (a one-time token, a counter) so only the click requests it.
+	 * `'intent'`: only hover, focus or a press fetch it early, never the viewport or idle tiers.
+	 * `'viewport'`: fetched while in view, even when the app's viewport tier is off (on fast links then).
 	 */
-	readonly prefetch?: boolean;
+	readonly prefetch?: boolean | PrefetchLinkChoice;
 	readonly replace?: boolean;
 	readonly scroll?: boolean;
 }
@@ -207,7 +211,11 @@ const REDIRECTS_TO_GET: ReadonlySet<number> = new Set([301, 302, 303]);
 export function __marklessAnswerInPlace(event: RuntimeHttpEvent, answer: unknown): unknown {
 	const request = event.req;
 	// A Response, or an answer shaped like one (h3's redirect() returns its own HTTPResponse class).
-	const shaped = answer as { readonly status?: unknown; readonly headers?: unknown; readonly body?: unknown } | null;
+	const shaped = answer as {
+		readonly status?: unknown;
+		readonly headers?: unknown;
+		readonly body?: unknown;
+	} | null;
 	if (typeof shaped?.status !== 'number' || !(shaped.headers instanceof Headers)) return answer;
 	if (!REDIRECTS_TO_GET.has(shaped.status)) return answer;
 	if (request?.method !== 'POST' || !request.headers.get(IN_PLACE_REQUEST_HEADER)) return answer;
@@ -326,8 +334,16 @@ function linkAnchorAttributes(props: LinkProps): Array<readonly [string, string]
 	attributes.set(LINK_ATTRIBUTE, '');
 	if (props.replace) attributes.set(REPLACE_ATTRIBUTE, '');
 	if (props.prefetch === false) attributes.set(PREFETCH_ATTRIBUTE, 'none');
+	else if (PREFETCH_LINK_CHOICES.includes(props.prefetch as PrefetchLinkChoice))
+		attributes.set(PREFETCH_ATTRIBUTE, props.prefetch as PrefetchLinkChoice);
 	if (props.scroll === false) attributes.set(SCROLL_ATTRIBUTE, 'manual');
 	return [...attributes];
+}
+
+/** What a link's `prefetch` value lowers to: 'none' for false, a link choice as is, nothing otherwise. */
+export function __marklessPrefetchAttribute(value: unknown): string | undefined {
+	if (value === false) return 'none';
+	return PREFETCH_LINK_CHOICES.includes(value as PrefetchLinkChoice) ? (value as string) : undefined;
 }
 
 function isLinkInternalProp(name: string): boolean {
