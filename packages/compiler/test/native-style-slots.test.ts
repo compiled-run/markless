@@ -165,7 +165,7 @@ export default function App() @{
 		);
 	});
 
-	it('is refused by name inside a @for row, which Dragon lays out once for every row', async () => {
+	it('inside a @for row is a slot of that row: one value per row copy, from the row item', async () => {
 		const { payload, diagnostics } = await build(`import { state } from '@markless/core';
 export default function App() @{
 	let rows = state([{ id: 'a', at: 10 }]);
@@ -175,9 +175,29 @@ export default function App() @{
 		}
 	</main>
 }`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.slots).toEqual([
+			{
+				id: 'slot:h1#0',
+				value: { member: { item: 'repeat:0' }, property: 'at' },
+				row: 'repeat:0',
+			},
+		]);
+	});
+
+	it('is refused by name inside a @for row when it is a template or empty text by a condition', async () => {
+		const { payload, diagnostics } = await build(`import { state } from '@markless/core';
+export default function App() @{
+	let rows = state([{ id: 'a', at: null as number | null }]);
+	<main>
+		@for (const row of rows; key row.id) {
+			<div style={row.at === null ? '' : \`--at: \${row.at}%\`}>Row</div>
+		}
+	</main>
+}`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toContain(
-			'a `style` that follows state inside a @for row, which Dragon lays out once for every row',
+			'a `style` inside a @for row that is a template or empty text by a condition; Dragon lays each row out from one template',
 		);
 	});
 });

@@ -1720,16 +1720,25 @@ class Runtime(
 	/** Each style slot's current value, in payload order; a slot that is not a finite number (or not whole when integer) is an error, as no layout of it was proven. */
 	fun slots(): List<Pair<String, Double>> {
 		val cases = styleCases().toMap()
-		return payload.slots.map { slot ->
+		return payload.slots.flatMap { slot ->
 			// Its expression may not hold while its style case hides the text (`point.x`), so it keeps its last value.
 			val w = slot.whenCase
-			if (w != null && cases[w.case] != w.value) return@map slot.id to (keptSlots[slot.id] ?: 0.0)
-			val v = evaluate(slot.value)
-			if (v !is JsValue.Num || !v.value.isFinite()) throw MarklessRuntimeError("style slot ${slot.id} is ${jsonValue(v)}, not a finite number")
-			if (slot.integer && v.value != Math.rint(v.value)) throw MarklessRuntimeError("style slot ${slot.id} is ${JsString.number(v.value)}, not a whole number")
-			keptSlots[slot.id] = v.value
-			slot.id to v.value
+			if (w != null && cases[w.case] != w.value) return@flatMap listOf(slot.id to (keptSlots[slot.id] ?: 0.0))
+			val owner = if (slot.row == null) null else slotOwners[slot.id]
+			val copies = owner?.let { o -> instances(o).map { "${slot.id}${it.id.substring(o.id.length)}" to it.scope } } ?: listOf(slot.id to Scope.EMPTY)
+			copies.map { (id, scope) ->
+				val v = evaluate(slot.value, scope)
+				if (v !is JsValue.Num || !v.value.isFinite()) throw MarklessRuntimeError("style slot $id is ${jsonValue(v)}, not a finite number")
+				if (slot.integer && v.value != Math.rint(v.value)) throw MarklessRuntimeError("style slot $id is ${JsString.number(v.value)}, not a whole number")
+				keptSlots[id] = v.value
+				id to v.value
+			}
 		}
+	}
+
+	/** The element whose style holds each slot: a slot inside a row has one value per row copy, `<slot>@<key>`. */
+	private val slotOwners: Map<String, Node.Element> by lazy {
+		payload.nodes.filterIsInstance<Node.Element>().flatMap { n -> n.style.orEmpty().filterIsInstance<StylePiece.Hole>().map { it.slot to n } }.toMap()
 	}
 
 	/** Whether each style case's test holds now, in payload order: which of Dragon's assignments the style is in. */

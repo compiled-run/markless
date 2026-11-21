@@ -122,7 +122,7 @@ data class ArmPlace(val branch: String, val index: Int)
 data class Binding(val name: String, val value: Expr, val property: Boolean = false)
 
 /** A number styles read while the app runs, journalled as `slot` when it changes; [integer] when only whole numbers are allowed. */
-data class StyleSlot(val id: String, val value: Expr, val integer: Boolean = false, val whenCase: StyleWhen? = null)
+data class StyleSlot(val id: String, val value: Expr, val integer: Boolean = false, val whenCase: StyleWhen? = null, val row: String? = null)
 
 /** A slot evaluated, or a style shown, only while style case [case] has [value]; a hidden slot keeps its last value (0 before the first). */
 data class StyleWhen(val case: String, val value: Boolean)
@@ -572,9 +572,9 @@ data class Payload(
 			val slots = root["slots"]?.arr("payload.slots")?.mapIndexed { n, v ->
 				val what = "payload.slots[$n]"
 				val o = v.obj(what)
-				o.only(setOf("id", "value", "integer", "when"), what)
+				o.only(setOf("id", "value", "integer", "when", "row"), what)
 				val integer = o["integer"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.integer must be true") else true } ?: false
-				StyleSlot(o.field("id", what).str("$what.id"), expr(o.field("value", what), "$what.value"), integer, o["when"]?.let { styleWhen(it, "$what.when", caseIds) })
+				StyleSlot(o.field("id", what).str("$what.id"), expr(o.field("value", what), "$what.value"), integer, o["when"]?.let { styleWhen(it, "$what.when", caseIds) }, o["row"]?.str("$what.row"))
 			} ?: emptyList()
 			val slotIds = HashSet<String>()
 			for (s in slots) {
