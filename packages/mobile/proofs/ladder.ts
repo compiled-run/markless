@@ -34,6 +34,10 @@ export type LadderAction =
 	  }
 	/** The keyboard's return key in the text field with this accessible name. */
 	| { readonly submit: string }
+	/** The keyboard's delete key in the text field with this accessible name, its text cursor at the end. */
+	| { readonly erase: string }
+	/** Two quick taps on this text or accessible name: the second press's `event.detail` is 2. */
+	| { readonly doubleTap: string }
 	/** Opens the `<select>` with this accessible name and picks the option with this label from its list. */
 	| { readonly choose: { readonly field: string; readonly option: string } }
 	/** Scroll until this text is on screen. */
@@ -61,6 +65,8 @@ export type LadderAction =
 	| { readonly back: 'gesture' | 'button' }
 	/** The device's light or dark appearance, switched in the system while the app runs (`prefers-color-scheme` on the web). */
 	| { readonly appearance: 'light' | 'dark' }
+	/** The phone turned upright or on its side while the app runs (the browser's viewport, its width and height swapped). */
+	| { readonly orientation: 'portrait' | 'landscape' }
 	/** Escape on the web, the back gesture on Android; iOS has none a flow can perform, so the step runs on Android only. */
 	| { readonly escape: true }
 	/** A press that starts and ends on the topmost overlay element itself, beside what it holds (a modal's backdrop). */
@@ -100,6 +106,8 @@ export type LadderStep = {
 	readonly absent?: readonly string[];
 	/** Texts or accessible names the page holds but that are scrolled out of sight. */
 	readonly offScreen?: readonly string[];
+	/** Texts the page holds but its styles do not show at this size (`display: none` in this band). */
+	readonly hidden?: readonly string[];
 	/** Controls, by text or accessible name, that are on screen and cannot be activated. */
 	readonly disabled?: readonly string[];
 	/** Texts that are on screen in this order, top to bottom. */
@@ -283,7 +291,11 @@ const selector = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  */
 export function changeWitness(previous: LadderStep, step: LadderStep): LadderStep {
 	const wasShown = new Set(previous.visible);
-	const wasAbsent = new Set([...(previous.absent ?? []), ...(previous.offScreen ?? [])]);
+	const wasAbsent = new Set([
+		...(previous.absent ?? []),
+		...(previous.offScreen ?? []),
+		...(previous.hidden ?? []),
+	]);
 	const order = step.order?.join('\n') !== previous.order?.join('\n') ? step.order : undefined;
 	const fields = Object.fromEntries(
 		Object.entries(step.fields ?? {}).filter(
@@ -295,6 +307,9 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 	return {
 		visible: step.visible.filter((text) => wasAbsent.has(text)),
 		absent: (step.absent ?? []).filter((text) => wasShown.has(text)),
+		...((step.hidden ?? []).some((text) => wasShown.has(text)) && {
+			hidden: (step.hidden ?? []).filter((text) => wasShown.has(text)),
+		}),
 		...((step.offScreen ?? []).some((text) => wasShown.has(text)) && {
 			offScreen: (step.offScreen ?? []).filter((text) => wasShown.has(text)),
 		}),
@@ -316,6 +331,7 @@ export const witnessCount = (witness: LadderStep): number =>
 	witness.visible.length +
 	(witness.absent?.length ?? 0) +
 	(witness.offScreen?.length ?? 0) +
+	(witness.hidden?.length ?? 0) +
 	(witness.order ? 1 : 0) +
 	Object.keys(witness.fields ?? {}).length +
 	(witness.calls ? 1 : 0) +
@@ -351,7 +367,7 @@ const platformAssertions = (step: LadderStep): unknown[] =>
 
 const screenAssertions = (step: LadderStep): unknown[] => [
 	...step.visible.map((text) => ({ assertVisible: selector(text) })),
-	...[...(step.absent ?? []), ...(step.offScreen ?? [])].map((text) => ({
+	...[...(step.absent ?? []), ...(step.offScreen ?? []), ...(step.hidden ?? [])].map((text) => ({
 		assertNotVisible: selector(text),
 	})),
 	...(step.disabled ?? []).map((text) => ({
@@ -400,6 +416,8 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			...(action.type.keepKeyboard ? [] : ['hideKeyboard']),
 		];
 	if ('submit' in action) return [{ tapOn: selector(action.submit) }, { pressKey: 'Enter' }];
+	if ('erase' in action) return [{ tapOn: selector(action.erase) }, { pressKey: 'Backspace' }];
+	if ('doubleTap' in action) return [{ doubleTapOn: selector(action.doubleTap) }];
 	if ('choose' in action)
 		return [
 			{ tapOn: selector(action.choose.field) },
@@ -457,6 +475,11 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 		// iOS cross-fades to the new appearance; the screenshot after the step is its only record.
 		return [
 			{ setDarkMode: action.appearance === 'dark' ? 'enabled' : 'disabled' },
+			{ waitForAnimationToEnd: { timeout: 5000 } },
+		];
+	if ('orientation' in action)
+		return [
+			{ setOrientation: action.orientation === 'portrait' ? 'PORTRAIT' : 'LANDSCAPE_LEFT' },
 			{ waitForAnimationToEnd: { timeout: 5000 } },
 		];
 	if ('back' in action)
@@ -526,6 +549,10 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 	const appearance = rung.steps.some((step) => looksOnly(step.do))
 		? [{ setDarkMode: 'disabled' }]
 		: [];
+	// A rung that turns the phone starts upright, whatever the device was left in.
+	const upright = rung.steps.some((step) => step.do && 'orientation' in step.do)
+		? [{ setOrientation: 'PORTRAIT' }]
+		: [];
 	// The Settings app keeps its place between runs; stopping it makes it open at its root every time.
 	const visitsSettings = rung.steps.some((step) => step.do && 'settings' in step.do);
 	return rung.steps.map((step, index) => {
@@ -541,7 +568,7 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 					]
 				: []),
 			...(index === 0 && rung.location ? [{ setLocation: rung.location }] : []),
-			...(index === 0 ? [...launch, ...appearance] : []),
+			...(index === 0 ? [...launch, ...appearance, ...upright] : []),
 			...(step.do ? actionCommands(step.do, step) : []),
 			...(index > 0
 				? assertions({

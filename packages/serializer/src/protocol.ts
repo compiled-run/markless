@@ -422,6 +422,12 @@ export type ProtocolStreamedArmPatch = readonly [
  * A row rebuilds when any slot value moves: its item changed under its key, or a
  * graph node a slot reads was written.
  */
+/**
+ * A `@for` key joined from fields of the row item, in order: each piece is fixed
+ * text, or a path on the item whose value is written as a template literal writes it.
+ */
+export type ProtocolRepeatKeyParts = ReadonlyArray<string | ReadonlyArray<string>>;
+
 export type ProtocolRowTemplateSlotValue =
 	| { readonly itemPath: ReadonlyArray<string> }
 	| { readonly graphNodeId: string; readonly graphPath: ReadonlyArray<string> }
@@ -583,14 +589,17 @@ export type ProtocolViewPayload = {
 		 * collection then reads the outermost enclosing collection with a `'*'`
 		 * segment for each enclosing row (`['*', 'items']`), which reads nothing on
 		 * its own and which each instance replaces with its enclosing row's index.
-		 * `repeatId` is spelled as the authoring module spells it: composition
-		 * prefixes a record's `id` but not this, so it resolves under the record's
-		 * own prefix.
+		 * `repeatId` is spelled as the authoring module spells it, which a row
+		 * reader keys on. Composition prefixes a record's `id` and adds the same
+		 * prefix to `prefix`, so the enclosing record's id is exactly
+		 * `prefix + repeatId` and this record's authored id is its `id` after `prefix`.
 		 *
 		 * Pay-per-use: a repeat inside no other repeat omits the field.
 		 */
 		readonly enclosingRow?: {
 			readonly repeatId: string;
+			/** What composition put in front of this record's `id`; absent while it put nothing. */
+			readonly prefix?: string;
 			readonly parentHostPath: ProtocolElementAddress;
 			readonly itemPath?: ReadonlyArray<string>;
 			/** The parent sits in an arm of the enclosing row's `@if`/`@switch`, as on a row event: `parentHostPath` is then arm-relative. */
@@ -599,6 +608,12 @@ export type ProtocolViewPayload = {
 		readonly collectionGraphNodeId?: string;
 		readonly collectionPath: ReadonlyArray<string>;
 		readonly keyPath: ReadonlyArray<string>;
+		/**
+		 * A key joined from the row's own fields (`` key `${line.id}:${line.size}` ``):
+		 * `keyPath` is then empty and is not the key. Pay-per-use: a key that is one
+		 * path on the item omits the field.
+		 */
+		readonly keyParts?: ProtocolRepeatKeyParts;
 		/**
 		 * `key i`: a row's key is its position, not a value read off the item.
 		 * Pay-per-use: a repeat keyed by item data omits the field.

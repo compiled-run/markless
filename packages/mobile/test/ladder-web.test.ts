@@ -229,24 +229,30 @@ async function drag(page: Page, on: string, direction: 'right' | 'up') {
 async function act(page: Page, step: LadderStep) {
 	const action = step.do;
 	if (!action) return;
-	if ('tap' in action) {
+	if ('tap' in action || 'doubleTap' in action) {
+		const tap = 'tap' in action ? action.tap : action.doubleTap;
 		// A text that is also a control's accessible name (a label and the switch it names) taps the control, as on a phone;
 		// a button named by its own text comes first, over a region its heading also names.
-		const button = page.getByRole('button', { name: action.tap, exact: true });
-		const named = page.getByLabel(action.tap, { exact: true });
-		await (
+		const button = page.getByRole('button', { name: tap, exact: true });
+		const named = page.getByLabel(tap, { exact: true });
+		const target =
 			(await button.count()) === 1
 				? button
 				: (await named.count()) === 1
 					? named
-					: shown(page, action.tap)
-		).click();
+					: shown(page, tap);
+		await ('tap' in action ? target.click() : target.dblclick());
 	} else if ('type' in action) {
 		const field = page.getByRole('textbox', { name: action.type.field, exact: true });
 		await field.fill('');
 		await field.pressSequentially(action.type.text);
 	} else if ('submit' in action)
 		await page.getByRole('textbox', { name: action.submit, exact: true }).press('Enter');
+	else if ('erase' in action) {
+		const field = page.getByRole('textbox', { name: action.erase, exact: true });
+		await field.press('End');
+		await field.press('Backspace');
+	}
 	else if ('choose' in action)
 		await page
 			.getByRole('combobox', { name: action.choose.field, exact: true })
@@ -262,6 +268,15 @@ async function act(page: Page, step: LadderStep) {
 	}
 	else if ('drag' in action) await drag(page, action.drag.on, action.drag.direction);
 	else if ('appearance' in action) await page.emulateMedia({ colorScheme: action.appearance });
+	else if ('orientation' in action) {
+		const { width, height } = page.viewportSize()!;
+		const [short, long] = width < height ? [width, height] : [height, width];
+		await page.setViewportSize(
+			action.orientation === 'portrait'
+				? { width: short, height: long }
+				: { width: long, height: short },
+		);
+	}
 	else if ('swipe' in action && action.swipe !== 'up') {
 		const { from, to, until } = action.swipe;
 		for (let turn = 0; turn < (until ? SWIPES_UNTIL : 1); turn++) {
@@ -279,6 +294,10 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 		if ((await onScreenCount(page, text)) === 0) failed.push(`"${text}" is not on screen`);
 	for (const text of step.absent ?? [])
 		if ((await onScreenCount(page, text)) > 0) failed.push(`"${text}" is on screen`);
+	for (const text of step.hidden ?? []) {
+		if ((await shown(page, text).count()) === 0) failed.push(`"${text}" is not on the page`);
+		else if ((await onScreenCount(page, text)) > 0) failed.push(`"${text}" is on screen`);
+	}
 	for (const text of step.offScreen ?? []) {
 		if ((await shown(page, text).count()) === 0) failed.push(`"${text}" is not on the page`);
 		else if ((await onScreenCount(page, text)) > 0) failed.push(`"${text}" is on screen`);

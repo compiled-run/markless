@@ -1,10 +1,10 @@
 {
 	"perPage": {
-		"/": 42586,
-		"/ sheet:component-edge:0 at 0.5": 22911,
-		"/ sheet:component-edge:0 at 1": 22913
+		"/": 42583,
+		"/ sheet:component-edge:0 at 0.5": 22908,
+		"/ sheet:component-edge:0 at 1": 22910
 	},
-	"perPageTotal": 88410,
+	"perPageTotal": 88401,
 	"app": 63394,
 	"targets": {
 		"ios": {

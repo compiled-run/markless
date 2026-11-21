@@ -1,9 +1,9 @@
 {
 	"perPage": {
-		"/": 55008,
-		"/boats": 55163
+		"/": 55005,
+		"/boats": 55160
 	},
-	"perPageTotal": 110171,
+	"perPageTotal": 110165,
 	"app": 97281,
 	"targets": {
 		"ios": {

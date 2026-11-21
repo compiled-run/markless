@@ -183,21 +183,27 @@ The hosts look a band up with Dragon's own translated lookup (`rt-band`, Chrome'
 of slack, orientation from the truncated size) on the page area in device px, with a phone's readings (coarse pointer, no
 hover). On a size change the host lays every assignment out at the new size, then moves to the new band's assignment, as a
 state change, so no frame shows the old band at the new size. Rung S14 (`proofs/s14-width-media/`): cards in a column that
-become a row from `min-width: 600px`, a `max-width: 399px` padding, a `(400px <= width < 700px)` note and a paragraph shown
-only in `(orientation: landscape)`; ten bands.
+become a row from `min-width: 600px`, a `max-width: 399px` padding and a `(400px <= width < 700px)` note. Rung S15
+(`proofs/s15-orientation/`): a paragraph shown only upright and one shown only in `(orientation: landscape)`; its flow turns the
+phone to landscape and back (the ladder's `orientation` step), and each text follows on both phones.
 
-S14's band, picked by the phone, in portrait then landscape (and back to the portrait band after the second rotation), every
-box matching the phone's browser (worst 0.67 device px):
+S14 and S15 are separate because Dragon's layout check (`--layout-check`) refuses a page that reads `orientation`: a phone's
+page area is not the browser's 100vh, and the check refuses any page whose layout reads the viewport's height. S15 is
+therefore proven by its texts, not by box comparison.
 
-| Device | Portrait: width, band | Landscape: width, band |
+S14's band, picked by the phone, in portrait and after rotating to landscape, every box matching the phone's browser
+(2026-11-20, `7c1559569` with the split, Dragon `b70e9530b3` plus the web-column fix below; 10 of 10 boxes within 1 device px):
+
+| Device | Portrait: page area, worst | Landscape: page area, worst |
 | --- | --- | --- |
-| iPhone SE | 375, 1 (max-width 399) | 667, 6 (min-width 600, 400 to 699, landscape) |
-| iPhone 17 / Pro Max | 402 / 440, 5 (400 to 699) | 750 / 832, 8 (min-width 600, landscape) |
-| iPad | 820, 9 (min-width 600) | 1180, 8 |
-| Small Android | 360, 1 | 640, 6 |
-| Pixel 7 / Pixel 9 Pro XL | 412 / 448, 5 | 863 / 945, 8 |
-| Pixel Tablet | 800, 9 | 1280, 8 |
+| iPhone 17 (3x) | 402 x 754, 0.01 | 750 x 402, 0.03 |
+| Pixel 7 (2.625x) | 412 x 839, 0.50 | 863 x 360, 0.38 |
+
+Dragon's web column on `b70e9530b3` cannot compare any page with a width band: it sets the device's appearance from each
+band through `schemeOf`, which refuses a band that reads anything but `prefers-color-scheme`. The fix reads only a band's
+colour-scheme conditions (the phone supplies its size); it is a Dragon change of its own. An earlier S14 measurement, which
+also read orientation, on more devices (iPhone SE, iPad, small Android, Pixel 9 Pro XL, Pixel Tablet; worst 0.67 device px)
+was taken with a Dragon from before that path.
 
 Known gap: a `height` or `aspect-ratio` query reads the app's page area, which is not the browser's (small Android phone: 536
-against Chrome's 592), so such a page can pick a different band than the browser near a threshold; S14 queries width and
-orientation only.
+against Chrome's 592), so such a page can pick a different band than the browser near a threshold.

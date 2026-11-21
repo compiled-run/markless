@@ -289,6 +289,9 @@ function mirror(
 			expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 			for (const text of step.absent ?? [])
 				expect(shown, `step ${index}`).not.toContain(text);
+			// Which texts a page's styles hide is Dragon's layout; the payload must still hold them.
+			for (const text of step.hidden ?? [])
+				expect([...open.values()], `step ${index}`).toContain(text);
 			if (step.order)
 				expect(shown.filter((text) => step.order!.includes(text))).toEqual(step.order);
 			if (step.title !== undefined)
@@ -371,8 +374,11 @@ function walkApp(
 				`step ${index}: Back journals only what it cancels`,
 			).toEqual([]);
 			stack.pop();
-		} else if (looksOnly(action) || (action && ('swipe' in action || 'scrollTo' in action))) {
-			// Neither the appearance nor a sheet's resting height or scroll changes state: the hosts restyle and lay out.
+		} else if (
+			looksOnly(action) ||
+			(action && ('swipe' in action || 'scrollTo' in action || 'orientation' in action))
+		) {
+			// Neither the appearance, a rotation, nor a sheet's resting height or scroll changes state: the hosts restyle and lay out.
 		} else if (action) {
 			const top = stack.at(-1)!;
 			const host = top.elementReading(
@@ -467,6 +473,8 @@ function walk(
 	const services = scriptServices();
 	// The device's clock: a second passes between a person's actions.
 	let clock = Date.now();
+	/** The text field that has the keyboard, if any. */
+	let focused: string | undefined;
 	const start = () => {
 		const r = createNativeRuntime(payload, store, params, undefined, () => clock, services.host);
 		for (const cell of payload.cells)
@@ -621,6 +629,12 @@ function walk(
 						.join(' '));
 		return label !== null && shownNode(node.id) ? [[id, label] as const] : [];
 	};
+	// A text field by its accessible name, as the web finds a textbox: a control named the same (a preview button) is not one.
+	const fieldReading = (text: string) =>
+		labels().find(([id, label]) => {
+			const element = nodeOf.get(id.split('@')[0]!);
+			return label === text && element?.kind === 'element' && (element.element === 'input' || element.element === 'textarea');
+		})?.[0] ?? elementReading(text);
 	const elementReading = (text: string) => {
 		const labelled = labels().find(([, label]) => label === text)?.[0];
 		if (labelled) return labelled;
@@ -933,7 +947,7 @@ function walk(
 			for (let n = 1; n <= moves; n++) out.push(...touch('pointermove', n));
 			out.push(...touch(action.drag.scrolls ? 'pointercancel' : 'pointerup', moves));
 			apply(out, index);
-		} else if (action && !('tap' in action) && !('type' in action) && !('submit' in action) && !('dismissSheet' in action))
+		} else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
 			const sheet = openSheet(index);
@@ -944,8 +958,16 @@ function walk(
 			apply(runtime.dispatch({ event: 'dismiss', host: sheet }), index);
 		} else if (action) {
 			const name =
-				'tap' in action ? action.tap : 'type' in action ? action.type.field : action.submit;
-			const host = elementReading(name);
+				'tap' in action
+					? action.tap
+					: 'doubleTap' in action
+						? action.doubleTap
+						: 'type' in action
+						? action.type.field
+						: 'erase' in action
+							? action.erase
+							: action.submit;
+			const host = 'tap' in action || 'doubleTap' in action ? elementReading(name) : fieldReading(name);
 			if (!host)
 				throw new Error(
 					`step ${index}: nothing reads "${name}" to ${'tap' in action ? 'tap' : 'type into'}`,
@@ -971,14 +993,19 @@ function walk(
 						]
 					: [];
 			apply(touched, index);
+			// A touch reaches the nearest element around it that handles a press, as on a phone; a row's copy (`<id>@<key>`)
+			// climbs through its node's parents, keeping the key while they are in the same row.
+			const at = host.indexOf('@');
+			const key = at < 0 ? '' : host.slice(at);
+			let node: string | null | undefined = at < 0 ? host : host.slice(0, at);
 			let pressed: string | null | undefined = host;
 			while (
-				pressed &&
-				!payload.events.some(
-					(event) => event.host === pressed && event.event === 'activate',
-				)
-			)
-				pressed = nodeOf.get(pressed)?.parent;
+				node &&
+				!payload.events.some((event) => event.host === node && event.event === 'activate')
+			) {
+				node = nodeOf.get(node)?.parent;
+				pressed = node && nodeOf.get(node)?.row ? `${node}${key}` : node;
+			}
 			// The return key in a field that submits nothing only puts the keyboard away.
 			const returns = payload.events.some(
 				(event) => event.host === host && event.event === 'enter',
@@ -987,16 +1014,54 @@ function walk(
 			const activates = !!pressed || host.includes('@');
 			if ('tap' in action && !activates && touched.length === 0)
 				throw new Error(`step ${index}: "${name}" is not a control and the press changed nothing`);
+			// A field takes the keyboard when typed into, and gives it up when anything else is tapped: its focus and blur run.
+			const handles = (node: string, event: 'input' | 'focus' | 'blur' | 'keydown') =>
+				payload.events.some((candidate) => candidate.host === node.split('@')[0] && candidate.event === event);
+			if ('type' in action && focused !== host) {
+				if (focused && handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
+				focused = host;
+				if (handles(host, 'focus')) apply(runtime.dispatch({ event: 'focus', host }), index);
+			}
+			if (('tap' in action || 'doubleTap' in action) && focused && focused !== host) {
+				if (handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
+				focused = undefined;
+			}
+			// Backspace with the cursor at the end takes the last character; the input event then runs the handler.
+			const erased = (field: string): ReturnType<typeof runtime.dispatch> => {
+				const text = [...fieldText(field)].slice(0, -1).join('');
+				if (properties.has(field)) properties.set(field, text);
+				else typed.set(field, text);
+				return handles(field, 'input') ? runtime.dispatch({ event: 'input', host: field, value: text }) : [];
+			};
+			// A key runs the field's keydown handler first; preventDefault() there leaves out what the key does.
+			const keyed = (key: string): boolean => {
+				if (!handles(host, 'keydown')) return false;
+				const journal = runtime.dispatch({ event: 'keydown', host, key });
+				apply(journal, index);
+				return journal.some((entry) => entry.op === 'preventDefault');
+			};
+			if ('type' in action) for (const key of action.type.text) keyed(key);
+			// A double tap is two presses, the second counted 2.
+			if ('doubleTap' in action)
+				apply(runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 1 }), index);
 			const dispatched =
 				'tap' in action
 					? activates
 						? runtime.dispatch({ event: 'activate', host: pressed ?? host })
 						: []
+					: 'doubleTap' in action
+						? runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 2 })
 					: 'type' in action
-						? runtime.dispatch({ event: 'input', host, value: text! })
-						: returns
-							? runtime.dispatch({ event: 'enter', host })
-							: [];
+						? handles(host, 'input')
+							? runtime.dispatch({ event: 'input', host, value: text! })
+							: []
+						: 'erase' in action
+							? keyed('Backspace') || fieldText(host) === ''
+								? []
+								: erased(host)
+							: keyed('Enter') || !returns
+								? []
+								: runtime.dispatch({ event: 'enter', host });
 			apply(dispatched, index);
 		}
 		raiseLoadEvents(index);
@@ -1020,7 +1085,7 @@ function walk(
 	function check(index: number, step: LadderStep) {
 		expect(invalid, `step ${index}: the message of a blocked submit`).toBe(step.invalid);
 		for (const [field, value] of Object.entries(step.fields ?? {})) {
-			const host = elementReading(field);
+			const host = fieldReading(field);
 			expect(host && fieldText(host), `step ${index}: the field "${field}"`).toBe(value);
 		}
 		if (step.calls) expect(calls, `step ${index}: the device calls made`).toEqual(step.calls);

@@ -1,0 +1,30 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "u24-pagination-links",
+			"failure": null,
+			"installSeconds": 1.6955887500000026,
+			"flowSeconds": 16.258100667000004
+		},
+		{
+			"name": "u11-pagination",
+			"failure": null,
+			"installSeconds": 1.7041935830000001,
+			"flowSeconds": 22.145541375
+		},
+		{
+			"name": "u14-gridlist",
+			"failure": null,
+			"installSeconds": 1.6959524579999998,
+			"flowSeconds": 20.438651374999985
+		},
+		{
+			"name": "u1-base",
+			"failure": null,
+			"installSeconds": 1.594930624999979,
+			"flowSeconds": 14.264391375000006
+		}
+	]
+}

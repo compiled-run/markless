@@ -1,0 +1,42 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "u22-radio-group",
+			"failure": null,
+			"installSeconds": 3.1838867919999974,
+			"flowSeconds": 33.379015167
+		},
+		{
+			"name": "u25-textbox-textarea",
+			"failure": null,
+			"installSeconds": 0.30222729199999593,
+			"flowSeconds": 25.590194042000018
+		},
+		{
+			"name": "u13-accordion",
+			"failure": null,
+			"installSeconds": 0.2930221250000177,
+			"flowSeconds": 47.27461491599999
+		},
+		{
+			"name": "f4-required",
+			"failure": null,
+			"installSeconds": 0.28758662499999627,
+			"flowSeconds": 31.31991495800001
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 0.3443073749999749,
+			"flowSeconds": 21.108078750000043
+		},
+		{
+			"name": "u1-base",
+			"failure": null,
+			"installSeconds": 0.2879153750000405,
+			"flowSeconds": 23.50458491699997
+		}
+	]
+}

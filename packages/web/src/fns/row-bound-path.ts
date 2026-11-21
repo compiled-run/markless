@@ -5,6 +5,10 @@ import {
 	marklessPageSpaceId,
 	type MarklessWidgetRegistry,
 } from './instance-scope.ts';
+import type { ProtocolRepeatKeyParts } from '@markless/serializer/protocol';
+
+// False when no @for of the app joins its key from fields, so each joined-key branch folds away.
+declare const __MARKLESS_JOINED_KEYS__: boolean;
 
 type RowBoundRow = {
 	readonly instancePath?: string;
@@ -111,6 +115,7 @@ type RowLocalRoute = {
 	readonly rows?: ReadonlyArray<{
 		readonly rowIndex: number;
 		readonly keyPath: ReadonlyArray<string>;
+		readonly keyParts?: ProtocolRepeatKeyParts;
 		readonly indexKey?: true;
 		readonly graphNodeId?: string;
 		readonly collectionPath?: ReadonlyArray<string>;
@@ -142,7 +147,9 @@ export function marklessRowLocal(
 		const items = collection == null ? [] : Array.from(collection as Iterable<unknown>);
 		item = step.indexKey
 			? items[Number(key)]
-			: items.find((candidate) => String(valueAt(candidate, step.keyPath)) === key);
+			: (typeof __MARKLESS_JOINED_KEYS__ === 'undefined' || __MARKLESS_JOINED_KEYS__) && step.keyParts
+				? items.find((candidate) => step.keyParts!.map((p) => (typeof p == 'string' ? p : `${valueAt(candidate, p)}`)).join('') === key)
+				: items.find((candidate) => String(valueAt(candidate, step.keyPath)) === key);
 	}
 	return item;
 }
