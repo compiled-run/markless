@@ -254,8 +254,8 @@
 			}
 		],
 		"script": {
-			"id": "9da0f46e65227336",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n for (const part of [event.clientX, event.clientY]) __s.log = __s.log + ' pad:' + part;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"9da0f46e65227336\");\n",
+			"id": "0bf76302e97d20e4",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n for (const part of [event.clientX, event.clientY]) __s.log = __s.log + ' pad:' + part;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"0bf76302e97d20e4\");\n",
 			"services": []
 		}
 	},

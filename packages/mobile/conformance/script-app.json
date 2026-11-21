@@ -248,8 +248,8 @@
 						}
 					],
 					"script": {
-						"id": "3709a3f6d652d31c",
-						"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => (__s.stamp = new Date(Date.UTC(2026, 10, 18)).toISOString()));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"3709a3f6d652d31c\");\n",
+						"id": "73976e12d4d16e9e",
+						"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => (__s.stamp = new Date(Date.UTC(2026, 10, 18)).toISOString()));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"73976e12d4d16e9e\");\n",
 						"services": []
 					}
 				}

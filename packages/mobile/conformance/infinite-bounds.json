@@ -224,8 +224,8 @@
 			}
 		],
 		"script": {
-			"id": "7f4281975659048f",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction describe(limit) {\n let words = '';\n for (const part of [limit > 1000 ? 'huge' : 'small', Number.isFinite(limit) ? 'bounded' : 'unbounded']) words += `${part} `;\n return words.trim();\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn function () {\nreturn (describe(__s.box.max));\n};\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"7f4281975659048f\");\n",
+			"id": "8bcfacab1b255e6d",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction describe(limit) {\n let words = '';\n for (const part of [limit > 1000 ? 'huge' : 'small', Number.isFinite(limit) ? 'bounded' : 'unbounded']) words += `${part} `;\n return words.trim();\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn function () {\nreturn (describe(__s.box.max));\n};\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"8bcfacab1b255e6d\");\n",
 			"services": []
 		}
 	},

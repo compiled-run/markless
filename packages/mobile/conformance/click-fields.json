@@ -133,8 +133,8 @@
 			}
 		],
 		"script": {
-			"id": "4b454e949a3763d2",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n const how = event.isTrusted ? 'Tapped' : 'Scripted';\n const where = event.clientX > 0 && event.clientY > 0 ? 'at a point' : 'at 0, 0';\n const keys = event.shiftKey || event.ctrlKey || event.altKey || event.metaKey ? 'with a key' : 'no key held';\n __s.last = `${how} ${where}, ${keys}`;\n});\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => __s.spot?.click());\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"4b454e949a3763d2\");\n",
+			"id": "66780018572859e0",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n const how = event.isTrusted ? 'Tapped' : 'Scripted';\n const where = event.clientX > 0 && event.clientY > 0 ? 'at a point' : 'at 0, 0';\n const keys = event.shiftKey || event.ctrlKey || event.altKey || event.metaKey ? 'with a key' : 'no key held';\n __s.last = `${how} ${where}, ${keys}`;\n});\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => __s.spot?.click());\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"66780018572859e0\");\n",
 			"services": []
 		},
 		"tapPoints": true

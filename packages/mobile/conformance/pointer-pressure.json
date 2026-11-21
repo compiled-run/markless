@@ -183,8 +183,8 @@
 			}
 		],
 		"script": {
-			"id": "126813901b286502",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0,\"fn:2\":0,\"fn:3\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n __s.down = event.pressure > 0 && event.pressure <= 1 ? 'Pressed with pressure' : `Pressure ${event.pressure}`;\n});\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn ((event) => {\n if (event.buttons > 0) __s.moved = event.getCoalescedEvents().length > 0 ? 'Coalesced moves' : 'No coalesced';\n});\n};\nfunctions[\"fn:2\"] = function (__s) {\nreturn ((event) => (__s.up = `Lifted at ${event.pressure}`));\n};\nfunctions[\"fn:3\"] = function (__s) {\nreturn ((event) => (__s.up = `Lifted at ${event.pressure}`));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"126813901b286502\");\n",
+			"id": "522a87b4d9c8da30",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0,\"fn:2\":0,\"fn:3\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n __s.down = event.pressure > 0 && event.pressure <= 1 ? 'Pressed with pressure' : `Pressure ${event.pressure}`;\n});\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn ((event) => {\n if (event.buttons > 0) __s.moved = event.getCoalescedEvents().length > 0 ? 'Coalesced moves' : 'No coalesced';\n});\n};\nfunctions[\"fn:2\"] = function (__s) {\nreturn ((event) => (__s.up = `Lifted at ${event.pressure}`));\n};\nfunctions[\"fn:3\"] = function (__s) {\nreturn ((event) => (__s.up = `Lifted at ${event.pressure}`));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"522a87b4d9c8da30\");\n",
 			"services": []
 		}
 	},

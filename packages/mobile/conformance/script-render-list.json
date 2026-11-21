@@ -137,8 +137,8 @@
 			}
 		],
 		"script": {
-			"id": "01d35f586209e30c",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [load(1)];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn function () {\nreturn (__i[0][\"byLength\"](__s.words));\n};\n};\n};\nmodules[1] = function (exports) {\n\"use strict\";\nvar __i = [];\n__export(exports, {\n\"byLength\": function () { return byLength; }\n});\nfunction byLength(words) {\n return [...words].sort((a, b) => a.length - b.length || (a < b ? -1 : a > b ? 1 : 0));\n}\n};\n/*markless-engine:entries*/\n})(globalThis, \"01d35f586209e30c\");\n",
+			"id": "1936a0046545bf06",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [load(1)];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn function () {\nreturn (__i[0][\"byLength\"](__s.words));\n};\n};\n};\nmodules[1] = function (exports) {\n\"use strict\";\nvar __i = [];\n__export(exports, {\n\"byLength\": function () { return byLength; }\n});\nfunction byLength(words) {\n return [...words].sort((a, b) => a.length - b.length || (a < b ? -1 : a > b ? 1 : 0));\n}\n};\n/*markless-engine:entries*/\n})(globalThis, \"1936a0046545bf06\");\n",
 			"services": []
 		}
 	},

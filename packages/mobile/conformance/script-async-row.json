@@ -351,8 +351,8 @@
 			}
 		],
 		"script": {
-			"id": "c4ff14a0d8c52136",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction answerAfter(question, wait) {\n return new Promise((resolve, reject) => {\n  setTimeout(() => {\n   if (question === 'riddle') reject(new Error('No answer for the riddle')); else resolve('The answer is 42');\n  }, wait);\n });\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn (async function() {\n return answerAfter(__s.question, 2000);\n}.bind(this));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"c4ff14a0d8c52136\");\n",
+			"id": "a9eafc1ce14ed174",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction answerAfter(question, wait) {\n return new Promise((resolve, reject) => {\n  setTimeout(() => {\n   if (question === 'riddle') reject(new Error('No answer for the riddle')); else resolve('The answer is 42');\n  }, wait);\n });\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn (async function() {\n return answerAfter(__s.question, 2000);\n}.bind(this));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"a9eafc1ce14ed174\");\n",
 			"services": [
 				"timers"
 			]

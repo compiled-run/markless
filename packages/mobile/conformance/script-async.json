@@ -307,8 +307,8 @@
 			}
 		],
 		"script": {
-			"id": "1dc82451941afa0d",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction later(ms) {\n return new Promise((resolve) => setTimeout(resolve, ms));\n}\nasync function lookup(word) {\n await later(5000);\n if (word === 'missing') throw new Error(`No entry for ${word}`);\n return word.toUpperCase();\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn (async function() {\n __s.steps++;\n __s.result = await lookup('found');\n __s.steps++;\n}.bind(this));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (async function() {\n __s.steps++;\n __s.result = await lookup('missing');\n __s.steps++;\n}.bind(this));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"1dc82451941afa0d\");\n",
+			"id": "0abb993dc3830377",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction later(ms) {\n return new Promise((resolve) => setTimeout(resolve, ms));\n}\nasync function lookup(word) {\n await later(5000);\n if (word === 'missing') throw new Error(`No entry for ${word}`);\n return word.toUpperCase();\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn (async function() {\n __s.steps++;\n __s.result = await lookup('found');\n __s.steps++;\n}.bind(this));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (async function() {\n __s.steps++;\n __s.result = await lookup('missing');\n __s.steps++;\n}.bind(this));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"0abb993dc3830377\");\n",
 			"services": [
 				"timers"
 			]

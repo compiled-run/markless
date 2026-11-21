@@ -342,8 +342,8 @@
 			}
 		],
 		"script": {
-			"id": "cdbb1aba05f9d0de",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction focusChosen(options, fromEnd) {\n if (!options) return;\n let wanted;\n let end;\n for (const option of options) {\n  if (option.getAttribute('aria-disabled') === 'true') continue;\n  if (wanted === undefined && option.getAttribute('aria-selected') === 'true') wanted = option;\n  if (fromEnd) end = option; else if (end === undefined) end = option;\n }\n wanted ??= end;\n wanted?.focus();\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => focusChosen(__s.options, false));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => focusChosen(__s.options, true));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"cdbb1aba05f9d0de\");\n",
+			"id": "5777ff6e589fe07c",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction focusChosen(options, fromEnd) {\n if (!options) return;\n let wanted;\n let end;\n for (const option of options) {\n  if (option.getAttribute('aria-disabled') === 'true') continue;\n  if (wanted === undefined && option.getAttribute('aria-selected') === 'true') wanted = option;\n  if (fromEnd) end = option; else if (end === undefined) end = option;\n }\n wanted ??= end;\n wanted?.focus();\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => focusChosen(__s.options, false));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => focusChosen(__s.options, true));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"5777ff6e589fe07c\");\n",
 			"services": []
 		}
 	},

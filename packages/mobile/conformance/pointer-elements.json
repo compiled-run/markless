@@ -162,8 +162,8 @@
 			}
 		],
 		"script": {
-			"id": "6a163ccaf6e8ba9c",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n const names = [];\n for (const element of [event.target, event.currentTarget]) names.push((element).getAttribute('data-name') ?? '?');\n const came = event.relatedTarget;\n const card = event.currentTarget;\n __s.log = `${names.join(' in ')} from ${came !== null && card.contains(came) ? 'inside' : 'outside'}`;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"6a163ccaf6e8ba9c\");\n",
+			"id": "2e128c9e64b73176",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n const names = [];\n for (const element of [event.target, event.currentTarget]) names.push((element).getAttribute('data-name') ?? '?');\n const came = event.relatedTarget;\n const card = event.currentTarget;\n __s.log = `${names.join(' in ')} from ${came !== null && card.contains(came) ? 'inside' : 'outside'}`;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"2e128c9e64b73176\");\n",
 			"services": []
 		}
 	},

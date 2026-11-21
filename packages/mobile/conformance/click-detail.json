@@ -113,8 +113,8 @@
 			}
 		],
 		"script": {
-			"id": "86097fe1a8d2ea87",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n let marks = '';\n for (let press = 0; press < event.detail; press++) marks += '*';\n __s.last = event.detail === 0 ? 'Count 0, no press' : `Count ${event.detail} ${marks}`;\n});\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => __s.spot?.click());\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"86097fe1a8d2ea87\");\n",
+			"id": "15d587f5675fe66d",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n let marks = '';\n for (let press = 0; press < event.detail; press++) marks += '*';\n __s.last = event.detail === 0 ? 'Count 0, no press' : `Count ${event.detail} ${marks}`;\n});\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => __s.spot?.click());\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"15d587f5675fe66d\");\n",
 			"services": []
 		}
 	},

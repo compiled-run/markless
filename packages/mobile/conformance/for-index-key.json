@@ -208,8 +208,8 @@
 			}
 		],
 		"script": {
-			"id": "f33adb0298b1e442",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction linesOf(text) {\n return text.split('\\n');\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn function () {\nreturn (linesOf(__s.text));\n};\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => (__s.text = __s.text.slice(0, __s.text.lastIndexOf('\\n'))));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"f33adb0298b1e442\");\n",
+			"id": "705381769eaa1568",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction linesOf(text) {\n return text.split('\\n');\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn function () {\nreturn (linesOf(__s.text));\n};\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => (__s.text = __s.text.slice(0, __s.text.lastIndexOf('\\n'))));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"705381769eaa1568\");\n",
 			"services": []
 		}
 	},

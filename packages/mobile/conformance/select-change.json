@@ -286,8 +286,8 @@
 			}
 		],
 		"script": {
-			"id": "582e5f502f052372",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction shout(text) {\n let out = '';\n for (const letter of text) out += letter.toUpperCase();\n return out;\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => (__s.size = shout(event.currentTarget.value)));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"582e5f502f052372\");\n",
+			"id": "84fcdb1c2bd3f658",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction shout(text) {\n let out = '';\n for (const letter of text) out += letter.toUpperCase();\n return out;\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => (__s.size = shout(event.currentTarget.value)));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"84fcdb1c2bd3f658\");\n",
 			"services": []
 		}
 	},

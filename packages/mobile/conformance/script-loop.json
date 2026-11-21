@@ -191,8 +191,8 @@
 			}
 		],
 		"script": {
-			"id": "28db29eeacaa89e8",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction slug(title) {\n let out = '';\n let dash = false;\n for (const char of title.toLowerCase()) {\n  const kept = (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9');\n  if (kept) {\n   out += char;\n   dash = false;\n  } else if (!dash && out.length > 0) {\n   out += '-';\n   dash = true;\n  }\n }\n return dash ? out.slice(0, -1) : out;\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => {\n __s.made = slug(__s.title);\n let count = 0;\n for (const part of __s.title.split(' ')) if (part.length > 0) count++;\n __s.words = count;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"28db29eeacaa89e8\");\n",
+			"id": "8d786a22937e8efa",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction slug(title) {\n let out = '';\n let dash = false;\n for (const char of title.toLowerCase()) {\n  const kept = (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9');\n  if (kept) {\n   out += char;\n   dash = false;\n  } else if (!dash && out.length > 0) {\n   out += '-';\n   dash = true;\n  }\n }\n return dash ? out.slice(0, -1) : out;\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => {\n __s.made = slug(__s.title);\n let count = 0;\n for (const part of __s.title.split(' ')) if (part.length > 0) count++;\n __s.words = count;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"8d786a22937e8efa\");\n",
 			"services": []
 		}
 	},

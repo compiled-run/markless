@@ -185,8 +185,8 @@
 			}
 		],
 		"script": {
-			"id": "ee881b93eee027c7",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (async function() {\n __s.status = 'loading';\n const response = await fetch('http://127.0.0.1:28761/j4/echo?word=native', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'hello' });\n const text = await response.text();\n __s.status = `${response.status} ${text}`;\n}.bind(this));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => {\n __s.ticking = 'yes';\n const id = setInterval(() => {\n  __s.ticks++;\n  if (__s.ticks >= 3) {\n   clearInterval(id);\n   __s.ticking = 'done';\n  }\n }, 1500);\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"ee881b93eee027c7\");\n",
+			"id": "8a13a227ae970bc5",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (async function() {\n __s.status = 'loading';\n const response = await fetch('http://127.0.0.1:28761/j4/echo?word=native', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'hello' });\n const text = await response.text();\n __s.status = `${response.status} ${text}`;\n}.bind(this));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => {\n __s.ticking = 'yes';\n const id = setInterval(() => {\n  __s.ticks++;\n  if (__s.ticks >= 3) {\n   clearInterval(id);\n   __s.ticking = 'done';\n  }\n }, 1500);\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"8a13a227ae970bc5\");\n",
 			"services": [
 				"fetch",
 				"timers"

@@ -150,8 +150,8 @@
 			}
 		],
 		"script": {
-			"id": "d75e0e76a90b2fc6",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nconst NAV = [{ kind: 'section', title: 'Start', pages: ['Install', 'First app'] }, { kind: 'link', title: 'Blog', pages: [] }, { kind: 'section', title: 'Guides', pages: ['State', 'Lists', 'Forms'] }];\nconst SECTIONS = NAV.flatMap((entry) => (entry.kind === 'section' ? [entry] : []));\nfunctions[\"fn:0\"] = function (__s) {\nconst rows = (section) => ({ title: __s.wide ? section.title.toUpperCase() : section.title, count: section.pages.length });\nconst sections = SECTIONS.map(rows);\nreturn function () {\nreturn (sections);\n};\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"d75e0e76a90b2fc6\");\n",
+			"id": "fd0bd94ac23b4844",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nconst NAV = [{ kind: 'section', title: 'Start', pages: ['Install', 'First app'] }, { kind: 'link', title: 'Blog', pages: [] }, { kind: 'section', title: 'Guides', pages: ['State', 'Lists', 'Forms'] }];\nconst SECTIONS = NAV.flatMap((entry) => (entry.kind === 'section' ? [entry] : []));\nfunctions[\"fn:0\"] = function (__s) {\nconst rows = (section) => ({ title: __s.wide ? section.title.toUpperCase() : section.title, count: section.pages.length });\nconst sections = SECTIONS.map(rows);\nreturn function () {\nreturn (sections);\n};\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"fd0bd94ac23b4844\");\n",
 			"services": []
 		}
 	},

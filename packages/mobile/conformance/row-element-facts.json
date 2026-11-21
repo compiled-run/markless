@@ -138,8 +138,8 @@
 			}
 		],
 		"script": {
-			"id": "3b8a87b15bdbaddd",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n __s.seen = `pressed ${event.currentTarget.getAttribute('data-name')}`;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"3b8a87b15bdbaddd\");\n",
+			"id": "c3351185189bcd9f",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n __s.seen = `pressed ${event.currentTarget.getAttribute('data-name')}`;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"c3351185189bcd9f\");\n",
 			"services": []
 		}
 	},

@@ -737,8 +737,8 @@
 			}
 		},
 		"script": {
-			"id": "adca91e6b0d46d32",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [null, load(1)];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn function () {\nreturn __i[1][\"addDraft\"].apply(undefined, __s.args);\n};\n};\n};\nmodules[1] = function (exports) {\n\"use strict\";\nvar __i = [];\n__export(exports, {\n\"addDraft\": function () { return addDraft; }\n});\nfunction addDraft(saved, draft) {\n const drafts = [...(JSON.parse(saved)), draft];\n const tags = new Set(drafts.map((one) => one.tag));\n return { saved: JSON.stringify(drafts), label: `Saved ${draft.title} (${draft.tag}): ${drafts.length} notes, ${tags.size} tags` };\n}\n};\n/*markless-engine:entries*/\n})(globalThis, \"adca91e6b0d46d32\");\n",
+			"id": "ba29f7122c940cc0",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [null, load(1)];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn function () {\nreturn __i[1][\"addDraft\"].apply(undefined, __s.args);\n};\n};\n};\nmodules[1] = function (exports) {\n\"use strict\";\nvar __i = [];\n__export(exports, {\n\"addDraft\": function () { return addDraft; }\n});\nfunction addDraft(saved, draft) {\n const drafts = [...(JSON.parse(saved)), draft];\n const tags = new Set(drafts.map((one) => one.tag));\n return { saved: JSON.stringify(drafts), label: `Saved ${draft.title} (${draft.tag}): ${drafts.length} notes, ${tags.size} tags` };\n}\n};\n/*markless-engine:entries*/\n})(globalThis, \"ba29f7122c940cc0\");\n",
 			"services": []
 		}
 	},

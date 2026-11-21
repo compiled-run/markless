@@ -167,8 +167,8 @@
 			}
 		],
 		"script": {
-			"id": "cfd595e8376dbd24",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => __s.words.split(' ').sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join(', '));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => {\n let best = '';\n for (const word of __s.words.split(' ')) if (word.length > best.length) best = word;\n return best;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"cfd595e8376dbd24\");\n",
+			"id": "03d73ac4b6d4846e",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => __s.words.split(' ').sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join(', '));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => {\n let best = '';\n for (const word of __s.words.split(' ')) if (word.length > best.length) best = word;\n return best;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"03d73ac4b6d4846e\");\n",
 			"services": []
 		}
 	},

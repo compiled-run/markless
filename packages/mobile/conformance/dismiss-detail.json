@@ -172,8 +172,8 @@
 			}
 		],
 		"script": {
-			"id": "972e4a4e26fe4d22",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n const detail = event.detail;\n const pressed = detail.pressTarget;\n const onOpener = pressed !== undefined && __s.opener !== undefined && __s.opener.contains(pressed);\n __s.last = onOpener ? `${detail.reason} on Guide` : detail.reason;\n if (!onOpener) __s.open = false;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"972e4a4e26fe4d22\");\n",
+			"id": "d936b7ca4693e4a0",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n const detail = event.detail;\n const pressed = detail.pressTarget;\n const onOpener = pressed !== undefined && __s.opener !== undefined && __s.opener.contains(pressed);\n __s.last = onOpener ? `${detail.reason} on Guide` : detail.reason;\n if (!onOpener) __s.open = false;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"d936b7ca4693e4a0\");\n",
 			"services": []
 		}
 	},

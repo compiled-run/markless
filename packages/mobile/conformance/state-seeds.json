@@ -274,8 +274,8 @@
 			}
 		],
 		"script": {
-			"id": "cd2f28da2a360c20",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nconst FRUIT = ['pear', 'fig', 'plum'];\nfunction titled(word) {\n return word.charAt(0).toUpperCase() + word.slice(1);\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn function () {\nreturn (FRUIT.map((word) => titled(word)));\n};\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"cd2f28da2a360c20\");\n",
+			"id": "2098ad76dd23a0aa",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nconst FRUIT = ['pear', 'fig', 'plum'];\nfunction titled(word) {\n return word.charAt(0).toUpperCase() + word.slice(1);\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn function () {\nreturn (FRUIT.map((word) => titled(word)));\n};\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"2098ad76dd23a0aa\");\n",
 			"services": []
 		}
 	},

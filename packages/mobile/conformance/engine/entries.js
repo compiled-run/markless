@@ -191,6 +191,7 @@ var stable = function (value) {
 	return JSON.stringify([s.json, s.nonFinite]);
 };
 var begin = function (entry) {
+	host.origin = origin;
 	elementFacts = entry.elements || {};
 	proxies = {};
 	captured = {};

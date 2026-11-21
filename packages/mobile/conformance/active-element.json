@@ -150,8 +150,8 @@
 			}
 		],
 		"script": {
-			"id": "a2b439db9efabf6d",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => {\n let held = false;\n for (const box of [__s.card]) if (box !== undefined && box.contains(document.activeElement)) held = true;\n __s.where = held ? 'inside the card' : 'outside the card';\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"a2b439db9efabf6d\");\n",
+			"id": "5678724fd92e36e7",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => {\n let held = false;\n for (const box of [__s.card]) if (box !== undefined && box.contains(document.activeElement)) held = true;\n __s.where = held ? 'inside the card' : 'outside the card';\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"5678724fd92e36e7\");\n",
 			"services": []
 		}
 	},

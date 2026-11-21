@@ -130,8 +130,11 @@ if (!host) {
 	g.fetch = function (input, init) {
 		return new Promise(function (resolve, reject) {
 			var url = typeof input === 'string' ? input : input && (input.href || input.url);
+			// A URL from the root reaches the app's site, as the web's reaches the page's origin; the phone shows no page URL.
+			if (typeof url === 'string' && host.origin && url.charAt(0) === '/')
+				url = url.charAt(1) === '/' ? host.origin.slice(0, host.origin.indexOf(':') + 1) + url : host.origin + url;
 			if (typeof url !== 'string' || !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) {
-				reject(new TypeError('Failed to parse URL from ' + String(url)));
+				reject(new TypeError('Failed to parse URL from ' + String(url) + (host.origin ? '' : ": a phone resolves a URL from the root ('/…') only against the app's origin (app.json \"origin\")")));
 				return;
 			}
 			var options = init || {};

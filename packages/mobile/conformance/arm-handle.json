@@ -308,8 +308,8 @@
 			}
 		],
 		"script": {
-			"id": "bdde02529ea0031c",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => {\n let seen = 'Script sees';\n for (const one of [__s.field]) seen += one === undefined ? ' nothing' : ' the field';\n __s.note = seen;\n __s.field?.focus();\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"bdde02529ea0031c\");\n",
+			"id": "3039a92eeb2a535e",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => {\n let seen = 'Script sees';\n for (const one of [__s.field]) seen += one === undefined ? ' nothing' : ' the field';\n __s.note = seen;\n __s.field?.focus();\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"3039a92eeb2a535e\");\n",
 			"services": []
 		}
 	},

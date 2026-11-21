@@ -375,8 +375,8 @@
 			}
 		],
 		"script": {
-			"id": "fbd31eb9bb4f861f",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0,\"fn:2\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => __s.plus?.click());\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => {\n __s.box?.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));\n});\n};\nfunctions[\"fn:2\"] = function (__s) {\nreturn (() => __s.panel?.dispatchEvent(new CustomEvent('dismiss', { detail: { reason: 'escape' } })));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"fbd31eb9bb4f861f\");\n",
+			"id": "929b9e7dbce53ec5",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0,\"fn:2\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => __s.plus?.click());\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => {\n __s.box?.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));\n});\n};\nfunctions[\"fn:2\"] = function (__s) {\nreturn (() => __s.panel?.dispatchEvent(new CustomEvent('dismiss', { detail: { reason: 'escape' } })));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"929b9e7dbce53ec5\");\n",
 			"services": []
 		}
 	},

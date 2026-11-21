@@ -187,8 +187,8 @@
 						}
 					],
 					"script": {
-						"id": "e9d3c003692ef165",
-						"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0,\"fn:2\":0};\nvar navigation = {\"here\":\"/\",\"routes\":[\"/\",\"/orders/[id]\"]};\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (async function() {\n __s.next++;\n await globalThis[\"__marklessHost\"][\"navigate\"](`/orders/${__s.next}`);\n}.bind(this));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (async function() {\n await globalThis[\"__marklessHost\"][\"navigate\"]('./');\n __s.note = 'Stayed on this page';\n}.bind(this));\n};\nfunctions[\"fn:2\"] = function (__s) {\nreturn (async function() {\n try {\n  await globalThis[\"__marklessHost\"][\"navigate\"]('/orders/../nowhere?from=desk');\n } catch (error) {\n  __s.note = (error).message;\n }\n}.bind(this));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"e9d3c003692ef165\");\n",
+						"id": "91b849a7553d467f",
+						"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0,\"fn:2\":0};\nvar navigation = {\"here\":\"/\",\"routes\":[\"/\",\"/orders/[id]\"]};\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (async function() {\n __s.next++;\n await globalThis[\"__marklessHost\"][\"navigate\"](`/orders/${__s.next}`);\n}.bind(this));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (async function() {\n await globalThis[\"__marklessHost\"][\"navigate\"]('./');\n __s.note = 'Stayed on this page';\n}.bind(this));\n};\nfunctions[\"fn:2\"] = function (__s) {\nreturn (async function() {\n try {\n  await globalThis[\"__marklessHost\"][\"navigate\"]('/orders/../nowhere?from=desk');\n } catch (error) {\n  __s.note = (error).message;\n }\n}.bind(this));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"91b849a7553d467f\");\n",
 						"services": [
 							"navigate"
 						]
@@ -302,8 +302,8 @@
 						}
 					],
 					"script": {
-						"id": "fadcdfc76762e067",
-						"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0};\nvar navigation = {\"here\":\"/orders/[id]\",\"routes\":[\"/\",\"/orders/[id]\"]};\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => globalThis[\"__marklessHost\"][\"navigate\"](String(Number(__s.params.id) + 1), { replace: true }));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"fadcdfc76762e067\");\n",
+						"id": "f6ecf313424a800d",
+						"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = {\"here\":\"/orders/[id]\",\"routes\":[\"/\",\"/orders/[id]\"]};\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => globalThis[\"__marklessHost\"][\"navigate\"](String(Number(__s.params.id) + 1), { replace: true }));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"f6ecf313424a800d\");\n",
 						"services": [
 							"navigate"
 						]

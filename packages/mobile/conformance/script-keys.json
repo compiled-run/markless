@@ -133,8 +133,8 @@
 			}
 		],
 		"script": {
-			"id": "4b1508db451dcceb",
-			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n const typed = (event.target).value;\n let known = false;\n for (const tag of __s.tags) if (tag === typed) known = true;\n if (event.key === 'Enter') {\n  event.preventDefault();\n  if (!known && typed !== '') __s.tags = [...__s.tags, typed];\n }\n __s.last = `${event.key} ${known ? 'known' : 'new'}`;\n});\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn ((event) => {\n event.preventDefault();\n const next = [...__s.tags];\n for (const part of (event.clipboardData?.getData('text') ?? '').split(',')) if (part.trim() !== '') next.push(part.trim());\n __s.tags = next;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"4b1508db451dcceb\");\n",
+			"id": "c2bb46df5386a8c1",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => {\n const typed = (event.target).value;\n let known = false;\n for (const tag of __s.tags) if (tag === typed) known = true;\n if (event.key === 'Enter') {\n  event.preventDefault();\n  if (!known && typed !== '') __s.tags = [...__s.tags, typed];\n }\n __s.last = `${event.key} ${known ? 'known' : 'new'}`;\n});\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn ((event) => {\n event.preventDefault();\n const next = [...__s.tags];\n for (const part of (event.clipboardData?.getData('text') ?? '').split(',')) if (part.trim() !== '') next.push(part.trim());\n __s.tags = next;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"c2bb46df5386a8c1\");\n",
 			"services": []
 		}
 	},
