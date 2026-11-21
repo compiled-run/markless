@@ -1,0 +1,18 @@
+{
+	"rung": 193,
+	"name": "A style value that follows state, as a number: a spacer's flex-grow pushes the end label down a column, laid out again on the phone by Dragon's plan",
+	"steps": [
+		{
+			"visible": ["Number slot", "Top label", "End label", "Middle mark", "Grow", "Grow 0"],
+			"placed": ["Top label", "End label", "Middle mark"]
+		},
+		{
+			"do": {
+				"tap": "Grow"
+			},
+			"visible": ["Grow 6"],
+			"absent": ["Grow 0"],
+			"placed": ["Top label", "Middle mark", "End label"]
+		}
+	]
+}

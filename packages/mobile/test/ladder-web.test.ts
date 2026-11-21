@@ -333,12 +333,12 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 		if (message !== step.invalid)
 			failed.push(`the focused field's validation message is ${JSON.stringify(message)}`);
 	}
-	if (step.order) {
+	for (const order of [step.order, step.placed]) {
+		if (!order) continue;
 		const tops: number[] = [];
-		for (const text of step.order)
-			tops.push((await onScreen(text).first().boundingBox())?.y ?? NaN);
+		for (const text of order) tops.push((await onScreen(text).first().boundingBox())?.y ?? NaN);
 		if (tops.some((top, index) => !(index === 0 || top > tops[index - 1]!)))
-			failed.push(`order ${step.order.join(', ')} is not top to bottom`);
+			failed.push(`order ${order.join(', ')} is not top to bottom`);
 	}
 	return failed;
 }

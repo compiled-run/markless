@@ -157,11 +157,22 @@ class MarklessHost(
 	private val planned = style
 	/** Dragon's HarfBuzz over this phone's system fonts, made when a page first lays its rows out. */
 	private var rowShaper: RowShaper? = null
-	private var laidOutFor: Pair<Int, Int>? = null
+	/** The page size in device px and the slot values (export order) the page was last laid out at. */
+	private var laidOutFor: Triple<Int, Int, List<Double>>? = null
 	private val fonts: FontSource = if (style?.systemFaces.isNullOrEmpty()) bundledFonts else SystemFonts(style!!.systemFaces, bundledFonts)
 	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine).apply {
 		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
 		onScriptEntry = AppScriptEngine::entryRan
+	}
+	/** Each style slot's current value, from the runtime at mount and then its `slot` entries. */
+	private val slotValues = HashMap(runtime.slots().toMap()).also { values ->
+		val slots = style?.slots.orEmpty()
+		if (slots.isNotEmpty() && planLayout == null) throw MarklessHostError("style values that follow state need Dragon's layout plan, which this host does not link")
+		val integer = payload.slots.associate { it.id to it.integer }
+		for (s in slots) {
+			if (s.id !in values) throw MarklessHostError("style export reads slot \"${s.id}\", which the payload does not have")
+			if (s.integer && integer[s.id] != true) throw MarklessHostError("style export laid slot \"${s.id}\" out at whole numbers only, but the payload's slot may take any number")
+		}
 	}
 	private val scriptServices = ScriptServices()
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
@@ -520,6 +531,7 @@ class MarklessHost(
 	/** The journal applier: the only code that changes a retained view after the first build. */
 	fun apply(journal: List<JournalEntry>) {
 		dismissMessage()
+		var slotMoved = false
 		for (entry in journal) {
 			when (entry) {
 				is JournalEntry.Text -> if (flow != null) {
@@ -539,6 +551,10 @@ class MarklessHost(
 					if (!page.advance(entry.node, entry.value)) throw MarklessHostError("style export has no state for cell \"${entry.node}\"")
 					for (s in sheetLayouts.values) for (l in s.layouts) l.advance(entry.node, entry.value)
 					repaint()
+				}
+				is JournalEntry.Slot -> {
+					if (slotValues.put(entry.slot, entry.value) == null) throw MarklessHostError("journal sets slot \"${entry.slot}\", which the payload does not have")
+					slotMoved = slotMoved || planned?.slots.orEmpty().any { it.id == entry.slot }
 				}
 				// Each select's shown choice is read again once the whole journal is applied.
 				is JournalEntry.Selected -> {}
@@ -581,6 +597,7 @@ class MarklessHost(
 			}
 			Log.i(TAG, "journal ${entry.toJson()}")
 		}
+		if (slotMoved) laidOutFor?.let { layOutAt(it.first, it.second) }
 		syncSheets()
 		refreshRelations()
 		refreshSelects()
@@ -624,17 +641,19 @@ class MarklessHost(
 	fun layOutAt(widthPx: Int, heightPx: Int, rowsMoved: Boolean = false): Boolean {
 		val p = page ?: return false
 		val layout = planLayout ?: return false
-		if (planned?.plan == null || widthPx <= 0 || heightPx <= 0 || (!rowsMoved && laidOutFor == widthPx to heightPx)) return false
+		if (planned?.plan == null || widthPx <= 0 || heightPx <= 0) return false
+		val at = Triple(widthPx, heightPx, planned.slots.map { slotValues.getValue(it.id) })
+		if (!rowsMoved && laidOutFor == at) return false
 		val withRows = planned.planRepeats.isNotEmpty()
 		val shaper = if (withRows) rowShaper ?: RowShaper(planned.systemFaces).also { rowShaper = it } else null
 		val next = planned.laidOut(
-			Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout,
+			Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout, at.third,
 			rows = if (withRows) planned.shownRows(payload, runtime) else null,
 			rowsLayout = shaper?.let { RowShaper.rowsLayout(it) ?: throw MarklessHostError("a page with styled rows needs Dragon's rows layout in the app") },
 		)
 		style = next
 		p.relaid(next)
-		laidOutFor = widthPx to heightPx
+		laidOutFor = at
 		followBand(isDark(context.resources.configuration))
 		repaint()
 		Log.i(TAG, "laid out at ${next.viewportWidth}x${next.viewportHeight} dp, style assignment ${p.assignment}")

@@ -539,8 +539,8 @@ final class ViewTree {
 			case let .sheet(node, open):
 				guard let sheet = sheets[node] else { throw HostError("journal names sheet \(node), which is not built") }
 				if open { sheet.open(from: presenter) } else { sheet.close() }
-			case .navigate, .title:
-				throw HostError("navigate and title entries reach the screen's controller, not its views")
+			case .navigate, .title, .slot:
+				throw HostError("navigate, title and slot entries reach the screen's controller, not its views")
 			case .call, .release, .fetch, .abort:
 				throw HostError("a \(entry.json.jsonText) entry reaches the page's device or script services, not its views")
 			case let .dialog(node, open):

@@ -34,6 +34,12 @@ sealed interface JournalEntry {
 		override fun toJson() = "{\"op\":\"state\",\"cell\":${jsonString(node)},\"value\":${jsonValue(value)}}"
 	}
 
+	/** A style slot's new value: the page is laid out again with it. */
+	data class Slot(val slot: String, val value: Double) : JournalEntry {
+		override val node get() = slot
+		override fun toJson() = "{\"op\":\"slot\",\"slot\":${jsonString(slot)},\"value\":${jsonValue(JsValue.Num(value))}}"
+	}
+
 	/** A list's row keys in their new order: rows whose key left go, new keys are built, the rest move. */
 	data class Rows(override val node: String, val keys: List<String>) : JournalEntry {
 		override fun toJson() = "{\"op\":\"rows\",\"node\":${jsonString(node)},\"keys\":${keys.joinToString(",", "[", "]", transform = ::jsonString)}}"
@@ -1435,12 +1441,34 @@ class Runtime(
 	}
 
 	/** The calls a host starts at mount, one per task cell. */
+	/** Each style slot's current value, in payload order; a slot that is not a finite number (or not whole when integer) is an error, as no layout of it was proven. */
+	fun slots(): List<Pair<String, Double>> {
+		val cases = styleCases().toMap()
+		return payload.slots.map { slot ->
+			// Its expression may not hold while its style case hides the text (`point.x`), so it keeps its last value.
+			val w = slot.whenCase
+			if (w != null && cases[w.case] != w.value) return@map slot.id to (keptSlots[slot.id] ?: 0.0)
+			val v = evaluate(slot.value)
+			if (v !is JsValue.Num || !v.value.isFinite()) throw MarklessRuntimeError("style slot ${slot.id} is ${jsonValue(v)}, not a finite number")
+			if (slot.integer && v.value != Math.rint(v.value)) throw MarklessRuntimeError("style slot ${slot.id} is ${JsString.number(v.value)}, not a whole number")
+			keptSlots[slot.id] = v.value
+			slot.id to v.value
+		}
+	}
+
+	/** Whether each style case's test holds now, in payload order: which of Dragon's assignments the style is in. */
+	fun styleCases(): List<Pair<String, Boolean>> = payload.styleCases.map { it.id to Js.truthy(evaluate(it.value)) }
+
+	private val keptSlots = HashMap<String, Double>()
+
 	fun tasks(): List<JournalEntry.Call> = payload.cells.mapNotNull { c -> c.task?.let { t -> JournalEntry.Call(t.call, t.arguments.map { evaluate(it) }, c.id) } }
 
 	/** Runs [apply] (cell writes, returning its calls or a navigation) and journals styled cells, changed nodes, released objects, then the calls. */
 	private inline fun change(host: String?, value: String?, apply: () -> List<JournalEntry>): List<JournalEntry> {
 		seedRows()
 		val cellsBefore = HashMap(values)
+		val slotsBefore = slots().toMap()
+		val casesBefore = styleCases().toMap()
 		val beforeTexts = texts().toMap()
 		val beforeAttributes = boundAttributes().associate { (n, a, v) -> (n to a) to v }
 		val beforeMarks = marks()
@@ -1501,6 +1529,8 @@ class Runtime(
 		val afterSheets = sheets().toMap()
 		val journal = ArrayList<JournalEntry>()
 		for (c in payload.cells) if (c.styled && !Js.strictEquals(cellsBefore.getValue(c.id), values.getValue(c.id))) journal.add(JournalEntry.State(c.id, values.getValue(c.id)))
+		for ((id, v) in styleCases()) if (casesBefore[id] != v) journal.add(JournalEntry.State(id, JsValue.Bool(v)))
+		for ((id, v) in slots()) if (slotsBefore[id]?.toRawBits() != v.toRawBits()) journal.add(JournalEntry.Slot(id, v))
 		for (node in payload.nodes) when (node) {
 			// Each shown copy of the list: an inner list has one per row of its outer list (`<id>@<key>`).
 			is Node.Repeat -> for ((id, a) in afterRows) {

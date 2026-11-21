@@ -117,6 +117,11 @@ export type LadderStep = {
 	readonly disabled?: readonly string[];
 	/** Texts that are on screen in this order, top to bottom. */
 	readonly order?: readonly string[];
+	/**
+	 * Texts on screen in this order, top to bottom, where styles rather than document order put them there (absolute
+	 * positions, flex `order`): the browser and the phones check it; the reference runtime, which has no layout, does not.
+	 */
+	readonly placed?: readonly string[];
 	/** Text fields, by accessible name, and the value each holds. */
 	readonly fields?: Readonly<Record<string, string>>;
 	/** The screen's title: the system navigation bar's on a phone, `document.title` on the web. */
@@ -309,6 +314,7 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 		...(previous.hidden ?? []),
 	]);
 	const order = step.order?.join('\n') !== previous.order?.join('\n') ? step.order : undefined;
+	const placed = step.placed?.join('\n') !== previous.placed?.join('\n') ? step.placed : undefined;
 	const fields = Object.fromEntries(
 		Object.entries(step.fields ?? {}).filter(
 			([name, value]) => previous.fields?.[name] !== value,
@@ -326,6 +332,7 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 			offScreen: (step.offScreen ?? []).filter((text) => wasShown.has(text)),
 		}),
 		...(order && { order }),
+		...(placed && { placed }),
 		...(Object.keys(fields).length > 0 && { fields }),
 		...(step.title !== undefined && step.title !== previous.title && { title: step.title }),
 		...(calls && { calls }),
@@ -345,6 +352,7 @@ export const witnessCount = (witness: LadderStep): number =>
 	(witness.offScreen?.length ?? 0) +
 	(witness.hidden?.length ?? 0) +
 	(witness.order ? 1 : 0) +
+	(witness.placed ? 1 : 0) +
 	Object.keys(witness.fields ?? {}).length +
 	(witness.calls ? 1 : 0) +
 	(witness.camera ? 1 : 0) +
@@ -398,9 +406,11 @@ const screenAssertions = (step: LadderStep): unknown[] => [
 	...(step.disabled ?? []).map((text) => ({
 		assertVisible: { text: selector(text), enabled: false },
 	})),
-	...(step.order ?? []).slice(1).map((text, index) => ({
-		assertVisible: { text: selector(text), below: selector(step.order![index]!) },
-	})),
+	...[step.order ?? [], step.placed ?? []].flatMap((texts) =>
+		texts.slice(1).map((text, index) => ({
+			assertVisible: { text: selector(text), below: selector(texts[index]!) },
+		})),
+	),
 	...Object.values(step.fields ?? {}).map((value) => ({ assertVisible: selector(value) })),
 	...(step.title === undefined ? [] : [{ assertVisible: selector(step.title) }]),
 	...(step.calls

@@ -52,6 +52,8 @@ export type DragonStyleExport = {
 	/** Only when a text is drawn in a system face; nothing of it is bundled. */
 	readonly systemFonts?: ReadonlyArray<StyleSystemFont>;
 	readonly targets: Readonly<Record<string, DragonTarget>>;
+	/** The numbers the page's styles read while the app runs, in the order Dragon's plan takes their values. */
+	readonly slots?: ReadonlyArray<Json>;
 };
 
 type InternedTarget = Omit<DragonTarget, 'backend' | 'viewport' | 'dpr' | 'assignments'> & {
@@ -68,6 +70,8 @@ export type NativeAppStyleRoute = InternedTarget & {
 	readonly pattern: string;
 	readonly component: string;
 	readonly compiler: string;
+	/** The page export's `slots`, when its styles read numbers that follow state. */
+	readonly slots?: ReadonlyArray<Json>;
 	/**
 	 * Each system sheet's content, laid out as its own document at every resting height it takes (`snapPoint`), in the
 	 * content area measured for it (`viewport`); its writes share the target's lists with the page's.
@@ -199,6 +203,7 @@ export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): Native
 				pattern,
 				component: exported.component,
 				compiler: exported.compiler,
+				...(exported.slots ? { slots: exported.slots } : {}),
 				...interned(target, `${pattern}: the ${name} export`),
 				...(nodes.length > 0
 					? {

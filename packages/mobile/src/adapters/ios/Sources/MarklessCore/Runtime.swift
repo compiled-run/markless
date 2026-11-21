@@ -69,6 +69,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case text(node: String, value: String)
 	/// A styled cell's new value: the host moves to the style export's next assignment.
 	case state(cell: String, value: NativeValue)
+	/// A style slot's new value: the host lays the page out again with it through Dragon's plan.
+	case slot(slot: String, value: Double)
 	/// nil removes the attribute; "" is a bare attribute.
 	case attribute(node: String, name: String, value: String?)
 	/// An input's text; never sent to the field whose edit caused it while it already shows that text.
@@ -116,6 +118,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 		case let .text(node, value): return .object([("op", .string("text")), ("node", .string(node)), ("value", .string(value))])
 		case let .state(cell, value):
 			return .object([("op", .string("state")), ("cell", .string(cell)), ("value", value.json)])
+		case let .slot(slot, value):
+			return .object([("op", .string("slot")), ("slot", .string(slot)), ("value", .number(value))])
 		case let .attribute(node, name, value):
 			return .object([("op", .string("attribute")), ("node", .string(node)), ("name", .string(name)), ("value", value.map(JSONValue.string) ?? .null)])
 		case let .property(node, name, value):
@@ -222,6 +226,8 @@ public final class NativeRuntime {
 	public let payload: NativeViewPayload
 	// Each write moves `version`, so a script computed is run again only once a cell may have changed.
 	private var values: [String: NativeValue] { didSet { version &+= 1 } }
+	/// Each style slot's last value, kept while its style case hides its text.
+	private var keptSlots: [String: Double] = [:]
 	/// Cells still `undefined` on the web: a script reads them so until one is written.
 	private var unset: Set<String> = []
 	/// Each following cell's last value of what it follows: the write runs again only when that value changes, as on the web.
@@ -1241,6 +1247,29 @@ public final class NativeRuntime {
 	/// The page's `<title>` text, nil when it has none.
 	public func title() throws -> String? { try payload.title.map { try text(of: $0) } }
 
+	/// Each style slot's number now, in the payload's order: what the host lays the page out with.
+	public func slots() throws -> [(slot: String, value: Double)] {
+		let cases = Dictionary(uniqueKeysWithValues: try styleCases().map { ($0.styleCase, $0.value) })
+		return try payload.slots.map { slot in
+			// Its expression may not hold while its style case hides the text (`point.x`), so it keeps its last value.
+			if let when = slot.when, cases[when.styleCase] != when.value { return (slot.id, keptSlots[slot.id] ?? 0) }
+			let evaluated = try evaluate(slot.value)
+			guard case let .number(value) = evaluated, value.isFinite else {
+				throw RuntimeError(reason: "style slot \(slot.id) is \(evaluated.json.jsonText), not a finite number")
+			}
+			if slot.integer, value.rounded(.towardZero) != value {
+				throw RuntimeError(reason: "style slot \(slot.id) is \(JSONValue.number(value).jsonText), not a whole number")
+			}
+			keptSlots[slot.id] = value
+			return (slot.id, value)
+		}
+	}
+
+	/// Whether each style case's test holds now, in the payload's order: which of Dragon's assignments the style is in.
+	public func styleCases() throws -> [(styleCase: String, value: Bool)] {
+		try payload.styleCases.map { ($0.id, try evaluate($0.value).isTruthy) }
+	}
+
 	/// Every system sheet shown (its arm, if any, showing) and whether its `open` is truthy.
 	public func sheets() throws -> [(node: String, open: Bool)] {
 		try payload.nodes.compactMap { node in
@@ -1659,6 +1688,8 @@ public final class NativeRuntime {
 		}
 		try seedRows()
 		let cellsBefore = values
+		let slotsBefore = Dictionary(try slots().map { ($0.slot, $0.value) }, uniquingKeysWith: { $1 })
+		let casesBefore = Dictionary(uniqueKeysWithValues: try styleCases().map { ($0.styleCase, $0.value) })
 		let beforeTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let beforeAttributes = keyed(try boundAttributes())
 		let beforeMarks = keyed(marks())
@@ -1724,6 +1755,11 @@ public final class NativeRuntime {
 		let styles = payload.cells.compactMap { cell -> NativeJournalEntry? in
 			guard cell.styled, let before = cellsBefore[cell.id], let after = values[cell.id], !before.strictlyEquals(after) else { return nil }
 			return .state(cell: cell.id, value: after)
+		} + (try styleCases()).compactMap { styleCase -> NativeJournalEntry? in
+			casesBefore[styleCase.styleCase] == styleCase.value ? nil : .state(cell: styleCase.styleCase, value: .bool(styleCase.value))
+		} + (try slots()).compactMap { slot -> NativeJournalEntry? in
+			// Object.is: a finite number is the same only with the same bit pattern (0 and -0 differ).
+			slotsBefore[slot.slot]?.bitPattern == slot.value.bitPattern ? nil : .slot(slot: slot.slot, value: slot.value)
 		}
 		let entries = try payload.nodes.flatMap { node -> [NativeJournalEntry] in
 			switch node.kind {
