@@ -17,6 +17,7 @@ import { instrumentFlow } from './flow.ts';
 import {
 	androidHostTests,
 	describeHostTests,
+	dragonCheckout,
 	iosHostTests,
 	type HostTestOutcome,
 } from './host-tests.ts';
@@ -34,7 +35,6 @@ import { loadRung, type ProofRung } from './rung.ts';
 import { verdictCommand } from './verdict.ts';
 import { androidTools, cacheRoot } from './tools.ts';
 import { androidLayoutCheck, iosLayoutCheck, LAYOUT_ORIENTATIONS, type LayoutOrientation } from './layout-check.ts';
-import { dragonDir } from '../style-export.ts';
 
 const USAGE = `usage: markless-proof [options] <rung folder>...
        markless-proof verdict <dir>/ios.json <dir>/android.json
@@ -101,12 +101,6 @@ type PlatformOutcome = {
 
 const seconds = (since: number) => (performance.now() - since) / 1000;
 const fixed = (value: number) => value.toFixed(1);
-
-/** The Dragon checkout when there is one: the iOS UIKit tests that paint with its faces read their files from it. */
-const dragonCheckout = (): string | undefined => {
-	const dir = dragonDir();
-	return existsSync(join(dir, 'package.json')) ? dir : undefined;
-};
 
 async function hostTestsCommand(argv: string[]): Promise<number> {
 	const { values } = parseArgs({
