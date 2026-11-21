@@ -5,7 +5,7 @@ import type {
 	ResumeRuntimeInput,
 } from './resume-types.ts';
 import type { ResumeEventWiring } from './resume-events.ts';
-import type { SlotRead } from './resume-keyed-repeats.ts';
+import type { PaintSnapshot } from './resume-keyed-repeats.ts';
 
 // An arm's rows adopt the served ones only once the computed they read from holds the served value.
 export async function wireArmKeyedRepeats(
@@ -18,7 +18,7 @@ export async function wireArmKeyedRepeats(
 		readonly storeHostSubscription: (hostNodeId: string, release: () => void) => void;
 	},
 	rowComponentHost?: import('./fns/row-component-mint.ts').RowComponentMintHost,
-	moved?: (read: SlotRead) => boolean,
+	painted?: PaintSnapshot,
 	// The arm's own records: a computed a component in the arm declares is not in the page's.
 	armComputed?: NonNullable<ResumeRuntimeInput['state']>['computed'],
 ): Promise<void> {
@@ -47,7 +47,7 @@ export async function wireArmKeyedRepeats(
 					host.storeHostSubscription(record.parentHostNodeId, release),
 				renderData: runtime.renderData,
 				pageRepeats: runtime.view.keyedRepeats,
-				moved,
+				painted,
 			},
 			rowComponentHost,
 		);
