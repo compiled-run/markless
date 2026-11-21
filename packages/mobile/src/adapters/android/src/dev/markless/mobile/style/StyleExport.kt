@@ -247,7 +247,9 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val shown = if (planRepeats.isEmpty()) null else rows?.invoke(k)
 			val lists = shown?.let { byList ->
 				Json.Arr(planRepeats.map { r ->
-					obj("parent" to Json.Str(r.parent), "template" to Json.Arr(r.template.map { Json.Str(it) }), "rows" to Json.Arr((byList[r.id] ?: emptyList()).map { row ->
+					// A list an arm hides at this assignment has no box to hold rows: its rows are not laid out there.
+					val parentShown = r.parent == "body" || assignments[k].byId[names[r.parent] ?: r.parent]?.frame != null
+					obj("parent" to Json.Str(r.parent), "template" to Json.Arr(r.template.map { Json.Str(it) }), "rows" to Json.Arr((if (parentShown) byList[r.id] ?: emptyList() else emptyList()).map { row ->
 						obj("key" to Json.Str(row.key), "assignment" to Json.Num(row.assignment.toDouble()), "texts" to Json.Arr(row.texts.entries.sortedBy { it.key }.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }))
 					}))
 				}).text()

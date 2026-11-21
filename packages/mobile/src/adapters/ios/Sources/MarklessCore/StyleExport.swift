@@ -555,9 +555,12 @@ public struct StyleExport: Sendable {
 			var line = "{\"assignment\":\(k),\"dpr\":\(JSONValue.number(scale).jsonText),\"viewport\":{\"width\":\(JSONValue.number(width).jsonText),\"height\":\(JSONValue.number(height).jsonText)},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":\(plan)"
 			if let shown {
 				let lists = planRepeats.map { r -> JSONValue in
-					.object([
+					// A list an arm hides at this assignment has no box to hold rows: its rows are not laid out there.
+					let parentId = names[r.parent] ?? r.parent
+					let parentShown = r.parent == "body" || assignments[k].nodes.first(where: { $0.id == parentId })?.frame != nil
+					return .object([
 						("parent", .string(r.parent)), ("template", .array(r.template.map { .string($0) })),
-						("rows", .array((shown[r.id] ?? []).map { row in
+						("rows", .array((parentShown ? shown[r.id] ?? [] : []).map { row in
 							.object([
 								("key", .string(row.key)), ("assignment", .number(Double(row.assignment))),
 								("texts", .array(row.texts.sorted { $0.key < $1.key }.map { .array([.string(dragonId[$0.key] ?? $0.key), .string($0.value)]) })),
