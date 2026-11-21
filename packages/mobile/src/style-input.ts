@@ -96,6 +96,8 @@ export type NativeStyleInput = {
 		readonly domain: ReadonlyArray<string>;
 		readonly initial: string;
 		readonly arm?: NativeArmPlace;
+		/** The list a branch inside a row belongs to: each row shows its own arm. */
+		readonly row?: string;
 	}>;
 };
 
@@ -357,15 +359,17 @@ export function nativeStyleInput(
 			: [],
 	);
 	const branches = nodes.flatMap((node) => {
-		if (node.kind !== 'branch' || node.row) return [];
+		if (node.kind !== 'branch') return [];
 		const domain = branchDomain(node);
-		const shown = shownArms.get(node.id);
+		const shown = node.row ? undefined : shownArms.get(node.id);
 		return [
 			{
 				id: node.id,
 				domain,
 				initial: shown === undefined ? domain[0]! : shown === null ? NATIVE_NO_ARM : String(shown),
 				...(node.arm ? { arm: node.arm } : {}),
+				// A branch in a row is a state of each row: the arm its own item shows.
+				...(node.row ? { row: node.row } : {}),
 			},
 		];
 	});

@@ -682,6 +682,22 @@ private fun rowStyles(fixtures: File) {
 	check("a row's text is its own", rows[1].texts["h6:text0"] == "Call the plumber about the kitchen tap before Friday") { "${rows[1].texts}" }
 }
 
+/** The S22 rung's: each task row shows a Done badge (the @if's first arm) or a Finish button (its second). */
+private fun rowArmStyles(fixtures: File) {
+	val style = StyleExport.decodeApp(File(fixtures, "s22-styled-row-arms.native-app-style.json").readBytes()).getValue("/")
+	val page = AppPayload.decodeOrNull(Json.parse(File(fixtures, "s22-styled-row-arms.payload.json").readBytes()))!!.routes.single { it.route.pattern == "/" }.page
+	val runtime = Runtime(page)
+	val branches = page.nodes.filter { it is Node.Branch && it.row == null }.map { it.id }
+	val rowStates = style.rowStates(page)
+	check("the row's @if is a state of each row", rowStates == setOf("branch-site:0")) { "$rowStates" }
+	val start = runCatching { style.start(page.cells.filter { it.styled }.map { it.id }, runtime::value, false, true, branches, runtime::styleArm, rowStates) }
+	check("a page with a styled @if in its rows starts", start.isSuccess) { start.exceptionOrNull().toString() }
+	val k = start.getOrNull() ?: return
+	val rows = style.shownRows(page, runtime)(k).getValue("repeat:0")
+	// The template is laid out at the first arm: row b's, which is done.
+	check("each row takes the assignment its own arm reaches", rows.map { it.key } == listOf("a", "b") && rows[1].assignment == k && rows[0].assignment != k) { "${rows.map { it.key to it.assignment }} from $k" }
+}
+
 fun main(args: Array<String>) {
 	routes()
 	arrays()
@@ -698,6 +714,7 @@ fun main(args: Array<String>) {
 	systemFonts(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	sheetStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	rowStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	rowArmStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	val dirs = args.map(::File)
 	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)

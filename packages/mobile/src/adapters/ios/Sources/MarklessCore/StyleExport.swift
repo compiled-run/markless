@@ -529,10 +529,11 @@ public struct StyleExport: Sendable {
 		}
 		if targetFields.has("planRepeats") {
 			style.planRepeats = try targetFields["planRepeats"].array().map { r in
-				let f = try r.object(required: ["id", "parent", "template"], optional: [])
+				let f = try r.object(required: ["id", "parent", "template"], optional: ["armed"])
 				let template = try f["template"].array().map { try $0.string() }
 				guard !template.isEmpty else { throw r.fail("a row has at least one box") }
-				return PlanRepeat(id: try f["id"].string(), parent: try f["parent"].string(), template: template)
+				let armed = f.has("armed") ? try f["armed"].array().map { try $0.string() } : []
+				return PlanRepeat(id: try f["id"].string(), parent: try f["parent"].string(), template: template, armed: armed)
 			}
 		}
 		return style
@@ -556,7 +557,7 @@ public struct StyleExport: Sendable {
 			if let shown {
 				let lists = planRepeats.map { r -> JSONValue in
 					.object([
-						("parent", .string(r.parent)), ("template", .array(r.template.map { .string($0) })),
+						("parent", .string(r.parent)), ("template", .array(r.template.map { .string($0) })), ("armed", .array(r.armed.map { .string($0) })),
 						("rows", .array((shown[r.id] ?? []).map { row in
 							.object([
 								("key", .string(row.key)), ("assignment", .number(Double(row.assignment))),
@@ -815,6 +816,8 @@ public struct PlanRepeat: Sendable, Equatable {
 	public let id: String
 	public let parent: String
 	public let template: [String]
+	/// The template's top boxes in an arm of the row's own @if, which a row showing another arm has no copy of.
+	public var armed: [String] = []
 }
 
 /// A row a page shows now: its key, the assignment its own states reach from the page's, and its texts by text node id.

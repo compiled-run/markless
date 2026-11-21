@@ -1,0 +1,35 @@
+appId: ${APP_ID}
+name: s22-styled-row-arms
+---
+- launchApp:
+      clearState: true
+- assertVisible: Tasks
+- assertVisible: Apples
+- assertVisible: Finish Apples
+- assertVisible: Bread
+- assertVisible: Done
+- assertVisible: End of list
+- assertNotVisible: Finish Bread
+- assertNotVisible: Cheese
+- assertVisible: Tasks
+- tapOn: Finish Apples
+- assertNotVisible: Finish Apples
+- assertVisible: Apples
+- assertVisible: Bread
+- assertVisible: End of list
+- assertNotVisible: Finish Apples
+- assertNotVisible: Finish Bread
+- assertNotVisible: Cheese
+- tapOn: Add cheese
+- assertVisible: Cheese
+- assertVisible: Cheese
+- assertVisible: Finish Cheese
+- assertVisible: End of list
+- assertNotVisible: Finish Apples
+- tapOn: Undo all
+- assertVisible: Finish Apples
+- assertVisible: Finish Apples
+- assertVisible: Finish Bread
+- assertVisible: Finish Cheese
+- assertVisible: End of list
+- assertNotVisible: Done

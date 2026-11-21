@@ -247,7 +247,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val shown = if (planRepeats.isEmpty()) null else rows?.invoke(k)
 			val lists = shown?.let { byList ->
 				Json.Arr(planRepeats.map { r ->
-					obj("parent" to Json.Str(r.parent), "template" to Json.Arr(r.template.map { Json.Str(it) }), "rows" to Json.Arr((byList[r.id] ?: emptyList()).map { row ->
+					obj("parent" to Json.Str(r.parent), "template" to Json.Arr(r.template.map { Json.Str(it) }), "armed" to Json.Arr(r.armed.map { Json.Str(it) }), "rows" to Json.Arr((byList[r.id] ?: emptyList()).map { row ->
 						obj("key" to Json.Str(row.key), "assignment" to Json.Num(row.assignment.toDouble()), "texts" to Json.Arr(row.texts.entries.sortedBy { it.key }.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }))
 					}))
 				}).text()
@@ -372,10 +372,11 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			if (t.containsKey("planNames") && names.size != style.assignments.size) throw MarklessDecodeError("$what.planNames names ${names.size} assignments; the export has ${style.assignments.size}")
 			val repeats = t["planRepeats"]?.arr("$what.planRepeats")?.mapIndexed { i, r ->
 				val o = r.obj("$what.planRepeats[$i]")
-				o.only(setOf("id", "parent", "template"), "$what.planRepeats[$i]")
+				o.only(setOf("id", "parent", "template", "armed"), "$what.planRepeats[$i]")
 				val template = o.field("template", "$what.planRepeats[$i]").arr("$what.planRepeats[$i].template").map { it.str("$what.planRepeats[$i].template[]") }
 				if (template.isEmpty()) throw MarklessDecodeError("$what.planRepeats[$i]: a row has at least one box")
-				PlanRepeat(o.field("id", "$what.planRepeats[$i]").str("id"), o.field("parent", "$what.planRepeats[$i]").str("parent"), template)
+				val armed = o["armed"]?.arr("$what.planRepeats[$i].armed")?.map { it.str("$what.planRepeats[$i].armed[]") } ?: emptyList()
+				PlanRepeat(o.field("id", "$what.planRepeats[$i]").str("id"), o.field("parent", "$what.planRepeats[$i]").str("parent"), template, armed)
 			} ?: emptyList()
 			return style.copy(plan = plan, planNames = names, planRepeats = repeats)
 		}
@@ -654,7 +655,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 }
 
 /** A list whose rows a phone lays out (Dragon's `planRepeats`): the box its rows hang from and one row's top boxes, by Dragon id. */
-data class PlanRepeat(val id: String, val parent: String, val template: List<String>)
+data class PlanRepeat(val id: String, val parent: String, val template: List<String>, val armed: List<String> = emptyList())
 
 /** A row a page shows now: its key, the assignment its own states reach from the page's, and its texts by text node id. */
 data class LaidOutRow(val key: String, val assignment: Int, val texts: Map<String, String>)

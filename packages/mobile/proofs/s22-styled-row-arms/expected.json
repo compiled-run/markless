@@ -1,0 +1,32 @@
+{
+	"rung": "S22",
+	"name": "Styled @if arms inside @for rows: each row shows its own arm, styled and laid out on the phone as the web lays it out",
+	"steps": [
+		{
+			"visible": ["Tasks", "Apples", "Finish Apples", "Bread", "Done", "End of list"],
+			"absent": ["Finish Bread", "Cheese"],
+			"title": "Tasks"
+		},
+		{
+			"do": {
+				"tap": "Finish Apples"
+			},
+			"visible": ["Apples", "Bread", "End of list"],
+			"absent": ["Finish Apples", "Finish Bread", "Cheese"]
+		},
+		{
+			"do": {
+				"tap": "Add cheese"
+			},
+			"visible": ["Cheese", "Finish Cheese", "End of list"],
+			"absent": ["Finish Apples"]
+		},
+		{
+			"do": {
+				"tap": "Undo all"
+			},
+			"visible": ["Finish Apples", "Finish Bread", "Finish Cheese", "End of list"],
+			"absent": ["Done"]
+		}
+	]
+}

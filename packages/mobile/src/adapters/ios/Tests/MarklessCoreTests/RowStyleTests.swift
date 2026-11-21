@@ -31,3 +31,19 @@ private func notes() throws -> (StyleExport, NativeViewPayload) {
 	#expect(rows[0].assignment != layout.start)
 	#expect(rows[1].texts["h6:text0"] == "Call the plumber about the kitchen tap before Friday")
 }
+
+// The S22 rung's: each task row shows a Done badge (the @if's first arm) or a Finish button (its second).
+@Test func eachRowTakesTheAssignmentItsOwnArmReaches() throws {
+	let styles = try StyleExport.decodeApp(try fixture("s22-styled-row-arms.native-app-style"))
+	guard case let .app(app) = try NativePayload.decode(try fixture("s22-styled-row-arms.payload")) else { throw PayloadError(path: "fixture", reason: "not an app") }
+	let style = try #require(styles["/"])
+	let page = try #require(app.routes.first { $0.pattern == "/" }).page
+	let runtime = NativeRuntime(payload: page)
+	let layout = try style.resolve(for: page, initialTexts: try runtime.texts(), value: runtime.value(of:), arm: runtime.styleArm(of:))
+	let rows = try #require(try style.shownRows(page, runtime: runtime)(layout.start)["repeat:0"])
+	#expect(rows.map(\.key) == ["a", "b"])
+	// The template is laid out at the first arm: row b's, which is done.
+	#expect(rows[1].assignment == layout.start)
+	#expect(rows[0].assignment != layout.start)
+	#expect(style.planRepeats.map(\.armed) == [[]])
+}

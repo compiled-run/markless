@@ -305,7 +305,7 @@ public final class MarklessViewController: UIViewController {
 		return journal.contains { entry in
 			switch entry {
 			case .rows: return true
-			case let .text(node, _), let .attribute(node, _, _): return node.contains("@")
+			case let .text(node, _), let .attribute(node, _, _), let .arm(node, _): return node.contains("@")
 			default: return false
 			}
 		}

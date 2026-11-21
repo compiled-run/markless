@@ -16,7 +16,8 @@ public func rowAttributeOptions(_ name: String, _ expr: NativeExpr) -> [String?]
 
 extension StyleExport {
 	/// The rows each list of the page shows now, for laying the page out at assignment `k`: each row's key, the assignment its
-	/// own states (the value its `class` or `ui-*` binding gives) reach from `k`, and its texts by the template's text node id.
+	/// own states (the value its `class` or `ui-*` binding gives, the arm each @if inside it shows) reach from `k`, and its texts
+	/// by the template's text node id.
 	public func shownRows(_ payload: NativeViewPayload, runtime: NativeRuntime) throws -> (Int) throws -> [String: [LaidOutRow]] {
 		let texts = Dictionary(try runtime.texts().map { ($0.node, $0.text) }, uniquingKeysWith: { a, _ in a })
 		let attributes = Dictionary(try runtime.attributes().map { ("\($0.node)\u{0}\($0.name)", $0.value) }, uniquingKeysWith: { a, _ in a })
@@ -33,6 +34,12 @@ extension StyleExport {
 				let options = rowAttributeOptions(attribute, binding.value)
 			else { continue }
 			rowStates.append((index, nodeId, attribute, options, list))
+		}
+		// Each @if or @try inside a row: its state is the arm the row's own copy of it shows.
+		var rowBranches: [(state: Int, branch: String, list: String)] = []
+		for node in payload.nodes {
+			guard case .branch = node.kind, let list = node.row, let state = states.firstIndex(where: { $0.key == node.id }) else { continue }
+			rowBranches.append((state, node.id, list))
 		}
 		let rowTexts = payload.nodes.filter { node in
 			if case .text = node.kind { return node.row != nil }
@@ -54,6 +61,16 @@ extension StyleExport {
 						}
 						reached = self.next[reached][row.state][column]
 						guard reached >= 0 else { throw PayloadError(path: "rows", reason: "\(row.node)@\(key)'s style is unreachable") }
+					}
+					for row in rowBranches where row.list == node.id {
+						guard let arm = try runtime.styleArm(of: "\(row.branch)@\(key)") else {
+							throw PayloadError(path: "rows", reason: "\(row.branch)@\(key) is not a branch the page shows")
+						}
+						guard let column = self.states[row.state].domain.firstIndex(where: { $0.strictlyEquals(arm) }) else {
+							throw PayloadError(path: "rows", reason: "the style state \(self.states[row.state].key) has no arm \(arm.jsonText)")
+						}
+						reached = self.next[reached][row.state][column]
+						guard reached >= 0 else { throw PayloadError(path: "rows", reason: "\(row.branch)@\(key)'s arm is unreachable") }
 					}
 					var own: [String: String] = [:]
 					for text in rowTexts where text.row == node.id { own[text.id] = texts["\(text.id)@\(key)"] ?? "" }
