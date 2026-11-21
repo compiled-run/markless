@@ -24,6 +24,7 @@ public final class MarklessViewController: UIViewController {
 	/// How long the last layout at the screen's size took, in milliseconds (Dragon's layout of every assignment and the views' move).
 	private var layoutMilliseconds: Double?
 	private let fonts: [String: Data]
+	private let images: [String: NativeImageAsset]
 	private let store: NativeStore
 	private let device: NativeDevice
 	private var runtime: NativeRuntime
@@ -46,7 +47,7 @@ public final class MarklessViewController: UIViewController {
 
 	/// `route`: the path a page opens at, matched against the payload's route; by default the `-route` launch argument.
 	public init(
-		payload: Data, style: Data? = nil, fonts: [String: Data] = [:], store: NativeStore = UserDefaultsStore(),
+		payload: Data, style: Data? = nil, fonts: [String: Data] = [:], images: [String: NativeImageAsset] = [:], store: NativeStore = UserDefaultsStore(),
 		device: NativeDevice? = nil, route: String? = MarklessViewController.launchRoute()
 	) throws {
 		FirstFrame.controllerCreated()
@@ -55,6 +56,7 @@ public final class MarklessViewController: UIViewController {
 		self.style = try style.map { try StyleExport.decode($0) }
 		if let reason = self.style?.notReady { NSLog("Markless iOS host: applying a style export Dragon marks analysis-only: %@", reason) }
 		self.fonts = fonts
+		self.images = images
 		self.store = store
 		var params: [NativeRouteParam] = []
 		if let route {
@@ -82,7 +84,7 @@ public final class MarklessViewController: UIViewController {
 
 	/// One screen of an app: the page for a route, opened with its params and its route's styles.
 	init(
-		page: NativeViewPayload, params: [NativeRouteParam], store: NativeStore, style: StyleExport?, fonts: [String: Data],
+		page: NativeViewPayload, params: [NativeRouteParam], store: NativeStore, style: StyleExport?, fonts: [String: Data], images: [String: NativeImageAsset] = [:],
 		device: NativeDevice
 	) throws {
 		FirstFrame.controllerCreated()
@@ -90,6 +92,7 @@ public final class MarklessViewController: UIViewController {
 		payload = page
 		self.style = style
 		self.fonts = fonts
+		self.images = images
 		self.store = store
 		runtime = NativeRuntime(payload: page, store: store, params: params, scriptHost: MarklessScripting.shared.host)
 		super.init(nibName: nil, bundle: nil)
@@ -165,7 +168,7 @@ public final class MarklessViewController: UIViewController {
 			runtime: runtime, layout: layout, sheetLayouts: sheetLayouts, faces: faces,
 			onAction: { [weak self] action in _ = self?.perform(action) },
 			ask: { [weak self] action in self?.perform(action) ?? false },
-			objectView: { object, kind in try device.view(for: object, device: kind) })
+			objectView: { object, kind in try device.view(for: object, device: kind) }, images: images)
 		tree?.presenter = self
 		navigationItem.title = try runtime.title()
 		try runCalls(try runtime.tasks())
