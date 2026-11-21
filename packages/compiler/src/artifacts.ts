@@ -322,6 +322,8 @@ export type SemanticComponentPropBinding =
 			readonly definitionSpans?: ReadonlyArray<SourceSpan>;
 			/** A callback's body as statements, collected for native builds only (`nativeFacts`). */
 			readonly nativeStatements?: ReadonlyArray<SemanticHandlerStatement>;
+			/** The name each callback parameter binds (`''` for a pattern), where `parameters` holds its source text. */
+			readonly nativeParameters?: ReadonlyArray<string>;
 			/** An opaque prop's value as a tree, collected for native builds only (`nativeFacts`). */
 			readonly nativeExpression?: SemanticExpression;
 			// `@catch (error, reset)` reset names a callback prop's own source calls, with the boundary each resets.

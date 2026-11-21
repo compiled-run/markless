@@ -3,6 +3,7 @@ package dev.markless.mobile.view
 import android.app.Activity
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.Insets
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
@@ -25,7 +26,10 @@ import android.widget.FrameLayout
 import dev.markless.mobile.core.AppPayload
 import dev.markless.mobile.core.FOCUS_INTO_VIEW
 import dev.markless.mobile.core.Payload
+import dev.markless.mobile.core.jsonNumber
+import dev.markless.mobile.core.jsonString
 import dev.markless.mobile.style.StyleExport
+import java.io.File
 import kotlin.math.roundToInt
 
 /**
@@ -191,7 +195,26 @@ abstract class MarklessActivity : Activity() {
 		super.onTitleChanged(tinted, color)
 	}
 
-	private fun screen(path: String, depth: Int) = Intent(this, javaClass).putExtra(ROUTE, path).putExtra(DEPTH, depth)
+	private fun screen(path: String, depth: Int) = Intent(this, javaClass).putExtra(ROUTE, path).putExtra(DEPTH, depth).putExtra(LAYOUT_DUMP, layoutDump)
+
+	/** Launched with the boolean extra [LAYOUT_DUMP]: every shown box is written to markless-layout.json after each layout and journal. */
+	private val layoutDump get() = intent.getBooleanExtra(LAYOUT_DUMP, false)
+
+	/**
+	 * Every shown box in dp from the page's top left ([page]), with the viewport the page is laid out at, written to
+	 * markless-layout.json in the app's external files folder, which adb can read, for a check against the phone's browser.
+	 */
+	private fun writeLayoutDump(page: View) {
+		if (!layoutDump || !::host.isInitialized || !page.isAttachedToWindow) return
+		val style = host.style ?: return
+		val density = resources.displayMetrics.density.toDouble()
+		val nodes = host.shownFrames(page).joinToString(",") { (id, box) -> "[${jsonString(id)},${box.joinToString(",") { jsonNumber(it / density) }}]" }
+		val text = "{\"component\":${jsonString(host.payload.component)},\"viewport\":{\"width\":${jsonNumber(style.viewportWidth)},\"height\":${jsonNumber(style.viewportHeight)}},\"scale\":${jsonNumber(density)},\"assignment\":${host.assignment},\"nodes\":[$nodes]}"
+		val dir = getExternalFilesDir(null) ?: return
+		val partial = File(dir, "markless-layout.json.partial")
+		partial.writeText(text)
+		partial.renameTo(File(dir, "markless-layout.json"))
+	}
 
 	/** Builds the page from scratch with [params]: one page per payload, so a link names this page's own route. */
 	private fun open(params: Map<String, String>) {
@@ -214,6 +237,17 @@ abstract class MarklessActivity : Activity() {
 				else host.root.layout(f.left, f.top, f.right, f.bottom)
 			}
 
+			private val bodyPaint = android.graphics.Paint()
+
+			// body's own background, under the page, where the assignment gives it one.
+			override fun dispatchDraw(canvas: android.graphics.Canvas) {
+				host.bodyBox?.let { (rect, color) ->
+					bodyPaint.color = color
+					canvas.drawRect((paddingLeft + rect.left).toFloat(), (paddingTop + rect.top).toFloat(), (paddingLeft + rect.right).toFloat(), (paddingTop + rect.bottom).toFloat(), bodyPaint)
+				}
+				super.dispatchDraw(canvas)
+			}
+
 			override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
 				val f = host.rootFrame
 				val size = host.pageSize()
@@ -222,8 +256,9 @@ abstract class MarklessActivity : Activity() {
 				setMeasuredDimension(maxOf(size.first, MeasureSpec.getSize(widthMeasureSpec)), size.second)
 			}
 		}
+		var bars = Insets.NONE
 		page.setOnApplyWindowInsetsListener { v, insets ->
-			val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+			bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
 			val keyboard = insets.getInsets(WindowInsets.Type.ime()).bottom
 			// The keyboard takes the bottom of the screen, as it shrinks a phone browser's viewport; the page ends above it.
 			v.setPadding(bars.left, bars.top, bars.right, if (keyboard > 0) 0 else bars.bottom)
@@ -235,8 +270,27 @@ abstract class MarklessActivity : Activity() {
 		content.addView(host.root, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 		page.addView(content, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 		host.canvasColor?.let(page::setBackgroundColor)
-		host.onCanvas = page::setBackgroundColor
-		setContentView(FrameLayout(this).apply { addView(page, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)) })
+		host.onCanvas = { color ->
+			page.setBackgroundColor(color)
+			content.invalidate()
+		}
+		// With Dragon's plan the page lays out at the area inside the bars before it is measured: at first show and after a rotation.
+		val screen = object : FrameLayout(this) {
+			override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+				host.layOutAt(MeasureSpec.getSize(widthMeasureSpec) - bars.left - bars.right, MeasureSpec.getSize(heightMeasureSpec) - bars.top - bars.bottom)
+				super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+			}
+		}
+		screen.addView(page, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+		setContentView(screen)
+		if (layoutDump) {
+			screen.viewTreeObserver.addOnGlobalLayoutListener { writeLayoutDump(content) }
+			val journaled = host.onJournal
+			host.onJournal = { journal ->
+				journaled?.invoke(journal)
+				content.post { writeLayoutDump(content) }
+			}
+		}
 		if (!firstFrameLogged) logFirstFrame(page)
 		if (warmsScriptEngine) host.warmScriptWhenIdle()
 		if (host.style != null) page.post { android.util.Log.i(MarklessHost.TAG, "frames max gap ${host.frameDeviation()} device px") }
@@ -267,6 +321,7 @@ abstract class MarklessActivity : Activity() {
 		/** The system's own theme, light or dark with the device. */
 		private val APP_THEME = if (Build.VERSION.SDK_INT >= 29) android.R.style.Theme_DeviceDefault_DayNight else android.R.style.Theme_Material_Light
 		const val ROUTE = "route"
+		const val LAYOUT_DUMP = "markless-layout-dump"
 		const val DEPTH = "markless.depth"
 		/** A deep link's host: `markless-proof://app/<path>`; a test build's device links use another. */
 		const val APP_LINK_HOST = "app"

@@ -1,0 +1,8 @@
+{
+	"rung": "R116",
+	"name": "A @markless/ui icon is the inline SVG the web renders: drawn natively, and naming the button it labels",
+	"steps": [
+		{ "visible": ["Icons", "Like", "Liked 0 times"] },
+		{ "do": { "tap": "Like" }, "visible": ["Liked 1 times"], "absent": ["Liked 0 times"] }
+	]
+}
