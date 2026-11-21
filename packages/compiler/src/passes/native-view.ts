@@ -63,6 +63,7 @@ import {
 import type {
 	CompilerDiagnostic,
 	SemanticComponentEdge,
+	SemanticElementRosterPosition,
 	SemanticEvent,
 	SemanticGraphArtifact,
 	SemanticMarkupChunk,
@@ -974,6 +975,11 @@ const isPrefix = (prefix: ReadonlyArray<number>, path: ReadonlyArray<number>): b
 
 /** Builds the native view of a module's root component from its semantic graph, or refuses with diagnostics. */
 export type NativeViewOptions = {
+	/**
+	 * A `<link rel="stylesheet">` with a fixed `href`: true when the build read that file (one the app serves), so it styles
+	 * the page as the browser's load does; else the link is refused.
+	 */
+	readonly linkStylesheet?: (href: string) => boolean;
 	/** The page's route when the module is a page: the router's pattern and its param names. */
 	readonly route?: { readonly pattern: string; readonly params: ReadonlyArray<string> };
 	/**
@@ -1049,6 +1055,10 @@ function moduleFactsOf(graph: SemanticGraphArtifact) {
 		eventsByHost: index(graph.events, (event) => event.hostNodeId),
 		repeatsById: new Map(
 			[...graph.keyedRepeats, ...(graph.unplacedProjectedRepeats ?? [])].map((repeat) => [repeat.id, repeat]),
+		),
+		/** Each computed whose whole body asks where its part stands among its family's parts, by the computed's graph node. */
+		rosterPositions: new Map(
+			(graph.elementRosterPositions ?? []).map((roster) => [roster.computedGraphNodeId, roster]),
 		),
 		/** Sync computeds by component, then name: a read of one inlines its expression. */
 		computeds: graph.graphBindings.reduce((byComponent, binding) => {
@@ -3127,6 +3137,29 @@ export function createNativeViewPayload(
 	const readFields = new Set<string>();
 	const nodeById = () => new Map(nodes.map((node) => [node.id, node]));
 
+	/** Each part's place read as a number while lowering, checked once every part is bound. */
+	const rosterReads: { readonly key: string; readonly host: string; readonly index: number; readonly what: string }[] = [];
+	/**
+	 * Where a part stands among its family's parts (`roster.indexOf(mine)`): the web's render order, which is tree order here, so
+	 * the parts bound before it in the build. A part not bound yet (its own attributes) is the next one.
+	 */
+	const rosterPosition = (
+		roster: SemanticElementRosterPosition,
+		scope: Scope,
+		what: string,
+	): NativeExpr | null => {
+		if (scope.row)
+			return refuse(`${what} reads where a part stands among its family's parts inside a @for row`);
+		const key = handleKey(roster.rosterGraphNodeId, scope);
+		if (!key) return refuse(`${what} reads where a part stands among parts this build does not bind`);
+		const host = scope.prefix + roster.hostNodeId;
+		const bound = boundHandles.get(key) ?? [];
+		const at = bound.indexOf(host);
+		const index = at >= 0 ? at : bound.length;
+		rosterReads.push({ key, host, index, what });
+		return { literal: index };
+	};
+
 	/** A handle read as a value in a handler: its element (null when unbound), or its elements in order when plural. */
 	const handleValue = (key: string, plural: boolean, what: string): NativeExpr | null => {
 		if (!lateLowering) return refuse(`${what} as a value outside a handler`);
@@ -3797,6 +3830,8 @@ export function createNativeViewPayload(
 						);
 					inlining.add(computed.id);
 					try {
+						const roster = scope.module.rosterPositions.get(computed.id);
+						if (roster) return rosterPosition(roster, scope, what);
 						if (!computed.nativeExpression)
 							return scriptComputed(computed, scope, what);
 						const data = attempt(() =>
@@ -4610,26 +4645,37 @@ export function createNativeViewPayload(
 				);
 				return value ? [{ attribute: target.name, value }] : [];
 			}
-			if (
-				target.kind === 'class' &&
-				target.trueValue !== undefined &&
-				target.falseValue !== undefined &&
-				target.constantClass === undefined &&
-				target.leadingClass === undefined
-			) {
-				const test = exprOf(read.expression, 'the class test', scope);
-				return test
-					? [
-							{
-								attribute: 'class',
-								value: {
-									if: test,
-									whenTrue: { literal: target.trueValue },
-									whenFalse: { literal: target.falseValue },
-								},
-							},
-						]
-					: [];
+			if (target.kind === 'class') {
+				const given = renderValue(
+					read.expression,
+					() => readScript(scope.module, read.sourceSpan),
+					'the class',
+					scope,
+				);
+				if (!given) return [];
+				const value: NativeExpr =
+					target.trueValue !== undefined && target.falseValue !== undefined
+						? { if: given, whenTrue: { literal: target.trueValue }, whenFalse: { literal: target.falseValue } }
+						: given;
+				const lead = target.leadingClass || undefined;
+				const constant = target.constantClass || undefined;
+				// As the web writes it: `[leading, value, constant].filter(Boolean).join(' ')`, the scopes kept around the value.
+				const fixed = [lead, constant].filter(Boolean).join(' ');
+				return [
+					{
+						attribute: 'class',
+						value:
+							fixed === ''
+								? value
+								: {
+										if: value,
+										whenTrue: {
+											template: [...(lead ? [`${lead} `] : []), value, ...(constant ? [` ${constant}`] : [])],
+										},
+										whenFalse: { literal: fixed },
+									},
+					},
+				];
 			}
 			refuse(`a ${target.kind} binding${'name' in target ? ` (\`${target.name}\`)` : ''}`);
 			return [];
@@ -4996,7 +5042,13 @@ export function createNativeViewPayload(
 							);
 					} else if (element === 'link') {
 						const rel = written.rel?.trim().toLowerCase().split(/\s+/) ?? [];
-						if (bound.includes('rel') || rel.includes('stylesheet'))
+						const read =
+							!bound.includes('rel') &&
+							!bound.includes('href') &&
+							rel.includes('stylesheet') &&
+							written.href !== undefined &&
+							options.linkStylesheet?.(written.href) === true;
+						if (!read && (bound.includes('rel') || rel.includes('stylesheet')))
 							refuseAs(
 								'stylesheet',
 								`<link rel="stylesheet"${written.href ? ` href="${written.href}"` : ''}> loads styles while the page runs`,
@@ -5801,10 +5853,6 @@ export function createNativeViewPayload(
 				close();
 				const boundary = scope.module.boundaries.get(item.id);
 
-				if (item.arms.catch === undefined) {
-					refuse('a @try with no @catch; its error would leave this screen');
-					continue;
-				}
 				const branchId = scope.prefix + item.id;
 				const at = nodes.length;
 				const tasks = new Set<string>();
@@ -5893,7 +5941,7 @@ export function createNativeViewPayload(
 				}
 				// A handler that rejects keeps the shown content and opens @catch after it, as the web's spec says (a failed
 				// value on the first load still shows only @catch).
-				if (caught || refreshes) {
+				if ((caught || refreshes) && item.arms.catch !== undefined) {
 					const caughtId = `${branchId}:caught`;
 					const handlerFailed: NativeExpr = {
 						binary: '!==',
@@ -7933,6 +7981,17 @@ export function createNativeViewPayload(
 			refuse(`the ${event.eventName} handler on an element this build does not show`);
 
 	const rowOfNode = new Map(nodes.map((node) => [node.id, node.row]));
+	// Parts an @if arm or a @for row shows join and leave while the app runs, which moves the places of the parts after them.
+	for (const read of rosterReads) {
+		const bound = boundHandles.get(read.key) ?? [];
+		const byId = nodeById();
+		if (bound.some((id) => byId.get(id)?.arm || byId.get(id)?.row))
+			refuse(
+				`${read.what} reads where a part stands among parts an @if arm or a @for row shows, which only the running app knows`,
+			);
+		else if (bound.indexOf(read.host) !== read.index)
+			refuse(`${read.what} reads where a part stands among its family's parts before the part is bound`);
+	}
 	for (const reference of handleReferences) {
 		const ids = reference.keys.flatMap((key) =>
 			key === undefined ? [] : (boundHandles.get(key) ?? []),
