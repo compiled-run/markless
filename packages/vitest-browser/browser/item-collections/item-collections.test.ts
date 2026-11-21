@@ -9,6 +9,7 @@ import KeyedPage from './ic-keyed-page.tsrx';
 import MutatingPage from './ic-mutating-page.tsrx';
 import NestedFlatPage from './ic-nested-flat-page.tsrx';
 import StaticPage from './ic-static-page.tsrx';
+import StepPage from './ic-step-page.tsrx';
 import TwoInstancesPage from './ic-two-instances-page.tsrx';
 
 // The general rule every widget family with a repeated part owes, in one place:
@@ -909,4 +910,26 @@ test('SSR: the count follows an @if arm applying and dropping', async () => {
 	await userEvent.click(armToggle());
 	await expect.poll(maxes, { timeout: 5000 }).toEqual(['3', '2']);
 	expect(totals()).toEqual(['3', '2']);
+});
+
+// --- a part declared before the root that renders it ---------------------------
+
+const showing = () => items().filter((one) => !one.hasAttribute('hidden')).map((one) => one.textContent);
+
+const stepsThrough = async () => {
+	expect(showing()).toEqual(['alpha']);
+	document.querySelector<HTMLButtonElement>('[data-ic-next]')!.click();
+	await expect.poll(showing, { timeout: 5000 }).toEqual(['bravo']);
+	document.querySelector<HTMLButtonElement>('[data-ic-next]')!.click();
+	await expect.poll(showing, { timeout: 5000 }).toEqual(['charlie']);
+};
+
+test('CSR: a family whose part is declared before its root: each part has its own place, and one step moves one part', async () => {
+	await render(StepPage);
+	await stepsThrough();
+});
+
+test('SSR: a family whose part is declared before its root: each part has its own place, and one step moves one part', async () => {
+	await renderSSR(StepPage);
+	await stepsThrough();
 });

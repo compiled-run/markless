@@ -26,6 +26,7 @@ import android.view.MotionEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.EditorInfo
 import android.text.Editable
+import android.text.InputType
 import android.text.InputFilter
 import android.text.Spanned
 import android.text.TextWatcher
@@ -37,6 +38,7 @@ import android.widget.EditText
 import android.widget.HorizontalScrollView
 import android.widget.ScrollView
 import android.widget.TextView
+import dev.markless.mobile.core.MemoryStore
 import dev.markless.mobile.core.ScrollAlignment
 import dev.markless.mobile.core.ScrollBox
 import dev.markless.mobile.core.ScrollRange
@@ -156,7 +158,7 @@ class MarklessHost(
 	private var rowShaper: RowShaper? = null
 	private var laidOutFor: Pair<Int, Int>? = null
 	private val fonts: FontSource = if (style?.systemFaces.isNullOrEmpty()) bundledFonts else SystemFonts(style!!.systemFaces, bundledFonts)
-	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine).apply {
+	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine, AppSession.store).apply {
 		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
 		onScriptEntry = AppScriptEngine::entryRan
 	}
@@ -497,6 +499,22 @@ class MarklessHost(
 	/** A scroll view took the touches that are down to scroll ([TakesTouches]): each is cancelled. */
 	fun scrollTookTouches() = overlays.cancelTouches()
 
+	private var lastPress: Triple<String, Long, Int>? = null
+
+	/** A press's count (`event.detail`): a second press on the same view within the double-tap time is 2, as Chrome counts a double tap. */
+	private fun pressCount(id: String): Int {
+		val now = android.os.SystemClock.uptimeMillis()
+		val count = lastPress?.let { (last, at, n) -> if (last == id && now - at < android.view.ViewConfiguration.getDoubleTapTimeout()) n + 1 else 1 } ?: 1
+		lastPress = Triple(id, now, count)
+		return count
+	}
+
+	/** Applies a key's or paste's journal and answers whether its handler called `preventDefault()`. */
+	private fun prevents(journal: List<JournalEntry>): Boolean {
+		apply(journal)
+		return journal.any { it is JournalEntry.PreventDefault }
+	}
+
 	/** The journal applier: the only code that changes a retained view after the first build. */
 	fun apply(journal: List<JournalEntry>) {
 		dismissMessage()
@@ -537,6 +555,8 @@ class MarklessHost(
 				}
 				is JournalEntry.Invalid -> invalid(entry.node, entry.message)
 				is JournalEntry.Timer -> scheduleTimer(entry.node, entry.ms)
+				// Read by the field that dispatched the key or paste, which leaves out what it would do.
+				JournalEntry.PreventDefault -> {}
 				is JournalEntry.Navigate -> {
 					timers.removeCallbacksAndMessages(null)
 					Log.i(TAG, "journal ${entry.toJson()}")
@@ -770,6 +790,7 @@ class MarklessHost(
 				else -> continue
 			}
 			views[inst.id] = view
+			(node as? Node.Element)?.live?.let { view.accessibilityLiveRegion = if (it.assertive) View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE else View.ACCESSIBILITY_LIVE_REGION_POLITE }
 			built[inst.id] = inst
 			val parentId = parentOf(inst)
 			val outer = if (parentId != null) views[parentId] else pageBox
@@ -879,7 +900,11 @@ class MarklessHost(
 		val unseen = type == "hidden" || (type in TICKABLE && node.attributes["aria-hidden"] == "true")
 		if (unseen) inert.add(inst.id)
 		val view = when (if (node.element == "button" && holdsElements) "box-button" else if (drawing != null) "drawing" else if (unstyled?.rule == true) "rule" else if (unseen) "unseen" else if (type in TICKABLE) type else node.element) {
-			"drawing" -> DrawingView(context, drawing!!, baseTextSize * (flow?.blockText(node.parent)?.size ?: 1.0)).also { named(it, inst.id, image = true) }
+			"drawing" -> DrawingView(context, drawing!!, baseTextSize * (flow?.blockText(node.parent)?.size ?: 1.0)).also {
+				// An svg's text is read as its own, as the browser exposes it; an svg without text is read only when named.
+				named(it, inst.id, image = drawing.label == null)
+				drawing.label?.let { label -> it.contentDescription = label; it.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES }
+			}
 			"rule" -> RuleView(context).also { named(it, inst.id) }
 			"unseen" -> View(context)
 			// The runtime owns checkedness: the widget never toggles itself, a press dispatches and the journal sets it.
@@ -926,10 +951,27 @@ class MarklessHost(
 			}
 			// The select's list shows its options; their views only keep their text current.
 			"option" -> MarklessBox(context).apply { visibility = View.GONE }
-			"input" -> EditText(context).apply {
+			"input", "textarea" -> MarklessField(context).apply {
 				filters = arrayOf(LengthLimit { nativeMaxLength(attrs[inst.id]?.get("maxlength")) })
-				setOnFocusChangeListener { v, focused -> if (focused) bringIntoView(v, dev.markless.mobile.core.FOCUS_INTO_VIEW) }
-				isSingleLine = true
+				val focusEvents = events[node.id].orEmpty().map { it.event }
+				setOnFocusChangeListener { v, focused ->
+					if (focused) bringIntoView(v, dev.markless.mobile.core.FOCUS_INTO_VIEW)
+					val event = if (focused) EventName.Focus else EventName.Blur
+					if (event in focusEvents) apply(runtime.dispatch(inst.id, event))
+				}
+				if (node.element == "input") {
+					isSingleLine = true
+					// After isSingleLine, whose transformation would show a password's text.
+					if (type == "password") inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+					// Chrome's keyboard for a number field: digits, a decimal mark and a sign.
+					if (type == "number") inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED
+				} else {
+					// A textarea's Return is a new line, and Chrome's default `rows="2"` shows two lines.
+					inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+					isSingleLine = false
+					minLines = 2
+					gravity = Gravity.TOP or Gravity.START
+				}
 				includeFontPadding = false
 				if (style != null) { background = null; setPadding(0, 0, 0, 0) }
 				addTextChangedListener(object : TextWatcher {
@@ -937,7 +979,7 @@ class MarklessHost(
 					override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
 					override fun afterTextChanged(s: Editable) = dismissMessage()
 				})
-				if (events[node.id].orEmpty().any { it.event == EventName.Enter }) imeOptions = EditorInfo.IME_ACTION_GO
+				if (node.element == "input" && events[node.id].orEmpty().any { it.event == EventName.Enter || it.event == EventName.Keydown }) imeOptions = EditorInfo.IME_ACTION_GO
 				named(this, inst.id)
 			}
 			else -> MarklessBox(context).apply {
@@ -954,10 +996,15 @@ class MarklessHost(
 		// A field's `value` attribute is its text until something sets it, as on the web.
 		if (view is EditText && node.bindings.none { it.property && it.name == "value" }) node.attributes["value"]?.let { view.setAppText(it) }
 		for (e in events[node.id].orEmpty()) when (e.event) {
-			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate)) }
+			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate, detail = pressCount(inst.id))) }
 			EventName.Dismiss -> if (OVERLAY_ATTRIBUTE !in node.attributes) throw MarklessHostError("dismiss event on \"${node.id}\", which is neither a sheet nor an overlay")
-			EventName.Cancel, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
-			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.Choose -> {}
+			// Raised by the field's focus listener, set where the field is built.
+			EventName.Focus, EventName.Blur -> if (view !is EditText) throw MarklessHostError("${e.event.wire} event on \"${node.id}\", which is not a text field")
+			EventName.Keydown -> (view as? MarklessField ?: throw MarklessHostError("keydown event on \"${node.id}\", which is not a text field")).onKey = { key -> prevents(runtime.dispatch(inst.id, EventName.Keydown, key)) }
+			EventName.Paste -> (view as? MarklessField ?: throw MarklessHostError("paste event on \"${node.id}\", which is not a text field")).onPaste = { text -> prevents(runtime.dispatch(inst.id, EventName.Paste, text)) }
+			EventName.Cancel, EventName.Close, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
+			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.MouseOver, EventName.MouseOut,
+			EventName.MouseEnter, EventName.MouseLeave, EventName.MouseMove, EventName.MouseDown, EventName.MouseUp, EventName.Choose -> {}
 			// The keyboard's action key arrives as its action id; a hardware Enter as IME_NULL with the key down, then up.
 			EventName.Enter -> (view as? EditText ?: throw MarklessHostError("enter event on \"${node.id}\", which is not an input")).setOnEditorActionListener { _, actionId, key ->
 				val now = android.os.SystemClock.uptimeMillis()
@@ -1105,8 +1152,8 @@ class MarklessHost(
 				view.setOnClickListener { views[value]?.performClick() }
 			}
 			"aria-label" -> if (view is AudioButton) view.label(value) else {
-				view.contentDescription = value
-				if (view is DrawingView && current["aria-hidden"] != "true") view.importantForAccessibility = if (value != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO
+				view.contentDescription = value ?: (view as? DrawingView)?.label
+				if (view is DrawingView && current["aria-hidden"] != "true") view.importantForAccessibility = if (view.contentDescription != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO
 			}
 			"alt" -> if (view is SizedImage) view.contentDescription = value
 			"src" -> when (view) {
@@ -1488,4 +1535,9 @@ private fun EditText.setAppText(text: String) {
 	val limit = filters.filterIsInstance<LengthLimit>().singleOrNull()
 	limit?.appWriting = true
 	try { setText(text) } finally { limit?.appWriting = false }
+}
+
+/** App-scoped shared fields for this launch: one store every screen reads and writes, as the web keeps one copy per document. */
+internal object AppSession {
+	val store = MemoryStore()
 }

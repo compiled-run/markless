@@ -1,0 +1,32 @@
+appId: ${APP_ID}
+name: u82-by-id
+---
+- launchApp:
+      clearState: true
+- assertVisible: Pick a
+- assertVisible: Pick b
+- assertVisible: Pick c
+- assertVisible: Find
+- assertVisible: Missing
+- assertNotVisible: found b
+- assertNotVisible: found c
+- assertNotVisible: no such id
+- tapOn: Find
+- assertVisible: found b
+- assertVisible: found b
+- assertNotVisible: found c
+- tapOn: Pick c
+- assertNotVisible: found b
+- assertVisible: picked c
+- assertNotVisible: found b
+- assertNotVisible: found c
+- tapOn: Find
+- assertVisible: found c
+- assertNotVisible: picked c
+- assertVisible: found c
+- assertNotVisible: found b
+- assertNotVisible: picked c
+- tapOn: Missing
+- assertNotVisible: found c
+- assertVisible: no such id
+- assertNotVisible: found c

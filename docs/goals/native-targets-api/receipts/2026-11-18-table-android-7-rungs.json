@@ -1,0 +1,48 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "u26-table",
+			"failure": null,
+			"installSeconds": 1.5619169170000022,
+			"flowSeconds": 16.230775624999996
+		},
+		{
+			"name": "u14-gridlist",
+			"failure": null,
+			"installSeconds": 1.6420362909999968,
+			"flowSeconds": 19.73004462500001
+		},
+		{
+			"name": "u11-pagination",
+			"failure": null,
+			"installSeconds": 1.5406859589999948,
+			"flowSeconds": 21.362820874999976
+		},
+		{
+			"name": "u12-buttongroup",
+			"failure": null,
+			"installSeconds": 1.5032027090000046,
+			"flowSeconds": 45.17505866599997
+		},
+		{
+			"name": "u13-accordion",
+			"failure": null,
+			"installSeconds": 1.515264084000024,
+			"flowSeconds": 44.025409208
+		},
+		{
+			"name": "05b-choices",
+			"failure": null,
+			"installSeconds": 1.5992813339999994,
+			"flowSeconds": 23.887685624999985
+		},
+		{
+			"name": "u23-textbox",
+			"failure": null,
+			"installSeconds": 1.5532371660000062,
+			"flowSeconds": 17.036013708000013
+		}
+	]
+}

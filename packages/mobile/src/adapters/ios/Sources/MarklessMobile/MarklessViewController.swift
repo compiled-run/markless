@@ -65,7 +65,7 @@ public final class MarklessViewController: UIViewController {
 			throw HostError("\(page.pattern) needs a route to open at, and none was given")
 		}
 		runtime = NativeRuntime(
-			payload: self.payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages, scriptHost: MarklessScripting.shared.host)
+			payload: self.payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages, scriptHost: MarklessScripting.shared.host, session: MarklessSession.store)
 		super.init(nibName: nil, bundle: nil)
 		Self.linkDragon()
 		try buildPage()
@@ -91,7 +91,7 @@ public final class MarklessViewController: UIViewController {
 		self.style = style
 		self.fonts = fonts
 		self.store = store
-		runtime = NativeRuntime(payload: page, store: store, params: params, scriptHost: MarklessScripting.shared.host)
+		runtime = NativeRuntime(payload: page, store: store, params: params, scriptHost: MarklessScripting.shared.host, session: MarklessSession.store)
 		super.init(nibName: nil, bundle: nil)
 		Self.linkDragon()
 		try buildPage()
@@ -163,7 +163,8 @@ public final class MarklessViewController: UIViewController {
 		let device = self.device
 		tree = try ViewTree(
 			runtime: runtime, layout: layout, sheetLayouts: sheetLayouts, faces: faces,
-			onAction: { [weak self] action in self?.perform(action) },
+			onAction: { [weak self] action in _ = self?.perform(action) },
+			ask: { [weak self] action in self?.perform(action) ?? false },
 			objectView: { object, kind in try device.view(for: object, device: kind) })
 		tree?.presenter = self
 		navigationItem.title = try runtime.title()
@@ -404,21 +405,25 @@ public final class MarklessViewController: UIViewController {
 	public override func viewDidAppear(_ animated: Bool) {
 		super.viewDidAppear(animated)
 		tree?.pageAppeared(self)
+		// Shown again (Back): the app's shared copies may have moved on another screen.
+		if appeared, let moved = try? runtime.resume(), !moved.isEmpty { apply { moved } }
 		appeared = true
 		scheduleLoadEvents()
 		if let script = payload.script { MarklessScripting.shared.warm(script) }
 	}
 
-	/// Runs the handler for an action and applies its journal, exactly as a tap does.
-	public func perform(_ action: NativeAction) {
+	/// Runs the handler for an action and applies its journal, exactly as a tap does; answers whether it called `preventDefault()`.
+	@discardableResult public func perform(_ action: NativeAction) -> Bool {
 		tree?.dismissMessage()
+		var prevented = false
 		do {
 			let journal = try runtime.dispatch(action)
 			if case let .navigate(route, params, replace)? = journal.last {
 				if replace || navigator == nil { leave() }
 				if let navigator { try navigator(route, params, replace) } else { try navigate(route, params) }
-				return
+				return false
 			}
+			prevented = journal.contains(.preventDefault)
 			for case let .title(value) in journal { navigationItem.title = value }
 			try tree?.apply(journal.filter(\.isForViews))
 			if movesRows(journal) { layOutAtScreenSize(rowsMoved: true) }
@@ -428,6 +433,7 @@ public final class MarklessViewController: UIViewController {
 			fatalError("Markless iOS host: \(error)")
 		}
 		scheduleLoadEvents()
+		return prevented
 	}
 
 	/// Builds the page at `route` from scratch with `params`; its state starts over.
@@ -435,7 +441,7 @@ public final class MarklessViewController: UIViewController {
 		guard payload.route?.pattern == route else { throw HostError("no page for \(route): this payload is \(payload.route?.pattern ?? "not a page")") }
 		for object in payload.objects { device.release(object.id) }
 		runtime = NativeRuntime(
-			payload: payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages, scriptHost: MarklessScripting.shared.host)
+			payload: payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages, scriptHost: MarklessScripting.shared.host, session: MarklessSession.store)
 		scrollWatches = [:]
 		tree?.unmount()
 		try buildPage()
@@ -464,7 +470,7 @@ extension NativeJournalEntry {
 	/// Every entry but the ones the page's device runs and the title, which the screen's navigation bar shows.
 	var isForViews: Bool {
 		switch self {
-		case .call, .release, .title, .fetch, .abort: false
+		case .call, .release, .title, .fetch, .abort, .preventDefault: false
 		default: true
 		}
 	}
@@ -474,4 +480,10 @@ public struct HostError: Error, CustomStringConvertible {
 	public let description: String
 	public init(_ description: String) { self.description = description }
 }
+/// App-scoped shared fields for this launch: one store every screen reads and writes, as the web keeps one copy per document.
+@MainActor
+enum MarklessSession {
+	static let store = MemoryStore()
+}
+
 #endif

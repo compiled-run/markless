@@ -1,0 +1,253 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "FieldFocus",
+		"cells": [
+			{
+				"id": "state:note",
+				"name": "note",
+				"initial": "idle",
+				"styled": true,
+				"domain": ["idle", "typing a name", "name left", "typing notes", "notes left"]
+			},
+			{
+				"id": "state:visits",
+				"name": "visits",
+				"initial": 0
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "input",
+				"parent": "h0",
+				"attributes": {
+					"aria-label": "Name"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "textarea",
+				"parent": "h0",
+				"attributes": {
+					"aria-label": "Notes"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"",
+								{
+									"cell": "state:note"
+								},
+								", ",
+								{
+									"cell": "state:visits"
+								},
+								" visits"
+							]
+						}
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "focus",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h1",
+				"event": "blur",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h2",
+				"event": "focus",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h2",
+				"event": "blur",
+				"handler": "handler:event:3"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:note",
+						"value": {
+							"literal": "typing a name"
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:visits",
+						"value": {
+							"binary": "+",
+							"left": {
+								"cell": "state:visits"
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:note",
+						"value": {
+							"literal": "name left"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:note",
+						"value": {
+							"literal": "typing notes"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:note",
+						"value": {
+							"literal": "notes left"
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [["h3:text0", "idle, 0 visits"]],
+	"steps": [
+		{
+			"action": {
+				"event": "focus",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:note",
+					"value": "typing a name"
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "typing a name, 1 visits"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "blur",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:note",
+					"value": "name left"
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "name left, 1 visits"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "focus",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:note",
+					"value": "typing notes"
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "typing notes, 1 visits"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "blur",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:note",
+					"value": "notes left"
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "notes left, 1 visits"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "focus",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:note",
+					"value": "typing a name"
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "typing a name, 2 visits"
+				}
+			]
+		}
+	]
+}

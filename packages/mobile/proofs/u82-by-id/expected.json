@@ -1,0 +1,66 @@
+{
+	"rung": 192,
+	"name": "document.getElementById finds the shown element whose id is the value now, row copies included",
+	"steps": [
+		{
+			"visible": [
+				"Pick a",
+				"Pick b",
+				"Pick c",
+				"Find",
+				"Missing"
+			],
+			"absent": [
+				"found b",
+				"found c",
+				"no such id"
+			]
+		},
+		{
+			"do": {
+				"tap": "Find"
+			},
+			"visible": [
+				"found b"
+			],
+			"absent": [
+				"found c"
+			]
+		},
+		{
+			"do": {
+				"tap": "Pick c"
+			},
+			"visible": [
+				"picked c"
+			],
+			"absent": [
+				"found b",
+				"found c"
+			]
+		},
+		{
+			"do": {
+				"tap": "Find"
+			},
+			"visible": [
+				"found c"
+			],
+			"absent": [
+				"found b",
+				"picked c"
+			]
+		},
+		{
+			"do": {
+				"tap": "Missing"
+			},
+			"visible": [
+				"no such id"
+			],
+			"absent": [
+				"found c"
+			]
+		}
+	]
+}

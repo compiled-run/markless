@@ -1033,6 +1033,8 @@ export type SemanticKeyedRepeat = {
 	readonly collectionPath: ReadonlyArray<string>;
 	/** The collection as a tree (native builds only). */
 	readonly collectionExpression?: SemanticExpression;
+	/** Where the collection is written, which finds it when no row element does (native builds only). */
+	readonly collectionSpan?: SourceSpan;
 	readonly keySource: string;
 	// Empty means the item ITSELF is the key (`key row`), which a list of scalars
 	// is; `indexKey` is what says a row has no data identity at all.
@@ -1541,6 +1543,8 @@ export type SemanticExpression =
 			readonly kind: 'object';
 			readonly entries: ReadonlyArray<readonly [string, SemanticExpression]>;
 	  }
+	/** An object literal with spreads (`{ ...row, name }`): each part's own fields in order, a later key winning. */
+	| { readonly kind: 'merge'; readonly parts: ReadonlyArray<SemanticExpression> }
 	/** A method called on a value: an array's or string's (with JavaScript's meaning), or an element's, which a native build resolves itself. */
 	| {
 			readonly kind: 'method';

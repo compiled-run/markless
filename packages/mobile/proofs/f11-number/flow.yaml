@@ -1,0 +1,89 @@
+appId: ${APP_ID}
+name: f11-number
+---
+- launchApp:
+    clearState: true
+- assertVisible: Settings
+- assertVisible: Save
+- assertVisible: Typed nothing
+- assertVisible: Not saved
+- assertNotVisible: Typed 3
+- assertNotVisible: Saved size 18, gap 2\.5
+- tapOn: Font size
+- eraseText
+- inputText: "3"
+- hideKeyboard
+- assertVisible: Typed 3
+- assertNotVisible: Typed nothing
+- assertVisible: Typed 3
+- assertVisible: Not saved
+- assertNotVisible: Typed nothing
+- tapOn: Save
+- assertVisible: Value must be greater than or equal to 14\.
+- assertVisible: Typed 3
+- assertVisible: Not saved
+- assertNotVisible: Saved size 18, gap 2\.5
+- assertVisible: Value must be greater than or equal to 14\.
+- tapOn: Font size
+- eraseText
+- inputText: "15.5"
+- hideKeyboard
+- assertNotVisible: Typed 3
+- assertVisible: Typed 15\.5
+- assertVisible: Not saved
+- assertNotVisible: Typed 3
+- tapOn: Save
+- assertVisible: Please enter a valid value\. The two nearest valid values are 15 and 16\.
+- assertVisible: Typed 15\.5
+- assertVisible: Not saved
+- assertNotVisible: Saved size 18, gap 2\.5
+- assertVisible: Please enter a valid value\. The two nearest valid values are 15 and 16\.
+- tapOn: Font size
+- eraseText
+- inputText: "18"
+- hideKeyboard
+- assertNotVisible: Typed 15\.5
+- assertVisible: Typed 18
+- assertVisible: Not saved
+- assertNotVisible: Typed 15\.5
+- tapOn: Spacing
+- eraseText
+- inputText: "12"
+- hideKeyboard
+- assertNotVisible: Typed 18
+- assertVisible: Typed 12
+- assertVisible: Not saved
+- assertNotVisible: Typed 18
+- tapOn: Save
+- assertVisible: Value must be less than or equal to 10\.
+- assertVisible: Typed 12
+- assertVisible: Not saved
+- assertNotVisible: Saved size 18, gap 2\.5
+- assertVisible: Value must be less than or equal to 10\.
+- tapOn: Spacing
+- eraseText
+- inputText: "1.2"
+- hideKeyboard
+- assertNotVisible: Typed 12
+- assertVisible: Typed 1\.2
+- assertVisible: Not saved
+- assertNotVisible: Typed 12
+- tapOn: Save
+- assertVisible: Please enter a valid value\. The two nearest valid values are 1 and 1\.5\.
+- assertVisible: Typed 1\.2
+- assertVisible: Not saved
+- assertNotVisible: Saved size 18, gap 2\.5
+- assertVisible: Please enter a valid value\. The two nearest valid values are 1 and 1\.5\.
+- tapOn: Spacing
+- eraseText
+- inputText: "2.5"
+- hideKeyboard
+- assertNotVisible: Typed 1\.2
+- assertVisible: Typed 2\.5
+- assertVisible: Not saved
+- assertNotVisible: Typed 1\.2
+- tapOn: Save
+- assertNotVisible: Not saved
+- assertVisible: Saved size 18, gap 2\.5
+- assertVisible: Typed 2\.5
+- assertNotVisible: Not saved

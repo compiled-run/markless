@@ -1,0 +1,443 @@
+{
+	"version": "markless.native-app-conformance/0",
+	"app": {
+		"version": "markless.native-app/0",
+		"routes": [
+			{
+				"pattern": "/",
+				"params": [],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Home",
+					"route": {
+						"pattern": "/",
+						"params": []
+					},
+					"cells": [
+						{
+							"id": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track",
+							"name": "box.track",
+							"initial": "Harbour Lights",
+							"storage": {
+								"key": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track",
+								"session": true
+							}
+						},
+						{
+							"id": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
+							"name": "box.playing",
+							"initial": false,
+							"storage": {
+								"key": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
+								"session": true
+							},
+							"styled": true
+						}
+					],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "h1",
+							"parent": "h0",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Player"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/h0",
+							"element": "div",
+							"parent": "h0"
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/h1",
+							"element": "p",
+							"parent": "component-edge:0/h0"
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0/h1:text0",
+							"parent": "component-edge:0/h1",
+							"parts": [
+								{
+									"expr": {
+										"if": {
+											"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing"
+										},
+										"whenTrue": {
+											"literal": "Playing"
+										},
+										"whenFalse": {
+											"literal": "Paused"
+										}
+									}
+								},
+								{
+									"text": ": "
+								},
+								{
+									"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/h2",
+							"element": "button",
+							"parent": "component-edge:0/h0"
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0/h2:text0",
+							"parent": "component-edge:0/h2",
+							"parts": [
+								{
+									"expr": {
+										"literal": "Play or pause"
+									}
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:1",
+							"element": "a",
+							"parent": "h0",
+							"attributes": {
+								"href": "/now"
+							}
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:1:text0",
+							"parent": "component-edge:1",
+							"parts": [
+								{
+									"text": "Now playing"
+								}
+							]
+						}
+					],
+					"events": [
+						{
+							"host": "component-edge:0/h2",
+							"event": "activate",
+							"handler": "handler:component-edge:0/event:0"
+						},
+						{
+							"host": "component-edge:1",
+							"event": "activate",
+							"handler": "handler:component-edge:1"
+						}
+					],
+					"handlers": [
+						{
+							"id": "handler:component-edge:0/event:0",
+							"ops": [
+								{
+									"op": "assign",
+									"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
+									"value": {
+										"unary": "!",
+										"value": {
+											"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing"
+										}
+									}
+								}
+							]
+						},
+						{
+							"id": "handler:component-edge:1",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/now",
+									"params": {}
+								}
+							]
+						}
+					],
+					"title": [
+						{
+							"text": "Home"
+						}
+					]
+				}
+			},
+			{
+				"pattern": "/now",
+				"params": [],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Now",
+					"route": {
+						"pattern": "/now",
+						"params": []
+					},
+					"cells": [
+						{
+							"id": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track",
+							"name": "box.track",
+							"initial": "Harbour Lights",
+							"storage": {
+								"key": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track",
+								"session": true
+							}
+						},
+						{
+							"id": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
+							"name": "box.playing",
+							"initial": false,
+							"storage": {
+								"key": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
+								"session": true
+							},
+							"styled": true
+						}
+					],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "h1",
+							"parent": "h0",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Track"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/h0",
+							"element": "div",
+							"parent": "h0"
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/h1",
+							"element": "p",
+							"parent": "component-edge:0/h0"
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0/h1:text0",
+							"parent": "component-edge:0/h1",
+							"parts": [
+								{
+									"expr": {
+										"if": {
+											"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing"
+										},
+										"whenTrue": {
+											"literal": "Playing"
+										},
+										"whenFalse": {
+											"literal": "Paused"
+										}
+									}
+								},
+								{
+									"text": ": "
+								},
+								{
+									"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0/h2",
+							"element": "button",
+							"parent": "component-edge:0/h0"
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0/h2:text0",
+							"parent": "component-edge:0/h2",
+							"parts": [
+								{
+									"expr": {
+										"literal": "Toggle here"
+									}
+								}
+							]
+						}
+					],
+					"events": [
+						{
+							"host": "component-edge:0/h2",
+							"event": "activate",
+							"handler": "handler:component-edge:0/event:0"
+						}
+					],
+					"handlers": [
+						{
+							"id": "handler:component-edge:0/event:0",
+							"ops": [
+								{
+									"op": "assign",
+									"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
+									"value": {
+										"unary": "!",
+										"value": {
+											"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing"
+										}
+									}
+								}
+							]
+						}
+					],
+					"title": [
+						{
+							"text": "Now playing"
+						}
+					]
+				}
+			}
+		]
+	},
+	"open": "/",
+	"initial": {
+		"stack": ["/"],
+		"title": "Home",
+		"texts": [
+			["h2:text0", "Player"],
+			["component-edge:0/h1:text0", "Paused: Harbour Lights"],
+			["component-edge:0/h2:text0", "Play or pause"],
+			["component-edge:1:text0", "Now playing"]
+		]
+	},
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h2"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
+					"value": true
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h1:text0",
+					"value": "Playing: Harbour Lights"
+				}
+			],
+			"stack": ["/"],
+			"title": "Home",
+			"texts": [
+				["h2:text0", "Player"],
+				["component-edge:0/h1:text0", "Playing: Harbour Lights"],
+				["component-edge:0/h2:text0", "Play or pause"],
+				["component-edge:1:text0", "Now playing"]
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1"
+			},
+			"journal": [
+				{
+					"op": "navigate",
+					"route": "/now",
+					"params": {}
+				}
+			],
+			"stack": ["/", "/now"],
+			"title": "Now playing",
+			"texts": [
+				["h2:text0", "Track"],
+				["component-edge:0/h1:text0", "Playing: Harbour Lights"],
+				["component-edge:0/h2:text0", "Toggle here"]
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h2"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
+					"value": false
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h1:text0",
+					"value": "Paused: Harbour Lights"
+				}
+			],
+			"stack": ["/", "/now"],
+			"title": "Now playing",
+			"texts": [
+				["h2:text0", "Track"],
+				["component-edge:0/h1:text0", "Paused: Harbour Lights"],
+				["component-edge:0/h2:text0", "Toggle here"]
+			]
+		},
+		{
+			"action": {
+				"event": "back"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
+					"value": false
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h1:text0",
+					"value": "Paused: Harbour Lights"
+				}
+			],
+			"stack": ["/"],
+			"title": "Home",
+			"texts": [
+				["h2:text0", "Player"],
+				["component-edge:0/h1:text0", "Paused: Harbour Lights"],
+				["component-edge:0/h2:text0", "Play or pause"],
+				["component-edge:1:text0", "Now playing"]
+			]
+		}
+	]
+}
