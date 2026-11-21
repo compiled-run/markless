@@ -502,7 +502,7 @@ export type SemanticGraphBinding = {
 	readonly async?: boolean;
 	readonly asyncCapable?: boolean;
 	readonly dependencies?: ReadonlyArray<SemanticGraphDependency>;
-	/** A sync computed's body as a tree, for native builds only (`nativeFacts`). */
+	/** A sync computed's body, or a state's first value that does not fold, as a tree, for native builds only (`nativeFacts`). */
 	readonly nativeExpression?: SemanticExpression;
 	readonly functionSource?: string;
 	// A synthetic computed spelling one run of text: inside @try it waits on its async inputs, not on itself.
@@ -2116,6 +2116,11 @@ export type SemanticGraphArtifact = {
 	readonly sharedCallbackBindings: ReadonlyArray<SemanticSharedCallbackBinding>;
 	readonly hostNodes: ReadonlyArray<SemanticHostNode>;
 	readonly keyedRepeats: ReadonlyArray<SemanticKeyedRepeat>;
+	/**
+	 * A `@for` written straight inside a component's tag whose rows this module cannot place, because it was analyzed
+	 * without the child's interface. Left out of `keyedRepeats`; a build that places rows itself (native) still reads it.
+	 */
+	readonly unplacedProjectedRepeats?: ReadonlyArray<SemanticKeyedRepeat>;
 	readonly events: ReadonlyArray<SemanticEvent>;
 	readonly syncPolicyConstants?: ReadonlyArray<SemanticSyncPolicyConstant>;
 	readonly behaviors: ReadonlyArray<SemanticBehavior>;

@@ -25,6 +25,7 @@ import {
 	NATIVE_DATA_SCRIPT_TYPES,
 	NATIVE_ELEMENTS,
 	NATIVE_DOCUMENT_BODY,
+	NATIVE_UNBOUND_HANDLE,
 	NATIVE_UNSHOWN_ELEMENTS,
 	NATIVE_SCRIPT_EVENT_MEMBERS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
@@ -314,7 +315,6 @@ const UNCHECKED_CONSTRAINTS = [
 	'max',
 	'step',
 	'multiple',
-	'readonly',
 	'form',
 ];
 /** A submit button's own overrides of where and how its form is sent. */
@@ -394,6 +394,45 @@ const isNativeValue = (value: unknown): value is NativeValue =>
 		Object.values(value as object).every(isNativeValue));
 
 /** Every value an attribute expression can write, when each comes from a literal in it; undefined when one may not. */
+/** An attribute's text as the web writes a bound value: `false` and nullish leave it out, `true` writes "true". */
+function attributeText(value: NativeExpr): NativeExpr {
+	return {
+		if: { logical: '||', left: { binary: '===', left: value, right: { literal: false } }, right: { binary: '===', left: value, right: { literal: null } } },
+		whenTrue: { literal: null },
+		whenFalse: { if: { binary: '===', left: value, right: { literal: true } }, whenTrue: { literal: 'true' }, whenFalse: { call: 'String', arguments: [value] } },
+	};
+}
+
+/**
+ * A live region's politeness (`'polite'`, `'assertive'` or null) and atomicity as ARIA defines them from `role`,
+ * `aria-live` and `aria-atomic`, for an element whose attributes follow state: the host evaluates them when it speaks.
+ */
+function liveRuleOf(
+	element: string,
+	attribute: (name: string) => NativeExpr,
+): { readonly politeness: NativeExpr; readonly atomic: NativeExpr } {
+	const is = (value: NativeExpr, text: string | null): NativeExpr => ({ binary: '===', left: value, right: { literal: text } });
+	const choose = (test: NativeExpr, whenTrue: NativeExpr, whenFalse: NativeExpr): NativeExpr => ({ if: test, whenTrue, whenFalse });
+	const role = attribute('role');
+	const live = attribute('aria-live');
+	const atomic = attribute('aria-atomic');
+	const implicit: NativeExpr = {
+		logical: '||',
+		left: { logical: '||', left: is(role, 'status'), right: is(role, 'alert') },
+		right: element === 'output' ? is(role, null) : { literal: false },
+	};
+	const politeness = choose(
+		{ logical: '||', left: is(live, 'polite'), right: is(live, 'assertive') },
+		live,
+		choose(
+			is(live, 'off'),
+			{ literal: null },
+			choose(is(role, 'alert'), { literal: 'assertive' }, choose({ logical: '||', left: implicit, right: is(role, 'log') }, { literal: 'polite' }, { literal: null })),
+		),
+	);
+	return { politeness, atomic: choose(is(atomic, null), implicit, is(atomic, 'true')) };
+}
+
 function writtenValuesOf(expr: NativeExpr): Set<string> | undefined {
 	if ('literal' in expr)
 		return new Set(
@@ -810,6 +849,8 @@ function mentionsBuildValue(expr: unknown): boolean {
 function mentionsElement(expr: unknown): boolean {
 	if (!expr || typeof expr !== 'object') return false;
 	if ('element' in expr && typeof (expr as ElementValue).element === 'string') return true;
+	if ('drawn' in expr && typeof expr.drawn === 'string') return true;
+	if ('literal' in expr && expr.literal === NATIVE_UNBOUND_HANDLE) return true;
 	return Object.values(expr).some((child) =>
 		Array.isArray(child) ? child.some(mentionsElement) : mentionsElement(child),
 	);
@@ -1005,7 +1046,9 @@ function moduleFactsOf(graph: SemanticGraphArtifact) {
 		),
 		edgesById: new Map(graph.componentEdges.map((edge) => [edge.id, edge])),
 		eventsByHost: index(graph.events, (event) => event.hostNodeId),
-		repeatsById: new Map(graph.keyedRepeats.map((repeat) => [repeat.id, repeat])),
+		repeatsById: new Map(
+			[...graph.keyedRepeats, ...(graph.unplacedProjectedRepeats ?? [])].map((repeat) => [repeat.id, repeat]),
+		),
 		/** Sync computeds by component, then name: a read of one inlines its expression. */
 		computeds: graph.graphBindings.reduce((byComponent, binding) => {
 			if (binding.kind !== 'computed') return byComponent;
@@ -1581,13 +1624,56 @@ export function createNativeViewPayload(
 			fields: new Map(),
 			slots: new Map(),
 		};
+		const handles = new Map(
+			owner.graph.graphBindings.flatMap((binding) =>
+				binding.sharedDefinitionId === definition.id && binding.kind === 'element'
+					? [
+							[
+								binding.name,
+								{ key: `${prefix}${binding.id}`, plural: binding.plural === true },
+							] as const,
+						]
+					: [],
+			),
+		);
+		instance.scope = {
+			module: owner,
+			component: '',
+			handles,
+			cells: { byName, byBinding },
+			prefix,
+			locals: new Set(),
+			items: new Map(),
+			props: new Map(),
+			objects,
+			args: new Map(),
+			shared: new Map(),
+			deviceObjects: new Map(),
+		};
 		const objectFields = new Map<string, Map<string, string>>();
 		for (const binding of owner.graph.graphBindings) {
 			if (binding.sharedDefinitionId !== definition.id || binding.kind !== 'state') continue;
 			const id = `${prefix}${binding.id}`;
-			const value = nativeInitialOf(binding.initialValue);
-			noteUndefined(id, binding.initialValue);
-			if (binding.initialValueKnown !== true || !isNativeValue(value)) {
+			let first: unknown = binding.initialValue;
+			let known = binding.initialValueKnown === true;
+			// A first value that reads module constants is fixed when the app is built, as the web evaluates it once.
+			if (!known && binding.nativeExpression) {
+				const lowered = attempt(() =>
+					exprOf(binding.nativeExpression!, `the first value of \`${binding.name}\``, instance.scope),
+				);
+				const folded =
+					!lowered.failed && lowered.value && cellsOf(lowered.value).size === 0
+						? foldConstant(lowered.value, initialOf)
+						: undefined;
+				lowered.rollBack();
+				if (folded) {
+					first = folded.value;
+					known = true;
+				}
+			}
+			const value = nativeInitialOf(first);
+			noteUndefined(id, first);
+			if (!known || !isNativeValue(value)) {
 				refuse(
 					`shared state \`${binding.name}\` of ${definition.name} needs a JSON initial value known at build time`,
 				);
@@ -1640,32 +1726,6 @@ export function createNativeViewPayload(
 					});
 			}
 		}
-		const handles = new Map(
-			owner.graph.graphBindings.flatMap((binding) =>
-				binding.sharedDefinitionId === definition.id && binding.kind === 'element'
-					? [
-							[
-								binding.name,
-								{ key: `${prefix}${binding.id}`, plural: binding.plural === true },
-							] as const,
-						]
-					: [],
-			),
-		);
-		instance.scope = {
-			module: owner,
-			component: '',
-			handles,
-			cells: { byName, byBinding },
-			prefix,
-			locals: new Set(),
-			items: new Map(),
-			props: new Map(),
-			objects,
-			args: new Map(),
-			shared: new Map(),
-			deviceObjects: new Map(),
-		};
 		return instance;
 	};
 
@@ -1813,13 +1873,15 @@ export function createNativeViewPayload(
 				if (folded && lowered && cellsOf(lowered).size === 0) {
 					value = folded.value;
 					known = true;
-					// A prop the part was not given is `undefined` on the web, there and as an object's field.
-					const absent = (e: SemanticExpression) =>
-						e.kind === 'read' && isPropName(e.name, scope) && !propOf(e.name, scope);
+					const absent = (e: SemanticExpression) => e.kind === 'read' && absentProp(e.name, scope);
 					if (absent(initializer)) undefinedFirst.add(id);
-					else if (initializer.kind === 'object')
-						for (const [field, e] of initializer.entries)
-							if (absent(e)) undefinedFirst.add(`${id}.${field}`);
+					else {
+						undefinedFirst.delete(id);
+						if (initializer.kind === 'object')
+							for (const [field, e] of initializer.entries)
+								if (absent(e)) undefinedFirst.add(`${id}.${field}`);
+								else undefinedFirst.delete(`${id}.${field}`);
+					}
 				} else if (
 					lowered &&
 					row &&
@@ -1956,11 +2018,7 @@ export function createNativeViewPayload(
 			);
 			return;
 		}
-		// A prop the root was not given is `undefined` there too; any other value replaces the first one.
-		const absent =
-			statement.value.kind === 'read' &&
-			isPropName(statement.value.name, scope) &&
-			!propOf(statement.value.name, scope);
+		const absent = statement.value.kind === 'read' && absentProp(statement.value.name, scope);
 		if (absent) undefinedFirst.add(cell);
 		else undefinedFirst.delete(cell);
 		setInitial(cell, folded.value);
@@ -2027,6 +2085,11 @@ export function createNativeViewPayload(
 		scope.props.get(scope.module.propNames.get(scope.component)?.get(name) ?? '');
 	const isPropName = (name: string, scope: Scope): boolean =>
 		scope.module.propNames.get(scope.component)?.has(name) === true;
+	/** A prop the part was not given and has no default for, which reads `undefined` on the web. */
+	const absentProp = (name: string, scope: Scope): boolean =>
+		isPropName(name, scope) &&
+		!propOf(name, scope) &&
+		!Object.hasOwn(scope.module.componentFacts.get(scope.component)?.native?.propDefaults ?? {}, name);
 
 	const cellOf = (name: string, scope: Scope): string | undefined => scope.cells.byName.get(name);
 	const isRouterLink = (scope: Scope, name: string): boolean => {
@@ -3074,9 +3137,20 @@ export function createNativeViewPayload(
 		if (!lateLowering) return refuse(`${what} as a value outside a handler`);
 		const bound = boundHandles.get(key) ?? [];
 		const byId = nodeById();
-		// An element in an @if arm is bound only while its arm shows, which the app knows only while it runs.
+		if (bound.some((id) => byId.get(id)?.arm) && !bound.some((id) => byId.get(id)?.row)) {
+			if (plural) return refuse(`${what}, a handle list bound inside an @if arm`);
+			const unarmed = bound.filter((id) => !byId.get(id)?.arm);
+			if (unarmed.length > 0 && bound.length > 1)
+				return refuse(`${what}, a handle bound to more than one element`);
+			const drawn = bound
+				.map((id): NativeExpr => ({ drawn: id }))
+				.reduceRight((right, left) => ({ logical: '??', left, right }));
+			return scriptReading
+				? { logical: '??', left: drawn, right: { literal: NATIVE_UNBOUND_HANDLE } }
+				: drawn;
+		}
 		if (bound.some((id) => byId.get(id)?.arm))
-			return refuse(`${what}, a handle bound inside an @if arm`);
+			return refuse(`${what}, a handle bound inside an @if arm within a @for row`);
 		if (scriptReading && plural && bound.some((id) => byId.get(id)?.row)) {
 			// JavaScript gets every row's copy, in the rows' order, as the web's handle list holds them.
 			const repeat = byId.get(bound[0]!)?.row;
@@ -3114,7 +3188,8 @@ export function createNativeViewPayload(
 		if (plural)
 			return { array: bound.map((id) => ({ spread: false, value: elementValue(id) })) };
 		if (bound.length > 1) return refuse(`${what}, a handle bound to more than one element`);
-		return bound[0] ? elementValue(bound[0]) : { literal: null };
+		if (bound[0]) return elementValue(bound[0]);
+		return scriptReading ? { literal: NATIVE_UNBOUND_HANDLE } : { literal: null };
 	};
 
 	/** Whether a node is an `<input>` a person ticks: a checkbox or a radio button. */
@@ -3148,25 +3223,36 @@ export function createNativeViewPayload(
 		attributes: Readonly<Record<string, string>>,
 		bindings: ReadonlyArray<{ readonly attribute: string } | { readonly property: string }>,
 		span: SourceSpan | undefined,
-	): NonNullable<Extract<NativeNode, { kind: 'element' }>['live']> | undefined => {
+		row: string | undefined,
+	): Pick<Extract<NativeNode, { kind: 'element' }>, 'live' | 'liveFollows'> => {
 		const LIVE_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
 			role: new Set(['status', 'alert', 'log']),
 			'aria-live': new Set(['polite', 'assertive']),
 			'aria-atomic': new Set(['true', 'false']),
 		};
-		for (const [name, live] of Object.entries(LIVE_VALUES)) {
-			const bound = bindings.find(
+		const boundTo = (name: string) =>
+			bindings.find(
 				(binding): binding is { readonly attribute: string; readonly value: NativeExpr } =>
 					'attribute' in binding && binding.attribute === name,
 			);
-			if (!bound) continue;
+		const follows = Object.entries(LIVE_VALUES).some(([name, live]) => {
+			const bound = boundTo(name);
+			if (!bound) return false;
 			const values = writtenValuesOf(bound.value);
-			if (values && ![...values].some((value) => live.has(value))) continue;
-			refuse(
-				`the \`${name}\` of a <${element}> follows state; a native host makes a live region when it builds the view`,
-				span,
-			);
-			return undefined;
+			return !values || [...values].some((value) => live.has(value));
+		});
+		if (follows) {
+			if (row !== undefined) {
+				refuse(
+					`a <${element}> in a @for row whose \`role\`, \`aria-live\` or \`aria-atomic\` follows state; a native host makes such a live region only outside a row`,
+					span,
+				);
+				return {};
+			}
+			return { liveFollows: liveRuleOf(element, (name) => {
+				const bound = boundTo(name);
+				return bound ? attributeText(bound.value) : { literal: attributes[name] ?? null };
+			}) };
 		}
 		const role = attributes['role'];
 		const implicit =
@@ -3182,12 +3268,12 @@ export function createNativeViewPayload(
 						: implicit || role === 'log'
 							? 'polite'
 							: undefined;
-		if (!politeness) return undefined;
+		if (!politeness) return {};
 		const atomic =
 			attributes['aria-atomic'] === undefined
 				? implicit
 				: attributes['aria-atomic'] === 'true';
-		return { politeness, atomic };
+		return { live: { politeness, atomic } };
 	};
 	/** Whether a click on the element does nothing on the web beyond its handlers, so `preventDefault()` there changes nothing. */
 	const clickHasNoDefault = (id: string): boolean => {
@@ -5145,7 +5231,7 @@ export function createNativeViewPayload(
 						);
 				}
 				const { value: label, ...unlabelled } = attributes;
-				const live = liveRegionOf(element ?? '*', attributes, bindings, item.span);
+				const live = liveRegionOf(element ?? '*', attributes, bindings, item.span, place.row);
 				nodes.push({
 					kind: 'element',
 					id,
@@ -5157,7 +5243,7 @@ export function createNativeViewPayload(
 					...(bindings.length > 0 ? { bindings } : {}),
 					...(defaultStyle ? { defaultStyle } : {}),
 					...(drawing ? { drawing } : {}),
-					...(live ? { live } : {}),
+					...live,
 					...place,
 				});
 				if (submitInput && label !== undefined) {

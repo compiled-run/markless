@@ -72,6 +72,8 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case focusOrigin(NativeExpr)
 	/// Whether the value is an element id or the document body.
 	case isElement(NativeExpr)
+	/// The element `node`, in an `@if` arm, if it was on screen when the run began; else null.
+	case drawn(String)
 	/// The page's route params, an object of strings.
 	case routeParams
 	/// `new FormData(form)`: the form's entries as `[name, value]` string pairs, in tree order.
@@ -86,7 +88,7 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .event, .focused, .local, .item, .index, .routeParams, .formData, .checked, .field: return []
+		case .literal, .event, .focused, .local, .item, .index, .routeParams, .formData, .checked, .field, .drawn: return []
 		case let .unary(_, inner), let .member(inner, _), let .optionalMember(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
 		case let .contains(within, node): return within.cells + node.cells
 		case let .captures(node, pointer): return node.cells + pointer.cells
@@ -164,6 +166,8 @@ public struct NativeNode: Equatable, Sendable {
 	public var drawing: NativeDrawing? = nil
 	/// A live region: a change to the text inside is announced.
 	public var live: NativeLive? = nil
+	/// A live region whose `role`, `aria-live` or `aria-atomic` follows state: its politeness and atomicity, evaluated when it speaks.
+	public var liveFollows: NativeLiveFollows? = nil
 
 	public var isElement: Bool { if case .element = kind { true } else { false } }
 	public var isText: Bool { if case .text = kind { true } else { false } }
@@ -660,7 +664,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let place = ["arm", "row"]
 			switch kind {
 			case "element":
-				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing", "live"] + place)
+				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing", "live", "liveFollows"] + place)
 				var attributes: [String: String] = [:]
 				if field.has("attributes") {
 					let reader = try field["attributes"]
@@ -682,7 +686,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 					object: field.has("object") ? try field["object"].string() : nil,
 					defaultStyle: field.has("defaultStyle") ? try decodeDefaultStyle(try field["defaultStyle"]) : nil,
 					drawing: field.has("drawing") ? try decodeDrawing(try field["drawing"]) : nil,
-					live: field.has("live") ? try decodeLive(try field["live"]) : nil)
+					live: field.has("live") ? try decodeLive(try field["live"]) : nil,
+					liveFollows: field.has("liveFollows") ? try decodeLiveFollows(try field["liveFollows"]) : nil)
 			case "text":
 				let field = try node.object(required: ["kind", "id", "parent", "parts"], optional: place)
 				let parts = try decodeParts(try field["parts"])
@@ -945,6 +950,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 		return NativeLive(assertive: politeness == "assertive", atomic: try live["atomic"].bool())
 	}
 
+	private static func decodeLiveFollows(_ reader: Reader) throws -> NativeLiveFollows {
+		let live = try reader.object(["politeness", "atomic"])
+		return NativeLiveFollows(politeness: try decodeExpr(try live["politeness"]), atomic: try decodeExpr(try live["atomic"]))
+	}
+
 	private static func decodeDrawing(_ reader: Reader) throws -> NativeDrawing {
 		let field = try reader.object(required: ["viewBox", "shapes"], optional: ["width", "height", "em"])
 		let viewBox = try field["viewBox"].isNull ? nil : try field["viewBox"].array().map { try $0.number() }
@@ -1063,6 +1073,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["captures", "pointer"]: return .captures(node: try decodeExpr(try field("captures")), pointer: try decodeExpr(try field("pointer")))
 		case ["focusOrigin"]: return .focusOrigin(try decodeExpr(try field("focusOrigin")))
 		case ["isElement"]: return .isElement(try decodeExpr(try field("isElement")))
+		case ["drawn"]: return .drawn(try field("drawn").string())
 		case ["literal"]: return .literal(try field("literal").scalar())
 		case ["unary", "value"]: return .unary(try oneOf("unary", ["!", "-", "+", "typeof"]), try decodeExpr(try field("value")))
 		case ["binary", "left", "right"]:
@@ -1393,6 +1404,17 @@ public struct NativeDeviceObject: Equatable, Sendable {
 public struct NativeLive: Sendable, Equatable {
 	public let assertive: Bool
 	public let atomic: Bool
+
+	public init(assertive: Bool, atomic: Bool) {
+		self.assertive = assertive
+		self.atomic = atomic
+	}
+}
+
+/// A live region's politeness (`"polite"`, `"assertive"` or null) and atomicity as expressions over the attributes that follow state.
+public struct NativeLiveFollows: Sendable, Equatable {
+	public let politeness: NativeExpr
+	public let atomic: NativeExpr
 }
 
 /// One piece of a key joined from a row's fields: fixed text, or the value at a path on the item, as a template literal writes it.
