@@ -119,6 +119,8 @@ async function serveRung(
 		join(root, 'node_modules/@markless/ui'),
 		'dir',
 	);
+	// The server an app rung's api/ routes run in, as the router's build imports it.
+	await symlink(join(packagesRoot, 'router/node_modules/nitro'), join(root, 'node_modules/nitro'), 'dir');
 	// The third-party package the script ladder imports (J2), as the mobile package depends on it.
 	await symlink(
 		join(packagesRoot, 'mobile/node_modules/scule'),
