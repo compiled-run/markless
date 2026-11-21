@@ -1,0 +1,10 @@
+{
+	"rung": "J17",
+	"name": "A child component's props computed by app functions (reduce, charAt) follow the state they read",
+	"steps": [
+		{ "visible": ["Tally", "Add two", "Rename"], "absent": ["Items: 0", "Items: 2"] },
+		{ "do": { "tap": "Add two" }, "visible": ["Items: 2"] },
+		{ "do": { "tap": "Add two" }, "visible": ["Items: 4"], "absent": ["Items: 2"] },
+		{ "do": { "tap": "Rename" }, "visible": ["Boxes: 4"], "absent": ["Items: 4"] }
+	]
+}

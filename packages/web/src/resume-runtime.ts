@@ -356,7 +356,7 @@ export function createResumeRuntime(
 			loadSymbol: input.loadSymbol,
 			getElementHandle: elementHandles.get,
 			storeHostSubscription,
-			registerKeyedRepeats: async (records, moved, computed) => {
+			registerKeyedRepeats: async (records, painted, computed) => {
 				await eventWiring.prepareSyncPolicy(
 					[],
 					records.flatMap((repeat) => repeat.rowEvents),
@@ -368,7 +368,7 @@ export function createResumeRuntime(
 					records,
 					{ elementsByHostId, events: eventWiring, elementHandles, storeHostSubscription },
 					rowComponentHost,
-					moved,
+					painted,
 					computed,
 				);
 			},
