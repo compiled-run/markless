@@ -62,6 +62,7 @@ import {
 import type {
 	CompilerDiagnostic,
 	SemanticComponentEdge,
+	SemanticElementRosterPosition,
 	SemanticEvent,
 	SemanticGraphArtifact,
 	SemanticMarkupChunk,
@@ -1130,6 +1131,10 @@ function moduleFactsOf(graph: SemanticGraphArtifact) {
 		eventsByHost: index(graph.events, (event) => event.hostNodeId),
 		repeatsById: new Map(
 			[...graph.keyedRepeats, ...(graph.unplacedProjectedRepeats ?? [])].map((repeat) => [repeat.id, repeat]),
+		),
+		/** Each computed whose whole body asks where its part stands among its family's parts, by the computed's graph node. */
+		rosterPositions: new Map(
+			(graph.elementRosterPositions ?? []).map((roster) => [roster.computedGraphNodeId, roster]),
 		),
 		/** Sync computeds by component, then name: a read of one inlines its expression. */
 		computeds: graph.graphBindings.reduce((byComponent, binding) => {
@@ -3208,6 +3213,29 @@ export function createNativeViewPayload(
 	const readFields = new Set<string>();
 	const nodeById = () => new Map(nodes.map((node) => [node.id, node]));
 
+	/** Each part's place read as a number while lowering, checked once every part is bound. */
+	const rosterReads: { readonly key: string; readonly host: string; readonly index: number; readonly what: string }[] = [];
+	/**
+	 * Where a part stands among its family's parts (`roster.indexOf(mine)`): the web's render order, which is tree order here, so
+	 * the parts bound before it in the build. A part not bound yet (its own attributes) is the next one.
+	 */
+	const rosterPosition = (
+		roster: SemanticElementRosterPosition,
+		scope: Scope,
+		what: string,
+	): NativeExpr | null => {
+		if (scope.row)
+			return refuse(`${what} reads where a part stands among its family's parts inside a @for row`);
+		const key = handleKey(roster.rosterGraphNodeId, scope);
+		if (!key) return refuse(`${what} reads where a part stands among parts this build does not bind`);
+		const host = scope.prefix + roster.hostNodeId;
+		const bound = boundHandles.get(key) ?? [];
+		const at = bound.indexOf(host);
+		const index = at >= 0 ? at : bound.length;
+		rosterReads.push({ key, host, index, what });
+		return { literal: index };
+	};
+
 	/** A handle read as a value in a handler: its element (null when unbound), or its elements in order when plural. */
 	const handleValue = (key: string, plural: boolean, what: string): NativeExpr | null => {
 		if (!lateLowering) return refuse(`${what} as a value outside a handler`);
@@ -3878,6 +3906,8 @@ export function createNativeViewPayload(
 						);
 					inlining.add(computed.id);
 					try {
+						const roster = scope.module.rosterPositions.get(computed.id);
+						if (roster) return rosterPosition(roster, scope, what);
 						if (!computed.nativeExpression)
 							return scriptComputed(computed, scope, what);
 						const data = attempt(() =>
@@ -8060,6 +8090,17 @@ export function createNativeViewPayload(
 			refuse(`the ${event.eventName} handler on an element this build does not show`);
 
 	const rowOfNode = new Map(nodes.map((node) => [node.id, node.row]));
+	// Parts an @if arm or a @for row shows join and leave while the app runs, which moves the places of the parts after them.
+	for (const read of rosterReads) {
+		const bound = boundHandles.get(read.key) ?? [];
+		const byId = nodeById();
+		if (bound.some((id) => byId.get(id)?.arm || byId.get(id)?.row))
+			refuse(
+				`${read.what} reads where a part stands among parts an @if arm or a @for row shows, which only the running app knows`,
+			);
+		else if (bound.indexOf(read.host) !== read.index)
+			refuse(`${read.what} reads where a part stands among its family's parts before the part is bound`);
+	}
 	for (const reference of handleReferences) {
 		const ids = reference.keys.flatMap((key) =>
 			key === undefined ? [] : (boundHandles.get(key) ?? []),
