@@ -70,6 +70,32 @@ A pointer resting on a link, a focus or a press starts fetching the next page be
 - The router never fetches other sites or `/api/` paths early.
 - Links with `download`, a `target` or `rel="external"` aren't fetched early either.
 - `router({ prefetch: false })` in `vite.config.ts` turns early fetches off everywhere.
+- Nothing is fetched early when the browser asks to save data, or while the tab is hidden. A mouse press still fetches its page: the click has started.
+- A click cancels the other early fetches still arriving, so they don't slow down the page you asked for.
+
+## Choose when pages are fetched early
+
+There are three triggers. Each one runs on `'all'` networks, only on `'fast'` ones, or `'none'`:
+
+```ts title="vite.config.ts"
+router({
+	prefetch: {
+		intent: 'all', // a resting pointer, a focus or a press
+		viewport: 'none', // every page link while it's on screen
+		idle: 'fast', // once the page is idle, up to six links on screen
+		concurrency: 2, // viewport and idle fetches in flight at once
+		budget: 2 * 1024 * 1024, // bytes viewport and idle may spend per page
+	},
+});
+```
+
+These are the defaults. A *fast* network is one the page's own downloads crossed at 1.6 Mbit/s or better, on a browser that doesn't report a slower one. Turn `viewport` on for sites whose readers jump around a big menu; every link on screen then costs a request.
+
+One link can choose too. `prefetch="intent"` keeps it out of the viewport and idle triggers, and `prefetch="viewport"` fetches it while it's on screen even when `viewport` is off:
+
+```tsrx
+<Link href="/pricing" prefetch="viewport">Pricing</Link>
+```
 
 ## `navigate()` is a click from code
 

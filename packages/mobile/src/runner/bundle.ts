@@ -7,6 +7,7 @@ import { instrumentFlow, type InstrumentedFlow } from '../harness/flow.ts';
 import { PROOF_PLATFORMS, type ProofPlatform } from '../harness/proof-app.ts';
 import { loadRung, type ProofAssets } from '../harness/rung.ts';
 import type { DeviceManifest } from '../permissions.ts';
+import { dragonDir } from '../style-export.ts';
 import { bundleMobile, bundleRung, type JobSpec, JOB_VERSION, writeJson } from './store.ts';
 
 const mobileDir = resolve(import.meta.dirname, '..', '..');
@@ -108,6 +109,15 @@ export async function writeBundle(input: {
 		rungs: names,
 		platforms: input.platforms,
 		host: input.host,
+		...(existsSync(join(dragonDir(), '.git'))
+			? {
+					dragon: {
+						dir: dragonDir(),
+						commit: execFileSync('git', ['-C', dragonDir(), 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+						...(process.env.MARKLESS_ZIG ? { zig: process.env.MARKLESS_ZIG } : {}),
+					},
+				}
+			: {}),
 	};
 	return spec;
 }

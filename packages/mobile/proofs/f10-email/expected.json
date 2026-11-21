@@ -1,0 +1,37 @@
+{
+	"rung": 148,
+	"name": "An email field and a submit input as the web keeps them: a value that is not an email address stops the submit with Chromium's reason, and the input labelled Send submits",
+	"steps": [
+		{ "visible": ["Account", "Nothing sent"], "fields": { "Email": "" } },
+		{
+			"do": { "type": { "field": "Email", "text": "abc" } },
+			"visible": ["Nothing sent"],
+			"fields": { "Email": "abc" }
+		},
+		{
+			"do": { "tap": "Send" },
+			"visible": ["Nothing sent"],
+			"invalid": "Please include an '@' in the email address. 'abc' is missing an '@'."
+		},
+		{
+			"do": { "type": { "field": "Email", "text": "a@b_c" } },
+			"visible": ["Nothing sent"],
+			"fields": { "Email": "a@b_c" }
+		},
+		{
+			"do": { "tap": "Send" },
+			"visible": ["Nothing sent"],
+			"invalid": "A part following '@' should not contain the symbol '_'."
+		},
+		{
+			"do": { "type": { "field": "Email", "text": "sam@example.com" } },
+			"visible": ["Nothing sent"],
+			"fields": { "Email": "sam@example.com" }
+		},
+		{
+			"do": { "tap": "Send" },
+			"visible": ["Sent sam@example.com"],
+			"absent": ["Nothing sent"]
+		}
+	]
+}
