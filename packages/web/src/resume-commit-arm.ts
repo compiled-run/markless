@@ -24,7 +24,7 @@ import type {
 	ResumeRuntimeInput,
 } from './resume-types.ts';
 import type { ProtocolStatePayload } from '@markless/serializer';
-import type { PaintSnapshot } from './resume-paint-snapshot.ts';
+import type { PaintSnapshot } from './resume-keyed-repeats.ts';
 
 // D1 tier 4: commitArm replaces the DOM range between an async boundary's
 // comment-anchor pair with freshly rendered arm content and re-registers the

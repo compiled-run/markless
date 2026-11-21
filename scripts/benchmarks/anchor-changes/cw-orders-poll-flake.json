@@ -5,22 +5,11 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-csr",
-				"web/resume-paint-snapshot"
-			],
-			"set": 1266,
-			"reason": "new module: the row slot-read helpers moved out of resume-keyed-repeats plus the PaintSnapshot type, loaded with resume-async-wiring so the snapshot is taken before the first await: 1266 B rendered (#1010)",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
 				"web/resume-async-wiring"
 			],
-			"delta": 337,
-			"reason": "an arm commit takes its paint-time snapshot (list collections and row slot reads) before its first await, so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010): 16061 -> 16398 B rendered",
-			"date": "2026-11-20"
+			"delta": 379,
+			"reason": "an arm commit reads each page-held list collection before its first await, skipping the arm's own cells and computeds, and passes a typed paint snapshot, so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010): 16061 -> 16440 B rendered",
+			"date": "2026-11-21"
 		},
 		{
 			"surface": "fixture-runtime",
@@ -29,9 +18,9 @@
 				"@fixtures/vite-csr",
 				"web/resume-keyed-repeats"
 			],
-			"delta": -868,
-			"reason": "the row slot-read helpers moved to resume-paint-snapshot; the wiring adopts painted rows under the snapshot collections (#1010): 22387 -> 21519 B rendered",
-			"date": "2026-11-20"
+			"delta": 182,
+			"reason": "the wiring takes a typed paint snapshot and adopts painted rows under its collections, dropping each entry once used (#1010): 22387 -> 22569 B rendered",
+			"date": "2026-11-21"
 		},
 		{
 			"surface": "fixture-runtime",
@@ -41,20 +30,9 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": -8,
+			"delta": 3,
 			"reason": "emitted runtime gzip measured on this tree after the paint snapshot change (#1010)",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-paint-snapshot"
-			],
-			"set": 1266,
-			"reason": "new module: the row slot-read helpers moved out of resume-keyed-repeats plus the PaintSnapshot type, loaded with resume-async-wiring so the snapshot is taken before the first await: 1266 B rendered (#1010)",
-			"date": "2026-11-20"
+			"date": "2026-11-21"
 		},
 		{
 			"surface": "fixture-runtime",
@@ -63,9 +41,9 @@
 				"@fixtures/vite-plus",
 				"web/resume-async-wiring"
 			],
-			"delta": 337,
-			"reason": "an arm commit takes its paint-time snapshot (list collections and row slot reads) before its first await, so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010): 16061 -> 16398 B rendered",
-			"date": "2026-11-20"
+			"delta": 379,
+			"reason": "an arm commit reads each page-held list collection before its first await, skipping the arm's own cells and computeds, and passes a typed paint snapshot, so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010): 16061 -> 16440 B rendered",
+			"date": "2026-11-21"
 		},
 		{
 			"surface": "fixture-runtime",
@@ -74,9 +52,9 @@
 				"@fixtures/vite-plus",
 				"web/resume-keyed-repeats"
 			],
-			"delta": -868,
-			"reason": "the row slot-read helpers moved to resume-paint-snapshot; the wiring adopts painted rows under the snapshot collections (#1010): 22387 -> 21519 B rendered",
-			"date": "2026-11-20"
+			"delta": 182,
+			"reason": "the wiring takes a typed paint snapshot and adopts painted rows under its collections, dropping each entry once used (#1010): 22387 -> 22569 B rendered",
+			"date": "2026-11-21"
 		},
 		{
 			"surface": "fixture-runtime",
@@ -86,9 +64,21 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": -2,
+			"delta": -1,
 			"reason": "emitted runtime gzip measured on this tree after the paint snapshot change (#1010)",
-			"date": "2026-11-20"
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -13,
+			"reason": "emitted runtime gzip measured on this tree after the paint snapshot change (#1010)",
+			"date": "2026-11-21"
 		},
 		{
 			"surface": "perf-guards",
@@ -96,19 +86,9 @@
 				"runtimeModules",
 				"web/resume-async-wiring"
 			],
-			"delta": 340,
-			"reason": "G10: an arm commit takes its paint-time snapshot (list collections and row slot reads) before its first await, so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010): 16058 -> 16398 B rendered",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/resume-paint-snapshot"
-			],
-			"set": 1266,
-			"reason": "G10: new module holding the row slot-read helpers moved from resume-keyed-repeats and the PaintSnapshot type, loaded with resume-async-wiring (#1010): 1266 B rendered",
-			"date": "2026-11-20"
+			"delta": 382,
+			"reason": "G10: an arm commit reads each page-held list collection before its first await, skipping the arm's own cells and computeds, and passes a typed paint snapshot, so a value landing while the arm wires reconciles over the painted rows (orders poll flake, #1010): 16058 -> 16440 B rendered",
+			"date": "2026-11-21"
 		},
 		{
 			"surface": "perf-guards",
@@ -116,20 +96,9 @@
 				"runtimeModules",
 				"web/resume-keyed-repeats"
 			],
-			"delta": -883,
-			"reason": "G10: the row slot-read helpers moved to resume-paint-snapshot; the wiring adopts painted rows under the snapshot collections (#1010): 22402 -> 21519 B rendered",
-			"date": "2026-11-20"
-		},
-		{
-			"surface": "build-scale",
-			"path": [
-				"budgets",
-				"clientModules",
-				"value"
-			],
-			"delta": 1,
-			"reason": "new client module web/resume-paint-snapshot: the row slot-read helpers and PaintSnapshot type, loaded with resume-async-wiring so an arm commit reads its paint snapshot before its first await (#1010)",
-			"date": "2026-11-20"
+			"delta": 167,
+			"reason": "G10: the wiring takes a typed paint snapshot and adopts painted rows under its collections, dropping each entry once used (#1010): 22402 -> 22569 B rendered",
+			"date": "2026-11-21"
 		}
 	]
 }
