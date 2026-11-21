@@ -84,6 +84,8 @@ const bindsValue = (nodeOf: ReadonlyMap<string, NativeViewPayload['nodes'][numbe
 };
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
 const REFUSED_RUNGS = new Set(['y4-sheet-beside-drawer', 'j7-page-refused']);
+// The <input> types a host draws as a control a press acts on; every other type is a text field that takes the keyboard.
+const PRESSED_INPUT_TYPES = new Set(['checkbox', 'radio', 'range', 'hidden']);
 
 /**
  * The script services as a phone's host provides them, on a clock that moves only when a step waits: a timer fires once
@@ -1136,12 +1138,30 @@ function walk(
 				node = nodeOf.get(node)?.parent;
 				pressed = node && nodeOf.get(node)?.row ? `${node}${key}` : node;
 			}
+			// A press on a <label> acts on the control it names, as the web does: a text field takes the keyboard, any other is pressed.
+			let focusing: string | undefined;
+			if ('tap' in action && !pressed) {
+				let climb: string | null | undefined = at < 0 ? host : host.slice(0, at);
+				while (climb) {
+					const element = nodeOf.get(climb);
+					if (element?.kind === 'element' && element.element === 'label') break;
+					climb = element?.parent;
+				}
+				const named = climb ? attributeNow(nodeOf.get(climb)?.row ? `${climb}${key}` : climb, 'for') : null;
+				const control = named ? nodeOf.get(named.split('@')[0]!) : undefined;
+				if (named && control?.kind === 'element') {
+					const type = control.attributes?.['type'] ?? 'text';
+					if (control.element === 'textarea' || (control.element === 'input' && !PRESSED_INPUT_TYPES.has(type)))
+						focusing = named;
+					else pressed = named;
+				}
+			}
 			// The return key in a field that submits nothing only puts the keyboard away.
 			const returns = payload.events.some(
 				(event) => event.host === host && event.event === 'enter',
 			);
 			const activates = !!pressed;
-			if ('tap' in action && !activates && touched.length === 0)
+			if ('tap' in action && !activates && !focusing && touched.length === 0)
 				throw new Error(`step ${index}: "${name}" is not a control and the press changed nothing`);
 			// A field takes the keyboard when typed into, and gives it up when anything else is tapped: its focus and blur run.
 			const handles = (node: string, event: 'input' | 'focus' | 'blur' | 'keydown' | 'keyup') =>
@@ -1151,9 +1171,13 @@ function walk(
 				focused = host;
 				if (handles(host, 'focus')) apply(runtime.dispatch({ event: 'focus', host }), index);
 			}
-			if (('tap' in action || 'doubleTap' in action) && focused && focused !== host) {
+			if (('tap' in action || 'doubleTap' in action) && focused && focused !== host && focused !== focusing) {
 				if (handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
 				focused = undefined;
+			}
+			if (focusing && focused !== focusing) {
+				focused = focusing;
+				if (handles(focusing, 'focus')) apply(runtime.dispatch({ event: 'focus', host: focusing }), index);
 			}
 			// Backspace with the cursor at the end takes the last character; the input event then runs the handler.
 			const erased = (field: string): ReturnType<typeof runtime.dispatch> => {
@@ -1196,7 +1220,7 @@ function walk(
 				apply(runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 1 }), index);
 			const dispatched =
 				'tap' in action
-					? activates
+					? activates && !focusing
 						? runtime.dispatch({ event: 'activate', host: pressed ?? host })
 						: []
 					: 'doubleTap' in action

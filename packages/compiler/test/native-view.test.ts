@@ -2511,6 +2511,50 @@ export function Entries() @{
 		]);
 	});
 
+	it('names the first labelable element inside a <label> with no `for`, as the web resolves its control', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Form() @{
+	<form onSubmit={(event) => event.preventDefault()}>
+		<label>Title <input name="title" /></label>
+		<label><input type="hidden" name="id" /><input type="checkbox" name="pinned" /> Pinned</label>
+	</form>
+}`);
+		expect(diagnostics).toEqual([]);
+		const elements = (payload?.nodes ?? []).filter((node) => node.kind === 'element');
+		const labels = elements.filter((node) => node.element === 'label');
+		const [title, , pinned] = elements.filter((node) => node.element === 'input');
+		expect(labels.map((label) => label.bindings)).toEqual([
+			[{ attribute: 'for', value: { literal: title?.id } }],
+			[{ attribute: 'for', value: { literal: pinned?.id } }],
+		]);
+	});
+
+	it("names the same row's control for a <label> inside a keyed @for row", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Tasks() @{
+	let tasks = state([{ slug: 'a', title: 'A' }]);
+	<ul>
+		@for (const task of tasks; key task.slug) {
+			<li><label><input type="checkbox" /> {task.title}</label></li>
+		}
+	</ul>
+}`);
+		expect(diagnostics).toEqual([]);
+		const label = payload?.nodes.find(
+			(node) => node.kind === 'element' && node.element === 'label',
+		);
+		const box = payload?.nodes.find(
+			(node) => node.kind === 'element' && node.element === 'input',
+		);
+		expect(label?.kind === 'element' && label.bindings).toEqual([
+			{
+				attribute: 'for',
+				value: {
+					template: [`${box?.id}@`, { member: { item: 'repeat:0' }, property: 'slug' }],
+				},
+			},
+		]);
+	});
+
 	it('refuses an id reference from outside a row to an element inside one', async () => {
 		const { payload, diagnostics } =
 			await nativeView(`import { element, shared, state } from '@markless/core';
