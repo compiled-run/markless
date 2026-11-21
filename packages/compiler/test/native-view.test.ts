@@ -996,6 +996,24 @@ export function Page() @{
 		);
 	});
 
+	it('seeds a shared field from a left-out prop with its default, so the field is null, not undefined', async () => {
+		const { payload, diagnostics } = await nativeView(`import { shared, state } from '@markless/core';
+const meterState = shared(() => {
+	const meter = state({ value: null as number | null });
+	return meter;
+}, { scope: 'subtree' });
+export function Page() @{
+	<main><Meter /></main>
+}
+function Meter({ value = null }: { readonly value?: number | null }) @{
+	const meter = meterState();
+	meter.value = value;
+	<p>{meter.value === null ? 'none' : 'some'}</p>
+}`, dataOnly);
+		expect(diagnostics).toEqual([]);
+		expect(JSON.stringify(payload!.nodes)).toContain('"binary":"==="');
+	});
+
 	it('reads names a component body destructures from an array as those indexes, skipping holes', async () => {
 		const { payload, diagnostics } = await nativeView(`export function Page() @{
 	<main>
