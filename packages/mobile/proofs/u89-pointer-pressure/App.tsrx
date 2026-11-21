@@ -15,7 +15,7 @@ export default function PointerPressure() @{
 			onPointerup={(event) => (up = `Lifted at ${event.pressure}`)}
 			onPointercancel={(event) => (up = `Lifted at ${event.pressure}`)}
 		>
-			<p>Drag me</p>
+			<p>Drag across this whole line to read the pressure</p>
 		</div>
 		<p>{down}</p>
 		<p>{moved}</p>

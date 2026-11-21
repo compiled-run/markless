@@ -45,7 +45,7 @@
 				"parent": "h2",
 				"parts": [
 					{
-						"text": "Drag me"
+						"text": "Drag across this whole line to read the pressure"
 					}
 				]
 			},
@@ -191,7 +191,7 @@
 	"initial": [
 		[
 			"h2:text0",
-			"Drag me"
+			"Drag across this whole line to read the pressure"
 		],
 		[
 			"h3:text0",

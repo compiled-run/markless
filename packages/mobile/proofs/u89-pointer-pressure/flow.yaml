@@ -3,13 +3,13 @@ name: u89-pointer-pressure
 ---
 - launchApp:
     clearState: true
-- assertVisible: Drag me
+- assertVisible: Drag across this whole line to read the pressure
 - assertVisible: No press
 - assertVisible: No move
 - assertVisible: Not lifted
 - swipe:
     from:
-      text: Drag me
+      text: Drag across this whole line to read the pressure
     direction: RIGHT
     duration: 800
 - assertNotVisible: No press
