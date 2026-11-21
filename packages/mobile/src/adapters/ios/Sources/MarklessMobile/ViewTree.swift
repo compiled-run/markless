@@ -1288,11 +1288,11 @@ final class ViewTree {
 				try wire(events[template] ?? [], on: view, element: element, id: id)
 				let boundFor = try bindings.first { $0.name == "for" }.map { try runtime.evaluate($0.value, in: context.scope).text }
 				if element == "label", let target = staticAttributes["for"] ?? boundFor {
-					// A press on a label activates its control, as a browser does.
-					let forward = LabelForward(target: target, control: { [weak self] in self?.elements[target] }, onAction: onAction)
+					let pressable = (events[String(target.split(separator: "@", maxSplits: 1)[0])] ?? []).contains { $0.event == .activate }
+					let forward = LabelForward(target: target, pressable: pressable, control: { [weak self] in self?.elements[target] }, onAction: onAction)
 					forwards.append(forward)
 					view.isUserInteractionEnabled = true
-					view.addGestureRecognizer(UITapGestureRecognizer(target: forward, action: #selector(LabelForward.press)))
+					view.addGestureRecognizer(UITapGestureRecognizer(target: forward, action: #selector(LabelForward.press(_:))))
 				}
 				var current = staticAttributes
 				for binding in bindings where !binding.isProperty {
@@ -2099,20 +2099,24 @@ final class LengthLimit: NSObject, UITextFieldDelegate {
 @MainActor
 final class LabelForward: NSObject {
 	private let target: String
+	private let pressable: Bool
 	private let control: () -> UIView?
 	private let onAction: (NativeAction) -> Void
-	init(target: String, control: @escaping () -> UIView?, onAction: @escaping (NativeAction) -> Void) {
+	init(target: String, pressable: Bool, control: @escaping () -> UIView?, onAction: @escaping (NativeAction) -> Void) {
 		self.target = target
+		self.pressable = pressable
 		self.control = control
 		self.onAction = onAction
 	}
-	/// A text field takes the keyboard, as a browser focuses it; any other control is pressed.
-	@objc func press() {
+	/// As a browser: a text field takes the keyboard; focus leaves the field that had it for any other control, which is pressed when
+	/// a press acts on it (a checkbox, a button) and only focused otherwise (a select), which a phone does not show.
+	@objc func press(_ gesture: UITapGestureRecognizer) {
 		if let field = control(), field is UITextField || field is UITextView {
 			field.becomeFirstResponder()
 			return
 		}
-		onAction(NativeAction(event: .activate, host: target))
+		gesture.view?.window?.endEditing(true)
+		if pressable { onAction(NativeAction(event: .activate, host: target)) }
 	}
 }
 

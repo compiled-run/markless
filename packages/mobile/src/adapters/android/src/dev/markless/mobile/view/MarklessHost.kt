@@ -1263,6 +1263,8 @@ class MarklessHost(
 			"for" -> if (value != null) view.setOnClickListener {
 				when (val control = views[value]) {
 					is EditText -> command(control, "focus", false)
+					// A select is only focused, as a browser does; its picker opens from a press on the select itself.
+					is SelectBox -> Unit
 					else -> control?.performClick()
 				}
 			}
