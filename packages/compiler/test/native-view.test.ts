@@ -996,6 +996,24 @@ export function Page() @{
 		);
 	});
 
+	it("folds a shared state's first value that reads module constants", async () => {
+		const { payload, diagnostics } = await nativeView(`import { shared, state } from '@markless/core';
+const SIZES = ['S', 'L'];
+const pickerState = shared(() => {
+	const picker = state({ sizes: SIZES, chosen: SIZES[0] });
+	return picker;
+}, { scope: 'subtree' });
+export function Page() @{
+	<main><Picker /></main>
+}
+function Picker() @{
+	const picker = pickerState();
+	<p>{picker.chosen}</p>
+}`, dataOnly);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.cells.find((cell) => cell.name === 'picker.chosen')?.initial).toBe('S');
+	});
+
 	it('seeds a shared field from a left-out prop with its default, so the field is null, not undefined', async () => {
 		const { payload, diagnostics } = await nativeView(`import { shared, state } from '@markless/core';
 const meterState = shared(() => {

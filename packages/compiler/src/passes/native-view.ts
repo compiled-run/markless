@@ -1576,13 +1576,56 @@ export function createNativeViewPayload(
 			fields: new Map(),
 			slots: new Map(),
 		};
+		const handles = new Map(
+			owner.graph.graphBindings.flatMap((binding) =>
+				binding.sharedDefinitionId === definition.id && binding.kind === 'element'
+					? [
+							[
+								binding.name,
+								{ key: `${prefix}${binding.id}`, plural: binding.plural === true },
+							] as const,
+						]
+					: [],
+			),
+		);
+		instance.scope = {
+			module: owner,
+			component: '',
+			handles,
+			cells: { byName, byBinding },
+			prefix,
+			locals: new Set(),
+			items: new Map(),
+			props: new Map(),
+			objects,
+			args: new Map(),
+			shared: new Map(),
+			deviceObjects: new Map(),
+		};
 		const objectFields = new Map<string, Map<string, string>>();
 		for (const binding of owner.graph.graphBindings) {
 			if (binding.sharedDefinitionId !== definition.id || binding.kind !== 'state') continue;
 			const id = `${prefix}${binding.id}`;
-			const value = nativeInitialOf(binding.initialValue);
-			noteUndefined(id, binding.initialValue);
-			if (binding.initialValueKnown !== true || !isNativeValue(value)) {
+			let first: unknown = binding.initialValue;
+			let known = binding.initialValueKnown === true;
+			// A first value that reads module constants is fixed when the app is built, as the web evaluates it once.
+			if (!known && binding.nativeExpression) {
+				const lowered = attempt(() =>
+					exprOf(binding.nativeExpression!, `the first value of \`${binding.name}\``, instance.scope),
+				);
+				const folded =
+					!lowered.failed && lowered.value && cellsOf(lowered.value).size === 0
+						? foldConstant(lowered.value, initialOf)
+						: undefined;
+				lowered.rollBack();
+				if (folded) {
+					first = folded.value;
+					known = true;
+				}
+			}
+			const value = nativeInitialOf(first);
+			noteUndefined(id, first);
+			if (!known || !isNativeValue(value)) {
 				refuse(
 					`shared state \`${binding.name}\` of ${definition.name} needs a JSON initial value known at build time`,
 				);
@@ -1635,32 +1678,6 @@ export function createNativeViewPayload(
 					});
 			}
 		}
-		const handles = new Map(
-			owner.graph.graphBindings.flatMap((binding) =>
-				binding.sharedDefinitionId === definition.id && binding.kind === 'element'
-					? [
-							[
-								binding.name,
-								{ key: `${prefix}${binding.id}`, plural: binding.plural === true },
-							] as const,
-						]
-					: [],
-			),
-		);
-		instance.scope = {
-			module: owner,
-			component: '',
-			handles,
-			cells: { byName, byBinding },
-			prefix,
-			locals: new Set(),
-			items: new Map(),
-			props: new Map(),
-			objects,
-			args: new Map(),
-			shared: new Map(),
-			deviceObjects: new Map(),
-		};
 		return instance;
 	};
 
