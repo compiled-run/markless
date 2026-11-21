@@ -1056,11 +1056,14 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 
 /**
  * What a script handler's event has on a phone, as member paths: a deeper read below `target.value` is a string's. Any
- * other member is refused at build time, since the web's event has it and a phone's does not.
+ * other member is refused at build time, since the web's event has it and a phone's does not. A text field's key and paste
+ * events carry the field's text as `target.value`; only a paste carries `clipboardData`, with its plain text.
  */
 export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> = [
 	['type'],
 	['key'],
+	['isComposing'],
+	['clipboardData', 'getData'],
 	['defaultPrevented'],
 	['preventDefault'],
 	['stopPropagation'],

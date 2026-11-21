@@ -297,11 +297,15 @@ var eventOf = function (given) {
 		target: target,
 		currentTarget: target,
 		key: given.key,
+		isComposing: false,
 		defaultPrevented: false,
 		preventDefault: function () { this.defaultPrevented = true; },
 		stopPropagation: function () {},
 	};
 	${JSON.stringify(NATIVE_SCRIPT_POINTER_FIELDS)}.forEach(function (field) { if (field in given) event[field] = given[field]; });
+	// A paste carries the pasted plain text, as the edit menu's paste does.
+	if ('text' in given)
+		event.clipboardData = { getData: function (type) { return type === 'text' || type === 'text/plain' ? given.text : ''; } };
 	return event;
 };
 var errorOf = function (error) {
@@ -368,12 +372,15 @@ g.__markless[id] = {
 		}
 		if (entry.kind === 'dispatch') {
 			var settled = function (error) { fail(entry['catch'], error); };
+			var event = eventOf(entry.event);
 			try {
-				var result = fn(entry.fn)(frameOf(entry.frame))(eventOf(entry.event));
+				var result = fn(entry.fn)(frameOf(entry.frame))(event);
 				if (result && typeof result.then === 'function') result.then(null, settled);
 			} catch (error) {
 				settled(error);
 			}
+			// A key's or paste's cancel reaches the host, as a browser reads defaultPrevented before the handler first awaits.
+			if (event.defaultPrevented && (entry.event.type === 'keydown' || entry.event.type === 'paste')) host.out.prevented = true;
 		} else if (entry.kind === 'timer') {
 			var timer = host.timers[entry.timer];
 			if (timer) {
@@ -421,7 +428,9 @@ g.__markless[id] = {
 		}
 		var out = host.out;
 		host.out = null;
-		return JSON.stringify({ writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands });
+		var result = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands };
+		if (out.prevented) result.prevented = true;
+		return JSON.stringify(result);
 	},
 };`;
 

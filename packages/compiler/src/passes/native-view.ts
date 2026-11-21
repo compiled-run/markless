@@ -1004,8 +1004,7 @@ export function nativeUnsupported(message: string, span?: SourceSpan): CompilerD
 
 const LANGUAGE_GLOBALS = new Set(NATIVE_SCRIPT_LANGUAGE_GLOBALS);
 // A submit's default action and a box's checkedness are the host's; a script's event cannot report them back yet.
-// A key's or paste's preventDefault() reaches the host only from data: the engine journals no cancel; keyup reads its key as keydown does.
-const DATA_ONLY_EVENTS = new Set(['submit', 'change', 'keydown', 'keyup', 'paste']);
+const DATA_ONLY_EVENTS = new Set(['submit', 'change']);
 const RENDER_UNSTEADY = new Set(['Date', 'crypto', 'performance']);
 const GLOBAL_OBJECTS = new Set(NATIVE_SCRIPT_GLOBAL_OBJECTS);
 
@@ -5914,7 +5913,7 @@ export function createNativeViewPayload(
 					) &&
 					(read.path.length <= members.length || members.length === 2),
 			);
-			if (known) continue;
+			if (known && (read.path[0] !== 'clipboardData' || semantic === 'paste')) continue;
 			readsMissing = true;
 			const doing = semantic === 'input' ? 'a text edit' : touch ? 'a touch' : 'a tap';
 			refuseScript(

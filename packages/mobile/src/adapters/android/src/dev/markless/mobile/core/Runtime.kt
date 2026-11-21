@@ -586,7 +586,9 @@ class Runtime(
 				}
 				if (command == "focus") focused = node
 				JournalEntry.Command(node, command, (parts[2] as? Json.Bool)?.value == true)
-			}
+			} +
+			// A key or paste handler called preventDefault() before it first awaited.
+			(if ((result["prevented"] as? Json.Bool)?.value == true) listOf(JournalEntry.PreventDefault) else emptyList())
 	}
 
 
@@ -1041,8 +1043,9 @@ class Runtime(
 		if (event == EventName.Activate) focused = host
 		val carried = when (event) {
 			EventName.Input -> value?.let { mapOf("value" to JsValue.Str(it)) }
-			EventName.Keydown, EventName.Keyup -> mapOf("key" to JsValue.Str(value!!))
-			EventName.Paste -> mapOf("text" to JsValue.Str(value!!))
+			// A key's or paste's script handler reads the field's text then as `event.target.value`.
+			EventName.Keydown, EventName.Keyup -> mapOf("key" to JsValue.Str(value!!), "value" to JsValue.Str(textOf(host)))
+			EventName.Paste -> mapOf("text" to JsValue.Str(value!!), "value" to JsValue.Str(textOf(host)))
 			EventName.Activate -> mapOf("detail" to JsValue.Num((detail ?: 1).toDouble()))
 			else -> null
 		}
@@ -1270,7 +1273,8 @@ class Runtime(
 			}
 			is Op.Script -> {
 				val touch = TOUCH_FIELDS.mapNotNull { f -> fields?.get(f)?.let { ",${jsonString(f)}:${jsonValue(it)}" } }.joinToString("")
-				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$touch}"
+				val typed = listOf("key", "text").mapNotNull { f -> (fields?.get(f) as? JsValue.Str)?.let { ",${jsonString(f)}:${jsonString(it.value)}" } }.joinToString("")
+				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$typed$touch}"
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
 				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope)},\"event\":$event$catch"))
 			}

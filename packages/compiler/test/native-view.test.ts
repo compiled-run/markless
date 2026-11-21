@@ -325,6 +325,32 @@ export function Tags() @{
 		]);
 	});
 
+	it("runs a text field's keydown and paste handlers as JavaScript when data cannot spell them", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Tags() @{
+	let tags = state(['red']);
+	let last = state('');
+	<input
+		aria-label="Tag"
+		onKeyDown={(event) => {
+			let known = false;
+			for (const tag of tags) if (tag === event.key) known = true;
+			if (event.key === 'Enter' || known) event.preventDefault();
+			last = event.key;
+		}}
+		onPaste={(event) => {
+			event.preventDefault();
+			const pasted = event.clipboardData?.getData('text') ?? '';
+			const next = [...tags];
+			for (const part of pasted.split(',')) next.push(part.trim());
+			tags = next;
+		}}
+	/>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.handlers.map((handler) => handler.ops.map((op) => op.op))).toEqual([['script'], ['script']]);
+	});
+
 	it("runs a text field's keyup handler with the key and the field's text after the key, and preventDefault() there does nothing", async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Search() @{
@@ -436,7 +462,7 @@ export function Rename() @{
 		]);
 	});
 
-	it('leaves out a paste handler on an element a phone does not edit, refuses one on an editable element, and a clipboard read other than plain text', async () => {
+	it('leaves out a paste handler on an element a phone does not edit, refuses one on an editable element, and runs a clipboard read of another type as JavaScript', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Paste() @{
 	let text = state('');
@@ -456,11 +482,15 @@ export function Paste() @{
 				'error',
 				'a paste handler on an editable <div>; a native build runs one only on a text field',
 			],
-			[
-				'error',
-				"the paste handler reads the clipboard other than as plain text (`getData('text')`), which a phone's paste does not give",
-			],
 		]);
+		// A phone browser's paste carries text/plain alone (2026-11-18 soft-keyboard measurement), so getData of another type reads ''.
+		const html = await nativeView(`import { state } from '@markless/core';
+export function Paste() @{
+	let text = state('');
+	<input onPaste={(event) => (text = event.clipboardData?.getData('text/html') ?? '')} />
+}`);
+		expect(html.diagnostics).toEqual([]);
+		expect(html.payload?.handlers[0]?.ops.map((op) => op.op)).toEqual(['script']);
 	});
 
 	it("leaves out key and focus handlers on a checkbox or radio button, and runs a text field's focus handler", async () => {

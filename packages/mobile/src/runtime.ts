@@ -721,6 +721,8 @@ export function createNativeRuntime(
 			}>;
 			readonly logs: ReadonlyArray<readonly [string, string]>;
 			readonly commands?: ReadonlyArray<readonly [string, 'focus' | 'scrollIntoView' | 'showModal' | 'close', boolean]>;
+			/** A key or paste handler called `preventDefault()` before it first awaited. */
+			readonly prevented?: true;
 		};
 		for (const [slot, value] of result.writes) {
 			const at = slot.indexOf('@');
@@ -757,6 +759,7 @@ export function createNativeRuntime(
 				if (command === 'focus') focused = node;
 				return [{ op: 'command', node, command, ...(preventScroll ? { preventScroll: true as const } : {}) }];
 			}),
+			...(result.prevented ? [{ op: 'preventDefault' } as NativeJournalEntry] : []),
 		];
 	};
 	const screen = ++screens;
@@ -1670,9 +1673,9 @@ export function createNativeRuntime(
 			const edit = action.event === 'input' ? action.value : undefined;
 			const eventValue: string | NativeEventFields | undefined =
 				action.event === 'keydown' || action.event === 'keyup'
-					? { key: action.key }
+					? { key: action.key, value: textOf(action.host) }
 					: action.event === 'paste'
-						? { text: action.text }
+						? { text: action.text, value: textOf(action.host) }
 						: action.event === 'activate'
 							? { detail: action.detail ?? 1 }
 							: edit;
@@ -1846,6 +1849,8 @@ export function createNativeRuntime(
 						event: {
 							type: op.type,
 							...(text === undefined ? {} : { value: text }),
+							...(typeof eventValue === 'object' && eventValue.key !== undefined ? { key: eventValue.key } : {}),
+							...(typeof eventValue === 'object' && eventValue.text !== undefined ? { text: eventValue.text } : {}),
 							...Object.fromEntries(touch),
 						},
 						...(op.catch ? { catch: slotOf(op.catch, scope) } : {}),
