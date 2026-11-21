@@ -19,7 +19,7 @@ export default function App() @{
 			</label>
 			<label>
 				<span>Tag</span>
-				<select name="tag">
+				<select name="tag" aria-label="Note tag">
 					<option value="work">Work</option>
 					<option value="home">Home</option>
 				</select>
