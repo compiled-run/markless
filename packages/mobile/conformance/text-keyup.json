@@ -1,0 +1,279 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "TextKeyup",
+		"cells": [
+			{
+				"id": "state:wasEmpty",
+				"name": "wasEmpty",
+				"initial": true
+			},
+			{
+				"id": "state:removed",
+				"name": "removed",
+				"initial": 0
+			},
+			{
+				"id": "state:last",
+				"name": "last",
+				"initial": "none"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "input",
+				"parent": "h0",
+				"attributes": {
+					"aria-label": "Chip"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"cell": "state:last"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Removed "
+					},
+					{
+						"cell": "state:removed"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "keydown",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h1",
+				"event": "keyup",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h1",
+				"event": "input",
+				"handler": "handler:h1/edit"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:wasEmpty",
+						"value": {
+							"binary": "===",
+							"left": {
+								"field": "h1"
+							},
+							"right": {
+								"literal": ""
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:last",
+						"value": {
+							"template": [
+								"",
+								{
+									"event": "key"
+								},
+								" [",
+								{
+									"field": "h1"
+								},
+								"]"
+							]
+						}
+					},
+					{
+						"op": "if",
+						"test": {
+							"logical": "&&",
+							"left": {
+								"logical": "&&",
+								"left": {
+									"binary": "===",
+									"left": {
+										"event": "key"
+									},
+									"right": {
+										"literal": "Backspace"
+									}
+								},
+								"right": {
+									"cell": "state:wasEmpty"
+								}
+							},
+							"right": {
+								"binary": "===",
+								"left": {
+									"field": "h1"
+								},
+								"right": {
+									"literal": ""
+								}
+							}
+						},
+						"whenTrue": [
+							{
+								"op": "assign",
+								"cell": "state:removed",
+								"value": {
+									"binary": "+",
+									"left": {
+										"cell": "state:removed"
+									},
+									"right": {
+										"literal": 1
+									}
+								}
+							}
+						],
+						"whenFalse": []
+					}
+				]
+			},
+			{
+				"id": "handler:h1/edit",
+				"ops": []
+			}
+		]
+	},
+	"initial": [
+		[
+			"h2:text0",
+			"none"
+		],
+		[
+			"h3:text0",
+			"Removed 0"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "keydown",
+				"host": "h1",
+				"key": "a"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h1",
+				"value": "a"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "keyup",
+				"host": "h1",
+				"key": "a"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "a [a]"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "keydown",
+				"host": "h1",
+				"key": "Backspace"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "h1",
+				"value": ""
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "keyup",
+				"host": "h1",
+				"key": "Backspace"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Backspace []"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "keydown",
+				"host": "h1",
+				"key": "Backspace"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "keyup",
+				"host": "h1",
+				"key": "Backspace"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Removed 1"
+				}
+			]
+		}
+	]
+}

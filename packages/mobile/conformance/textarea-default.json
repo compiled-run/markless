@@ -200,7 +200,9 @@
 												},
 												"arguments": [
 													{
-														"lambda": ["formdata:entry"],
+														"lambda": [
+															"formdata:entry"
+														],
 														"body": {
 															"binary": "===",
 															"left": {
@@ -230,7 +232,9 @@
 														},
 														"arguments": [
 															{
-																"lambda": ["formdata:entry"],
+																"lambda": [
+																	"formdata:entry"
+																],
 																"body": {
 																	"binary": "===",
 																	"left": {
@@ -273,7 +277,9 @@
 												},
 												"arguments": [
 													{
-														"lambda": ["formdata:entry"],
+														"lambda": [
+															"formdata:entry"
+														],
 														"body": {
 															"binary": "===",
 															"left": {
@@ -303,7 +309,9 @@
 														},
 														"arguments": [
 															{
-																"lambda": ["formdata:entry"],
+																"lambda": [
+																	"formdata:entry"
+																],
 																"body": {
 																	"binary": "===",
 																	"left": {
@@ -398,7 +406,9 @@
 						"kind": "text"
 					}
 				],
-				"submitters": ["h6"]
+				"submitters": [
+					"h6"
+				]
 			}
 		],
 		"valueMissing": {
@@ -680,16 +690,43 @@
 		}
 	},
 	"initial": [
-		["h1:text0", "Postcard"],
-		["h4:text0", "Draft Hello"],
-		["h5:text0", "Suggest"],
-		["h6:text0", "Send"],
-		["h7:text0", "Nothing sent"]
+		[
+			"h1:text0",
+			"Postcard"
+		],
+		[
+			"h4:text0",
+			"Draft Hello"
+		],
+		[
+			"h5:text0",
+			"Suggest"
+		],
+		[
+			"h6:text0",
+			"Send"
+		],
+		[
+			"h7:text0",
+			"Nothing sent"
+		]
 	],
 	"initialAttributes": [
-		["h2", "value", "Hello"],
-		["h0", "aria-busy", null],
-		["h6", "aria-disabled", null]
+		[
+			"h2",
+			"value",
+			"Hello"
+		],
+		[
+			"h0",
+			"aria-busy",
+			null
+		],
+		[
+			"h6",
+			"aria-disabled",
+			null
+		]
 	],
 	"steps": [
 		{

@@ -8,8 +8,8 @@ const val OVERLAY_HINT_ATTRIBUTE = "overlay-hint"
 const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
 const val OVERLAY_MODAL_VALUE = "true"
 
-/** The events that carry a string: an `input` the field's text, a `keydown` its key, a `paste` the pasted text. */
-private val VALUED = setOf(EventName.Input, EventName.Commit, EventName.Keydown, EventName.Paste)
+/** The events that carry a string: an `input` or `commit` the field's text, a `keydown` or `keyup` its key, a `paste` the pasted text. */
+private val VALUED = setOf(EventName.Input, EventName.Commit, EventName.Keydown, EventName.Keyup, EventName.Paste)
 
 sealed interface JournalEntry {
 	val node: String
@@ -604,6 +604,8 @@ class Runtime(
 				if (command == "focus") focused = node
 				JournalEntry.Command(node, command, (parts[2] as? Json.Bool)?.value == true)
 			} +
+			// A key or paste handler called preventDefault() before it first awaited.
+			(if ((result["prevented"] as? Json.Bool)?.value == true) listOf(JournalEntry.PreventDefault) else emptyList()) +
 			listOfNotNull(result["navigate"]?.let { n ->
 				val o = n.obj("leave().navigate")
 				o.only(setOf("route", "params", "replace"), "leave().navigate")
@@ -1088,8 +1090,9 @@ class Runtime(
 		if (event == EventName.Activate) focused = host
 		val carried = when (event) {
 			EventName.Input, EventName.Commit -> value?.let { mapOf("value" to JsValue.Str(it)) }
-			EventName.Keydown -> mapOf("key" to JsValue.Str(value!!))
-			EventName.Paste -> mapOf("text" to JsValue.Str(value!!))
+			// A key's or paste's script handler reads the field's text then as `event.target.value`.
+			EventName.Keydown, EventName.Keyup -> mapOf("key" to JsValue.Str(value!!), "value" to JsValue.Str(textOf(host)))
+			EventName.Paste -> mapOf("text" to JsValue.Str(value!!), "value" to JsValue.Str(textOf(host)))
 			EventName.Activate -> mapOf("detail" to JsValue.Num((detail ?: 1).toDouble()))
 			else -> null
 		}
@@ -1318,7 +1321,8 @@ class Runtime(
 			}
 			is Op.Script -> {
 				val touch = TOUCH_FIELDS.mapNotNull { f -> fields?.get(f)?.let { ",${jsonString(f)}:${jsonValue(it)}" } }.joinToString("")
-				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$touch}"
+				val typed = listOf("key", "text").mapNotNull { f -> (fields?.get(f) as? JsValue.Str)?.let { ",${jsonString(f)}:${jsonString(it.value)}" } }.joinToString("")
+				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$typed$touch}"
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
 				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope)},\"event\":$event$catch", submission))
 			}

@@ -1,0 +1,41 @@
+appId: ${APP_ID}
+name: f22-script-keys
+---
+- launchApp:
+      clearState: true
+- assertVisible: Tags
+- assertVisible: 'Tags: red'
+- assertVisible: Nothing added
+- tapOn: Tag
+- eraseText
+- inputText: blue
+- hideKeyboard
+- assertVisible: blue
+- assertVisible: 'Tags: red'
+- assertVisible: Nothing added
+- assertVisible: blue
+- tapOn: Tag
+- pressKey: Enter
+- assertNotVisible: 'Tags: red'
+- assertNotVisible: Nothing added
+- assertVisible: ''
+- assertVisible: 'Tags: red, blue'
+- assertVisible: Added blue
+- assertNotVisible: 'Tags: red'
+- assertNotVisible: Nothing added
+- assertVisible: ''
+- tapOn: Tag
+- eraseText
+- inputText: red
+- hideKeyboard
+- assertVisible: red
+- assertVisible: 'Tags: red, blue'
+- assertVisible: Added blue
+- assertVisible: red
+- tapOn: Tag
+- pressKey: Enter
+- assertNotVisible: Added blue
+- assertVisible: 'Tags: red, blue'
+- assertVisible: Already have red
+- assertNotVisible: Added blue
+- assertVisible: red
