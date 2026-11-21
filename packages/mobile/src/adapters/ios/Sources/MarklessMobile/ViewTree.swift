@@ -1279,6 +1279,9 @@ final class ViewTree {
 				area.onPaste = { text in ask(NativeAction(event: .paste, host: id, value: text)) }
 			case let (.enter, field as UITextField):
 				field.addAction(UIAction { _ in onAction(NativeAction(event: .enter, host: id)) }, for: .editingDidEndOnExit)
+			case (.input, _) where element == "select":
+				// A select's input handler runs when a choice lands, from the runtime's choose.
+				continue
 			case (.idle, _), (.visible, _), (.dismiss, _), (.close, _), (_, _) where event.event.isPointer:
 				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host, close by the runtime.
 				continue
@@ -1400,9 +1403,15 @@ final class ViewTree {
 			button.accessibilityLabel = label
 			return
 		}
+		// As the web names a button from its content: its text, and the label of an image or svg inside it.
 		func texts(_ view: UIView) -> [String] {
 			view.subviews.flatMap { child -> [String] in
 				if let label = child as? UILabel { return [label.text ?? ""] }
+				if child is DrawingView || child is UIImageView {
+					let own = child.accessibilityIdentifier.flatMap { attributes[$0] }
+					if own?["aria-hidden"] == "true" { return [] }
+					return [own?["aria-label"] ?? (child is UIImageView ? own?["alt"] : nil) ?? ""]
+				}
 				return texts(child)
 			}
 		}

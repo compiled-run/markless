@@ -129,7 +129,7 @@ async function serveRung(
 	// Vitest's NODE_ENV=test leaves import.meta.env.DEV true in a build.
 	process.env.NODE_ENV = 'production';
 	try {
-		await buildFixture({ root });
+		await buildFixture({ root, ui: true });
 	} finally {
 		if (nodeEnv === undefined) delete process.env.NODE_ENV;
 		else process.env.NODE_ENV = nodeEnv;
@@ -163,6 +163,7 @@ const shown = (page: Page, text: string): Locator =>
 	page
 		.getByText(text, { exact: true })
 		.or(page.getByLabel(text, { exact: true }))
+		.or(page.getByRole('img', { name: text, exact: true }))
 		.or(page.getByRole('combobox').filter({ has: page.locator('option:checked').getByText(text, { exact: true }) }));
 
 // The phone the style exports lay out for (Dragon's iOS viewport): a rung that scrolls scrolls here as on the phones.
