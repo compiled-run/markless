@@ -160,7 +160,7 @@ class MarklessHost(
 	private var rowShaper: RowShaper? = null
 	private var laidOutFor: Pair<Int, Int>? = null
 	private val fonts: FontSource = if (style?.systemFaces.isNullOrEmpty()) bundledFonts else SystemFonts(style!!.systemFaces, bundledFonts)
-	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine, AppSession.store).apply {
+	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine).apply {
 		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
 		onScriptEntry = AppScriptEngine::entryRan
 	}
@@ -575,7 +575,8 @@ class MarklessHost(
 				is JournalEntry.Fetch -> scriptServices.fetch(entry.id, entry.request) { if (!released) apply(runtime.response(entry.id, it)) }
 				is JournalEntry.Abort -> scriptServices.abort(entry.id)
 				is JournalEntry.Rows -> {
-					if (runtime.node(entry.node) !is Node.Repeat) throw MarklessHostError("journal names \"${entry.node}\", which is not a list")
+					// An inner list's copy in one outer row is `<list>@<outer key>`.
+					if (runtime.node(entry.node.substringBefore('@')) !is Node.Repeat) throw MarklessHostError("journal names \"${entry.node}\", which is not a list")
 					rebuild()
 				}
 			}
@@ -801,7 +802,7 @@ class MarklessHost(
 				else -> continue
 			}
 			views[inst.id] = view
-			(node as? Node.Element)?.live?.let { view.accessibilityLiveRegion = if (it.assertive) View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE else View.ACCESSIBILITY_LIVE_REGION_POLITE }
+			(node as? Node.Element)?.let { liveRegion(it, view) }
 			built[inst.id] = inst
 			val parentId = parentOf(inst)
 			val outer = if (parentId != null) views[parentId] else pageBox
@@ -847,16 +848,23 @@ class MarklessHost(
 		return view
 	}
 
-	/** The instance id of [inst]'s parent: in the same row when the parent is a row node too. */
+	/** The instance id of [inst]'s parent: in the same row as [inst] at the parent's own depth when the parent is a row node. */
 	private fun parentOf(inst: Instance): String? {
 		val p = inst.node.parent ?: return null
-		return if (runtime.node(p).row != null) "$p@${inst.rowKey ?: throw MarklessHostError("\"${inst.id}\" is outside the rows of its parent \"$p\"")}" else p
+		val row = runtime.node(p).row ?: return p
+		return "$p@${inst.scope.keys[row] ?: throw MarklessHostError("\"${inst.id}\" is outside the rows of its parent \"$p\"")}"
 	}
 
-	/** Where an instance sits among its siblings: document order, with a list's rows at the list's place, in row order. */
+	/**
+	 * Where an instance sits among its siblings: document order, with a list's rows at the list's place, in row order. A row
+	 * of a list inside another list's row is ordered within that list's copy (`<list>@<outer key>`).
+	 */
 	private fun position(inst: Instance, rowIndex: Map<String, Map<String, Int>>): List<Int> {
 		val r = inst.node.row ?: return listOf(order.getValue(inst.node.id))
-		return listOf(order.getValue(r), rowIndex.getValue(r).getValue(inst.rowKey!!), order.getValue(inst.node.id))
+		val outer = runtime.node(r).row?.let { inst.scope.keys.getValue(it) }
+		val copy = if (outer == null) r else "$r@$outer"
+		val key = inst.scope.keys.getValue(r).let { if (outer == null) it else it.removePrefix("$outer@") }
+		return listOf(order.getValue(r), rowIndex.getValue(copy).getValue(key), order.getValue(inst.node.id))
 	}
 
 	/** Moves [box]'s retained children into position order; the views are kept, only their places change. */
@@ -945,6 +953,12 @@ class MarklessHost(
 				needDevice().view(obj, device).also { named(it, inst.id) }
 			}
 			"img" -> SizedImage(context).also { named(it, inst.id) }
+			"iframe" -> EmbeddedPage(
+				context,
+				node.attributes["src"] ?: throw MarklessHostError("<iframe> ${inst.id} has no src"),
+				node.attributes["width"]?.toIntOrNull() ?: 300,
+				node.attributes["height"]?.toIntOrNull() ?: 150,
+			).also { it.contentDescription = node.attributes["title"]; it.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES }
 			"audio" -> AudioButton(context).apply {
 				visibility = View.GONE
 				named(this, inst.id)
@@ -1156,6 +1170,21 @@ class MarklessHost(
 		return view
 	}
 
+	/** How TalkBack speaks a change inside the element: as built, or, when its live attributes follow state, as they read now. */
+	private fun liveRegion(node: Node.Element, view: View) {
+		val follows = node.liveFollows
+		val assertive = if (follows != null) when ((runtime.evaluate(follows.politeness) as? JsValue.Str)?.value) {
+			"assertive" -> true
+			"polite" -> false
+			else -> null
+		} else node.live?.assertive
+		view.accessibilityLiveRegion = when (assertive) {
+			true -> View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE
+			false -> View.ACCESSIBILITY_LIVE_REGION_POLITE
+			null -> View.ACCESSIBILITY_LIVE_REGION_NONE
+		}
+	}
+
 	/** Attributes per the contract's Android mapping; `class` reaches views only through Dragon's style states, and any other attribute is ignored. */
 	private fun attribute(id: String, name: String, value: String?) {
 		val view = view(id)
@@ -1163,6 +1192,7 @@ class MarklessHost(
 		if (value == null) current.remove(name) else current[name] = value
 		if (id in inert && (name == "aria-hidden" || name == "hidden")) return
 		if (view is RangeBar && name in RangeBar.SHAPE) view.show(current)
+		if (name == "role" || name == "aria-live") (payload.nodes.firstOrNull { it.id == id.substringBefore('@') } as? Node.Element)?.takeIf { it.liveFollows != null }?.let { liveRegion(it, view) }
 		when (name) {
 			// A label names its control, so TalkBack reads it there and not a second time on the label; a press on it activates the control.
 			"for" -> if (value != null) {
@@ -1180,6 +1210,7 @@ class MarklessHost(
 			}
 			"controls" -> if (view is AudioButton) view.visibility = if (value == null) View.GONE else View.VISIBLE
 			"disabled" -> view.isEnabled = value == null
+			"readonly" -> if (view is MarklessField) view.readOnly = value != null
 			"aria-pressed", "aria-selected" -> view.isSelected = value == "true"
 			"aria-expanded" -> expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }
 			"aria-hidden" -> view.importantForAccessibility = if (value == "true") View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else if (view is DrawingView) (if (view.contentDescription != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO) else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
@@ -1561,10 +1592,6 @@ private fun EditText.setAppText(text: String) {
 	try { setText(text) } finally { limit?.appWriting = false }
 }
 
-/** App-scoped shared fields for this launch: one store every screen reads and writes, as the web keeps one copy per document. */
-internal object AppSession {
-	val store = MemoryStore()
-}
 /**
  * `<input type="range">`: a seek bar whose progress counts the input's steps from its minimum (a thousandth of the range
  * for `step="any"`), its value kept as the web keeps it (`nativeRangeValue`). A move reports the value it lands on once,

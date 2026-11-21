@@ -5,8 +5,7 @@ class Screen(val route: String, val params: Map<String, String>, val path: Strin
 
 /** The stack an app's screens form, without views: what each host's real stack must match. Free of android.*. */
 class AppRuntime(val app: AppPayload, path: String, private val store: Store = MemoryStore(), private val scriptHost: ScriptHost? = null) {
-	/** App-scoped shared fields: one copy for the whole launch, as the web keeps one per document. */
-	private val session = MemoryStore()
+	private val session = AppSession()
 	val screens: MutableList<Screen> = app.backStack(path).map { open(app.match(it)!!.first.route.pattern, app.match(it)!!.second) }.toMutableList()
 
 	/** What starting the screens the app opened with asked for, bottom first (their async values' requests and timers). */
@@ -33,5 +32,14 @@ class AppRuntime(val app: AppPayload, path: String, private val store: Store = M
 		if (screens.size < 2) throw MarklessRuntimeError("back on the first screen leaves the app")
 		val left = screens.removeAt(screens.size - 1).runtime.leave()
 		return left + screens.last().runtime.resume()
+	}
+}
+
+/** The values of an app's app-wide `shared()` cells, one for every page; [shared] lasts as long as the app's process runs. */
+class AppSession {
+	val values = HashMap<String, JsValue>()
+
+	companion object {
+		val shared = AppSession()
 	}
 }

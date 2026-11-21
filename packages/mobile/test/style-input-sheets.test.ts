@@ -107,20 +107,21 @@ export default function Tag({ params }: PageProps<{ tag: string }>) @{
 	expect(texts).toEqual(['', 'Tagged ']);
 });
 
-test("a styled page refuses a row's class or aria-* that follows its row, by name, where Dragon could not lay it out", async () => {
-	const build = await compileNativeApp({
-		pages: [
-			{
-				page: 'pages/index.tsrx',
-				filename: 'packages/mobile/test/fixtures/pages/index.tsrx',
-				source: `import { state } from '@markless/core';
+test("a styled page refuses a row's aria-* that follows its row only where a selector reads it, and leaves it out of Dragon's input otherwise", async () => {
+	const build = (css: string) =>
+		compileNativeApp({
+			pages: [
+				{
+					page: 'pages/index.tsrx',
+					filename: 'packages/mobile/test/fixtures/pages/index.tsrx',
+					source: `import { state } from '@markless/core';
 
 export default function List() @{
 	let names = state(['ada', 'grace']);
 	let busy = state(false);
 	<main>
 		<style>
-			li { padding: 4px; }
+			${css}
 		</style>
 		<ul>
 			@for (const name of names; key name) {
@@ -129,10 +130,17 @@ export default function List() @{
 		</ul>
 	</main>
 }`,
-			},
-		],
-	});
-	expect(build.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+				},
+			],
+		});
+	const untested = await build('li { padding: 4px; }');
+	expect(untested.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	const item = untested.styleInputs[0]!.input.nodes.find(
+		(node) => node.kind === 'element' && node.element === 'li',
+	);
+	expect(Object.keys(item?.kind === 'element' ? item.attributes : {})).toEqual(['class']);
+	const tested = await build('li[aria-label] { padding: 4px; }');
+	expect(tested.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
 		expect.stringMatching(
 			/^the `aria-label` of <li> \S+ follows its @for row on a styled page through a value the build cannot list; Dragon styles a row by each value it can give, so write it as literals chosen by conditions$/,
 		),

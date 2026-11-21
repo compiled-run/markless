@@ -33,6 +33,15 @@ open class SizedFrame(context: Context, private val widthDp: Int, private val he
 	}
 }
 
+/** An `iframe`: the platform's web view showing [src] in a box of the iframe's size, 300 by 150 by default as on the web. */
+class EmbeddedPage(context: Context, src: String, widthDp: Int, heightDp: Int) : SizedFrame(context, widthDp, heightDp) {
+	val page = android.webkit.WebView(context).apply { loadUrl(src) }
+
+	init {
+		addView(page, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+	}
+}
+
 /** An `img`: an ImageView in a fixed box. */
 class SizedImage(context: Context) : SizedFrame(context, 120, 90) {
 	val image = ImageView(context).apply { scaleType = ImageView.ScaleType.FIT_CENTER }

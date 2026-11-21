@@ -57,6 +57,8 @@ sealed interface Expr {
 	data class Local(val name: String) : Expr
 	/** The current row's item of a list. */
 	data class Item(val repeat: String) : Expr
+	/** The current row's position in its list, from 0: a `@for`'s `index`. */
+	data class Index(val repeat: String) : Expr
 	data class Call(val name: String, val arguments: List<Expr>) : Expr
 	/** A field of the event running the handler: an input's `value`, a dismissal's `reason` and `pressTarget`, or a pointer field. */
 	data class Event(val field: String) : Expr
@@ -73,6 +75,8 @@ sealed interface Expr {
 	data class Shown(val node: String) : Expr
 	/** `document.getElementById(value)`: the first shown element whose `id` attribute is the value now, else null. */
 	data class ById(val value: Expr) : Expr
+	/** The element [node], in an `@if` arm, if it was on screen when the run began; else null. */
+	data class Drawn(val node: String) : Expr
 	/** The page's route params, an object of strings. */
 	data object RouteParams : Expr
 	/** `new FormData(form)`: the form's entries as `[name, value]` string pairs, in tree order. */
@@ -90,6 +94,8 @@ sealed interface ScriptBinding {
 	data class Cell(val cell: String) : ScriptBinding
 	data class Fields(val fields: Map<String, String>) : ScriptBinding
 	data class Value(val value: Expr) : ScriptBinding
+	/** A device object the component made: the script calls its methods through `call` entries. */
+	data class Device(val device: String, val obj: String) : ScriptBinding
 	/** A function a parent passed as a prop: the script function it names, its own names bound as `<name>.<its name>`. */
 	data class Callback(val fn: String) : ScriptBinding
 	/** An element, or an array of them, the function reads through proxies the host answers. */
@@ -123,7 +129,7 @@ sealed interface Node {
 	val row: String?
 
 	/** [obj]: the device object a `camera` element shows. */
-	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null, val obj: String? = null, val defaultStyle: DefaultStyle? = null, val drawing: Drawing? = null, val live: Live? = null) : Node
+	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null, val obj: String? = null, val defaultStyle: DefaultStyle? = null, val drawing: Drawing? = null, val live: Live? = null, val liveFollows: LiveFollows? = null) : Node
 	/** [parent] is null for text at the top of the page. */
 	data class Text(override val id: String, override val parent: String?, val parts: List<TextPart>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
 	/** An `@if` with [test] (arm 0 while truthy, arm 1 otherwise), or a chain with [tests]: the first truthy arm, else the `null` arm. */
@@ -258,7 +264,7 @@ data class Route(val pattern: String, val params: List<String>) {
 /** [device]: a live device value the host fills at mount and on change. [task]: an async device call started at mount. [row]: state of a component a list row renders, one value per row of that `repeat`, [initial] when the row is built. */
 /** [clock]: the clock when the screen opened, written at mount before the first build. */
 /** [async]: an async value function [AsyncValue.fn] of the payload's script computes while one of its [AsyncValue.boundaries] branches is shown; the script settles the cell. */
-data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false, val device: String? = null, val task: Task? = null, val obj: String? = null, val row: String? = null, val clock: Boolean = false, val first: Expr? = null, val rebuiltBy: List<Expr>? = null, val async: AsyncValue? = null, val seed: Expr? = null, val session: Boolean = false, val arm: ArmPlace? = null, val unset: Boolean = false, val follows: Expr? = null)
+data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false, val device: String? = null, val task: Task? = null, val obj: String? = null, val row: String? = null, val clock: Boolean = false, val first: Expr? = null, val rebuiltBy: List<Expr>? = null, val async: AsyncValue? = null, val seed: Expr? = null, val arm: ArmPlace? = null, val unset: Boolean = false, val follows: Expr? = null, val app: Boolean = false)
 
 data class AsyncValue(val fn: String, val bindings: Map<String, ScriptBinding>, val boundaries: List<String>)
 data class Event(val host: String, val event: EventName, val handler: String)
@@ -427,7 +433,8 @@ fun nativeMaxLength(attribute: String?): Int? {
 }
 
 /** A form's submittable fields and submit buttons, each in tree order. */
-data class Form(val node: String, val fields: List<Field>, val submitters: List<String>, val noValidate: Boolean = false, val authoredAriaDisabled: Boolean = false)
+/** [opens]: a GET form on another site, whose submit opens this URL with its query replaced by the form's entries. */
+data class Form(val node: String, val fields: List<Field>, val submitters: List<String>, val noValidate: Boolean = false, val authoredAriaDisabled: Boolean = false, val opens: String? = null)
 
 data class Payload(
 	val component: String,
@@ -574,13 +581,14 @@ data class Payload(
 			is Expr.Method -> hasScript(e.target) || e.arguments.any(::hasScript)
 			is Expr.Lambda -> hasScript(e.body)
 			is Expr.Call -> e.arguments.any(::hasScript)
-			is Expr.CellRef, is Expr.Literal, is Expr.Local, is Expr.Item, Expr.RouteParams, is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field -> false
+			is Expr.CellRef, is Expr.Literal, is Expr.Local, is Expr.Item, is Expr.Index, Expr.RouteParams, is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field -> false
 			is Expr.Contains -> hasScript(e.within) || hasScript(e.node)
 			is Expr.Captures -> hasScript(e.node) || hasScript(e.pointer)
 			is Expr.FocusOrigin -> hasScript(e.overlay)
 			is Expr.IsElement -> hasScript(e.value)
 			is Expr.Shown -> false
 			is Expr.ById -> hasScript(e.value)
+			is Expr.Drawn -> false
 		}
 
 		private fun scriptOps(ops: List<Op>): Boolean = ops.any { op ->
@@ -612,7 +620,7 @@ data class Payload(
 			is Expr.Merge -> e.parts.flatMap { cellsOf(it) }
 			is Expr.Method -> cellsOf(e.target) + e.arguments.flatMap(::cellsOf)
 			is Expr.Lambda -> cellsOf(e.body)
-			is Expr.Local, is Expr.Item, Expr.RouteParams -> emptyList()
+			is Expr.Local, is Expr.Item, is Expr.Index, Expr.RouteParams -> emptyList()
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
 			is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field -> emptyList()
 			is Expr.Contains -> cellsOf(e.within) + cellsOf(e.node)
@@ -621,6 +629,7 @@ data class Payload(
 			is Expr.IsElement -> cellsOf(e.value)
 			is Expr.Shown -> emptyList()
 			is Expr.ById -> cellsOf(e.value)
+			is Expr.Drawn -> emptyList()
 			is Expr.Script -> cellsOf(e.bindings)
 		}
 
@@ -629,6 +638,7 @@ data class Payload(
 				is ScriptBinding.Cell -> listOf(b.cell)
 				is ScriptBinding.Fields -> b.fields.values.toList()
 				is ScriptBinding.Value -> cellsOf(b.value)
+				is ScriptBinding.Device -> emptyList()
 				is ScriptBinding.Callback -> emptyList()
 				is ScriptBinding.Elements -> cellsOf(b.value)
 				is ScriptBinding.Object -> cellsOf(b.members)
@@ -637,7 +647,7 @@ data class Payload(
 			}
 		}
 
-		private val SERVICES = setOf("timers", "fetch", "console", "crypto", "navigate")
+		private val SERVICES = setOf("timers", "fetch", "console", "crypto", "navigate", "device")
 
 		private fun scriptBindings(v: Json, what: String): Map<String, ScriptBinding> = v.obj(what).entries.associateTo(LinkedHashMap()) { (name, b) ->
 			val bo = b.obj("$what.$name")
@@ -648,6 +658,10 @@ data class Payload(
 					ScriptBinding.Fields(bo.field("fields", what).obj("$what.$name.fields").entries.associateTo(LinkedHashMap()) { (f, c) -> f to c.str("$what.$name.fields.$f") })
 				}
 				bo.containsKey("value") -> { bo.only(setOf("value"), "$what.$name"); ScriptBinding.Value(expr(bo.field("value", what), "$what.$name.value")) }
+				bo.containsKey("device") -> {
+					bo.only(setOf("device", "object"), "$what.$name")
+					ScriptBinding.Device(bo.field("device", what).str("$what.$name.device"), bo.field("object", what).str("$what.$name.object"))
+				}
 				bo.containsKey("callback") -> { bo.only(setOf("callback"), "$what.$name"); ScriptBinding.Callback(bo.field("callback", what).str("$what.$name.callback")) }
 				bo.containsKey("elements") -> { bo.only(setOf("elements"), "$what.$name"); ScriptBinding.Elements(expr(bo.field("elements", what), "$what.$name.elements")) }
 				bo.containsKey("object") -> { bo.only(setOf("object"), "$what.$name"); ScriptBinding.Object(scriptBindings(bo.field("object", what), "$what.$name.object")) }
@@ -721,6 +735,7 @@ data class Payload(
 				o.containsKey("lambda") -> { o.only(setOf("lambda", "body"), what); Expr.Lambda(o.field("lambda", what).arr("$what.lambda").map { it.str("$what.lambda[]") }, sub("body")) }
 				o.containsKey("local") -> { o.only(setOf("local"), what); Expr.Local(o.field("local", what).str("$what.local")) }
 				o.containsKey("item") -> { o.only(setOf("item"), what); Expr.Item(o.field("item", what).str("$what.item")) }
+				o.containsKey("index") -> { o.only(setOf("index"), what); Expr.Index(o.field("index", what).str("$what.index")) }
 				o.containsKey("call") -> {
 					o.only(setOf("call", "arguments"), what)
 					Expr.Call(oneOf(o, "call", BUILTINS, what), o.field("arguments", what).arr("$what.arguments").mapIndexed { n, a -> expr(a, "$what.arguments[$n]") })
@@ -738,6 +753,7 @@ data class Payload(
 				o.containsKey("isElement") -> { o.only(setOf("isElement"), what); Expr.IsElement(sub("isElement")) }
 				o.containsKey("shown") -> { o.only(setOf("shown"), what); Expr.Shown(o.field("shown", what).str("$what.shown")) }
 				o.containsKey("byId") -> { o.only(setOf("byId"), what); Expr.ById(sub("byId")) }
+				o.containsKey("drawn") -> { o.only(setOf("drawn"), what); Expr.Drawn(o.field("drawn", what).str("$what.drawn")) }
 				o.containsKey("checked") -> { o.only(setOf("checked"), what); Expr.Checked(o.field("checked", what).str("$what.checked")) }
 				o.containsKey("field") -> { o.only(setOf("field"), what); Expr.Field(o.field("field", what).str("$what.field")) }
 				o.containsKey("formData") -> { o.only(setOf("formData"), what); Expr.FormData(o.field("formData", what).str("$what.formData")) }
@@ -767,15 +783,13 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial", "storage", "styled", "domain", "device", "task", "object", "row", "clock", "async", "first", "rebuiltBy", "seed", "arm", "unset", "follows"), what)
+			o.only(setOf("id", "name", "initial", "storage", "styled", "domain", "device", "task", "object", "row", "clock", "async", "first", "rebuiltBy", "seed", "arm", "unset", "follows", "app"), what)
 			// The style export carries each state's domain; the payload's copy is Dragon's input, checked here and not kept.
 			o["domain"]?.arr("$what.domain")?.forEach { it.str("$what.domain[]") }
 			val unset = o["unset"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.unset must be true when present"); true } ?: false
 			val clock = o["clock"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.clock must be true when present"); true } ?: false
 			val styled = o["styled"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.styled must be true when present"); true } ?: false
-			val storageObject = o["storage"]?.obj("$what.storage")
-			val storage = storageObject?.let { it.only(setOf("key", "session"), "$what.storage"); it.field("key", what).str("$what.storage.key") }
-			val session = storageObject?.get("session")?.let { it == Json.Bool(true) || throw MarklessDecodeError("$what.storage.session is true when present") } ?: false
+			val storage = o["storage"]?.obj("$what.storage")?.let { it.only(setOf("key"), "$what.storage"); it.field("key", what).str("$what.storage.key") }
 			val task = o["task"]?.obj("$what.task")?.let { t ->
 				t.only(setOf("call", "arguments"), "$what.task")
 				Task(t.field("call", what).str("$what.task.call"), t.field("arguments", what).arr("$what.task.arguments").mapIndexed { n, a -> expr(a, "$what.task.arguments[$n]") })
@@ -784,7 +798,7 @@ data class Payload(
 				a.only(setOf("script", "bindings", "boundaries"), "$what.async")
 				AsyncValue(a.field("script", what).str("$what.async.script"), scriptBindings(a.field("bindings", what), "$what.async.bindings"), a.field("boundaries", what).arr("$what.async.boundaries").map { it.str("$what.async.boundaries[]") })
 			}
-			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock, first = o["first"]?.let { expr(it, "$what.first") }, rebuiltBy = o["rebuiltBy"]?.arr("$what.rebuiltBy")?.mapIndexed { n, e -> expr(e, "$what.rebuiltBy[$n]") }, async = async, seed = o["seed"]?.let { expr(it, "$what.seed") }, session = session, arm = armPlace(o, what), unset = unset, follows = o["follows"]?.let { expr(it, "$what.follows") })
+			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock, first = o["first"]?.let { expr(it, "$what.first") }, rebuiltBy = o["rebuiltBy"]?.arr("$what.rebuiltBy")?.mapIndexed { n, e -> expr(e, "$what.rebuiltBy[$n]") }, async = async, seed = o["seed"]?.let { expr(it, "$what.seed") }, arm = armPlace(o, what), unset = unset, follows = o["follows"]?.let { expr(it, "$what.follows") }, app = o["app"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.app must be true") else true } ?: false)
 		}
 
 		private fun defaultStyle(v: Json, what: String): DefaultStyle {
@@ -828,6 +842,12 @@ data class Payload(
 			if (politeness != "polite" && politeness != "assertive") throw MarklessDecodeError("$what.politeness: unknown politeness \"$politeness\"")
 			val atomic = o.field("atomic", what) as? Json.Bool ?: throw MarklessDecodeError("$what.atomic must be a boolean")
 			return Live(politeness == "assertive", atomic.value)
+		}
+
+		private fun liveFollows(v: Json, what: String): LiveFollows {
+			val o = v.obj(what)
+			o.only(setOf("politeness", "atomic"), what)
+			return LiveFollows(expr(o.field("politeness", what), "$what.politeness"), expr(o.field("atomic", what), "$what.atomic"))
 		}
 
 		private fun drawing(v: Json, what: String): Drawing {
@@ -887,7 +907,7 @@ data class Payload(
 			val id = o.field("id", what).str("$what.id")
 			return when (val kind = o.field("kind", what).str("$what.kind")) {
 				"element" -> {
-					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm", "row", "object", "defaultStyle", "drawing", "live"), what)
+					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm", "row", "object", "defaultStyle", "drawing", "live", "liveFollows"), what)
 					val parent = o.field("parent", what)
 					val attributes = o["attributes"]?.obj("$what.attributes")?.mapValues { (k, v) -> v.str("$what.attributes.$k") } ?: emptyMap()
 					val bindings = o["bindings"]?.arr("$what.bindings")?.mapIndexed { n, b ->
@@ -901,7 +921,7 @@ data class Payload(
 							Binding(bo.field("attribute", what).str("$what.bindings[$n].attribute"), value)
 						}
 					} ?: emptyList()
-					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what), rowPlace(o, what), o["object"]?.str("$what.object"), o["defaultStyle"]?.let { defaultStyle(it, "$what.defaultStyle") }, o["drawing"]?.let { drawing(it, "$what.drawing") }, o["live"]?.let { live(it, "$what.live") })
+					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what), rowPlace(o, what), o["object"]?.str("$what.object"), o["defaultStyle"]?.let { defaultStyle(it, "$what.defaultStyle") }, o["drawing"]?.let { drawing(it, "$what.drawing") }, o["live"]?.let { live(it, "$what.live") }, o["liveFollows"]?.let { liveFollows(it, "$what.liveFollows") })
 				}
 				"text" -> {
 					o.only(setOf("kind", "id", "parent", "parts", "arm", "row"), what)
@@ -966,7 +986,7 @@ data class Payload(
 
 		private fun form(v: Json, what: String): Form {
 			val o = v.obj(what)
-			o.only(setOf("node", "fields", "submitters", "noValidate", "authoredAriaDisabled"), what)
+			o.only(setOf("node", "fields", "submitters", "noValidate", "authoredAriaDisabled", "opens"), what)
 			val fields = o.field("fields", what).arr("$what.fields").mapIndexed { n, f ->
 				val fo = f.obj("$what.fields[$n]")
 				fo.only(setOf("node", "kind"), "$what.fields[$n]")
@@ -974,7 +994,7 @@ data class Payload(
 				Field(fo.field("node", what).str("$what.fields[$n].node"), FieldKind.entries.first { it.wire == kind })
 			}
 			val submitters = o.field("submitters", what).arr("$what.submitters").map { it.str("$what.submitters[]") }
-			return Form(o.field("node", what).str("$what.node"), fields, submitters, flag(o, "noValidate", what), flag(o, "authoredAriaDisabled", what))
+			return Form(o.field("node", what).str("$what.node"), fields, submitters, flag(o, "noValidate", what), flag(o, "authoredAriaDisabled", what), o["opens"]?.str("$what.opens"))
 		}
 
 		private fun handler(v: Json, what: String, cells: Set<String>): Handler {
@@ -1162,3 +1182,6 @@ data class AppPayload(val routes: List<AppRoute>) {
 
 /** A live region: an assertive one interrupts the screen reader; an atomic one is read whole. */
 data class Live(val assertive: Boolean, val atomic: Boolean)
+
+/** A live region's politeness ("polite", "assertive" or null) and atomicity as expressions over the attributes that follow state. */
+data class LiveFollows(val politeness: Expr, val atomic: Expr)

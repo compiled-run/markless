@@ -1,0 +1,24 @@
+{
+	"rung": "J44",
+	"name": "an element handle bound inside an @if arm is the element while its arm shows and nothing otherwise",
+	"steps": [
+		{ "visible": ["Rename", "Not focused"], "absent": ["No field"] },
+		{ "do": { "tap": "Check" }, "visible": ["No field"], "absent": ["Not focused"] },
+		{ "do": { "tap": "Script" }, "visible": ["Script sees nothing"], "absent": ["No field"] },
+		{
+			"do": { "tap": "Edit and focus" },
+			"visible": ["Editing"],
+			"absent": ["Script sees nothing", "Field focused"]
+		},
+		{ "do": { "tap": "Check" }, "visible": ["Field shown"], "absent": ["Editing"] },
+		{ "do": { "tap": "Script" }, "visible": ["Field focused"], "absent": ["Field shown"] },
+		{ "do": { "tap": "Stop editing" }, "visible": ["Stopped"], "absent": ["Field focused"] },
+		{ "do": { "tap": "Check" }, "visible": ["No field"], "absent": ["Stopped"] },
+		{
+			"do": { "tap": "Edit and focus" },
+			"visible": ["Editing"],
+			"absent": ["No field", "Field focused"]
+		},
+		{ "do": { "tap": "Focus" }, "visible": ["Field focused"], "absent": ["Editing"] }
+	]
+}

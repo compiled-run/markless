@@ -1,0 +1,48 @@
+appId: ${APP_ID}
+name: j44-arm-handle
+---
+- launchApp:
+    clearState: true
+- assertVisible: Rename
+- assertVisible: Not focused
+- assertNotVisible: No field
+- tapOn: Check
+- assertVisible: No field
+- assertNotVisible: Not focused
+- assertVisible: No field
+- assertNotVisible: Not focused
+- tapOn: Script
+- assertNotVisible: No field
+- assertVisible: Script sees nothing
+- assertNotVisible: No field
+- tapOn: Edit and focus
+- assertNotVisible: Script sees nothing
+- assertVisible: Editing
+- assertNotVisible: Script sees nothing
+- assertNotVisible: Field focused
+- tapOn: Check
+- assertNotVisible: Editing
+- assertVisible: Field shown
+- assertNotVisible: Editing
+- tapOn: Script
+- assertNotVisible: Field shown
+- assertVisible: Field focused
+- assertNotVisible: Field shown
+- tapOn: Stop editing
+- assertNotVisible: Field focused
+- assertVisible: Stopped
+- assertNotVisible: Field focused
+- tapOn: Check
+- assertNotVisible: Stopped
+- assertVisible: No field
+- assertNotVisible: Stopped
+- tapOn: Edit and focus
+- assertNotVisible: No field
+- assertVisible: Editing
+- assertNotVisible: No field
+- assertNotVisible: Field focused
+- tapOn: Focus
+- assertVisible: Field focused
+- assertNotVisible: Editing
+- assertVisible: Field focused
+- assertNotVisible: Editing

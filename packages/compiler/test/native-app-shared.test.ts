@@ -42,15 +42,18 @@ describe('an app-wide shared()', () => {
 		expect(diagnostics).toEqual([]);
 		const cells = payload!.cells.filter((cell) => cell.name === 'count.taps');
 		expect(cells).toHaveLength(1);
-		expect(cells[0]!.id.startsWith('app:')).toBe(true);
+		expect(cells[0]!.id.startsWith('app/')).toBe(true);
+		expect(cells[0]!.app).toBe(true);
 	});
 
-	it('is one instance across an app with pages, as the web keeps one per document', async () => {
+	it('is held by the app across its pages: in an app, its cells are app cells', async () => {
 		const { payload, diagnostics } = await nativeView({
 			routes: [{ pattern: '/', params: [] }],
 			resolvePath: () => undefined,
 		});
 		expect(diagnostics).toEqual([]);
-		expect(payload!.cells.filter((cell) => cell.name === 'count.taps')).toHaveLength(1);
+		expect(payload!.cells.filter((cell) => cell.name === 'count.taps')).toEqual([
+			expect.objectContaining({ app: true, initial: 0 }),
+		]);
 	});
 });

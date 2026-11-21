@@ -285,22 +285,12 @@
 						"cell": "component-edge:0/shared:packages/mobile/proofs/lib/projected-box.tsrx#boxState/state:box.seen",
 						"value": {
 							"if": {
-								"if": {
-									"shown": "component-edge:1/h4"
+								"logical": "??",
+								"left": {
+									"drawn": "component-edge:1/h4"
 								},
-								"whenTrue": {
-									"literal": "component-edge:1/h4"
-								},
-								"whenFalse": {
-									"if": {
-										"shown": "copy-1/component-edge:1/h4"
-									},
-									"whenTrue": {
-										"literal": "copy-1/component-edge:1/h4"
-									},
-									"whenFalse": {
-										"literal": null
-									}
+								"right": {
+									"drawn": "copy-1/component-edge:1/h4"
 								}
 							},
 							"whenTrue": {
@@ -335,22 +325,12 @@
 						"cell": "component-edge:0/shared:packages/mobile/proofs/lib/projected-box.tsrx#boxState/state:box.seen",
 						"value": {
 							"if": {
-								"if": {
-									"shown": "component-edge:1/h4"
+								"logical": "??",
+								"left": {
+									"drawn": "component-edge:1/h4"
 								},
-								"whenTrue": {
-									"literal": "component-edge:1/h4"
-								},
-								"whenFalse": {
-									"if": {
-										"shown": "copy-1/component-edge:1/h4"
-									},
-									"whenTrue": {
-										"literal": "copy-1/component-edge:1/h4"
-									},
-									"whenFalse": {
-										"literal": null
-									}
+								"right": {
+									"drawn": "copy-1/component-edge:1/h4"
 								}
 							},
 							"whenTrue": {

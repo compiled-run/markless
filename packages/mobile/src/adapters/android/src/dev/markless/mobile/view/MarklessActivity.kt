@@ -86,8 +86,8 @@ abstract class MarklessActivity : Activity() {
 	override fun onResume() {
 		super.onResume()
 		device.resumed()
-		// Shown again (Back): the app's shared copies may have moved on another screen.
-		if (::host.isInitialized) host.runtime.resume().takeIf { it.isNotEmpty() }?.let(host::apply)
+		// Shown again after Back: the app-wide cells a screen above changed reach this one.
+		if (::host.isInitialized) host.apply(host.runtime.resume())
 	}
 
 	override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

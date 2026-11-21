@@ -154,7 +154,7 @@
 												"spread": true,
 												"value": {
 													"if": {
-														"shown": "h2"
+														"drawn": "h2"
 													},
 													"whenTrue": {
 														"array": [
@@ -184,15 +184,7 @@
 								" ",
 								{
 									"if": {
-										"if": {
-											"shown": "h2"
-										},
-										"whenTrue": {
-											"literal": "h2"
-										},
-										"whenFalse": {
-											"literal": null
-										}
+										"drawn": "h2"
 									},
 									"whenTrue": {
 										"literal": "with extra"

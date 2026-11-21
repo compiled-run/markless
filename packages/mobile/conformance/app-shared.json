@@ -15,23 +15,10 @@
 					},
 					"cells": [
 						{
-							"id": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track",
-							"name": "box.track",
-							"initial": "Harbour Lights",
-							"storage": {
-								"key": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track",
-								"session": true
-							}
-						},
-						{
-							"id": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
-							"name": "box.playing",
-							"initial": false,
-							"storage": {
-								"key": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
-								"session": true
-							},
-							"styled": true
+							"id": "app/shared:packages/mobile/proofs/n11-app-shared/lib/tally.tsrx#tallyState/state:tally.taps",
+							"name": "tally.taps",
+							"initial": 0,
+							"app": true
 						}
 					],
 					"nodes": [
@@ -57,120 +44,113 @@
 							"parent": "h2",
 							"parts": [
 								{
-									"text": "Player"
+									"text": "Home page"
 								}
 							]
 						},
 						{
 							"kind": "element",
 							"id": "component-edge:0/h0",
-							"element": "div",
+							"element": "p",
 							"parent": "h0"
 						},
 						{
-							"kind": "element",
-							"id": "component-edge:0/h1",
-							"element": "p",
-							"parent": "component-edge:0/h0"
-						},
-						{
 							"kind": "text",
-							"id": "component-edge:0/h1:text0",
-							"parent": "component-edge:0/h1",
+							"id": "component-edge:0/h0:text0",
+							"parent": "component-edge:0/h0",
 							"parts": [
 								{
 									"expr": {
-										"if": {
-											"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing"
-										},
-										"whenTrue": {
-											"literal": "Playing"
-										},
-										"whenFalse": {
-											"literal": "Paused"
-										}
+										"template": [
+											"",
+											{
+												"literal": "Home sees"
+											},
+											" ",
+											{
+												"cell": "app/shared:packages/mobile/proofs/n11-app-shared/lib/tally.tsrx#tallyState/state:tally.taps"
+											},
+											""
+										]
 									}
-								},
-								{
-									"text": ": "
-								},
-								{
-									"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track"
 								}
 							]
 						},
 						{
 							"kind": "element",
-							"id": "component-edge:0/h2",
+							"id": "component-edge:1/h1",
 							"element": "button",
-							"parent": "component-edge:0/h0"
+							"parent": "h0"
 						},
 						{
 							"kind": "text",
-							"id": "component-edge:0/h2:text0",
-							"parent": "component-edge:0/h2",
+							"id": "component-edge:1/h1:text0",
+							"parent": "component-edge:1/h1",
 							"parts": [
 								{
 									"expr": {
-										"literal": "Play or pause"
+										"literal": "Bump at home"
 									}
 								}
 							]
 						},
 						{
 							"kind": "element",
-							"id": "component-edge:1",
+							"id": "component-edge:2",
 							"element": "a",
 							"parent": "h0",
 							"attributes": {
-								"href": "/now"
+								"href": "/other"
 							}
 						},
 						{
 							"kind": "text",
-							"id": "component-edge:1:text0",
-							"parent": "component-edge:1",
+							"id": "component-edge:2:text0",
+							"parent": "component-edge:2",
 							"parts": [
 								{
-									"text": "Now playing"
+									"text": "Open other"
 								}
 							]
 						}
 					],
 					"events": [
 						{
-							"host": "component-edge:0/h2",
+							"host": "component-edge:1/h1",
 							"event": "activate",
-							"handler": "handler:component-edge:0/event:0"
+							"handler": "handler:component-edge:1/event:0"
 						},
 						{
-							"host": "component-edge:1",
+							"host": "component-edge:2",
 							"event": "activate",
-							"handler": "handler:component-edge:1"
+							"handler": "handler:component-edge:2"
 						}
 					],
 					"handlers": [
 						{
-							"id": "handler:component-edge:0/event:0",
+							"id": "handler:component-edge:1/event:0",
 							"ops": [
 								{
 									"op": "assign",
-									"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
+									"cell": "app/shared:packages/mobile/proofs/n11-app-shared/lib/tally.tsrx#tallyState/state:tally.taps",
 									"value": {
-										"unary": "!",
-										"value": {
-											"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing"
+										"binary": "+",
+										"left": {
+											"cell": "app/shared:packages/mobile/proofs/n11-app-shared/lib/tally.tsrx#tallyState/state:tally.taps"
+										},
+										"right": {
+											"literal": 1
 										}
 									}
 								}
 							]
 						},
 						{
-							"id": "handler:component-edge:1",
+							"id": "handler:component-edge:2",
 							"ops": [
 								{
 									"op": "navigate",
-									"route": "/now",
+									"route": "/other",
 									"params": {}
 								}
 							]
@@ -184,34 +164,21 @@
 				}
 			},
 			{
-				"pattern": "/now",
+				"pattern": "/other",
 				"params": [],
 				"page": {
 					"version": "markless.native-view/0",
-					"component": "Now",
+					"component": "Other",
 					"route": {
-						"pattern": "/now",
+						"pattern": "/other",
 						"params": []
 					},
 					"cells": [
 						{
-							"id": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track",
-							"name": "box.track",
-							"initial": "Harbour Lights",
-							"storage": {
-								"key": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track",
-								"session": true
-							}
-						},
-						{
-							"id": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
-							"name": "box.playing",
-							"initial": false,
-							"storage": {
-								"key": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
-								"session": true
-							},
-							"styled": true
+							"id": "app/shared:packages/mobile/proofs/n11-app-shared/lib/tally.tsrx#tallyState/state:tally.taps",
+							"name": "tally.taps",
+							"initial": 0,
+							"app": true
 						}
 					],
 					"nodes": [
@@ -237,62 +204,52 @@
 							"parent": "h2",
 							"parts": [
 								{
-									"text": "Track"
+									"text": "Other page"
 								}
 							]
 						},
 						{
 							"kind": "element",
 							"id": "component-edge:0/h0",
-							"element": "div",
+							"element": "p",
 							"parent": "h0"
 						},
 						{
-							"kind": "element",
-							"id": "component-edge:0/h1",
-							"element": "p",
-							"parent": "component-edge:0/h0"
-						},
-						{
 							"kind": "text",
-							"id": "component-edge:0/h1:text0",
-							"parent": "component-edge:0/h1",
+							"id": "component-edge:0/h0:text0",
+							"parent": "component-edge:0/h0",
 							"parts": [
 								{
 									"expr": {
-										"if": {
-											"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing"
-										},
-										"whenTrue": {
-											"literal": "Playing"
-										},
-										"whenFalse": {
-											"literal": "Paused"
-										}
+										"template": [
+											"",
+											{
+												"literal": "Other sees"
+											},
+											" ",
+											{
+												"cell": "app/shared:packages/mobile/proofs/n11-app-shared/lib/tally.tsrx#tallyState/state:tally.taps"
+											},
+											""
+										]
 									}
-								},
-								{
-									"text": ": "
-								},
-								{
-									"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.track"
 								}
 							]
 						},
 						{
 							"kind": "element",
-							"id": "component-edge:0/h2",
+							"id": "component-edge:1/h1",
 							"element": "button",
-							"parent": "component-edge:0/h0"
+							"parent": "h0"
 						},
 						{
 							"kind": "text",
-							"id": "component-edge:0/h2:text0",
-							"parent": "component-edge:0/h2",
+							"id": "component-edge:1/h1:text0",
+							"parent": "component-edge:1/h1",
 							"parts": [
 								{
 									"expr": {
-										"literal": "Toggle here"
+										"literal": "Bump here"
 									}
 								}
 							]
@@ -300,22 +257,25 @@
 					],
 					"events": [
 						{
-							"host": "component-edge:0/h2",
+							"host": "component-edge:1/h1",
 							"event": "activate",
-							"handler": "handler:component-edge:0/event:0"
+							"handler": "handler:component-edge:1/event:0"
 						}
 					],
 					"handlers": [
 						{
-							"id": "handler:component-edge:0/event:0",
+							"id": "handler:component-edge:1/event:0",
 							"ops": [
 								{
 									"op": "assign",
-									"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
+									"cell": "app/shared:packages/mobile/proofs/n11-app-shared/lib/tally.tsrx#tallyState/state:tally.taps",
 									"value": {
-										"unary": "!",
-										"value": {
-											"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing"
+										"binary": "+",
+										"left": {
+											"cell": "app/shared:packages/mobile/proofs/n11-app-shared/lib/tally.tsrx#tallyState/state:tally.taps"
+										},
+										"right": {
+											"literal": 1
 										}
 									}
 								}
@@ -324,7 +284,7 @@
 					],
 					"title": [
 						{
-							"text": "Now playing"
+							"text": "Other"
 						}
 					]
 				}
@@ -340,19 +300,19 @@
 		"texts": [
 			[
 				"h2:text0",
-				"Player"
+				"Home page"
 			],
 			[
-				"component-edge:0/h1:text0",
-				"Paused: Harbour Lights"
+				"component-edge:0/h0:text0",
+				"Home sees 0"
 			],
 			[
-				"component-edge:0/h2:text0",
-				"Play or pause"
+				"component-edge:1/h1:text0",
+				"Bump at home"
 			],
 			[
-				"component-edge:1:text0",
-				"Now playing"
+				"component-edge:2:text0",
+				"Open other"
 			]
 		]
 	},
@@ -360,18 +320,13 @@
 		{
 			"action": {
 				"event": "activate",
-				"host": "component-edge:0/h2"
+				"host": "component-edge:1/h1"
 			},
 			"journal": [
 				{
-					"op": "state",
-					"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
-					"value": true
-				},
-				{
 					"op": "text",
-					"node": "component-edge:0/h1:text0",
-					"value": "Playing: Harbour Lights"
+					"node": "component-edge:0/h0:text0",
+					"value": "Home sees 1"
 				}
 			],
 			"stack": [
@@ -381,88 +336,83 @@
 			"texts": [
 				[
 					"h2:text0",
-					"Player"
+					"Home page"
 				],
 				[
-					"component-edge:0/h1:text0",
-					"Playing: Harbour Lights"
+					"component-edge:0/h0:text0",
+					"Home sees 1"
 				],
 				[
-					"component-edge:0/h2:text0",
-					"Play or pause"
+					"component-edge:1/h1:text0",
+					"Bump at home"
 				],
 				[
-					"component-edge:1:text0",
-					"Now playing"
+					"component-edge:2:text0",
+					"Open other"
 				]
 			]
 		},
 		{
 			"action": {
 				"event": "activate",
-				"host": "component-edge:1"
+				"host": "component-edge:2"
 			},
 			"journal": [
 				{
 					"op": "navigate",
-					"route": "/now",
+					"route": "/other",
 					"params": {}
 				}
 			],
 			"stack": [
 				"/",
-				"/now"
+				"/other"
 			],
-			"title": "Now playing",
+			"title": "Other",
 			"texts": [
 				[
 					"h2:text0",
-					"Track"
+					"Other page"
 				],
 				[
-					"component-edge:0/h1:text0",
-					"Playing: Harbour Lights"
+					"component-edge:0/h0:text0",
+					"Other sees 1"
 				],
 				[
-					"component-edge:0/h2:text0",
-					"Toggle here"
+					"component-edge:1/h1:text0",
+					"Bump here"
 				]
 			]
 		},
 		{
 			"action": {
 				"event": "activate",
-				"host": "component-edge:0/h2"
+				"host": "component-edge:1/h1"
 			},
 			"journal": [
 				{
-					"op": "state",
-					"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
-					"value": false
-				},
-				{
 					"op": "text",
-					"node": "component-edge:0/h1:text0",
-					"value": "Paused: Harbour Lights"
+					"node": "component-edge:0/h0:text0",
+					"value": "Other sees 2"
 				}
 			],
 			"stack": [
 				"/",
-				"/now"
+				"/other"
 			],
-			"title": "Now playing",
+			"title": "Other",
 			"texts": [
 				[
 					"h2:text0",
-					"Track"
+					"Other page"
 				],
 				[
-					"component-edge:0/h1:text0",
-					"Paused: Harbour Lights"
+					"component-edge:0/h0:text0",
+					"Other sees 2"
 				],
 				[
-					"component-edge:0/h2:text0",
-					"Toggle here"
+					"component-edge:1/h1:text0",
+					"Bump here"
 				]
 			]
 		},
@@ -472,14 +422,9 @@
 			},
 			"journal": [
 				{
-					"op": "state",
-					"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
-					"value": false
-				},
-				{
 					"op": "text",
-					"node": "component-edge:0/h1:text0",
-					"value": "Paused: Harbour Lights"
+					"node": "component-edge:0/h0:text0",
+					"value": "Home sees 2"
 				}
 			],
 			"stack": [
@@ -489,19 +434,19 @@
 			"texts": [
 				[
 					"h2:text0",
-					"Player"
+					"Home page"
 				],
 				[
-					"component-edge:0/h1:text0",
-					"Paused: Harbour Lights"
+					"component-edge:0/h0:text0",
+					"Home sees 2"
 				],
 				[
-					"component-edge:0/h2:text0",
-					"Play or pause"
+					"component-edge:1/h1:text0",
+					"Bump at home"
 				],
 				[
-					"component-edge:1:text0",
-					"Now playing"
+					"component-edge:2:text0",
+					"Open other"
 				]
 			]
 		}

@@ -65,7 +65,7 @@ public final class MarklessViewController: UIViewController {
 			throw HostError("\(page.pattern) needs a route to open at, and none was given")
 		}
 		runtime = NativeRuntime(
-			payload: self.payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages, scriptHost: MarklessScripting.shared.host, session: MarklessSession.store)
+			payload: self.payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages, scriptHost: MarklessScripting.shared.host)
 		super.init(nibName: nil, bundle: nil)
 		Self.linkDragon()
 		try buildPage()
@@ -91,7 +91,7 @@ public final class MarklessViewController: UIViewController {
 		self.style = style
 		self.fonts = fonts
 		self.store = store
-		runtime = NativeRuntime(payload: page, store: store, params: params, scriptHost: MarklessScripting.shared.host, session: MarklessSession.store)
+		runtime = NativeRuntime(payload: page, store: store, params: params, scriptHost: MarklessScripting.shared.host)
 		super.init(nibName: nil, bundle: nil)
 		Self.linkDragon()
 		try buildPage()
@@ -402,11 +402,15 @@ public final class MarklessViewController: UIViewController {
 		}
 	}
 
+	/// Shown again after Back: the app-wide cells a page above changed reach this page before it slides in.
+	public override func viewWillAppear(_ animated: Bool) {
+		super.viewWillAppear(animated)
+		if tree != nil { apply { try runtime.resume() } }
+	}
+
 	public override func viewDidAppear(_ animated: Bool) {
 		super.viewDidAppear(animated)
 		tree?.pageAppeared(self)
-		// Shown again (Back): the app's shared copies may have moved on another screen.
-		if appeared, let moved = try? runtime.resume(), !moved.isEmpty { apply { moved } }
 		appeared = true
 		scheduleLoadEvents()
 		if let script = payload.script { MarklessScripting.shared.warm(script) }
@@ -441,7 +445,7 @@ public final class MarklessViewController: UIViewController {
 		guard payload.route?.pattern == route else { throw HostError("no page for \(route): this payload is \(payload.route?.pattern ?? "not a page")") }
 		for object in payload.objects { device.release(object.id) }
 		runtime = NativeRuntime(
-			payload: payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages, scriptHost: MarklessScripting.shared.host, session: MarklessSession.store)
+			payload: payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages, scriptHost: MarklessScripting.shared.host)
 		scrollWatches = [:]
 		tree?.unmount()
 		try buildPage()
@@ -480,10 +484,4 @@ public struct HostError: Error, CustomStringConvertible {
 	public let description: String
 	public init(_ description: String) { self.description = description }
 }
-/// App-scoped shared fields for this launch: one store every screen reads and writes, as the web keeps one copy per document.
-@MainActor
-enum MarklessSession {
-	static let store = MemoryStore()
-}
-
 #endif

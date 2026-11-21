@@ -114,7 +114,6 @@ export function createNativeAppRuntime(
 	/** One engine for the whole app, as a phone has: started by the first screen that needs it. */
 	scriptHost?: NativeScriptHost,
 ): NativeAppRuntime {
-	// App-scoped shared fields: one copy for the whole launch, as the web keeps one per document.
 	const session = new Map<string, NativeValue>();
 	const open = (route: string, params: Readonly<Record<string, string>>): NativeScreen => {
 		const entry = app.routes.find((candidate) => candidate.pattern === route);
@@ -146,8 +145,7 @@ export function createNativeAppRuntime(
 		dispatch(action) {
 			if (action.event === 'back') {
 				if (screens.length < 2) throw new Error('back on the first screen leaves the app');
-				const left = screens.pop()!.runtime.leave();
-				return [...left, ...screens.at(-1)!.runtime.resume()];
+				return [...screens.pop()!.runtime.leave(), ...screens.at(-1)!.runtime.resume()];
 			}
 			const journal = screens.at(-1)!.runtime.dispatch(action);
 			const last = journal.at(-1);

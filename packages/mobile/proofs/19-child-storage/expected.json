@@ -1,0 +1,38 @@
+{
+	"rung": 19,
+	"name": "storage() with one key in a page and in two copies of a child component is one value, kept across launches",
+	"steps": [
+		{
+			"visible": ["Shared taps", "Total 0", "Left 0", "Right 0"],
+			"absent": ["Total 1"]
+		},
+		{
+			"do": {
+				"tap": "Left 0"
+			},
+			"visible": ["Total 1", "Left 1", "Right 1"],
+			"absent": ["Total 0", "Left 0", "Right 0"]
+		},
+		{
+			"do": {
+				"tap": "Right 1"
+			},
+			"visible": ["Total 2", "Left 2", "Right 2"],
+			"absent": ["Total 1", "Left 1"]
+		},
+		{
+			"do": {
+				"relaunch": true
+			},
+			"visible": ["Total 2", "Left 2", "Right 2"],
+			"absent": ["Total 0", "Left 0"]
+		},
+		{
+			"do": {
+				"tap": "Reset"
+			},
+			"visible": ["Total 0", "Left 0", "Right 0"],
+			"absent": ["Total 2", "Left 2", "Right 2"]
+		}
+	]
+}
