@@ -254,6 +254,8 @@ export function scriptFunctionOf(
 	filename: string,
 	/** A value read while rendering, not a function: the code returns a function that gives it. */
 	asValue = false,
+	/** A shared factory's method, whose parameters are its arguments rather than an event. */
+	method = false,
 ): SemanticScriptFunction | undefined {
 	const root = semanticNodeOf(semantic, graphNode);
 	if (!root) return undefined;
@@ -343,7 +345,7 @@ export function scriptFunctionOf(
 	const eventReads: { path: string[]; span: SourceSpan }[] = [];
 	const [parameter] = (root.params as AnyNode[] | undefined) ?? [];
 	const eventBinding =
-		parameter?.type === 'Identifier' ? semantic.bindingOf(parameter as never) : null;
+		parameter?.type === 'Identifier' && !method ? semantic.bindingOf(parameter as never) : null;
 	for (const reference of eventBinding?.references ?? []) {
 		let at = reference.node as unknown as AnyNode;
 		const path: string[] = [];
@@ -613,6 +615,12 @@ export function scriptFactsOf(source: string, filename: string) {
 		handler: (span: SourceSpan): SemanticScriptFunction | undefined => {
 			const node = nodeOver(semantic, span);
 			return node && scriptFunctionOf(node, semantic, filename);
+		},
+		/** A shared factory's method written at `span` (its property). */
+		method: (span: SourceSpan): SemanticScriptFunction | undefined => {
+			const node = nodeOver(semantic, span);
+			const fn = node?.type === 'Property' ? (node.value as AnyNode | undefined) : undefined;
+			return fn && scriptFunctionOf(fn, semantic, filename, false, true);
 		},
 		/** A value the template reads, written at `span`. */
 		value: (span: SourceSpan): SemanticScriptFunction | undefined => {

@@ -1,0 +1,11 @@
+appId: ${APP_ID}
+name: u37-timebox
+---
+- launchApp:
+      clearState: true
+- assertVisible: Meeting
+- assertVisible: Start time
+- assertVisible: '2'
+- assertVisible: '30'
+- assertVisible: PM
+- assertNotVisible: '14'
