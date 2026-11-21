@@ -1,0 +1,14 @@
+<!doctype html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{font:20px system-ui;margin:16px} span[role=spinbutton]{display:inline-block;padding:12px 20px;border:1px solid #888;margin:8px} input{font:20px system-ui;width:60%}</style>
+<p>Segments</p>
+<div><span id="dd" role="spinbutton" tabindex="0" aria-label="Day">dd</span><span id="mm" role="spinbutton" tabindex="0" aria-label="Month">mm</span></div>
+<p><input id="text" autocomplete="off" autocorrect="off" placeholder="text field"></p>
+<p id="outside">outside</p>
+<script>
+const send = (o) => fetch('/', { method: 'POST', body: JSON.stringify(o) });
+for (const id of ['dd', 'mm', 'text'])
+  for (const type of ['focus','blur','keydown','keyup','beforeinput','input','paste','copy','contextmenu','selectstart'])
+    document.getElementById(id).addEventListener(type, (e) => send({ el: id, type, key: e.key, data: e.clipboardData ? e.clipboardData.getData('text/plain') : e.data }));
+send({ type: 'loaded', ua: navigator.userAgent });
+</script>

@@ -1,0 +1,188 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "UnsetFirst",
+		"cells": [
+			{
+				"id": "state:flags.mode",
+				"name": "flags.mode",
+				"initial": null,
+				"unset": true
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "p",
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"binary": "!==",
+								"left": {
+									"cell": "state:flags.mode"
+								},
+								"right": {
+									"literal": null
+								}
+							},
+							"whenTrue": {
+								"if": {
+									"cell": "state:flags.mode"
+								},
+								"whenTrue": {
+									"literal": "on"
+								},
+								"whenFalse": {
+									"literal": "off"
+								}
+							},
+							"whenFalse": {
+								"literal": "unset"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "On"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Off"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:flags.mode",
+						"value": {
+							"literal": true
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:flags.mode",
+						"value": {
+							"literal": false
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"unset"
+		],
+		[
+			"h2:text0",
+			"On"
+		],
+		[
+			"h3:text0",
+			"Off"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": "on"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": "off"
+				}
+			]
+		}
+	]
+}
