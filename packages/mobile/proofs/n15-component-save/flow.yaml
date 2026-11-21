@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: n14-component-save
+name: n15-component-save
 ---
 - launchApp:
       clearState: true

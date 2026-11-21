@@ -123,6 +123,8 @@ export function compileRungApp(
 	options: {
 		readonly target?: ProofPlatform;
 		readonly device?: DeviceAppConfig;
+		/** Keep the pages that build when others refuse (a rung's `refusedPages`). */
+		readonly partial?: boolean;
 		readonly origin?: string;
 	} = {},
 ) {
@@ -431,6 +433,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 			const build = await compileRungApp(dir, {
 				target: platform,
 				...(appConfig.device ? { device: appConfig.device } : {}),
+				...(expected.refusedPages ? { partial: true } : {}),
 				...(appConfig.origin !== undefined ? { origin: appConfig.origin } : {}),
 			});
 			if (!build.payload) {
