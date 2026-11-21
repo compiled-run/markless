@@ -1,0 +1,21 @@
+appId: ${APP_ID}
+name: r151-optional-chain
+---
+- launchApp:
+    clearState: true
+- assertVisible: Profile
+- assertVisible: "Name: nobody"
+- assertVisible: "City: unknown"
+- assertNotVisible: "Name: Sam"
+- tapOn: Sign in
+- assertVisible: "Name: Sam"
+- assertNotVisible: "Name: nobody"
+- assertVisible: "Name: Sam"
+- assertVisible: "City: Lyon"
+- assertNotVisible: "Name: nobody"
+- tapOn: Sign out
+- assertVisible: "Name: nobody"
+- assertNotVisible: "Name: Sam"
+- assertVisible: "Name: nobody"
+- assertVisible: "City: unknown"
+- assertNotVisible: "Name: Sam"

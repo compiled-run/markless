@@ -18,6 +18,7 @@ import type {
 import { PROTOCOL_IDLE_EVENT_NAME, PROTOCOL_VISIBLE_EVENT_NAME } from '@markless/serializer';
 import {
 	isNativeStyleStateAttribute,
+	NATIVE_EMAIL_MISMATCH_BY_LOCALE,
 	nativeExprCells,
 	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
@@ -303,7 +304,7 @@ function returningInto(
 const TICKED_TYPES = new Set(['checkbox', 'radio']);
 
 /** `<input>` types a host draws as a single-line text field; each blocks the return key's submit when a form has two. */
-const TEXT_TYPES = new Set(['text', 'search', 'tel']);
+const TEXT_TYPES = new Set(['text', 'search', 'tel', 'email']);
 /** Field attributes the web checks before a submit (or that limit typing) and no host checks yet. */
 const UNCHECKED_CONSTRAINTS = [
 	'pattern',
@@ -326,9 +327,15 @@ const NOT_ON_PHONES = new Set(['beforematch']);
  * focus), except focus and blur on a text field, which the soft keyboard raises; a checkbox or radio button is ticked, not
  * typed in. Hosts have no hardware keyboard yet, so these handlers are left out with a warning that names each one.
  */
-const KEYBOARD_ONLY = new Set(['keydown', 'keyup', 'focus', 'blur', 'focusin', 'focusout']);
+const KEYBOARD_ONLY = new Set(['keydown', 'keyup', 'keypress', 'focus', 'blur', 'focusin', 'focusout']);
 const TEXT_ENTRY = new Set(['input', 'textarea']);
 export const NATIVE_KEYBOARD_ONLY_CODE = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
+/** Events a phone raises only from a connected mouse or trackpad: a touch scrolls and swipes without a wheel event. */
+const MOUSE_ONLY = new Set(['wheel']);
+export const NATIVE_MOUSE_ONLY_CODE = 'MARKLESS_NATIVE_MOUSE_ONLY';
+/** Events a drop target raises only while something is dragged onto it, which a phone's browser does only from another app. */
+const DROP_ONLY = new Set(['dragenter', 'dragover', 'dragleave', 'drop']);
+export const NATIVE_DROP_ONLY_CODE = 'MARKLESS_NATIVE_DROP_ONLY';
 
 type Item =
 	| {
@@ -359,6 +366,11 @@ type Item =
 			readonly path: ReadonlyArray<number>;
 	  }
 	| { readonly kind: 'children'; readonly path: ReadonlyArray<number> }
+	| {
+			readonly kind: 'dynamic';
+			readonly slot: Extract<SemanticMarkupChunk['slots'][number], { kind: 'dynamic-host' }>;
+			readonly path: ReadonlyArray<number>;
+	  }
 	| {
 			readonly kind: 'boundary';
 			readonly id: string;
@@ -497,6 +509,8 @@ type ObjectRef =
 type Scope = {
 	/** The analysis of the module whose template is being lowered. */
 	readonly module: ModuleFacts;
+	/** The tag each dynamic element (`<{tag}>`) takes in this instance, by host id. */
+	readonly tags?: ReadonlyMap<string, string>;
 	readonly component: string;
 	/** This instance's cells by state name and by the analyzer's binding id. */
 	readonly cells: {
@@ -930,6 +944,11 @@ export type NativeViewOptions = {
 		readonly pattern: string;
 		readonly params: ReadonlyArray<string>;
 	}>;
+	/**
+	 * The route the app's not-found page is under, when it has one: a path inside the app that no route matches opens it,
+	 * as the web's router answers that path with the app's `pages/404.tsrx`.
+	 */
+	readonly notFound?: string;
 	/** Matches a path written in `navigate()` against the app's routes, as the router matches a URL. */
 	readonly resolvePath?: (
 		path: string,
@@ -1215,6 +1234,7 @@ function foldConstant(
 		const object = fold(expr.member);
 		if (!object) return undefined;
 		const holder = object.value;
+		if (expr.optional && holder == null) return { value: null };
 		if (holder && typeof holder === 'object' && tokenElement.has(holder)) return undefined;
 		if (expr.property === 'length' && (typeof holder === 'string' || Array.isArray(holder)))
 			return { value: holder.length };
@@ -1265,6 +1285,34 @@ export function createNativeViewPayload(
 			passId: 'native-view',
 			suggestions: [],
 			docsUrl: `https://markless.dev/errors/${NATIVE_KEYBOARD_ONLY_CODE}`,
+		});
+	};
+	const dropOnly = (what: string, span?: SourceSpan) => {
+		diagnostics.push({
+			code: NATIVE_DROP_ONLY_CODE,
+			severity: 'warning',
+			phase: 'serialization',
+			title: 'A drop handler is left out of the native build',
+			message: `${what} runs only while something is dragged onto it; native hosts take no drops yet, so it is left out`,
+			why: 'A phone raises drag and drop events only when something is dragged onto the page from another app.',
+			...(span ? { primarySpan: span } : {}),
+			passId: 'native-view',
+			suggestions: [],
+			docsUrl: `https://markless.dev/errors/${NATIVE_DROP_ONLY_CODE}`,
+		});
+	};
+	const mouseOnly = (what: string, span?: SourceSpan) => {
+		diagnostics.push({
+			code: NATIVE_MOUSE_ONLY_CODE,
+			severity: 'warning',
+			phase: 'serialization',
+			title: 'A mouse-only handler is left out of the native build',
+			message: `${what} runs only from a mouse or trackpad on a phone; native hosts have none yet, so it is left out`,
+			why: 'A touch on iOS and Android scrolls and swipes without raising wheel events.',
+			...(span ? { primarySpan: span } : {}),
+			passId: 'native-view',
+			suggestions: [],
+			docsUrl: `https://markless.dev/errors/${NATIVE_MOUSE_ONLY_CODE}`,
 		});
 	};
 	const elementSources = new Map<
@@ -1982,12 +2030,17 @@ export function createNativeViewPayload(
 		return Object.fromEntries(entries);
 	};
 	/** A link or `navigate()` target as a route pattern and params, checked against the app's routes when they are known. */
+	/** A path inside the app (`/logout`), not another site (`//cdn.example`, `https://…`): only it falls to the not-found page. */
+	const inApp = (start: string | NativeExpr | undefined) =>
+		typeof start === 'string' && start.startsWith('/') && !start.startsWith('//');
 	const linkRoute = (
 		pattern: string,
 		params: Record<string, string | NativeExpr>,
 		span: SourceSpan | undefined,
 	): { route: string; params: Record<string, string | NativeExpr> } | null => {
-		const known = options.routes?.find((route) => route.pattern === pattern);
+		const known =
+			options.routes?.find((route) => route.pattern === pattern) ??
+			(pattern === options.notFound ? { pattern, params: [] } : undefined);
 		if (options.routes && !known)
 			return refuse(`a link to ${pattern}, which is not a route of this app`, span);
 		const names = Object.keys(params).sort().join(',');
@@ -2088,6 +2141,8 @@ export function createNativeViewPayload(
 		const [only] = candidates;
 		if (candidates.length === 1 && only?.exact)
 			return linkRoute(only.route.pattern, only.params, span);
+		if (candidates.length === 0 && options.notFound && inApp(parts[0]))
+			return linkRoute(options.notFound, {}, span);
 		return refuse(
 			candidates.length === 0
 				? `${what} that matches no route of this app`
@@ -2364,7 +2419,7 @@ export function createNativeViewPayload(
 		// What the function reaches in its modules is refused now, while the handler can still stay data.
 		const before = diagnostics.length;
 		const services = [...scriptServices];
-		buildScript([entry]);
+		buildScript([entry], forms);
 		scriptServices.clear();
 		for (const service of services) scriptServices.add(service);
 		if (diagnostics.slice(before).some((diagnostic) => diagnostic.severity === 'error'))
@@ -2702,6 +2757,7 @@ export function createNativeViewPayload(
 			readonly module: ModuleFacts;
 			readonly fact: SemanticScriptFunction;
 		}>,
+		forms = false,
 	): NativeViewPayload['script'] | undefined {
 		if (!only && scriptFunctions.size === 0) return undefined;
 		type Included = {
@@ -2781,7 +2837,7 @@ export function createNativeViewPayload(
 					`${at} uses ${construct.construct}, which a phone's script cannot run`,
 					construct.span,
 				);
-			checkGlobals(statement.globals, at, scriptSubmits.size > 0);
+			checkGlobals(statement.globals, at, forms || scriptSubmits.size > 0);
 			checkNavigates(statement.navigates, at);
 			for (const name of statement.uses) local(entry, name);
 			for (const use of statement.imports) imported(entry, use.slot, use.name);
@@ -3922,7 +3978,11 @@ export function createNativeViewPayload(
 						};
 				}
 				if (!object) return null;
-				const member: NativeExpr = { member: object, property: expression.property };
+				const member: NativeExpr = {
+					member: object,
+					property: expression.property,
+					...(expression.optional ? { optional: true as const } : {}),
+				};
 				// A field of an object or array known when the app is built is that field's value.
 				if (rowCopies.has(object))
 					return refuse(
@@ -4529,8 +4589,12 @@ export function createNativeViewPayload(
 				});
 				continue;
 			}
+			if (slot.kind === 'dynamic-host') {
+				items.push({ kind: 'dynamic', slot, path: slot.coordinate.path });
+				continue;
+			}
 			if (slot.kind !== 'text') {
-				refuse(`a ${slot.kind} binding`);
+				refuse(`a ${(slot as { readonly kind: string }).kind} binding`);
 				continue;
 			}
 			if (slot.raw) {
@@ -4660,9 +4724,83 @@ export function createNativeViewPayload(
 		for (const item of items) {
 			if (consumed.some((path) => isPrefix(path, item.path))) continue;
 			const parent = parentOf(item.path);
+			if (item.kind === 'dynamic') {
+				close();
+				const { slot } = item;
+				const span = scope.module.hostSpans.get(slot.hostNodeId);
+				const tagExpr = slot.nativeTag && exprOf(slot.nativeTag, 'the tag of a dynamic element', scope);
+				// A tag that reads state could change while the app runs; a phone builds one element for each use.
+				const tag =
+					tagExpr && cellsOf(tagExpr).size === 0 ? foldConstant(tagExpr, initialOf)?.value : undefined;
+				const children = scope.module.chunks.get(slot.childChunkId);
+				if (typeof tag !== 'string' || tag === '' || !children) {
+					refuse(
+						'a dynamic element (`<{tag}>`) whose tag is not one element name when the app is built; each use must name one',
+						span,
+					);
+					continue;
+				}
+				// The element the web renders for this use, laid out as a written one: its attributes at the anchor's path,
+				// its children under it.
+				const under = (coordinate: { readonly kind: string; readonly path: ReadonlyArray<number> }) => ({
+					...coordinate,
+					path: [...item.path, ...coordinate.path],
+				});
+				const at = { kind: 'child-index' as const, path: item.path };
+				const written: SemanticMarkupChunk = {
+					...children,
+					hosts: [
+						{ hostNodeId: slot.hostNodeId, tagName: tag, coordinate: at, ...(span ? { sourceSpan: span } : {}) },
+						...children.hosts.map((host) => ({ ...host, coordinate: under(host.coordinate) as typeof host.coordinate })),
+					],
+					attributes: [
+						...Object.entries(slot.staticAttributes).map(([name, value]) => ({ coordinate: at, name, value })),
+						...(children.attributes ?? []).map((attribute) => ({
+							...attribute,
+							coordinate: under(attribute.coordinate) as typeof attribute.coordinate,
+						})),
+					],
+					...(children.texts
+						? {
+								texts: children.texts.map((text) => ({
+									...text,
+									coordinate: under(text.coordinate) as typeof text.coordinate,
+								})),
+							}
+						: {}),
+					slots: [
+						...slot.attributeSlots.map((attribute): SemanticMarkupChunk['slots'][number] =>
+							attribute.kind === 'spread'
+								? {
+										kind: 'spread-attributes',
+										coordinate: at,
+										residue: attribute.residue,
+										excludeNames: attribute.excludeNames ?? [],
+										staticIndex: slot.staticIndex,
+									}
+								: {
+										kind: 'attribute',
+										name: attribute.name,
+										coordinate: at,
+										residue: attribute.residue,
+										staticIndex: slot.staticIndex,
+									},
+						),
+						...children.slots.map(
+							(child) =>
+								({ ...child, coordinate: under(child.coordinate) }) as SemanticMarkupChunk['slots'][number],
+						),
+					],
+				};
+				lowerChunk(written, parent, place, {
+					...scope,
+					tags: new Map([...(scope.tags ?? []), [slot.hostNodeId, tag]]),
+				});
+				continue;
+			}
 			if (item.kind === 'host') {
 				close();
-				const element = scope.module.tagOf.get(item.id);
+				const element = scope.tags?.get(item.id) ?? scope.module.tagOf.get(item.id);
 				const span = scope.module.hostSpans.get(item.id);
 				if (!element || element === '*') refuse(`host ${item.id} has no static tag`, span);
 				else if (
@@ -4878,30 +5016,70 @@ export function createNativeViewPayload(
 					if (result.title !== undefined && !('aria-label' in attributes))
 						attributes['aria-label'] = result.title;
 				}
+				// An <input> phones draw: a text field, a checkbox or radio button, a hidden input, or a submit input.
+				const drawnType = element === 'input' ? attributes['type']?.toLowerCase() : undefined;
+				if (
+					drawnType !== undefined &&
+					drawnType !== '' &&
+					!TEXT_TYPES.has(drawnType) &&
+					!['checkbox', 'radio', 'hidden', 'submit', 'range'].includes(drawnType)
+				)
+					refuse(`the <input type="${drawnType}"> ${id}, which no native host draws or checks yet`, span);
+				// A submit input is the button its `value` labels, as the web draws it.
+				const submitInput = element === 'input' && attributes['type'] === 'submit';
+				if (submitInput) {
+					if (bindings.some((binding) => 'attribute' in binding && binding.attribute === 'value'))
+						refuse(
+							`the <input type="submit"> ${id} binds its \`value\`, its label, which a native build reads only as written`,
+							span,
+						);
+					else if (!('value' in attributes))
+						refuse(
+							`the <input type="submit"> ${id} has no \`value\`: the web labels it with the browser's own word for Submit, in the browser's language`,
+							span,
+						);
+				}
+				const { value: label, ...unlabelled } = attributes;
 				const live = liveRegionOf(element ?? '*', attributes, bindings, item.span);
 				nodes.push({
 					kind: 'element',
 					id,
-					element: element ?? '*',
+					element: submitInput ? 'button' : (element ?? '*'),
 					parent,
-					...(Object.keys(attributes).length > 0 ? { attributes } : {}),
+					...(Object.keys(submitInput ? unlabelled : attributes).length > 0
+						? { attributes: submitInput ? unlabelled : attributes }
+						: {}),
 					...(bindings.length > 0 ? { bindings } : {}),
 					...(defaultStyle ? { defaultStyle } : {}),
 					...(drawing ? { drawing } : {}),
 					...(live ? { live } : {}),
 					...place,
 				});
+				if (submitInput && label !== undefined) {
+					textRuns.set(id, 1);
+					nodes.push({ kind: 'text', id: `${id}:text0`, parent: id, parts: [{ text: label }], ...place });
+				}
 				for (const event of scope.module.eventsByHost.get(item.id) ?? []) {
 					if (scope.module === rootModule) loweredEvents.add(event.id);
 					if (NOT_ON_PHONES.has(event.eventName)) continue;
 					if (
 						KEYBOARD_ONLY.has(event.eventName) &&
-						(!TEXT_ENTRY.has(element ?? '') || TICKED_TYPES.has(inputType ?? ''))
+						(!TEXT_ENTRY.has(element ?? '') ||
+							TICKED_TYPES.has(inputType ?? '') ||
+							inputType === 'range')
 					) {
 						keyboardOnly(
 							`the ${event.eventName} handler on <${element}> ${id}`,
 							event.handlerSpan,
 						);
+						continue;
+					}
+					if (MOUSE_ONLY.has(event.eventName)) {
+						mouseOnly(`the ${event.eventName} handler on <${element}> ${id}`, event.handlerSpan);
+						continue;
+					}
+					if (DROP_ONLY.has(event.eventName)) {
+						dropOnly(`the ${event.eventName} handler on <${element}> ${id}`, event.handlerSpan);
 						continue;
 					}
 					const semantic = SEMANTIC_EVENTS[event.eventName];
@@ -5114,7 +5292,11 @@ export function createNativeViewPayload(
 								: pathRoute(hrefValue, href?.sourceSpan ?? edge.sourceSpan)
 							: matched
 								? linkRoute(matched.pattern, matched.params, edge.sourceSpan)
-								: linkRoute(fixedHref, paramValues, edge.sourceSpan);
+								: options.notFound &&
+									  inApp(fixedHref) &&
+									  !options.routes?.some((known) => known.pattern === fixedHref)
+									? linkRoute(options.notFound, {}, edge.sourceSpan)
+									: linkRoute(fixedHref, paramValues, edge.sourceSpan);
 					if (!route) continue;
 					// The anchor's attributes as the router renders them, so styles see a link (`:any-link`) as the web does.
 					if (fixedHref === undefined)
@@ -5669,8 +5851,8 @@ export function createNativeViewPayload(
 		scope: Scope,
 	) {
 		const what = `<${PLATFORM_PIECES_NAMESPACE}.sheet>`;
-		if (place.arm || place.row) {
-			refuse(`a ${what} inside an @if arm or a @for row`, edge.sourceSpan);
+		if (place.row) {
+			refuse(`a ${what} inside a @for row`, edge.sourceSpan);
 			return;
 		}
 		const props = new Map(edge.props.map((prop) => [prop.name, prop]));
@@ -5729,11 +5911,11 @@ export function createNativeViewPayload(
 			points.length >= 1 &&
 			points.length <= 2 &&
 			points.every((point) => typeof point === 'number' && point > 0 && point <= 1) &&
-			Math.max(...(points as number[])) === 1 &&
+			(points.length === 1 || Math.max(...(points as number[])) === 1) &&
 			new Set(points).size === points.length;
 		if (points !== NOT_FIXED && !portableHeights)
 			refuse(
-				`\`snapPoints\` of ${what}: one or two fractions of the screen's height, the largest 1 (Android's sheet has one height between collapsed and full)`,
+				`\`snapPoints\` of ${what}: one fraction of the screen's height, or two with the larger 1 (Android's sheet has one height between collapsed and full)`,
 				props.get('snapPoints')?.sourceSpan,
 			);
 		const snapPoints = portableHeights ? [...(points as number[])].sort((a, b) => a - b) : null;
@@ -5760,8 +5942,8 @@ export function createNativeViewPayload(
 			refuse(`children passed to ${what} that have no markup`, edge.sourceSpan);
 		const id = `sheet:${scope.prefix}${edge.id}`;
 		if (open && snapPoints && dismissible !== null && modal !== null)
-			nodes.push({ kind: 'sheet', id, parent, open, snapPoints, dismissible, modal });
-		if (projected) lowerChunk(projected, id, {}, scope);
+			nodes.push({ kind: 'sheet', id, parent, open, snapPoints, dismissible, modal, ...place });
+		if (projected) lowerChunk(projected, id, place, scope);
 		if (onChange?.kind === 'callback' && dismissible === true) {
 			if (!onChange.nativeStatements) {
 				refuse(
@@ -6162,7 +6344,9 @@ export function createNativeViewPayload(
 								kind: semantic === 'dismiss' ? 'dismiss' : 'pointer',
 							},
 						}
-					: event.eventName === 'input' && !(pressed && isTicked(pressed.currentTarget))
+					: (event.eventName === 'input' && !(pressed && isTicked(pressed.currentTarget))) ||
+						  // A range's change carries its value as its input does.
+						  (event.eventName === 'change' && pressed !== undefined && isRange(pressed.currentTarget))
 						? { ...running, event: parameter }
 						: {
 								...running,
@@ -7462,7 +7646,9 @@ export function createNativeViewPayload(
 			);
 			return [];
 		}
-		const matched = options.resolvePath?.(path);
+		const matched =
+			options.resolvePath?.(path) ??
+			(options.notFound && inApp(path) ? { pattern: options.notFound, params: {} } : undefined);
 		if (!matched) {
 			refuse(`${what} navigates to ${path}, which is not a route of this app`, span);
 			return [];
@@ -7669,9 +7855,11 @@ export function createNativeViewPayload(
 		}
 	}
 	tapRun = false;
+	textareaDefaults();
 	wireTicks();
 	checkSelects();
 	let lengthLimited = false;
+	let emailChecked = false;
 	const forms = wireForms();
 	// The runtime keeps a field's text from its edits, so a field whose text a handler reads reports each edit.
 	for (const field of readFields)
@@ -7826,6 +8014,7 @@ export function createNativeViewPayload(
 		...(objects.length > 0 ? { objects } : {}),
 		...(forms.length > 0 ? { forms, valueMissing: NATIVE_VALUE_MISSING_BY_LOCALE } : {}),
 		...(lengthLimited ? { tooLong: NATIVE_TOO_LONG_BY_LOCALE } : {}),
+		...(emailChecked ? { typeMismatch: NATIVE_EMAIL_MISMATCH_BY_LOCALE } : {}),
 		...(script ? { script } : {}),
 	});
 
@@ -7908,6 +8097,48 @@ export function createNativeViewPayload(
 		}
 	}
 
+	/** Whether the element `id` is an `<input type="range">`. */
+	function isRange(id: string): boolean {
+		const node = nodes.find((candidate) => candidate.id === id);
+		return node?.kind === 'element' && node.element === 'input' && node.attributes?.['type'] === 'range';
+	}
+
+	/**
+	 * A `<textarea>`'s text is its default value, as the web parses it: the field shows it, and follows it, until a person
+	 * edits it. It becomes the field's `value` attribute, which the runtimes read as an `<input>`'s.
+	 */
+	function textareaDefaults() {
+		for (const area of nodes) {
+			if (area.kind !== 'element' || area.element !== 'textarea') continue;
+			const inside = nodes.filter((node) => node.parent === area.id);
+			if (inside.length === 0) continue;
+			const [text, ...more] = inside;
+			if (text?.kind !== 'text' || more.length > 0) {
+				refuse(`the <textarea> ${area.id} holds more than one run of text, which the web reads as its text`);
+				continue;
+			}
+			nodes.splice(nodes.indexOf(text), 1);
+			const at = nodes.indexOf(area);
+			if (text.parts.every((part) => 'text' in part)) {
+				const value = text.parts.map((part) => ('text' in part ? part.text : '')).join('');
+				nodes[at] = { ...area, attributes: { ...area.attributes, value } };
+				continue;
+			}
+			const value: NativeExpr = {
+				template: text.parts.map((part) =>
+					'text' in part
+						? part.text
+						: {
+								logical: '??' as const,
+								left: 'cell' in part ? { cell: part.cell } : part.expr,
+								right: { literal: '' },
+							},
+				),
+			};
+			nodes[at] = { ...area, bindings: [...(area.bindings ?? []), { attribute: 'value', value }] };
+		}
+	}
+
 	function wireTicks() {
 		for (const node of nodes) {
 			if (
@@ -7917,12 +8148,18 @@ export function createNativeViewPayload(
 				continue;
 			const own = pendingHandlers.filter((pending) => pending.host === node.id);
 			if (!isTicked(node.id)) {
-				for (const pending of own)
-					if (pending.event.eventName === 'change')
+				for (const pending of own) {
+					if (pending.event.eventName !== 'change') continue;
+					// A range's change runs when it is let go after its value moved.
+					const at = events.findIndex((entry) => entry.handler === pending.handler.id);
+					if (node.attributes?.['type'] === 'range' && at >= 0)
+						events[at] = { ...events[at]!, event: 'commit' };
+					else
 						refuse(
 							`the change handler on the <${node.element}> ${node.id}: a text field raises it when it loses focus, which a native build has no lowering for yet`,
 							pending.event.handlerSpan,
 						);
+				}
 				continue;
 			}
 			if (node.row) continue;
@@ -8013,6 +8250,8 @@ export function createNativeViewPayload(
 			const fields: NativeForm['fields'][number][] = [];
 			const submitters: string[] = [];
 			const textFields: string[] = [];
+			const ranges: string[] = [];
+			const areas: string[] = [];
 			/** Fields and submit buttons in an @if arm inside the form: they take part only while it shows them. */
 			const armed = new Set<string>();
 			for (const node of nodes) {
@@ -8023,12 +8262,9 @@ export function createNativeViewPayload(
 					refuse(`${field}, a form inside a form`);
 					continue;
 				}
-				if (node.element === 'textarea') {
-					refuse(`${field}, whose text a native build does not submit yet`);
-					continue;
-				}
 				if (
 					node.element !== 'input' &&
+					node.element !== 'textarea' &&
 					node.element !== 'button' &&
 					node.element !== 'select'
 				)
@@ -8047,7 +8283,7 @@ export function createNativeViewPayload(
 					);
 					continue;
 				}
-				const type = node.attributes?.['type'];
+				const type = node.element === 'textarea' ? undefined : node.attributes?.['type'];
 				if (node.element === 'select') {
 					for (const name of [...UNCHECKED_CONSTRAINTS, 'maxlength', 'required'])
 						if (attribute(node, name))
@@ -8074,28 +8310,44 @@ export function createNativeViewPayload(
 					submitters.push(node.id);
 					continue;
 				}
+				const range = type === 'range';
+				// A range's min, max and step only shape its value, which is always valid; they never stop a submit.
 				for (const name of UNCHECKED_CONSTRAINTS)
-					if (attribute(node, name))
+					if (attribute(node, name) && !(range && ['min', 'max', 'step'].includes(name)))
 						refuse(
 							`${field} has \`${name}\`, which the web checks before a submit and no native host checks yet`,
 						);
 				let kind: NativeFieldKind;
-				if (type === undefined || TEXT_TYPES.has(type)) kind = 'text';
+				if (type === undefined || TEXT_TYPES.has(type) || range) kind = 'text';
 				else if (type === 'checkbox' || type === 'radio' || type === 'hidden') kind = type;
-				else {
-					refuse(
-						`${field} is an <input type="${type}">, which no native host draws or checks yet`,
-					);
-					continue;
-				}
+				// Any other type is refused where the element is lowered.
+				else continue;
 				if (kind === 'radio' && attribute(node, 'name') === 'bound')
 					refuse(
 						`${field} binds the \`name\` of a radio button, which a native build reads only as written`,
 					);
 				fields.push({ node: node.id, kind });
-				if (kind === 'text') {
+				if (node.element === 'textarea') {
+					const wrap = attribute(node, 'wrap');
+					if (wrap === 'bound' || (wrap && node.attributes?.['wrap']?.toLowerCase() === 'hard'))
+						refuse(
+							`${field} has \`wrap\`, whose hard wrapping the web adds to the text it sends and no native host adds yet`,
+						);
+					if (attribute(node, 'dirname'))
+						refuse(
+							`${field} has \`dirname\`, which sends the text's direction with the form, and no native host sends it yet`,
+						);
+					// Its return key adds a line, so it blocks no implicit submission.
+					areas.push(node.id);
+					if (attribute(node, 'maxlength')) lengthLimited = true;
+					continue;
+				}
+				// A range is no text field: it blocks no implicit submission and has no return key.
+				if (range) ranges.push(node.id);
+				if (kind === 'text' && !range) {
 					textFields.push(node.id);
 					if (attribute(node, 'maxlength')) lengthLimited = true;
+					if (type === 'email') emailChecked = true;
 				}
 			}
 			if (!submit) {
@@ -8143,6 +8395,8 @@ export function createNativeViewPayload(
 					: textFields.length === 1
 						? [{ op: 'submit', form: form.id, submitter: null }]
 						: [];
+			// The runtime keeps each range's value from its moves, as each text field's text from its edits.
+			for (const field of [...ranges, ...areas]) ensureHandler(field, 'input', 'edit');
 			for (const field of textFields) {
 				// The runtime keeps each field's text from its edits, so every text field reports them.
 				ensureHandler(field, 'input', 'edit');

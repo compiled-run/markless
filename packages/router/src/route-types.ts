@@ -1,3 +1,4 @@
+import { PREFETCH_LINK_CHOICES } from './link-attributes.ts';
 import type { RouteManifest, RouteManifestRoute } from './route-manifest.ts';
 
 export const routeTypesEnvPath = 'markless-router-env.d.ts';
@@ -123,7 +124,7 @@ function createLinkTypes(): string {
 		'};',
 		'',
 		'export type MarklessRouterNavigationProps = {',
-		'\treadonly prefetch?: boolean;',
+		`\treadonly prefetch?: boolean | ${PREFETCH_LINK_CHOICES.map((choice) => `'${choice}'`).join(' | ')};`,
 		'\treadonly replace?: boolean;',
 		'\treadonly scroll?: boolean;',
 		'};',

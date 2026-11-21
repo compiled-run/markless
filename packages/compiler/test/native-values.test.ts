@@ -317,6 +317,41 @@ export function App() @{
 		);
 	});
 
+	it("opens the app's not-found page for an in-app path no route matches, written, built or navigated to", async () => {
+		const { payload, diagnostics } = await nativeView(
+			`import { state } from '@markless/core';
+import { Link, navigate } from '@markless/router';
+export function App() @{
+	let user = state('sam');
+	<main>
+		<Link href="/nowhere/">Lost</Link>
+		<Link href={\`/logout/\${user}/now\`}>Out</Link>
+		<button onClick={() => navigate('/settings')}>Settings</button>
+	</main>
+}`,
+			{ routes, resolvePath, notFound: '/404' },
+		);
+		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([]);
+		expect(payload?.handlers.map((handler) => handler.ops)).toEqual([
+			[{ op: 'navigate', route: '/404', params: {} }],
+			[{ op: 'navigate', route: '/404', params: {} }],
+			[{ op: 'navigate', route: '/404', params: {} }],
+		]);
+	});
+
+	it('leaves a link to another site alone with a not-found page', async () => {
+		const { diagnostics } = await nativeView(
+			`import { Link } from '@markless/router';
+export function App() @{
+	<main><Link href="//cdn.example/x">Away</Link></main>
+}`,
+			{ routes, resolvePath, notFound: '/404' },
+		);
+		expect(diagnostics.map((diagnostic) => diagnostic.message)).toContain(
+			'a link to //cdn.example/x, which is not a route of this app',
+		);
+	});
+
 	it('still refuses a path no route matches, where it is written', async () => {
 		const { diagnostics } = await nativeView(
 			`import { Link } from '@markless/router';
