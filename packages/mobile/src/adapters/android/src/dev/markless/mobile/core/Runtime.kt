@@ -1749,12 +1749,8 @@ class Runtime(
 		val checkedBefore = HashMap(checkedness)
 		val selectedBefore = HashMap(selectedness)
 		val bindingsBefore = ticked.associate { it.id to checkedBinding(it.id) }
-		val beforeProperties = properties().associate { (n, a, v) -> (n to a) to v }.toMutableMap()
-		// The edited field already shows what was typed, so its own value counts as written.
-		if (value != null && host != null) {
-			beforeProperties[host to "value"] = value
-			edited[host] = value
-		}
+		val beforeProperties = properties().associate { (n, a, v) -> (n to a) to v }
+		if (value != null && host != null) edited[host] = value
 		val beforeArms = arms().toMap()
 		val beforeRows = rows().toMap()
 		val beforeTitle = title()
@@ -1839,7 +1835,9 @@ class Runtime(
 				for (binding in node.bindings) {
 				val key = inst.id to binding.name
 				if (binding.property) {
-					if (key in beforeProperties && key in afterProperties && beforeProperties[key] != afterProperties[key]) journal.add(JournalEntry.Property(inst.id, binding.name, afterProperties.getValue(key)))
+					// A `value` binding writes the field only when its own value changes, as on the web: typing alone never resets it.
+					val typedNow = value != null && inst.id == host && afterProperties[key] == value
+					if (key in beforeProperties && key in afterProperties && beforeProperties[key] != afterProperties[key] && !typedNow) journal.add(JournalEntry.Property(inst.id, binding.name, afterProperties.getValue(key)))
 				} else if (key in beforeAttributes && key in afterAttributes && beforeAttributes[key] != afterAttributes[key]) {
 					journal.add(JournalEntry.Attribute(inst.id, binding.name, afterAttributes[key]))
 					// A textarea nobody edited and no `value` property sets shows its `value` attribute, as the web's default value.

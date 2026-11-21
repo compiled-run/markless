@@ -292,6 +292,8 @@ export type NativeRuntime = {
 	>;
 	/** Every shown input's bound `value`, as `String(value)`. */
 	readonly properties: () => ReadonlyArray<readonly [node: string, name: 'value', value: string]>;
+	/** Each field `properties` lists and the text it shows now: what was typed since its binding last wrote it. */
+	readonly fields: () => ReadonlyArray<readonly [node: string, text: string]>;
 	/** Every `<dialog>` and whether it is open in the top layer. */
 	readonly dialogs: () => ReadonlyArray<readonly [node: string, open: boolean]>;
 	/** The overlay stack, topmost last: each element marked `overlay` that is shown, and whether it is modal. */
@@ -2073,6 +2075,7 @@ export function createNativeRuntime(
 			}),
 		],
 		properties,
+		fields: () => properties().map(([node]) => [node, textOf(node)] as const),
 		arms,
 		dialogs: () => [...dialogs],
 		overlays: () => stack.map((overlay) => [overlay, isModal(overlay)] as const),
@@ -2829,12 +2832,10 @@ export function createNativeRuntime(
 			const bindingsBefore = new Map(
 				ticked.map((node) => [node.id, checkedBinding(node.id)] as const),
 			);
-			// The edited field already shows what was typed, so its own value counts as already written.
+			// A `value` binding writes the field only when its own value changes, as on the web: typing alone never resets it.
 			const beforeProperties = keyed(properties());
-			if (eventValue !== undefined && host !== undefined) {
-				beforeProperties.set(`${host}\0value`, eventValue);
-				edited.set(host, eventValue);
-			}
+			const typedKey = eventValue !== undefined && host !== undefined ? `${host}\0value` : undefined;
+			if (eventValue !== undefined && host !== undefined) edited.set(host, eventValue);
 			const beforeArms = new Map(arms());
 			drawnArms = beforeArms;
 			const beforeRows = new Map(rows());
@@ -2994,7 +2995,8 @@ export function createNativeRuntime(
 							if (
 								!before.has(key) ||
 								!after.has(key) ||
-								before.get(key) === after.get(key)
+								before.get(key) === after.get(key) ||
+								(!('attribute' in binding) && key === typedKey && after.get(key) === eventValue)
 							)
 								return [];
 							return 'attribute' in binding
