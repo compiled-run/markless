@@ -1,0 +1,13 @@
+A package
+  ui: 24 writers (23 first) {'beginner': 8, 'experienced': 8, 'mobile': 8}
+  headless: 18 writers (1 first) {'beginner': 8, 'experienced': 8, 'mobile': 2}
+  primitives: 17 writers (0 first) {'beginner': 5, 'experienced': 8, 'mobile': 4}
+  components: 11 writers (0 first) {'beginner': 3, 'mobile': 8}
+  kit: 2 writers (0 first) {'mobile': 2}
+B inner namespace
+  ui: 24 writers (24 first) {'beginner': 8, 'experienced': 8, 'mobile': 8}
+  base: 24 writers (0 first) {'beginner': 8, 'experienced': 8, 'mobile': 8}
+  core: 16 writers (0 first) {'beginner': 5, 'experienced': 6, 'mobile': 5}
+  el: 5 writers (0 first) {'beginner': 3, 'experienced': 2}
+  control: 2 writers (0 first) {'mobile': 2}
+  controls: 1 writers (0 first) {'mobile': 1}

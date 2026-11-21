@@ -1,0 +1,22 @@
+rank/raw/beginner-1 open ['ui', 'components', 'headless'] | rank headless > unstyled > primitives > ui > components > parts > kit > elements > base | install headless
+rank/raw/beginner-2 open ['ui', 'components', 'native'] | rank unstyled > headless > primitives > ui > components > parts > elements > kit > base | install ui
+rank/raw/beginner-3 open ['ui', 'components', 'headless'] | rank unstyled > headless > primitives > components > ui > elements > parts > kit > base | install ui
+rank/raw/beginner-4 open ['ui', 'components', 'native'] | rank unstyled > headless > ui > components > primitives > kit > elements > parts > base | install ui
+rank/raw/beginner-5 open ['ui', 'components', 'native'] | rank unstyled > headless > primitives > ui > components > parts > elements > kit > base | install ui
+rank/raw/beginner-6 open ['ui', 'components', 'headless'] | rank headless > unstyled > components > ui > primitives > parts > elements > kit > base | install ui
+rank/raw/experienced-1 open ['ui', 'components', 'headless'] | rank headless > primitives > unstyled > ui > components > kit > elements > parts > base | install ui
+rank/raw/experienced-2 open ['ui', 'components', 'headless'] | rank unstyled > headless > primitives > ui > components > kit > parts > elements > base | install ui
+rank/raw/experienced-3 open ['ui', 'components', 'native'] | rank unstyled > headless > primitives > ui > components > parts > kit > elements > base | install ui
+rank/raw/experienced-4 open ['ui', 'components', 'native'] | rank headless > primitives > unstyled > ui > components > elements > parts > kit > base | install ui
+rank/raw/experienced-5 open ['ui', 'components', 'headless'] | rank unstyled > headless > ui > components > primitives > parts > base > kit > elements | install ui
+rank/raw/experienced-6 open ['ui', 'components', 'headless'] | rank headless > unstyled > primitives > ui > components > elements > parts > kit > base | install ui
+headless: mean 1.58 first 5 last 0 install-first 1 open-first 0 open-any 7
+unstyled: mean 1.58 first 7 last 0 install-first 0 open-first 0 open-any 0
+primitives: mean 3.33 first 0 last 0 install-first 0 open-first 0 open-any 0
+ui: mean 3.92 first 0 last 0 install-first 11 open-first 12 open-any 12
+components: mean 4.58 first 0 last 0 install-first 0 open-first 0 open-any 12
+parts: mean 6.67 first 0 last 0 install-first 0 open-first 0 open-any 0
+elements: mean 7.17 first 0 last 1 install-first 0 open-first 0 open-any 0
+kit: mean 7.33 first 0 last 0 install-first 0 open-first 0 open-any 0
+base: mean 8.83 first 0 last 11 install-first 0 open-first 0 open-any 0
+open guesses (any of 3): {'ui': 12, 'components': 12, 'headless': 7, 'native': 5}

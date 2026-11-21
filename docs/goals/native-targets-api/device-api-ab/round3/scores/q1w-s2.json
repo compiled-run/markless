@@ -1,0 +1,425 @@
+{
+ "HN-1": {
+  "web": {
+   "camera": "empty preview; Take photo disabled forever",
+   "location": "'Finding you…' forever",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "Share button does nothing",
+   "hint": "⌘K (modifierKey reads visitor's system)"
+  },
+  "deadButtons": [
+   "Take photo (disabled forever: ready stays false)",
+   "Share (promise never settles, nothing opens)"
+  ],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": false,
+  "notes": "iPhone hint: modifierKey gives '⌘' on any Apple system, so the iPhone app shows ⌘K although the task says Ctrl+K for non-Mac people; sheet-driven, not writer error (left phoneOk true). Writer's own website account is accurate."
+ },
+ "HN-2": {
+  "web": {
+   "camera": "empty preview; Take photo disabled forever",
+   "location": "'Finding you…' forever",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "Share button does nothing",
+   "hint": "⌘K (modifierKey reads visitor's system)"
+  },
+  "deadButtons": [
+   "Take photo (disabled forever: ready stays false)",
+   "Share (promise never settles, nothing opens)"
+  ],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": false,
+  "notes": "iPhone hint: modifierKey gives '⌘' on any Apple system, so the iPhone app shows ⌘K although the task says Ctrl+K for non-Mac people; sheet-driven, not writer error (left phoneOk true). Writer's own website account is accurate."
+ },
+ "HN-3": {
+  "web": {
+   "camera": "empty preview; Take photo disabled forever",
+   "location": "'Finding you…' forever",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "Share button does nothing",
+   "hint": "⌘K (modifierKey reads visitor's system)"
+  },
+  "deadButtons": [
+   "Take photo (disabled forever: ready stays false)",
+   "Share (promise never settles, nothing opens)"
+  ],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": false,
+  "notes": "iPhone hint: modifierKey gives '⌘' on any Apple system, so the iPhone app shows ⌘K although the task says Ctrl+K for non-Mac people; sheet-driven, not writer error (left phoneOk true). Also shows camera-refused message on phone. Writer's own website account is accurate."
+ },
+ "HN-4": {
+  "web": {
+   "camera": "empty preview; Take photo disabled forever",
+   "location": "'Finding you…' forever",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "Share button does nothing",
+   "hint": "⌘K (modifierKey reads visitor's system)"
+  },
+  "deadButtons": [
+   "Take photo (disabled forever: ready stays false)",
+   "Share (promise never settles, nothing opens)"
+  ],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": false,
+  "notes": "iPhone hint: modifierKey gives '⌘' on any Apple system, so the iPhone app shows ⌘K although the task says Ctrl+K for non-Mac people; sheet-driven, not writer error (left phoneOk true). Also shows camera-refused message on phone. Writer's own website account is accurate."
+ },
+ "HN-5": {
+  "web": {
+   "camera": "empty preview; Take photo disabled forever",
+   "location": "'Finding you…' forever",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "Share button does nothing",
+   "hint": "⌘K (modifierKey reads visitor's system)"
+  },
+  "deadButtons": [
+   "Take photo (disabled forever: ready stays false)",
+   "Share (promise never settles, nothing opens)"
+  ],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": false,
+  "notes": "iPhone hint: modifierKey gives '⌘' on any Apple system, so the iPhone app shows ⌘K although the task says Ctrl+K for non-Mac people; sheet-driven, not writer error (left phoneOk true). Writer's own website account is accurate."
+ },
+ "QT-1": {
+  "web": {
+   "camera": "note: camera in iPhone/Android apps",
+   "location": "note: location in apps",
+   "like": "counts; no haptic",
+   "offline": "never shown (guarded out)",
+   "share": "'Copy link' button, label changes to 'Link copied'",
+   "hint": "⌘K"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": true,
+  "notes": "iPhone hint: modifierKey gives '⌘' on any Apple system, so the iPhone app shows ⌘K although the task says Ctrl+K for non-Mac people; sheet-driven, not writer error (left phoneOk true). Extra web code: navigator.clipboard.writeText. All device uses guarded."
+ },
+ "QT-2": {
+  "web": {
+   "camera": "note: camera in apps",
+   "location": "note: location in apps",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "'Copy link' button, label changes to 'Link copied'",
+   "hint": "⌘K"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": true,
+  "notes": "iPhone hint: modifierKey gives '⌘' on any Apple system, so the iPhone app shows ⌘K although the task says Ctrl+K for non-Mac people; sheet-driven, not writer error (left phoneOk true). Extra web code: navigator.clipboard.writeText. No disabled on Take photo; takePhoto waits for ready, fine."
+ },
+ "QT-3": {
+  "web": {
+   "camera": "note: camera in apps",
+   "location": "note: location in apps",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "plain link showing the url, no button",
+   "hint": "⌘K"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": false,
+  "notes": "iPhone hint: modifierKey gives '⌘' on any Apple system, so the iPhone app shows ⌘K although the task says Ctrl+K for non-Mac people; sheet-driven, not writer error (left phoneOk true). All uses guarded."
+ },
+ "QT-4": {
+  "web": {
+   "camera": "note: taking photos in apps",
+   "location": "note: location in apps",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "plain link (title) to url, no button",
+   "hint": "⌘K"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": false,
+  "notes": "iPhone hint: modifierKey gives '⌘' on any Apple system, so the iPhone app shows ⌘K although the task says Ctrl+K for non-Mac people; sheet-driven, not writer error (left phoneOk true). All uses guarded (handlers re-guard)."
+ },
+ "QT-5": {
+  "web": {
+   "camera": "note: open in iPhone/Android app to take photos",
+   "location": "note: location in apps",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "link to url labelled with title, no button",
+   "hint": "⌘K"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": false,
+  "notes": "iPhone hint: modifierKey gives '⌘' on any Apple system, so the iPhone app shows ⌘K although the task says Ctrl+K for non-Mac people; sheet-driven, not writer error (left phoneOk true). Split into components, each guards itself."
+ },
+ "VR-1": {
+  "web": {
+   "camera": "note: camera in apps",
+   "location": "note: location in apps",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "Share button: navigator.share panel where the browser has it (Safari), else silent clipboard copy",
+   "hint": "⌘K via navigator.userAgent /Mac/"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": true,
+  "notes": "Share fallback copies to clipboard with no visible feedback when navigator.share is missing (e.g. Firefox on Mac): effectively a dead button there; not listed since Safari/Chrome on Mac open the share panel. Mac detection is a const computed in the body; a server render would show Ctrl+K and never update. Extra web code: navigator.userAgent, navigator.share, navigator.clipboard. Guards all valid (handler `if (ios||android) {...return;}` form)."
+ },
+ "VR-2": {
+  "web": {
+   "camera": "note: camera in apps",
+   "location": "note: location in apps",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "Share button: navigator.share panel where the browser has it (Safari), else silent clipboard copy",
+   "hint": "⌘K via navigator.platform /Mac/"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": true,
+  "notes": "Share fallback copies to clipboard with no visible feedback when navigator.share is missing (e.g. Firefox on Mac): effectively a dead button there; not listed since Safari/Chrome on Mac open the share panel. Mac detection is a const computed in the body; a server render would show Ctrl+K and never update. Extra web code: navigator.platform, navigator.share, navigator.clipboard."
+ },
+ "VR-3": {
+  "web": {
+   "camera": "note: camera in apps",
+   "location": "note: location in apps",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "Share button: navigator.share panel where the browser has it (Safari), else silent clipboard copy",
+   "hint": "⌘K via navigator.userAgent includes 'Mac'"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": true,
+  "notes": "Share fallback copies to clipboard with no visible feedback when navigator.share is missing (e.g. Firefox on Mac): effectively a dead button there; not listed since Safari/Chrome on Mac open the share panel. Mac detection is a const computed in the body; a server render would show Ctrl+K and never update. Extra web code: navigator.userAgent, navigator.share, navigator.clipboard."
+ },
+ "VR-4": {
+  "web": {
+   "camera": "note: camera in apps",
+   "location": "note: location in apps",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "text 'Share this page:' plus link to url",
+   "hint": "'Press ⌘K (Mac) or Ctrl+K to search'"
+  },
+  "deadButtons": [],
+  "unguarded": [
+   "<base.camera el={cam} />",
+   "disabled={!cam.ready}",
+   "await cam.takePhoto()",
+   "cam.access === 'denied'",
+   "geo.access === 'denied'",
+   "geo.position === null",
+   "geo.position.latitude / longitude / accuracy reads"
+  ],
+  "macWebHint": "both",
+  "phoneOk": false,
+  "extraWebCode": false,
+  "notes": "CameraPanel and LocationPanel use cam/geo with no guard in their own bodies; the only guard is the parent's @if around <CameraPanel />/<LocationPanel />. The sheet defines a guard as an @if/if around the use, so read strictly these are rejected and no build (including iPhone) compiles; if guards were taken to cross component boundaries all would be fine and phoneOk would be true. Website description assumes the parent guard removes the panels."
+ },
+ "VR-5": {
+  "web": {
+   "camera": "nothing (empty section)",
+   "location": "nothing (empty section)",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "link (title) plus 'Copy link' button that changes to 'Link copied'",
+   "hint": "⌘K via navigator.platform /Mac|iPhone|iPad/"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": true,
+  "notes": "Extra web code: navigator.platform, navigator.clipboard. Camera/location have no @else, so the website shows empty sections with no explanation. Each panel guards itself. SSR caveat on the const hint as in VR-1..3."
+ },
+ "LX-1": {
+  "web": {
+   "camera": "@catch note: camera in apps",
+   "location": "@catch note: location in apps",
+   "like": "counts; haptic throw caught",
+   "offline": "never shown (@catch renders hidden span)",
+   "share": "Share: sharesheet rejects, url copied to clipboard, 'Link copied' shown (else link text)",
+   "hint": "⌘K"
+  },
+  "deadButtons": [],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": true,
+  "notes": "iPhone hint: modifierKey gives '⌘' on any Apple system, so the iPhone app shows ⌘K although the task says Ctrl+K for non-Mac people; sheet-driven, not writer error (left phoneOk true). Haptics wrapped in try/catch. Extra web code: navigator.clipboard."
+ },
+ "LX-2": {
+  "web": {
+   "camera": "@catch note: camera only in apps",
+   "location": "@catch note: location only in apps",
+   "like": "counts; haptic throw caught",
+   "offline": "never shown",
+   "share": "Share: clipboard copy + 'Link copied' (or 'Could not share this page')",
+   "hint": "⌘K"
+  },
+  "deadButtons": [],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": true,
+  "notes": "iPhone hint: modifierKey gives '⌘' on any Apple system, so the iPhone app shows ⌘K although the task says Ctrl+K for non-Mac people; sheet-driven, not writer error (left phoneOk true). Haptics wrapped in try/catch. Extra web code: navigator.clipboard. Catches any share rejection, including a phone-side failure, with a clipboard fallback."
+ },
+ "LX-3": {
+  "web": {
+   "camera": "@catch note: camera in apps",
+   "location": "@catch note: location in apps",
+   "like": "counts; haptic throw caught",
+   "offline": "never shown",
+   "share": "Share: navigator.share panel if present, else clipboard + 'Link copied.'",
+   "hint": "⌘K"
+  },
+  "deadButtons": [],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": true,
+  "notes": "iPhone hint: modifierKey gives '⌘' on any Apple system, so the iPhone app shows ⌘K although the task says Ctrl+K for non-Mac people; sheet-driven, not writer error (left phoneOk true). Haptics wrapped in try/catch. Extra web code: navigator.share, navigator.clipboard."
+ },
+ "LX-4": {
+  "web": {
+   "camera": "@catch note: camera in apps",
+   "location": "@catch note: location in apps",
+   "like": "counts; haptic throw caught",
+   "offline": "never shown",
+   "share": "Share: navigator.share panel if present, else clipboard + 'Link copied'",
+   "hint": "⌘K"
+  },
+  "deadButtons": [],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": true,
+  "notes": "iPhone hint: modifierKey gives '⌘' on any Apple system, so the iPhone app shows ⌘K although the task says Ctrl+K for non-Mac people; sheet-driven, not writer error (left phoneOk true). Haptics wrapped in try/catch. Extra web code: navigator.share, navigator.clipboard."
+ },
+ "LX-5": {
+  "web": {
+   "camera": "@catch note: camera in apps",
+   "location": "@catch note: location in apps",
+   "like": "counts; NotSupportedError from haptics caught",
+   "offline": "never shown",
+   "share": "Share: navigator.share panel if present, else clipboard + 'Link copied.'",
+   "hint": "⌘K"
+  },
+  "deadButtons": [],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": true,
+  "notes": "iPhone hint: modifierKey gives '⌘' on any Apple system, so the iPhone app shows ⌘K although the task says Ctrl+K for non-Mac people; sheet-driven, not writer error (left phoneOk true). Haptics wrapped in try/catch. Extra web code: navigator.share, navigator.clipboard. @catch distinguishes NotSupportedError from other errors."
+ },
+ "GP-1": {
+  "web": {
+   "camera": "note: camera in apps",
+   "location": "note: location in apps",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "Share button: navigator.share if present, else clipboard copy, label becomes 'Link copied'",
+   "hint": "⌘K via navigator.platform/userAgent"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": true,
+  "notes": "Extra web code: navigator.platform, navigator.userAgent, navigator.share, navigator.clipboard. Works around platform.macos being false on the website. All device uses guarded. SSR caveat: hint is a const computed in body."
+ },
+ "GP-2": {
+  "web": {
+   "camera": "note: taking photos in apps",
+   "location": "note: location in apps",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "'Copy link' button, label becomes 'Link copied'",
+   "hint": "Ctrl+K (platform.macos false on web)"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "Ctrl+K",
+  "phoneOk": true,
+  "extraWebCode": true,
+  "notes": "Extra web code: navigator.clipboard. Writer correctly states Mac website visitors get Ctrl+K. All device uses guarded."
+ },
+ "GP-3": {
+  "web": {
+   "camera": "note: camera in apps",
+   "location": "note: location in apps",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "'Copy link' button, label becomes 'Link copied'",
+   "hint": "Ctrl+K (platform.macos false on web)"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "Ctrl+K",
+  "phoneOk": true,
+  "extraWebCode": true,
+  "notes": "Extra web code: navigator.clipboard. Writer correctly states Mac visitors get Ctrl+K."
+ },
+ "GP-4": {
+  "web": {
+   "camera": "note: taking photos in apps",
+   "location": "note: location in apps",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "'Copy link' button, label becomes 'Link copied'",
+   "hint": "'Press ⌘K (on a Mac) or Ctrl+K to search'"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "both",
+  "phoneOk": true,
+  "extraWebCode": true,
+  "notes": "Extra web code: navigator.clipboard. Location reads sit inside @if (geolocation.supported) arm, so guarded."
+ },
+ "GP-5": {
+  "web": {
+   "camera": "note: taking photos in apps",
+   "location": "note: location in apps",
+   "like": "counts; no haptic",
+   "offline": "never shown",
+   "share": "Share button: navigator.share if present, else clipboard + 'Link copied'",
+   "hint": "⌘K via navigator.platform.startsWith('Mac')"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": true,
+  "notes": "Extra web code: navigator.platform, navigator.share, navigator.clipboard. Share handler guard uses `if (sharesheet.supported) {...return;}` form. SSR caveat on const hint."
+ }
+}

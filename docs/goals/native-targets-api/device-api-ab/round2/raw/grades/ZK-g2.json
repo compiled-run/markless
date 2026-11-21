@@ -1,0 +1,518 @@
+{
+ "label": "ZK",
+ "grader": "g2",
+ "answers": {
+  "A1": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "cam.scan(...) called in component body; sheet does not say where it registers, body may run only on server"
+     ]
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "guessed route component receives a url: URL prop",
+      "invented /api/places fetch endpoint for search",
+      "no router import; uses plain <a href> (same-app link, fine)"
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "every shutter in tasks 1-4 is camera.trigger, which the sheet says is disabled until ready (and takePhoto waits anyway)"
+    },
+    "B2": {
+     "value": true,
+     "why": "onPhoto sets cam.active = false, which the sheet says releases the camera while the component stays; Close sets it true"
+    },
+    "B3": {
+     "value": true,
+     "why": "header uses only named<Camera>(name) plus <camera.trigger of={cam}> and a callback prop; no element, methods or state driven"
+    },
+    "B4": {
+     "value": true,
+     "why": "trigger label reads rec.recording, the recorder's own live field"
+    },
+    "B5": {
+     "value": true,
+     "why": "search result is a same-app <a href=/map?lat&lng>; map reads url.searchParams into mapview({center}) so it opens centred"
+    }
+   },
+   "confusion": [
+    "Task 4 guess: 'I assumed a panel laid over the camera does not count as the camera's element leaving the screen, so I set active explicitly' - unsure what 'on screen' means for start/release",
+    "Task 8 guess: 'I assumed network() and compass() start when they are created, since they have no element' - sheet's element-starts-device rule leaves elementless devices unexplained",
+    "Task 7 guess: 'assumed player() plays video and that <player el> shows the picture'"
+   ]
+  },
+  "A2": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "cam.scan(...) called in component body; sheet does not say where it registers, body may run only on server",
+      "<p>Last code: {lastCode}</p> mixes text and expression (fine)"
+     ]
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "no denied message for the microphone (not a required behaviour)"
+     ]
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "guessed route table format and url: URL prop",
+      "selected?.name inside @if(selected) - unsure of narrowing"
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "src taken as a prop instead of a fixed path (fine)"
+     ]
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "every shutter in tasks 1-4 is camera.trigger, which the sheet says is disabled until ready (and takePhoto waits anyway)"
+    },
+    "B2": {
+     "value": true,
+     "why": "onPhoto sets cam.active = false, which the sheet says releases the camera while the component stays; Close sets it true"
+    },
+    "B3": {
+     "value": true,
+     "why": "header uses only named<Camera>(name) plus <camera.trigger of={cam}> and a callback prop; no element, methods or state driven"
+    },
+    "B4": {
+     "value": true,
+     "why": "trigger label reads rec.recording, the recorder's own live field"
+    },
+    "B5": {
+     "value": true,
+     "why": "search result is a same-app <a href=/map?lat&lng>; map page reads url.searchParams into the mapview starting center"
+    }
+   },
+   "confusion": [
+    "Task 4 comment: 'Relies on `active = false` releasing the camera while the component stays mounted' and guess 'even though its element stays on screen under the panel' - unsure whether covering counts as off screen",
+    "Task 8 guess: 'assumed network() and compass() work without being tied to an element'",
+    "Task 7 guess: 'assumed <player el={video} /> shows video (the sheet only says \"the picture\")'"
+   ]
+  },
+  "A3": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "cam.scan(...) called in component body; sheet does not say where it registers, body may run only on server"
+     ]
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "guessed file routes map.tsrx/search.tsrx and url: URL prop",
+      "invented /api/places search endpoint; result id types differ between files (string vs number)"
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "aria-label on an inner span duplicates visible text (harmless)"
+     ]
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "every shutter in tasks 1-4 is camera.trigger, which the sheet says is disabled until ready (and takePhoto waits anyway)"
+    },
+    "B2": {
+     "value": true,
+     "why": "onPhoto sets cam.active = false, which the sheet says releases the camera while the component stays; Close sets it true"
+    },
+    "B3": {
+     "value": true,
+     "why": "header uses only named<Camera>(name) plus <camera.trigger of={cam}> and a callback prop; no element, methods or state driven"
+    },
+    "B4": {
+     "value": true,
+     "why": "trigger label reads rec.recording, the recorder's own live field"
+    },
+    "B5": {
+     "value": true,
+     "why": "result links to /map?lat&lng (same-app link); placeFromUrl(url) feeds mapview({center})"
+    }
+   },
+   "confusion": [
+    "Task 4 guess: 'I did not rely on the panel covering the camera, because the sheet does not say whether \"on screen\" means in the DOM or actually visible'",
+    "Task 8 guess: 'network().online is true during server rendering' - unsure where elementless devices run"
+   ]
+  },
+  "A4": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Body.tsrx imports camera and openSettings without using them (unused imports)"
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "cam.scan(...) called in component body; sheet does not say where it registers, body may run only on server"
+     ]
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "<recorder.label> rendered unconditionally; sheet says it is present only while recording, so fine"
+     ]
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "guessed routes/ folder file routing and url: URL prop",
+      "invented /api/places search endpoint"
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "every shutter in tasks 1-4 is camera.trigger, which the sheet says is disabled until ready (and takePhoto waits anyway)"
+    },
+    "B2": {
+     "value": true,
+     "why": "onPhoto sets cam.active = false, which the sheet says releases the camera while the component stays; Close sets it true"
+    },
+    "B3": {
+     "value": true,
+     "why": "header uses only named<Camera>(name) plus <camera.trigger of={cam}> and a callback prop; no element, methods or state driven"
+    },
+    "B4": {
+     "value": true,
+     "why": "trigger label reads rec.recording, the recorder's own live field"
+    },
+    "B5": {
+     "value": true,
+     "why": "result is <a href=/map?lat&lng>; map reads url.searchParams into mapview center"
+    }
+   },
+   "confusion": [
+    "Task 4 guess: 'I assumed active = false really stops the camera even though its element stays in the page under the panel'",
+    "Task 8 guess: 'assumed network() and compass() start without being tied to any element'",
+    "General guess: 'I assumed <camera el={cam} />, <mapview> and <player> are valid tags'"
+   ]
+  },
+  "A5": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "cam.scan(...) called in component body; sheet does not say where it registers, body may run only on server",
+      "<p>Last code: {lastCode}</p> (fine)"
+     ]
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "guessed route component receives searchParams: URLSearchParams prop",
+      "invented /api/places search endpoint"
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "every shutter in tasks 1-4 is camera.trigger, which the sheet says is disabled until ready (and takePhoto waits anyway)"
+    },
+    "B2": {
+     "value": true,
+     "why": "onPhoto sets cam.active = false, which the sheet says releases the camera while the component stays; Close sets it true"
+    },
+    "B3": {
+     "value": true,
+     "why": "header uses only named<Camera>(name) plus <camera.trigger of={cam}> and a callback prop; no element, methods or state driven"
+    },
+    "B4": {
+     "value": true,
+     "why": "trigger label reads rec.recording, the recorder's own live field"
+    },
+    "B5": {
+     "value": true,
+     "why": "result is a same-app <a href=/map?lat&lng>; map reads searchParams into mapview({center}) so it opens centred (relies on guessed searchParams prop)"
+    }
+   },
+   "confusion": [
+    "Task 4 comment: 'covering the element alone does not stop it' and guess 'Dropping the <camera> element with an @if might also stop it, but the sheet does not say so'",
+    "Task 8 guess: 'assumed network() and compass() start straight away without an element on screen'",
+    "Task 7 guess: 'assumed <player el={p} /> renders video, since the sheet only says \"The picture.\"'"
+   ]
+  }
+ }
+}

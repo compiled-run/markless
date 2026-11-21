@@ -1,0 +1,428 @@
+{
+ "writers": {
+  "FD-1": {
+   "inPage": "cam.takePhoto()",
+   "system": "camera.takePhoto()",
+   "library": "choosePhoto()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "FD-2": {
+   "inPage": "cam.takePhoto()",
+   "system": "camera.takePhoto()",
+   "library": "choosePhoto()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "FD-3": {
+   "inPage": "cam.takePhoto()",
+   "system": "camera.takePhoto()",
+   "library": "choosePhoto()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "FD-4": {
+   "inPage": "cam.takePhoto()",
+   "system": "camera.takePhoto()",
+   "library": "choosePhoto()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "FD-5": {
+   "inPage": "cam.takePhoto()",
+   "system": "camera.takePhoto()",
+   "library": "choosePhoto()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "TJ-1": {
+   "inPage": "cam.takePhoto()",
+   "system": "systemCamera.open()",
+   "library": "photoLibrary.open()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "TJ-2": {
+   "inPage": "cam.takePhoto()",
+   "system": "systemCamera.open()",
+   "library": "photoLibrary.open()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "TJ-3": {
+   "inPage": "cam.takePhoto()",
+   "system": "systemCamera.open()",
+   "library": "photoLibrary.open()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "TJ-4": {
+   "inPage": "cam.takePhoto()",
+   "system": "systemCamera.open()",
+   "library": "photoLibrary.open()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "TJ-5": {
+   "inPage": "cam.takePhoto()",
+   "system": "systemCamera.open()",
+   "library": "photoLibrary.open()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "NB-1": {
+   "inPage": "cam.takePhoto()",
+   "system": "cameraScreen.open()",
+   "library": "photoLibrary.open()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "NB-2": {
+   "inPage": "cam.takePhoto()",
+   "system": "cameraScreen.open()",
+   "library": "photoLibrary.open()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "NB-3": {
+   "inPage": "cam.takePhoto()",
+   "system": "cameraScreen.open()",
+   "library": "photoLibrary.open()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "NB-4": {
+   "inPage": "cam.takePhoto()",
+   "system": "cameraScreen.open()",
+   "library": "photoLibrary.open()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "NB-5": {
+   "inPage": "cam.takePhoto()",
+   "system": "cameraScreen.open()",
+   "library": "photoLibrary.open()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "RZ-1": {
+   "inPage": "cam.takePhoto()",
+   "system": "cameraApp.open()",
+   "library": "photoLibrary.open()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "RZ-2": {
+   "inPage": "cam.takePhoto()",
+   "system": "cameraApp.open()",
+   "library": "photoLibrary.open()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "RZ-3": {
+   "inPage": "cam.takePhoto()",
+   "system": "cameraApp.open()",
+   "library": "photoLibrary.open()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "RZ-4": {
+   "inPage": "cam.takePhoto()",
+   "system": "cameraApp.open()",
+   "library": "photoLibrary.open()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "RZ-5": {
+   "inPage": "cam.takePhoto()",
+   "system": "cameraApp.open()",
+   "library": "photoLibrary.open()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "WK-1": {
+   "inPage": "cam.takePhoto()",
+   "system": "takePhoto()",
+   "library": "choosePhoto()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "WK-2": {
+   "inPage": "cam.takePhoto()",
+   "system": "takePhoto()",
+   "library": "choosePhoto()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "WK-3": {
+   "inPage": "cam.takePhoto()",
+   "system": "takePhoto()",
+   "library": "choosePhoto()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "WK-4": {
+   "inPage": "cam.takePhoto()",
+   "system": "takePhoto()",
+   "library": "choosePhoto()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  },
+  "WK-5": {
+   "inPage": "cam.takePhoto()",
+   "system": "takePhoto()",
+   "library": "choosePhoto()",
+   "confused": false,
+   "why": "each button uses the sheet's call for its job",
+   "missing": []
+  }
+ },
+ "readers": {
+  "FD-1": {
+   "q1": 1,
+   "q2": 1,
+   "q3a": 1,
+   "q3b": 1,
+   "q3c": 1,
+   "q4": 1,
+   "zeros": {},
+   "pairFlagged": true,
+   "flagged": [
+    "cam.takePhoto()",
+    "camera.takePhoto()"
+   ]
+  },
+  "FD-2": {
+   "q1": 1,
+   "q2": 1,
+   "q3a": 1,
+   "q3b": 1,
+   "q3c": 1,
+   "q4": 1,
+   "zeros": {},
+   "pairFlagged": true,
+   "flagged": [
+    "cam.takePhoto()",
+    "camera.takePhoto()",
+    "camera()"
+   ]
+  },
+  "FD-3": {
+   "q1": 1,
+   "q2": 1,
+   "q3a": 1,
+   "q3b": 1,
+   "q3c": 1,
+   "q4": 1,
+   "zeros": {},
+   "pairFlagged": true,
+   "flagged": [
+    "cam.takePhoto()",
+    "camera.takePhoto()",
+    "camera()",
+    "base.camera"
+   ]
+  },
+  "TJ-1": {
+   "q1": 1,
+   "q2": 1,
+   "q3a": 1,
+   "q3b": 1,
+   "q3c": 1,
+   "q4": 1,
+   "zeros": {},
+   "pairFlagged": true,
+   "flagged": [
+    "camera()",
+    "systemCamera"
+   ]
+  },
+  "TJ-2": {
+   "q1": 1,
+   "q2": 1,
+   "q3a": 1,
+   "q3b": 1,
+   "q3c": 1,
+   "q4": 1,
+   "zeros": {},
+   "pairFlagged": true,
+   "flagged": [
+    "camera()",
+    "cam.takePhoto()",
+    "systemCamera.open()"
+   ]
+  },
+  "TJ-3": {
+   "q1": 1,
+   "q2": 1,
+   "q3a": 1,
+   "q3b": 1,
+   "q3c": 1,
+   "q4": 1,
+   "zeros": {},
+   "pairFlagged": true,
+   "flagged": [
+    "camera()",
+    "systemCamera.open()",
+    "base.camera"
+   ]
+  },
+  "NB-1": {
+   "q1": 1,
+   "q2": 1,
+   "q3a": 1,
+   "q3b": 1,
+   "q3c": 1,
+   "q4": 1,
+   "zeros": {},
+   "pairFlagged": true,
+   "flagged": [
+    "camera()",
+    "cam.takePhoto()",
+    "cameraScreen.open()"
+   ]
+  },
+  "NB-2": {
+   "q1": 1,
+   "q2": 1,
+   "q3a": 1,
+   "q3b": 1,
+   "q3c": 1,
+   "q4": 1,
+   "zeros": {},
+   "pairFlagged": true,
+   "flagged": [
+    "camera()",
+    "cameraScreen",
+    "base.camera"
+   ]
+  },
+  "NB-3": {
+   "q1": 1,
+   "q2": 1,
+   "q3a": 1,
+   "q3b": 1,
+   "q3c": 1,
+   "q4": 1,
+   "zeros": {},
+   "pairFlagged": true,
+   "flagged": [
+    "camera()",
+    "cam.takePhoto()",
+    "cameraScreen.open()",
+    "base.camera"
+   ]
+  },
+  "RZ-1": {
+   "q1": 1,
+   "q2": 1,
+   "q3a": 1,
+   "q3b": 1,
+   "q3c": 1,
+   "q4": 1,
+   "zeros": {},
+   "pairFlagged": true,
+   "flagged": [
+    "camera()",
+    "cameraApp.open()"
+   ]
+  },
+  "RZ-2": {
+   "q1": 1,
+   "q2": 1,
+   "q3a": 1,
+   "q3b": 1,
+   "q3c": 1,
+   "q4": 1,
+   "zeros": {},
+   "pairFlagged": true,
+   "flagged": [
+    "camera()",
+    "cameraApp.open()"
+   ]
+  },
+  "RZ-3": {
+   "q1": 1,
+   "q2": 1,
+   "q3a": 1,
+   "q3b": 1,
+   "q3c": 1,
+   "q4": 1,
+   "zeros": {},
+   "pairFlagged": true,
+   "flagged": [
+    "camera()",
+    "cameraApp",
+    "base.camera"
+   ]
+  },
+  "WK-1": {
+   "q1": 1,
+   "q2": 1,
+   "q3a": 1,
+   "q3b": 1,
+   "q3c": 1,
+   "q4": 1,
+   "zeros": {},
+   "pairFlagged": true,
+   "flagged": [
+    "cam.takePhoto()",
+    "takePhoto()"
+   ]
+  },
+  "WK-2": {
+   "q1": 1,
+   "q2": 1,
+   "q3a": 1,
+   "q3b": 1,
+   "q3c": 1,
+   "q4": 1,
+   "zeros": {},
+   "pairFlagged": true,
+   "flagged": [
+    "takePhoto()",
+    "cam.takePhoto()"
+   ]
+  },
+  "WK-3": {
+   "q1": 1,
+   "q2": 1,
+   "q3a": 1,
+   "q3b": 1,
+   "q3c": 1,
+   "q4": 1,
+   "zeros": {},
+   "pairFlagged": true,
+   "flagged": [
+    "cam.takePhoto()",
+    "takePhoto()",
+    "camera()",
+    "base.camera"
+   ]
+  }
+ }
+}

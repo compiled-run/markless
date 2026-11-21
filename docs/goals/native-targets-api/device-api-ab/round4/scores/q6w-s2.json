@@ -1,0 +1,502 @@
+{
+ "AU-1": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "drawer = sheet everywhere; plain modal = sheet on phone by default (no author CSS overriding placement); alert modal stays centered. Website lines match rule."
+ },
+ "AU-2": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "drawer = sheet everywhere; plain modal = sheet on phone by default (no author CSS overriding placement); alert modal stays centered. Website lines match rule."
+ },
+ "AU-3": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "drawer = sheet everywhere; plain modal = sheet on phone by default (no author CSS overriding placement); alert modal stays centered. Website lines match rule. Classes on modal.content but no CSS shown, so no placement override."
+ },
+ "AU-4": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "drawer = sheet everywhere; plain modal = sheet on phone by default (no author CSS overriding placement); alert modal stays centered. Website lines match rule."
+ },
+ "AU-5": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "drawer = sheet everywhere; plain modal = sheet on phone by default (no author CSS overriding placement); alert modal stays centered. Website lines match rule."
+ },
+ "LI-1": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "Address picker chosen as drawer, so sheet on phone and website by rule; writer's website line says bottom sheet, matching rule. Delete confirm is a plain button closing via controlled open."
+ },
+ "LI-2": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "Address picker chosen as drawer, so sheet on phone and website by rule; writer's website line says bottom sheet, matching rule."
+ },
+ "LI-3": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "Address picker chosen as drawer, so sheet on phone and website by rule; writer's website line says bottom sheet, matching rule. Address choices are drawer.close parts."
+ },
+ "LI-4": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "Address picker chosen as drawer, so sheet on phone and website by rule; writer's website line says bottom sheet, matching rule."
+ },
+ "LI-5": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "Address picker chosen as drawer, so sheet on phone and website by rule; writer's website line says bottom sheet, matching rule. Address choices are drawer.close parts."
+ },
+ "AD-1": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "spelledAsSheet": true,
+   "spelling": "adaptive"
+  },
+  "notes": "Opt-in `adaptive` on address modal only, spelled as the sheet says; writer correctly says website stays centered."
+ },
+ "AD-2": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "spelledAsSheet": true,
+   "spelling": "adaptive"
+  },
+  "notes": "Opt-in `adaptive` on address modal only, spelled as the sheet says; writer correctly says website stays centered."
+ },
+ "AD-3": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "spelledAsSheet": true,
+   "spelling": "adaptive"
+  },
+  "notes": "Opt-in `adaptive` on address modal only, spelled as the sheet says; writer correctly says website stays centered."
+ },
+ "AD-4": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "spelledAsSheet": true,
+   "spelling": "adaptive"
+  },
+  "notes": "Opt-in `adaptive` on address modal only, spelled as the sheet says; writer correctly says website stays centered."
+ },
+ "AD-5": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "spelledAsSheet": true,
+   "spelling": "adaptive"
+  },
+  "notes": "Opt-in `adaptive` on address modal only, spelled as the sheet says; writer correctly says website stays centered."
+ },
+ "PR-1": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "spelledAsSheet": true,
+   "spelling": "presentation=\"adaptive\""
+  },
+  "notes": "Opt-in `presentation=\"adaptive\"` on address modal only, spelled as the sheet says; writer correctly says website stays centered."
+ },
+ "PR-2": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "spelledAsSheet": true,
+   "spelling": "presentation=\"adaptive\""
+  },
+  "notes": "Opt-in `presentation=\"adaptive\"` on address modal only, spelled as the sheet says; writer correctly says website stays centered."
+ },
+ "PR-3": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "spelledAsSheet": true,
+   "spelling": "presentation=\"adaptive\""
+  },
+  "notes": "Opt-in `presentation=\"adaptive\"` on address modal only, spelled as the sheet says; writer correctly says website stays centered. modal.trigger placed inside a <p> within modal.root; Delete confirm is a plain button."
+ },
+ "PR-4": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "spelledAsSheet": true,
+   "spelling": "presentation=\"adaptive\""
+  },
+  "notes": "Opt-in `presentation=\"adaptive\"` on address modal only, spelled as the sheet says; writer correctly says website stays centered."
+ },
+ "PR-5": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "spelledAsSheet": true,
+   "spelling": "presentation=\"adaptive\""
+  },
+  "notes": "Opt-in `presentation=\"adaptive\"` on address modal only, spelled as the sheet says; writer correctly says website stays centered."
+ }
+}

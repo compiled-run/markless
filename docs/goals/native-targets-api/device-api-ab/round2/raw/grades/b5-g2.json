@@ -1,0 +1,32 @@
+{"grader":"b5-g2","answers":{
+"WZ":{
+"A1":{"value":true,"why":"Module-level map.handle(); search link onClick calls moveTo, same-app <a href=\"/map\"> keeps module state, and the sheet says a root shown next starts at the moveTo place."},
+"A2":{"value":true,"why":"Module-level handle moveTo before a same-app <a href=\"/map\">; module value survives and the sheet says the next root starts there."},
+"A3":{"value":true,"why":"Module-level handle moveTo plus same-app link to /map; the sheet guarantees the next root starts at the moved place."},
+"A4":{"value":true,"why":"Module-level handle moveTo in the result link's onClick, then same-app link to /map; the sheet guarantees the next root starts there."},
+"A5":{"value":true,"why":"Module-level handle moveTo(spot.at) then same-app <a href=\"/map\">; module state survives and the root starts at that place."}},
+"JR":{
+"A1":{"value":true,"why":"Place passed in the URL (?lat&lng) via location.assign; an attach callback reads location.search in the browser and assigns map.center, which the sheet says moves the map."},
+"A2":{"value":true,"why":"Place passed in the URL via a link; an attach callback reads window.location.search in the browser and assigns m.center, which moves the map."},
+"A3":{"value":true,"why":"Place passed in the URL via a link; the page's url prop is read into mapview({ center })."},
+"A4":{"value":false,"why":"Place passed in the URL, but read via globalThis.location in the component body; on the server that is unavailable so the map is created at HOME."},
+"A5":{"value":true,"why":"Place passed in the URL via a link; the page's url prop is read into mapview({ center })."}},
+"ZK":{
+"A1":{"value":true,"why":"Place passed in the URL via a link; the page's url prop is read into mapview({ center })."},
+"A2":{"value":true,"why":"Place passed in the URL via a link; the page's url prop is read into mapview({ center })."},
+"A3":{"value":true,"why":"Place passed in the URL via a link; placeFromUrl(url prop) feeds mapview({ center })."},
+"A4":{"value":true,"why":"Place passed in the URL via a link; the page's url prop is read into mapview({ center })."},
+"A5":{"value":true,"why":"Place passed in the URL via a link; the page's searchParams prop is read into mapview({ center })."}},
+"DU":{
+"A1":{"value":true,"why":"storage('map-center') written before location.assign('/map'); the cookie makes the fresh server render read it into MapView center."},
+"A2":{"value":true,"why":"storage('map-center') write then location.assign; the cookie-backed value feeds MapView center on the fresh load."},
+"A3":{"value":true,"why":"storage('map-center') write then location.assign; the cookie-backed value feeds MapView center on the fresh load."},
+"A4":{"value":true,"why":"storage('map-center') write then location.assign; parseCenter(storage) feeds MapView center on the fresh load."},
+"A5":{"value":true,"why":"storage('map-center') write then location.assign; readCenter(storage) feeds MapView center on the fresh load."}},
+"KJ":{
+"A1":{"value":true,"why":"storage('map-center') write then window.location.assign; the server render reads the cookie into the center state's start value."},
+"A2":{"value":true,"why":"storage(MAP_CENTER_KEY) write then window.location.assign; the cookie-backed value feeds device.map center on the fresh load."},
+"A3":{"value":true,"why":"storage('map-center') write then location.assign; the cookie-backed value feeds device.map center on the fresh load."},
+"A4":{"value":true,"why":"storage('map-center') write then location.assign; the cookie-backed value feeds device.map center on the fresh load."},
+"A5":{"value":true,"why":"storage('map-center') write then location.assign; the cookie-backed value feeds device.map center on the fresh load."}}
+}}

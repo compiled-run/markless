@@ -1,0 +1,11 @@
+agreement 480/480
+base: full beginner 2/3 experienced 3/3 score 0.83 | a 6 b 5 c 6 q4 6 q5 6 q7 6 clash 5 wrong 0
+base-ui: full beginner 3/3 experienced 2/3 score 0.83 | a 6 b 5 c 6 q4 6 q5 6 q7 6 clash 3 wrong 0
+components: full beginner 3/3 experienced 3/3 score 1.00 | a 6 b 6 c 6 q4 6 q5 6 q7 6 clash 0 wrong 0
+elements: full beginner 3/3 experienced 3/3 score 1.00 | a 6 b 6 c 6 q4 6 q5 6 q7 6 clash 0 wrong 0
+headless: full beginner 3/3 experienced 3/3 score 1.00 | a 6 b 6 c 6 q4 6 q5 6 q7 6 clash 0 wrong 0
+kit: full beginner 3/3 experienced 3/3 score 1.00 | a 6 b 6 c 6 q4 6 q5 6 q7 6 clash 0 wrong 0
+parts: full beginner 3/3 experienced 3/3 score 1.00 | a 6 b 6 c 6 q4 6 q5 6 q7 6 clash 0 wrong 0
+primitives: full beginner 3/3 experienced 3/3 score 1.00 | a 6 b 6 c 6 q4 6 q5 6 q7 6 clash 0 wrong 0
+ui: full beginner 3/3 experienced 3/3 score 1.00 | a 6 b 6 c 6 q4 6 q5 6 q7 6 clash 0 wrong 0
+unstyled: full beginner 3/3 experienced 3/3 score 1.00 | a 6 b 6 c 6 q4 6 q5 6 q7 6 clash 0 wrong 0

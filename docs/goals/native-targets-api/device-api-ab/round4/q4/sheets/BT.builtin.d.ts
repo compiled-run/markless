@@ -1,0 +1,22 @@
+import type { Camera } from '@markless/device';
+// Built into Markless: written like HTML elements, lowercase, with no import.
+// <camera el={cam} />   <sheet open={…} onChange={…}>…</sheet>
+// Two elements whose inside the system draws.
+// The camera element shows a camera made with camera(). It is one box: the author sizes and places it with `class`; the
+// picture inside is drawn by the device.
+// The sheet element is the system's own sheet: a panel that slides up from the bottom over the screen. The system draws
+// the panel, its grab handle, its corners and its animation, and closes it on a swipe down (calling onChange(false)).
+// The author's children go inside it; the panel itself takes no class.
+// On the website the camera element shows the browser's camera picture, and the sheet element is the browser's own
+// <dialog>, shown at the bottom of the window with the browser's default look.
+type CameraElementProps = { el: Camera; class?: string };
+type SheetProps = { open?: boolean; onChange?: (open: boolean) => void; children?: unknown };
+declare global {
+	namespace JSX {
+		interface IntrinsicElements {
+			camera: CameraElementProps;
+			sheet: SheetProps;
+		}
+	}
+}
+export {};

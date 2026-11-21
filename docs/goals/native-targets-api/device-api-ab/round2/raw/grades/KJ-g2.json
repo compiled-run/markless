@@ -1,0 +1,512 @@
+{
+ "label": "KJ",
+ "grader": "g2",
+ "answers": {
+  "A1": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "No onDenied handling (not required)"
+     ]
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "// comment placed inside markup; may be rejected or rendered as text"
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "No onDenied handling for the microphone"
+     ]
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [
+      "returns-centred"
+     ],
+     "markless": [
+      "storage() read in body plus window.location.assign reload; state initialised once from storage during server render",
+      "Invented /api/places endpoint"
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Shutters are disabled until onReady and the handle's takePhoto() is stated to wait until ready."
+    },
+    "B2": {
+     "value": false,
+     "why": "Task 4 removes <device.camera> from the markup with @if/@else while the panel shows, which the sheet says releases it."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header receives only a ready flag and an onShutter callback; the parent calls takePhoto on the handle."
+    },
+    "B4": {
+     "value": false,
+     "why": "Label reads app-kept `recording` flag toggled on click; never resets if the recorder is refused or fails to start."
+    },
+    "B5": {
+     "value": false,
+     "why": "MapPage seeds state(center) from storage() at render; Passes the place via storage() plus location.assign('/map'); the map body runs on the server where localStorage is unavailable, so the first render uses the default centre."
+    }
+   },
+   "confusion": [
+    "None about display/switch-on; correctly notes the always-present recorder 'may ask for microphone permission when the page loads'."
+   ]
+  },
+  "A2": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "// comment placed inside markup"
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [
+      "returns-centred"
+     ],
+     "markless": [
+      "storage() shared key plus window.location.assign full reload instead of URL/navigate"
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Shutters are disabled until onReady and the handle's takePhoto() is stated to wait until ready."
+    },
+    "B2": {
+     "value": false,
+     "why": "Task 4 removes <device.camera> from the markup with @if/@else while the panel shows, which the sheet says releases it."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header receives only a ready flag and an onShutter callback; the parent calls takePhoto on the handle."
+    },
+    "B4": {
+     "value": false,
+     "why": "Label reads app-kept `recording` flag; onDenied sets denied but never resets `recording` (button is hidden, but flag can drift)."
+    },
+    "B5": {
+     "value": false,
+     "why": "computed over storage() plus window.location.assign; Passes the place via storage() plus location.assign('/map'); the map body runs on the server where localStorage is unavailable, so the first render uses the default centre."
+    }
+   },
+   "confusion": [
+    "None; correctly states the always-mounted recorder 'asks for microphone permission as soon as the page loads'."
+   ]
+  },
+  "A3": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Header imports `device` without using it; uses non-null assertion cam!",
+      "Header passes back only photo.url, not the Photo"
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "// comment placed inside markup"
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [
+      "returns-centred"
+     ],
+     "markless": [
+      "Recenter has no try/catch: a refused location (NotAllowedError) is unhandled",
+      "storage() shared key plus location.assign reload"
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Shutters are disabled until onReady and the handle's takePhoto() is stated to wait until ready."
+    },
+    "B2": {
+     "value": false,
+     "why": "Task 4 removes <device.camera> from the markup with @if/@else while the panel shows, which the sheet says releases it."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header receives the element handle and makes one takePhoto() call; no camera element, props or state driven by hand."
+    },
+    "B4": {
+     "value": false,
+     "why": "Label reads app-kept `recording` flag; no onDenied, so a refused start leaves 'Stop' showing."
+    },
+    "B5": {
+     "value": false,
+     "why": "computed over storage('map-center') plus location.assign('/map'); Passes the place via storage() plus location.assign('/map'); the map body runs on the server where localStorage is unavailable, so the first render uses the default centre."
+    }
+   },
+   "confusion": [
+    "Mild: guesses 'onDenied fires again on its own after a refusal, and onReady fires once access is granted again ... while the camera stays in the markup' \u2014 unsure whether a mounted-but-refused device restarts."
+   ]
+  },
+  "A4": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "// comment placed inside markup"
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [
+      "returns-centred"
+     ],
+     "markless": [
+      "storage() shared key plus location.assign reload",
+      "Invented /api/places endpoint"
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Shutters are disabled until onReady and the handle's takePhoto() is stated to wait until ready."
+    },
+    "B2": {
+     "value": false,
+     "why": "Task 4 removes <device.camera> from the markup with @if/@else while the panel shows, which the sheet says releases it."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header receives the element handle and makes one takePhoto() call; no camera element, props or state driven by hand."
+    },
+    "B4": {
+     "value": false,
+     "why": "Label reads app-kept `recording` flag; no onDenied, so it never resets if start fails."
+    },
+    "B5": {
+     "value": false,
+     "why": "computed over storage('map-center') plus location.assign('/map'); Passes the place via storage() plus location.assign('/map'); the map body runs on the server where localStorage is unavailable, so the first render uses the default centre."
+    }
+   },
+   "confusion": [
+    "Mild: 'I assumed nothing restarts it after the person returns from Settings unless the element is remounted, and I did not handle that.'"
+   ]
+  },
+  "A5": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "// comment placed inside markup"
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [
+      "returns-centred"
+     ],
+     "markless": [
+      "storage() shared key plus location.assign reload",
+      "Invented /api/places endpoint"
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Shutters are disabled until onReady and the handle's takePhoto() is stated to wait until ready."
+    },
+    "B2": {
+     "value": false,
+     "why": "Task 4 removes <device.camera> from the markup with @if/@else while the panel shows, which the sheet says releases it."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header receives the element handle and makes one takePhoto() call; no camera element, props or state driven by hand."
+    },
+    "B4": {
+     "value": false,
+     "why": "Label reads app-kept `recording` flag; no onDenied, so it never resets if start fails."
+    },
+    "B5": {
+     "value": false,
+     "why": "computed over storage('map-center') plus location.assign('/map'); Passes the place via storage() plus location.assign('/map'); the map body runs on the server where localStorage is unavailable, so the first render uses the default centre."
+    }
+   },
+   "confusion": [
+    "None; guesses only that the compass 'needs no element or permission'."
+   ]
+  }
+ }
+}

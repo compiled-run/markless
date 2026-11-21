@@ -1,0 +1,10 @@
+A: Rule 2. Rule 3 gives the same result here, because this code never uses `adaptive`. I predicted that Edit name (`modal`) would be a centered box and Comments (`drawer`) a bottom sheet, which is what Rules 2 and 3 say. Rule 1 does not match: under it, Edit name would become a bottom sheet. My Share prediction does not fully match any rule. I expected a raw `<dialog open>` to show as a non-modal box with no backdrop, not a centered modal box.
+
+B: Rule 3, because what I write is what I get, the same as on the web. The component name tells me the shape: `modal` is a centered box and `drawer` is a bottom sheet. If I want the native phone feel, one visible attribute turns it on, and I can see it in the code. Rule 1 would make my CSS behave differently on phones in ways I can't see. For example, which properties count as "placement" that cancels the sheet? Rule 2 is predictable too, but it pushes me to write `drawer` plus platform checks whenever I want "centered on desktop, sheet on phone". Rule 3 covers that common case directly.
+
+C:
+Rule 1: My Edit name box, which I styled with rounded corners on all sides like a centered card, would slide up from the bottom with a grab handle. Share would turn into a sheet too, even though it has no backdrop and I set `open` by hand. Neither has placement CSS, so neither would stay put. I would also be surprised that a small CSS change, like adding `margin: auto`, silently switches it from a sheet to a centered box.
+Rule 2: A centered box on a phone feels like a web page more than a native app, and I would not learn that until I tested on a device. A second surprise is that `drawer` is a bottom sheet on a laptop too. I would have expected a drawer to slide in from the side on desktop.
+Rule 3: Mostly no surprises. The one risk is that `adaptive` sounds like responsive or screen-width behaviour, so I might expect a narrow browser window on the website to show a sheet too. Under this rule it only changes iPhone and Android.
+
+Tools used: none

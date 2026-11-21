@@ -1,0 +1,6 @@
+spelling-blind1: X=S1
+spelling-blind2: X=S2
+spelling-blind3: X=S1
+spelling-blind4: X=S2
+spelling-blind5: X=S1
+spelling-blind6: X=S2

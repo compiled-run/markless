@@ -1,0 +1,662 @@
+{
+ "builtin-mobile-1": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "builtin-mobile-2": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "builtin-mobile-3": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "builtin-web-1": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "builtin-web-2": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "builtin-web-3": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "host-mobile-1": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "host-mobile-2": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "host-mobile-3": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "host-web-1": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "host-web-2": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "host-web-3": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "native-mobile-1": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "native-mobile-2": {
+  "q1": 1,
+  "a": 1,
+  "b": 0,
+  "bTags": {
+   "sheet": 0,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {
+   "b": "`native.sheet` would probably become an HTML bottom sheet or dialog"
+  },
+  "wrongMeanings": []
+ },
+ "native-mobile-3": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "native-web-1": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "native-web-2": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "native-web-3": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "os-mobile-1": {
+  "q1": 1,
+  "a": 1,
+  "b": 0,
+  "bTags": {
+   "sheet": 0,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {
+   "b": "`os.sheet` would likely be an HTML bottom sheet or dialog"
+  },
+  "wrongMeanings": []
+ },
+ "os-mobile-2": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "os-mobile-3": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "os-web-1": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "os-web-2": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "os-web-3": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "maybe",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "system-mobile-1": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "system-mobile-2": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "system-mobile-3": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "system-web-1": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "system-web-2": {
+  "q1": 1,
+  "a": 1,
+  "b": 1,
+  "bTags": {
+   "sheet": 1,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "maybe",
+  "zeros": {},
+  "wrongMeanings": []
+ },
+ "system-web-3": {
+  "q1": 1,
+  "a": 1,
+  "b": 0,
+  "bTags": {
+   "sheet": 0,
+   "camera": 1,
+   "pdf": 1
+  },
+  "bLenient": 1,
+  "c": 1,
+  "button": "no",
+  "zeros": {
+   "b": "I'd guess sheet becomes a `<dialog>`-style panel or bottom sheet the framework draws itself"
+  },
+  "wrongMeanings": []
+ },
+ "pair-mobile-1": {
+  "q1": 0,
+  "a": 1,
+  "b": 0,
+  "bTags": {
+   "sheet": 0,
+   "camera": 0,
+   "pdf": 0
+  },
+  "bLenient": 0,
+  "c": 1,
+  "button": "no",
+  "zeros": {
+   "q1": "Each one probably renders only in its own platform's build.",
+   "b": "My best guess is that a website visitor gets nothing from any of these pairs.",
+   "bLenient": "the filter sheet, camera preview and PDF viewer would be missing on the web"
+  },
+  "wrongMeanings": [
+   {
+    "question": "1",
+    "quote": "Each one probably renders only in its own platform's build.",
+    "meaning": "phones only, nothing on the web"
+   },
+   {
+    "question": "4",
+    "quote": "Each tag seems to render only on its own platform, and none of them is a web fallback",
+    "meaning": "phones only, nothing on the web"
+   },
+   {
+    "question": "5",
+    "quote": "The drawer works on the web too, and the native sheets probably don't.",
+    "meaning": "phones only, nothing on the web"
+   }
+  ]
+ },
+ "pair-mobile-2": {
+  "q1": 0,
+  "a": 1,
+  "b": 0,
+  "bTags": {
+   "sheet": 0,
+   "camera": 0,
+   "pdf": 0
+  },
+  "bLenient": 0,
+  "c": 1,
+  "button": "no",
+  "zeros": {
+   "q1": "Each one renders only when the app runs on its own platform",
+   "b": "My best guess is that the website gets nothing for any of them.",
+   "bLenient": "on the web the filter sheet, the camera preview and the PDF viewer would all be missing"
+  },
+  "wrongMeanings": [
+   {
+    "question": "1",
+    "quote": "Each one renders only when the app runs on its own platform",
+    "meaning": "phones only, nothing on the web"
+   },
+   {
+    "question": "4",
+    "quote": "Each `ios.*` / `android.*` element renders only on its own native platform",
+    "meaning": "phones only, nothing on the web"
+   },
+   {
+    "question": "5",
+    "quote": "likely doesn't exist on the web",
+    "meaning": "phones only, nothing on the web"
+   }
+  ]
+ },
+ "pair-mobile-3": {
+  "q1": 0,
+  "a": 1,
+  "b": 0,
+  "bTags": {
+   "sheet": 0,
+   "camera": 0,
+   "pdf": 0
+  },
+  "bLenient": 0,
+  "c": 1,
+  "button": "no",
+  "zeros": {
+   "q1": "Each one probably only renders when the app is running on its own platform",
+   "b": "My best guess is that the website renders nothing for any of these six components",
+   "bLenient": "no filter sheet, no camera preview and no PDF viewer on the web"
+  },
+  "wrongMeanings": [
+   {
+    "question": "1",
+    "quote": "Each one probably only renders when the app is running on its own platform",
+    "meaning": "phones only, nothing on the web"
+   },
+   {
+    "question": "4",
+    "quote": "they are tied to a platform and there is no native view in a browser",
+    "meaning": "phones only, nothing on the web"
+   },
+   {
+    "question": "5",
+    "quote": "which feel native but exist only on their own platform",
+    "meaning": "phones only, nothing on the web"
+   }
+  ]
+ },
+ "pair-web-1": {
+  "q1": 1,
+  "a": 1,
+  "b": 0,
+  "bTags": {
+   "sheet": 0,
+   "camera": 0,
+   "pdf": 0
+  },
+  "bLenient": 0,
+  "c": 1,
+  "button": "no",
+  "zeros": {
+   "b": "My best guess is that the website gets nothing for any of them",
+   "bLenient": "on the web the filter sheet, the camera preview and the PDF viewer simply aren't there"
+  },
+  "wrongMeanings": [
+   {
+    "question": "4",
+    "quote": "the `ios.*` and `android.*` elements render nothing in a browser, just as each one renders nothing on the other phone",
+    "meaning": "phones only, nothing on the web"
+   },
+   {
+    "question": "5",
+    "quote": "so they feel exactly native but only exist on that platform",
+    "meaning": "phones only, nothing on the web"
+   }
+  ]
+ },
+ "pair-web-2": {
+  "q1": 0,
+  "a": 1,
+  "b": 0,
+  "bTags": {
+   "sheet": 0,
+   "camera": 0,
+   "pdf": 0
+  },
+  "bLenient": 0,
+  "c": 1,
+  "button": "no",
+  "zeros": {
+   "q1": "each one is tied to a single phone platform",
+   "b": "My best guess is that a website visitor gets nothing from any of them.",
+   "bLenient": "on the website the filter sheet never appears, there's no camera preview ... and no PDF viewer shows up"
+  },
+  "wrongMeanings": [
+   {
+    "question": "1",
+    "quote": "each one is tied to a single phone platform",
+    "meaning": "phones only, nothing on the web"
+   },
+   {
+    "question": "4",
+    "quote": "`ios.*` only renders in the iPhone app and `android.*` only in the Android app",
+    "meaning": "phones only, nothing on the web"
+   },
+   {
+    "question": "5",
+    "quote": "The sheet is the phone's own component, so it only appears in the phone apps",
+    "meaning": "phones only, nothing on the web"
+   }
+  ]
+ },
+ "pair-web-3": {
+  "q1": 0,
+  "a": 1,
+  "b": 0,
+  "bTags": {
+   "sheet": 0,
+   "camera": 0,
+   "pdf": 0
+  },
+  "bLenient": 0,
+  "c": 1,
+  "button": "no",
+  "zeros": {
+   "q1": "Each one seems to show up only on its own platform",
+   "b": "My best guess is that a website visitor gets nothing from any of the six tags",
+   "bLenient": "no filter sheet, no camera preview and no PDF viewer on the web"
+  },
+  "wrongMeanings": [
+   {
+    "question": "1",
+    "quote": "Each one seems to show up only on its own platform",
+    "meaning": "phones only, nothing on the web"
+   },
+   {
+    "question": "4",
+    "quote": "because each one only renders in its own native app",
+    "meaning": "phones only, nothing on the web"
+   },
+   {
+    "question": "5",
+    "quote": "it doesn't exist on the web",
+    "meaning": "phones only, nothing on the web"
+   }
+  ]
+ }
+}

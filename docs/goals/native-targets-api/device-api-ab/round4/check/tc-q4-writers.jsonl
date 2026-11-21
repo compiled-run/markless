@@ -1,0 +1,30 @@
+{"name":"q4w-BC-1","errors":[]}
+{"name":"q4w-BC-2","errors":[]}
+{"name":"q4w-BC-3","errors":[]}
+{"name":"q4w-BC-4","errors":[]}
+{"name":"q4w-BC-5","errors":[]}
+{"name":"q4w-BT-1","errors":["../../../../..src/capture.tsrx(16,3): error TS2786: 'sheet' cannot be used as a JSX component.","../../../../..src/capture.tsrx(16,32): error TS7006: Parameter 'next' implicitly has an 'any' type.","../../../../..src/capture.tsrx(58,4): error TS2786: 'camera' cannot be used as a JSX component."]}
+{"name":"q4w-BT-2","errors":["../../../../..src/capture.tsrx(16,4): error TS2786: 'sheet' cannot be used as a JSX component.","../../../../..src/capture.tsrx(16,33): error TS7006: Parameter 'next' implicitly has an 'any' type.","../../../../..src/capture.tsrx(65,4): error TS2786: 'camera' cannot be used as a JSX component."]}
+{"name":"q4w-BT-3","errors":["../../../../..src/capture.tsrx(35,4): error TS2786: 'camera' cannot be used as a JSX component.","../../../../..src/capture.tsrx(51,4): error TS2786: 'sheet' cannot be used as a JSX component.","../../../../..src/capture.tsrx(51,38): error TS7006: Parameter 'open' implicitly has an 'any' type."]}
+{"name":"q4w-BT-4","errors":["../../../../..src/capture.tsrx(40,4): error TS2786: 'camera' cannot be used as a JSX component.","../../../../..src/capture.tsrx(56,4): error TS2786: 'sheet' cannot be used as a JSX component.","../../../../..src/capture.tsrx(56,38): error TS7006: Parameter 'open' implicitly has an 'any' type."]}
+{"name":"q4w-BT-5","errors":["../../../../..src/capture.tsrx(37,4): error TS2786: 'camera' cannot be used as a JSX component.","../../../../..src/capture.tsrx(50,4): error TS2786: 'sheet' cannot be used as a JSX component.","../../../../..src/capture.tsrx(50,40): error TS7006: Parameter 'open' implicitly has an 'any' type."]}
+{"name":"q4w-IA-1","errors":[]}
+{"name":"q4w-IA-2","errors":[]}
+{"name":"q4w-IA-3","errors":[]}
+{"name":"q4w-IA-4","errors":["../../../../..src/capture.tsrx(3,28): error TS2305: Module '\"@markless/device\"' has no exported member 'ios'.","../../../../..src/capture.tsrx(3,33): error TS2305: Module '\"@markless/device\"' has no exported member 'android'.","../../../../..src/capture.tsrx(3,42): error TS2305: Module '\"@markless/device\"' has no exported member 'web'.","../../../../..src/capture.tsrx(3,47): error TS2305: Module '\"@markless/device\"' has no exported member 'base'.","../../../../..src/capture.tsrx(3,53): error TS2305: Module '\"@markless/device\"' has no exported member 'drawer'."]}
+{"name":"q4w-IA-5","errors":["../../../../..src/capture.tsrx(3,28): error TS2305: Module '\"@markless/device\"' has no exported member 'ios'.","../../../../..src/capture.tsrx(3,33): error TS2305: Module '\"@markless/device\"' has no exported member 'android'.","../../../../..src/capture.tsrx(3,42): error TS2305: Module '\"@markless/device\"' has no exported member 'web'.","../../../../..src/capture.tsrx(3,47): error TS2305: Module '\"@markless/device\"' has no exported member 'base'.","../../../../..src/capture.tsrx(3,53): error TS2305: Module '\"@markless/device\"' has no exported member 'drawer'.","../../../../..src/capture.tsrx(88,43): error TS7006: Parameter 'open' implicitly has an 'any' type.","../../../../..src/capture.tsrx(93,47): error TS7006: Parameter 'open' implicitly has an 'any' type.","../../../../..src/capture.tsrx(98,43): error TS7006: Parameter 'open' implicitly has an 'any' type."]}
+{"name":"q4w-NT-1","errors":[]}
+{"name":"q4w-NT-2","errors":["../../../../..src/capture.tsrx(3,18): error TS2305: Module '\"@markless/device\"' has no exported member 'native'.","../../../../..src/capture.tsrx(65,45): error TS7006: Parameter 'open' implicitly has an 'any' type."]}
+{"name":"q4w-NT-3","errors":["../../../../..src/capture.tsrx(3,18): error TS2305: Module '\"@markless/device\"' has no exported member 'native'.","../../../../..src/capture.tsrx(14,40): error TS7006: Parameter 'next' implicitly has an 'any' type."]}
+{"name":"q4w-NT-4","errors":[]}
+{"name":"q4w-NT-5","errors":["../../../../..src/capture.tsrx(3,18): error TS2305: Module '\"@markless/device\"' has no exported member 'native'.","../../../../..src/capture.tsrx(16,40): error TS7006: Parameter 'next' implicitly has an 'any' type."]}
+{"name":"q4w-PF-1","errors":[]}
+{"name":"q4w-PF-2","errors":[]}
+{"name":"q4w-PF-3","errors":[]}
+{"name":"q4w-PF-4","errors":[]}
+{"name":"q4w-PF-5","errors":[]}
+{"name":"q4w-SY-1","errors":[]}
+{"name":"q4w-SY-2","errors":[]}
+{"name":"q4w-SY-3","errors":[]}
+{"name":"q4w-SY-4","errors":["../../../../..src/capture.tsrx(3,28): error TS2305: Module '\"@markless/device\"' has no exported member 'system'."]}
+{"name":"q4w-SY-5","errors":[]}

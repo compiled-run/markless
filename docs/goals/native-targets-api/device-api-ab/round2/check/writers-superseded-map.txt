@@ -1,0 +1,10 @@
+JR 1 a6e890c8a24c5b50b
+JR 2 a5bbe6434d0344c67
+JR 3 afa65d786f009b1da
+JR 4 ae0fe9590e2f83b1e
+JR 5 acce93c4480d16fb8
+ZK 1 ae79b78fb1fa57cea
+ZK 2 ac6bc7eaf6b4fbead
+ZK 3 a7a3c6d4f83e8d257
+ZK 4 a6aecd1f694a9cf0d
+ZK 5 afff9eb793722cdbf
