@@ -91,6 +91,8 @@ const ARM_COMMIT = ['web/resume-commit-arm'];
 const BRANCH = ['web/resume-branches', ...ARM_COMMIT];
 // Stops what an arm's components own once the arm closes; only a branch naming such components loads it.
 const ARM_GATE = ['web/fns/arm-gate'];
+// An arm holding a component re-renders its records in its module's own space; composition's qualifier puts them in the page's.
+const COMPOSED_ARMS = ['web/fns/instance-scope'];
 // Stands in for what is above an owner its own file places, when the browser draws that owner's arm.
 const OWNER_PLACEMENT = ['web/prerender/owner-rooted'];
 // Settle tracking and streamed-arm adoption load only for async boundaries.
@@ -1119,6 +1121,7 @@ function payloadDemandRecords(
 					...BRANCH,
 					...(armsHoldLists([record]) ? ARM_LISTS : []),
 					...(record.armComponents ? ARM_GATE : []),
+					...(record.escalates ? COMPOSED_ARMS : []),
 					...symbolIdsDemand(flipSymbolIds, symbolDemand),
 				]),
 			};

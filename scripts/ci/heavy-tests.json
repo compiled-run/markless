@@ -156,6 +156,7 @@
 		"packages/router/test/vite/link-bridge-static.test.ts",
 		"packages/router/test/vite/lookup-table-imports.test.ts",
 		"packages/router/test/vite/many-interactions.test.ts",
+		"packages/router/test/vite/mdx-arm-component.test.ts",
 		"packages/router/test/vite/mdx-row-arm-popover.test.ts",
 		"packages/router/test/vite/migration-defects.test.ts",
 		"packages/router/test/vite/migration-shapes.test.ts",
