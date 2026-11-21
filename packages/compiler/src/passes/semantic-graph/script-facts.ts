@@ -33,6 +33,78 @@ const spanOf = (node: { start: number; end: number }, filename: string): SourceS
 const within = (node: { start: number; end: number }, outer: { start: number; end: number }) =>
 	node.start >= outer.start && node.end <= outer.end;
 
+/** `import.meta.env` as the web's production client build (Vite) defines it. */
+const CLIENT_ENV: Readonly<Record<string, boolean | string>> = {
+	SSR: false,
+	DEV: false,
+	PROD: true,
+	MODE: 'production',
+};
+
+const unchained = (node: AnyNode): AnyNode =>
+	node.type === 'ChainExpression' ? (node.expression as AnyNode) : node;
+const propertyName = (node: AnyNode): string | undefined =>
+	!node.computed && (node.property as AnyNode | undefined)?.type === 'Identifier'
+		? String((node.property as AnyNode).name)
+		: undefined;
+
+/** The value `import.meta.env.<name>` has in the web's client build, when the build defines it. */
+function clientEnvValue(node: AnyNode): boolean | string | undefined {
+	const read = unchained(node);
+	if (read.type !== 'MemberExpression') return undefined;
+	const env = read.object as AnyNode;
+	if (
+		env.type !== 'MemberExpression' ||
+		(env.object as AnyNode).type !== 'MetaProperty' ||
+		propertyName(env) !== 'env'
+	)
+		return undefined;
+	const name = propertyName(read);
+	return name !== undefined && Object.hasOwn(CLIENT_ENV, name) ? CLIENT_ENV[name] : undefined;
+}
+
+/** The branch an `if` or `?:` on an `import.meta.env` value takes in a client build; the other is dead code there. */
+function takenBranch(
+	node: AnyNode,
+): { readonly taken: AnyNode | null; readonly dead: AnyNode | null } | undefined {
+	if (node.type !== 'IfStatement' && node.type !== 'ConditionalExpression') return undefined;
+	let test = node.test as AnyNode;
+	let negated = false;
+	while (test.type === 'UnaryExpression' && test.operator === '!') {
+		negated = !negated;
+		test = test.argument as AnyNode;
+	}
+	const value = clientEnvValue(test);
+	if (value === undefined) return undefined;
+	const consequent = node.consequent as AnyNode;
+	const alternate = (node.alternate as AnyNode | null | undefined) ?? null;
+	return Boolean(value) !== negated
+		? { taken: consequent, dead: alternate }
+		: { taken: alternate, dead: consequent };
+}
+
+/** The branches a client build never runs, whose names a script does not need. */
+function deadIn(node: AnyNode, into: AnyNode[] = []): AnyNode[] {
+	const branch = takenBranch(node);
+	if (branch?.dead) into.push(branch.dead);
+	for (const value of Object.values(node)) {
+		if (Array.isArray(value)) {
+			for (const item of value) if (isNode(item)) deadIn(item, into);
+		} else if (isNode(value)) deadIn(value, into);
+	}
+	return into;
+}
+
+/** `import.meta.url`: the `import.meta` member path a node reads, when it reads one. */
+function metaPath(node: AnyNode): string | undefined {
+	if (node.type === 'MetaProperty') return 'import.meta';
+	const read = unchained(node);
+	if (read.type !== 'MemberExpression') return undefined;
+	const object = metaPath(read.object as AnyNode);
+	const name = propertyName(read);
+	return object && (name ? `${object}.${name}` : object);
+}
+
 const identifier = (name: string): AnyNode => ({ type: 'Identifier', name }) as AnyNode;
 const member = (object: AnyNode, property: string | number): AnyNode =>
 	({
@@ -55,6 +127,13 @@ const stateName = (name: string): AnyNode =>
 function cloneWith(node: AnyNode, replace: (node: AnyNode) => AnyNode | undefined): AnyNode {
 	const swapped = replace(node);
 	if (swapped) return swapped;
+	const branch = takenBranch(node);
+	if (branch)
+		return branch.taken
+			? cloneWith(branch.taken, replace)
+			: ({ type: 'EmptyStatement' } as AnyNode);
+	const env = clientEnvValue(node);
+	if (env !== undefined) return { type: 'Literal', value: env, raw: JSON.stringify(env) } as AnyNode;
 	const copy: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(node)) {
 		if (Array.isArray(value))
@@ -232,6 +311,19 @@ function unsupportedIn(
 		into.push({ construct: 'markup', span: spanOf(node as never, filename) });
 		return;
 	}
+	const branch = takenBranch(node);
+	if (branch) {
+		if (branch.taken) unsupportedIn(branch.taken, filename, into);
+		return;
+	}
+	if (clientEnvValue(node) !== undefined) return;
+	const meta = metaPath(node);
+	if (meta) {
+		into.push({ construct: `\`${meta}\``, span: spanOf(node as never, filename) });
+		return;
+	}
+	if (node.type === 'ImportExpression')
+		into.push({ construct: 'a dynamic `import()`', span: spanOf(node as never, filename) });
 	if (node.type === 'TSEnumDeclaration' || node.type === 'TSModuleDeclaration')
 		into.push({
 			construct: node.type === 'TSEnumDeclaration' ? 'an `enum`' : 'a `namespace`',
@@ -273,9 +365,11 @@ export function scriptFunctionOf(
 	const usedImports = new Map<string, { slot: number; name: string | null }>();
 	for (let index = 0; index < parts.length; index++) {
 		const part = parts[index]!;
+		const dead = deadIn(part);
 		for (const reference of semantic.references) {
 			const node = reference.node as unknown as AnyNode;
 			if (reference.inTypePosition || !within(node as never, part as never)) continue;
+			if (dead.some((branch) => within(node as never, branch as never))) continue;
 			const binding = reference.binding;
 			if (!binding) {
 				globals.push(globalOf(semantic, reference, filename));
@@ -346,8 +440,10 @@ export function scriptFunctionOf(
 	const [parameter] = (root.params as AnyNode[] | undefined) ?? [];
 	const eventBinding =
 		parameter?.type === 'Identifier' && !method ? semantic.bindingOf(parameter as never) : null;
+	const deadInRoot = deadIn(root);
 	for (const reference of eventBinding?.references ?? []) {
 		let at = reference.node as unknown as AnyNode;
+		if (deadInRoot.some((branch) => within(at as never, branch as never))) continue;
 		const path: string[] = [];
 		for (;;) {
 			const parent = semantic.parentOf(at as never) as AnyNode | null;
@@ -434,9 +530,11 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 		const dropped: { name: string; span: SourceSpan }[] = [];
 		const framework: { name: string; source: string; span: SourceSpan }[] = [];
 		const unsupported: { construct: string; span: SourceSpan }[] = [];
+		const dead = deadIn(node);
 		for (const reference of semantic.references) {
 			const at = reference.node as unknown as AnyNode;
 			if (reference.inTypePosition || !within(at as never, range as never)) continue;
+			if (dead.some((branch) => within(at as never, branch as never))) continue;
 			const binding = reference.binding;
 			if (!binding) {
 				globals.push(globalOf(semantic, reference, filename));

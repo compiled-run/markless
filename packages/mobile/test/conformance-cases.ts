@@ -646,6 +646,26 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A hint superseded by a surface shown from inside it, a hint shown over a surface, an outside press reaching both, Escape.
+		name: 'overlay-hint',
+		fixture: 'proofs/u61-overlay-hint/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'pointerdown', host: 'h7' },
+			{ event: 'pointerup', host: 'h7' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'pointerdown', host: 'h10' },
+			{ event: 'pointerup', host: 'h10' },
+			{ event: 'activate', host: 'h10' },
+			{ event: 'pointerdown', host: 'h1' },
+			{ event: 'pointerup', host: 'h1' },
+			{ event: 'pointerdown', host: 'h4' },
+			{ event: 'pointerup', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'dismiss', host: 'h5', reason: 'escape' },
+		],
+	},
+	{
 		name: 'element-proxies',
 		fixture: 'test/fixtures/OptionFocus.tsrx',
 		actions: [
@@ -744,6 +764,72 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h4' },
 			{ event: 'activate', host: 'h5' },
 			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		name: 'script-submit',
+		fixture: 'proofs/j42-submit-script/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h3' },
+			{ event: 'input', host: 'component-edge:0/h1', value: 'Groceries' },
+			{ event: 'activate', host: 'component-edge:0/h3' },
+			{ event: 'input', host: 'component-edge:0/h1', value: 'Call Ada' },
+			{ event: 'input', host: 'component-edge:0/h2', value: 'work' },
+			{ event: 'activate', host: 'component-edge:0/h3' },
+		],
+	},
+	{
+		name: 'script-submit-async',
+		fixture: 'proofs/j41-async-submit-script/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'input', host: 'h3', value: 'Pump house' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'timer', timer: 'script:1' },
+			{ event: 'input', host: 'h3', value: 'admin' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'timer', timer: 'script:2' },
+		],
+	},
+	{
+		name: 'spread-callback',
+		fixture: 'proofs/r117-spread-callback/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'component-edge:1/h0' },
+			{ event: 'activate', host: 'component-edge:1/h0' },
+		],
+	},
+	{
+		name: 'typed-callbacks',
+		fixture: 'proofs/r118-typed-callbacks/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h1' },
+			{ event: 'activate', host: 'component-edge:0/h2' },
+		],
+	},
+	{
+		name: 'select-events',
+		fixture: 'proofs/r119-select-events/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'choose', host: 'h5' },
+			{ event: 'choose', host: 'h5' },
+			{ event: 'choose', host: 'h3' },
+			{ event: 'activate', host: 'h10' },
+		],
+	},
+	{
+		name: 'script-structured-clone',
+		fixture: 'proofs/j43-structured-clone/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
 		],
 	},
 	{

@@ -47,11 +47,10 @@
 		]
 	},
 	"checklist": {
-		"payload": false,
+		"payload": true,
 		"diagnostics": [
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:7/component-edge:7/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:9/component-edge:4/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: `checkboxState.triggerEl`, a handle bound to more than one element"
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:9/component-edge:4/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out"
 		]
 	},
 	"collapsible": {
@@ -195,7 +194,6 @@
 		"diagnostics": [
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focusin handler on <div> component-edge:0/h0 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focusout handler on <div> component-edge:0/h0 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: an `overlay-hint` surface (a tooltip or hovercard), which phones do not show yet",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler uses `PointerEvent`, which a phone's script engine does not provide",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet",
@@ -462,7 +460,6 @@
 	"tooltip": {
 		"payload": false,
 		"diagnostics": [
-			"MARKLESS_NATIVE_UNSUPPORTED: an `overlay-hint` surface (a tooltip or hovercard), which phones do not show yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <button> component-edge:2/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the blur handler on <button> component-edge:2/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet",

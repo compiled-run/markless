@@ -11,6 +11,8 @@ export type FixtureBuild = {
 	/** The fixture's own Vite config; without it the plugins are `markless()` and `router()`. */
 	readonly configFile?: string;
 	readonly markless?: Parameters<typeof markless>[0];
+	/** Puts `@markless/ui`'s `ui()` before `markless()`, as an app that uses its icons does. */
+	readonly ui?: true;
 	readonly nitro?: Record<string, unknown>;
 	readonly build?: Record<string, unknown>;
 	/** Kills the build and rejects with a `stalled` error once it runs this long. */
