@@ -1157,7 +1157,7 @@ class Runtime(
 		if (detail != null && event != EventName.Activate) throw MarklessRuntimeError("a ${event.wire} event carries no press count")
 		if ((event in VALUED) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
 		if (reason != null && event != EventName.Dismiss) throw MarklessRuntimeError("a ${event.wire} event carries no reason")
-		if (point != null && !event.touch) throw MarklessRuntimeError("a ${event.wire} event carries no touch")
+		if (point != null && !event.touch && event != EventName.ContextMenu) throw MarklessRuntimeError("a ${event.wire} event carries no touch")
 		if (event == EventName.Dismiss && reason != null) {
 			if (stack.lastOrNull() != host) throw MarklessRuntimeError("\"$host\" is not the topmost overlay")
 			val dismiss = handlerFor(host, event)?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
@@ -1166,6 +1166,7 @@ class Runtime(
 			}
 		}
 		if (event.touch) return touch(host, event, point ?: TouchPoint())
+		if (event == EventName.ContextMenu) return contextMenu(host, point ?: TouchPoint())
 		if (event.pointer) throw MarklessRuntimeError("${event.wire} is raised by the runtime, not dispatched")
 		if (event == EventName.Cancel) {
 			if (dialogs[host] != true) throw MarklessRuntimeError("\"$host\" is not an open dialog")
@@ -1217,6 +1218,29 @@ class Runtime(
 			at = byId[at]?.parent
 		}
 		return out
+	}
+
+	/** A long press on [host]: its `contextmenu` handler, then each one of the elements it is inside, innermost first. */
+	private fun contextMenu(host: String, point: TouchPoint): List<JournalEntry> {
+		val scope = (instances(node(host.substringBefore('@'))).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")).scope
+		return change(null, null) {
+			val calls = ArrayList<JournalEntry>()
+			for (node in chain(host)) {
+				val id = handlerFor(node.substringBefore('@'), EventName.ContextMenu) ?: continue
+				val handler = handlers[id] ?: throw MarklessRuntimeError("unknown handler \"$id\"")
+				val fields = mapOf(
+					"target" to JsValue.Str(host),
+					"currentTarget" to JsValue.Str(node),
+					"clientX" to JsValue.Num(point.x),
+					"clientY" to JsValue.Num(point.y),
+					"timeStamp" to JsValue.Num(point.time),
+				)
+				val out = withFields(fields) { run(handler.ops, scope) }
+				if (out.firstOrNull() is JournalEntry.Navigate) return@change out
+				calls.addAll(out)
+			}
+			calls
+		}
 	}
 
 	private fun touch(host: String, event: EventName, point: TouchPoint): List<JournalEntry> {

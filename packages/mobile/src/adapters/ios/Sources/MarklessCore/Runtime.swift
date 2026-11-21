@@ -1316,6 +1316,9 @@ public final class NativeRuntime {
 		if action.event.isTouch {
 			return try touch(action, handlerOf: handlerOf)
 		}
+		if action.event == .contextmenu {
+			return try contextmenu(action, handlerOf: handlerOf)
+		}
 		// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
 		let host = action.host.firstIndex(of: "@").map { String(action.host[..<$0]) } ?? action.host
 		guard let bound = payload.events.first(where: { $0.host == host && $0.event == action.event }), let node = nodesById[host] else {
@@ -1338,6 +1341,31 @@ public final class NativeRuntime {
 		if [.keydown, .keyup, .paste].contains(action.event) { targetText = try textOf(field: action.host) }
 		defer { eventValue = nil; edit = nil; eventFields = nil; targetText = nil }
 		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: scope) }
+	}
+
+	/// A long press on the action's host: its `contextmenu` handler, then each one of the elements it is inside, innermost first.
+	private func contextmenu(_ action: NativeAction, handlerOf: (String, NativeEventName) -> NativeEvent?) throws -> [NativeJournalEntry] {
+		guard let node = nodesById[nodeOf(action.host)], let instance = try instances(of: node).first(where: { $0.id == action.host }) else {
+			throw RuntimeError(reason: "\(action.host) is not shown")
+		}
+		return try change(host: nil) {
+			defer { self.eventFields = nil }
+			var calls: [NativeJournalEntry] = []
+			var at: String? = self.nodeOf(action.host)
+			while let current = at {
+				let element = current == self.nodeOf(action.host) ? action.host : current
+				at = self.nodesById[current]?.parent
+				guard let own = handlerOf(current, .contextmenu) else { continue }
+				self.eventFields = [
+					.target: .string(action.host), .currentTarget: .string(element), .clientX: .number(action.x ?? 0),
+					.clientY: .number(action.y ?? 0), .timeStamp: .number(action.time ?? 0),
+				]
+				let taken = try self.run(self.handlers[own.handler] ?? [], in: instance.scope)
+				if case .navigate? = taken.first { return taken }
+				calls.append(contentsOf: taken)
+			}
+			return calls
+		}
 	}
 
 	/// A touch as a phone's browser raises it: `pointerover`, `pointerenter` outermost first, the overlay's outside press and

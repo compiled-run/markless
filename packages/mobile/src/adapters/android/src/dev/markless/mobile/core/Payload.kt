@@ -186,6 +186,8 @@ enum class EventName(val wire: String, val pointer: Boolean = false, val touch: 
 	Choose("choose"),
 	/** A range input let go after its value moved: the web's `change` on it. */
 	Commit("commit"),
+	/** A long press, as Chrome on Android raises `contextmenu`: carries a [TouchPoint] for its place, and reaches each element it is inside. */
+	ContextMenu("contextmenu"),
 }
 
 sealed interface Op {
