@@ -434,6 +434,17 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'box-in-arm',
+		fixture: 'proofs/r144-box-in-arm/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
 		name: 'ticked-keys',
 		fixture: 'test/fixtures/TickedKeys.tsrx',
 		actions: [

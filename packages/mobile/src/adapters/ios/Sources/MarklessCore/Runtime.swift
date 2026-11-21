@@ -920,8 +920,10 @@ public final class NativeRuntime {
 		return try attributeNow(id, "value") ?? ""
 	}
 
+	/// A box an arm hides is not built yet, so its binding (which may read what the arm's test guards) is not read.
 	private func checkedBinding(_ id: String) throws -> Bool? {
-		try propertyBinding(id, "checked").map { try evaluate($0.value).isTruthy }
+		if let node = ticked.first(where: { $0.id == id }), try instances(of: node).isEmpty { return nil }
+		return try propertyBinding(id, "checked").map { try evaluate($0.value).isTruthy }
 	}
 
 	/// A checkbox's or radio button's checkedness now.

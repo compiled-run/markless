@@ -1145,7 +1145,10 @@ export function createNativeRuntime(
 			? [node]
 			: [],
 	);
+	// A box an arm hides is not built yet, so its binding (which may read what the arm's test guards) is not read.
 	const checkedBinding = (id: string) => {
+		const node = nodesById.get(id);
+		if (node && !shown(node)) return undefined;
 		const binding = propertyBinding(id, 'checked');
 		return binding ? Boolean(evaluate(binding.value)) : undefined;
 	};
