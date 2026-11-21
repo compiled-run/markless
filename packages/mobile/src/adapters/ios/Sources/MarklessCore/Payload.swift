@@ -18,6 +18,8 @@ public enum NativeEventField: String, Sendable {
 	case value, reason, pressTarget, key, text, detail
 	/// A pointer event's, as a phone's browser reports a touch.
 	case target, currentTarget, relatedTarget, button, buttons, clientX, clientY, pointerId, pointerType, isPrimary, timeStamp
+	/// An animation event's: its `@keyframes` name and its elapsed time in seconds.
+	case animationName, elapsedTime
 }
 
 public enum NativeBuiltin: String, Sendable {
@@ -247,6 +249,8 @@ public enum NativeEventName: String, Sendable {
 	case submit
 	/// A range input let go after its value moved: the web's `change` on it.
 	case commit
+	/// A CSS animation's events on a styled page, from the host's run of Dragon's animator.
+	case animationstart, animationiteration, animationend, animationcancel
 	/// A `timer` journal entry's time has come.
 	case timer
 	/// The host is idle after the element appeared; once for each shown instance.

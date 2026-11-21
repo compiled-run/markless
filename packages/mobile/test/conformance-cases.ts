@@ -39,6 +39,14 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'animation-events',
+		fixture: 'test/fixtures/AnimationEvents.tsrx',
+		actions: [
+			{ event: 'animationstart', host: 'h1', animationName: 'close', elapsedTime: 0 },
+			{ event: 'animationend', host: 'h1', animationName: 'close', elapsedTime: 0.25 },
+		],
+	},
+	{
 		name: 'switches',
 		fixture: 'test/fixtures/Switches.tsrx',
 		actions: [

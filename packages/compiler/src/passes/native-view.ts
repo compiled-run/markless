@@ -200,6 +200,10 @@ const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][numbe
 	pointerout: 'pointerout',
 	pointerenter: 'pointerenter',
 	pointerleave: 'pointerleave',
+	animationstart: 'animationstart',
+	animationiteration: 'animationiteration',
+	animationend: 'animationend',
+	animationcancel: 'animationcancel',
 };
 
 const CAPTURE_METHODS: ReadonlySet<string> = new Set([
@@ -573,6 +577,8 @@ type Scope = {
 	readonly typing?: 'keydown' | 'keyup' | 'paste';
 	/** In a click handler: `event.detail` is the number of presses in a row. */
 	readonly clicking?: true;
+	/** In an animation event's handler: `event.animationName` and `event.elapsedTime` are the event's. */
+	readonly animating?: true;
 	/** In a form's submit handler: the form, which `event.preventDefault()` keeps from being sent. */
 	readonly submitting?: string;
 	readonly locals: ReadonlySet<string>;
@@ -4049,6 +4055,10 @@ export function createNativeViewPayload(
 						return { event: 'key' };
 					if (scope.clicking && expression.property === 'detail')
 						return { event: 'detail' };
+					if (scope.animating && (expression.property === 'animationName' || expression.property === 'elapsedTime'))
+						return { event: expression.property };
+					// No ::before or ::after box is animated on a phone: an animation event's pseudo-element is always ''.
+					if (scope.animating && expression.property === 'pseudoElement') return { literal: '' };
 					if ((scope.typing === 'keydown' || scope.typing === 'keyup') && expression.property === 'isComposing')
 						return { literal: false };
 					if (
@@ -6558,7 +6568,12 @@ export function createNativeViewPayload(
 		const clicking =
 			semantic === 'activate' && event.eventName === 'click'
 				? { clicking: true as const }
-				: {};
+				: semantic === 'animationstart' ||
+					  semantic === 'animationiteration' ||
+					  semantic === 'animationend' ||
+					  semantic === 'animationcancel'
+					? { animating: true as const }
+					: {};
 		const inner: Scope =
 			parameter === undefined
 				? { ...running, ...submitting, ...typing }

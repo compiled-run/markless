@@ -1,0 +1,183 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "AnimationEvents",
+		"cells": [
+			{
+				"id": "state:open",
+				"name": "open",
+				"initial": true,
+				"styled": true
+			},
+			{
+				"id": "state:seen",
+				"name": "seen",
+				"initial": "none"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "div",
+				"parent": "h0",
+				"attributes": {
+					"class": "panel"
+				},
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:open"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Panel"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"cell": "state:seen"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "animationstart",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h1",
+				"event": "animationend",
+				"handler": "handler:event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:seen",
+						"value": {
+							"template": [
+								"start ",
+								{
+									"event": "animationName"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:seen",
+						"value": {
+							"template": [
+								"end ",
+								{
+									"event": "animationName"
+								},
+								" after ",
+								{
+									"event": "elapsedTime"
+								},
+								"s"
+							]
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:open",
+						"value": {
+							"literal": false
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		["h1:text0", "Panel"],
+		["h2:text0", "none"]
+	],
+	"initialAttributes": [["h1", "hidden", null]],
+	"steps": [
+		{
+			"action": {
+				"event": "animationstart",
+				"host": "h1",
+				"animationName": "close",
+				"elapsedTime": 0
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "start close"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "animationend",
+				"host": "h1",
+				"animationName": "close",
+				"elapsedTime": 0.25
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:open",
+					"value": false
+				},
+				{
+					"op": "attribute",
+					"node": "h1",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "end close after 0.25s"
+				}
+			]
+		}
+	]
+}

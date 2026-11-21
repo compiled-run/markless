@@ -121,7 +121,7 @@ export type NativeExpr =
 	 * handler's pasted plain text (`event.clipboardData.getData('text')`); a click handler's `event.detail`, how many presses
 	 * in a row on the element (a double tap's second press is 2).
 	 */
-	| { readonly event: 'value' | 'reason' | 'pressTarget' | 'key' | 'text' | 'detail' | NativePointerField }
+	| { readonly event: 'value' | 'reason' | 'pressTarget' | 'key' | 'text' | 'detail' | NativeAnimationField | NativePointerField }
 	/** Whether the element `node` has captured the pointer `pointer` (`node.hasPointerCapture(pointer)`). */
 	| { readonly captures: NativeExpr; readonly pointer: NativeExpr }
 	/**
@@ -539,7 +539,17 @@ export type NativeEventName =
 	| 'visible'
 	/** A range input let go after its value moved: the web's `change` on it. */
 	| 'commit'
+	| NativeAnimationEventName
 	| NativePointerEventName;
+
+/**
+ * A CSS animation's events on a styled page, as the host's run of Dragon's animator gives them (css-animations-1 §4.2): it
+ * started, began another iteration, ended, or was removed while it ran.
+ */
+export type NativeAnimationEventName = 'animationstart' | 'animationiteration' | 'animationend' | 'animationcancel';
+
+/** What an animation event carries: the `@keyframes` name and the elapsed time in seconds. */
+export type NativeAnimationField = 'animationName' | 'elapsedTime';
 
 /**
  * The pointer events a touch raises, in a phone browser's order (Safari on iOS, Chrome on Android): `pointerover`, then
