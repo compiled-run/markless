@@ -112,7 +112,12 @@ const APP_DOCUMENT = 'document.tsrx';
 /** Compiles a navigation rung's app: every page under `pages/`, with repo-relative filenames as for one-screen rungs. */
 export function compileRungApp(
 	dir: string,
-	options: { readonly target?: ProofPlatform; readonly device?: DeviceAppConfig } = {},
+	options: {
+		readonly target?: ProofPlatform;
+		readonly device?: DeviceAppConfig;
+		/** Keep the pages that build when others refuse (a rung's `refusedPages`). */
+		readonly partial?: boolean;
+	} = {},
 ) {
 	const document = join(dir, APP_DOCUMENT);
 	return compileNativeApp({
@@ -415,6 +420,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 			const build = await compileRungApp(dir, {
 				target: platform,
 				...(appConfig.device ? { device: appConfig.device } : {}),
+				...(expected.refusedPages ? { partial: true } : {}),
 			});
 			if (!build.payload) {
 				const lines = build.diagnostics.map(
