@@ -1,6 +1,10 @@
 import type { NativeScript, NativeScriptService } from '@markless/serializer';
 import { DEVICE_CALLS } from '@markless/serializer/native-device';
 import {
+	NATIVE_SCRIPT_DOM_CLASSES,
+	NATIVE_SCRIPT_CLICK_FIELDS,
+	NATIVE_SCRIPT_KEY_FIELDS,
+	NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	NATIVE_SCRIPT_SUBMITTED_FORM,
 	NATIVE_UNBOUND_HANDLE,
@@ -74,6 +78,45 @@ if (!host) {
 		signal.listeners.slice().forEach(function (fn) { fn.call(signal, event); });
 	};
 	if (typeof g.queueMicrotask !== 'function') g.queueMicrotask = function (fn) { Promise.resolve().then(fn); };
+	// Events a script makes and dispatches on an element: the host raises them on that element once the script returns.
+	var EventBase = function (type, init) {
+		init = init || {};
+		this.type = String(type);
+		this.bubbles = init.bubbles === true;
+		this.cancelable = init.cancelable === true;
+		this.defaultPrevented = false;
+		this.isTrusted = false;
+		this.target = null;
+		this.currentTarget = null;
+	};
+	EventBase.prototype.preventDefault = function () { if (this.cancelable) this.defaultPrevented = true; };
+	EventBase.prototype.stopPropagation = function () {};
+	var eventKind = function (parent, fields) {
+		var Kind = function (type, init) {
+			parent.call(this, type, init);
+			for (var name in fields) this[name] = init && init[name] !== undefined ? init[name] : fields[name];
+		};
+		Kind.prototype = Object.create(parent.prototype);
+		return Kind;
+	};
+	g.Event = EventBase;
+	g.CustomEvent = eventKind(EventBase, { detail: null });
+	g.MouseEvent = eventKind(EventBase, { detail: 0, button: 0, buttons: 0, clientX: 0, clientY: 0, relatedTarget: null });
+	g.PointerEvent = eventKind(g.MouseEvent, { pointerId: 0, pointerType: '', isPrimary: false, pressure: 0 });
+	g.KeyboardEvent = eventKind(EventBase, { key: '', code: '', repeat: false, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false });
+	// The DOM's interfaces, so an element proxy answers instanceof as the browser's element does; none can be constructed.
+	var domClasses = ${JSON.stringify(NATIVE_SCRIPT_DOM_CLASSES)};
+	var defineClass = function (name) {
+		if (Object.prototype.hasOwnProperty.call(g, name) && g[name].__dom) return g[name];
+		var parent = domClasses[name] ? defineClass(domClasses[name]) : null;
+		var Class = function () { throw new TypeError('Illegal constructor'); };
+		if (parent) Class.prototype = Object.create(parent.prototype);
+		Object.defineProperty(Class, '__dom', { value: true });
+		Object.defineProperty(Class, 'name', { value: name });
+		g[name] = Class;
+		return Class;
+	};
+	for (var domName in domClasses) defineClass(domName);
 	var Headers = function (pairs) {
 		this.get = function (name) {
 			var key = String(name).toLowerCase(), found = [];
@@ -493,6 +536,8 @@ var pathOf = function (pattern, params) {
 // element, and the commands a handler's data can run. No tree walking, no selectors, no layout.
 var elementFacts = {};
 var proxies = {};
+// Which element holds each touch, as this entry's own capture calls left it; the host's facts answer the rest.
+var captured = {};
 var elementOf = function (id) {
 	if (typeof id !== 'string') return id;
 	if (id === ${JSON.stringify(NATIVE_UNBOUND_HANDLE)}) return undefined;
@@ -512,6 +557,26 @@ var elementOf = function (id) {
 			return node === id || (!!elementFacts[node] && elementFacts[node].ancestors.indexOf(id) >= 0);
 		},
 		focus: function (options) { command('focus', !!(options && options.preventScroll)); },
+		click: function () { host.out.raises.push({ node: id, type: 'click', bubbles: true }); },
+		dispatchEvent: function (event) {
+			var raised = { node: id, type: String(event.type), bubbles: event.bubbles === true };
+			if (event.detail !== null && typeof event.detail === 'object' && typeof event.detail.reason === 'string')
+				raised.reason = event.detail.reason;
+			if (event.relatedTarget && typeof event.relatedTarget.__node === 'string') raised.relatedTarget = event.relatedTarget.__node;
+			['pointerId', 'pointerType', 'isPrimary', 'button', 'buttons', 'clientX', 'clientY', 'key'].forEach(function (field) {
+				if (field in event) raised[field] = event[field];
+			});
+			host.out.raises.push(raised);
+			return !event.defaultPrevented;
+		},
+		hasPointerCapture: function (pointerId) {
+			return pointerId in captured ? captured[pointerId] === id : (facts().captures || []).indexOf(pointerId) >= 0;
+		},
+		setPointerCapture: function (pointerId) { captured[pointerId] = id; host.out.commands.push([id, 'setPointerCapture', pointerId]); },
+		releasePointerCapture: function (pointerId) {
+			if (proxy.hasPointerCapture(pointerId)) captured[pointerId] = null;
+			host.out.commands.push([id, 'releasePointerCapture', pointerId]);
+		},
 		scrollIntoView: function () { command('scrollIntoView', false); },
 		showModal: function () { command('showModal', false); },
 		close: function () { command('close', false); },
@@ -519,6 +584,8 @@ var elementOf = function (id) {
 			throw new Error('getBoundingClientRect() asks the host to measure while JavaScript waits, which a phone does not answer');
 		},
 	};
+	var tag = (typeof classes === 'object' && classes[id.split('@')[0]]) || 'HTMLElement';
+	if (g[tag] && g[tag].__dom) Object.setPrototypeOf(proxy, g[tag].prototype);
 	Object.defineProperty(proxy, '__node', { value: id });
 	proxies[id] = proxy;
 	return proxy;
@@ -561,13 +628,14 @@ var stable = function (value) {
 var begin = function (entry) {
 	elementFacts = entry.elements || {};
 	proxies = {};
+	captured = {};
 	cells = join(entry.cells, entry.nonFinite);
 	unset = {};
 	forced = {};
 	(entry.unset || []).forEach(function (slot) { unset[slot] = true; });
 	before = {};
 	for (var slot in cells) before[slot] = stable(cells[slot]);
-	host.out = { timers: [], clears: [], requests: [], aborts: [], calls: [], logs: [], commands: [], pending: [], settled: [], navigate: null };
+	host.out = { timers: [], clears: [], requests: [], aborts: [], calls: [], logs: [], commands: [], pending: [], settled: [], raises: [], navigate: null };
 	host.place = navigation && entry.kind !== 'compute' ? { routes: navigation.routes, path: pathOf(navigation.here, entry.params || {}) } : null;
 	host.seed = entry.seed || null;
 	host.counter = 0;
@@ -588,12 +656,21 @@ var eventOf = function (given, frame) {
 		target: target,
 		currentTarget: target,
 		key: given.key,
+		isTrusted: given.isTrusted !== false,
 		isComposing: false,
 		defaultPrevented: false,
 		preventDefault: function () { this.defaultPrevented = true; },
 		stopPropagation: function () {},
 	};
-	${JSON.stringify(NATIVE_SCRIPT_POINTER_FIELDS)}.forEach(function (field) { if (field in given) event[field] = given[field]; });
+	${JSON.stringify([...new Set([...NATIVE_SCRIPT_POINTER_FIELDS, ...NATIVE_SCRIPT_CLICK_FIELDS, ...NATIVE_SCRIPT_KEY_FIELDS])])}.forEach(function (field) { if (field in given) event[field] = given[field]; });
+	if (typeof given.pointerType === 'string') {
+		event.pressure = event.buttons > 0 ? 0.5 : 0;
+		event.getCoalescedEvents = function () { return event.type === 'pointermove' ? [event] : []; };
+	}
+	if (given.nodes)
+		${JSON.stringify(NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS)}.forEach(function (field) {
+			event[field] = given.nodes[field] == null ? null : elementOf(given.nodes[field]);
+		});
 	// A paste carries the pasted plain text, as the edit menu's paste does.
 	if ('text' in given)
 		event.clipboardData = { getData: function (type) { return type === 'text' || type === 'text/plain' ? given.text : ''; } };
@@ -730,7 +807,7 @@ g.__markless[id] = {
 		}
 		var out = host.out;
 		host.out = null;
-		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands, pending: out.pending, settled: out.settled };
+		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands, pending: out.pending, settled: out.settled, raises: out.raises };
 		if (out.calls.length > 0) left.calls = out.calls;
 		if (out.prevented) left.prevented = true;
 		if (out.navigate) left.navigate = out.navigate;
@@ -757,6 +834,8 @@ function contentId(text: string): string {
 export function nativeScriptOf(
 	modules: ReadonlyArray<NativeScriptModuleInput>,
 	services: ReadonlyArray<NativeScriptService>,
+	/** Each element's DOM interface by node id, given when the script names one of the DOM's classes. */
+	classes?: Readonly<Record<string, string>>,
 	/** For `navigate()`: the page's route pattern, and the app's route patterns in the router's order. */
 	navigation?: { readonly here: string; readonly routes: ReadonlyArray<string> },
 ): NativeScript {
@@ -777,6 +856,7 @@ export function nativeScriptOf(
 	const body = [
 		'var modules = [];',
 		`var owners = ${JSON.stringify(owners)};`,
+		...(classes ? [`var classes = ${JSON.stringify(classes)};`] : []),
 		`var navigation = ${JSON.stringify(navigation ?? null)};`,
 		...definitions,
 		ENTRIES,

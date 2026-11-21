@@ -1,0 +1,20 @@
+{
+	"rung": 193,
+	"name": "A row's element reaches JavaScript with its own row's attributes",
+	"steps": [
+		{
+			"visible": ["Ada", "Bo"],
+			"absent": ["pressed Ada", "pressed Bo"]
+		},
+		{
+			"do": { "tap": "Bo" },
+			"visible": ["pressed Bo"],
+			"absent": ["pressed Ada"]
+		},
+		{
+			"do": { "tap": "Ada" },
+			"visible": ["pressed Ada"],
+			"absent": ["pressed Bo"]
+		}
+	]
+}

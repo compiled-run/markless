@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: n3-navigate
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Welcome screen ahead
 - assertVisible: Sign in
 - assertVisible: Home
@@ -21,16 +21,16 @@ name: n3-navigate
 - assertNotVisible: Signed in
 - assertVisible: Dashboard
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertNotVisible: Your dashboard
 - assertVisible: Home
 - assertVisible: Welcome screen ahead

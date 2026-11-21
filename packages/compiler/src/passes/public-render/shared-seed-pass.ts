@@ -387,13 +387,51 @@ export function widgetRootComponents(input: PublicRenderModuleInput): Map<string
 	const seedingComponent = seedingComponents(input);
 	const roots = new Map<string, string>();
 	for (const definition of declaredWidgetDefinitions(input)) {
-		const resolver = input.semanticGraph.sharedInstances.find(
-			(instance) => instance.definitionId === definition.id && instance.componentName,
-		);
-		const owner = seedingComponent.get(definition.id) ?? resolver?.componentName;
+		const resolvers = [
+			...new Set(
+				input.semanticGraph.sharedInstances.flatMap((instance) =>
+					instance.definitionId === definition.id && instance.componentName
+						? [instance.componentName]
+						: [],
+				),
+			),
+		];
+		const owner =
+			seedingComponent.get(definition.id) ??
+			resolvers.find((name) => !renderedByAnother(input, name, resolvers)) ??
+			resolvers[0];
 		if (owner) roots.set(definition.id, owner);
 	}
 	return roots;
+}
+
+/** Whether another of `resolvers` renders `name` in this module, directly or through components between them. */
+function renderedByAnother(
+	input: PublicRenderModuleInput,
+	name: string,
+	resolvers: ReadonlyArray<string>,
+): boolean {
+	const children = new Map<string, string[]>();
+	for (const edge of input.semanticGraph.componentEdges)
+		if (edge.importSource === undefined)
+			children.set(edge.parentComponentName, [
+				...(children.get(edge.parentComponentName) ?? []),
+				edge.childComponentName,
+			]);
+	return resolvers.some((other) => {
+		if (other === name) return false;
+		const seen = new Set([other]);
+		const queue = [other];
+		while (queue.length > 0)
+			for (const child of children.get(queue.pop()!) ?? []) {
+				if (child === name) return true;
+				if (!seen.has(child)) {
+					seen.add(child);
+					queue.push(child);
+				}
+			}
+		return false;
+	});
 }
 
 function seedingComponents(input: PublicRenderModuleInput): Map<string, string> {

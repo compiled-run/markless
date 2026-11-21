@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: s23-styled-row-pressed
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Sizes
 - assertVisible: Small
 - assertVisible: Medium

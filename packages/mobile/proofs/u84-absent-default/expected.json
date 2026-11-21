@@ -1,0 +1,37 @@
+{
+	"rung": 194,
+	"name": "a prop the root was not given is its default, so a null default reads as null",
+	"steps": [
+		{
+			"visible": [
+				"Upload waiting",
+				"Upload +10"
+			],
+			"absent": [
+				"Upload at 10"
+			]
+		},
+		{
+			"do": {
+				"tap": "Upload +10"
+			},
+			"visible": [
+				"Upload at 10"
+			],
+			"absent": [
+				"Upload waiting"
+			]
+		},
+		{
+			"do": {
+				"tap": "Upload +10"
+			},
+			"visible": [
+				"Upload at 20"
+			],
+			"absent": [
+				"Upload at 10"
+			]
+		}
+	]
+}

@@ -38,6 +38,7 @@ import android.widget.EditText
 import android.widget.HorizontalScrollView
 import android.widget.ScrollView
 import android.widget.TextView
+import dev.markless.mobile.core.MemoryStore
 import dev.markless.mobile.core.ScrollAlignment
 import dev.markless.mobile.core.ScrollBox
 import dev.markless.mobile.core.ScrollRange
@@ -918,7 +919,11 @@ class MarklessHost(
 		val unseen = type == "hidden" || (type in TICKABLE && node.attributes["aria-hidden"] == "true")
 		if (unseen) inert.add(inst.id)
 		val view = when (if (node.element == "button" && holdsElements) "box-button" else if (drawing != null) "drawing" else if (unstyled?.rule == true) "rule" else if (unseen) "unseen" else if (type in TICKABLE) type else node.element) {
-			"drawing" -> DrawingView(context, drawing!!, baseTextSize * (flow?.blockText(node.parent)?.size ?: 1.0)).also { named(it, inst.id, image = true) }
+			"drawing" -> DrawingView(context, drawing!!, baseTextSize * (flow?.blockText(node.parent)?.size ?: 1.0)).also {
+				// An svg's text is read as its own, as the browser exposes it; an svg without text is read only when named.
+				named(it, inst.id, image = drawing.label == null)
+				drawing.label?.let { label -> it.contentDescription = label; it.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES }
+			}
 			"rule" -> RuleView(context).also { named(it, inst.id) }
 			"unseen" -> View(context)
 			// The runtime owns checkedness: the widget never toggles itself, a press dispatches and the journal sets it.
@@ -983,6 +988,10 @@ class MarklessHost(
 					// Chrome gives an email field the email keyboard.
 					if (node.attributes["type"] == "email") inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
 					isSingleLine = true
+					// After isSingleLine, whose transformation would show a password's text.
+					if (type == "password") inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+					// Chrome's keyboard for a number field: digits, a decimal mark and a sign.
+					if (type == "number") inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED
 				} else {
 					// A textarea's Return is a new line, and Chrome's default `rows="2"` shows two lines.
 					inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
@@ -1018,11 +1027,13 @@ class MarklessHost(
 			EventName.Dismiss -> if (OVERLAY_ATTRIBUTE !in node.attributes) throw MarklessHostError("dismiss event on \"${node.id}\", which is neither a sheet nor an overlay")
 			// Raised by the field's focus listener, set where the field is built.
 			EventName.Focus, EventName.Blur -> if (view !is EditText) throw MarklessHostError("${e.event.wire} event on \"${node.id}\", which is not a text field")
-			EventName.Keydown -> (view as? MarklessField ?: throw MarklessHostError("keydown event on \"${node.id}\", which is not a text field")).onKey = { key -> prevents(runtime.dispatch(inst.id, EventName.Keydown, key)) }
+			// Off a text field a keydown comes only from a script, which the runtime raises.
+			EventName.Keydown -> (view as? MarklessField)?.onKey = { key -> prevents(runtime.dispatch(inst.id, EventName.Keydown, key)) }
 			EventName.Keyup -> (view as? MarklessField ?: throw MarklessHostError("keyup event on \"${node.id}\", which is not a text field")).onKeyUp = { key -> apply(runtime.dispatch(inst.id, EventName.Keyup, key)) }
 			EventName.Paste -> (view as? MarklessField ?: throw MarklessHostError("paste event on \"${node.id}\", which is not a text field")).onPaste = { text -> prevents(runtime.dispatch(inst.id, EventName.Paste, text)) }
-			EventName.Cancel, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
-			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.Choose -> {}
+			EventName.Cancel, EventName.Close, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
+			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.MouseOver, EventName.MouseOut,
+			EventName.MouseEnter, EventName.MouseLeave, EventName.MouseMove, EventName.MouseDown, EventName.MouseUp, EventName.Choose -> {}
 			// The keyboard's action key arrives as its action id; a hardware Enter as IME_NULL with the key down, then up.
 			EventName.Enter -> (view as? EditText ?: throw MarklessHostError("enter event on \"${node.id}\", which is not an input")).setOnEditorActionListener { _, actionId, key ->
 				val now = android.os.SystemClock.uptimeMillis()
@@ -1189,8 +1200,8 @@ class MarklessHost(
 				view.setOnClickListener { views[value]?.performClick() }
 			}
 			"aria-label" -> if (view is AudioButton) view.label(value) else {
-				view.contentDescription = value
-				if (view is DrawingView && current["aria-hidden"] != "true") view.importantForAccessibility = if (value != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO
+				view.contentDescription = value ?: (view as? DrawingView)?.label
+				if (view is DrawingView && current["aria-hidden"] != "true") view.importantForAccessibility = if (view.contentDescription != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO
 			}
 			"alt" -> if (view is SizedImage) view.contentDescription = value
 			"src" -> when (view) {

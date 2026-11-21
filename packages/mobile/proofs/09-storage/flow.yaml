@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: 09-storage
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Kept count
 - assertVisible: Kept 0
 - assertNotVisible: Kept 1

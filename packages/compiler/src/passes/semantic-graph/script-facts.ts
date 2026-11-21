@@ -806,6 +806,23 @@ function nodeOver(semantic: ModuleSemantics, span: { readonly start: number; rea
 export function scriptFactsOf(source: string, filename: string) {
 	const semantic = moduleSemantics(source, filename);
 	let module: SemanticScriptModule | undefined;
+	/** The first argument of the framework call (`computed(...)`, `state(...)`) bound to `name` in `component`. */
+	const frameworkArgument = (component: string | undefined, name: string): AnyNode | undefined => {
+		for (const binding of semantic.bindings) {
+			if (binding.name !== name) continue;
+			const declaring = declaringNode(semantic, binding);
+			if (declaring?.type !== 'VariableDeclarator' || !isFrameworkCall(semantic, declaring.init as AnyNode)) continue;
+			let owner: string | undefined;
+			for (const node of semantic.ancestors(declaring as never) as Iterable<AnyNode>)
+				if (isComponent(node)) {
+					owner = String((node.id as AnyNode | undefined)?.name);
+					break;
+				}
+			if ((owner ?? '') !== (component ?? '')) continue;
+			return ((declaring.init as AnyNode).arguments as AnyNode[] | undefined)?.[0];
+		}
+		return undefined;
+	};
 	return {
 		/** A handler written at `span`: an inline function, or the name of one. */
 		handler: (span: SourceSpan): SemanticScriptFunction | undefined => {
@@ -833,21 +850,13 @@ export function scriptFactsOf(source: string, filename: string) {
 		},
 		/** The function of `computed(...)` bound to `name` in `component` (module level when there is none). */
 		computed: (component: string | undefined, name: string): SemanticScriptFunction | undefined => {
-			for (const binding of semantic.bindings) {
-				if (binding.name !== name) continue;
-				const declaring = declaringNode(semantic, binding);
-				if (declaring?.type !== 'VariableDeclarator' || !isFrameworkCall(semantic, declaring.init as AnyNode)) continue;
-				let owner: string | undefined;
-				for (const node of semantic.ancestors(declaring as never) as Iterable<AnyNode>)
-					if (isComponent(node)) {
-						owner = String((node.id as AnyNode | undefined)?.name);
-						break;
-					}
-				if ((owner ?? '') !== (component ?? '')) continue;
-				const [fn] = ((declaring.init as AnyNode).arguments as AnyNode[] | undefined) ?? [];
-				return fn && scriptFunctionOf(fn, semantic, filename);
-			}
-			return undefined;
+			const fn = frameworkArgument(component, name);
+			return fn && scriptFunctionOf(fn, semantic, filename);
+		},
+		/** The first value of `state(...)` bound to `name` in `component` (module level when there is none), as a value. */
+		stateSeed: (component: string | undefined, name: string): SemanticScriptFunction | undefined => {
+			const seed = frameworkArgument(component, name);
+			return seed && scriptFunctionOf(seed, semantic, filename, true);
 		},
 		/**
 		 * A call to `name`, a function this module declares or imports from app code, with the arguments the caller passes as

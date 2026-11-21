@@ -2,19 +2,19 @@ appId: ${APP_ID}
 name: 14-scroll-row
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Scroll row
 - assertVisible: Card 1
 - assertVisible: Below the row
 - assertNotVisible: Card 12
 - repeat:
-      times: 80
-      while:
-          notVisible: Card 12
-      commands:
-          - swipe:
-                start: 85%, 25%
-                end: 15%, 25%
+    times: 80
+    while:
+      notVisible: Card 12
+    commands:
+      - swipe:
+          start: 85%, 25%
+          end: 15%, 25%
 - assertVisible: Card 12
 - assertNotVisible: Card 1
 - assertVisible: Card 12

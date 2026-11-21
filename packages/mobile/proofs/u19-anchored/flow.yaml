@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u19-anchored
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Anchored
 - assertVisible: Details
 - assertVisible: Tap for details

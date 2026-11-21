@@ -215,7 +215,8 @@ function mirror(
 		payload.nodes.flatMap((node) => {
 			if (node.kind !== 'element') return [];
 			const bound = attributes.get(`${node.id}\0aria-label`);
-			const label = bound !== undefined ? bound : (node.attributes?.['aria-label'] ?? null);
+			const label =
+				bound !== undefined ? bound : (node.attributes?.['aria-label'] ?? node.drawing?.label ?? null);
 			return label !== null && shownNode(node.id) ? [[node.id, label] as const] : [];
 		});
 	// The element a text names: a labelled element, or the element holding that text (a row instance keeps its key).
@@ -657,6 +658,8 @@ function walk(
 		const label =
 			attribute('aria-label') ??
 			(node.element === 'img' ? (node.attributes?.alt ?? null) : null) ??
+			// An svg's text reads as the svg's, as the browser exposes it.
+			node.drawing?.label ??
 			(labelledBy === null
 				? null
 				: labelledBy
@@ -1055,12 +1058,12 @@ function walk(
 				else typed.set(host, text);
 			}
 			// A tap is a touch going down and up on what it lands on, then the activation of the nearest element around it
-			// that handles a press, as on a phone.
+			// that handles a press, as on a phone; it lands inside the screen, never at its corner.
 			const touched =
 				'tap' in action
 					? [
-							...runtime.dispatch({ event: 'pointerdown', host }),
-							...runtime.dispatch({ event: 'pointerup', host }),
+							...runtime.dispatch({ event: 'pointerdown', host, x: 1, y: 1 }),
+							...runtime.dispatch({ event: 'pointerup', host, x: 1, y: 1 }),
 						]
 					: [];
 			apply(touched, index);
@@ -1081,8 +1084,7 @@ function walk(
 			const returns = payload.events.some(
 				(event) => event.host === host && event.event === 'enter',
 			);
-			// A row's copy (`<node>@<key>`) is not in the tree by that id: it activates as itself.
-			const activates = !!pressed || host.includes('@');
+			const activates = !!pressed;
 			if ('tap' in action && !activates && touched.length === 0)
 				throw new Error(`step ${index}: "${name}" is not a control and the press changed nothing`);
 			// A field takes the keyboard when typed into, and gives it up when anything else is tapped: its focus and blur run.

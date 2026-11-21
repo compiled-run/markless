@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: z4-sheet-dark-mode
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - setDarkMode: disabled
 - assertVisible: Journal
 - assertVisible: Read today
@@ -10,7 +10,7 @@ name: z4-sheet-dark-mode
 - assertNotVisible: Walked by the river
 - setDarkMode: enabled
 - waitForAnimationToEnd:
-      timeout: 5000
+    timeout: 5000
 - assertVisible: Journal
 - assertVisible: Read today
 - assertNotVisible: Today
@@ -22,11 +22,11 @@ name: z4-sheet-dark-mode
 - assertVisible: Walked by the river
 - setDarkMode: disabled
 - waitForAnimationToEnd:
-      timeout: 5000
+    timeout: 5000
 - assertVisible: Today
 - assertVisible: Walked by the river
 - setDarkMode: enabled
 - waitForAnimationToEnd:
-      timeout: 5000
+    timeout: 5000
 - assertVisible: Today
 - assertVisible: Walked by the river

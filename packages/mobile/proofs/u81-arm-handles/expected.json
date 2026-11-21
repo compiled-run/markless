@@ -1,0 +1,35 @@
+{
+	"rung": 191,
+	"name": "An element handle bound inside an @if arm holds its element only while the arm shows",
+	"steps": [
+		{
+			"visible": ["Toggle", "Count"],
+			"absent": ["Extra", "2 no extra"]
+		},
+		{
+			"do": { "tap": "Count" },
+			"visible": ["2 no extra"],
+			"absent": ["Extra"]
+		},
+		{
+			"do": { "tap": "Toggle" },
+			"visible": ["Extra", "2 no extra"],
+			"absent": ["3 with extra"]
+		},
+		{
+			"do": { "tap": "Count" },
+			"visible": ["3 with extra", "Extra"],
+			"absent": ["2 no extra"]
+		},
+		{
+			"do": { "tap": "Toggle" },
+			"visible": ["3 with extra"],
+			"absent": ["Extra", "2 no extra"]
+		},
+		{
+			"do": { "tap": "Count" },
+			"visible": ["2 no extra"],
+			"absent": ["Extra", "3 with extra"]
+		}
+	]
+}
