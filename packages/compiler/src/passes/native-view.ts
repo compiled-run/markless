@@ -1212,6 +1212,11 @@ export type NativeViewOptions = {
 	readonly keyHandlers?: boolean;
 	/** A module's source as the build read it, by filename: where a native build finds a value's own JavaScript. */
 	readonly readSource?: (filename: string) => string | undefined;
+	/**
+	 * Where the app's site is served (`https://shop.example`): a URL from the root (`/api/products`) that the phone's
+	 * JavaScript fetches resolves against it, as the web resolves one against the page's origin.
+	 */
+	readonly origin?: string;
 };
 
 /** One module's facts, indexed for lowering its templates. */
@@ -3443,6 +3448,7 @@ export function createNativeViewPayload(
 						routes: options.routes.map((route) => route.pattern),
 					}
 				: undefined,
+			options.origin,
 		);
 	}
 

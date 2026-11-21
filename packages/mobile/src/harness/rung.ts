@@ -61,12 +61,18 @@ export type ProofRung = {
 const APP_CONFIG = 'app.json';
 
 /** The config of the app a rung folder is (its own app.json) or belongs to (one beside it); empty when the app has none. */
-export function readAppConfig(rungDir: string): { readonly device?: DeviceAppConfig } {
+export function readAppConfig(rungDir: string): {
+	readonly device?: DeviceAppConfig;
+	readonly origin?: string;
+} {
 	const file = [join(rungDir, APP_CONFIG), join(dirname(rungDir), APP_CONFIG)].find((path) =>
 		existsSync(path),
 	);
 	return file
-		? (JSON.parse(readFileSync(file, 'utf8')) as { readonly device?: DeviceAppConfig })
+		? (JSON.parse(readFileSync(file, 'utf8')) as {
+				readonly device?: DeviceAppConfig;
+				readonly origin?: string;
+			})
 		: {};
 }
 
@@ -164,7 +170,11 @@ const APP_DOCUMENT = 'document.tsrx';
 /** Compiles a navigation rung's app: every page under `pages/`, with repo-relative filenames as for one-screen rungs. */
 export function compileRungApp(
 	dir: string,
-	options: { readonly target?: ProofPlatform; readonly device?: DeviceAppConfig } = {},
+	options: {
+		readonly target?: ProofPlatform;
+		readonly device?: DeviceAppConfig;
+		readonly origin?: string;
+	} = {},
 ) {
 	const document = join(dir, APP_DOCUMENT);
 	return compileNativeApp({
@@ -418,6 +428,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				readServedFile: servedFileReader(dir),
 				readAsset: assetReader,
 				...(appConfig.device ? { device: appConfig.device } : {}),
+				...(appConfig.origin !== undefined ? { origin: appConfig.origin } : {}),
 				target: platform,
 			});
 			if (!build.payload) {
@@ -475,6 +486,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 			const build = await compileRungApp(dir, {
 				target: platform,
 				...(appConfig.device ? { device: appConfig.device } : {}),
+				...(appConfig.origin !== undefined ? { origin: appConfig.origin } : {}),
 			});
 			if (!build.payload) {
 				const lines = build.diagnostics.map(
