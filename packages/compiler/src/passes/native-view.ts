@@ -547,6 +547,8 @@ type Scope = {
 	};
 	/** Prefix of every id this component instance emits (`component-edge:0/` inside a child, empty at the root). */
 	readonly prefix: string;
+	/** Where children projected into a second @if arm are lowered again: the first copy's prefix, which keys its handles. */
+	readonly handlePrefix?: string;
 	/** The list whose rows this instance renders in: its state and async values are per row. */
 	readonly row?: string;
 	readonly event?: string;
@@ -3096,8 +3098,13 @@ export function createNativeViewPayload(
 							: { spread: false, value: elementValue(id) },
 					),
 				};
-			if (bound.length > 1) return refuse(`${what}, a handle bound to more than one element`);
-			return { if: { shown: bound[0]! }, whenTrue: elementValue(bound[0]!), whenFalse: { literal: null } };
+			if (bound.some((id, index) => bound.slice(index + 1).some((other) => !excludes(id, other))))
+				return refuse(`${what}, a handle bound to more than one element`);
+			// Bound in arms that exclude each other, the handle holds the one shown.
+			return bound.reduceRight<NativeExpr>(
+				(rest, id) => ({ if: { shown: id }, whenTrue: elementValue(id), whenFalse: rest }),
+				{ literal: null },
+			);
 		}
 		if (scriptReading && plural && bound.some((id) => byId.get(id)?.row)) {
 			// JavaScript gets every row's copy, in the rows' order, as the web's handle list holds them.
@@ -4506,9 +4513,24 @@ export function createNativeViewPayload(
 			}
 			return undefined;
 		}
-		return binding ? `${scope.prefix}${graphNodeId}` : undefined;
+		return binding ? `${scope.handlePrefix ?? scope.prefix}${graphNodeId}` : undefined;
 	};
 	const boundHandles = new Map<string, string[]>();
+	/** How many times each caller's children have been lowered, by the caller's prefix and the children's chunk. */
+	const projections = new Map<string, number>();
+	/** The @if arms a node sits in, outermost to innermost, by branch. */
+	const armsOf = (id: string): Map<string, number> => {
+		const byId = nodeById();
+		const arms = new Map<string, number>();
+		for (let node = byId.get(id); node; node = node.parent ? byId.get(node.parent) : undefined)
+			if (node.arm && !arms.has(node.arm.branch)) arms.set(node.arm.branch, node.arm.index);
+		return arms;
+	};
+	/** Whether two nodes sit in different arms of one @if, so at most one of them is ever shown. */
+	const excludes = (a: string, b: string): boolean => {
+		const inB = armsOf(b);
+		return [...armsOf(a)].some(([branch, index]) => inB.has(branch) && inB.get(branch) !== index);
+	};
 	/** Roster positions and counts read while the tree was walked, settled from the handles bound once it is built. */
 	const rosterReads: { expr: { literal: number }; roster: string; own: string | undefined; what: string }[] = [];
 	const dialogOps: { op: 'dialog'; node: string; method: 'showModal' | 'close' }[] = [];
@@ -4992,7 +5014,7 @@ export function createNativeViewPayload(
 						const bindingId = scope.module.elementBindings.get(
 							`${scope.component}#${handle.name}`,
 						);
-						if (bindingId) key = `${scope.prefix}${bindingId}`;
+						if (bindingId) key = `${scope.handlePrefix ?? scope.prefix}${bindingId}`;
 					}
 					if (key) boundHandles.set(key, [...(boundHandles.get(key) ?? []), id]);
 				}
@@ -5167,8 +5189,18 @@ export function createNativeViewPayload(
 					refuse('`{children}` at the top of a component');
 					continue;
 				}
+				// Children projected into more than one @if arm are a copy in each, as the web renders them in whichever arm shows.
+				const projection = `${children.scope.prefix}\0${children.chunk.id}`;
+				const copy = projections.get(projection) ?? 0;
+				projections.set(projection, copy + 1);
 				lowerChunk(children.chunk, parent, place, {
 					...children.scope,
+					...(copy > 0
+						? {
+								prefix: `${children.scope.prefix}copy-${copy}/`,
+								handlePrefix: children.scope.handlePrefix ?? children.scope.prefix,
+							}
+						: {}),
 					shared: scope.shared,
 				});
 				continue;
@@ -7718,9 +7750,10 @@ export function createNativeViewPayload(
 
 	const rowOfNode = new Map(nodes.map((node) => [node.id, node.row]));
 	for (const reference of handleReferences) {
-		const ids = reference.keys.flatMap((key) =>
-			key === undefined ? [] : (boundHandles.get(key) ?? []),
-		);
+		// An element in one @if arm names only the copies that can be shown beside it.
+		const ids = reference.keys
+			.flatMap((key) => (key === undefined ? [] : (boundHandles.get(key) ?? [])))
+			.filter((id) => !excludes(id, reference.node));
 		if (ids.length === 0) continue;
 		const index = nodes.findIndex(
 			(node) => node.id === reference.node && node.kind === 'element',

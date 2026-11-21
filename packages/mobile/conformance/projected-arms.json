@@ -1,0 +1,421 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "ProjectedArms",
+		"cells": [
+			{
+				"id": "component-edge:0/shared:packages/mobile/proofs/lib/projected-box.tsrx#boxState/state:box.wide",
+				"name": "box.wide",
+				"initial": false
+			},
+			{
+				"id": "component-edge:0/shared:packages/mobile/proofs/lib/projected-box.tsrx#boxState/state:box.seen",
+				"name": "box.seen",
+				"initial": ""
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "branch",
+				"id": "component-edge:0/branch-site:0",
+				"parent": "h0",
+				"test": {
+					"cell": "component-edge:0/shared:packages/mobile/proofs/lib/projected-box.tsrx#boxState/state:box.wide"
+				},
+				"arms": 2
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "section",
+				"parent": "h0",
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h1",
+				"element": "p",
+				"parent": "component-edge:0/h0",
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h1:text0",
+				"parent": "component-edge:0/h1",
+				"parts": [
+					{
+						"text": "Wide box"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h4",
+				"element": "span",
+				"parent": "component-edge:0/h0",
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h4:text0",
+				"parent": "component-edge:1/h4",
+				"parts": [
+					{
+						"text": "Volume"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:2/h5",
+				"element": "div",
+				"parent": "component-edge:0/h0",
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:2/h6",
+				"element": "button",
+				"parent": "component-edge:2/h5",
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:2/h6:text0",
+				"parent": "component-edge:2/h6",
+				"parts": [
+					{
+						"text": "Check"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:2/h7",
+				"element": "p",
+				"parent": "component-edge:2/h5",
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:2/h7:text0",
+				"parent": "component-edge:2/h7",
+				"parts": [
+					{
+						"cell": "component-edge:0/shared:packages/mobile/proofs/lib/projected-box.tsrx#boxState/state:box.seen"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h2",
+				"element": "div",
+				"parent": "h0",
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h3",
+				"element": "p",
+				"parent": "component-edge:0/h2",
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h3:text0",
+				"parent": "component-edge:0/h3",
+				"parts": [
+					{
+						"text": "Narrow box"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "element",
+				"id": "copy-1/component-edge:1/h4",
+				"element": "span",
+				"parent": "component-edge:0/h2",
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "copy-1/component-edge:1/h4:text0",
+				"parent": "copy-1/component-edge:1/h4",
+				"parts": [
+					{
+						"text": "Volume"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "element",
+				"id": "copy-1/component-edge:2/h5",
+				"element": "div",
+				"parent": "component-edge:0/h2",
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "element",
+				"id": "copy-1/component-edge:2/h6",
+				"element": "button",
+				"parent": "copy-1/component-edge:2/h5",
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "copy-1/component-edge:2/h6:text0",
+				"parent": "copy-1/component-edge:2/h6",
+				"parts": [
+					{
+						"text": "Check"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "element",
+				"id": "copy-1/component-edge:2/h7",
+				"element": "p",
+				"parent": "copy-1/component-edge:2/h5",
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "copy-1/component-edge:2/h7:text0",
+				"parent": "copy-1/component-edge:2/h7",
+				"parts": [
+					{
+						"cell": "component-edge:0/shared:packages/mobile/proofs/lib/projected-box.tsrx#boxState/state:box.seen"
+					}
+				],
+				"arm": {
+					"branch": "component-edge:0/branch-site:0",
+					"index": 1
+				}
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:2/h6",
+				"event": "activate",
+				"handler": "handler:component-edge:2/event:0"
+			},
+			{
+				"host": "copy-1/component-edge:2/h6",
+				"event": "activate",
+				"handler": "handler:copy-1/component-edge:2/event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:2/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "component-edge:0/shared:packages/mobile/proofs/lib/projected-box.tsrx#boxState/state:box.seen",
+						"value": {
+							"if": {
+								"if": {
+									"shown": "component-edge:1/h4"
+								},
+								"whenTrue": {
+									"literal": "component-edge:1/h4"
+								},
+								"whenFalse": {
+									"if": {
+										"shown": "copy-1/component-edge:1/h4"
+									},
+									"whenTrue": {
+										"literal": "copy-1/component-edge:1/h4"
+									},
+									"whenFalse": {
+										"literal": null
+									}
+								}
+							},
+							"whenTrue": {
+								"template": [
+									"label in ",
+									{
+										"if": {
+											"cell": "component-edge:0/shared:packages/mobile/proofs/lib/projected-box.tsrx#boxState/state:box.wide"
+										},
+										"whenTrue": {
+											"literal": "wide"
+										},
+										"whenFalse": {
+											"literal": "narrow"
+										}
+									},
+									""
+								]
+							},
+							"whenFalse": {
+								"literal": "no label"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:copy-1/component-edge:2/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "component-edge:0/shared:packages/mobile/proofs/lib/projected-box.tsrx#boxState/state:box.seen",
+						"value": {
+							"if": {
+								"if": {
+									"shown": "component-edge:1/h4"
+								},
+								"whenTrue": {
+									"literal": "component-edge:1/h4"
+								},
+								"whenFalse": {
+									"if": {
+										"shown": "copy-1/component-edge:1/h4"
+									},
+									"whenTrue": {
+										"literal": "copy-1/component-edge:1/h4"
+									},
+									"whenFalse": {
+										"literal": null
+									}
+								}
+							},
+							"whenTrue": {
+								"template": [
+									"label in ",
+									{
+										"if": {
+											"cell": "component-edge:0/shared:packages/mobile/proofs/lib/projected-box.tsrx#boxState/state:box.wide"
+										},
+										"whenTrue": {
+											"literal": "wide"
+										},
+										"whenFalse": {
+											"literal": "narrow"
+										}
+									},
+									""
+								]
+							},
+							"whenFalse": {
+								"literal": "no label"
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"component-edge:0/h3:text0",
+			"Narrow box"
+		],
+		[
+			"copy-1/component-edge:1/h4:text0",
+			"Volume"
+		],
+		[
+			"copy-1/component-edge:2/h6:text0",
+			"Check"
+		],
+		[
+			"copy-1/component-edge:2/h7:text0",
+			""
+		]
+	],
+	"initialArms": [
+		[
+			"component-edge:0/branch-site:0",
+			1
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "copy-1/component-edge:2/h6"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "copy-1/component-edge:2/h7:text0",
+					"value": "label in narrow"
+				}
+			]
+		}
+	]
+}

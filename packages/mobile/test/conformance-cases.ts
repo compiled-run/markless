@@ -491,6 +491,13 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// Children projected into both arms of an @if: the shown arm's copy answers its tap and holds the handle.
+		name: 'projected-arms',
+		fixture: 'proofs/u85-projected-arms/App.tsrx',
+		modules: true,
+		actions: [{ event: 'activate', host: 'copy-1/component-edge:2/h6' }],
+	},
+	{
 		name: 'by-id',
 		fixture: 'test/fixtures/ById.tsrx',
 		actions: [

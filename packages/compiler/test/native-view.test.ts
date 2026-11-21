@@ -893,6 +893,46 @@ export function Page() @{
 		]);
 	});
 
+	it('lowers children projected into both arms of an @if as a copy in each, whose handle and IDREFs follow the shown arm', async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, shared, state } from '@markless/core';
+export const boxState = shared(() => {
+	const box = state({ wide: false, seen: '' });
+	const labelEl = element<HTMLSpanElement>();
+	return { ...box, labelEl };
+}, { scope: 'subtree' });
+function BoxRoot({ wide = false, children }: { wide?: boolean; children?: unknown }) @{
+	const box = boxState();
+	box.wide = wide;
+	@if (box.wide) {
+		<section aria-labelledby={box.labelEl}>{children}</section>
+	} @else {
+		<div aria-labelledby={box.labelEl}>{children}</div>
+	}
+}
+function BoxLabel() @{
+	const box = boxState();
+	<span el={box.labelEl}>Volume</span>
+}
+function BoxCheck() @{
+	const box = boxState();
+	<button onClick={() => (box.seen = box.labelEl ? 'label' : 'none')}>{box.seen}</button>
+}
+export function Page() @{
+	<BoxRoot><BoxLabel /><BoxCheck /></BoxRoot>
+}`, dataOnly);
+		expect(diagnostics).toEqual([]);
+		const ids = payload!.nodes.map((node) => node.id);
+		expect(ids.filter((id, index) => ids.indexOf(id) !== index)).toEqual([]);
+		const labels = payload!.nodes.filter((node) => node.kind === 'element' && node.element === 'span').map((node) => node.id);
+		expect(labels).toHaveLength(2);
+		const named = payload!.nodes.flatMap((node) =>
+			node.kind === 'element' ? (node.bindings ?? []).filter((binding) => 'attribute' in binding && binding.attribute === 'aria-labelledby') : [],
+		);
+		expect(named.map((binding) => binding.value)).toEqual(labels.map((id) => ({ literal: id })));
+		expect(payload!.events).toHaveLength(2);
+		for (const handler of payload!.handlers) expect(JSON.stringify(handler.ops)).toContain(`{"shown":"${labels[0]}"}`);
+	});
+
 	it("takes a prop the root was not given as its default, so null there is null and not undefined", async () => {
 		const source = (param: string) => `import { shared, state } from '@markless/core';
 export const barState = shared(() => {

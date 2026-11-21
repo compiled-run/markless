@@ -338,7 +338,9 @@
 		"diagnostics": [
 			"MARKLESS_NATIVE_UNSUPPORTED: a style binding",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:2/h4 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: `sliderState.labelEl`, a handle bound to more than one element"
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> copy-1/component-edge:2/h4 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/slider/slider-track.ts uses `window.getComputedStyle`: computed CSS, which a phone does not have at run time",
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/slider/slider-track.ts uses `DOMException`, which a phone's script engine does not provide"
 		]
 	},
 	"table": {

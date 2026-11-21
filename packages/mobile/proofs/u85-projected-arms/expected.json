@@ -1,0 +1,28 @@
+{
+	"rung": 195,
+	"name": "children a component projects into both arms of an @if are a copy in each, and a handle bound inside holds the shown one",
+	"steps": [
+		{
+			"visible": [
+				"Narrow box",
+				"Volume",
+				"Check"
+			],
+			"absent": [
+				"Wide box",
+				"label in narrow"
+			]
+		},
+		{
+			"do": {
+				"tap": "Check"
+			},
+			"visible": [
+				"label in narrow"
+			],
+			"absent": [
+				"no label"
+			]
+		}
+	]
+}
