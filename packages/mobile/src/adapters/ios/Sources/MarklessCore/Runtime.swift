@@ -229,6 +229,7 @@ public final class NativeRuntime {
 	private var computedAt = -1
 	private let store: NativeStore
 	private let storageKeys: [String: String]
+	private let session: NativeAppSession
 	private let handlers: [String: [NativeOp]]
 	private let continuations: [String: NativeContinuation]
 	private let nodesById: [String: NativeNode]
@@ -294,9 +295,11 @@ public final class NativeRuntime {
 	/// `preferredLanguages`: the device's, most preferred first; the web's messages are shown in the first one the payload has.
 	public init(
 		payload: NativeViewPayload, store: NativeStore = MemoryStore(), params: [NativeRouteParam] = [], preferredLanguages: [String] = ["en"],
-		now: @escaping () -> Double = { (Date().timeIntervalSince1970 * 1000).rounded(.down) }, scriptHost: NativeScriptHost? = nil
+		now: @escaping () -> Double = { (Date().timeIntervalSince1970 * 1000).rounded(.down) }, scriptHost: NativeScriptHost? = nil,
+		session: NativeAppSession = .shared
 	) {
 		self.payload = payload
+		self.session = session
 		self.params = params
 		self.store = store
 		self.now = now
@@ -306,10 +309,10 @@ public final class NativeRuntime {
 		asyncCells = payload.cells.filter { $0.async != nil }
 		let opened = now()
 		values = Dictionary(uniqueKeysWithValues: payload.cells.map { cell in
-			(cell.id, cell.clock ? .number(opened) : cell.storageKey.flatMap(store.read) ?? cell.initial)
+			(cell.id, cell.clock ? .number(opened) : (cell.app ? session.values[cell.id] : nil) ?? cell.storageKey.flatMap(store.read) ?? cell.initial)
 		})
 		storageKeys = Dictionary(uniqueKeysWithValues: payload.cells.compactMap { cell in cell.storageKey.map { (cell.id, $0) } })
-		unset = Set(payload.cells.filter { $0.unset && $0.storageKey.flatMap(store.read) == nil }.map(\.id))
+		unset = Set(payload.cells.filter { $0.unset && $0.storageKey.flatMap(store.read) == nil && !($0.app && session.values[$0.id] != nil) }.map(\.id))
 		handlers = Dictionary(uniqueKeysWithValues: payload.handlers.map { ($0.id, $0.ops) })
 		var continuations: [String: NativeContinuation] = [:]
 		func collect(_ ops: [NativeOp]) {
@@ -791,6 +794,16 @@ public final class NativeRuntime {
 	/// Starts the async values the script computes, once the screen is built; the host applies its journal as an action's.
 	public func start() throws -> [NativeJournalEntry] {
 		asyncCells.isEmpty ? [] : try change(host: nil) { [] }
+	}
+
+	/// The screen shows again after Back: it takes the app's values of its app-wide cells that a page above it changed.
+	public func resume() throws -> [NativeJournalEntry] {
+		let moved = payload.cells.filter { cell in cell.app && session.values[cell.id] != nil && session.values[cell.id] != values[cell.id] }
+		guard !moved.isEmpty else { return [] }
+		return try change(host: nil) {
+			for cell in moved { values[cell.id] = session.values[cell.id] }
+			return []
+		}
 	}
 
 	/// The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel.
@@ -1719,6 +1732,7 @@ public final class NativeRuntime {
 		let titled: [NativeJournalEntry] = afterTitle != beforeTitle ? afterTitle.map { [.title(value: $0)] } ?? [] : []
 		var journal: [NativeJournalEntry] = styles
 		for part in [entries, checks, chosen, marked, titled, releases, overlays, calls] { journal += part }
+		for cell in payload.cells where cell.app && !unset.contains(cell.id) { session.values[cell.id] = values[cell.id] }
 		return journal
 	}
 }
@@ -1732,10 +1746,20 @@ public struct NativeScreen {
 }
 
 /// The reference meaning of an app's stack (`packages/mobile/src/app.ts`): the UIKit stack is checked against it headless.
+/// The values of an app's app-wide `shared()` cells, one for every page; `shared` lasts as long as the app runs, as the web's
+/// module-level instance lasts as long as its page is open.
+public final class NativeAppSession: @unchecked Sendable {
+	// Read and written on the main thread only, where every runtime runs.
+	public static let shared = NativeAppSession()
+	public var values: [String: NativeValue] = [:]
+	public init() {}
+}
+
 public final class NativeAppStack {
 	public let app: NativeAppPayload
 	private let store: NativeStore
 	private let scriptHost: NativeScriptHost?
+	private let session = NativeAppSession()
 	public private(set) var screens: [NativeScreen]
 	/// What starting the screens the app opened with asked for, bottom first.
 	public private(set) var started: [NativeJournalEntry] = []
@@ -1757,7 +1781,7 @@ public final class NativeAppStack {
 		guard let entry = app.routes.first(where: { $0.pattern == route }) else { throw RuntimeError(reason: "no page for \(route)") }
 		return NativeScreen(
 			route: route, params: params, path: try NativeAppPayload.path(route, params),
-			runtime: NativeRuntime(payload: entry.page, store: store, params: params, scriptHost: scriptHost))
+			runtime: NativeRuntime(payload: entry.page, store: store, params: params, scriptHost: scriptHost, session: session))
 	}
 
 	/// Runs an action on the top screen; a `navigate` entry pushes the new screen or replaces the top one.
@@ -1776,7 +1800,8 @@ public final class NativeAppStack {
 	@discardableResult
 	public func back() throws -> [NativeJournalEntry] {
 		guard screens.count > 1 else { throw RuntimeError(reason: "back on the first screen leaves the app") }
-		return try screens.removeLast().runtime.leave()
+		let left = try screens.removeLast().runtime.leave()
+		return left + (try screens[screens.count - 1].runtime.resume())
 	}
 }
 

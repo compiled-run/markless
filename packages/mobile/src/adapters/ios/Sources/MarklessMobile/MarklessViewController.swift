@@ -402,6 +402,12 @@ public final class MarklessViewController: UIViewController {
 		}
 	}
 
+	/// Shown again after Back: the app-wide cells a page above changed reach this page before it slides in.
+	public override func viewWillAppear(_ animated: Bool) {
+		super.viewWillAppear(animated)
+		if tree != nil { apply { try runtime.resume() } }
+	}
+
 	public override func viewDidAppear(_ animated: Bool) {
 		super.viewDidAppear(animated)
 		tree?.pageAppeared(self)

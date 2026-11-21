@@ -237,7 +237,7 @@ data class Route(val pattern: String, val params: List<String>) {
 /** [device]: a live device value the host fills at mount and on change. [task]: an async device call started at mount. [row]: state of a component a list row renders, one value per row of that `repeat`, [initial] when the row is built. */
 /** [clock]: the clock when the screen opened, written at mount before the first build. */
 /** [async]: an async value function [AsyncValue.fn] of the payload's script computes while one of its [AsyncValue.boundaries] branches is shown; the script settles the cell. */
-data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false, val device: String? = null, val task: Task? = null, val obj: String? = null, val row: String? = null, val clock: Boolean = false, val first: Expr? = null, val rebuiltBy: List<Expr>? = null, val unset: Boolean = false, val follows: Expr? = null, val async: AsyncValue? = null)
+data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false, val device: String? = null, val task: Task? = null, val obj: String? = null, val row: String? = null, val clock: Boolean = false, val first: Expr? = null, val rebuiltBy: List<Expr>? = null, val unset: Boolean = false, val follows: Expr? = null, val async: AsyncValue? = null, val app: Boolean = false)
 
 data class AsyncValue(val fn: String, val bindings: Map<String, ScriptBinding>, val boundaries: List<String>)
 data class Event(val host: String, val event: EventName, val handler: String)
@@ -660,7 +660,7 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial", "storage", "styled", "domain", "device", "task", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows", "async"), what)
+			o.only(setOf("id", "name", "initial", "storage", "styled", "domain", "device", "task", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows", "async", "app"), what)
 			// The style export carries each state's domain; the payload's copy is Dragon's input, checked here and not kept.
 			o["domain"]?.arr("$what.domain")?.forEach { it.str("$what.domain[]") }
 			val unset = o["unset"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.unset must be true when present"); true } ?: false
@@ -675,7 +675,7 @@ data class Payload(
 				a.only(setOf("script", "bindings", "boundaries"), "$what.async")
 				AsyncValue(a.field("script", what).str("$what.async.script"), scriptBindings(a.field("bindings", what), "$what.async.bindings"), a.field("boundaries", what).arr("$what.async.boundaries").map { it.str("$what.async.boundaries[]") })
 			}
-			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock, o["first"]?.let { expr(it, "$what.first") }, o["rebuiltBy"]?.arr("$what.rebuiltBy")?.mapIndexed { n, e -> expr(e, "$what.rebuiltBy[$n]") }, unset, o["follows"]?.let { expr(it, "$what.follows") }, async)
+			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"), o["row"]?.str("$what.row"), clock, o["first"]?.let { expr(it, "$what.first") }, o["rebuiltBy"]?.arr("$what.rebuiltBy")?.mapIndexed { n, e -> expr(e, "$what.rebuiltBy[$n]") }, unset, o["follows"]?.let { expr(it, "$what.follows") }, async, o["app"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.app must be true") else true } ?: false)
 		}
 
 		private fun defaultStyle(v: Json, what: String): DefaultStyle {

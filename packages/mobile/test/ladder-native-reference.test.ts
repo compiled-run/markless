@@ -378,13 +378,15 @@ function walkApp(
 	for (const [index, step] of steps.entries()) {
 		const action = step.do;
 		if (action && 'back' in action) {
-			expect(
-				appRuntime
-					.dispatch({ event: 'back' })
-					.filter((entry) => entry.op !== 'abort' && entry.op !== 'clearTimer'),
-				`step ${index}: Back journals only what it cancels`,
-			).toEqual([]);
+			const journal = appRuntime.dispatch({ event: 'back' });
 			stack.pop();
+			// The screen shown again takes what a page above it changed in the app-wide cells; nothing else changes.
+			const resumed = appRuntime.screens().at(-1)!.runtime.resume();
+			expect(resumed, `step ${index}: the screen shown again had resumed already`).toEqual([]);
+			const shownAgain = journal.filter((entry) => entry.op !== 'abort' && entry.op !== 'clearTimer');
+			const appWide = pageOf(appRuntime.screens().at(-1)!.route).cells.some((cell) => cell.app);
+			if (!appWide) expect(shownAgain, `step ${index}: Back journals only what it cancels`).toEqual([]);
+			for (const entry of shownAgain) stack.at(-1)!.apply(entry, -1);
 		} else if (
 			looksOnly(action) ||
 			(action && ('swipe' in action || 'scrollTo' in action || 'orientation' in action))

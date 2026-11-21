@@ -205,13 +205,15 @@ class Runtime(
 	private val now: () -> Double = { System.currentTimeMillis().toDouble() },
 	/** Where a page with a script gets the app's engine; never asked for a page without one. */
 	private val scriptHost: ScriptHost? = null,
+	/** The app's values of its app-wide `shared()` cells, one for every page. */
+	private val session: AppSession = AppSession.shared,
 ) {
 	private val opened = now()
 	private val computed = HashMap<String, JsValue>()
 	private var computedCells: String? = null
 	/** Cells still `undefined` on the web: a script reads them so until one is written. */
-	private val unset = HashSet<String>().apply { for (c in payload.cells) if (c.unset && c.storageKey?.let(store::get) == null) add(c.id) }
-	private val values = LinkedHashMap<String, JsValue>().apply { for (c in payload.cells) put(c.id, if (c.clock) JsValue.Num(opened) else c.storageKey?.let(store::get) ?: c.initial) }
+	private val unset = HashSet<String>().apply { for (c in payload.cells) if (c.unset && c.storageKey?.let(store::get) == null && !(c.app && c.id in session.values)) add(c.id) }
+	private val values = LinkedHashMap<String, JsValue>().apply { for (c in payload.cells) put(c.id, if (c.clock) JsValue.Num(opened) else (if (c.app) session.values[c.id] else null) ?: c.storageKey?.let(store::get) ?: c.initial) }
 	/** `idle` and `visible` handlers that ran, by `<event>\u0000<instance>`; an instance that leaves the screen is forgotten. */
 	private val fired = HashSet<String>()
 	private val storageKeys = payload.cells.mapNotNull { c -> c.storageKey?.let { c.id to it } }.toMap()
@@ -648,6 +650,13 @@ class Runtime(
 
 	/** Starts the async values the script computes, once the screen is built; the host applies its journal as an action's. */
 	fun start(): List<JournalEntry> = if (asyncCells.isEmpty()) emptyList() else change(null, null) { emptyList() }
+
+	/** The screen shows again after Back: it takes the app's values of its app-wide cells that a page above it changed. */
+	fun resume(): List<JournalEntry> {
+		val moved = payload.cells.filter { c -> c.app && session.values[c.id]?.let { it != values[c.id] } == true }
+		if (moved.isEmpty()) return emptyList()
+		return change(null, null) { for (c in moved) values[c.id] = session.values.getValue(c.id); emptyList() }
+	}
 
 	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
 	fun leave(): List<JournalEntry> =
@@ -1483,6 +1492,7 @@ class Runtime(
 		for (o in released) journal.add(JournalEntry.Overlay(o, open = false, modal = isModal(o)))
 		for (o in enlisted) journal.add(JournalEntry.Overlay(o, open = true, modal = isModal(o)))
 		journal.addAll(synced)
+		for (c in payload.cells) if (c.app && c.id !in unset) session.values[c.id] = values.getValue(c.id)
 		return journal
 	}
 
