@@ -3,6 +3,7 @@ import { DEVICE_CALLS } from '@markless/serializer/native-device';
 import {
 	NATIVE_SCRIPT_POINTER_FIELDS,
 	NATIVE_SCRIPT_SUBMITTED_FORM,
+	NATIVE_UNBOUND_HANDLE,
 } from '@markless/serializer/native-view';
 
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
@@ -494,6 +495,7 @@ var elementFacts = {};
 var proxies = {};
 var elementOf = function (id) {
 	if (typeof id !== 'string') return id;
+	if (id === ${JSON.stringify(NATIVE_UNBOUND_HANDLE)}) return undefined;
 	if (proxies[id]) return proxies[id];
 	var facts = function () {
 		if (!elementFacts[id]) throw new Error('the host described no element ' + id);

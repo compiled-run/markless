@@ -888,7 +888,7 @@ export function Page() @{
 		);
 	});
 
-	it('marks live regions as ARIA defines them, and refuses one whose politeness follows state', async () => {
+	it('marks live regions as ARIA defines them, and one whose politeness follows state as following it', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Page() @{
 	let open = state(false);
@@ -919,9 +919,8 @@ export function Page() @{
 	let paused = state(false);
 	<div aria-live={paused ? 'off' : 'polite'}>news</div>
 }`);
-		expect(dynamic.diagnostics.map((d) => d.message)).toContain(
-			'the `aria-live` of a <div> follows state; a native host makes a live region when it builds the view',
-		);
+		expect(dynamic.diagnostics).toEqual([]);
+		expect(dynamic.payload!.nodes.find((node) => node.kind === 'element' && node.element === 'div')).toHaveProperty('liveFollows');
 	});
 
 	it('runs only the side of &&, || and ?? that a left side known when the app is built leaves to run', async () => {
@@ -1012,7 +1011,7 @@ export function Page() @{
 		expect(counted.diagnostics.map((d) => d.message).join('\n')).toContain('a @for');
 	});
 
-	it("reads a shared() factory's own handle by its name in the factory's methods, and refuses one bound inside an @if arm", async () => {
+	it("reads a shared() factory's own handle by its name in the factory's methods, and one bound inside an @if arm as drawn", async () => {
 		const source = (field: string) => `import { element, shared, state } from '@markless/core';
 const boxState = shared(() => {
 	const box = state({ note: '' });
@@ -1045,14 +1044,122 @@ export function Page() @{
 				value: { literal: 'has field' },
 			},
 		]);
-		const armed = await nativeView(
-			source('@if (shown) { <input aria-label="Field" el={box.fieldEl} /> }'),
+		const armed = await nativeView(source('@if (shown) { <input aria-label="Field" el={box.fieldEl} /> }'), dataOnly);
+		expect(armed.diagnostics).toEqual([]);
+		const input = armed.payload!.nodes.find((node) => node.kind === 'element' && node.element === 'input')!;
+		expect(armed.payload?.handlers[0]?.ops).toEqual([
+			{
+				op: 'assign',
+				cell: 'shared:src/App.tsrx#boxState/state:box.note',
+				value: { if: { drawn: input.id }, whenTrue: { literal: 'has field' }, whenFalse: { literal: 'no field' } },
+			},
+		]);
+		const either = await nativeView(
+			source('@if (shown) { <input aria-label="Field" el={box.fieldEl} /> } @else { <input aria-label="Other" el={box.fieldEl} /> }'),
 			dataOnly,
 		);
-		expect(armed.payload).toBeNull();
-		expect(armed.diagnostics.map((d) => d.message)).toContain(
-			'the click handler reads `fieldEl`, a handle bound inside an @if arm',
+		expect(either.diagnostics).toEqual([]);
+		const [first, second] = either.payload!.nodes.filter((node) => node.kind === 'element' && node.element === 'input');
+		expect(JSON.stringify(either.payload?.handlers[0]?.ops)).toContain(
+			JSON.stringify({ logical: '??', left: { drawn: first!.id }, right: { drawn: second!.id } }),
 		);
+	});
+
+	it('makes a live region whose aria-live or role follows state, outside a row, with its politeness as an expression', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let paused = state(false);
+	<main>
+		<p aria-live={paused ? 'off' : 'polite'}>Slide</p>
+		<button onClick={() => (paused = !paused)}>Pause</button>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const region = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'p');
+		expect(region).toMatchObject({ liveFollows: { politeness: expect.any(Object), atomic: expect.any(Object) } });
+		expect(region).not.toHaveProperty('live');
+		const rows = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let items = state([{ id: 'a', bad: false }]);
+	<ul>
+		@for (const item of items; key item.id) {
+			<li role={item.bad ? 'alert' : 'status'}>{item.id}</li>
+		}
+	</ul>
+}`);
+		expect(rows.diagnostics.map((d) => d.message).join('\n')).toContain('in a @for row whose `role`, `aria-live` or `aria-atomic` follows state');
+	});
+
+	it("folds a shared state's first value that reads module constants", async () => {
+		const { payload, diagnostics } = await nativeView(`import { shared, state } from '@markless/core';
+const SIZES = ['S', 'L'];
+const pickerState = shared(() => {
+	const picker = state({ sizes: SIZES, chosen: SIZES[0] });
+	return picker;
+}, { scope: 'subtree' });
+export function Page() @{
+	<main><Picker /></main>
+}
+function Picker() @{
+	const picker = pickerState();
+	<p>{picker.chosen}</p>
+}`, dataOnly);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.cells.find((cell) => cell.name === 'picker.chosen')?.initial).toBe('S');
+	});
+
+	it('seeds a shared field from a left-out prop with its default, so the field is null, not undefined', async () => {
+		const { payload, diagnostics } = await nativeView(`import { shared, state } from '@markless/core';
+const meterState = shared(() => {
+	const meter = state({ value: null as number | null });
+	return meter;
+}, { scope: 'subtree' });
+export function Page() @{
+	<main><Meter /></main>
+}
+function Meter({ value = null }: { readonly value?: number | null }) @{
+	const meter = meterState();
+	meter.value = value;
+	<p>{meter.value === null ? 'none' : 'some'}</p>
+}`, dataOnly);
+		expect(diagnostics).toEqual([]);
+		expect(JSON.stringify(payload!.nodes)).toContain('"binary":"==="');
+	});
+
+	it("seeds a part's state from a left-out prop whose default only the compiler folds, so comparing it with null is not refused", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	<main><Meter /></main>
+}
+const NONE = null;
+function Meter({ value = NONE }: { readonly value?: number | null }) @{
+	const meter = state(value);
+	<p>{meter === null ? 'none' : 'some'}</p>
+}`, dataOnly);
+		expect(diagnostics).toEqual([]);
+		expect(JSON.stringify(payload!.nodes)).toContain('"binary":"==="');
+	});
+
+	it('reads names a component body destructures from an array as those indexes, skipping holes', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Page() @{
+	<main>
+		<Files files={[{ name: 'a' }, { name: 'b' }, { name: 'c' }]} />
+		<Files files={[{ name: 'only' }]} />
+	</main>
+}
+function Files({ files }: { readonly files: readonly { readonly name: string }[] }) @{
+	const [first, , third] = files;
+	<section>
+		<p>{first.name}</p>
+		@if (third) {
+			<p>{third.name}</p>
+		}
+	</section>
+}`);
+		expect(diagnostics).toEqual([]);
+		const texts = JSON.stringify(payload!.nodes.filter((node) => node.kind === 'text'));
+		for (const name of ['"a"', '"c"', '"only"']) expect(texts).toContain(name);
+		expect(texts).not.toContain('"b"');
 	});
 
 	it('leaves out a <select> hidden from sight and screen readers, and refuses one inside a form by name', async () => {
