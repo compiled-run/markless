@@ -156,11 +156,26 @@
 		}
 	},
 	"initial": [
-		["h1:text0", "Helper classes"],
-		["h2:text0", "Quiet note"],
-		["h3:text0", "Toggle loud"]
+		[
+			"h1:text0",
+			"Helper classes"
+		],
+		[
+			"h2:text0",
+			"Quiet note"
+		],
+		[
+			"h3:text0",
+			"Toggle loud"
+		]
 	],
-	"initialAttributes": [["h2", "class", "note mk-dyjz6b"]],
+	"initialAttributes": [
+		[
+			"h2",
+			"class",
+			"note mk-dyjz6b"
+		]
+	],
 	"steps": [
 		{
 			"action": {

@@ -23,6 +23,7 @@ import dev.markless.mobile.core.DefaultStyle
 import dev.markless.mobile.core.Drawing
 import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.Payload
+import dev.markless.mobile.core.Shape
 import dev.markless.mobile.core.ShapePaint
 
 /** The text style a block gives the text inside it: its own default style and its ancestors', combined. */
@@ -157,26 +158,48 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 	/** What `currentColor` paints: the svg's text colour from a style export, else black. */
 	var currentColor: Int = Color.BLACK
 		set(value) { field = value; invalidate() }
-	private val paths = drawing.shapes.map { shape ->
-		Path().apply {
-			fillType = if (shape.evenOdd) Path.FillType.EVEN_ODD else Path.FillType.WINDING
-			val v = shape.path
-			var i = 0
-			while (i < v.size) {
-				when (v[i].toInt()) {
-					0 -> { moveTo(v[i + 1].toFloat(), v[i + 2].toFloat()); i += 3 }
-					1 -> { lineTo(v[i + 1].toFloat(), v[i + 2].toFloat()); i += 3 }
-					3 -> { cubicTo(v[i + 1].toFloat(), v[i + 2].toFloat(), v[i + 3].toFloat(), v[i + 4].toFloat(), v[i + 5].toFloat(), v[i + 6].toFloat()); i += 7 }
-					4 -> { close(); i += 1 }
-					else -> throw MarklessHostError("unknown path verb ${v[i]}")
-				}
+	private fun pathOf(shape: Shape, v: List<Double>) = Path().apply {
+		fillType = if (shape.evenOdd) Path.FillType.EVEN_ODD else Path.FillType.WINDING
+		var i = 0
+		while (i < v.size) {
+			when (v[i].toInt()) {
+				0 -> { moveTo(v[i + 1].toFloat(), v[i + 2].toFloat()); i += 3 }
+				1 -> { lineTo(v[i + 1].toFloat(), v[i + 2].toFloat()); i += 3 }
+				3 -> { cubicTo(v[i + 1].toFloat(), v[i + 2].toFloat(), v[i + 3].toFloat(), v[i + 4].toFloat(), v[i + 5].toFloat(), v[i + 6].toFloat()); i += 7 }
+				4 -> { close(); i += 1 }
+				else -> throw MarklessHostError("unknown path verb ${v[i]}")
 			}
 		}
 	}
+	private val paths = drawing.shapes.map { pathOf(it, it.path) }
 	private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
+	/** min-x, min-y, width and height: the compiled one, or what a `viewBox` that follows state gives. */
+	var viewBox: List<Double>? = drawing.viewBox
+		private set
+	/** Shapes from inside it (a component's `<path>`), in tree order, each with the outline it has now. */
+	private val live = ArrayList<Triple<String, Shape, Path>>()
+
 	/** The width over the height the web gives it without a size: the viewBox's, else 300 by 150. */
-	private val ratio: Double = drawing.viewBox?.let { it[3] / it[2] } ?: 0.5
+	private val ratio: Double get() = viewBox?.let { it[3] / it[2] } ?: 0.5
+
+	fun addShape(id: String, shape: Shape, outline: String?) {
+		live.add(Triple(id, shape, pathOf(shape, if (shape.path.isEmpty()) numbers(outline) else shape.path)))
+		invalidate()
+	}
+
+	fun setOutline(id: String, outline: String?) {
+		val at = live.indexOfFirst { it.first == id }
+		if (at < 0) return
+		live[at] = Triple(id, live[at].second, pathOf(live[at].second, numbers(outline)))
+		invalidate()
+	}
+
+	fun setViewBox(text: String?) {
+		viewBox = numbers(text).takeIf { it.size == 4 }
+		requestLayout()
+		invalidate()
+	}
 
 	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
 		val available = MeasureSpec.getSize(widthMeasureSpec).toDouble()
@@ -187,12 +210,12 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 
 	override fun onDraw(canvas: Canvas) {
 		canvas.save()
-		drawing.viewBox?.let { (x, y, w, h) ->
+		viewBox?.let { (x, y, w, h) ->
 			val scale = minOf(width / w, height / h)
 			canvas.translate((-x * scale + (width - w * scale) / 2).toFloat(), (-y * scale + (height - h * scale) / 2).toFloat())
 			canvas.scale(scale.toFloat(), scale.toFloat())
 		} ?: canvas.scale(density, density)
-		for ((index, shape) in drawing.shapes.withIndex()) {
+		for ((shape, path) in drawing.shapes.zip(paths) + live.map { it.second to it.third }) {
 			canvas.save()
 			shape.transform?.let { (a, b, c, d, e, f) ->
 				canvas.concat(Matrix().apply { setValues(floatArrayOf(a.toFloat(), c.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) })
@@ -201,7 +224,7 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 				paint.reset(); paint.isAntiAlias = true
 				paint.style = Paint.Style.FILL
 				paint.color = colorOf(fill)
-				canvas.drawPath(paths[index], paint)
+				canvas.drawPath(path, paint)
 			}
 			shape.stroke?.let { stroke ->
 				paint.reset(); paint.isAntiAlias = true
@@ -211,7 +234,7 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 				paint.strokeCap = when (shape.cap) { "round" -> Paint.Cap.ROUND; "square" -> Paint.Cap.SQUARE; else -> Paint.Cap.BUTT }
 				paint.strokeJoin = when (shape.join) { "round" -> Paint.Join.ROUND; "bevel" -> Paint.Join.BEVEL; else -> Paint.Join.MITER }
 				paint.strokeMiter = shape.miterLimit.toFloat()
-				canvas.drawPath(paths[index], paint)
+				canvas.drawPath(path, paint)
 			}
 			canvas.restore()
 		}
@@ -225,3 +248,6 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 }
 
 private operator fun <T> List<T>.component6(): T = this[5]
+
+/** The engine's numbers, space-separated, as the journal carries a drawing's outline or viewBox; nil or empty is none. */
+internal fun numbers(text: String?): List<Double> = text.orEmpty().split(' ').mapNotNull { it.toDoubleOrNull() }
