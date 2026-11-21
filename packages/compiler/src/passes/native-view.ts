@@ -1746,6 +1746,13 @@ export function createNativeViewPayload(
 				if (folded && lowered && cellsOf(lowered).size === 0) {
 					value = folded.value;
 					known = true;
+					// A prop the part was not given is `undefined` on the web, there and as an object's field.
+					const absent = (e: SemanticExpression) =>
+						e.kind === 'read' && isPropName(e.name, scope) && !propOf(e.name, scope);
+					if (absent(initializer)) undefinedFirst.add(id);
+					else if (initializer.kind === 'object')
+						for (const [field, e] of initializer.entries)
+							if (absent(e)) undefinedFirst.add(`${id}.${field}`);
 				} else if (
 					lowered &&
 					row &&
@@ -4725,15 +4732,36 @@ export function createNativeViewPayload(
 				}
 				const id = scope.prefix + item.id;
 				nodeSpans.set(id, span);
-				const spread = chunk.slots.some(
+				const spreadSlot = chunk.slots.find(
 					(slot) =>
 						slot.kind === 'spread-attributes' &&
 						comparePaths(slot.coordinate.path, item.path) === 0,
 				);
-				const restAttributes: Record<string, string> = {};
+				const spread = spreadSlot !== undefined;
+				// In a scoped module the spread's slot writes the module's scope class before the class the caller passed.
+				const leadingClass =
+					spreadSlot?.kind === 'spread-attributes' ? spreadSlot.leadingClass : undefined;
+				const restAttributes: Record<string, string> = leadingClass ? { class: leadingClass } : {};
 				const restBindings: { attribute: string; value: NativeExpr }[] = [];
 				if (spread) {
 					for (const [name, value] of scope.rest ?? []) {
+						if (name === 'class' && leadingClass) {
+							if ('literal' in value) {
+								if (typeof value.literal === 'string' && value.literal !== '')
+									restAttributes['class'] = `${leadingClass} ${value.literal}`;
+							} else {
+								delete restAttributes['class'];
+								restBindings.push({
+									attribute: 'class',
+									value: {
+										if: value,
+										whenTrue: { template: [`${leadingClass} `, value] },
+										whenFalse: { literal: leadingClass },
+									},
+								});
+							}
+							continue;
+						}
 						if ('literal' in value) {
 							if (value.literal === null || value.literal === false) continue;
 							restAttributes[name] =
