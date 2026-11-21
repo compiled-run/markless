@@ -531,12 +531,14 @@ class Runtime(
 		return facts.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value}" }
 	}
 
-	/** Every current value by slot, and the seed `crypto` draws from when the script uses it. */
+	/** Every current value by slot, the seed `crypto` draws from when the script uses it, and the route params for `navigate`. */
 	private fun entryCells(): String = buildString {
 		append(",\"cells\":")
 		append(values.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonValue(it.value)}" })
 		if (unset.isNotEmpty()) append(",\"unset\":${unset.sorted().joinToString(",", "[", "]") { jsonString(it) }}")
 		if (payload.script?.services?.contains("crypto") == true) scriptHost?.seed()?.let { append(",\"seed\":${jsonString(it)}") }
+		if (payload.script?.services?.contains("navigate") == true)
+			append(",\"params\":" + params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" })
 	}
 
 	/** Submissions held by a script promise not settled yet, by the engine's run number. */
@@ -602,7 +604,16 @@ class Runtime(
 				JournalEntry.Command(node, command, (parts[2] as? Json.Bool)?.value == true)
 			} +
 			// A key or paste handler called preventDefault() before it first awaited.
-			(if ((result["prevented"] as? Json.Bool)?.value == true) listOf(JournalEntry.PreventDefault) else emptyList())
+			(if ((result["prevented"] as? Json.Bool)?.value == true) listOf(JournalEntry.PreventDefault) else emptyList()) +
+			listOfNotNull(result["navigate"]?.let { n ->
+				val o = n.obj("leave().navigate")
+				o.only(setOf("route", "params", "replace"), "leave().navigate")
+				JournalEntry.Navigate(
+					o.field("route", "leave().navigate").str("leave().navigate.route"),
+					o.field("params", "leave().navigate").obj("leave().navigate.params").mapValues { it.value.str("a route param") },
+					(o.field("replace", "leave().navigate") as? Json.Bool)?.value ?: throw MarklessDecodeError("leave().navigate.replace must be a boolean"),
+				)
+			})
 	}
 
 
@@ -936,6 +947,9 @@ class Runtime(
 	}
 
 	/** Every shown branch's chosen arm. */
+	/** A branch's style state: the arm it shows ("0", "1", …, or "none"); null while it is not shown. */
+	fun styleArm(branch: String): JsValue? = arms().firstOrNull { it.first == branch }?.let { JsValue.Str(it.second?.toString() ?: "none") }
+
 	fun arms(): List<Pair<String, Int?>> = payload.nodes.filterIsInstance<Node.Branch>().flatMap { b -> instances(b).map { it.id to armOf(b, it.scope) } }
 
 	/** Every shown list's row keys, in order. */

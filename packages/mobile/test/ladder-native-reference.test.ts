@@ -230,6 +230,14 @@ function mirror(
 					const text = kept.get(id) ?? fresh.get(id);
 					if (text !== undefined) texts.set(id, text);
 				}
+			// A row's copy is built with its bound attributes, as an arm's nodes are; a row that left takes its own with it.
+			const inRows = (id: string) => {
+				const at = id.indexOf('@');
+				return at >= 0 && rowNodes.includes(id.slice(0, at));
+			};
+			for (const key of attributes.keys()) if (inRows(key.split('\0')[0]!)) attributes.delete(key);
+			for (const [node, name, value] of runtime.attributes())
+				if (inRows(node) && entry.keys.includes(node.slice(node.indexOf('@') + 1))) attributes.set(`${node}\0${name}`, value);
 		} else if (entry.op === 'arm') {
 			chosen.set(entry.node, entry.index);
 			for (const [node, index] of runtime.arms())

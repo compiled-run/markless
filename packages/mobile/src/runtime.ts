@@ -711,6 +711,7 @@ export function createNativeRuntime(
 		...(script?.services.includes('crypto') && scriptHost?.seed
 			? { seed: scriptHost.seed() }
 			: {}),
+		...(script?.services.includes('navigate') ? { params } : {}),
 	});
 	/** One engine entry, then what it asked for: its writes land in cells; timers, clears and requests become entries. */
 	/** Submissions held by a script promise not settled yet, by the engine's run number. */
@@ -732,7 +733,14 @@ export function createNativeRuntime(
 				readonly request: Extract<NativeJournalEntry, { op: 'fetch' }>['request'];
 			}>;
 			readonly logs: ReadonlyArray<readonly [string, string]>;
-			readonly commands?: ReadonlyArray<readonly [string, 'focus' | 'scrollIntoView' | 'showModal' | 'close', boolean]>;
+			readonly navigate?: {
+				readonly route: string;
+				readonly params: Readonly<Record<string, string>>;
+				readonly replace: boolean;
+			};
+			readonly commands?: ReadonlyArray<
+				readonly [string, 'focus' | 'scrollIntoView' | 'showModal' | 'close', boolean]
+			>;
 			/** A key or paste handler called `preventDefault()` before it first awaited. */
 			readonly prevented?: true;
 		};
@@ -774,17 +782,37 @@ export function createNativeRuntime(
 				id,
 				request,
 			})),
-			...(result.commands ?? []).flatMap(([node, command, preventScroll]): NativeJournalEntry[] => {
-				// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
-				if (command === 'showModal' || command === 'close') {
-					if (!dialogs.has(node)) throw new Error(`${command}() on ${node}, which is not a dialog`);
-					dialogs.set(node, command === 'showModal');
-					return [];
-				}
-				if (command === 'focus') focused = node;
-				return [{ op: 'command', node, command, ...(preventScroll ? { preventScroll: true as const } : {}) }];
-			}),
+			...(result.commands ?? []).flatMap(
+				([node, command, preventScroll]): NativeJournalEntry[] => {
+					// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
+					if (command === 'showModal' || command === 'close') {
+						if (!dialogs.has(node))
+							throw new Error(`${command}() on ${node}, which is not a dialog`);
+						dialogs.set(node, command === 'showModal');
+						return [];
+					}
+					if (command === 'focus') focused = node;
+					return [
+						{
+							op: 'command',
+							node,
+							command,
+							...(preventScroll ? { preventScroll: true as const } : {}),
+						},
+					];
+				},
+			),
 			...(result.prevented ? [{ op: 'preventDefault' } as NativeJournalEntry] : []),
+			...(result.navigate
+				? [
+						{
+							op: 'navigate',
+							route: result.navigate.route,
+							params: result.navigate.params,
+							...(result.navigate.replace ? { replace: true as const } : {}),
+						} satisfies NativeJournalEntry,
+					]
+				: []),
 		];
 	};
 	const screen = ++screens;

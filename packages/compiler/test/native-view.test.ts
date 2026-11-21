@@ -3080,6 +3080,22 @@ export function Page() @{
 	});
 });
 
+describe('navigate() in JavaScript', () => {
+	it('needs the app\'s routes, which a build of one component does not have', async () => {
+		const text = `import { state } from '@markless/core';
+import { navigate } from '@markless/router';
+export function Page() @{
+	let id = state(1);
+	<button onClick={async () => { id++; await navigate(\`/orders/\${id}\`); }}>Next</button>
+}`;
+		const { payload, diagnostics } = await nativeView(text);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toContain(
+			"the click handler calls `navigate` from @markless/router inside JavaScript that runs on the phone, which needs the app's routes; build the app, not one component",
+		);
+	});
+});
+
 describe('element proxies', () => {
 	const source = `import { element, shared, state } from '@markless/core';
 const pickerState = shared(
