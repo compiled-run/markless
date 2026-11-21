@@ -164,15 +164,18 @@ export type NativeScriptBinding =
 	/** A shared object's method: the script function `method` returns, run over its own `bindings` when called. */
 	| { readonly method: string; readonly bindings: Readonly<Record<string, NativeScriptBinding>> }
 	/** A `shared()` accessor (`selectState`): a function that returns that object. */
-	| { readonly shared: Readonly<Record<string, NativeScriptBinding>> };
+	| { readonly shared: Readonly<Record<string, NativeScriptBinding>> }
+	/** A function a parent passed as a prop: the script function `callback`, its own names bound as `<name>.<its name>`. */
+	| { readonly callback: string };
 
 export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>;
 
 /**
  * Host services a payload's script uses, so a host provides only those: timers (`setTimeout` and the rest, through
- * `timer` entries), `fetch` (through `fetch` entries), `console`, and `crypto.randomUUID` (from a `seed` the host passes).
+ * `timer` entries), `fetch` (through `fetch` entries), `console`, `crypto.randomUUID` (from a `seed` the host passes),
+ * and `navigate` from @markless/router (through a `navigate` entry; the host passes the page's route `params`).
  */
-export type NativeScriptService = 'timers' | 'fetch' | 'console' | 'crypto';
+export type NativeScriptService = 'timers' | 'fetch' | 'console' | 'crypto' | 'navigate';
 
 /** The JavaScript a payload's `script` ops and script computeds run, in the platform's engine, started on first use. */
 export type NativeScript = {
@@ -1065,6 +1068,7 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		setInterval: 'timers',
 		clearInterval: 'timers',
 		queueMicrotask: 'engine',
+		structuredClone: 'engine',
 		console: 'console',
 		fetch: 'fetch',
 		crypto: 'crypto',
@@ -1087,6 +1091,9 @@ export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> =
 	['currentTarget', 'value'],
 	['currentTarget', 'checked'],
 ];
+
+/** A submit handler's binding for its form's entries now, which its event's `target` and `currentTarget` carry for FormData. */
+export const NATIVE_SCRIPT_SUBMITTED_FORM = 'submitted form';
 
 /** What a touch adds to a script pointer handler's event: its plain values. The elements it names reach only data handlers. */
 export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [

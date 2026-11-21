@@ -11,12 +11,7 @@ export const ICON_SOURCE_ID = /\.(?:tsrx|mdx)(?:$|[?#])/;
 
 export function icons(input: IconsOptions = {}): Plugin {
 	const options = resolveOptions(input);
-	const loader = new CollectionLoader(options);
-	// Each query variant of one file (`?markless-symbols`, `?markless-render-data`, ...) arrives with the same code.
-	const lastByFile = new Map<
-		string,
-		{ code: string; result: Promise<{ transformed: string | undefined; warnings: string[] }> }
-	>();
+	const transform = iconSourceTransform(input);
 	return {
 		name: '@markless/icons',
 		enforce: 'pre',
@@ -25,29 +20,45 @@ export function icons(input: IconsOptions = {}): Plugin {
 			filter: { id: ICON_SOURCE_ID },
 			async handler(code, id) {
 				const filename = id.split(/[?#]/, 1)[0]!;
-				let last = lastByFile.get(filename);
-				if (last?.code !== code) {
-					const warnings: string[] = [];
-					const diagnostic = (message: string) => warnings.push(message);
-					const transformed = filename.endsWith('.tsrx')
-						? transformTsrx(code, filename, options, loader, diagnostic)
-						: filename.endsWith('.mdx')
-							? transformMdx(code, filename, options, loader, diagnostic)
-							: Promise.resolve(undefined);
-					last = {
-						code,
-						result: transformed.then((value) => ({ transformed: value, warnings })),
-					};
-					lastByFile.set(filename, last);
-					last.result.catch(() => lastByFile.delete(filename));
-				}
-				const { transformed, warnings } = await last.result;
+				const { code: transformed, warnings } = await transform(code, filename);
 				for (const message of warnings) this.warn(message);
 				if (transformed === undefined) return;
 				if (options.debug) this.info(`@markless/icons: transformed ${filename}`);
 				return { code: transformed, map: null };
 			},
 		},
+	};
+}
+
+/**
+ * The plugin's rewrite without Vite: each icon tag in a `.tsrx` or `.mdx` source becomes its inline `<svg>`, for a build
+ * that reads sources itself (a phone app's).
+ */
+export function iconSourceTransform(
+	input: IconsOptions = {},
+): (code: string, filename: string) => Promise<{ code: string | undefined; warnings: string[] }> {
+	const options = resolveOptions(input);
+	const loader = new CollectionLoader(options);
+	// Each query variant of one file (`?markless-symbols`, `?markless-render-data`, ...) arrives with the same code.
+	const lastByFile = new Map<
+		string,
+		{ code: string; result: Promise<{ code: string | undefined; warnings: string[] }> }
+	>();
+	return (code, filename) => {
+		let last = lastByFile.get(filename);
+		if (last?.code !== code) {
+			const warnings: string[] = [];
+			const diagnostic = (message: string) => warnings.push(message);
+			const transformed = filename.endsWith('.tsrx')
+				? transformTsrx(code, filename, options, loader, diagnostic)
+				: filename.endsWith('.mdx')
+					? transformMdx(code, filename, options, loader, diagnostic)
+					: Promise.resolve(undefined);
+			last = { code, result: transformed.then((value) => ({ code: value, warnings })) };
+			lastByFile.set(filename, last);
+			last.result.catch(() => lastByFile.delete(filename));
+		}
+		return last.result;
 	};
 }
 

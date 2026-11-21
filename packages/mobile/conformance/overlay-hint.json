@@ -1,0 +1,606 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:tip",
+				"name": "tip",
+				"initial": true,
+				"styled": true
+			},
+			{
+				"id": "state:menu",
+				"name": "menu",
+				"initial": false,
+				"styled": true
+			},
+			{
+				"id": "state:tipClosed",
+				"name": "tipClosed",
+				"initial": "not yet"
+			},
+			{
+				"id": "state:menuClosed",
+				"name": "menuClosed",
+				"initial": "not yet"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Hints"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Tip closed: "
+					},
+					{
+						"cell": "state:tipClosed"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Menu closed: "
+					},
+					{
+						"cell": "state:menuClosed"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Show tip"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "div",
+				"parent": "h0",
+				"attributes": {
+					"overlay-hint": "",
+					"role": "tooltip",
+					"overlay": ""
+				},
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "state:tip"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "p",
+				"parent": "h5"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Saves a draft"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "button",
+				"parent": "h5"
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "More"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "div",
+				"parent": "h0",
+				"attributes": {
+					"role": "dialog",
+					"overlay": ""
+				},
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"binary": "!==",
+							"left": {
+								"cell": "state:menu"
+							},
+							"right": {
+								"literal": true
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "p",
+				"parent": "h8"
+			},
+			{
+				"kind": "text",
+				"id": "h9:text0",
+				"parent": "h9",
+				"parts": [
+					{
+						"text": "Draft options"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h10",
+				"element": "button",
+				"parent": "h8"
+			},
+			{
+				"kind": "text",
+				"id": "h10:text0",
+				"parent": "h10",
+				"parts": [
+					{
+						"text": "Explain"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h5",
+				"event": "dismiss",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h7",
+				"event": "activate",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h8",
+				"event": "dismiss",
+				"handler": "handler:event:3"
+			},
+			{
+				"host": "h10",
+				"event": "activate",
+				"handler": "handler:event:4"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:tip",
+						"value": {
+							"literal": true
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:tipClosed",
+						"value": {
+							"event": "reason"
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:tip",
+						"value": {
+							"literal": false
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:menu",
+						"value": {
+							"literal": true
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:menuClosed",
+						"value": {
+							"event": "reason"
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:menu",
+						"value": {
+							"literal": false
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:4",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:tip",
+						"value": {
+							"literal": true
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Hints"
+		],
+		[
+			"h2:text0",
+			"Tip closed: not yet"
+		],
+		[
+			"h3:text0",
+			"Menu closed: not yet"
+		],
+		[
+			"h4:text0",
+			"Show tip"
+		],
+		[
+			"h6:text0",
+			"Saves a draft"
+		],
+		[
+			"h7:text0",
+			"More"
+		],
+		[
+			"h9:text0",
+			"Draft options"
+		],
+		[
+			"h10:text0",
+			"Explain"
+		]
+	],
+	"initialAttributes": [
+		[
+			"h5",
+			"hidden",
+			null
+		],
+		[
+			"h8",
+			"hidden",
+			""
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h7"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h7"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h7"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:tip",
+					"value": false
+				},
+				{
+					"op": "state",
+					"cell": "state:menu",
+					"value": true
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Tip closed: superseded"
+				},
+				{
+					"op": "attribute",
+					"node": "h5",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "h8",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "overlay",
+					"node": "h5",
+					"open": false,
+					"modal": false
+				},
+				{
+					"op": "overlay",
+					"node": "h8",
+					"open": true,
+					"modal": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h10"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h10"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h10"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:tip",
+					"value": true
+				},
+				{
+					"op": "attribute",
+					"node": "h5",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "overlay",
+					"node": "h5",
+					"open": true,
+					"modal": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:tip",
+					"value": false
+				},
+				{
+					"op": "state",
+					"cell": "state:menu",
+					"value": false
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Tip closed: outside-press"
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Menu closed: outside-press"
+				},
+				{
+					"op": "attribute",
+					"node": "h5",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "h8",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "overlay",
+					"node": "h8",
+					"open": false,
+					"modal": false
+				},
+				{
+					"op": "overlay",
+					"node": "h5",
+					"open": false,
+					"modal": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h1"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h4"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h4"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:tip",
+					"value": true
+				},
+				{
+					"op": "attribute",
+					"node": "h5",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "overlay",
+					"node": "h5",
+					"open": true,
+					"modal": false
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "dismiss",
+				"host": "h5",
+				"reason": "escape"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:tip",
+					"value": false
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Tip closed: escape"
+				},
+				{
+					"op": "attribute",
+					"node": "h5",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "overlay",
+					"node": "h5",
+					"open": false,
+					"modal": false
+				}
+			]
+		}
+	]
+}
