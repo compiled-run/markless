@@ -2159,6 +2159,7 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	if let drawing = view as? DrawingView {
 		// An svg's text colour is what its currentColor paints.
 		if let color = style.textColor { drawing.currentColor = uiColor(color) }
+		drawing.isHidden = style.hidden
 		return
 	}
 	guard let label = view as? UILabel else {
@@ -2170,6 +2171,8 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 		label.font = UIFont(descriptor: face, size: font.size)
 	}
 	if let color = style.textColor { label.textColor = uiColor(color) }
+	// Text that is not visible keeps its place but neither shows nor reads out, as the web hides it.
+	label.isHidden = style.hidden
 }
 
 /// A text node's lines drawn glyph for glyph at Dragon's positions in the platform's own font (`CTFontDrawGlyphs`).
