@@ -1,0 +1,15 @@
+{
+	"rung": 187,
+	"name": "An svg's markers draw at a path's vertices, turned along it (auto-start-reverse at the start), scaled by its stroke width",
+	"steps": [
+		{
+			"visible": ["Route map", "Turn route", "Both ways"],
+			"absent": ["Four stops"]
+		},
+		{
+			"do": { "tap": "Turn route" },
+			"visible": ["Four stops"],
+			"absent": ["Both ways"]
+		}
+	]
+}

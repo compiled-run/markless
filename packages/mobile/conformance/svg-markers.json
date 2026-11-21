@@ -1,0 +1,697 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:across",
+				"name": "across",
+				"initial": true
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Route map"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Turn route"
+					}
+				]
+			},
+			{
+				"kind": "branch",
+				"id": "branch-site:0",
+				"parent": "h0",
+				"test": {
+					"cell": "state:across"
+				},
+				"arms": 2
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "svg",
+				"parent": "h0",
+				"attributes": {
+					"viewBox": "0 0 160 60",
+					"width": "320",
+					"height": "120"
+				},
+				"drawing": {
+					"viewBox": [
+						0,
+						0,
+						160,
+						60
+					],
+					"width": 320,
+					"height": 120,
+					"shapes": [
+						{
+							"path": [
+								0,
+								10,
+								40,
+								1,
+								150,
+								40
+							],
+							"fill": {
+								"r": 0,
+								"g": 0,
+								"b": 0,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": {
+								"r": 51,
+								"g": 51,
+								"b": 51,
+								"alpha": 255
+							},
+							"width": 2,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						},
+						{
+							"clip": [
+								[
+									0,
+									20.799999999999997,
+									46,
+									1,
+									8.799999999999997,
+									46,
+									1,
+									8.799999999999995,
+									34,
+									1,
+									20.799999999999997,
+									34,
+									4
+								]
+							],
+							"path": [
+								0,
+								0,
+								0,
+								1,
+								10,
+								5,
+								1,
+								0,
+								10,
+								4
+							],
+							"fill": {
+								"r": 204,
+								"g": 51,
+								"b": 51,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4,
+							"transform": [
+								-1.2,
+								1.4695761589768238e-16,
+								-1.4695761589768238e-16,
+								-1.2,
+								20.799999999999997,
+								46
+							]
+						},
+						{
+							"clip": [
+								[
+									0,
+									139.2,
+									34,
+									1,
+									151.2,
+									34,
+									1,
+									151.2,
+									46,
+									1,
+									139.2,
+									46,
+									4
+								]
+							],
+							"path": [
+								0,
+								0,
+								0,
+								1,
+								10,
+								5,
+								1,
+								0,
+								10,
+								4
+							],
+							"fill": {
+								"r": 204,
+								"g": 51,
+								"b": 51,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4,
+							"transform": [
+								1.2,
+								0,
+								0,
+								1.2,
+								139.2,
+								34
+							]
+						},
+						{
+							"path": [],
+							"fill": {
+								"r": 0,
+								"g": 0,
+								"b": 0,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 0,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4,
+							"text": {
+								"anchor": "middle",
+								"baseline": "alphabetic",
+								"runs": [
+									{
+										"text": "Both ways",
+										"x": 80,
+										"y": 20,
+										"size": 12,
+										"weight": 400,
+										"letterSpacing": 0,
+										"fill": {
+											"r": 0,
+											"g": 0,
+											"b": 0,
+											"alpha": 255
+										}
+									}
+								]
+							}
+						}
+					],
+					"label": "Both ways"
+				},
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "svg",
+				"parent": "h0",
+				"attributes": {
+					"viewBox": "0 0 160 60",
+					"width": "320",
+					"height": "120"
+				},
+				"drawing": {
+					"viewBox": [
+						0,
+						0,
+						160,
+						60
+					],
+					"width": 320,
+					"height": 120,
+					"shapes": [
+						{
+							"path": [
+								0,
+								10,
+								50,
+								1,
+								60,
+								10,
+								1,
+								110,
+								50,
+								1,
+								150,
+								10
+							],
+							"fill": null,
+							"fillRule": "nonzero",
+							"stroke": {
+								"r": 51,
+								"g": 51,
+								"b": 51,
+								"alpha": 255
+							},
+							"width": 2,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						},
+						{
+							"clip": [
+								[
+									0,
+									6,
+									46,
+									1,
+									14,
+									46,
+									1,
+									14,
+									54,
+									1,
+									6,
+									54,
+									4
+								]
+							],
+							"path": [
+								0,
+								10,
+								5,
+								3,
+								10,
+								7.761423749153967,
+								7.761423749153967,
+								10,
+								5,
+								10,
+								3,
+								2.238576250846033,
+								10,
+								0,
+								7.761423749153967,
+								0,
+								5,
+								3,
+								0,
+								2.238576250846033,
+								2.238576250846033,
+								0,
+								5,
+								0,
+								3,
+								7.761423749153967,
+								0,
+								10,
+								2.238576250846033,
+								10,
+								5,
+								4
+							],
+							"fill": {
+								"r": 51,
+								"g": 102,
+								"b": 204,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4,
+							"transform": [
+								0.8,
+								0,
+								0,
+								0.8,
+								6,
+								46
+							]
+						},
+						{
+							"clip": [
+								[
+									0,
+									56,
+									6,
+									1,
+									64,
+									6,
+									1,
+									64,
+									14,
+									1,
+									56,
+									14,
+									4
+								]
+							],
+							"path": [
+								0,
+								10,
+								5,
+								3,
+								10,
+								7.761423749153967,
+								7.761423749153967,
+								10,
+								5,
+								10,
+								3,
+								2.238576250846033,
+								10,
+								0,
+								7.761423749153967,
+								0,
+								5,
+								3,
+								0,
+								2.238576250846033,
+								2.238576250846033,
+								0,
+								5,
+								0,
+								3,
+								7.761423749153967,
+								0,
+								10,
+								2.238576250846033,
+								10,
+								5,
+								4
+							],
+							"fill": {
+								"r": 51,
+								"g": 102,
+								"b": 204,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4,
+							"transform": [
+								0.8,
+								0,
+								0,
+								0.8,
+								56,
+								6
+							]
+						},
+						{
+							"clip": [
+								[
+									0,
+									106,
+									46,
+									1,
+									114,
+									46,
+									1,
+									114,
+									54,
+									1,
+									106,
+									54,
+									4
+								]
+							],
+							"path": [
+								0,
+								10,
+								5,
+								3,
+								10,
+								7.761423749153967,
+								7.761423749153967,
+								10,
+								5,
+								10,
+								3,
+								2.238576250846033,
+								10,
+								0,
+								7.761423749153967,
+								0,
+								5,
+								3,
+								0,
+								2.238576250846033,
+								2.238576250846033,
+								0,
+								5,
+								0,
+								3,
+								7.761423749153967,
+								0,
+								10,
+								2.238576250846033,
+								10,
+								5,
+								4
+							],
+							"fill": {
+								"r": 51,
+								"g": 102,
+								"b": 204,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4,
+							"transform": [
+								0.8,
+								0,
+								0,
+								0.8,
+								106,
+								46
+							]
+						},
+						{
+							"clip": [
+								[
+									0,
+									146,
+									6,
+									1,
+									154,
+									6,
+									1,
+									154,
+									14,
+									1,
+									146,
+									14,
+									4
+								]
+							],
+							"path": [
+								0,
+								10,
+								5,
+								3,
+								10,
+								7.761423749153967,
+								7.761423749153967,
+								10,
+								5,
+								10,
+								3,
+								2.238576250846033,
+								10,
+								0,
+								7.761423749153967,
+								0,
+								5,
+								3,
+								0,
+								2.238576250846033,
+								2.238576250846033,
+								0,
+								5,
+								0,
+								3,
+								7.761423749153967,
+								0,
+								10,
+								2.238576250846033,
+								10,
+								5,
+								4
+							],
+							"fill": {
+								"r": 51,
+								"g": 102,
+								"b": 204,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4,
+							"transform": [
+								0.8,
+								0,
+								0,
+								0.8,
+								146,
+								6
+							]
+						},
+						{
+							"path": [],
+							"fill": {
+								"r": 0,
+								"g": 0,
+								"b": 0,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 0,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4,
+							"text": {
+								"anchor": "middle",
+								"baseline": "alphabetic",
+								"runs": [
+									{
+										"text": "Four stops",
+										"x": 80,
+										"y": 58,
+										"size": 10,
+										"weight": 400,
+										"letterSpacing": 0,
+										"fill": {
+											"r": 0,
+											"g": 0,
+											"b": 0,
+											"alpha": 255
+										}
+									}
+								]
+							}
+						}
+					],
+					"label": "Four stops"
+				},
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 1
+				}
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:across",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:across"
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Route map"
+		],
+		[
+			"h2:text0",
+			"Turn route"
+		]
+	],
+	"initialArms": [
+		[
+			"branch-site:0",
+			0
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 1
+				}
+			]
+		}
+	]
+}

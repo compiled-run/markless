@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: n10-await-navigate
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Unsaved draft
 - assertVisible: Save
 - assertVisible: Draft

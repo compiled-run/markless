@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u17-borders-dashed
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Borders
 - assertVisible: Dashed all round
 - assertVisible: Dotted all round

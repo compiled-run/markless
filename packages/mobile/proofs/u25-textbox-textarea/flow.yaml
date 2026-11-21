@@ -2,17 +2,17 @@ appId: ${APP_ID}
 name: u25-textbox-textarea
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Feedback
 - assertVisible: Tell us what you think
-- assertVisible: 'Sent: nothing yet'
+- assertVisible: "Sent: nothing yet"
 - assertVisible: Great app
 - tapOn: Your message
 - eraseText
 - inputText: Fast and clear
 - hideKeyboard
-- assertNotVisible: 'Sent: nothing yet'
+- assertNotVisible: "Sent: nothing yet"
 - assertVisible: Fast and clear
-- assertVisible: 'Sent: Fast and clear'
-- assertNotVisible: 'Sent: nothing yet'
+- assertVisible: "Sent: Fast and clear"
+- assertNotVisible: "Sent: nothing yet"
 - assertVisible: Fast and clear

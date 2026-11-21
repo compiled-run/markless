@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: y2-sheet-pick
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Checkout
 - assertVisible: Ship to nowhere yet
 - assertVisible: Choose city
