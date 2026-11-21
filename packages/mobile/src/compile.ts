@@ -26,7 +26,7 @@ import {
 	NATIVE_APP_VERSION,
 	NATIVE_NOT_FOUND_ROUTE,
 } from '@markless/serializer/native-view';
-import { nativeStyleInputs, readsRow, rowAttributeOptions, type NativeStyleInput } from './style-input.ts';
+import { booleanCellsOf, nativeStyleInputs, readsRow, rowAttributeOptions, type NativeStyleInput } from './style-input.ts';
 import type { NativeDeviceFeature } from '@markless/serializer/native-device';
 import { deviceManifest, type DeviceAppConfig, type DeviceManifest } from './permissions.ts';
 
@@ -292,15 +292,24 @@ export async function compileNativeComponent(input: {
 		native.features,
 		input.device,
 	);
-	const styles = [...importedStyles, ...compiled.publicRenderPlan.styleScopes].filter(
-		(style, index, all) => all.findIndex((other) => other.scopeId === style.scopeId) === index,
-	);
 	const sheets = stylesheets.filter(
 		(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
 	);
-	const unstyled = native.payload
-		? unstyledOnly(native.payload, native.elementSources, sheets.length > 0 || styles.some((style) => style.cssText.length > 0))
-		: [];
+	const authored = [...importedStyles, ...compiled.publicRenderPlan.styleScopes];
+	const styled = sheets.length > 0 || authored.some((style) => style.cssText.length > 0);
+	// A styled page gets every component module's <style> blocks it is built from, as the web bundle does (a family's
+	// defaults); an unstyled page keeps the phone's own look, which those defaults do not change.
+	const built: NativeBuild['styles'][number][] = [];
+	if (styled)
+		for (const file of graphs.keys()) {
+			const module = read.get(file);
+			if (file === input.filename || !module || !file.endsWith('.tsrx')) continue;
+			built.push(...(await compileTsrxModule({ ...module, symbols: [] })).publicRenderPlan.styleScopes);
+		}
+	const styles = [...importedStyles, ...built, ...compiled.publicRenderPlan.styleScopes].filter(
+		(style, index, all) => all.findIndex((other) => other.scopeId === style.scopeId) === index,
+	);
+	const unstyled = native.payload ? unstyledOnly(native.payload, native.elementSources, styled) : [];
 	return {
 		payload: errors.length > 0 || usage.length > 0 || unstyled.length > 0 ? null : native.payload,
 		styles,
@@ -334,7 +343,7 @@ function unstyledOnly(
 			'attribute' in binding &&
 			(binding.attribute === 'class' || isNativeStyleStateAttribute(binding.attribute)) &&
 			readsRow(payload, binding.value) &&
-			!rowAttributeOptions(binding.attribute, binding.value)
+			!rowAttributeOptions(binding.attribute, binding.value, booleanCellsOf(payload))
 				? [
 						nativeUnsupported(
 							`the \`${binding.attribute}\` of <${node.element}> ${node.id} follows its @for row on a styled page through a value the build cannot list; Dragon styles a row by each value it can give, so write it as literals chosen by conditions`,

@@ -284,6 +284,8 @@ final class ViewTree {
 	private var timers: [String: Task<Void, Never>] = [:]
 	private var lists: [String: (anchor: UIView, keys: [String], built: [String: [String]])] = [:]
 	private(set) var sheets: [String: SystemSheet] = [:]
+	/// Sheets built since the last stacking pass, whose content an unstyled page still has to stack.
+	private var unstacked: Set<String> = []
 	/// The controller that presents the page's system sheets.
 	weak var presenter: UIViewController?
 	private var anchors = Set<ObjectIdentifier>()
@@ -386,6 +388,7 @@ final class ViewTree {
 		if layout == nil {
 			stackTree(root)
 			for sheet in sheets.values { stackTree(sheet.content) }
+			unstacked.removeAll()
 			alignTables()
 		} else {
 			try sizePage()
@@ -950,6 +953,8 @@ final class ViewTree {
 		if layout == nil {
 			stack(container)
 			for id in built.flatMap(withArms) { if let view = elements[id] { stackTree(view) } }
+			for id in unstacked { if let sheet = sheets[id] { stackTree(sheet.content) } }
+			unstacked.removeAll()
 		}
 	}
 
@@ -1271,7 +1276,8 @@ final class ViewTree {
 				var childIndex = 0
 				_ = try build(template, in: sheet.content, at: &childIndex, Context())
 				sheets[id] = sheet
-				if try runtime.evaluate(open).isTruthy { sheet.open(from: nil) }
+				if layout == nil { unstacked.insert(id) }
+				if try runtime.evaluate(open).isTruthy { sheet.open(from: presenter) }
 			}
 		}
 		return built
@@ -1316,6 +1322,10 @@ final class ViewTree {
 				field.onKey = { key in ask(NativeAction(event: .keydown, host: id, value: key)) }
 			case let (.keydown, area as TextArea):
 				area.onKey = { key in ask(NativeAction(event: .keydown, host: id, value: key)) }
+			case let (.keyup, field as TextField):
+				field.onKeyUp = { key in onAction(NativeAction(event: .keyup, host: id, value: key)) }
+			case let (.keyup, area as TextArea):
+				area.onKeyUp = { key in onAction(NativeAction(event: .keyup, host: id, value: key)) }
 			case let (.paste, field as TextField):
 				field.onPaste = { text in ask(NativeAction(event: .paste, host: id, value: text)) }
 			case let (.paste, area as TextArea):
@@ -1335,6 +1345,7 @@ final class ViewTree {
 	}
 
 	private func remove(_ id: String) {
+		sheets.removeValue(forKey: id)?.close(animated: false)
 		if let branch = branches.removeValue(forKey: id) {
 			for inner in branch.built { remove(inner) }
 			anchors.remove(ObjectIdentifier(branch.anchor))
@@ -2275,14 +2286,20 @@ final class ContainerScrollView: UIScrollView {
 
 /// Keys and pastes as Safari on iOS reports them for the on-screen keyboard: each typed character is its own key, a delete is
 /// `Backspace` (in an empty field too), Return is `Enter`. Each callback answers whether the handler called `preventDefault()`,
-/// which leaves out what the key or paste would do.
+/// which leaves out what the key or paste would do. `onKeyUp` runs after the key's edit, or after it was left out.
 @MainActor protocol KeyedInput: AnyObject {
 	var onKey: ((String) -> Bool)? { get }
+	var onKeyUp: ((String) -> Void)? { get }
 	var onPaste: ((String) -> Bool)? { get }
 }
 
 extension KeyedInput {
-	func keyLeavesOut(_ text: String) -> Bool { onKey?(text == "\n" ? "Enter" : text) ?? false }
+	func keyName(_ text: String) -> String { text == "\n" ? "Enter" : text }
+	/// The key's keydown, then `edit` unless the handler prevented it, then its keyup.
+	func press(_ key: String, _ edit: () -> Void) {
+		if onKey?(key) != true { edit() }
+		onKeyUp?(key)
+	}
 	func pasteLeavesOut() -> Bool { onPaste?(UIPasteboard.general.string ?? "") ?? false }
 }
 
@@ -2290,6 +2307,7 @@ extension KeyedInput {
 /// `textFieldShouldReturn`, not as typed text; a prevented Return neither returns nor puts the keyboard away.
 final class TextField: UITextField, KeyedInput, UITextFieldDelegate {
 	var onKey: ((String) -> Bool)?
+	var onKeyUp: ((String) -> Void)?
 	var onPaste: ((String) -> Bool)?
 
 	override init(frame: CGRect) {
@@ -2301,11 +2319,16 @@ final class TextField: UITextField, KeyedInput, UITextFieldDelegate {
 	required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
 	override func insertText(_ text: String) {
-		if text != "\n" && keyLeavesOut(text) { return }
-		super.insertText(text)
+		if text == "\n" { return super.insertText(text) }
+		press(keyName(text)) { super.insertText(text) }
 	}
 
-	func textFieldShouldReturn(_ textField: UITextField) -> Bool { !keyLeavesOut("\n") }
+	func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+		let prevented = onKey?("Enter") == true
+		// UIKit returns (change, then the implicit submit) after this answer; Safari's keyup comes after both.
+		if let keyUp = onKeyUp { DispatchQueue.main.async { keyUp("Enter") } }
+		return !prevented
+	}
 
 	/// The field is its own delegate, so `maxlength` is asked here.
 	var lengthLimit: LengthLimit?
@@ -2315,8 +2338,7 @@ final class TextField: UITextField, KeyedInput, UITextFieldDelegate {
 	}
 
 	override func deleteBackward() {
-		if onKey?("Backspace") == true { return }
-		super.deleteBackward()
+		press("Backspace") { super.deleteBackward() }
 	}
 
 	override func paste(_ sender: Any?) {
@@ -2329,6 +2351,7 @@ final class TextField: UITextField, KeyedInput, UITextFieldDelegate {
 final class TextArea: UITextView, UITextViewDelegate, KeyedInput {
 	var onChange: [(String) -> Void] = []
 	var onKey: ((String) -> Bool)?
+	var onKeyUp: ((String) -> Void)?
 	var onPaste: ((String) -> Bool)?
 	var onBegin: (() -> Void)?
 	var onFocus: [() -> Void] = []
@@ -2344,13 +2367,11 @@ final class TextArea: UITextView, UITextViewDelegate, KeyedInput {
 	required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
 	override func insertText(_ text: String) {
-		if keyLeavesOut(text) { return }
-		super.insertText(text)
+		press(keyName(text)) { super.insertText(text) }
 	}
 
 	override func deleteBackward() {
-		if onKey?("Backspace") == true { return }
-		super.deleteBackward()
+		press("Backspace") { super.deleteBackward() }
 	}
 
 	override func paste(_ sender: Any?) {

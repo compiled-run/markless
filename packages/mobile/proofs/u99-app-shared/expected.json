@@ -1,0 +1,9 @@
+{
+	"rung": 199,
+	"name": "An app-wide shared() (no scope): components that are not inside one another read and write one instance, as the web's module-level one",
+	"steps": [
+		{ "visible": ["App-wide state", "Top 0", "Bump", "Side 0"] },
+		{ "do": { "tap": "Bump" }, "visible": ["Top 1", "Side 1"], "absent": ["Top 0", "Side 0"] },
+		{ "do": { "tap": "Bump" }, "visible": ["Top 2", "Side 2"], "absent": ["Top 1", "Side 1"] }
+	]
+}

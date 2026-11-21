@@ -1,0 +1,87 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "App",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "mk-5ymd41"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-5ymd41"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Family styles"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "top mk-5ymd41"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Top row"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0/h0",
+			"element": "section",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-11iar12"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0/component-edge:0/h0",
+			"element": "span",
+			"parent": "component-edge:0/h0",
+			"attributes": {
+				"class": "mk-nzjzck tone mk-11iar12",
+				"ui-badge": ""
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:0/component-edge:0/h0:text0",
+			"parent": "component-edge:0/component-edge:0/h0",
+			"text": "Badge"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0/component-edge:0/h1",
+			"element": "p",
+			"parent": "component-edge:0/h0",
+			"attributes": {
+				"class": "mk-nzjzck"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:0/component-edge:0/h1:text0",
+			"parent": "component-edge:0/component-edge:0/h1",
+			"text": "Seed none"
+		}
+	],
+	"css": ".tone.mk-11iar12 {\n\t\t\t\tbackground: #ffd166;\n\t\t\t\tcolor: #22223b;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tpadding: 6px 12px;\n\t\t\t}\n@layer markless {\n\t\t\t\t\t[ui-badge].mk-nzjzck {\n\t\t\t\t\t\tdisplay: block;\n\t\t\t\t\t\tmargin: 12px;\n\t\t\t\t\t\tborder: 4px solid #06d6a0;\n\t\t\t\t\t}\n\t\t\t\t}\n.top.mk-5ymd41 {\n\t\t\t\theight: 60px;\n\t\t\t\tfont-size: 18px;\n\t\t\t}",
+	"states": []
+}

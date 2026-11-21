@@ -243,6 +243,8 @@ public final class NativeRuntime {
 	private var edit: String?
 	/// What a dismiss or pointer event carries while its handlers run.
 	private var eventFields: [NativeEventField: NativeValue]?
+	/// A text field's key or paste event: the field's text then, a script handler's `event.target.value`.
+	private var targetText: String?
 	/// What a touch adds to a script pointer handler's event, in the order the reference writes them.
 	private let touchFields: [NativeEventField] = [.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp, .shiftKey, .ctrlKey, .altKey, .metaKey, .isTrusted, .detail, .key]
 	/// Where the last touch came up, which the click it makes reports; a click no touch made is at 0, 0.
@@ -729,7 +731,7 @@ public final class NativeRuntime {
 			return try callScript("leave")
 		}
 		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave")
-			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["commands", "navigate", "raises"])
+			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["commands", "navigate", "prevented", "raises"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
 			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
@@ -796,11 +798,13 @@ public final class NativeRuntime {
 			if case .navigate? = taken.first { return taken }
 			raised += taken
 		}
+		// A key or paste handler called preventDefault() before it first awaited.
+		let prevented: [NativeJournalEntry] = try result.has("prevented") && result["prevented"].bool() ? [.preventDefault] : []
 		let entries: [NativeJournalEntry] = aborts + clears + timers + requests
-		guard result.has("navigate") else { return entries + commands + raised }
+		guard result.has("navigate") else { return entries + commands + prevented + raised }
 		let opened = try result["navigate"].object(["route", "params", "replace"])
 		let params = try opened["params"].keys().map { NativeRouteParam(name: $0, value: try opened["params"].field($0).string()) }
-		return entries + commands + raised + [.navigate(route: try opened["route"].string(), params: params, replace: try opened["replace"].bool())]
+		return entries + commands + prevented + raised + [.navigate(route: try opened["route"].string(), params: params, replace: try opened["replace"].bool())]
 	}
 
 	/// How deep events raised from JavaScript may nest.
@@ -1353,10 +1357,10 @@ public final class NativeRuntime {
 	/// The page's `<title>` text, nil when it has none.
 	public func title() throws -> String? { try payload.title.map { try text(of: $0) } }
 
-	/// Every system sheet and whether its `open` is truthy.
+	/// Every system sheet shown (its arm, if any, showing) and whether its `open` is truthy.
 	public func sheets() throws -> [(node: String, open: Bool)] {
 		try payload.nodes.compactMap { node in
-			guard case let .sheet(open, _, _, _) = node.kind else { return nil }
+			guard case let .sheet(open, _, _, _) = node.kind, try isShown(node.arm) else { return nil }
 			return (node.id, try evaluate(open).isTruthy)
 		}
 	}
@@ -1441,12 +1445,13 @@ public final class NativeRuntime {
 		eventValue = action.event == .input || action.event == .commit ? action.value ?? "" : nil
 		edit = eventValue
 		switch action.event {
-		case .keydown: eventFields = [.key: .string(action.value ?? "")]
+		case .keydown, .keyup: eventFields = [.key: .string(action.value ?? "")]
 		case .paste: eventFields = [.text: .string(action.value ?? "")]
 		case .activate: eventFields = clickFields(trusted: true).merging([.detail: .number(Double(action.detail ?? 1))]) { _, new in new }
 		default: break
 		}
-		defer { eventValue = nil; edit = nil; eventFields = nil }
+		if [.keydown, .keyup, .paste].contains(action.event) { targetText = try textOf(field: action.host) }
+		defer { eventValue = nil; edit = nil; eventFields = nil; targetText = nil }
 		// A number field keeps what was typed, and its handlers read its value, which is empty while that is no number.
 		let numeric = action.event == .input && { if case let .element(_, attributes, _) = node.kind { attributes["type"] == "number" } else { false } }()
 		return try change(host: action.host) {
@@ -1736,7 +1741,8 @@ public final class NativeRuntime {
 				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
 			case let .script(fn, type, bindings, catchCell):
 				let touch = touchFields.compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
-				var fields: [(String, JSONValue)] = [("type", .string(type))] + (eventValue.map { [("value", JSONValue.string($0))] } ?? []) + touch
+				let typed = [NativeEventField.key, .text].compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
+				var fields: [(String, JSONValue)] = [("type", .string(type))] + ((eventValue ?? targetText).map { [("value", JSONValue.string($0))] } ?? []) + typed + touch
 				var named: [String] = []
 				if case .string? = eventFields?[.currentTarget] {
 					let nodes: [(String, JSONValue)] = [NativeEventField.target, .currentTarget, .relatedTarget].map { field in

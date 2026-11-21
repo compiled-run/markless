@@ -67,16 +67,9 @@
 		]
 	},
 	"combobox": {
-		"payload": false,
+		"payload": true,
 		"diagnostics": [
-			"MARKLESS_NATIVE_UNSUPPORTED: the keyup event has no native meaning yet",
-			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <div> component-edge:6/h5 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler uses a `let` declaration, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler uses a ForOfStatement, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler's `if` test reads `first`, which is not state of this component",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler's `if` test reads `last`, which is not state of this component",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler's `if` test compares with `undefined` a value whose first value is `null`; a native value does not tell undefined from null",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler calls `.click()` on a value, which needs a script engine"
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <div> component-edge:6/h5 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out"
 		]
 	},
 	"crop": {
@@ -253,7 +246,7 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `activeLocale`'s `if` test uses `typeof` other than compared with 'string', 'number' or 'boolean'; a native value does not tell undefined from null",
 			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/numberbox/numberbox-math.ts uses `document`: the web page, which a phone does not have",
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `currencyScale` uses a TryStatement, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null"
+			"MARKLESS_NATIVE_JAVASCRIPT: the keydown handler reads `event.shiftKey`, which a tap on a phone does not have"
 		]
 	},
 	"otp": {
@@ -350,19 +343,11 @@
 		]
 	},
 	"taglist": {
-		"payload": false,
+		"payload": true,
 		"diagnostics": [
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:5/h4 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <button> component-edge:6/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:6/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the paste handler uses a ForOfStatement, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: the function `elementForValue` uses a call to `elements.find`, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler uses a ForOfStatement, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler's `if` test compares with `undefined` a value whose first value is `null`; a native value does not tell undefined from null",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler uses a call to `held.filter`, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler uses a returned call's value, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler uses an assignment to something other than a name or member, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: handler:component-edge:4/event:2 reads `.selectionStart` of an element, which a native host has no meaning for yet"
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:6/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out"
 		]
 	},
 	"textbox": {

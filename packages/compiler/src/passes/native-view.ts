@@ -191,6 +191,7 @@ const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][numbe
 	focusout: 'blur',
 	// A text field's, as a phone's browser sends them from its on-screen keyboard (anywhere else keydown is keyboard-only).
 	keydown: 'keydown',
+	keyup: 'keyup',
 	paste: 'paste',
 	submit: 'submit',
 	// A checkbox's or radio button's change runs after its tick, joined into its press by `wireTicks`.
@@ -575,7 +576,7 @@ type Scope = {
 	/** A dismiss or pointer handler's event parameter, whose fields in `EVENT_FIELDS` it may read. */
 	readonly carried?: { readonly name: string; readonly kind: 'dismiss' | 'pointer' | 'mouse' };
 	/** In a text field's keydown or paste handler: `event.key` or the pasted text is the event's, and `preventDefault()` an op. */
-	readonly typing?: 'keydown' | 'paste';
+	readonly typing?: 'keydown' | 'keyup' | 'paste';
 	/** In a click handler: `event.detail` is the number of presses in a row. */
 	readonly clicking?: true;
 	/** In a form's submit handler: the form, which `event.preventDefault()` keeps from being sent. */
@@ -1107,8 +1108,7 @@ export function nativeUnsupported(message: string, span?: SourceSpan): CompilerD
 
 const LANGUAGE_GLOBALS = new Set(NATIVE_SCRIPT_LANGUAGE_GLOBALS);
 // A box's checkedness is the host's; a script's event cannot report it back yet.
-// keydown and paste stay data: the engine journals no cancel of what the key or paste does.
-const DATA_ONLY_EVENTS = new Set(['change', 'keydown', 'paste']);
+const DATA_ONLY_EVENTS = new Set(['change']);
 /** A select's own events: a choice that changes it fires `input`, reading the chosen value. */
 const SELECT_EVENTS: ReadonlySet<string> = new Set(['input']);
 const RENDER_UNSTEADY = new Set(['Date', 'crypto', 'performance']);
@@ -1888,6 +1888,13 @@ export function createNativeViewPayload(
 				if (folded && lowered.value && cellsOf(lowered.value).size === 0) {
 					value = folded.value;
 					known = true;
+					// A prop the part was not given is `undefined` on the web, there and as an object's field.
+					const absent = (e: SemanticExpression) =>
+						e.kind === 'read' && isPropName(e.name, scope) && !propOf(e.name, scope);
+					if (absent(initializer)) undefinedFirst.add(id);
+					else if (initializer.kind === 'object')
+						for (const [field, e] of initializer.entries)
+							if (absent(e)) undefinedFirst.add(`${id}.${field}`);
 				} else if (
 					!lowered.failed &&
 					lowered.value &&
@@ -2555,7 +2562,7 @@ export function createNativeViewPayload(
 		// What the function reaches in its modules is refused now, while the handler can still stay data.
 		const before = diagnostics.length;
 		const services = [...scriptServices];
-		buildScript([entry]);
+		buildScript([entry], forms);
 		scriptServices.clear();
 		for (const service of services) scriptServices.add(service);
 		if (diagnostics.slice(before).some((diagnostic) => diagnostic.severity === 'error'))
@@ -2894,6 +2901,7 @@ export function createNativeViewPayload(
 			readonly module: ModuleFacts;
 			readonly fact: SemanticScriptFunction;
 		}>,
+		forms = false,
 	): NativeViewPayload['script'] | undefined {
 		if (!only && scriptFunctions.size === 0) return undefined;
 		type Included = {
@@ -2973,7 +2981,7 @@ export function createNativeViewPayload(
 					`${at} uses ${construct.construct}, which a phone's script cannot run`,
 					construct.span,
 				);
-			checkGlobals(statement.globals, at, scriptSubmits.size > 0);
+			checkGlobals(statement.globals, at, forms || scriptSubmits.size > 0);
 			checkNavigates(statement.navigates, at);
 			for (const name of statement.uses) local(entry, name);
 			for (const use of statement.imports) imported(entry, use.slot, use.name);
@@ -4063,11 +4071,11 @@ export function createNativeViewPayload(
 					!scope.args.has(holder.name)
 				) {
 					if (TOUCH_MODIFIERS.has(expression.property)) return { literal: false };
-					if (scope.typing === 'keydown' && expression.property === 'key')
+					if ((scope.typing === 'keydown' || scope.typing === 'keyup') && expression.property === 'key')
 						return { event: 'key' };
 					if (scope.clicking && expression.property === 'detail')
 						return { event: 'detail' };
-					if (scope.typing === 'keydown' && expression.property === 'isComposing')
+					if ((scope.typing === 'keydown' || scope.typing === 'keyup') && expression.property === 'isComposing')
 						return { literal: false };
 					if (
 						scope.pressed &&
@@ -5089,15 +5097,36 @@ export function createNativeViewPayload(
 				}
 				const id = scope.prefix + item.id;
 				nodeSpans.set(id, span);
-				const spread = chunk.slots.some(
+				const spreadSlot = chunk.slots.find(
 					(slot) =>
 						slot.kind === 'spread-attributes' &&
 						comparePaths(slot.coordinate.path, item.path) === 0,
 				);
-				const restAttributes: Record<string, string> = {};
+				const spread = spreadSlot !== undefined;
+				// In a scoped module the spread's slot writes the module's scope class before the class the caller passed.
+				const leadingClass =
+					spreadSlot?.kind === 'spread-attributes' ? spreadSlot.leadingClass : undefined;
+				const restAttributes: Record<string, string> = leadingClass ? { class: leadingClass } : {};
 				const restBindings: { attribute: string; value: NativeExpr }[] = [];
 				if (spread) {
 					for (const [name, value] of scope.rest ?? []) {
+						if (name === 'class' && leadingClass) {
+							if ('literal' in value) {
+								if (typeof value.literal === 'string' && value.literal !== '')
+									restAttributes['class'] = `${leadingClass} ${value.literal}`;
+							} else {
+								delete restAttributes['class'];
+								restBindings.push({
+									attribute: 'class',
+									value: {
+										if: value,
+										whenTrue: { template: [`${leadingClass} `, value] },
+										whenFalse: { literal: leadingClass },
+									},
+								});
+							}
+							continue;
+						}
 						if ('literal' in value) {
 							if (value.literal === null || value.literal === false) continue;
 							restAttributes[name] =
@@ -6086,8 +6115,8 @@ export function createNativeViewPayload(
 		scope: Scope,
 	) {
 		const what = `<${PLATFORM_PIECES_NAMESPACE}.sheet>`;
-		if (place.arm || place.row) {
-			refuse(`a ${what} inside an @if arm or a @for row`, edge.sourceSpan);
+		if (place.row) {
+			refuse(`a ${what} inside a @for row`, edge.sourceSpan);
 			return;
 		}
 		const props = new Map(edge.props.map((prop) => [prop.name, prop]));
@@ -6146,11 +6175,11 @@ export function createNativeViewPayload(
 			points.length >= 1 &&
 			points.length <= 2 &&
 			points.every((point) => typeof point === 'number' && point > 0 && point <= 1) &&
-			Math.max(...(points as number[])) === 1 &&
+			(points.length === 1 || Math.max(...(points as number[])) === 1) &&
 			new Set(points).size === points.length;
 		if (points !== NOT_FIXED && !portableHeights)
 			refuse(
-				`\`snapPoints\` of ${what}: one or two fractions of the screen's height, the largest 1 (Android's sheet has one height between collapsed and full)`,
+				`\`snapPoints\` of ${what}: one fraction of the screen's height, or two with the larger 1 (Android's sheet has one height between collapsed and full)`,
 				props.get('snapPoints')?.sourceSpan,
 			);
 		const snapPoints = portableHeights ? [...(points as number[])].sort((a, b) => a - b) : null;
@@ -6177,8 +6206,8 @@ export function createNativeViewPayload(
 			refuse(`children passed to ${what} that have no markup`, edge.sourceSpan);
 		const id = `sheet:${scope.prefix}${edge.id}`;
 		if (open && snapPoints && dismissible !== null && modal !== null)
-			nodes.push({ kind: 'sheet', id, parent, open, snapPoints, dismissible, modal });
-		if (projected) lowerChunk(projected, id, {}, scope);
+			nodes.push({ kind: 'sheet', id, parent, open, snapPoints, dismissible, modal, ...place });
+		if (projected) lowerChunk(projected, id, place, scope);
 		if (onChange?.kind === 'callback' && dismissible === true) {
 			if (!onChange.nativeStatements) {
 				refuse(
@@ -6504,7 +6533,7 @@ export function createNativeViewPayload(
 					) &&
 					(read.path.length <= members.length || members.length === 2),
 			);
-			if (known) continue;
+			if (known && (read.path[0] !== 'clipboardData' || semantic === 'paste')) continue;
 			readsMissing = true;
 			const doing =
 				semantic === 'input'
@@ -6576,7 +6605,7 @@ export function createNativeViewPayload(
 			semantic === 'dismiss' ||
 			POINTER_EVENTS.has(semantic ?? '') ||
 			MOUSE_EVENTS.has(semantic ?? '');
-		const typing = semantic === 'keydown' || semantic === 'paste' ? { typing: semantic } : {};
+		const typing = semantic === 'keydown' || semantic === 'keyup' || semantic === 'paste' ? { typing: semantic } : {};
 		const clicking =
 			semantic === 'activate' && event.eventName === 'click'
 				? { clicking: true as const }
@@ -7511,7 +7540,7 @@ export function createNativeViewPayload(
 				statement.path[0] === 'preventDefault' &&
 				(statement.arguments ?? []).length === 0
 			)
-				return [{ op: 'preventDefault' }];
+				return scope.typing === 'keyup' ? [] : [{ op: 'preventDefault' }];
 			if (
 				scope.pressed &&
 				statement.name === scope.opaque &&
