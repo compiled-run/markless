@@ -1,7 +1,7 @@
 /// The values a row's `class` or `ui-*` binding can give, as the style input lists them (style-input.ts `rowAttributeOptions`):
 /// literals chosen by conditions, in first-seen order; nil for any other binding.
-public func rowAttributeOptions(_ name: String, _ expr: NativeExpr) -> [String?]? {
-	if givesBoolean(expr) {
+public func rowAttributeOptions(_ name: String, _ expr: NativeExpr, booleanCells: Set<String> = []) -> [String?]? {
+	if givesBoolean(expr, booleanCells) {
 		let options = [marklessAttributeValue(name, .bool(true)), marklessAttributeValue(name, .bool(false))]
 		return options[0] == options[1] ? [options[0]] : options
 	}
@@ -9,7 +9,7 @@ public func rowAttributeOptions(_ name: String, _ expr: NativeExpr) -> [String?]
 	case let .literal(value):
 		return [marklessAttributeValue(name, value)]
 	case let .conditional(_, whenTrue, whenFalse):
-		guard let a = rowAttributeOptions(name, whenTrue), let b = rowAttributeOptions(name, whenFalse) else { return nil }
+		guard let a = rowAttributeOptions(name, whenTrue, booleanCells: booleanCells), let b = rowAttributeOptions(name, whenFalse, booleanCells: booleanCells) else { return nil }
 		var out: [String?] = []
 		for value in a + b where !out.contains(where: { $0 == value }) { out.append(value) }
 		return out
@@ -18,9 +18,19 @@ public func rowAttributeOptions(_ name: String, _ expr: NativeExpr) -> [String?]
 	}
 }
 
-/// Whether an expression's value is always true or false: a comparison, a negation, or `&&`, `||` and `?:` of those.
-private func givesBoolean(_ expr: NativeExpr) -> Bool {
+/// The payload's cells whose first value is true or false.
+public func booleanCells(of payload: NativeViewPayload) -> Set<String> {
+	Set(payload.cells.compactMap { cell in
+		if case .bool = cell.initial { return cell.id }
+		return nil
+	})
+}
+
+/// Whether an expression's value is always true or false: a comparison, a negation, a boolean cell, or `&&`, `||` and `?:` of those.
+private func givesBoolean(_ expr: NativeExpr, _ booleanCells: Set<String>) -> Bool {
 	switch expr {
+	case let .cell(id):
+		return booleanCells.contains(id)
 	case let .literal(value):
 		if case .bool = value { return true }
 		return false
@@ -29,9 +39,9 @@ private func givesBoolean(_ expr: NativeExpr) -> Bool {
 	case let .binary(op, _, _):
 		return ["===", "!==", "<", "<=", ">", ">="].contains(op)
 	case let .logical(op, left, right):
-		return op != "??" && givesBoolean(left) && givesBoolean(right)
+		return op != "??" && givesBoolean(left, booleanCells) && givesBoolean(right, booleanCells)
 	case let .conditional(_, whenTrue, whenFalse):
-		return givesBoolean(whenTrue) && givesBoolean(whenFalse)
+		return givesBoolean(whenTrue, booleanCells) && givesBoolean(whenFalse, booleanCells)
 	default:
 		return false
 	}
@@ -53,7 +63,7 @@ extension StyleExport {
 			guard let node = payload.nodes.first(where: { $0.id == nodeId }), let list = node.row,
 				case let .element(_, _, bindings) = node.kind,
 				let binding = bindings.first(where: { !$0.isProperty && $0.name == attribute }),
-				let options = rowAttributeOptions(attribute, binding.value)
+				let options = rowAttributeOptions(attribute, binding.value, booleanCells: booleanCells(of: payload))
 			else { continue }
 			rowStates.append((index, nodeId, attribute, options, list))
 		}

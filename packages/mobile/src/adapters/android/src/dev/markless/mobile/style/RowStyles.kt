@@ -12,16 +12,19 @@ import dev.markless.mobile.core.Runtime
  * The values a row's `class` or `ui-*` binding can give, as the style input lists them (style-input.ts `rowAttributeOptions`):
  * literals chosen by conditions, in first-seen order; null for any other binding.
  */
-fun rowAttributeOptions(name: String, expr: Expr): List<String?>? = when {
-	givesBoolean(expr) -> listOf(AttributeValue.of(name, JsValue.Bool(true)), AttributeValue.of(name, JsValue.Bool(false))).distinct()
-	else -> literalOptions(name, expr)
+fun rowAttributeOptions(name: String, expr: Expr, booleanCells: Set<String> = emptySet()): List<String?>? = when {
+	givesBoolean(expr, booleanCells) -> listOf(AttributeValue.of(name, JsValue.Bool(true)), AttributeValue.of(name, JsValue.Bool(false))).distinct()
+	else -> literalOptions(name, expr, booleanCells)
 }
 
-private fun literalOptions(name: String, expr: Expr): List<String?>? = when (expr) {
+/** The payload's cells whose first value is true or false. */
+fun booleanCellsOf(payload: Payload): Set<String> = payload.cells.filter { it.initial is JsValue.Bool }.map { it.id }.toSet()
+
+private fun literalOptions(name: String, expr: Expr, booleanCells: Set<String>): List<String?>? = when (expr) {
 	is Expr.Literal -> listOf(AttributeValue.of(name, expr.value))
 	is Expr.If -> {
-		val a = rowAttributeOptions(name, expr.whenTrue)
-		val b = rowAttributeOptions(name, expr.whenFalse)
+		val a = rowAttributeOptions(name, expr.whenTrue, booleanCells)
+		val b = rowAttributeOptions(name, expr.whenFalse, booleanCells)
 		if (a == null || b == null) null else (a + b).distinct()
 	}
 	else -> null
@@ -33,13 +36,14 @@ fun StyleExport.rowStates(payload: Payload): Set<String> {
 	return states.map { it.key }.filter { key -> key in inRows || key.substringBeforeLast('#', "") in inRows }.toSet()
 }
 
-/** Whether an expression's value is always true or false: a comparison, a negation, or `&&`, `||` and `?:` of those. */
-private fun givesBoolean(expr: Expr): Boolean = when (expr) {
+/** Whether an expression's value is always true or false: a comparison, a negation, a boolean cell, or `&&`, `||` and `?:` of those. */
+private fun givesBoolean(expr: Expr, booleanCells: Set<String>): Boolean = when (expr) {
 	is Expr.Literal -> expr.value is JsValue.Bool
+	is Expr.CellRef -> expr.cell in booleanCells
 	is Expr.Unary -> expr.op == "!"
 	is Expr.Binary -> expr.op in setOf("===", "!==", "<", "<=", ">", ">=")
-	is Expr.Logical -> expr.op != "??" && givesBoolean(expr.left) && givesBoolean(expr.right)
-	is Expr.If -> givesBoolean(expr.whenTrue) && givesBoolean(expr.whenFalse)
+	is Expr.Logical -> expr.op != "??" && givesBoolean(expr.left, booleanCells) && givesBoolean(expr.right, booleanCells)
+	is Expr.If -> givesBoolean(expr.whenTrue, booleanCells) && givesBoolean(expr.whenFalse, booleanCells)
 	else -> false
 }
 
@@ -60,7 +64,7 @@ fun StyleExport.shownRows(payload: Payload, runtime: Runtime): (Int) -> Map<Stri
 		val node = payload.nodes.firstOrNull { it.id == nodeId } as? Node.Element ?: return@mapIndexedNotNull null
 		val list = node.row ?: return@mapIndexedNotNull null
 		val binding = node.bindings.firstOrNull { !it.property && it.name == attribute } ?: return@mapIndexedNotNull null
-		val options = rowAttributeOptions(attribute, binding.value) ?: return@mapIndexedNotNull null
+		val options = rowAttributeOptions(attribute, binding.value, booleanCellsOf(payload)) ?: return@mapIndexedNotNull null
 		RowState(index, nodeId, attribute, options, list)
 	}
 	val rowTexts = payload.nodes.filterIsInstance<Node.Text>().filter { it.row != null }

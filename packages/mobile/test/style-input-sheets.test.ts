@@ -204,3 +204,33 @@ export default function Sizes() @{
 		button.kind === 'element' && button.attributesByState?.['aria-pressed']?.map((entry) => entry.value),
 	).toEqual(expect.arrayContaining(['true', 'false']));
 });
+
+test("a styled page lays a row's ui-* attribute out at true and false when it reads true/false cells", async () => {
+	const build = await compileNativeApp({
+		pages: [
+			{
+				page: 'pages/index.tsrx',
+				filename: 'packages/mobile/test/fixtures/pages/index.tsrx',
+				source: `import { state } from '@markless/core';
+
+export default function Sites() @{
+	let locked = state(false);
+	let sites = state([{ id: 'a' }, { id: 'b' }]);
+	<main>
+		<style>
+			.site { padding: 4px; }
+			.site[ui-disabled] { padding: 8px; }
+		</style>
+		<button type="button" onClick={() => (locked = !locked)}>Lock</button>
+		@for (const site of sites; key site.id) {
+			<div class="site" ui-disabled={site.id === 'b' || locked}>{site.id}</div>
+		}
+	</main>
+}`,
+			},
+		],
+	});
+	expect(build.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([]);
+	const rowState = build.styleInputs[0]!.input.states.find((state) => state.row !== undefined)!;
+	expect(rowState.domain).toEqual(['0', '1']);
+});
