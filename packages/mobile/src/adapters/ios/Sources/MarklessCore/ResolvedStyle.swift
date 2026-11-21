@@ -148,7 +148,8 @@ extension StyleExport {
 		initialTexts: [(node: String, text: String)], value: (String) throws -> NativeValue,
 		arm: (String) throws -> NativeValue?, dark: Bool
 	) throws -> StyleLayout {
-		let styledCells = payload.cells.filter(\.styled).map(\.id)
+		// A style case is a state of the export as a styled cell is; the runtime answers its value.
+		let styledCells = payload.cells.filter(\.styled).map(\.id) + payload.styleCases.map(\.id)
 		// An @if or @try outside list rows: its style state is the arm it shows.
 		let branches = Set(payload.nodes.compactMap { node -> String? in
 			guard case .branch = node.kind, node.row == nil else { return nil }

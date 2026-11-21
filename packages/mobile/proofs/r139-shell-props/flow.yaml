@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: r139-shell-props
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Pick a topic
 - assertVisible: Open fruit
 - assertNotVisible: 0 picked

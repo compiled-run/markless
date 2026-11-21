@@ -260,8 +260,10 @@ export async function compileNativeComponent(input: {
 		return sheet !== undefined;
 	};
 	let native: NativeViewArtifact;
+	let keyHandlers = false;
 	for (;;) {
 		native = createNativeViewPayload(compiled.semanticGraph, {
+			...(keyHandlers ? { keyHandlers } : {}),
 			linkStylesheet,
 			...(route
 				? {
@@ -294,6 +296,11 @@ export async function compileNativeComponent(input: {
 				: {}),
 		});
 		const missing = (native.missingModules ?? []).filter((file) => !graphs.has(file));
+		// A script that makes a KeyboardEvent can raise keydown, so elements' keydown handlers are built after all.
+		if (missing.length === 0 && native.raisesKeys) {
+			keyHandlers = true;
+			continue;
+		}
 		if (missing.length === 0) break;
 		for (const file of missing) graphs.set(file, await analyze(file, new Set()));
 	}

@@ -1,0 +1,459 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:items",
+				"name": "items",
+				"initial": [
+					{
+						"id": "a",
+						"name": "Apples",
+						"done": false
+					},
+					{
+						"id": "b",
+						"name": "Bread",
+						"done": true
+					}
+				]
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Errands"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "ul",
+				"parent": "h0",
+				"defaultStyle": {
+					"indent": 40,
+					"marker": "disc"
+				}
+			},
+			{
+				"kind": "repeat",
+				"id": "repeat:0",
+				"parent": "h2",
+				"list": {
+					"cell": "state:items"
+				},
+				"key": [
+					"id"
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "li",
+				"parent": "h2",
+				"row": "repeat:0"
+			},
+			{
+				"kind": "branch",
+				"id": "branch-site:0",
+				"parent": "h3",
+				"test": {
+					"member": {
+						"item": "repeat:0"
+					},
+					"property": "done"
+				},
+				"arms": 2,
+				"row": "repeat:0"
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h3",
+				"row": "repeat:0",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"expr": {
+							"member": {
+								"item": "repeat:0"
+							},
+							"property": "name"
+						}
+					},
+					{
+						"text": " done"
+					}
+				],
+				"row": "repeat:0",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "button",
+				"parent": "h3",
+				"row": "repeat:0",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Finish "
+					},
+					{
+						"expr": {
+							"member": {
+								"item": "repeat:0"
+							},
+							"property": "name"
+						}
+					}
+				],
+				"row": "repeat:0",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Add cheese"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Undo all"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h5",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h6",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h7",
+				"event": "activate",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:items",
+						"value": {
+							"method": "map",
+							"target": {
+								"cell": "state:items"
+							},
+							"arguments": [
+								{
+									"lambda": [
+										"one"
+									],
+									"body": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"member": {
+													"local": "one"
+												},
+												"property": "id"
+											},
+											"right": {
+												"member": {
+													"item": "repeat:0"
+												},
+												"property": "id"
+											}
+										},
+										"whenTrue": {
+											"merge": [
+												{
+													"local": "one"
+												},
+												{
+													"object": [
+														[
+															"done",
+															{
+																"literal": true
+															}
+														]
+													]
+												}
+											]
+										},
+										"whenFalse": {
+											"local": "one"
+										}
+									}
+								}
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:items",
+						"value": {
+							"array": [
+								{
+									"spread": true,
+									"value": {
+										"cell": "state:items"
+									}
+								},
+								{
+									"spread": false,
+									"value": {
+										"object": [
+											[
+												"id",
+												{
+													"literal": "c"
+												}
+											],
+											[
+												"name",
+												{
+													"literal": "Cheese"
+												}
+											],
+											[
+												"done",
+												{
+													"literal": false
+												}
+											]
+										]
+									}
+								}
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:items",
+						"value": {
+							"method": "map",
+							"target": {
+								"cell": "state:items"
+							},
+							"arguments": [
+								{
+									"lambda": [
+										"one"
+									],
+									"body": {
+										"merge": [
+											{
+												"local": "one"
+											},
+											{
+												"object": [
+													[
+														"done",
+														{
+															"literal": false
+														}
+													]
+												]
+											}
+										]
+									}
+								}
+							]
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Errands"
+		],
+		[
+			"h4:text0@b",
+			"Bread done"
+		],
+		[
+			"h5:text0@a",
+			"Finish Apples"
+		],
+		[
+			"h6:text0",
+			"Add cheese"
+		],
+		[
+			"h7:text0",
+			"Undo all"
+		]
+	],
+	"initialArms": [
+		[
+			"branch-site:0@a",
+			1
+		],
+		[
+			"branch-site:0@b",
+			0
+		]
+	],
+	"initialRows": [
+		[
+			"repeat:0",
+			[
+				"a",
+				"b"
+			]
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5@a"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0@a",
+					"index": 0
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "rows",
+					"node": "repeat:0",
+					"keys": [
+						"a",
+						"b",
+						"c"
+					]
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h7"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0@a",
+					"index": 1
+				},
+				{
+					"op": "arm",
+					"node": "branch-site:0@b",
+					"index": 1
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5@b"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0@b",
+					"index": 0
+				}
+			]
+		}
+	]
+}

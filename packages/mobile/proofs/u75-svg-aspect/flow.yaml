@@ -1,0 +1,22 @@
+appId: ${APP_ID}
+name: u75-svg-aspect
+---
+- launchApp:
+    clearState: true
+- assertVisible: Banner fit
+- assertVisible: Change fit
+- assertVisible: Stretched
+- assertNotVisible: Cropped
+- assertNotVisible: Bottom left
+- tapOn: Change fit
+- assertVisible: Cropped
+- assertNotVisible: Stretched
+- assertVisible: Cropped
+- assertNotVisible: Stretched
+- assertNotVisible: Bottom left
+- tapOn: Change fit
+- assertVisible: Bottom left
+- assertNotVisible: Cropped
+- assertVisible: Bottom left
+- assertNotVisible: Stretched
+- assertNotVisible: Cropped

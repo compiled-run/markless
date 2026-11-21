@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u32-double-tap
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Photo
 - assertVisible: Not pressed
 - assertVisible: Presses 0

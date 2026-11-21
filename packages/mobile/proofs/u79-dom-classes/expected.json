@@ -1,0 +1,29 @@
+{
+	"rung": 189,
+	"name": "JavaScript's instanceof answers for an element as the browser's DOM interfaces do",
+	"steps": [
+		{
+			"visible": ["Field", "Button", "Note", "Make"],
+			"absent": ["a text field", "a button", "an element", "not constructible"]
+		},
+		{
+			"do": { "tap": "Field" },
+			"visible": ["a text field"]
+		},
+		{
+			"do": { "tap": "Button" },
+			"visible": ["a button"],
+			"absent": ["a text field"]
+		},
+		{
+			"do": { "tap": "Note" },
+			"visible": ["an element"],
+			"absent": ["a button"]
+		},
+		{
+			"do": { "tap": "Make" },
+			"visible": ["not constructible"],
+			"absent": ["an element"]
+		}
+	]
+}

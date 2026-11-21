@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u34-select
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Order
 - assertVisible: Favorite Fruit
 - assertVisible: Choose a Fruit

@@ -1,0 +1,129 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "App",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "mk-582oxm"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-582oxm"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Integer slot"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "list mk-582oxm"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "span",
+			"parent": "h2",
+			"attributes": {
+				"class": "item mk-582oxm"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Item one"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "span",
+			"parent": "h2",
+			"attributes": {
+				"class": "item mk-582oxm"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Item two"
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "span",
+			"parent": "h2",
+			"attributes": {
+				"class": "item moving mk-582oxm"
+			},
+			"styleTemplate": [
+				"order: ",
+				{
+					"slot": "slot:h5#0"
+				}
+			]
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Moving item"
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"class": "tap mk-582oxm"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h6:text0",
+			"parent": "h6",
+			"text": "Later"
+		},
+		{
+			"kind": "element",
+			"id": "h7",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-582oxm"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h7:text0",
+			"parent": "h7",
+			"text": "Rank -1"
+		}
+	],
+	"css": ".list.mk-582oxm {\n\t\t\t\tdisplay: flex;\n\t\t\t\tflex-direction: column;\n\t\t\t\tgap: 8px;\n\t\t\t\tmargin: 0 12px;\n\t\t\t}\n\t\t\t.item.mk-582oxm {\n\t\t\t\tfont-size: 16px;\n\t\t\t\twhite-space: nowrap;\n\t\t\t\tpadding: 6px;\n\t\t\t\tbackground: #edf2f4;\n\t\t\t}\n\t\t\t.moving.mk-582oxm {\n\t\t\t\tbackground: #ef476f;\n\t\t\t\tcolor: #ffffff;\n\t\t\t}\n\t\t\t.tap.mk-582oxm {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin: 12px;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tpadding: 10px 18px;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffd166;\n\t\t\t\tcolor: #22223b;\n\t\t\t}",
+	"states": [],
+	"slots": [
+		{
+			"id": "slot:h5#0",
+			"initial": -1,
+			"integer": true
+		}
+	]
+}

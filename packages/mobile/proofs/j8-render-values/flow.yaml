@@ -2,18 +2,18 @@ appId: ${APP_ID}
 name: j8-render-values
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Render
-- assertVisible: 'Initials: AL'
-- assertVisible: 'Vowels: 6'
+- assertVisible: "Initials: AL"
+- assertVisible: "Vowels: 6"
 - assertVisible: Rename AL
 - tapOn: Rename AL
-- assertNotVisible: 'Initials: AL'
-- assertNotVisible: 'Vowels: 6'
+- assertNotVisible: "Initials: AL"
+- assertNotVisible: "Vowels: 6"
 - assertNotVisible: Rename AL
-- assertVisible: 'Initials: GH'
-- assertVisible: 'Vowels: 4'
+- assertVisible: "Initials: GH"
+- assertVisible: "Vowels: 4"
 - assertVisible: Rename GH
-- assertNotVisible: 'Initials: AL'
-- assertNotVisible: 'Vowels: 6'
+- assertNotVisible: "Initials: AL"
+- assertNotVisible: "Vowels: 6"
 - assertNotVisible: Rename AL

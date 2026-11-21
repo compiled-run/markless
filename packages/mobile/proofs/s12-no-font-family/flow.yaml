@@ -2,9 +2,9 @@ appId: ${APP_ID}
 name: s12-no-font-family
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Field notes
 - assertVisible: "No font-family anywhere: the browser's default serif, on the web
-      and on the phone"
+    and on the phone"
 - assertVisible: Waffles, quays and fjords
 - assertVisible: Notes

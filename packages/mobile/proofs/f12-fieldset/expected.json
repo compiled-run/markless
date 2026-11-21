@@ -1,0 +1,43 @@
+{
+	"rung": 150,
+	"name": "A <fieldset> groups a form's fields under its <legend>, whose fields still send with the form, as the browser shows them",
+	"steps": [
+		{
+			"visible": ["Order", "Who it is for", "Where it goes", "Send", "Not sent"],
+			"absent": ["Sent to Ann in Oslo"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Name",
+					"text": "Ann"
+				}
+			},
+			"visible": ["Not sent"],
+			"fields": {
+				"Name": "Ann"
+			},
+			"absent": ["Sent to Ann in Oslo"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "City",
+					"text": "Oslo"
+				}
+			},
+			"visible": ["Not sent"],
+			"fields": {
+				"City": "Oslo"
+			},
+			"absent": ["Sent to Ann in Oslo"]
+		},
+		{
+			"do": {
+				"tap": "Send"
+			},
+			"visible": ["Sent to Ann in Oslo", "Who it is for"],
+			"absent": ["Not sent"]
+		}
+	]
+}

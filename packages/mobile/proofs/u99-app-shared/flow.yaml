@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u99-app-shared
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: App-wide state
 - assertVisible: Top 0
 - assertVisible: Bump

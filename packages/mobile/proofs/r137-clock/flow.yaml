@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: r137-clock
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Opened in 20xx
 - assertVisible: Opened ISO 24
 - assertVisible: Not pressed

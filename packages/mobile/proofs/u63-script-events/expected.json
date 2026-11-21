@@ -1,0 +1,25 @@
+{
+	"rung": 173,
+	"name": "JavaScript raises events on elements: a CustomEvent, click() and a PointerEvent run those elements' handlers",
+	"steps": [
+		{
+			"visible": ["Raised", "Plus", "Count 0", "Hover none", "Panel", "Closed not yet"],
+			"absent": ["Count 1", "Hover script over", "Closed escape"]
+		},
+		{
+			"do": { "tap": "Close by script" },
+			"visible": ["Count 0", "Hover none", "Closed escape"],
+			"absent": ["Panel", "Closed not yet"]
+		},
+		{
+			"do": { "tap": "Click Plus" },
+			"visible": ["Count 1", "Hover none", "Closed escape"],
+			"absent": ["Count 0"]
+		},
+		{
+			"do": { "tap": "Hover by script" },
+			"visible": ["Count 1", "Hover script over", "Closed escape"],
+			"absent": ["Hover none"]
+		}
+	]
+}
