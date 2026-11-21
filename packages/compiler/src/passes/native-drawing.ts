@@ -1,4 +1,10 @@
-import type { NativeColor, NativeDrawing, NativeShape } from '@markless/serializer';
+import type {
+	NativeColor,
+	NativeDrawing,
+	NativeDrawingText,
+	NativeDrawingTextRun,
+	NativeShape,
+} from '@markless/serializer';
 
 // An inline <svg> as data a native host draws: SVG 2's attribute grammars (path data, points, transforms, viewBox, paint)
 // read once when the app is built, so no phone parses SVG.
@@ -40,6 +46,22 @@ type Inherited = {
 	readonly miterLimit: number;
 	/** What `currentColor` is, when an ancestor's `color` attribute says; else the svg's text colour. */
 	readonly color: NativeColor | null;
+	readonly fontSize: number;
+	readonly fontWeight: number;
+	readonly fontFamily: NativeDrawingTextRun['family'];
+	readonly anchor: NativeDrawingText['anchor'];
+	readonly baseline: NativeDrawingText['baseline'];
+	/** In user units, or in ems of the font size. */
+	readonly letterSpacing: { readonly value: number; readonly em: boolean };
+	readonly preserve: boolean;
+	/** The clip outlines of it and its groups, in the drawing's units. */
+	readonly clips: ReadonlyArray<ReadonlyArray<number>>;
+	/** The <marker> each of a path's vertices gets: its first, its middle ones, its last. */
+	readonly markers: {
+		readonly start?: DrawingElement;
+		readonly mid?: DrawingElement;
+		readonly end?: DrawingElement;
+	};
 };
 const INITIAL: Inherited = {
 	fill: { r: 0, g: 0, b: 0, alpha: 255 },
@@ -53,11 +75,23 @@ const INITIAL: Inherited = {
 	join: 'miter',
 	miterLimit: 4,
 	color: null,
+	// The page's default text: 16px, its own font.
+	fontSize: 16,
+	fontWeight: 400,
+	fontFamily: undefined,
+	anchor: 'start',
+	baseline: 'alphabetic',
+	letterSpacing: { value: 0, em: false },
+	preserve: false,
+	clips: [],
+	markers: {},
 };
 
 const SHAPES = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
 /** Elements that draw nothing themselves and whose content is never drawn in place. */
-const NEVER_DRAWN = new Set(['defs', 'symbol', 'title', 'desc', 'metadata']);
+const NEVER_DRAWN = new Set(['defs', 'symbol', 'title', 'desc', 'metadata', 'clipPath', 'marker']);
+/** Shapes that get markers at their vertices. */
+const MARKABLE = new Set(['path', 'line', 'polyline', 'polygon']);
 /** Attributes that change nothing a native drawing shows. */
 const NO_DRAWING_EFFECT = new Set([
 	'class',
@@ -79,16 +113,21 @@ const NO_DRAWING_EFFECT = new Set([
 ]);
 const GEOMETRY: Readonly<Record<string, ReadonlyArray<string>>> = {
 	svg: ['viewBox', 'width', 'height', 'x', 'y'],
-	g: [],
+	// Position and size mean nothing on a group or a circle's box; the browser ignores them.
+	g: ['x', 'y', 'dx', 'dy', 'width', 'height', 'alignment-baseline'],
 	path: ['d'],
 	rect: ['x', 'y', 'width', 'height', 'rx', 'ry'],
-	circle: ['cx', 'cy', 'r'],
+	circle: ['cx', 'cy', 'r', 'width', 'height'],
 	ellipse: ['cx', 'cy', 'rx', 'ry'],
 	line: ['x1', 'y1', 'x2', 'y2'],
 	polyline: ['points'],
 	polygon: ['points'],
 	use: ['href', 'xlink:href', 'x', 'y', 'width', 'height'],
 	symbol: ['viewBox', 'width', 'height', 'x', 'y'],
+	// `width`, `height` and `orientation` mean nothing on text; the browser ignores them, as charting libraries leave them.
+	text: ['x', 'y', 'dx', 'dy', 'width', 'height', 'orientation', 'xml:space', 'alignment-baseline'],
+	tspan: ['x', 'y', 'dx', 'dy', 'xml:space', 'alignment-baseline'],
+	marker: ['viewBox', 'refX', 'refY', 'markerWidth', 'markerHeight', 'markerUnits', 'orient', 'preserveAspectRatio'],
 };
 const PRESENTATION = new Set([
 	'fill',
@@ -104,7 +143,31 @@ const PRESENTATION = new Set([
 	'transform',
 	'stroke-dasharray',
 	'color',
+	'font-size',
+	'font-weight',
+	'font-family',
+	'text-anchor',
+	'dominant-baseline',
+	'letter-spacing',
+	'clip-path',
+	'marker-start',
+	'marker-mid',
+	'marker-end',
 ]);
+
+const GENERIC_FAMILIES = new Set(['serif', 'sans-serif', 'monospace']);
+const BASELINES: Readonly<Record<string, NativeDrawingText['baseline']>> = {
+	auto: 'alphabetic',
+	alphabetic: 'alphabetic',
+	middle: 'middle',
+	central: 'central',
+	hanging: 'hanging',
+	'text-before-edge': 'text-top',
+	'text-top': 'text-top',
+	'text-after-edge': 'text-bottom',
+	'text-bottom': 'text-bottom',
+	ideographic: 'ideographic',
+};
 
 export function compileDrawing(
 	svg: Readonly<Record<string, string>>,
@@ -193,7 +256,7 @@ export function compileDrawing(
 				refuse(element.id, `\`stroke-width="${width}"\` on <${element.tag}>`);
 			else next.width = value;
 		}
-		const keyword = <K extends 'fillRule' | 'cap' | 'join'>(
+		const keyword = <K extends 'fillRule' | 'cap' | 'join' | 'anchor'>(
 			name: string,
 			key: K,
 			allowed: ReadonlyArray<Inherited[K]>,
@@ -213,6 +276,72 @@ export function compileDrawing(
 				refuse(element.id, `\`stroke-miterlimit="${limit}"\` on <${element.tag}>`);
 			else next.miterLimit = value;
 		}
+		const fontSize = attribute('font-size')?.trim();
+		if (fontSize !== undefined) {
+			const css = parseCssLength(fontSize);
+			if (css === null || css.value < 0 || fontSize.endsWith('%'))
+				refuse(element.id, `\`font-size="${fontSize}"\` on <${element.tag}>`);
+			else next.fontSize = css.unit === 'em' ? css.value * from.fontSize : css.value;
+		}
+		const fontWeight = attribute('font-weight')?.trim();
+		if (fontWeight !== undefined) {
+			const weight =
+				fontWeight === 'normal'
+					? 400
+					: fontWeight === 'bold'
+						? 700
+						: fontWeight === 'bolder'
+							? Math.min(900, Math.max(400, from.fontWeight + 300))
+							: fontWeight === 'lighter'
+								? Math.max(100, Math.min(400, from.fontWeight - 300))
+								: Number(fontWeight);
+			if (!Number.isInteger(weight) || weight < 1 || weight > 1000)
+				refuse(element.id, `\`font-weight="${fontWeight}"\` on <${element.tag}>`);
+			else next.fontWeight = weight;
+		}
+		const family = attribute('font-family');
+		if (family !== undefined)
+			// The first generic family the list names; a named face falls back to the page's font, as on a phone without it.
+			next.fontFamily = family
+				.split(',')
+				.map((name) => name.trim().replace(/^["']|["']$/g, '').toLowerCase())
+				.find((name) => GENERIC_FAMILIES.has(name)) as NativeDrawingTextRun['family'];
+		keyword('text-anchor', 'anchor', ['start', 'middle', 'end']);
+		const baseline = attribute('dominant-baseline')?.trim();
+		if (baseline !== undefined && baseline !== 'inherit') {
+			const mapped = BASELINES[baseline];
+			if (mapped) next.baseline = mapped;
+			else refuse(element.id, `\`dominant-baseline="${baseline}"\` on <${element.tag}>`);
+		}
+		const spacing = attribute('letter-spacing')?.trim();
+		if (spacing !== undefined) {
+			const css = spacing === 'normal' ? { value: 0, unit: 'px' as const } : parseCssLength(spacing);
+			if (css === null) refuse(element.id, `\`letter-spacing="${spacing}"\` on <${element.tag}>`);
+			else next.letterSpacing = { value: css.value, em: css.unit === 'em' };
+		}
+		// alignment-baseline places a text element's own glyphs, as dominant-baseline does for what it holds.
+		const alignment = element.tag === 'text' || element.tag === 'tspan' ? attribute('alignment-baseline')?.trim() : undefined;
+		if (alignment !== undefined && alignment !== 'baseline' && alignment !== 'auto') {
+			const mapped = BASELINES[alignment];
+			if (mapped) next.baseline = mapped;
+			else refuse(element.id, `\`alignment-baseline="${alignment}"\` on <${element.tag}>`);
+		}
+		const markers = { ...from.markers } as { -readonly [K in keyof Inherited['markers']]: Inherited['markers'][K] };
+		for (const at of ['start', 'mid', 'end'] as const) {
+			const raw = attribute(`marker-${at}`)?.trim();
+			if (raw === undefined) continue;
+			if (raw === 'none') {
+				delete markers[at];
+				continue;
+			}
+			const id = raw.startsWith('url(#') && raw.endsWith(')') ? raw.slice(5, -1).trim() : undefined;
+			const target = id === undefined ? undefined : byId.get(id);
+			if (target?.tag === 'marker') markers[at] = target;
+			else refuse(element.id, `\`marker-${at}="${raw}"\` on <${element.tag}>, which names no <marker> inside this <svg>`);
+		}
+		next.markers = markers;
+		const space = attribute('xml:space')?.trim();
+		if (space !== undefined) next.preserve = space === 'preserve';
 		const dashes = attribute('stroke-dasharray')?.trim();
 		if (dashes !== undefined && dashes !== 'none')
 			refuse(
@@ -268,6 +397,7 @@ export function compileDrawing(
 			);
 		if (outline.length === 0) return;
 		shapes.push({
+			...(style.clips.length > 0 ? { clip: style.clips } : {}),
 			path: outline,
 			fill: alpha(style.fill, style.fillOpacity * style.opacity),
 			fillRule: style.fillRule,
@@ -344,6 +474,102 @@ export function compileDrawing(
 		}
 	};
 
+	const spoken: string[] = [];
+	const emitText = (element: DrawingElement, style: Inherited, matrix: Matrix) => {
+		const paintOf = (at: Inherited): NativeDrawingTextRun['fill'] => {
+			const given = at.fill === 'currentColor' && at.color ? at.color : at.fill;
+			const opacity = at.fillOpacity * at.opacity;
+			if (given === 'currentColor' && opacity !== 1)
+				refuse(element.id, "a see-through `currentColor` fill on <text>: its colour comes from the page's styles");
+			if (given === null || given === 'currentColor' || opacity === 1) return given;
+			return { ...given, alpha: Math.round(given.alpha * opacity) };
+		};
+		const runs: { -readonly [K in keyof NativeDrawingTextRun]: NativeDrawingTextRun[K] }[] = [];
+		let pending: { x?: number; y?: number; dx?: number; dy?: number } = {};
+		const position = (node: DrawingElement) => {
+			for (const name of ['x', 'y', 'dx', 'dy'] as const) {
+				const raw = node.attributes[name];
+				if (raw === undefined) continue;
+				const value = parseLength(raw);
+				if (value === null)
+					refuse(node.id, `\`${name}="${raw}"\` on <${node.tag}>: one length per text is drawn, not a list`);
+				else pending[name] = name === 'dx' || name === 'dy' ? (pending[name] ?? 0) + value : value;
+			}
+		};
+		const collect = (node: DrawingElement, at: Inherited) => {
+			if (at.stroke !== null && at.width > 0)
+				refuse(node.id, `a stroke on <${node.tag}>: text is filled, not outlined, natively yet`);
+			position(node);
+			const items: ({ readonly index: number } & (
+				| { readonly element: DrawingElement }
+				| { readonly text: string }
+			))[] = [
+				...childrenOf(node.path).map((child) => ({ index: child.path.at(-1)!, element: child })),
+				...texts
+					.filter((text) => text.path.length === node.path.length + 1 && isPrefix(node.path, text.path))
+					.map((text) => ({ index: text.path.at(-1)!, text: text.text })),
+			].sort((a, b) => a.index - b.index);
+			for (const item of items) {
+				if ('text' in item) {
+					runs.push({
+						text: item.text,
+						...pending,
+						size: at.fontSize,
+						weight: at.fontWeight,
+						...(at.fontFamily ? { family: at.fontFamily } : {}),
+						letterSpacing: at.letterSpacing.em ? at.letterSpacing.value * at.fontSize : at.letterSpacing.value,
+						fill: paintOf(at),
+					});
+					pending = {};
+					continue;
+				}
+				if (item.element.tag !== 'tspan') {
+					if (!NEVER_DRAWN.has(item.element.tag))
+						refuse(item.element.id, `the SVG <${item.element.tag}> element inside <text>, which a native drawing does not draw yet`);
+					continue;
+				}
+				checkAttributes(item.element);
+				if (item.element.attributes.transform !== undefined)
+					refuse(item.element.id, '`transform` on <tspan>, which SVG does not apply');
+				collect(item.element, inherit(item.element, at));
+			}
+		};
+		collect(element, style);
+		// White space as the browser collapses it in SVG text (kept with `xml:space="preserve"`): line breaks and tabs are
+		// spaces, a run of spaces is one, and the text's first and last spaces go.
+		let previousSpace = true;
+		for (const run of runs) {
+			let out = '';
+			for (const char of run.text) {
+				const space = char === ' ' || char === '\n' || char === '\t' || char === '\r';
+				if (space && !style.preserve && previousSpace) continue;
+				out += space ? ' ' : char;
+				previousSpace = space;
+			}
+			run.text = out;
+		}
+		if (!style.preserve) {
+			const last = runs.findLast((run) => run.text !== '');
+			if (last?.text.endsWith(' ')) last.text = last.text.slice(0, -1);
+		}
+		const shown = runs.filter((run) => run.text !== '' || run.x !== undefined || run.y !== undefined);
+		if (shown.every((run) => run.text === '')) return;
+		spoken.push(shown.map((run) => run.text).join('').trim());
+		shapes.push({
+			...(style.clips.length > 0 ? { clip: style.clips } : {}),
+			path: [],
+			fill: paintOf(style),
+			fillRule: 'nonzero',
+			stroke: null,
+			width: 0,
+			cap: 'butt',
+			join: 'miter',
+			miterLimit: 4,
+			...(matrix.every((value, index) => value === IDENTITY[index]) ? {} : { transform: matrix }),
+			text: { anchor: style.anchor, baseline: style.baseline, runs: shown },
+		});
+	};
+
 	const transformOf = (element: DrawingElement): Matrix => {
 		const raw = element.attributes.transform;
 		if (raw === undefined) return IDENTITY;
@@ -353,6 +579,96 @@ export function compileDrawing(
 			return IDENTITY;
 		}
 		return parsed;
+	};
+
+	/** `clip-path="url(#id)"`: the <clipPath>'s shapes, in the user space of the element that names it, joined as one outline. */
+	const clipped = (element: DrawingElement, style: Inherited, own: Matrix): Inherited => {
+		const raw = element.attributes['clip-path']?.trim();
+		if (raw === undefined || raw === 'none') return style;
+		const id = raw.startsWith('url(#') && raw.endsWith(')') ? raw.slice(5, -1).trim() : undefined;
+		const target = id === undefined ? undefined : byId.get(id);
+		if (!target || target.tag !== 'clipPath') {
+			refuse(element.id, `\`clip-path="${raw}"\` on <${element.tag}>, which names no <clipPath> inside this <svg>`);
+			return style;
+		}
+		const units = target.attributes.clipPathUnits?.trim();
+		if (units !== undefined && units !== 'userSpaceOnUse') {
+			refuse(target.id, `\`clipPathUnits="${units}"\` on <clipPath>: a clip is drawn in user space only`);
+			return style;
+		}
+		const base = multiply(own, transformOf(target));
+		const outline: number[] = [];
+		for (const child of childrenOf(target.path)) {
+			if (!SHAPES.has(child.tag)) {
+				if (!NEVER_DRAWN.has(child.tag))
+					refuse(child.id, `<${child.tag}> inside <clipPath>, whose shapes alone clip natively yet`);
+				continue;
+			}
+			if (child.attributes['clip-path'] !== undefined)
+				refuse(child.id, `\`clip-path\` on a shape inside <clipPath>`);
+			outline.push(...mapOutline(outlineOf(child), multiply(base, transformOf(child))));
+		}
+		return { ...style, clips: [...style.clips, outline] };
+	};
+
+	/**
+	 * SVG 2 §11.6: each <marker> drawn at the vertices it marks, rotated by its `orient`, scaled by the stroke width
+	 * (`markerUnits="strokeWidth"`) and its viewBox, its `refX`/`refY` on the vertex, clipped to its box; its content takes
+	 * its styles from where the marker is written, not from the shape.
+	 */
+	const placeMarkers = (outline: ReadonlyArray<number>, style: Inherited, own: Matrix, using: ReadonlySet<string>) => {
+		const vertices = verticesOf(outline);
+		if (vertices.length === 0) return;
+		const place = (marker: DrawingElement, vertex: Vertex, first: boolean) => {
+			if (using.has(marker.id)) return;
+			checkAttributes(marker);
+			const units = marker.attributes.markerUnits?.trim() ?? 'strokeWidth';
+			if (units !== 'strokeWidth' && units !== 'userSpaceOnUse') {
+				refuse(marker.id, `\`markerUnits="${units}"\` on <marker>`);
+				return;
+			}
+			const orient = marker.attributes.orient?.trim() ?? '0';
+			let angle: number;
+			if (orient === 'auto' || orient === 'auto-start-reverse') {
+				angle = vertex.angle + (orient === 'auto-start-reverse' && first ? Math.PI : 0);
+			} else {
+				const degrees = parseAngle(orient);
+				if (degrees === null) {
+					refuse(marker.id, `\`orient="${orient}"\` on <marker>`);
+					return;
+				}
+				angle = (degrees * Math.PI) / 180;
+			}
+			const width = number(marker, 'markerWidth', 3);
+			const height = number(marker, 'markerHeight', 3);
+			const box = marker.attributes.viewBox === undefined ? null : parseViewBox(marker.attributes.viewBox);
+			const aspect = marker.attributes.preserveAspectRatio?.trim();
+			if (aspect !== undefined && parseAspect(aspect) !== 'default')
+				refuse(marker.id, `\`preserveAspectRatio="${aspect}"\` on <marker>: a marker's viewBox is centred and fitted`);
+			const fit = box ? fitViewBox(box, width, height) : IDENTITY;
+			const refX = number(marker, 'refX');
+			const refY = number(marker, 'refY');
+			const scale = units === 'strokeWidth' ? style.width : 1;
+			const cos = Math.cos(angle);
+			const sin = Math.sin(angle);
+			// The marker's box (its viewport) on the vertex: the ref point, through the viewBox, lands on the vertex.
+			const viewport = multiply(
+				multiply(own, [cos * scale, sin * scale, -sin * scale, cos * scale, vertex.x, vertex.y]),
+				[1, 0, 0, 1, -(fit[0] * refX + fit[4]), -(fit[3] * refY + fit[5])],
+			);
+			const content = multiply(viewport, fit);
+			const markerStyle: Inherited = {
+				...inherit(marker, rootStyle),
+				clips: [...style.clips, mapOutline([0, 0, 0, 1, width, 0, 1, width, height, 1, 0, height, 4], viewport)],
+			};
+			const inner = new Set([...using, marker.id]);
+			for (const child of childrenOf(marker.path)) visit(child, markerStyle, content, inner);
+		};
+		const { start, mid, end } = style.markers;
+		vertices.forEach((vertex, index) => {
+			const marker = index === 0 ? start : index === vertices.length - 1 ? end : mid;
+			if (marker) place(marker, vertex, index === 0);
+		});
 	};
 
 	const visit = (
@@ -370,12 +686,19 @@ export function compileDrawing(
 			return;
 		}
 		checkAttributes(element);
-		const style = inherit(element, from);
 		const own = multiply(matrix, transformOf(element));
+		const style = clipped(element, inherit(element, from), own);
 		if (SHAPES.has(element.tag)) {
-			emit(element, outlineOf(element), style, own);
+			const outline = outlineOf(element);
+			emit(element, outline, style, own);
+			if (MARKABLE.has(element.tag)) placeMarkers(outline, style, own, using);
 			return;
 		}
+		if (element.tag === 'text') {
+			emitText(element, style, own);
+			return;
+		}
+		if (element.tag === 'tspan') return;
 		if (element.tag === 'use') {
 			const href = (element.attributes.href ?? element.attributes['xlink:href'] ?? '').trim();
 			const target = href.startsWith('#') ? byId.get(href.slice(1)) : undefined;
@@ -432,26 +755,128 @@ export function compileDrawing(
 	const em = width?.unit === 'em' || height?.unit === 'em';
 	if (em && width?.unit !== height?.unit)
 		refuse(svgId, 'a width and a height on <svg> where only one is in `em`');
-	const aspect = svg.preserveAspectRatio?.trim();
-	if (aspect !== undefined && aspect !== 'xMidYMid' && aspect !== 'xMidYMid meet')
-		refuse(
-			svgId,
-			`\`preserveAspectRatio="${aspect}"\` on <svg>: drawings are centred and fitted (xMidYMid meet)`,
-		);
+	const rawAspect = svg.preserveAspectRatio?.trim();
+	const aspect = rawAspect === undefined ? undefined : parseAspect(rawAspect);
+	if (aspect === null) refuse(svgId, `\`preserveAspectRatio="${rawAspect}"\` on <svg>`);
 	return {
 		drawing: {
 			viewBox,
 			...(width !== undefined ? { width: width.value } : {}),
 			...(height !== undefined ? { height: height.value } : {}),
 			...(em ? { em: true as const } : {}),
+			...(aspect && aspect !== 'default' ? { aspect } : {}),
 			shapes,
+			...(spoken.length > 0 ? { label: spoken.join(' ') } : {}),
 		},
 		...(title ? { title } : {}),
 		refusals,
 	};
 }
 
+/** SVG 2 §8.5's `preserveAspectRatio`; `default` for `xMidYMid meet`, null when it is not one. */
+function parseAspect(raw: string): NativeDrawing['aspect'] | 'default' | null {
+	const [align, mode, ...rest] = raw.split(/\s+/);
+	if (rest.length > 0 || (mode !== undefined && mode !== 'meet' && mode !== 'slice')) return null;
+	if (align === 'none') return 'none';
+	const axes: Readonly<Record<string, 'min' | 'mid' | 'max'>> = { Min: 'min', Mid: 'mid', Max: 'max' };
+	const x = axes[align?.slice(1, 4) ?? ''];
+	const y = axes[align?.slice(5, 8) ?? ''];
+	if (align?.length !== 8 || align[0] !== 'x' || align[4] !== 'Y' || !x || !y) return null;
+	if (x === 'mid' && y === 'mid' && mode !== 'slice') return 'default';
+	return { x, y, ...(mode === 'slice' ? { slice: true as const } : {}) };
+}
+
 // Geometry.
+
+type Vertex = { readonly x: number; readonly y: number; readonly angle: number };
+
+/** A path's vertices in order, each with the direction a marker with `orient="auto"` takes there (SVG 2 §11.6.2). */
+function verticesOf(outline: ReadonlyArray<number>): Vertex[] {
+	type Point = { x: number; y: number; into?: [number, number] | undefined; out?: [number, number] | undefined };
+	const points: Point[] = [];
+	let start: Point | undefined;
+	let i = 0;
+	const direction = (from: { x: number; y: number }, ...to: [number, number][]): [number, number] | undefined => {
+		for (const [x, y] of to) if (x !== from.x || y !== from.y) return [x - from.x, y - from.y];
+		return undefined;
+	};
+	while (i < outline.length) {
+		const verb = outline[i++]!;
+		const previous = points.at(-1);
+		if (verb === 0) {
+			start = { x: outline[i]!, y: outline[i + 1]! };
+			points.push(start);
+			i += 2;
+		} else if (verb === 1 && previous) {
+			const next: Point = { x: outline[i]!, y: outline[i + 1]! };
+			previous.out ??= direction(previous, [next.x, next.y]);
+			next.into = direction(previous, [next.x, next.y]);
+			points.push(next);
+			i += 2;
+		} else if (verb === 3 && previous) {
+			const c1: [number, number] = [outline[i]!, outline[i + 1]!];
+			const c2: [number, number] = [outline[i + 2]!, outline[i + 3]!];
+			const next: Point = { x: outline[i + 4]!, y: outline[i + 5]! };
+			previous.out ??= direction(previous, c1, c2, [next.x, next.y]);
+			const back = direction(next, c2, c1, [previous.x, previous.y]);
+			next.into = back ? [-back[0], -back[1]] : undefined;
+			points.push(next);
+			i += 6;
+		} else if (verb === 4 && previous && start) {
+			const closing: Point = { x: start.x, y: start.y, into: direction(previous, [start.x, start.y]) };
+			previous.out ??= closing.into;
+			points.push(closing);
+		} else break;
+	}
+	const angleOf = (v: [number, number]) => Math.atan2(v[1], v[0]);
+	return points.map((point) => {
+		const { into, out } = point;
+		let angle = 0;
+		if (into && out) {
+			const a = angleOf(into);
+			const b = angleOf(out);
+			let delta = b - a;
+			while (delta > Math.PI) delta -= 2 * Math.PI;
+			while (delta < -Math.PI) delta += 2 * Math.PI;
+			angle = a + delta / 2;
+		} else if (into) angle = angleOf(into);
+		else if (out) angle = angleOf(out);
+		return { x: point.x, y: point.y, angle };
+	});
+}
+
+/** An `orient` angle: degrees, or with `deg`, `rad`, `grad` or `turn`. */
+function parseAngle(raw: string): number | null {
+	const match = NUMBER.exec(raw);
+	if (!match) return null;
+	const value = Number(match[0]);
+	const unit = raw.slice(match[0].length);
+	const scale: Readonly<Record<string, number>> = { '': 1, deg: 1, rad: 180 / Math.PI, grad: 0.9, turn: 360 };
+	return scale[unit] === undefined ? null : value * scale[unit]!;
+}
+
+/** A verb-coded outline with every point mapped by `m`; an affine map keeps lines and cubics what they are. */
+function mapOutline(outline: ReadonlyArray<number>, m: Matrix): number[] {
+	const out: number[] = [];
+	let i = 0;
+	const point = () => {
+		const x = outline[i]!;
+		const y = outline[i + 1]!;
+		out.push(m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]);
+		i += 2;
+	};
+	while (i < outline.length) {
+		const verb = outline[i++]!;
+		out.push(verb);
+		if (verb === 0 || verb === 1) point();
+		else if (verb === 3) {
+			point();
+			point();
+			point();
+		}
+	}
+	return out;
+}
 
 function multiply(m: Matrix, n: Matrix): Matrix {
 	return [

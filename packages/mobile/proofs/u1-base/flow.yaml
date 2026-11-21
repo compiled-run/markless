@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u1-base
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Base parts
 - assertVisible: Save
 - assertVisible: Not saved
@@ -10,8 +10,8 @@ name: u1-base
 - assertVisible: Send
 - assertNotVisible: Saved
 - assertVisible:
-      text: Send
-      enabled: false
+    text: Send
+    enabled: false
 - tapOn: Save
 - assertVisible: Saved
 - assertNotVisible: Not saved

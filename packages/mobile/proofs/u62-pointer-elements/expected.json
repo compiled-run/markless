@@ -1,0 +1,18 @@
+{
+	"rung": 172,
+	"name": "A pointer handler in JavaScript reads its event's target, currentTarget and relatedTarget as elements",
+	"steps": [
+		{ "visible": ["Pointer", "Title", "Body", "Last none"] },
+		{
+			"do": { "tap": "Title" },
+			"visible": ["Last Title in Card from outside"],
+			"absent": ["Last none"]
+		},
+		{ "do": { "tap": "Reset" }, "visible": ["Last none"], "absent": ["Last Title in Card from outside"] },
+		{
+			"do": { "tap": "Body" },
+			"visible": ["Last Body in Card from outside"],
+			"absent": ["Last none"]
+		}
+	]
+}

@@ -1,0 +1,17 @@
+{
+	"rung": 180,
+	"name": "A custom element the app never defines (<app-root>, <router-outlet>) is a plain container around what it holds, as the browser renders an unknown element",
+	"steps": [
+		{
+			"visible": ["Conduit", "Read the feed", "Like 0"],
+			"absent": ["Like 1"]
+		},
+		{
+			"do": {
+				"tap": "Like 0"
+			},
+			"visible": ["Like 1", "Conduit", "Read the feed"],
+			"absent": ["Like 0"]
+		}
+	]
+}

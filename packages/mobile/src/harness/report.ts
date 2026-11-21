@@ -12,6 +12,8 @@ export type ProofReport = {
 		readonly failure: FlowFailure | null;
 		readonly installSeconds: number;
 		readonly flowSeconds: number;
+		/** The job whose pass this is: the rung's bundle and host sources were byte-identical to that run, so it did not run again. */
+		readonly reusedFrom?: string;
 	}>;
 };
 

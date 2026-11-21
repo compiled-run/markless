@@ -86,6 +86,22 @@ private func settings() throws -> (StyleExport, NativeViewPayload) {
 	#expect { try StyleExport.decodeApp(changed) } throws: { ($0 as? PayloadError)?.reason == "the canvas is not opaque" }
 }
 
+@Test func aRouteWithSlotsNeedsItsPlan() throws {
+	var root = try #require(try JSONSerialization.jsonObject(with: try fixture("s5-page-canvas.native-app-style")) as? [String: Any])
+	var targets = try #require(root["targets"] as? [String: Any])
+	var ios = try #require(targets["ios"] as? [String: Any])
+	var routes = try #require(ios["routes"] as? [[String: Any]])
+	routes[0]["slots"] = [["id": "slot:h0#0", "initial": 25]]
+	routes[0].removeValue(forKey: "plan")
+	ios["routes"] = routes
+	targets["ios"] = ios
+	root["targets"] = targets
+	let changed = try JSONSerialization.data(withJSONObject: root)
+	#expect { try StyleExport.decodeApp(changed) } throws: {
+		($0 as? PayloadError)?.reason == "style values that follow state need Dragon's layout plan, and the export has none"
+	}
+}
+
 // The Z3 and Z5 rungs' app styles and payloads (proofs/z3-sheet-size, proofs/z5-sheet-state-style): a system sheet's content
 // laid out as its own document at each resting height.
 private func styledSheet(_ rung: String) throws -> (StyleExport, NativeViewPayload) {

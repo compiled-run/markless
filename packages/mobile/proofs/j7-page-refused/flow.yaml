@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: j7-page-refused
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Page title
 - assertVisible: Count 0
 - tapOn: Count 0

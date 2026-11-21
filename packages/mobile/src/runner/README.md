@@ -28,8 +28,10 @@ pnpm --filter @markless/mobile phones affected [--base <rev>]             # whic
     - a copy of your hosts (`src/adapters`), shells and conformance vectors.
 3. After that the runner never reads your checkout. You can keep editing, switch branches or delete the worktree while
    the job waits.
-4. The job is split into chunks: up to 8 rungs on one platform each (`--chunk <n>` changes the size). Any free phone of
-   that platform takes the oldest job's next chunk. With two phones of a platform, a job's chunks for that platform run
+4. The job is split into chunks: up to 8 rungs on one platform each (`--chunk <n>` changes the size). A free phone of
+   that platform takes the next chunk of the oldest short job, one with at most 2 chunks left on that platform (a
+   long job's last chunks count). When no short job waits, it takes the oldest job's next chunk. So a 1-rung job no
+   longer waits behind a 115-rung one. With two phones of a platform, a job's chunks for that platform run
    on both at once.
 5. Each chunk runs through the machine queue (`~/.claude/bin/heavy`, reserving 2 GB; the measured peak was 0.9 GB):
     - it builds or reuses the shell around **your** hosts, cached by source content in `~/.cache/markless-proof`;
@@ -44,6 +46,23 @@ pnpm --filter @markless/mobile phones affected [--base <rev>]             # whic
    was requested, but it is not connected") runs once more. If the phone also stops answering, the runner restarts it
    and runs every failed rung of that chunk once more. The result lists those rungs under "ran again because its phone was
    unreachable"; a rung that fails twice is a failure.
+
+### Reused passes
+
+The submit hashes each rung's bundle on each platform. That covers its flow, its manifest and the bytes its shell
+carries, together with that platform's host sources: `src/adapters/<platform>`, `src/harness/shells/<platform>` and
+`conformance/`. When an earlier job passed that rung on that platform with the same hash, the job reuses that pass
+instead of running the rung again.
+
+The runner files each pass under `~/.cache/markless-phones/passes/<platform>/<hash>.json`, keeping the first job that
+passed. The report never hides a reused pass:
+
+- the rung's entry in `result/<platform>.json` carries `reusedFrom: <job>`;
+- `result/summary.json` lists it under `reused`;
+- `phones result` prints `PASS <rung> <platform> (reused pass from job <job>)`.
+
+So a compiler change that leaves a rung's bytes alone does not run that rung again, and an iOS host change does not run
+the Android rungs again. `--no-reuse` runs every rung. `--failed` always runs.
 
 A rung that does not compile fails at `build` on every platform it was asked for, and never reaches a phone. A host whose
 own tests fail fails every rung of that chunk at `host-tests`.

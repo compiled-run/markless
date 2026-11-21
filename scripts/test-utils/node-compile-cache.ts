@@ -1,4 +1,4 @@
-import { readdirSync, rmSync } from 'node:fs';
+import { readdirSync, renameSync, rmSync } from 'node:fs';
 import { enableCompileCache } from 'node:module';
 import { join, resolve } from 'node:path';
 
@@ -23,7 +23,15 @@ export function useNodeCompileCache(rootDir: string): void {
 
 /** Node never prunes the directory, so one cold run is the price of keeping it bounded. */
 export function pruneCompileCache(directory: string, maxEntries = MAX_ENTRIES): void {
-	if (entryCount(directory) > maxEntries) rmSync(directory, { recursive: true, force: true });
+	if (entryCount(directory) <= maxEntries) return;
+	// Removed in place, another test process writing an entry fails the removal with ENOTEMPTY; moved aside, it cannot.
+	const aside = `${directory}.pruned-${process.pid}`;
+	try {
+		renameSync(directory, aside);
+	} catch {
+		return;
+	}
+	rmSync(aside, { recursive: true, force: true });
 }
 
 function entryCount(directory: string): number {

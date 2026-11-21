@@ -1,0 +1,31 @@
+{
+	"rung": 175,
+	"name": "A tap's click is trusted and reports where the touch came up, with no key held; a click a script raised is untrusted at 0, 0, as on the web",
+	"steps": [
+		{
+			"visible": ["Clicks", "Tap here", "Click it by script", "No click yet"],
+			"absent": ["Tapped at a point, no key held", "Scripted at 0, 0, no key held"]
+		},
+		{
+			"do": {
+				"tap": "Tap here"
+			},
+			"visible": ["Tapped at a point, no key held"],
+			"absent": ["No click yet", "Scripted at 0, 0, no key held"]
+		},
+		{
+			"do": {
+				"tap": "Click it by script"
+			},
+			"visible": ["Scripted at 0, 0, no key held"],
+			"absent": ["Tapped at a point, no key held"]
+		},
+		{
+			"do": {
+				"tap": "Tap here"
+			},
+			"visible": ["Tapped at a point, no key held"],
+			"absent": ["Scripted at 0, 0, no key held"]
+		}
+	]
+}

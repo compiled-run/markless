@@ -82,7 +82,7 @@ object DeviceConformance {
 				"cancel" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Cancel))
 				"dismiss" -> action["reason"]?.let { host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Dismiss, reason = it.str("reason"))) }
 					?: host.closedByPlatform(action.field("host", "action").str("host"))
-				"pointerdown", "pointermove", "pointerup", "pointercancel" -> {
+				"pointerdown", "pointermove", "pointerup", "pointercancel", "contextmenu" -> {
 					fun n(name: String, default: Double) = action[name]?.num("action.$name") ?: default
 					val point = TouchPoint(n("pointerId", 1.0), n("x", 0.0), n("y", 0.0), n("time", 0.0))
 					host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.entries.first { it.wire == event }, point = point))

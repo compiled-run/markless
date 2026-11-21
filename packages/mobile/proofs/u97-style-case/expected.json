@@ -1,0 +1,28 @@
+{
+	"rung": 197,
+	"name": "A style that is empty text or a template with a number by a condition on an object (menu's point): Dragon lays out each case, and the number is read only while its text shows",
+	"steps": [
+		{
+			"visible": ["Style case", "Middle row", "Marker", "Open", "Close", "Closed"],
+			"placed": ["Marker", "Middle row"]
+		},
+		{
+			"do": { "tap": "Open" },
+			"visible": ["Shown"],
+			"absent": ["Closed"],
+			"placed": ["Middle row", "Marker"]
+		},
+		{
+			"do": { "tap": "Close" },
+			"visible": ["Closed"],
+			"absent": ["Shown"],
+			"placed": ["Marker", "Middle row"]
+		},
+		{
+			"do": { "tap": "Open" },
+			"visible": ["Shown"],
+			"absent": ["Closed"],
+			"placed": ["Middle row", "Marker"]
+		}
+	]
+}

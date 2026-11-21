@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u15-tabs-styled
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Tabs
 - assertVisible: Apple
 - assertVisible: Banana

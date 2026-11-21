@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: s9-web-font
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Tide almanac
 - assertVisible: Lato for the body, regular weight
 - assertVisible: Waffles, quays and fjords

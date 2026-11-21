@@ -5,6 +5,12 @@ class MarklessRuntimeError(message: String) : RuntimeException(message)
 /** The overlay protocol of `@markless/web/overlay-protocol`: the marker attribute, the hint mark, and what makes an overlay modal. */
 const val OVERLAY_ATTRIBUTE = "overlay"
 const val OVERLAY_HINT_ATTRIBUTE = "overlay-hint"
+
+/** How deep events raised from JavaScript may nest. */
+const val RAISE_DEPTH = 32
+
+/** How many dialog close events one change runs, so close handlers that reopen and close their dialog end. */
+const val CLOSE_DEPTH = 16
 const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
 const val OVERLAY_MODAL_VALUE = "true"
 
@@ -32,6 +38,12 @@ sealed interface JournalEntry {
 	/** A styled cell's new value; [node] is the cell id. */
 	data class State(override val node: String, val value: JsValue) : JournalEntry {
 		override fun toJson() = "{\"op\":\"state\",\"cell\":${jsonString(node)},\"value\":${jsonValue(value)}}"
+	}
+
+	/** A style slot's new value: the page is laid out again with it. */
+	data class Slot(val slot: String, val value: Double) : JournalEntry {
+		override val node get() = slot
+		override fun toJson() = "{\"op\":\"slot\",\"slot\":${jsonString(slot)},\"value\":${jsonValue(JsValue.Num(value))}}"
 	}
 
 	/** A list's row keys in their new order: rows whose key left go, new keys are built, the rest move. */
@@ -135,9 +147,12 @@ data class FetchRequest(val url: String, val method: String, val headers: List<P
 	fun toJson() = "{\"url\":${jsonString(url)},\"method\":${jsonString(method)},\"headers\":${headers.joinToString(",", "[", "]") { "[${jsonString(it.first)},${jsonString(it.second)}]" }},\"body\":${body?.let(::jsonString) ?: "null"}}"
 }
 
+/** An element's box in CSS pixels from the screen's top left, and its text direction, as its view has them now. */
+data class ElementBox(val x: Double, val y: Double, val width: Double, val height: Double, val rightToLeft: Boolean)
+
 /** `JSON.stringify` of a value: non-finite numbers are `null`. */
 /** What a touch adds to a script pointer handler's event, in the order the reference writes them. */
-private val TOUCH_FIELDS = listOf("button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp")
+private val TOUCH_FIELDS = listOf("button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp", "shiftKey", "ctrlKey", "altKey", "metaKey", "isTrusted", "detail", "key")
 
 fun jsonValue(v: JsValue): String = when (v) {
 	JsValue.Null -> "null"
@@ -276,7 +291,7 @@ class Runtime(
 	/** The fields of the event whose handler is running, by the name an `event` expression reads. */
 	private var fields: Map<String, JsValue>? = null
 
-	fun value(cell: String): JsValue = values[cell] ?: throw MarklessRuntimeError("unknown cell \"$cell\"")
+	fun value(cell: String): JsValue = values[cell] ?: styleCases().firstOrNull { it.first == cell }?.let { JsValue.Bool(it.second) } ?: throw MarklessRuntimeError("unknown cell \"$cell\"")
 
 	/** Where a cell's value is kept: its id, or `<id>@<key>` for a row's own state, read in that row. */
 	private fun slot(cell: String, scope: Scope): String {
@@ -368,6 +383,11 @@ class Runtime(
 			Expr.Focused -> JsValue.Str(focused ?: NATIVE_DOCUMENT_BODY)
 			is Expr.FocusOrigin -> (eval(e.overlay) as? JsValue.Str)?.let { o -> origins[o.value]?.let(JsValue::Str) } ?: JsValue.Null
 			is Expr.IsElement -> JsValue.Bool((eval(e.value) as? JsValue.Str)?.let { isElement(it.value) } ?: false)
+			is Expr.Shown -> JsValue.Bool(byId[e.node]?.let { isShown(it) } ?: false)
+			is Expr.ById -> when (val wanted = eval(e.value)) {
+				JsValue.Null -> JsValue.Null
+				else -> elementById(Js.toStr(wanted))?.let { JsValue.Str(it) } ?: JsValue.Null
+			}
 			is Expr.Drawn -> {
 				val chosen = drawnArms ?: arms().toMap()
 				var at = byId[e.node]?.arm
@@ -427,6 +447,13 @@ class Runtime(
 				}
 			})
 			is Expr.ObjectLit -> JsValue.Obj(LinkedHashMap<String, JsValue>().apply { for ((k, x) in e.entries) put(k, eval(x)) })
+			is Expr.Merge -> JsValue.Obj(LinkedHashMap<String, JsValue>().apply {
+				for (part in e.parts) when (val value = eval(part)) {
+					JsValue.Null -> {}
+					is JsValue.Obj -> putAll(value.fields)
+					else -> throw MarklessRuntimeError("a spread of a value that is not an object")
+				}
+			})
 			is Expr.Lambda -> throw MarklessRuntimeError("a function value outside a method call")
 			is Expr.Method -> {
 				val target = eval(e.target)
@@ -469,6 +496,9 @@ class Runtime(
 
 	/** Called with each line the script logs. */
 	var onScriptLog: ((level: String, text: String) -> Unit)? = null
+
+	/** The screen's views: the box of an element (its node id, `<node>@<key>` in a row) a script reads, measured as an entry begins; null when it has no view. */
+	var measure: ((id: String) -> ElementBox?)? = null
 
 	/** Called with each engine entry's duration in nanoseconds, including starting the engine when the entry had to. */
 	var onScriptEntry: ((nanos: Long) -> Unit)? = null
@@ -559,7 +589,7 @@ class Runtime(
 	}
 
 	/** What the host tells a script about the elements its frame passes as proxies: each one's attributes now and the elements it is inside, nearest first. */
-	private fun elementFacts(bindings: Map<String, ScriptBinding>, scope: Scope): String {
+	private fun elementFacts(bindings: Map<String, ScriptBinding>, scope: Scope, also: List<String> = emptyList()): String {
 		val facts = LinkedHashMap<String, String>()
 		fun add(value: JsValue) {
 			if (value !is JsValue.Str) return
@@ -568,14 +598,21 @@ class Runtime(
 			val key = if ('@' in id) id.substring(id.indexOf('@')) else ""
 			val node = elementOf(id.substringBefore('@'))
 			val names = LinkedHashSet<String>(node.attributes.keys.sorted()).apply { addAll(node.bindings.filter { !it.property }.map { it.name }) }
-			val attributes = names.mapNotNull { name -> attributeNow(id, name)?.let { "${jsonString(name)}:${jsonString(it)}" } }
+			val at = instances(node).firstOrNull { it.id == id }?.scope ?: Scope.EMPTY
+			val attributes = names.mapNotNull { name -> attributeIn(node, name, at)?.let { "${jsonString(name)}:${jsonString(it)}" } }
 			val ancestors = ArrayList<String>()
 			var up = node.parent
 			while (up != null) {
 				ancestors.add(jsonString(if (key.isNotEmpty() && byId[up]?.row != null) up + key else up))
 				up = byId[up]?.parent
 			}
-			facts[id] = "{\"attributes\":${attributes.joinToString(",", "{", "}")},\"ancestors\":${ancestors.joinToString(",", "[", "]")}}"
+			val captures = touches.filterValues { it.capture == id }.keys.sorted().map { jsonValue(JsValue.Num(it)) }
+			val held = if (captures.isEmpty()) "" else ",\"captures\":${captures.joinToString(",", "[", "]")}"
+			val box = measure?.invoke(id)?.let { b ->
+				val n = { v: Double -> jsonValue(JsValue.Num(v)) }
+				",\"box\":{\"x\":${n(b.x)},\"y\":${n(b.y)},\"width\":${n(b.width)},\"height\":${n(b.height)}},\"direction\":\"${if (b.rightToLeft) "rtl" else "ltr"}\""
+			} ?: ""
+			facts[id] = "{\"attributes\":${attributes.joinToString(",", "{", "}")},\"ancestors\":${ancestors.joinToString(",", "[", "]")}$held$box}"
 		}
 		fun visit(named: Map<String, ScriptBinding>) {
 			for (b in named.values) when (b) {
@@ -590,6 +627,7 @@ class Runtime(
 			}
 		}
 		visit(bindings)
+		also.forEach { add(JsValue.Str(it)) }
 		return facts.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value}" }
 	}
 
@@ -611,7 +649,9 @@ class Runtime(
 
 	/** One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries, in that order. */
 	private fun enter(fields: String, submission: Submission? = null): List<JournalEntry> {
-		val entry = "{$fields${entryCells()}}"
+		// A handler may read the focused element; a computed, which renders, never does, so only entries carry it.
+		val focus = focused?.takeIf { it != NATIVE_DOCUMENT_BODY }?.let { ",\"focused\":${jsonString(it)},\"focusElements\":${elementFacts(emptyMap(), Scope.EMPTY, listOf(it))}" } ?: ""
+		val entry = "{$fields$focus${entryCells()}}"
 		val started = System.nanoTime()
 		scriptCall("enter", entry)
 		val result = Json.parse(scriptCall("leave", null)).obj("leave()")
@@ -641,6 +681,12 @@ class Runtime(
 			scriptRuns[id(run)] = submission
 		}
 		for (run in list("settled")) scriptRuns.remove(id(run))?.let { it.pending--; settled(it) }
+		val raised = ArrayList<JournalEntry>()
+		for (event in result["raises"]?.arr("leave().raises") ?: emptyList()) {
+			val taken = raise(event.obj("leave().raises[]"))
+			if (taken.firstOrNull() is JournalEntry.Navigate) return taken
+			raised.addAll(taken)
+		}
 		return list("aborts").map { JournalEntry.Abort(id(it)) } +
 			list("clears").map { JournalEntry.ClearTimer("$SCRIPT_TIMER${id(it)}") } +
 			list("timers").map { t -> t.arr("leave().timers[]").let { JournalEntry.Timer("$SCRIPT_TIMER${id(it[0])}", it[1].num("leave().timers[][1]")) } } +
@@ -670,10 +716,15 @@ class Runtime(
 				val parts = c.arr("leave().commands[]")
 				val node = parts[0].str("leave().commands[][0]")
 				val command = parts[1].str("leave().commands[][1]")
+				if (command == "setPointerCapture" || command == "releasePointerCapture") {
+					val touch = (parts[2] as? Json.Num)?.let { touches[it.value + 0.0] } ?: return@mapNotNull null
+					if (command == "setPointerCapture") touch.capture = node else if (touch.capture == node) touch.capture = null
+					return@mapNotNull null
+				}
 				// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
 				if (command == "showModal" || command == "close") {
 					if (node !in dialogs) throw MarklessRuntimeError("$command() on $node, which is not a dialog")
-					dialogs[node] = command == "showModal"
+					setDialog(node, command == "showModal")
 					return@mapNotNull null
 				}
 				if (command == "focus") focused = node
@@ -681,6 +732,7 @@ class Runtime(
 			} +
 			// A key or paste handler called preventDefault() before it first awaited.
 			(if ((result["prevented"] as? Json.Bool)?.value == true) listOf(JournalEntry.PreventDefault) else emptyList()) +
+			raised +
 			listOfNotNull(result["navigate"]?.let { n ->
 				val o = n.obj("leave().navigate")
 				o.only(setOf("route", "params", "replace"), "leave().navigate")
@@ -690,6 +742,53 @@ class Runtime(
 					(o.field("replace", "leave().navigate") as? Json.Bool)?.value ?: throw MarklessDecodeError("leave().navigate.replace must be a boolean"),
 				)
 			})
+	}
+
+	/** How deep events raised from JavaScript nest now. */
+	private var raising = 0
+
+	/**
+	 * An event a script dispatched on an element (or its `click()`), raised once the script returned: `click` as a press on
+	 * the innermost element from it outwards that has one; any other type on the element, then its ancestors when it
+	 * bubbles, each running its own handler for that type.
+	 */
+	private fun raise(event: Map<String, Json>): List<JournalEntry> {
+		if (raising >= RAISE_DEPTH) throw MarklessRuntimeError("events raised from JavaScript nest deeper than $RAISE_DEPTH")
+		raising++
+		try {
+			val target = (event["node"] ?: Json.Null).str("a raised event's node")
+			val type = (event["type"] ?: Json.Null).str("a raised event's type")
+			val chain = chain(target)
+			fun scopeOf(id: String): Scope? = byId[id.substringBefore('@')]?.let { node -> instances(node).firstOrNull { it.id == id }?.scope }
+			if (type == "click") {
+				val pressed = chain.firstOrNull { handlerFor(it.substringBefore('@'), EventName.Activate) != null } ?: return emptyList()
+				val scope = scopeOf(pressed) ?: return emptyList()
+				return withFields(clickFields(trusted = false)) { run(handlers[handlerFor(pressed.substringBefore('@'), EventName.Activate)]?.ops.orEmpty(), scope) }
+			}
+			val name = EventName.entries.firstOrNull { it.wire == type } ?: return emptyList()
+			fun optional(key: String, fallback: JsValue): JsValue = event[key]?.let { JsValue.fromJson(it) } ?: fallback
+			val calls = ArrayList<JournalEntry>()
+			for (node in if ((event["bubbles"] as? Json.Bool)?.value == true) chain else chain.take(1)) {
+				val own = handlerFor(node.substringBefore('@'), name) ?: continue
+				val scope = scopeOf(node) ?: continue
+				val f = if (name == EventName.Dismiss) mapOf("reason" to optional("reason", JsValue.Str("")), "pressTarget" to JsValue.Null, "isTrusted" to JsValue.Bool(false))
+				else if (name == EventName.Keydown) mapOf("isTrusted" to JsValue.Bool(false), "key" to optional("key", JsValue.Str("")), "target" to JsValue.Str(target), "currentTarget" to JsValue.Str(node))
+				else mapOf(
+					"isTrusted" to JsValue.Bool(false),
+					"target" to JsValue.Str(target), "currentTarget" to JsValue.Str(node), "relatedTarget" to optional("relatedTarget", JsValue.Null),
+					"button" to optional("button", JsValue.Num(0.0)), "buttons" to optional("buttons", JsValue.Num(0.0)),
+					"clientX" to optional("clientX", JsValue.Num(0.0)), "clientY" to optional("clientY", JsValue.Num(0.0)),
+					"pointerId" to optional("pointerId", JsValue.Num(0.0)), "pointerType" to optional("pointerType", JsValue.Str("")),
+					"isPrimary" to optional("isPrimary", JsValue.Bool(false)), "timeStamp" to JsValue.Num(0.0),
+				)
+				val taken = withFields(f) { run(handlers[own]?.ops.orEmpty(), scope) }
+				if (taken.firstOrNull() is JournalEntry.Navigate) return taken
+				calls.addAll(taken)
+			}
+			return calls
+		} finally {
+			raising--
+		}
 	}
 
 
@@ -724,6 +823,7 @@ class Runtime(
 	}
 
 	/** Starts the async values the script computes, once the screen is built; the host applies its journal as an action's. */
+	/** The screen shows again (Back): app-scoped shared fields take the values the app holds now; the journal of what moved. */
 	fun start(): List<JournalEntry> = if (asyncCells.isEmpty()) emptyList() else change(null, null) { emptyList() }
 
 	/** The screen shows again after Back: it takes the app's values of its app-wide cells that a page above it changed. */
@@ -749,8 +849,11 @@ class Runtime(
 	}
 
 	/** Whether [node] shows where [scope] is: in a list row, the arms around it are that row's. */
-	fun shownIn(node: Node, scope: Scope): Boolean {
-		val a = node.arm ?: return true
+	fun shownIn(node: Node, scope: Scope): Boolean = armShown(node.arm, scope)
+
+	/** Whether an arm place shows: its branch shows and has that arm chosen; no place always shows. */
+	private fun armShown(a: ArmPlace?, scope: Scope = Scope.EMPTY): Boolean {
+		if (a == null) return true
 		val b = byId[a.branch] as? Node.Branch ?: return false
 		return shownIn(b, scope) && armOf(b, scope) == a.index
 	}
@@ -882,6 +985,15 @@ class Runtime(
 	/** Every `<select>`, in payload order. */
 	private val selects = payload.nodes.filterIsInstance<Node.Element>().filter { it.element == "select" }
 
+	/** The first shown element whose `id` attribute is [wanted] now, as `document.getElementById` finds it. */
+	private fun elementById(wanted: String): String? {
+		for (node in payload.nodes) {
+			if (node !is Node.Element) continue
+			for (instance in instances(node)) if (attributeIn(node, "id", instance.scope) == wanted) return instance.id
+		}
+		return null
+	}
+
 	/** An attribute of one instance as the web has it now: a binding's value in its row, else the attribute as built. */
 	private fun attributeIn(node: Node.Element, name: String, scope: Scope): String? {
 		val binding = node.bindings.firstOrNull { !it.property && it.name == name }
@@ -985,6 +1097,7 @@ class Runtime(
 
 	private val missing: ValueMissing? = payload.valueMissing[nativeLocale(preferredLanguages, payload.valueMissing.keys)]
 	private val tooLong: TooLong? = payload.tooLong[nativeLocale(preferredLanguages, payload.tooLong.keys)]
+	private val numberMessages: NumberMessages? = payload.numberMessages[nativeLocale(preferredLanguages, payload.numberMessages.keys)]
 	private val emailMismatch: EmailMismatch? = payload.typeMismatch[nativeLocale(preferredLanguages, payload.typeMismatch.keys)]
 
 	/** A text field's value as the web keeps it: an email field drops line breaks and trims its ends. */
@@ -1000,6 +1113,7 @@ class Runtime(
 				FieldKind.Checkbox, FieldKind.Radio -> if (checkedOf(node)) attributeNow(node, "value") ?: "on" else continue
 				FieldKind.Hidden -> attributeNow(node, "value") ?: ""
 				FieldKind.Text -> valueOf(node)
+				FieldKind.Number -> nativeNumberValue(textOf(node))
 				FieldKind.Select -> optionsOf(node).firstOrNull { selectedness[it.id] == true }?.let(::optionValue) ?: continue
 			}
 			out.add(JsValue.Arr(mutableListOf(JsValue.Str(name), JsValue.Str(value))))
@@ -1024,13 +1138,18 @@ class Runtime(
 		val required = if (kind == FieldKind.Radio) groupOf(node).any { attributeNow(it.id, "required") != null } else attributeNow(node, "required") != null
 		val absent = required && when (kind) {
 			FieldKind.Radio -> groupOf(node).none { checkedOf(it.id) }
-			FieldKind.Text -> valueOf(node) == ""
+			FieldKind.Text, FieldKind.Number -> valueOf(node) == ""
 			else -> !checkedOf(node)
 		}
 		if (absent) {
 			val messages = missing ?: throw MarklessRuntimeError("the payload has no message for a ${kind.wire} missing its value")
 			return when (kind) { FieldKind.Radio -> messages.radio; FieldKind.Checkbox -> messages.checkbox; else -> messages.text }
 		}
+		if (kind == FieldKind.Number) {
+			val problem = nativeNumberProblem(textOf(node), attributeNow(node, "min"), attributeNow(node, "max"), attributeNow(node, "step"), attributeNow(node, "value")) ?: return null
+			return (numberMessages ?: throw MarklessRuntimeError("the payload has no messages for a number field")).message(problem)
+		}
+		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		if (kind != FieldKind.Text) return null
 		if (attributeNow(node, "type") == "email")
 			(emailMismatch ?: throw MarklessRuntimeError("the payload has no message for an email field")).message(valueOf(node))?.let { return it }
@@ -1073,6 +1192,14 @@ class Runtime(
 	fun dialogs(): List<Pair<String, Boolean>> = dialogs.entries.map { it.key to it.value }
 
 	fun isDialogOpen(id: String): Boolean = dialogs[id] == true
+
+	/** Dialogs that closed during the current change, in order; each fires its `close` once the change's handler ends. */
+	private val closing = ArrayDeque<String>()
+
+	private fun setDialog(node: String, open: Boolean) {
+		if (dialogs[node] == true && !open) closing.addLast(node)
+		dialogs[node] = open
+	}
 
 	private var focused: String? = null
 	/** The arms on screen when the running action began; null between actions, when what shows is what the cells say. */
@@ -1157,7 +1284,7 @@ class Runtime(
 		if (detail != null && event != EventName.Activate) throw MarklessRuntimeError("a ${event.wire} event carries no press count")
 		if ((event in VALUED) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
 		if (reason != null && event != EventName.Dismiss) throw MarklessRuntimeError("a ${event.wire} event carries no reason")
-		if (point != null && !event.touch) throw MarklessRuntimeError("a ${event.wire} event carries no touch")
+		if (point != null && !event.touch && event != EventName.ContextMenu) throw MarklessRuntimeError("a ${event.wire} event carries no touch")
 		if (event == EventName.Dismiss && reason != null) {
 			if (stack.lastOrNull() != host) throw MarklessRuntimeError("\"$host\" is not the topmost overlay")
 			val dismiss = handlerFor(host, event)?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
@@ -1166,12 +1293,13 @@ class Runtime(
 			}
 		}
 		if (event.touch) return touch(host, event, point ?: TouchPoint())
-		if (event.pointer) throw MarklessRuntimeError("${event.wire} is raised by the runtime, not dispatched")
+		if (event == EventName.ContextMenu) return contextMenu(host, point ?: TouchPoint())
+		if (event.pointer || event == EventName.Close) throw MarklessRuntimeError("${event.wire} is raised by the runtime, not dispatched")
 		if (event == EventName.Cancel) {
 			if (dialogs[host] != true) throw MarklessRuntimeError("\"$host\" is not an open dialog")
 			val cancel = handlerFor(host, event)?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
 			return change(host, null) {
-				dialogs[host] = false
+				setDialog(host, false)
 				cancel?.let { run(it.ops, Scope.EMPTY) } ?: emptyList()
 			}
 		}
@@ -1187,12 +1315,14 @@ class Runtime(
 		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
 		// A press focuses the control it presses, as the browser does.
 		if (event == EventName.Activate) focused = host
+		// A number field keeps what was typed, and its handlers read its value, which is empty while that is no number.
+		val numeric = event == EventName.Input && (node(template) as? Node.Element)?.attributes?.get("type") == "number"
 		val carried = when (event) {
-			EventName.Input, EventName.Commit -> value?.let { mapOf("value" to JsValue.Str(it)) }
+			EventName.Input, EventName.Commit -> value?.let { mapOf("value" to JsValue.Str(if (numeric) nativeNumberValue(it) else it)) }
 			// A key's or paste's script handler reads the field's text then as `event.target.value`.
 			EventName.Keydown, EventName.Keyup -> mapOf("key" to JsValue.Str(value!!), "value" to JsValue.Str(textOf(host)))
 			EventName.Paste -> mapOf("text" to JsValue.Str(value!!), "value" to JsValue.Str(textOf(host)))
-			EventName.Activate -> mapOf("detail" to JsValue.Num((detail ?: 1).toDouble()))
+			EventName.Activate -> clickFields(trusted = true) + ("detail" to JsValue.Num((detail ?: 1).toDouble()))
 			else -> null
 		}
 		return change(host, if (event == EventName.Input || event == EventName.Commit) value else null) {
@@ -1200,23 +1330,72 @@ class Runtime(
 		}
 	}
 
+	/** Where the last touch came up, which the click it makes reports; a click no touch made is at 0, 0. */
+	private var tapPoint: Pair<Double, Double>? = null
+
+	/** The element a phone browser's mouse is over: the last one tapped, until a tap elsewhere moves it. */
+	private var mouseOver: String? = null
+
+	private fun clickFields(trusted: Boolean): Map<String, JsValue> {
+		val at = if (trusted) tapPoint else null
+		tapPoint = null
+		return mapOf(
+			"isTrusted" to JsValue.Bool(trusted), "clientX" to JsValue.Num(at?.first ?: 0.0), "clientY" to JsValue.Num(at?.second ?: 0.0),
+			"shiftKey" to JsValue.Bool(false), "ctrlKey" to JsValue.Bool(false), "altKey" to JsValue.Bool(false), "metaKey" to JsValue.Bool(false),
+			"detail" to JsValue.Num(0.0),
+		)
+	}
+
 	private class Touching(var capture: String?, var over: String, val primary: Boolean)
 
 	/** Each touch that is down: the element it is captured to (null after a release), the one under it, and whether it was first. */
 	private val touches = LinkedHashMap<Double, Touching>()
 
+	// Last, once every field a script entry reads is set: a first value the build could not know is taken when the screen
+	// opens, in cell order, as the body runs once on the web.
+	/** Seeded cells whose arm is hidden: their seed runs again when the arm shows, as its component renders then. */
+	private val reseed = HashSet<String>()
+
+	init {
+		for (c in payload.cells) c.seed?.let { if (armShown(c.arm)) values[c.id] = evaluate(it) else reseed.add(c.id) }
+	}
+
 	private fun touching(pointer: JsValue): Touching? = (pointer as? JsValue.Num)?.let { touches[it.value + 0.0] }
 
-	/** The elements from [id] out to the root, innermost first; a row's copy keeps its own id. */
+	/** The elements from [id] out to the root, innermost first; those in its row keep its row's key. */
 	private fun chain(id: String): List<String> {
 		val base = id.substringBefore('@')
+		val key = if ('@' in id) id.substring(id.indexOf('@')) else ""
 		val out = ArrayList<String>()
 		var at: String? = base
 		while (!at.isNullOrEmpty()) {
-			out.add(if (at == base) id else at)
+			out.add(if (at == base) id else if (key.isNotEmpty() && byId[at]?.row != null) at + key else at)
 			at = byId[at]?.parent
 		}
 		return out
+	}
+
+	/** A long press on [host]: its `contextmenu` handler, then each one of the elements it is inside, innermost first. */
+	private fun contextMenu(host: String, point: TouchPoint): List<JournalEntry> {
+		val scope = (instances(node(host.substringBefore('@'))).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")).scope
+		return change(null, null) {
+			val calls = ArrayList<JournalEntry>()
+			for (node in chain(host)) {
+				val id = handlerFor(node.substringBefore('@'), EventName.ContextMenu) ?: continue
+				val handler = handlers[id] ?: throw MarklessRuntimeError("unknown handler \"$id\"")
+				val fields = mapOf(
+					"target" to JsValue.Str(host),
+					"currentTarget" to JsValue.Str(node),
+					"clientX" to JsValue.Num(point.x),
+					"clientY" to JsValue.Num(point.y),
+					"timeStamp" to JsValue.Num(point.time),
+				)
+				val out = withFields(fields) { run(handler.ops, scope) }
+				if (out.firstOrNull() is JournalEntry.Navigate) return@change out
+				calls.addAll(out)
+			}
+			calls
+		}
 	}
 
 	private fun touch(host: String, event: EventName, point: TouchPoint): List<JournalEntry> {
@@ -1227,6 +1406,7 @@ class Runtime(
 		return change(null, null) {
 			val calls = ArrayList<JournalEntry>()
 			val state = down ?: Touching(host, host, touches.values.none { it.primary }).also { touches[pointerId] = it }
+			if (event != EventName.PointerMove) tapPoint = if (event == EventName.PointerUp) point.x to point.y else null
 			fun fieldsOf(type: EventName, target: String, currentTarget: String, related: String?): Map<String, JsValue> {
 				val lifted = type == EventName.PointerUp || type == EventName.PointerCancel || type == EventName.PointerOut || type == EventName.PointerLeave
 				val cancelled = event == EventName.PointerCancel
@@ -1245,23 +1425,23 @@ class Runtime(
 					"timeStamp" to JsValue.Num(point.time),
 				)
 			}
-			val runs = ArrayList<Pair<String, Map<String, JsValue>>>()
+			val runs = ArrayList<Triple<String, Map<String, JsValue>, Scope?>>()
 			fun raise(type: EventName, target: String, related: String? = null) {
-				for (node in chain(target)) handlerFor(node.substringBefore('@'), type)?.let { runs.add(it to fieldsOf(type, target, node, related)) }
+				for (node in chain(target)) handlerFor(node.substringBefore('@'), type)?.let { runs.add(Triple(it, fieldsOf(type, target, node, related), null)) }
 			}
 			/** `pointerenter` on each element [target] is in that [from] is not, outermost first; `pointerleave` the other way. */
 			fun crossing(type: EventName, target: String, from: String?, related: String?) {
 				val outside = if (from == null) emptySet() else chain(from).toSet()
 				val nodes = chain(target).filter { it !in outside }
 				for (node in if (type == EventName.PointerEnter) nodes.asReversed() else nodes)
-					handlerFor(node.substringBefore('@'), type)?.let { runs.add(it to fieldsOf(type, node, node, related)) }
+					handlerFor(node.substringBefore('@'), type)?.let { runs.add(Triple(it, fieldsOf(type, node, node, related), null)) }
 			}
 			fun flush(): List<JournalEntry>? {
 				val taken = runs.toList()
 				runs.clear()
-				for ((id, f) in taken) {
+				for ((id, f, at) in taken) {
 					val handler = handlers[id] ?: throw MarklessRuntimeError("unknown handler \"$id\"")
-					val out = withFields(f) { run(handler.ops, scope) }
+					val out = withFields(f) { run(handler.ops, at ?: scope) }
 					if (out.firstOrNull() is JournalEntry.Navigate) return out
 					calls.addAll(out)
 				}
@@ -1273,7 +1453,7 @@ class Runtime(
 				// The overlay behaviour's document listener hears the press: the topmost hint and the topmost other overlay it landed outside are told.
 				for (top in listOf(stack.lastOrNull { isHint(it) }, stack.lastOrNull { !isHint(it) })) {
 					if (top == null || contains(top, host)) continue
-					handlerFor(top, EventName.Dismiss)?.let { runs.add(it to mapOf("reason" to JsValue.Str("outside-press"), "pressTarget" to JsValue.Str(host))) }
+					handlerFor(top, EventName.Dismiss)?.let { runs.add(Triple(it, mapOf("reason" to JsValue.Str("outside-press"), "pressTarget" to JsValue.Str(host)), null)) }
 				}
 				raise(EventName.PointerDown, host)
 				return@change flush() ?: calls
@@ -1298,6 +1478,46 @@ class Runtime(
 			if (early != null) return@change early
 			raise(EventName.PointerOut, target)
 			crossing(EventName.PointerLeave, target, null, null)
+			flush()?.let { return@change it }
+			if (event != EventName.PointerUp) return@change calls
+			// A tap's compatibility mouse events, as a phone browser fires them before its click.
+			fun scopeOf(id: String): Scope? = byId[id.substringBefore('@')]?.let { at -> instances(at).firstOrNull { it.id == id }?.scope }
+			fun mouseRun(type: EventName, target: String, node: String, related: String?) {
+				val handler = handlerFor(node.substringBefore('@'), type) ?: return
+				val f = mapOf(
+					"target" to JsValue.Str(target),
+					"currentTarget" to JsValue.Str(node),
+					"relatedTarget" to (related?.let(JsValue::Str) ?: JsValue.Null),
+					"button" to JsValue.Num(0.0),
+					"buttons" to JsValue.Num(if (type == EventName.MouseDown) 1.0 else 0.0),
+					"clientX" to JsValue.Num(point.x),
+					"clientY" to JsValue.Num(point.y),
+					"timeStamp" to JsValue.Num(point.time),
+				)
+				runs.add(Triple(handler, f, scopeOf(target)))
+			}
+			fun mouse(type: EventName, target: String, related: String? = null) {
+				for (node in chain(target)) mouseRun(type, target, node, related)
+			}
+			fun mouseCrossing(type: EventName, target: String, from: String?, related: String?) {
+				val outside = if (from == null) emptySet() else chain(from).toSet()
+				val nodes = chain(target).filter { it !in outside }
+				for (node in if (type == EventName.MouseEnter) nodes.asReversed() else nodes) mouseRun(type, node, node, related)
+			}
+			// An element that left the screen took the mouse with it.
+			val from = mouseOver?.takeIf { scopeOf(it) != null }
+			if (from != host) {
+				if (from != null) {
+					mouse(EventName.MouseOut, from, host)
+					mouseCrossing(EventName.MouseLeave, from, host, host)
+				}
+				mouse(EventName.MouseOver, host, from)
+				mouseCrossing(EventName.MouseEnter, host, from, from)
+				mouseOver = host
+			}
+			mouse(EventName.MouseMove, host)
+			mouse(EventName.MouseDown, host)
+			mouse(EventName.MouseUp, host)
 			flush() ?: calls
 		}
 	}
@@ -1348,6 +1568,14 @@ class Runtime(
 		fired.removeAll { !shownInstance(it.substringAfter('\u0000')) }
 		edited.keys.removeAll { !shownInstance(it) }
 		for (n in ticked) if (!isShown(n)) checkedness[n.id] = checkedBinding(n.id) ?: ("checked" in n.attributes)
+		// A component an arm hid renders anew when it shows again, so its state starts over (a seed runs again then).
+		for (c in payload.cells) {
+			if (c.arm == null) continue
+			if (!armShown(c.arm)) {
+				values[c.id] = c.initial
+				if (c.seed != null) reseed.add(c.id)
+			} else if (c.seed != null && reseed.remove(c.id)) values[c.id] = evaluate(c.seed)
+		}
 	}
 
 	/** A device call a handler awaited answered: its continuation runs with the answer as its local. */
@@ -1409,7 +1637,7 @@ class Runtime(
 			}
 			is Op.Dialog -> {
 				if (op.node !in dialogs) throw MarklessRuntimeError("\"${op.node}\" is not a dialog")
-				dialogs[op.node] = op.open
+				setDialog(op.node, op.open)
 			}
 			is Op.Capture -> {
 				val node = evaluate(op.node, scope)
@@ -1426,11 +1654,17 @@ class Runtime(
 				calls.add(JournalEntry.Command(node.value, op.command, op.preventScroll))
 			}
 			is Op.Script -> {
+				val pressed = (fields?.get("pressTarget") as? JsValue.Str)?.value
+				val detail = (fields?.get("reason") as? JsValue.Str)?.let {
+					",\"detail\":{\"reason\":${jsonString(it.value)},\"pressTarget\":${pressed?.let(::jsonString) ?: "null"}}"
+				} ?: ""
 				val touch = TOUCH_FIELDS.mapNotNull { f -> fields?.get(f)?.let { ",${jsonString(f)}:${jsonValue(it)}" } }.joinToString("")
 				val typed = listOf("key", "text").mapNotNull { f -> (fields?.get(f) as? JsValue.Str)?.let { ",${jsonString(f)}:${jsonString(it.value)}" } }.joinToString("")
-				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$typed$touch}"
+				val named = if (fields?.get("currentTarget") is JsValue.Str) listOf("target", "currentTarget", "relatedTarget").associateWith { (fields?.get(it) as? JsValue.Str)?.value } else null
+				val nodes = named?.let { n -> ",\"nodes\":" + n.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value?.let(::jsonString) ?: "null"}" } } ?: ""
+				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$typed$touch$nodes$detail}"
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
-				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope)},\"event\":$event$catch", submission))
+				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope, named?.values?.filterNotNull().orEmpty() + listOfNotNull(pressed))},\"event\":$event$catch", submission))
 			}
 			Op.PreventDefault -> calls.add(JournalEntry.PreventDefault)
 			is Op.FieldText -> {
@@ -1481,12 +1715,34 @@ class Runtime(
 	}
 
 	/** The calls a host starts at mount, one per task cell. */
+	/** Each style slot's current value, in payload order; a slot that is not a finite number (or not whole when integer) is an error, as no layout of it was proven. */
+	fun slots(): List<Pair<String, Double>> {
+		val cases = styleCases().toMap()
+		return payload.slots.map { slot ->
+			// Its expression may not hold while its style case hides the text (`point.x`), so it keeps its last value.
+			val w = slot.whenCase
+			if (w != null && cases[w.case] != w.value) return@map slot.id to (keptSlots[slot.id] ?: 0.0)
+			val v = evaluate(slot.value)
+			if (v !is JsValue.Num || !v.value.isFinite()) throw MarklessRuntimeError("style slot ${slot.id} is ${jsonValue(v)}, not a finite number")
+			if (slot.integer && v.value != Math.rint(v.value)) throw MarklessRuntimeError("style slot ${slot.id} is ${JsString.number(v.value)}, not a whole number")
+			keptSlots[slot.id] = v.value
+			slot.id to v.value
+		}
+	}
+
+	/** Whether each style case's test holds now, in payload order: which of Dragon's assignments the style is in. */
+	fun styleCases(): List<Pair<String, Boolean>> = payload.styleCases.map { it.id to Js.truthy(evaluate(it.value)) }
+
+	private val keptSlots = HashMap<String, Double>()
+
 	fun tasks(): List<JournalEntry.Call> = payload.cells.mapNotNull { c -> c.task?.let { t -> JournalEntry.Call(t.call, t.arguments.map { evaluate(it) }, c.id) } }
 
 	/** Runs [apply] (cell writes, returning its calls or a navigation) and journals styled cells, changed nodes, released objects, then the calls. */
 	private inline fun change(host: String?, value: String?, apply: () -> List<JournalEntry>): List<JournalEntry> {
 		seedRows()
 		val cellsBefore = HashMap(values)
+		val slotsBefore = slots().toMap()
+		val casesBefore = styleCases().toMap()
 		val beforeTexts = texts().toMap()
 		val beforeAttributes = boundAttributes().associate { (n, a, v) -> (n to a) to v }
 		val beforeMarks = marks()
@@ -1509,8 +1765,20 @@ class Runtime(
 		val stackBefore = stack
 		val signaturesBefore = rowSignatures()
 		drawnArms = beforeArms
-		val calls = try { apply() } finally { drawnArms = null }
+		val calls = try { apply().toMutableList() } finally { drawnArms = null }
 		if (calls.firstOrNull() is JournalEntry.Navigate) return calls
+		// As the browser queues a dialog's close event, it runs after the handler that closed it.
+		var fired = 0
+		while (closing.isNotEmpty() && fired < CLOSE_DEPTH) {
+			fired++
+			val node = closing.removeFirst()
+			val handler = handlerFor(node, EventName.Close)?.let { handlers[it] } ?: continue
+			val scope = byId[node]?.let { at -> instances(at).firstOrNull { it.id == node }?.scope } ?: Scope.EMPTY
+			val taken = run(handler.ops, scope)
+			if (taken.firstOrNull() is JournalEntry.Navigate) return taken
+			calls.addAll(taken)
+		}
+		closing.clear()
 		// A row that left takes its state with it; a later row with the same key starts from the first values.
 		val kept = rows().flatMap { (list, keys) -> keys.map { "$list\u0000$it" } }.toSet()
 		values.keys.removeAll { slot ->
@@ -1547,6 +1815,8 @@ class Runtime(
 		val afterSheets = sheets().toMap()
 		val journal = ArrayList<JournalEntry>()
 		for (c in payload.cells) if (c.styled && !Js.strictEquals(cellsBefore.getValue(c.id), values.getValue(c.id))) journal.add(JournalEntry.State(c.id, values.getValue(c.id)))
+		for ((id, v) in styleCases()) if (casesBefore[id] != v) journal.add(JournalEntry.State(id, JsValue.Bool(v)))
+		for ((id, v) in slots()) if (slotsBefore[id]?.toRawBits() != v.toRawBits()) journal.add(JournalEntry.Slot(id, v))
 		for (node in payload.nodes) when (node) {
 			// Each shown copy of the list: an inner list has one per row of its outer list (`<id>@<key>`).
 			is Node.Repeat -> for ((id, a) in afterRows) {

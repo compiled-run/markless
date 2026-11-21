@@ -2,18 +2,18 @@ appId: ${APP_ID}
 name: r132-body-constants
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Count
-- assertVisible: '2'
+- assertVisible: "2"
 - assertVisible: Now 2
 - assertVisible: Grow
 - tapOn: Grow
 - assertNotVisible: Now 2
-- assertVisible: '2'
+- assertVisible: "2"
 - assertVisible: Now 6
 - assertNotVisible: Now 2
 - tapOn: Grow
 - assertNotVisible: Now 6
-- assertVisible: '2'
+- assertVisible: "2"
 - assertVisible: Now 14
 - assertNotVisible: Now 6

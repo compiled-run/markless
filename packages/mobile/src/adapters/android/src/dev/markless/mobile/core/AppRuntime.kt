@@ -27,7 +27,7 @@ class AppRuntime(val app: AppPayload, path: String, private val store: Store = M
 		return journal
 	}
 
-	/** Pops the top screen; the one below is shown as it was left; the journal is the popped screen's [Runtime.leave]. */
+	/** Pops the top screen; the one below is shown as it was left, with the app's shared copies as they are now: the journal is the popped screen's [Runtime.leave], then the shown one's [Runtime.resume]. */
 	fun back(): List<JournalEntry> {
 		if (screens.size < 2) throw MarklessRuntimeError("back on the first screen leaves the app")
 		val left = screens.removeAt(screens.size - 1).runtime.leave()
