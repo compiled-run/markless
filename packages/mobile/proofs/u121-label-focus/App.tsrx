@@ -12,7 +12,17 @@ export default function App() @{
 			</label>
 			<label>
 				Body
-				<textarea name="body" aria-label="Note text" onFocus={() => (note = 'Editing body')}></textarea>
+				<textarea name="body" aria-label="Note text"
+					onFocus={() => (note = 'Editing body')}
+					onBlur={() => (note = 'Left body')}
+				></textarea>
+			</label>
+			<label>
+				<span>Tag</span>
+				<select name="tag">
+					<option value="work">Work</option>
+					<option value="home">Home</option>
+				</select>
 			</label>
 			<label>
 				<input type="checkbox" name="pinned" onChange={(event) => (pinned = event.currentTarget.checked)} />

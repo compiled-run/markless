@@ -1144,7 +1144,8 @@ function walk(
 				const control = named ? nodeOf.get(named.split('@')[0]!) : undefined;
 				if (named && control?.kind === 'element') {
 					const type = control.attributes?.['type'] ?? 'text';
-					if (control.element === 'textarea' || (control.element === 'input' && !PRESSED_INPUT_TYPES.has(type)))
+					const pressable = payload.events.some((event) => event.host === control.id && event.event === 'activate');
+					if (control.element === 'textarea' || (control.element === 'input' && !PRESSED_INPUT_TYPES.has(type)) || !pressable)
 						focusing = named;
 					else pressed = named;
 				}
