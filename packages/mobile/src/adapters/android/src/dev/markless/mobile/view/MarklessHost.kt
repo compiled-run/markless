@@ -61,6 +61,15 @@ import kotlin.math.roundToInt
 
 class MarklessHostError(message: String) : RuntimeException(message)
 
+/** The web's default text colour, CanvasText: black, or white in the dark appearance. */
+internal fun canvasText(configuration: Configuration): Int = if (isDark(configuration)) Color.WHITE else Color.BLACK
+
+/** Chrome's LinkText: #0000ee, or #9e9eff when dark. */
+internal fun linkText(configuration: Configuration): Int = if (isDark(configuration)) 0xFF9E9EFF.toInt() else 0xFF0000EE.toInt()
+
+/** The web's Canvas colour, as Chrome paints a page that allows dark mode: white, or #121212 when dark. */
+internal fun canvas(configuration: Configuration): Int = if (isDark(configuration)) 0xFF121212.toInt() else Color.WHITE
+
 internal fun isDark(configuration: Configuration): Boolean =
 	configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
 
@@ -128,6 +137,8 @@ class MarklessHost(
 	/** The page's own box when its top holds more than one node (text at the top of the page). */
 	private val pageBox: MarklessBox?
 	private val baseTextSize = TextView(context).textSize
+	/** The views drawn with Chrome's form control look ([DefaultStyle.control]), redrawn when the appearance changes. */
+	private val controls = java.util.WeakHashMap<View, String>()
 	private val expanded = HashMap<View, Boolean?>()
 	private val sheets = LinkedHashMap<String, SystemSheet>()
 	/** Each view's current attributes, for the relations and roles the accessibility delegate reports. */
@@ -228,7 +239,8 @@ class MarklessHost(
 		val single = (payload.nodes.firstOrNull() as? Node.Element)?.takeIf { it.parent == null && it.arm == null && payload.nodes.count { n -> n.parent == null } == 1 }
 		if (single == null && style != null) throw MarklessHostError("a styled payload must start with its one root element")
 		if (single == null && payload.nodes.isEmpty()) throw MarklessHostError("payload has no nodes")
-		pageBox = if (single == null) MarklessBox(context) else null
+		// Without a style export the page's nodes sit in a body with the browser's 8 px margin; a styled root fills the page itself.
+		pageBox = if (single == null || style == null) MarklessBox(context).apply { body = (8 * dpr).roundToInt(); setPadding(body, 0, body, 0) } else null
 		for (sheet in payload.nodes.filterIsInstance<Node.Sheet>()) {
 			if (sheet.dismissible && runtime.handlerFor(sheet.id, EventName.Dismiss) == null) throw MarklessHostError("\"${sheet.id}\" is dismissible but has no dismiss handler")
 			val content = MarklessBox(context).apply { named(this, sheet.id) }
@@ -413,7 +425,13 @@ class MarklessHost(
 		val at = lead.indexOf('@')
 		val base = if (at < 0) lead else lead.substring(0, at)
 		val node = f.node(base)!!
-		view.text = f.render(base, if (at < 0) "" else lead.substring(at), f.blockText(node.parent).preformatted) { heldTexts[it] }
+		view.text = f.render(base, if (at < 0) "" else lead.substring(at), f.blockText(node.parent).preformatted, { before, after ->
+			if (view is FlowText && (view.spaceBefore != before || view.spaceAfter != after)) {
+				view.spaceBefore = before
+				view.spaceAfter = after
+				view.requestLayout()
+			}
+		}) { heldTexts[it] }
 	}
 
 	/** Whether the sheet's dialog is on screen. */
@@ -518,14 +536,59 @@ class MarklessHost(
 		scheduleLoadEvents()
 	}
 
-	/** The colour behind the page in the current assignment (the export's canvas, else the web canvas's white); null unstyled. */
-	val canvasColor: Int? get() = page?.let { it.export.assignments[it.assignment].canvas?.argb ?: Color.WHITE }
+	/** Chrome's look for a form control without CSS, light or dark: fill, a 1 px border, 2 px corners, its padding and width. */
+	private fun controlLook(view: View, control: String, configuration: Configuration) {
+		if (control == "tick") { view.invalidate(); return }
+		val dark = isDark(configuration)
+		val (fill, line) = when {
+			control == "button" && dark -> 0xFF6B6B6B to 0xFF6B6B6B
+			control == "button" -> 0xFFEFEFEF to 0xFF767676
+			dark -> 0xFF3B3B3B to 0xFF858585
+			else -> 0xFFFFFFFF to 0xFF767676
+		}
+		view.background = GradientDrawable().apply {
+			setColor(fill.toInt())
+			setStroke(maxOf(1, dpr.roundToInt()), line.toInt())
+			cornerRadius = (2 * dpr).toFloat()
+		}
+		// The border box is 2 px; the text sits 6 px (a field 2 px) in from the sides and 1 px from the top and bottom; a
+		// textarea's 2 px padding is the same on every side.
+		val side = ((when (control) { "button" -> 8; "area" -> 3; else -> 4 }) * dpr).roundToInt()
+		val top = ((if (control == "select") 2 else 3) * dpr).roundToInt()
+		view.setPadding(side, top, side, top)
+		if (view is SelectBox) view.chromeLook(canvasText(configuration), dpr.toFloat())
+		(view as? TextView)?.setTextColor(canvasText(configuration))
+		if (control == "field" && view is EditText) (153 * dpr).roundToInt().let { view.minWidth = it; view.maxWidth = it }
+		if (control == "area" && view is EditText) view.typeface = Typeface.MONOSPACE
+	}
+
+	/**
+	 * A textarea's size as Chrome gives it: `cols` monospace characters across and `rows` lines down (20 and 2 unless the
+	 * attribute is a positive integer), plus the 16 px scrollbar gutter, the 2 px padding and the 1 px border.
+	 */
+	private fun sizeArea(view: EditText, current: Map<String, String>) {
+		val column = view.paint.measureText("0")
+		view.width = (Math.ceil(textareaExtent(current["cols"], 20) * column.toDouble()) + 22 * dpr).roundToInt()
+		view.height = textareaExtent(current["rows"], 2) * view.lineHeight + (6 * dpr).roundToInt()
+	}
+
+	/** The colour behind the page: the current assignment's canvas (else the web canvas's white), or unstyled the web's Canvas. */
+	val canvasColor: Int get() = page?.let { it.export.assignments[it.assignment].canvas?.argb ?: Color.WHITE } ?: canvas(context.resources.configuration)
 
 	/** Called with [canvasColor] whenever the assignment changes. */
 	var onCanvas: ((Int) -> Unit)? = null
 
 	/** The device's appearance changed: move to the @media band it selects, as a cell's `state` entry moves to its assignment. */
 	fun configurationChanged(configuration: Configuration) {
+		if (style == null) {
+			for ((id, view) in textViews) if (view !is Button) {
+				val parent = flow?.node(id.substringBefore('@'))?.parent
+				view.setTextColor(if (flow?.blockText(parent)?.link == true) linkText(configuration) else canvasText(configuration))
+			}
+			onCanvas?.invoke(canvas(configuration))
+			for ((view, control) in controls) controlLook(view, control, configuration)
+			for (view in views.values) if (view is SizedImage) view.recolor(configuration)
+		}
 		var changed = false
 		for (l in allLayouts()) {
 			if (l.export.bandState < 0) continue
@@ -557,7 +620,7 @@ class MarklessHost(
 	}
 
 	private fun repaint() {
-		canvasColor?.let { onCanvas?.invoke(it) }
+		onCanvas?.invoke(canvasColor)
 		for (inst in built.values.sortedBy { order.getValue(it.node.id) }) place(inst, views.getValue(inst.id))
 		root.requestLayout()
 		// A sheet's boxes live in its dialog, outside the page's root.
@@ -580,7 +643,7 @@ class MarklessHost(
 			val marker = (inst.node as? Node.Element)?.defaultStyle?.marker ?: continue
 			val box = views[inst.id] as? MarklessBox ?: continue
 			val items = (0 until box.childCount).map { box.getChildAt(it) }.filter { v -> built[views.entries.firstOrNull { it.value === v }?.key]?.node.let { it is Node.Element && it.element == "li" } }
-			box.markers = items.withIndex().associate { (i, v) -> v to if (marker == "decimal") "${i + 1}." else "•" }
+			box.markers = items.withIndex().associate { (i, v) -> v to listMarker(marker, i + 1) }
 		}
 	}
 
@@ -655,11 +718,13 @@ class MarklessHost(
 		val view: TextView = if (parent is Button) {
 			if (textViews.values.any { it === parent }) throw MarklessHostError("button \"${inst.node.parent}\" has more than one paragraph; Android holds one per button")
 			parent
-		} else TextView(context).apply {
+		} else FlowText(context).apply {
 			includeFontPadding = false
 			isClickable = false
 			isFocusable = false
 			named(this, inst.id, heading = parent.isAccessibilityHeading)
+			if (style == null) setTextColor(if (block.link) linkText(context.resources.configuration) else canvasText(context.resources.configuration))
+			if (style == null && block.underline) paintFlags = paintFlags or Paint.UNDERLINE_TEXT_FLAG
 		}
 		if (view !is Button || block != BlockText(false, false, false, 1.0, false)) {
 			view.typeface = Typeface.create(if (block.monospace) Typeface.MONOSPACE else Typeface.DEFAULT, when {
@@ -744,11 +809,15 @@ class MarklessHost(
 		if (unseen) inert.add(inst.id)
 		val view = when (if (node.element == "button" && holdsElements) "box-button" else if (drawing != null) "drawing" else if (unstyled?.rule == true) "rule" else if (unseen) "unseen" else if (type in TICKABLE) type else node.element) {
 			"drawing" -> DrawingView(context, drawing!!, baseTextSize * (flow?.blockText(node.parent)?.size ?: 1.0)).also { named(it, inst.id, image = true) }
-			"rule" -> RuleView(context).also { named(it, inst.id) }
+			"rule" -> RuleView(context).also { rule ->
+				named(rule, inst.id)
+				unstyled?.let { s -> (s.margin * baseTextSize * flow!!.blockText(node.id).size).roundToInt().let { rule.marginTop = it; rule.marginBottom = it } }
+			}
 			"unseen" -> View(context)
 			// The runtime owns checkedness: the widget never toggles itself, a press dispatches and the journal sets it.
-			"checkbox", "radio" -> (if (type == "radio") object : RadioButton(context) { override fun toggle() {} } else object : CheckBox(context) { override fun toggle() {} }).apply {
-				if (style == null) { minWidth = (48 * dpr).roundToInt(); minHeight = (48 * dpr).roundToInt() }
+			"checkbox", "radio" -> (if (unstyled?.control == "tick") (if (type == "radio") ChromeRadio(context) else ChromeCheckBox(context))
+				else if (type == "radio") object : RadioButton(context) { override fun toggle() {} } else object : CheckBox(context) { override fun toggle() {} }).apply {
+				if (style == null && unstyled?.control != "tick") { minWidth = (48 * dpr).roundToInt(); minHeight = (48 * dpr).roundToInt() }
 				if (node.row == null) isChecked = runtime.checkedOf(node.id)
 				named(this, inst.id)
 			}
@@ -778,7 +847,7 @@ class MarklessHost(
 				named(this, inst.id)
 			}
 			"select" -> SelectBox(context).apply {
-				if (style == null) { minimumWidth = (120 * dpr).roundToInt(); minimumHeight = (48 * dpr).roundToInt() }
+				if (style == null && unstyled?.control == null) { minimumWidth = (120 * dpr).roundToInt(); minimumHeight = (48 * dpr).roundToInt() }
 				named(this, inst.id, control = true)
 				setOnClickListener {
 					if (attrs[inst.id]?.containsKey("disabled") == true) return@setOnClickListener
@@ -821,9 +890,23 @@ class MarklessHost(
 				named(this, inst.id, heading = node.element in HEADINGS, control = events[node.id].orEmpty().any { it.event == EventName.Activate }, link = node.element == "a")
 				unstyled?.let { s ->
 					table = s.table?.takeIf { it != "cell" }
+					// Chrome's table: a cell's content 1 px inside it; rows 2 px apart and from the table's edges, their margins meeting.
+					if (s.table == "cell") (1 * dpr).roundToInt().let { setPadding(it, it, it, it) }
+					if (s.table == "row") (2 * dpr).roundToInt().let { marginTop = it; marginBottom = it }
+					center = s.center
 					if (s.indent > 0) setPaddingRelative((s.indent * dpr).roundToInt(), 0, 0, 0)
+					if (s.margin > 0) (s.margin * baseTextSize * flow!!.blockText(node.id).size).roundToInt().let { marginTop = it; marginBottom = it }
 				}
 			}
+		}
+		if (unstyled?.inline == true) inlineLevel.add(view)
+		unstyled?.control?.let { control ->
+			controls[view] = control
+			controlLook(view, control, context.resources.configuration)
+			val controlText = (baseTextSize * unstyled.size * flow!!.blockText(node.parent).size).toFloat()
+			if (view is EditText) view.setTextSize(TypedValue.COMPLEX_UNIT_PX, controlText)
+			if (view is SelectBox) view.textSize(controlText)
+			if (control == "area" && view is EditText) sizeArea(view, attrs[inst.id].orEmpty() + node.attributes)
 		}
 		layoutOf(inst.node)?.let { l -> l.export.assignments[l.assignment].byId[inst.id] }?.let { styled -> scrollContainer(inst.id, view, styled) }
 		views[inst.id] = view
@@ -962,11 +1045,12 @@ class MarklessHost(
 		val view: TextView = if (parent is Button) {
 			if (textViews.values.any { it === parent }) throw MarklessHostError("button \"${node.parent}\" has more than one text run; Android holds one per button")
 			parent
-		} else TextView(context).apply {
+		} else FlowText(context).apply {
 			includeFontPadding = false
 			isClickable = false
 			isFocusable = false
 			named(this, inst.id, heading = parent.isAccessibilityHeading)
+			if (style == null) setTextColor(canvasText(context.resources.configuration))
 		}
 		view.text = runtime.text(node, inst.scope)
 		textViews[inst.id] = view
@@ -989,13 +1073,16 @@ class MarklessHost(
 				view.contentDescription = value
 				if (view is DrawingView && current["aria-hidden"] != "true") view.importantForAccessibility = if (value != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO
 			}
-			"alt" -> if (view is SizedImage) view.contentDescription = value
+			"alt" -> if (view is SizedImage) { view.contentDescription = value; view.alt(value) }
+			// Shown while the field is empty, in Chrome's placeholder grey (#757575).
+			"placeholder" -> if (view is EditText) { view.hint = value; view.setHintTextColor(0xFF757575.toInt()) }
 			"src" -> when (view) {
 				is SizedImage -> view.show(value)
 				is AudioButton -> view.source(value)
 			}
 			"controls" -> if (view is AudioButton) view.visibility = if (value == null) View.GONE else View.VISIBLE
 			"disabled" -> view.isEnabled = value == null
+			"cols", "rows" -> if (controls[view] == "area" && view is EditText) sizeArea(view, current)
 			"aria-pressed", "aria-selected" -> view.isSelected = value == "true"
 			"aria-expanded" -> expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }
 			"aria-hidden" -> view.importantForAccessibility = if (value == "true") View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else if (view is DrawingView) (if (view.contentDescription != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO) else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
@@ -1283,4 +1370,16 @@ private fun EditText.setAppText(text: String) {
 	val limit = filters.filterIsInstance<LengthLimit>().singleOrNull()
 	limit?.appWriting = true
 	try { setText(text) } finally { limit?.appWriting = false }
+}
+
+/** A textarea's `cols` or `rows` as HTML reads it: the digits after any leading whitespace, if they make a number above zero, else [fallback]. */
+internal fun textareaExtent(value: String?, fallback: Int): Int =
+	(value ?: "").trimStart(' ', '\t', '\n', '\r', '\u000C').takeWhile { it in '0'..'9' }.toIntOrNull()?.takeIf { it > 0 } ?: fallback
+
+/** The marker before a list's [number]th item, as Chrome writes it: `1.`, or a disc, circle or square. */
+internal fun listMarker(kind: String?, number: Int): String = when (kind) {
+	"decimal" -> "$number."
+	"circle" -> "\u25E6"
+	"square" -> "\u25AA"
+	else -> "\u2022"
 }

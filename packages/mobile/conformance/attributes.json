@@ -31,7 +31,8 @@
 				},
 				"defaultStyle": {
 					"bold": true,
-					"size": 2
+					"size": 2,
+					"margin": 0.67
 				}
 			},
 			{
@@ -84,7 +85,12 @@
 							"cell": "state:liked"
 						}
 					}
-				]
+				],
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -114,7 +120,12 @@
 							}
 						}
 					}
-				]
+				],
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",

@@ -48,13 +48,21 @@
 							"cell": "component-edge:0/shared:src/typed-target.tsrx#fieldState/state:field.value"
 						}
 					}
-				]
+				],
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "field"
+				}
 			},
 			{
 				"kind": "element",
 				"id": "component-edge:0/h2",
 				"element": "p",
-				"parent": "component-edge:0/h0"
+				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
@@ -82,7 +90,10 @@
 				"kind": "element",
 				"id": "component-edge:0/h3",
 				"element": "p",
-				"parent": "component-edge:0/h0"
+				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",

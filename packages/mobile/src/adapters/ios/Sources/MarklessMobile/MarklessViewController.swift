@@ -266,6 +266,8 @@ public final class MarklessViewController: UIViewController {
 
 	public override func viewDidLayoutSubviews() {
 		super.viewDidLayoutSubviews()
+		// Lines of an unstyled page break at the width they get; a new width breaks them again before the frame shows.
+		if tree?.relineIfResized(view.safeAreaLayoutGuide.layoutFrame.width) == true { view.layoutIfNeeded() }
 		if view.window != nil { FirstFrame.laidOut() }
 		raiseVisible()
 	}
@@ -279,10 +281,15 @@ public final class MarklessViewController: UIViewController {
 		tree?.mount(in: view)
 	}
 
-	/// A styled page shows its canvas behind the page and the bars, as a browser does; an unstyled one the system background.
+	/// A styled page shows its canvas behind the page and the bars, as a browser does; an unstyled one the web's Canvas.
 	private func paintCanvas() {
 		guard isViewLoaded else { return }
-		view.backgroundColor = tree?.canvas ?? .systemBackground
+		view.backgroundColor = tree?.canvas ?? MarklessViewController.webCanvas
+	}
+
+	/// Chrome's Canvas for a page that allows dark mode: white, or #121212 when dark.
+	private static let webCanvas = UIColor { traits in
+		traits.userInterfaceStyle == .dark ? UIColor(red: 18 / 255, green: 18 / 255, blue: 18 / 255, alpha: 1) : .white
 	}
 
 	public override func viewDidLoad() {

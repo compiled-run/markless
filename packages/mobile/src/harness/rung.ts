@@ -51,10 +51,16 @@ export type ProofRung = {
 const APP_CONFIG = 'app.json';
 
 /** The config of the app a rung folder belongs to; empty when the app has none. */
-export function readAppConfig(rungDir: string): { readonly device?: DeviceAppConfig } {
+export function readAppConfig(rungDir: string): {
+	readonly device?: DeviceAppConfig;
+	readonly origin?: string;
+} {
 	const file = join(dirname(rungDir), APP_CONFIG);
 	return existsSync(file)
-		? (JSON.parse(readFileSync(file, 'utf8')) as { readonly device?: DeviceAppConfig })
+		? (JSON.parse(readFileSync(file, 'utf8')) as {
+				readonly device?: DeviceAppConfig;
+				readonly origin?: string;
+			})
 		: {};
 }
 
@@ -93,7 +99,11 @@ const APP_DOCUMENT = 'document.tsrx';
 /** Compiles a navigation rung's app: every page under `pages/`, with repo-relative filenames as for one-screen rungs. */
 export function compileRungApp(
 	dir: string,
-	options: { readonly target?: ProofPlatform; readonly device?: DeviceAppConfig } = {},
+	options: {
+		readonly target?: ProofPlatform;
+		readonly device?: DeviceAppConfig;
+		readonly origin?: string;
+	} = {},
 ) {
 	const document = join(dir, APP_DOCUMENT);
 	return compileNativeApp({
@@ -309,6 +319,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				...(expected.route === undefined ? {} : { page: `pages/${expected.route}.tsrx` }),
 				readModule: readWorkspaceModule,
 				...(appConfig.device ? { device: appConfig.device } : {}),
+				...(appConfig.origin !== undefined ? { origin: appConfig.origin } : {}),
 				target: platform,
 			});
 			if (!build.payload) {
@@ -360,16 +371,21 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 			const build = await compileRungApp(dir, {
 				target: platform,
 				...(appConfig.device ? { device: appConfig.device } : {}),
+				...(appConfig.origin !== undefined ? { origin: appConfig.origin } : {}),
 			});
 			if (!build.payload) {
 				const lines = build.diagnostics.map(
-					(diagnostic) => `  ${diagnostic.page}: ${diagnostic.code}: ${diagnostic.message}`,
+					(diagnostic) =>
+						`  ${diagnostic.page}: ${diagnostic.code}: ${diagnostic.message}`,
 				);
 				throw new Error(`${name}: the app has no ${platform} build\n${lines.join('\n')}`);
 			}
 			manifest = build.manifest;
 			payloads[platform] = JSON.stringify(build.payload);
-			assets[platform].push([PROOF_PAYLOAD_PATH, new TextEncoder().encode(payloads[platform])]);
+			assets[platform].push([
+				PROOF_PAYLOAD_PATH,
+				new TextEncoder().encode(payloads[platform]),
+			]);
 			if (build.styleInputs.length > 0 && platform === 'android') {
 				// Dragon lays out one input for both phones, so both must build the same views.
 				if (payloads.ios !== payloads.android)

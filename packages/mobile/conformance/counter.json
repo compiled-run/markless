@@ -30,7 +30,8 @@
 				},
 				"defaultStyle": {
 					"bold": true,
-					"size": 2
+					"size": 2,
+					"margin": 0.67
 				}
 			},
 			{
@@ -50,6 +51,11 @@
 				"parent": "h0",
 				"attributes": {
 					"class": "tap mk-u81dxg"
+				},
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
 				}
 			},
 			{

@@ -54,7 +54,8 @@
 				"parent": "h8",
 				"defaultStyle": {
 					"bold": true,
-					"size": 2
+					"size": 2,
+					"margin": 0.67
 				}
 			},
 			{
@@ -71,7 +72,10 @@
 				"kind": "element",
 				"id": "h10",
 				"element": "p",
-				"parent": "h8"
+				"parent": "h8",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
@@ -116,7 +120,12 @@
 				"kind": "element",
 				"id": "component-edge:1/h1",
 				"element": "button",
-				"parent": "component-edge:1/h0"
+				"parent": "component-edge:1/h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -142,7 +151,10 @@
 				"kind": "element",
 				"id": "component-edge:1/h2",
 				"element": "p",
-				"parent": "component-edge:1/h0"
+				"parent": "component-edge:1/h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
@@ -168,7 +180,10 @@
 				"kind": "element",
 				"id": "component-edge:1/h3",
 				"element": "p",
-				"parent": "component-edge:1/h0"
+				"parent": "component-edge:1/h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
@@ -187,7 +202,12 @@
 				"kind": "element",
 				"id": "component-edge:1/h4",
 				"element": "button",
-				"parent": "component-edge:1/h0"
+				"parent": "component-edge:1/h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -203,7 +223,12 @@
 				"kind": "element",
 				"id": "component-edge:1/h5",
 				"element": "button",
-				"parent": "component-edge:1/h0"
+				"parent": "component-edge:1/h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -219,7 +244,10 @@
 				"kind": "element",
 				"id": "component-edge:1/h6",
 				"element": "p",
-				"parent": "component-edge:1/h0"
+				"parent": "component-edge:1/h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
@@ -265,6 +293,9 @@
 						}
 					}
 				],
+				"defaultStyle": {
+					"inline": true
+				},
 				"arm": {
 					"branch": "component-edge:1/branch-site:1",
 					"index": 0

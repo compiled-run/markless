@@ -51,7 +51,8 @@
 				"parent": "h6",
 				"defaultStyle": {
 					"bold": true,
-					"size": 2
+					"size": 2,
+					"margin": 0.67
 				}
 			},
 			{
@@ -74,7 +75,12 @@
 				"kind": "element",
 				"id": "h9",
 				"element": "button",
-				"parent": "h8"
+				"parent": "h8",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -120,6 +126,9 @@
 				"id": "component-edge:0/h1",
 				"element": "p",
 				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "branch-site:1",
 					"index": 0
@@ -147,6 +156,11 @@
 				"id": "component-edge:0/h2",
 				"element": "button",
 				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				},
 				"arm": {
 					"branch": "branch-site:1",
 					"index": 0
@@ -181,6 +195,9 @@
 				"id": "component-edge:0/h3",
 				"element": "p",
 				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "branch-site:1",
 					"index": 0
@@ -208,6 +225,9 @@
 				"id": "component-edge:0/h4",
 				"element": "p",
 				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"margin": 1
+				},
 				"arm": {
 					"branch": "branch-site:1",
 					"index": 0
@@ -278,6 +298,9 @@
 						}
 					}
 				],
+				"defaultStyle": {
+					"inline": true
+				},
 				"arm": {
 					"branch": "component-edge:0/branch-site:0",
 					"index": 0

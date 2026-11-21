@@ -22,7 +22,10 @@
 				"kind": "element",
 				"id": "h1",
 				"element": "p",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
@@ -62,7 +65,12 @@
 				"kind": "element",
 				"id": "h2",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -78,7 +86,12 @@
 				"kind": "element",
 				"id": "h3",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",

@@ -163,9 +163,23 @@ function defaultStyleOf(
 		'title' in attributes ||
 		bindings.some((binding) => 'attribute' in binding && binding.attribute === 'title');
 	const style: NativeDefaultStyle =
-		element === 'abbr' && titled ? { ...base, line: 'underline' } : base;
+		element === 'abbr' && titled
+			? { ...base, line: 'dotted-underline' }
+			: element === 'input' &&
+				  (attributes['type'] === 'checkbox' || attributes['type'] === 'radio')
+				? { inline: true, control: 'tick' }
+				: (element === 'input' && !TEXT_TYPES.has(attributes['type'] ?? 'text')) ||
+					  (element === 'a' &&
+							!('href' in attributes) &&
+							!bindings.some(
+								(binding) => 'attribute' in binding && binding.attribute === 'href',
+							))
+					? { inline: true }
+					: base;
 	return Object.keys(style).length > 0 ? style : undefined;
 }
+
+const LIST_ELEMENTS: ReadonlySet<string> = new Set(['dl', 'menu', 'ol', 'ul']);
 
 const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][number]['event']>> = {
 	click: 'activate',
@@ -907,6 +921,11 @@ export type NativeViewOptions = {
 	readonly scriptHandlers?: 'fallback' | 'all' | 'never';
 	/** A module's source as the build read it, by filename: where a native build finds a value's own JavaScript. */
 	readonly readSource?: (filename: string) => string | undefined;
+	/**
+	 * Where the app's site is served (`https://shop.example`): a URL from the root (`/api/products`) that the phone's
+	 * JavaScript fetches resolves against it, as the web resolves one against the page's origin.
+	 */
+	readonly origin?: string;
 };
 
 /** One module's facts, indexed for lowering its templates. */
@@ -2124,23 +2143,8 @@ export function createNativeViewPayload(
 		const call = methodCallSite(body?.kind === 'await' ? body.value : body);
 		const device = call ? deviceName(call.calleePath, scope) : undefined;
 		const id = `${scope.prefix}task:${computed.id}`;
-		if (
-			!call ||
-			device === undefined ||
-			!isDeviceCall(device) ||
-			!DEVICE_CALLS[device].async
-		) {
-			if (!cells.some((cell) => cell.id === id)) {
-				const script = scriptAsync(computed, { ...scope, boundary: undefined }, what);
-				if (script === null) return null;
-				addCell({
-					id,
-					name: computed.name,
-					initial: { state: 'pending' },
-					async: { ...script, boundaries: [] },
-					...(scope.row ? { row: scope.row } : {}),
-				});
-			}
+		if (!call || device === undefined || !isDeviceCall(device) || !DEVICE_CALLS[device].async) {
+			if (scriptTaskCell(computed, scope, what) === null) return null;
 			scope.boundary.tasks.add(id);
 			return { member: { cell: id }, property: 'value' };
 		}
@@ -2242,9 +2246,17 @@ export function createNativeViewPayload(
 	/** Script functions by where they are written; each payload numbers its own. */
 	const scriptFunctions = new Map<
 		string,
-		{ readonly id: string; readonly module: ModuleFacts; readonly fact: SemanticScriptFunction }
+		{
+			readonly id: string;
+			readonly module: ModuleFacts;
+			readonly fact: SemanticScriptFunction;
+			/** The async values it reads as their settled values (`__settled` in the engine). */
+			settled?: ReadonlyArray<string>;
+		}
 	>();
 	const scriptServices = new Set<NativeScriptService>();
+	/** Task cells whose script is being lowered: an async value that reads one of them back would never settle. */
+	const taskCellsBuilding = new Set<string>();
 	const refuseScript = (message: string, span?: SourceSpan): null => {
 		diagnostics.push(nativeRefusal('javascript', message, span));
 		return null;
@@ -2367,11 +2379,12 @@ export function createNativeViewPayload(
 		scope: Scope,
 		what: string,
 		reading = false,
+		settled?: string[],
 	): Record<string, NativeScriptBinding> | null {
 		const was = scriptReading;
 		scriptReading = true;
 		try {
-			return scriptBindingsOf(fact, scope, what, reading);
+			return scriptBindingsOf(fact, scope, what, reading, settled);
 		} finally {
 			scriptReading = was;
 		}
@@ -2382,10 +2395,26 @@ export function createNativeViewPayload(
 		scope: Scope,
 		what: string,
 		reading: boolean,
+		settled?: string[],
 	): Record<string, NativeScriptBinding> | null {
 		const bindings: Record<string, NativeScriptBinding> = {};
 		let ok = true;
 		for (const { name, written, span } of fact.names) {
+			const upstream =
+				settled && !written && !scope.locals.has(name)
+					? asyncComputedOf(name, scope)
+					: undefined;
+			if (upstream) {
+				// An async value read by another waits for it, as on the web: the reader sees its settled value.
+				const cell = scriptTaskCell(upstream, scope, `${what}'s \`${name}\``);
+				if (cell === null) {
+					ok = false;
+					continue;
+				}
+				bindings[name] = { cell };
+				settled!.push(name);
+				continue;
+			}
 			const object = scope.objects.get(name);
 			if (object?.kind === 'fields') {
 				bindings[name] = { fields: Object.fromEntries(object.cells) };
@@ -2610,9 +2639,50 @@ export function createNativeViewPayload(
 				);
 			const label = `the async value \`${computed.name}\``;
 			const fn = scriptFunctionId(fact, scope.module, label);
-			const bindings = scriptBindings(fact, scope, label);
-			return fn === null || bindings === null ? null : { script: fn, bindings };
+			const settled: string[] = [];
+			const bindings = scriptBindings(fact, scope, label, false, settled);
+			if (fn === null || bindings === null) return null;
+			if (settled.length > 0)
+				scriptFunctions.get(`${fact.span.filename}\0${fact.span.start}`)!.settled = settled;
+			return { script: fn, bindings };
 		});
+	}
+
+	/** The async computed a name reads in this component, if it is one. */
+	function asyncComputedOf(name: string, scope: Scope) {
+		const computed =
+			scope.module.computeds.get(scope.component)?.get(name) ??
+			scope.module.computeds.get('')?.get(name);
+		return computed?.kind === 'computed' && computed.async ? computed : undefined;
+	}
+
+	/** The task cell of an async value its script runs, made the first time something reads it. */
+	function scriptTaskCell(
+		computed: SemanticGraphArtifact['graphBindings'][number],
+		scope: Scope,
+		what: string,
+	): string | null {
+		const id = `${scope.prefix}task:${computed.id}`;
+		if (cells.some((cell) => cell.id === id)) return id;
+		if (taskCellsBuilding.has(id))
+			return refuse(
+				`${what} reads the async value \`${computed.name}\`, which reads it back`,
+			);
+		taskCellsBuilding.add(id);
+		try {
+			const script = scriptAsync(computed, { ...scope, boundary: undefined }, what);
+			if (script === null) return null;
+			addCell({
+				id,
+				name: computed.name,
+				initial: { state: 'pending' },
+				async: { ...script, boundaries: [] },
+				...(scope.row ? { row: scope.row } : {}),
+			});
+			return id;
+		} finally {
+			taskCellsBuilding.delete(id);
+		}
 	}
 
 	/**
@@ -2804,10 +2874,15 @@ export function createNativeViewPayload(
 				imports: facts.imports.map((_, slot) => entry.slots.get(slot) ?? null),
 				functions: [...scriptFunctions.values()]
 					.filter((fn) => fn.module === entry.module)
-					.map((fn) => ({ id: fn.id, code: fn.fact.code })),
+					.map((fn) => ({
+						id: fn.id,
+						code: fn.settled?.length
+							? `__s = __settled(__s, ${JSON.stringify(fn.settled)});\n${fn.fact.code}`
+							: fn.fact.code,
+					})),
 			};
 		});
-		return nativeScriptOf(inputs, [...scriptServices].sort());
+		return nativeScriptOf(inputs, [...scriptServices].sort(), options.origin);
 	}
 
 	const inlining = new Set<string>();
@@ -3930,7 +4005,8 @@ export function createNativeViewPayload(
 					refuse(`${what} uses a call to \`${name}\`, which needs a script engine`);
 				if (!found && !handlerCallsScript) return unknown();
 				const key = found && `${found.module.graph.filename}#${found.fn.name}`;
-				if (key && inlining.has(key)) return refuse(`${what} calls \`${name}\` inside itself`);
+				if (key && inlining.has(key))
+					return refuse(`${what} calls \`${name}\` inside itself`);
 				const args = all(expression.arguments);
 				if (!args) return null;
 				const evaluate = (): NativeExpr | null => {
@@ -3966,7 +4042,9 @@ export function createNativeViewPayload(
 				const data = asData(() => attempt(evaluate));
 				if (!data.failed) return data.value;
 				data.rollBack();
-				const called = attempt(() => scriptCall(scope.module, name, args, what, scope.span));
+				const called = attempt(() =>
+					scriptCall(scope.module, name, args, what, scope.span),
+				);
 				if (called.value && !called.failed) return called.value;
 				called.rollBack();
 				return asData(evaluate);
@@ -4565,6 +4643,30 @@ export function createNativeViewPayload(
 					? [slot.name]
 					: [],
 			);
+		/**
+		 * Bound attributes of a drawn element whose value is known when the app is built (a prop its caller fixed, a module
+		 * constant), as the text the web renders: the drawing takes them as written. One that follows state is left out.
+		 */
+		const foldedAttributes = (
+			host: string,
+			names: ReadonlyArray<string>,
+			scope: Scope,
+		): Record<string, string> => {
+			if (names.length === 0) return {};
+			const lowered = attempt(() => bindingsOf(host, scope, new Set(), false));
+			lowered.rollBack();
+			const out: Record<string, string> = {};
+			for (const binding of lowered.value) {
+				if (!('attribute' in binding) || !names.includes(binding.attribute)) continue;
+				const folded = foldConstant(binding.value, () => undefined);
+				if (
+					folded &&
+					(typeof folded.value === 'string' || typeof folded.value === 'number')
+				)
+					out[binding.attribute] = String(folded.value);
+			}
+			return out;
+		};
 		// A <select> hidden from sight and from screen readers only carries a value for its form: outside one it does nothing.
 		const hiddenFormValue = (path: ReadonlyArray<number>): boolean =>
 			attributesAt(path)['aria-hidden'] === 'true' && !boundAt(path).includes('aria-hidden');
@@ -4756,12 +4858,13 @@ export function createNativeViewPayload(
 					for (const other of inside) {
 						if (other.kind === 'host') {
 							const tag = scope.module.tagOf.get(other.id) ?? '*';
+							const folded = foldedAttributes(other.id, boundAt(other.path), scope);
 							drawn.push({
 								id: other.id,
 								tag,
 								path: relative(other.path),
-								attributes: attributesAt(other.path),
-								bound: boundAt(other.path),
+								attributes: { ...attributesAt(other.path), ...folded },
+								bound: boundAt(other.path).filter((name) => !(name in folded)),
 							});
 							for (const event of scope.module.eventsByHost.get(other.id) ?? []) {
 								if (scope.module === rootModule) loweredEvents.add(event.id);
@@ -4780,7 +4883,12 @@ export function createNativeViewPayload(
 								span,
 							);
 					}
-					const result = compileDrawing(attributes, drawn, texts, item.id);
+					const result = compileDrawing(
+						{ ...attributes, ...foldedAttributes(item.id, boundAt(item.path), scope) },
+						drawn,
+						texts,
+						item.id,
+					);
 					for (const refusal of result.refusals)
 						refuseAs(
 							'svg',
@@ -5004,6 +5112,7 @@ export function createNativeViewPayload(
 					if (fixedHref === undefined)
 						bindings.push({ attribute: 'href', value: hrefValue });
 					else attributes['href'] = fixedHref;
+					const defaultStyle = defaultStyleOf('a', attributes, bindings);
 					nodes.push({
 						kind: 'element',
 						id,
@@ -5011,6 +5120,7 @@ export function createNativeViewPayload(
 						parent,
 						attributes,
 						...(bindings.length > 0 ? { bindings } : {}),
+						...(defaultStyle ? { defaultStyle } : {}),
 						...place,
 					});
 					if (projection) lowerChunk(projection, id, place, scope);
@@ -5330,7 +5440,10 @@ export function createNativeViewPayload(
 					lowerChunk(
 						chunk,
 						parent,
-						{ ...(place.row ? { row: place.row } : {}), arm: { branch: branchId, index } },
+						{
+							...(place.row ? { row: place.row } : {}),
+							arm: { branch: branchId, index },
+						},
 						{
 							...scope,
 							...(arm === 'try' ? { catches } : {}),
@@ -5386,7 +5499,10 @@ export function createNativeViewPayload(
 					const cell = cells[index]!;
 					cells[index] = {
 						...cell,
-						async: { ...cell.async!, boundaries: [...cell.async!.boundaries, branchId] },
+						async: {
+							...cell.async!,
+							boundaries: [...cell.async!.boundaries, branchId],
+						},
 					};
 				}
 				// A handler that rejects keeps the shown content and opens @catch after it, as the web's spec says (a failed
@@ -5432,7 +5548,10 @@ export function createNativeViewPayload(
 					lowerChunk(
 						scope.module.chunks.get(item.arms.catch)!,
 						parent,
-						{ ...(place.row ? { row: place.row } : {}), arm: { branch: caughtId, index: 0 } },
+						{
+							...(place.row ? { row: place.row } : {}),
+							arm: { branch: caughtId, index: 0 },
+						},
 						{
 							...scope,
 							prefix: `${scope.prefix}${caughtId}/`,
@@ -5964,7 +6083,11 @@ export function createNativeViewPayload(
 			live: true,
 			...(event.handlerSpan ? { span: event.handlerSpan } : {}),
 			...(event.handlerCatchResets?.length
-				? { resets: new Map(event.handlerCatchResets.map((reset) => [reset.name, reset.boundaryId])) }
+				? {
+						resets: new Map(
+							event.handlerCatchResets.map((reset) => [reset.name, reset.boundaryId]),
+						),
+					}
 				: {}),
 		};
 		const submitting =
@@ -6745,18 +6868,35 @@ export function createNativeViewPayload(
 	}
 
 	/** `reset()` of the `@catch` the handler is in: its async values that failed run again, its handler error clears. */
-	function resetOps(boundaryId: string, scope: Scope, what: string, span: SourceSpan | undefined): NativeOp[] {
+	function resetOps(
+		boundaryId: string,
+		scope: Scope,
+		what: string,
+		span: SourceSpan | undefined,
+	): NativeOp[] {
 		const boundary = scope.boundary;
 		if (boundary?.id !== boundaryId || boundary.arm !== 'catch') {
-			refuse(`${what} calls the \`reset\` of a @catch it is not in (handed to a component), which phones cannot do yet`, span);
+			refuse(
+				`${what} calls the \`reset\` of a @catch it is not in (handed to a component), which phones cannot do yet`,
+				span,
+			);
 			return [];
 		}
 		const tasks = [...boundary.tasks];
 		if (tasks.some((task) => !cells[cellIndex.get(task) ?? -1]?.async)) {
-			refuse(`${what} calls \`reset\` of a @try that waits on a device call, which phones cannot run again yet`, span);
+			refuse(
+				`${what} calls \`reset\` of a @try that waits on a device call, which phones cannot run again yet`,
+				span,
+			);
 			return [];
 		}
-		return [{ op: 'reset', cells: tasks, ...(boundary.catches.used() ? { catch: boundary.catches.cell() } : {}) }];
+		return [
+			{
+				op: 'reset',
+				cells: tasks,
+				...(boundary.catches.used() ? { catch: boundary.catches.cell() } : {}),
+			},
+		];
 	}
 
 	function statementOps(
@@ -7334,6 +7474,32 @@ export function createNativeViewPayload(
 		const { defaultStyle: _style, ...plain } = node;
 		nodes[index] = Object.keys(rest).length > 0 ? { ...plain, defaultStyle: rest } : plain;
 	}
+	// Chrome's stylesheet drops a list's block margins inside another: `:is(dl, menu, ol, ul) :is(dl, menu, ol, ul) { margin-block: 0 }`.
+	const byId = new Map(nodes.map((node) => [node.id, node]));
+	const isList = (node: (typeof nodes)[number] | undefined) =>
+		node?.kind === 'element' && LIST_ELEMENTS.has(node.element);
+	for (let index = 0; index < nodes.length; index++) {
+		const node = nodes[index]!;
+		if (node.kind !== 'element' || node.defaultStyle?.margin === undefined || !isList(node))
+			continue;
+		let above = node.parent ? byId.get(node.parent) : undefined;
+		while (above && !isList(above)) above = above.parent ? byId.get(above.parent) : undefined;
+		if (!above) continue;
+		const { margin: _margin, ...rest } = node.defaultStyle;
+		const { defaultStyle: _style, ...plain } = node;
+		nodes[index] = Object.keys(rest).length > 0 ? { ...plain, defaultStyle: rest } : plain;
+	}
+	// Chrome's marker for a bulleted list inside another list: a circle one level in, a square two or more levels in.
+	const MARKED_LISTS: ReadonlySet<string> = new Set(['menu', 'ol', 'ul']);
+	for (let index = 0; index < nodes.length; index++) {
+		const node = nodes[index]!;
+		if (node.kind !== 'element' || node.defaultStyle?.marker !== 'disc') continue;
+		let depth = 0;
+		for (let above = node.parent ? byId.get(node.parent) : undefined; above; above = above.parent ? byId.get(above.parent) : undefined)
+			if (above.kind === 'element' && MARKED_LISTS.has(above.element)) depth++;
+		if (depth > 0)
+			nodes[index] = { ...node, defaultStyle: { ...node.defaultStyle, marker: depth === 1 ? 'circle' : 'square' } };
+	}
 	rootObjects.own(0);
 	// A backstop for markup nothing lowered: a refused @for or arm already says why its markup was not.
 	if (
@@ -7465,6 +7631,7 @@ export function createNativeViewPayload(
 	}
 	tapRun = false;
 	wireTicks();
+	foldTextareaText();
 	checkSelects();
 	let lengthLimited = false;
 	const forms = wireForms();
@@ -7527,6 +7694,30 @@ export function createNativeViewPayload(
 							styledCells.add(cell);
 			}
 
+	// An async value another one reads runs wherever that one runs.
+	for (let changed = true; changed;) {
+		changed = false;
+		for (const reader of cells) {
+			for (const binding of Object.values(reader.async?.bindings ?? {})) {
+				if (!('cell' in binding)) continue;
+				const index = cellIndex.get(binding.cell);
+				const upstream = index === undefined ? undefined : cells[index];
+				if (!upstream?.async) continue;
+				const missing = reader.async!.boundaries.filter(
+					(id) => !upstream.async!.boundaries.includes(id),
+				);
+				if (missing.length === 0) continue;
+				cells[index!] = {
+					...upstream,
+					async: {
+						...upstream.async,
+						boundaries: [...upstream.async.boundaries, ...missing],
+					},
+				};
+				changed = true;
+			}
+		}
+	}
 	const script = buildScript();
 	return done({
 		version: NATIVE_VIEW_VERSION,
@@ -7620,6 +7811,49 @@ export function createNativeViewPayload(
 					`${where} sits inside an <option>, which a native build shows only text of`,
 					span,
 				);
+		}
+	}
+
+	/**
+	 * A `<textarea>`'s text is its value, as the web makes it the element's default value (less one leading line break):
+	 * fixed text becomes its `value` attribute, which each host shows until the field is edited, and one value that follows
+	 * state (`<textarea>{body}</textarea>`) binds its `value` as `<input value={…}>` does. Neither leaves a child. Fixed
+	 * text mixed with a value, or an element inside, is refused.
+	 */
+	function foldTextareaText() {
+		for (const [at, area] of nodes.entries()) {
+			if (area.kind !== 'element' || area.element !== 'textarea') continue;
+			const inside = nodes.filter((node) => node.parent === area.id);
+			if (inside.length === 0) continue;
+			const span = nodeSpans.get(area.id);
+			const where = `the <textarea> ${area.id}`;
+			if (inside.some((node) => node.kind !== 'text')) {
+				refuse(`${where} holds more than text, which is its value`, span);
+				continue;
+			}
+			const parts = inside.flatMap((node) => (node.kind === 'text' ? node.parts : []));
+			const values = parts.filter(
+				(part): part is Exclude<NativeTextPart, { readonly text: string }> => !('text' in part),
+			);
+			const text = parts.map((part) => ('text' in part ? part.text : '')).join('');
+			if (values.length > 1 || (values.length === 1 && text.trim() !== '')) {
+				refuse(`the text inside ${where} mixes fixed text with a value that follows state`, span);
+				continue;
+			}
+			for (const node of inside) nodes.splice(nodes.indexOf(node), 1);
+			const value = values[0];
+			nodes[at] = value
+				? {
+						...area,
+						bindings: [
+							...(area.bindings ?? []),
+							{ property: 'value', value: 'cell' in value ? { cell: value.cell } : value.expr },
+						],
+					}
+				: {
+						...area,
+						attributes: { ...area.attributes, value: text.startsWith('\n') ? text.slice(1) : text },
+					};
 		}
 	}
 

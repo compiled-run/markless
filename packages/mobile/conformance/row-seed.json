@@ -76,6 +76,11 @@
 				"id": "component-edge:0/h0",
 				"element": "button",
 				"parent": "h1",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				},
 				"row": "repeat:0"
 			},
 			{
@@ -105,7 +110,12 @@
 				"kind": "element",
 				"id": "h2",
 				"element": "button",
-				"parent": "h1"
+				"parent": "h1",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -121,7 +131,12 @@
 				"kind": "element",
 				"id": "h3",
 				"element": "button",
-				"parent": "h1"
+				"parent": "h1",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -137,7 +152,12 @@
 				"kind": "element",
 				"id": "h4",
 				"element": "button",
-				"parent": "h1"
+				"parent": "h1",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",

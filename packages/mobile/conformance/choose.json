@@ -44,6 +44,11 @@
 				"attributes": {
 					"name": "size",
 					"aria-label": "Size"
+				},
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "select"
 				}
 			},
 			{
@@ -122,6 +127,11 @@
 				"attributes": {
 					"name": "fruit",
 					"aria-label": "Fruit"
+				},
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "select"
 				}
 			},
 			{
@@ -188,6 +198,11 @@
 					"name": "off",
 					"aria-label": "Off",
 					"disabled": ""
+				},
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "select"
 				}
 			},
 			{
@@ -214,6 +229,11 @@
 				"attributes": {
 					"name": "snack",
 					"aria-label": "Snack"
+				},
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "select"
 				}
 			},
 			{
@@ -249,7 +269,12 @@
 				"kind": "element",
 				"id": "h12",
 				"element": "button",
-				"parent": "h1"
+				"parent": "h1",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -265,7 +290,12 @@
 				"kind": "element",
 				"id": "h13",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -281,7 +311,12 @@
 				"kind": "element",
 				"id": "h14",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -297,7 +332,12 @@
 				"kind": "element",
 				"id": "h15",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -313,7 +353,12 @@
 				"kind": "element",
 				"id": "h16",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -329,7 +374,10 @@
 				"kind": "element",
 				"id": "h17",
 				"element": "p",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",

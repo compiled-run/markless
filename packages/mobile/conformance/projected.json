@@ -27,7 +27,10 @@
 				"kind": "element",
 				"id": "component-edge:0/h1",
 				"element": "p",
-				"parent": "component-edge:0/h0"
+				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "branch",
@@ -70,7 +73,10 @@
 				"kind": "element",
 				"id": "component-edge:0/h2",
 				"element": "p",
-				"parent": "component-edge:0/h0"
+				"parent": "component-edge:0/h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
@@ -200,7 +206,10 @@
 				"kind": "element",
 				"id": "component-edge:3/h1",
 				"element": "p",
-				"parent": "component-edge:3/h0"
+				"parent": "component-edge:3/h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "branch",
@@ -229,7 +238,10 @@
 				"kind": "element",
 				"id": "component-edge:3/h2",
 				"element": "p",
-				"parent": "component-edge:3/h0"
+				"parent": "component-edge:3/h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
@@ -253,7 +265,12 @@
 				"kind": "element",
 				"id": "h6",
 				"element": "button",
-				"parent": "h4"
+				"parent": "h4",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",

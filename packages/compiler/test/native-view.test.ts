@@ -48,7 +48,7 @@ export function Counter() @{
 					element: 'h1',
 					parent: 'h0',
 					attributes: { class: 'title' },
-					defaultStyle: { bold: true, size: 2 },
+					defaultStyle: { bold: true, size: 2, margin: 0.67 },
 				},
 				{ kind: 'text', id: 'h1:text0', parent: 'h1', parts: [{ text: 'Counter' }] },
 				{
@@ -57,6 +57,7 @@ export function Counter() @{
 					element: 'button',
 					parent: 'h0',
 					attributes: { class: 'tap' },
+					defaultStyle: { inline: true, size: 13.3333 / 16, control: 'button' },
 				},
 				{
 					kind: 'text',
@@ -98,7 +99,7 @@ export function Tally() @{
 		expect(diagnostics).toEqual([]);
 		expect(payload?.nodes).toEqual([
 			{ kind: 'element', id: 'h0', element: 'section', parent: null },
-			{ kind: 'element', id: 'h1', element: 'p', parent: 'h0' },
+			{ kind: 'element', id: 'h1', element: 'p', parent: 'h0', defaultStyle: { margin: 1 } },
 			{
 				kind: 'text',
 				id: 'h1:text0',
@@ -119,7 +120,13 @@ export function Tally() @{
 				parent: 'h1',
 				parts: [{ text: ' after ' }, { cell: 'state:right' }],
 			},
-			{ kind: 'element', id: 'h3', element: 'button', parent: 'h0' },
+			{
+				kind: 'element',
+				id: 'h3',
+				element: 'button',
+				parent: 'h0',
+				defaultStyle: { inline: true, size: 13.3333 / 16, control: 'button' },
+			},
 			{ kind: 'text', id: 'h3:text0', parent: 'h3', parts: [{ text: 'Move' }] },
 		]);
 		expect(payload?.handlers).toEqual([
@@ -1219,6 +1226,7 @@ export function Toggle() @{
 				id: 'h1',
 				element: 'button',
 				parent: 'h0',
+				defaultStyle: { inline: true, size: 13.3333 / 16, control: 'button' },
 				bindings: [{ attribute: 'aria-expanded', value: { cell: 'state:open' } }],
 			},
 			{
@@ -1248,6 +1256,7 @@ export function Toggle() @{
 				element: 'p',
 				parent: 'h0',
 				arm: { branch: 'branch-site:0', index: 0 },
+				defaultStyle: { margin: 1 },
 			},
 			{
 				kind: 'text',
@@ -1262,6 +1271,7 @@ export function Toggle() @{
 				element: 'p',
 				parent: 'h0',
 				arm: { branch: 'branch-site:0', index: 1 },
+				defaultStyle: { margin: 1 },
 			},
 			{
 				kind: 'text',
@@ -2606,6 +2616,95 @@ ${markup}
 }`;
 	const lineOf = (text: string, offset: number) => text.slice(0, offset).split('\n').length;
 
+	it("draws a text field, a checkbox, a textarea and a button as Chrome's controls", async () => {
+		const { payload, diagnostics } = await nativeView(
+			source(`		<input aria-label="Name" />
+		<input type="checkbox" aria-label="Urgent" />
+		<textarea aria-label="Notes"></textarea>`),
+		);
+		expect(diagnostics).toEqual([]);
+		expect(
+			payload!.nodes.flatMap((node) =>
+				node.kind === 'element' && node.element !== 'main'
+					? [[node.element, node.defaultStyle]]
+					: [],
+			),
+		).toEqual([
+			['input', { inline: true, size: 13.3333 / 16, control: 'field' }],
+			['input', { inline: true, control: 'tick' }],
+			['textarea', { inline: true, monospace: true, size: 13.3333 / 16, control: 'area' }],
+			['button', { inline: true, size: 13.3333 / 16, control: 'button' }],
+		]);
+	});
+
+	it('marks a bulleted list inside a list with circles, and one two lists in with squares, as Chrome does', async () => {
+		const { payload, diagnostics } = await nativeView(
+			source(`		<ul>
+			<li>One<ul><li>Two<ol><li>Three<ul><li>Four</li></ul></li></ol></li></ul></li>
+		</ul>`),
+		);
+		expect(diagnostics).toEqual([]);
+		expect(
+			payload!.nodes.flatMap((node) =>
+				node.kind === 'element' && node.defaultStyle?.marker ? [[node.element, node.defaultStyle.marker]] : [],
+			),
+		).toEqual([
+			['ul', 'disc'],
+			['ul', 'circle'],
+			['ol', 'decimal'],
+			['ul', 'square'],
+		]);
+	});
+
+	it('gives a table its structure and centres a header cell, as Chrome draws one', async () => {
+		const { payload, diagnostics } = await nativeView(
+			source(`		<table>
+			<tr><th>Item</th></tr>
+			<tr><td>Apples</td></tr>
+		</table>`),
+		);
+		expect(diagnostics).toEqual([]);
+		expect(
+			payload!.nodes.flatMap((node) =>
+				node.kind === 'element' && node.element !== 'main' && node.element !== 'button'
+					? [[node.element, node.defaultStyle]]
+					: [],
+			),
+		).toEqual([
+			['table', { table: 'table' }],
+			['tr', { table: 'row' }],
+			['th', { table: 'cell', bold: true, center: true }],
+			['tr', { table: 'row' }],
+			['td', { table: 'cell' }],
+		]);
+	});
+
+	it("makes a textarea's text its starting value, as the HTML parser does, instead of a child", async () => {
+		const { payload, diagnostics } = await nativeView(
+			source(`		<textarea aria-label="Notes">{'\\nTen across'}</textarea>`),
+		);
+		expect(diagnostics).toEqual([]);
+		const area = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'textarea')!;
+		expect(area.kind === 'element' && area.attributes).toEqual({ 'aria-label': 'Notes', value: 'Ten across' });
+		expect(payload!.nodes.filter((node) => node.parent === area.id)).toEqual([]);
+	});
+
+	it("binds a textarea's value to the one value inside it, as <input value={…}> binds it", async () => {
+		const { payload, diagnostics } = await nativeView(source(`		<textarea aria-label="Notes">{n}</textarea>`));
+		expect(diagnostics).toEqual([]);
+		const area = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'textarea')!;
+		expect(area.kind === 'element' && area.bindings).toEqual([{ property: 'value', value: { cell: 'state:n' } }]);
+		expect(payload!.nodes.filter((node) => node.parent === area.id)).toEqual([]);
+	});
+
+	it('refuses fixed text mixed with a value inside a textarea', async () => {
+		const { payload, diagnostics } = await nativeView(source(`		<textarea aria-label="Notes">Count {n}</textarea>`));
+		expect(payload).toBeNull();
+		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			expect.stringContaining('the text inside the <textarea> h1 mixes fixed text with a value that follows state'),
+		]);
+	});
+
 	it('gives phrase elements a flow inside their paragraph and blocks their default look', async () => {
 		const { payload, diagnostics } = await nativeView(
 			source(`		<p>Run <code>{n}</code><br /><kbd>K</kbd></p>
@@ -2618,13 +2717,38 @@ ${markup}
 		);
 		expect(styles).toEqual([
 			['main', undefined],
-			['p', undefined],
+			['p', { margin: 1 }],
 			['code', { flow: 'inline', monospace: true, size: 0.8125 }],
 			['br', { flow: 'break' }],
 			['kbd', { flow: 'inline', monospace: true, size: 0.8125 }],
-			['pre', { monospace: true, size: 0.8125, preformatted: true }],
-			['abbr', { flow: 'inline', line: 'underline' }],
-			['button', undefined],
+			['pre', { monospace: true, size: 0.8125, preformatted: true, margin: 1 }],
+			['abbr', { flow: 'inline', line: 'dotted-underline' }],
+			['button', { inline: true, size: 13.3333 / 16, control: 'button' }],
+		]);
+	});
+
+	it("drops a list's block margins inside another list, as Chrome's stylesheet does", async () => {
+		const { payload, diagnostics } = await nativeView(
+			source(`		<ul><li>a<ol><li>b</li></ol></li></ul>
+		<dl><dt>t</dt><dd><ul><li>c</li></ul></dd></dl>
+		<h2>h</h2>`),
+		);
+		expect(diagnostics).toEqual([]);
+		const margins = payload!.nodes.flatMap((node) =>
+			node.kind === 'element' && node.element !== 'li'
+				? [[node.element, node.defaultStyle?.margin ?? null]]
+				: [],
+		);
+		expect(margins).toEqual([
+			['main', null],
+			['ul', 1],
+			['ol', null],
+			['dl', 1],
+			['dt', null],
+			['dd', null],
+			['ul', null],
+			['h2', 0.83],
+			['button', null],
 		]);
 	});
 
@@ -2902,7 +3026,14 @@ export function Page() @{
 }`);
 		expect(diagnostics).toEqual([]);
 		expect(payload!.nodes.find((node) => node.kind === 'text')).toMatchObject({
-			parts: [{ expr: { script: expect.any(String), bindings: { cart: { cell: 'state:cart' } } } }],
+			parts: [
+				{
+					expr: {
+						script: expect.any(String),
+						bindings: { cart: { cell: 'state:cart' } },
+					},
+				},
+			],
 		});
 		expect(payload!.script!.source).toContain('function total(text)');
 	});

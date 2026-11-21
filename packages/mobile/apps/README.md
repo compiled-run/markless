@@ -34,6 +34,28 @@ On 2026-11-18 (`cw/native-integration` at `3babf6ff2`), 0 of 18 built. #829 (han
 component's prop that follows state), #883 (`@for` inside `@if` or `@try`) and #884 (`compileNativeApp` takes the app
 config) are what moved it.
 
+## On phones
+
+Measured on the branch that adds relative fetch, inline lines and Chrome's default looks (2026-11-20). There 6 of 18 screens build: notes 3, checkin 3; with #959's `import.meta.env` fold, which is queued, shop's 5 more build too (11 of 18).
+
+Styled, the apps do not reach a phone: Dragon refuses every screen that builds (web font asset, `@media` bands, `:active`
+and `:focus-visible`, `<img>` sources from state). So the phone runs below use the same screens with their CSS left out,
+compared with the web's rendering of that unstyled markup in Chromium at 402 by 778, light. Each was walked through the
+shared runner on the iOS simulator and the Android emulator; every step passed on both.
+
+| Screen                               | Runs on both phones | Differences from the web                                                                                                                             |
+| ------------------------------------ | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| checkin `/` (empty, then a list row) | yes                 | none seen                                                                                                                                            |
+| checkin `/checkins/[id]`             | yes                 | none seen; iOS's engine wrote "Nov 19, 2026 at 3:30 AM" until the phone's script joined an English medium date and time with a comma, as Chrome does |
+| checkin `/permissions`               | yes                 | the text says what each phone allows, by design of the app                                                                                           |
+| notes `/` (empty, then two notes)    | yes                 | none seen                                                                                                                                            |
+| notes `/tags`                        | yes                 | none seen                                                                                                                                            |
+| notes `/tags/[tag]`                  | yes                 | none seen                                                                                                                                            |
+| shop, 5 screens                      | not run             | they load their data from the app's API routes; a phone reaches them through app.json `origin`, which needs the shop's server running                |
+
+"None seen" means the same text, links, controls, line breaks and spacing; buttons can wrap a word sooner or later than
+Chromium's because the phones' system fonts are not Arial.
+
 ## How it is measured
 
 - Web reference: `test/apps-web.test.ts` builds each app with the router, serves it from its production server and

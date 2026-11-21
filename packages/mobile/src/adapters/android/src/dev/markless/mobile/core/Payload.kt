@@ -145,11 +145,21 @@ data class DefaultStyle(
 	val quotes: Boolean = false,
 	val preformatted: Boolean = false,
 	val indent: Double = 0.0,
+	/** Space above and below, in ems of the element's own font size; adjoining margins collapse. */
+	val margin: Double = 0.0,
+	/** An inline-level box: it sits on its parent's line beside text and other such boxes, wrapping at the parent's width. */
+	val inline: Boolean = false,
+	/** An `<a>` with an `href`: its text is LinkText. */
+	val link: Boolean = false,
+	/** Chrome's look for a form control without CSS: `button` or `field`. */
+	val control: String? = null,
 	val rule: Boolean = false,
 	/** "disc" or "decimal", on a list. */
 	val marker: String? = null,
 	/** "table", "row" or "cell". */
 	val table: String? = null,
+	/** Its content centred across its box (`<th>`). */
+	val center: Boolean = false,
 )
 
 /** An RGBA colour, each channel 0-255. */
@@ -592,20 +602,25 @@ data class Payload(
 
 		private fun defaultStyle(v: Json, what: String): DefaultStyle {
 			val o = v.obj(what)
-			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "rule", "marker", "table"), what)
+			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "link", "highlight", "quotes", "preformatted", "indent", "margin", "inline", "control", "rule", "marker", "table", "center"), what)
 			fun flag(name: String): Boolean = o[name]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.$name must be true when present"); true } ?: false
 			fun word(name: String, allowed: Set<String>): String? = o[name]?.let { oneOf(o, name, allowed, what) }
 			return DefaultStyle(
 				flow = word("flow", setOf("inline", "break")),
 				bold = flag("bold"), italic = flag("italic"), monospace = flag("monospace"),
 				size = o["size"]?.num("$what.size") ?: 1.0,
-				line = word("line", setOf("underline", "line-through")),
+				line = word("line", setOf("underline", "dotted-underline", "line-through")),
 				shift = word("shift", setOf("sub", "super")),
 				highlight = flag("highlight"), quotes = flag("quotes"), preformatted = flag("preformatted"),
 				indent = o["indent"]?.num("$what.indent") ?: 0.0,
+				margin = o["margin"]?.num("$what.margin") ?: 0.0,
+				inline = flag("inline"),
+				link = flag("link"),
+				control = word("control", setOf("button", "field", "select", "tick", "area")),
 				rule = flag("rule"),
-				marker = word("marker", setOf("disc", "decimal")),
+				marker = word("marker", setOf("disc", "circle", "square", "decimal")),
 				table = word("table", setOf("table", "row", "cell")),
+				center = flag("center"),
 			)
 		}
 

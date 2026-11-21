@@ -45,7 +45,11 @@
 							"cell": "state:forced"
 						}
 					}
-				]
+				],
+				"defaultStyle": {
+					"inline": true,
+					"control": "tick"
+				}
 			},
 			{
 				"kind": "element",
@@ -58,6 +62,10 @@
 					"name": "size",
 					"value": "S",
 					"required": ""
+				},
+				"defaultStyle": {
+					"inline": true,
+					"control": "tick"
 				}
 			},
 			{
@@ -70,13 +78,22 @@
 					"aria-label": "Large",
 					"name": "size",
 					"value": "L"
+				},
+				"defaultStyle": {
+					"inline": true,
+					"control": "tick"
 				}
 			},
 			{
 				"kind": "element",
 				"id": "h5",
 				"element": "button",
-				"parent": "h1"
+				"parent": "h1",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -92,7 +109,12 @@
 				"kind": "element",
 				"id": "h6",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -113,6 +135,10 @@
 					"type": "radio",
 					"aria-label": "Other small",
 					"name": "size"
+				},
+				"defaultStyle": {
+					"inline": true,
+					"control": "tick"
 				}
 			},
 			{
@@ -125,13 +151,20 @@
 					"aria-label": "Other large",
 					"name": "size",
 					"checked": ""
+				},
+				"defaultStyle": {
+					"inline": true,
+					"control": "tick"
 				}
 			},
 			{
 				"kind": "element",
 				"id": "h9",
 				"element": "p",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",

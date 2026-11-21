@@ -68,6 +68,33 @@ if (!host) {
 		if (typeof signal.onabort === 'function') signal.onabort(event);
 		signal.listeners.slice().forEach(function (fn) { fn.call(signal, event); });
 	};
+	// iOS's JavaScriptCore joins an English medium date and its time with " at "; Chrome, and Android's engine, with ", ".
+	if (g.Intl && g.Intl.DateTimeFormat && !host.dateTimeFormat) {
+		var NativeDateTimeFormat = (host.dateTimeFormat = g.Intl.DateTimeFormat);
+		var DateTimeFormat = function (locales, options) {
+			var inner = new NativeDateTimeFormat(locales, options);
+			var resolved = inner.resolvedOptions();
+			if (resolved.dateStyle !== 'medium' || !resolved.timeStyle || !/^en(-|$)/.test(resolved.locale)) return inner;
+			var dateOnly = {}, timeOnly = {};
+			for (var key in options) {
+				if (key !== 'timeStyle') dateOnly[key] = options[key];
+				if (key !== 'dateStyle') timeOnly[key] = options[key];
+			}
+			var date = new NativeDateTimeFormat(locales, dateOnly), time = new NativeDateTimeFormat(locales, timeOnly);
+			Object.defineProperty(inner, 'format', { value: function (when) { return date.format(when) + ', ' + time.format(when); } });
+			Object.defineProperty(inner, 'formatToParts', {
+				value: function (when) { return date.formatToParts(when).concat([{ type: 'literal', value: ', ' }], time.formatToParts(when)); },
+			});
+			return inner;
+		};
+		DateTimeFormat.prototype = NativeDateTimeFormat.prototype;
+		DateTimeFormat.supportedLocalesOf = NativeDateTimeFormat.supportedLocalesOf;
+		g.Intl.DateTimeFormat = DateTimeFormat;
+		var toLocaleString = Date.prototype.toLocaleString;
+		Date.prototype.toLocaleString = function (locales, options) {
+			return options && options.dateStyle ? DateTimeFormat(locales, options).format(this) : toLocaleString.call(this, locales, options);
+		};
+	}
 	if (typeof g.queueMicrotask !== 'function') g.queueMicrotask = function (fn) { Promise.resolve().then(fn); };
 	var Headers = function (pairs) {
 		this.get = function (name) {
@@ -91,8 +118,11 @@ if (!host) {
 	g.fetch = function (input, init) {
 		return new Promise(function (resolve, reject) {
 			var url = typeof input === 'string' ? input : input && (input.href || input.url);
+			// A URL from the root reaches the app's site, as the web's reaches the page's origin; the phone shows no page URL.
+			if (typeof url === 'string' && host.origin && url.charAt(0) === '/')
+				url = url.charAt(1) === '/' ? host.origin.slice(0, host.origin.indexOf(':') + 1) + url : host.origin + url;
 			if (typeof url !== 'string' || !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) {
-				reject(new TypeError('Failed to parse URL from ' + String(url)));
+				reject(new TypeError('Failed to parse URL from ' + String(url) + (host.origin ? '' : ": a phone resolves a URL from the root ('/…') only against the app's origin (app.json \"origin\")")));
 				return;
 			}
 			var options = init || {};
@@ -270,6 +300,7 @@ var elementOf = function (id) {
 };
 var elementsOf = function (value) { return Array.isArray(value) ? value.map(elementOf) : elementOf(value); };
 var begin = function (entry) {
+	host.origin = origin;
 	elementFacts = entry.elements || {};
 	proxies = {};
 	cells = entry.cells;
@@ -319,6 +350,28 @@ var keyOf = function (frame) {
 		return binding.value;
 	}));
 };
+// An async value another one reads: its settled value, its error thrown again, or, while it is pending, a wait the run
+// leaves unsettled until the value it reads changes, as the web's reader waits for it.
+var PENDING = {};
+var __settled = function (frame, names) {
+	var out = Object.create(frame);
+	names.forEach(function (name) {
+		Object.defineProperty(out, name, {
+			enumerable: true,
+			get: function () {
+				var shown = frame[name];
+				if (!shown || shown.state === 'pending') throw PENDING;
+				if (shown.state === 'error') {
+					var error = new Error(shown.error.message);
+					error.name = shown.error.name;
+					throw error;
+				}
+				return shown.value;
+			},
+		});
+	});
+	return out;
+};
 var startRun = function (at, task, key) {
 	var signal = host.signal();
 	var run = runs[at] = { key: key, signal: signal, done: false };
@@ -329,6 +382,7 @@ var startRun = function (at, task, key) {
 		cells[task.slot] = value;
 	};
 	var failed = function (error) {
+		if (error === PENDING) return;
 		var shown = slotValue(task.slot);
 		var caught = errorOf(error);
 		settle(shown && shown.state === 'value' ? { state: 'value', value: shown.value, error: caught } : { state: 'error', error: caught });
@@ -444,6 +498,7 @@ function contentId(text: string): string {
 export function nativeScriptOf(
 	modules: ReadonlyArray<NativeScriptModuleInput>,
 	services: ReadonlyArray<NativeScriptService>,
+	origin?: string,
 ): NativeScript {
 	const owners: Record<string, number> = {};
 	const definitions = modules.map((module, index) => {
@@ -461,6 +516,7 @@ export function nativeScriptOf(
 	});
 	const body = [
 		'var modules = [];',
+		`var origin = ${JSON.stringify(origin ?? null)};`,
 		`var owners = ${JSON.stringify(owners)};`,
 		...definitions,
 		ENTRIES,

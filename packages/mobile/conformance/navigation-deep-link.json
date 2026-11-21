@@ -28,7 +28,8 @@
 							"parent": "h0",
 							"defaultStyle": {
 								"bold": true,
-								"size": 2
+								"size": 2,
+								"margin": 0.67
 							}
 						},
 						{
@@ -48,6 +49,11 @@
 							"parent": "h0",
 							"attributes": {
 								"href": "/orders"
+							},
+							"defaultStyle": {
+								"inline": true,
+								"line": "underline",
+								"link": true
 							}
 						},
 						{
@@ -127,7 +133,8 @@
 							"parent": "h0",
 							"defaultStyle": {
 								"bold": true,
-								"size": 2
+								"size": 2,
+								"margin": 0.67
 							}
 						},
 						{
@@ -147,7 +154,8 @@
 							"parent": "h0",
 							"defaultStyle": {
 								"indent": 40,
-								"marker": "disc"
+								"marker": "disc",
+								"margin": 1
 							}
 						},
 						{
@@ -175,6 +183,11 @@
 							"parent": "h4",
 							"attributes": {
 								"href": "/orders/[id]"
+							},
+							"defaultStyle": {
+								"inline": true,
+								"line": "underline",
+								"link": true
 							},
 							"row": "repeat:0"
 						},
@@ -257,7 +270,8 @@
 							"parent": "h0",
 							"defaultStyle": {
 								"bold": true,
-								"size": 2
+								"size": 2,
+								"margin": 0.67
 							}
 						},
 						{
@@ -282,7 +296,10 @@
 							"kind": "element",
 							"id": "h3",
 							"element": "p",
-							"parent": "h0"
+							"parent": "h0",
+							"defaultStyle": {
+								"margin": 1
+							}
 						},
 						{
 							"kind": "text",

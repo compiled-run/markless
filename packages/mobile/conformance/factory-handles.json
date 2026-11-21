@@ -35,13 +35,23 @@
 				"parent": "component-edge:0/h1",
 				"attributes": {
 					"aria-label": "Field"
+				},
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "field"
 				}
 			},
 			{
 				"kind": "element",
 				"id": "component-edge:0/h2",
 				"element": "button",
-				"parent": "component-edge:0/h1"
+				"parent": "component-edge:0/h1",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -63,7 +73,12 @@
 				"kind": "element",
 				"id": "component-edge:2/h2",
 				"element": "button",
-				"parent": "component-edge:2/h1"
+				"parent": "component-edge:2/h1",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",

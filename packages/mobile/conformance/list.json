@@ -33,7 +33,8 @@
 				"parent": "h0",
 				"defaultStyle": {
 					"bold": true,
-					"size": 2
+					"size": 2,
+					"margin": 0.67
 				}
 			},
 			{
@@ -50,7 +51,12 @@
 				"kind": "element",
 				"id": "h2",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -66,7 +72,12 @@
 				"kind": "element",
 				"id": "h3",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -82,7 +93,12 @@
 				"kind": "element",
 				"id": "h4",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "button"
+				}
 			},
 			{
 				"kind": "text",
@@ -101,7 +117,8 @@
 				"parent": "h0",
 				"defaultStyle": {
 					"indent": 40,
-					"marker": "disc"
+					"marker": "disc",
+					"margin": 1
 				}
 			},
 			{

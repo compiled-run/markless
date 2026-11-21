@@ -26,7 +26,10 @@ import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.ShapePaint
 
 /** The text style a block gives the text inside it: its own default style and its ancestors', combined. */
-data class BlockText(val bold: Boolean, val italic: Boolean, val monospace: Boolean, val size: Double, val preformatted: Boolean)
+data class BlockText(
+	val bold: Boolean, val italic: Boolean, val monospace: Boolean, val size: Double, val preformatted: Boolean,
+	val underline: Boolean = false, val link: Boolean = false,
+)
 
 /**
  * Text flow without a style export, as `nativeParagraphs` (packages/mobile/src/paragraphs.ts) defines it: among one parent's
@@ -73,29 +76,32 @@ class TextFlow(payload: Payload) {
 
 	/** The style text inherits inside [parent]: every non-flowing ancestor's default style, nearest last. */
 	fun blockText(parent: String?): BlockText {
-		var bold = false; var italic = false; var mono = false; var size = 1.0; var pre = false
+		var bold = false; var italic = false; var mono = false; var size = 1.0; var pre = false; var underline = false; var link = false
 		var at = parent
 		while (at != null) {
 			val n = byId[at] ?: break
 			if (n is Node.Element && !flowing(n)) n.defaultStyle?.let { s ->
 				bold = bold || s.bold; italic = italic || s.italic; mono = mono || s.monospace; size *= s.size; pre = pre || s.preformatted
+				underline = underline || s.line == "underline"; link = link || s.link
 			}
 			at = n.parent
 		}
-		return BlockText(bold, italic, mono, size, pre)
+		return BlockText(bold, italic, mono, size, pre, underline, link)
 	}
 
 	/**
 	 * The paragraph that starts at [lead], for the row instance [suffix] (`@key` or ""): its texts from [text], whitespace
 	 * collapsed as CSS `white-space: normal` unless [preformatted], each flowing element's look as spans.
 	 */
-	fun render(lead: String, suffix: String, preformatted: Boolean, text: (String) -> String?): CharSequence {
+	fun render(lead: String, suffix: String, preformatted: Boolean, edges: ((before: Boolean, after: Boolean) -> Unit)? = null, text: (String) -> String?): CharSequence {
 		val out = SpannableStringBuilder()
 		var pending = false
 		var spaceAt = -1
+		var before = false
 		fun chars(s: String) {
 			for (c in s) {
 				if (!preformatted && (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\u000c')) { pending = true; continue }
+				if (pending && out.isEmpty()) before = true
 				if (pending && out.isNotEmpty() && out[out.length - 1] != '\n') { spaceAt = out.length; out.append(' ') }
 				pending = false
 				out.append(c)
@@ -118,6 +124,8 @@ class TextFlow(payload: Payload) {
 			}
 		}
 		for (id in paragraphs.getValue(lead)) emit(byId.getValue(id))
+		// Whitespace at either end collapses into the space the web shows there when an inline box sits beside the text.
+		edges?.invoke(before || (pending && out.isEmpty()), pending)
 		return out
 	}
 
@@ -125,24 +133,77 @@ class TextFlow(payload: Payload) {
 		if (s.bold && s.italic) add(StyleSpan(Typeface.BOLD_ITALIC)) else if (s.bold) add(StyleSpan(Typeface.BOLD)) else if (s.italic) add(StyleSpan(Typeface.ITALIC))
 		if (s.monospace) add(TypefaceSpan("monospace"))
 		if (s.size != 1.0) add(RelativeSizeSpan(s.size.toFloat()))
-		when (s.line) { "underline" -> add(UnderlineSpan()); "line-through" -> add(StrikethroughSpan()) }
+		when (s.line) { "underline" -> add(UnderlineSpan()); "dotted-underline" -> add(DottedUnderline()); "line-through" -> add(StrikethroughSpan()) }
 		when (s.shift) { "sub" -> add(SubscriptSpan()); "super" -> add(SuperscriptSpan()) }
 		if (s.highlight) { add(BackgroundColorSpan(Color.YELLOW)); add(ForegroundColorSpan(Color.BLACK)) }
 	}
 }
 
-/** `<hr>`: a thin gray line across the available width, with space above and below. */
-class RuleView(context: Context) : View(context) {
-	private val density = context.resources.displayMetrics.density
-	private val paint = Paint().apply { color = 0xFF808080.toInt(); strokeWidth = density }
+/** A paragraph's text view: with no text it takes no space, as an empty paragraph has no height on the web, unless a style export sizes it. */
+class FlowText(context: Context) : android.widget.TextView(context) {
+	/** Whether the paragraph's text starts or ends with whitespace, which is a space beside an inline box on its line. */
+	var spaceBefore = false
+	var spaceAfter = false
 
 	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-		setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), resolveSize((17 * density).toInt(), heightMeasureSpec))
+		if (text.isEmpty() && MeasureSpec.getMode(heightMeasureSpec) != MeasureSpec.EXACTLY) setMeasuredDimension(0, 0)
+		else super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+	}
+
+	/** TextView skips a new layout when the text changes inside a fixed box; one that empties or fills changes height here. */
+	override fun onTextChanged(text: CharSequence?, start: Int, lengthBefore: Int, lengthAfter: Int) {
+		super.onTextChanged(text, start, lengthBefore, lengthAfter)
+		if ((lengthBefore == 0) != (this.text.isEmpty())) requestLayout()
+	}
+
+	private val dots = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+
+	/** Draws each [DottedUnderline] range's dots under every line it covers, as Chrome draws `underline dotted`. */
+	override fun onDraw(canvas: Canvas) {
+		super.onDraw(canvas)
+		val spanned = text as? android.text.Spanned ?: return
+		val layout = layout ?: return
+		val marks = spanned.getSpans(0, spanned.length, DottedUnderline::class.java)
+		if (marks.isEmpty()) return
+		val thickness = maxOf(1f, textSize / 16f)
+		dots.color = currentTextColor
+		dots.strokeWidth = thickness
+		dots.pathEffect = android.graphics.DashPathEffect(floatArrayOf(thickness, thickness), 0f)
+		canvas.save()
+		canvas.translate(totalPaddingLeft.toFloat(), totalPaddingTop.toFloat())
+		for (mark in marks) {
+			val start = spanned.getSpanStart(mark)
+			val end = spanned.getSpanEnd(mark)
+			for (line in layout.getLineForOffset(start)..layout.getLineForOffset(end)) {
+				val from = maxOf(start, layout.getLineStart(line))
+				val to = minOf(end, layout.getLineEnd(line))
+				if (from >= to) continue
+				val y = layout.getLineBaseline(line) + thickness * 2
+				canvas.drawLine(layout.getPrimaryHorizontal(from), y, layout.getPrimaryHorizontal(to).takeIf { to < layout.getLineEnd(line) || line == layout.lineCount - 1 } ?: layout.getLineRight(line), y, dots)
+			}
+		}
+		canvas.restore()
+	}
+}
+
+/** Marks text that `onDraw` underlines with dots (`<abbr title>`); it changes nothing about the text itself. */
+class DottedUnderline
+
+/** `<hr>`: a thin gray line across the available width, with space above and below. */
+/** `<hr>` as Chrome draws it: a 2 px inset box, a #9a9a9a line over a #eeeeee one, across its container. */
+class RuleView(context: Context) : MarklessBox(context) {
+	private val density = context.resources.displayMetrics.density
+	private val upper = Paint().apply { color = 0xFF9A9A9A.toInt() }
+	private val lower = Paint().apply { color = 0xFFEEEEEE.toInt() }
+
+	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+		setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), resolveSize(maxOf(2, (2 * density).toInt()), heightMeasureSpec))
 	}
 
 	override fun onDraw(canvas: Canvas) {
-		val y = height / 2f
-		canvas.drawLine(0f, y, width.toFloat(), y, paint)
+		val half = height / 2f
+		canvas.drawRect(0f, 0f, width.toFloat(), half, upper)
+		canvas.drawRect(0f, half, width.toFloat(), height.toFloat(), lower)
 	}
 }
 

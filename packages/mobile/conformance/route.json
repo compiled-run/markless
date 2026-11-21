@@ -24,7 +24,8 @@
 				"parent": "h0",
 				"defaultStyle": {
 					"bold": true,
-					"size": 2
+					"size": 2,
+					"margin": 0.67
 				}
 			},
 			{
@@ -52,6 +53,11 @@
 				"parent": "h0",
 				"attributes": {
 					"href": "/[fruit]"
+				},
+				"defaultStyle": {
+					"inline": true,
+					"line": "underline",
+					"link": true
 				}
 			},
 			{
@@ -71,6 +77,11 @@
 				"parent": "h0",
 				"attributes": {
 					"href": "/[fruit]"
+				},
+				"defaultStyle": {
+					"inline": true,
+					"line": "underline",
+					"link": true
 				}
 			},
 			{

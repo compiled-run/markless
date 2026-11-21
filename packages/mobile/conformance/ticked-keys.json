@@ -31,6 +31,10 @@
 					"type": "radio",
 					"aria-label": "Small",
 					"name": "size"
+				},
+				"defaultStyle": {
+					"inline": true,
+					"control": "tick"
 				}
 			},
 			{
@@ -42,6 +46,10 @@
 					"type": "radio",
 					"aria-label": "Large",
 					"name": "size"
+				},
+				"defaultStyle": {
+					"inline": true,
+					"control": "tick"
 				}
 			},
 			{
@@ -52,13 +60,20 @@
 				"attributes": {
 					"type": "checkbox",
 					"aria-label": "News"
+				},
+				"defaultStyle": {
+					"inline": true,
+					"control": "tick"
 				}
 			},
 			{
 				"kind": "element",
 				"id": "h4",
 				"element": "p",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
@@ -74,7 +89,10 @@
 				"kind": "element",
 				"id": "h5",
 				"element": "p",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",

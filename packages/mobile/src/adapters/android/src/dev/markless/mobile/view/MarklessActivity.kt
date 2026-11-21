@@ -234,7 +234,7 @@ abstract class MarklessActivity : Activity() {
 		page.addOnLayoutChangeListener { _, _, _, _, bottom, _, _, _, oldBottom -> if (bottom != oldBottom) host.focusedField()?.let { host.bringIntoView(it, FOCUS_INTO_VIEW) } }
 		content.addView(host.root, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 		page.addView(content, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-		host.canvasColor?.let(page::setBackgroundColor)
+		page.setBackgroundColor(host.canvasColor)
 		host.onCanvas = page::setBackgroundColor
 		setContentView(FrameLayout(this).apply { addView(page, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)) })
 		if (!firstFrameLogged) logFirstFrame(page)

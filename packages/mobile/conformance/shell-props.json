@@ -34,7 +34,8 @@
 							"parent": "component-edge:0/h2",
 							"defaultStyle": {
 								"bold": true,
-								"size": 2
+								"size": 2,
+								"margin": 0.67
 							}
 						},
 						{
@@ -53,7 +54,10 @@
 							"kind": "element",
 							"id": "component-edge:0/h4",
 							"element": "p",
-							"parent": "component-edge:0/h2"
+							"parent": "component-edge:0/h2",
+							"defaultStyle": {
+								"margin": 1
+							}
 						},
 						{
 							"kind": "text",
@@ -85,7 +89,10 @@
 										}
 									}
 								}
-							]
+							],
+							"defaultStyle": {
+								"margin": 1
+							}
 						},
 						{
 							"kind": "text",
@@ -118,6 +125,11 @@
 							"parent": "component-edge:0/h5",
 							"attributes": {
 								"href": "/topics/[topic]"
+							},
+							"defaultStyle": {
+								"inline": true,
+								"line": "underline",
+								"link": true
 							}
 						},
 						{
@@ -202,7 +214,8 @@
 							"parent": "component-edge:0/h2",
 							"defaultStyle": {
 								"bold": true,
-								"size": 2
+								"size": 2,
+								"margin": 0.67
 							}
 						},
 						{
@@ -224,7 +237,10 @@
 							"kind": "element",
 							"id": "component-edge:0/h4",
 							"element": "p",
-							"parent": "component-edge:0/h2"
+							"parent": "component-edge:0/h2",
+							"defaultStyle": {
+								"margin": 1
+							}
 						},
 						{
 							"kind": "text",
@@ -294,7 +310,10 @@
 										}
 									}
 								}
-							]
+							],
+							"defaultStyle": {
+								"margin": 1
+							}
 						},
 						{
 							"kind": "text",
@@ -330,7 +349,12 @@
 							"kind": "element",
 							"id": "h0",
 							"element": "button",
-							"parent": "component-edge:0/h5"
+							"parent": "component-edge:0/h5",
+							"defaultStyle": {
+								"inline": true,
+								"size": 0.83333125,
+								"control": "button"
+							}
 						},
 						{
 							"kind": "text",

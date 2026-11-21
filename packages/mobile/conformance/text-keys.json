@@ -67,7 +67,12 @@
 							"cell": "state:draft"
 						}
 					}
-				]
+				],
+				"defaultStyle": {
+					"inline": true,
+					"size": 0.83333125,
+					"control": "field"
+				}
 			},
 			{
 				"kind": "element",
@@ -84,13 +89,22 @@
 							"cell": "state:notes"
 						}
 					}
-				]
+				],
+				"defaultStyle": {
+					"inline": true,
+					"monospace": true,
+					"size": 0.83333125,
+					"control": "area"
+				}
 			},
 			{
 				"kind": "element",
 				"id": "h3",
 				"element": "p",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",
@@ -126,7 +140,10 @@
 				"kind": "element",
 				"id": "h4",
 				"element": "p",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"margin": 1
+				}
 			},
 			{
 				"kind": "text",

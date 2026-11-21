@@ -42,6 +42,11 @@
 								"aria-current": "page",
 								"aria-label": "Home tab, open",
 								"href": "/"
+							},
+							"defaultStyle": {
+								"inline": true,
+								"line": "underline",
+								"link": true
 							}
 						},
 						{
@@ -62,6 +67,11 @@
 							"attributes": {
 								"aria-label": "About tab",
 								"href": "/about"
+							},
+							"defaultStyle": {
+								"inline": true,
+								"line": "underline",
+								"link": true
 							}
 						},
 						{
@@ -78,7 +88,12 @@
 							"kind": "element",
 							"id": "h2",
 							"element": "button",
-							"parent": "h0"
+							"parent": "h0",
+							"defaultStyle": {
+								"inline": true,
+								"size": 0.83333125,
+								"control": "button"
+							}
 						},
 						{
 							"kind": "text",
@@ -109,7 +124,12 @@
 										]
 									}
 								}
-							]
+							],
+							"defaultStyle": {
+								"inline": true,
+								"line": "underline",
+								"link": true
+							}
 						},
 						{
 							"kind": "text",
@@ -238,6 +258,11 @@
 							"attributes": {
 								"aria-label": "Home tab",
 								"href": "/"
+							},
+							"defaultStyle": {
+								"inline": true,
+								"line": "underline",
+								"link": true
 							}
 						},
 						{
@@ -259,6 +284,11 @@
 								"aria-current": "page",
 								"aria-label": "About tab, open",
 								"href": "/about"
+							},
+							"defaultStyle": {
+								"inline": true,
+								"line": "underline",
+								"link": true
 							}
 						},
 						{
@@ -275,7 +305,10 @@
 							"kind": "element",
 							"id": "h2",
 							"element": "p",
-							"parent": "h0"
+							"parent": "h0",
+							"defaultStyle": {
+								"margin": 1
+							}
 						},
 						{
 							"kind": "text",
@@ -365,6 +398,11 @@
 							"attributes": {
 								"aria-label": "Home tab",
 								"href": "/"
+							},
+							"defaultStyle": {
+								"inline": true,
+								"line": "underline",
+								"link": true
 							}
 						},
 						{
@@ -385,6 +423,11 @@
 							"attributes": {
 								"aria-label": "About tab",
 								"href": "/about"
+							},
+							"defaultStyle": {
+								"inline": true,
+								"line": "underline",
+								"link": true
 							}
 						},
 						{
@@ -401,7 +444,10 @@
 							"kind": "element",
 							"id": "h2",
 							"element": "p",
-							"parent": "h0"
+							"parent": "h0",
+							"defaultStyle": {
+								"margin": 1
+							}
 						},
 						{
 							"kind": "text",
@@ -428,6 +474,11 @@
 							"parent": "h0",
 							"attributes": {
 								"href": "/"
+							},
+							"defaultStyle": {
+								"inline": true,
+								"line": "underline",
+								"link": true
 							}
 						},
 						{

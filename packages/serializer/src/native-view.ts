@@ -208,8 +208,11 @@ export type NativeDefaultStyle = {
 	readonly monospace?: true;
 	/** Font size as a multiple of the parent's (`<h1>` 2, `<small>` 0.833, `<code>` 0.8125). */
 	readonly size?: number;
-	readonly line?: 'underline' | 'line-through';
+	/** A line through or under the text; `dotted-underline` is `<abbr title>`'s `underline dotted`. */
+	readonly line?: 'underline' | 'dotted-underline' | 'line-through';
 	readonly shift?: 'sub' | 'super';
+	/** An `<a>` with an `href`: its text is LinkText, #0000ee (#9e9eff dark), as Chrome paints an unvisited link. */
+	readonly link?: true;
 	/** `<mark>`: black text on yellow. */
 	readonly highlight?: true;
 	/** `<q>`: the text inside curly quotes. */
@@ -218,16 +221,49 @@ export type NativeDefaultStyle = {
 	readonly preformatted?: true;
 	/** Space before the content on the start side, in CSS pixels (`<blockquote>`, `<dd>`, `<ul>`). */
 	readonly indent?: number;
-	/** `<hr>`: a thin horizontal line across the box. */
+	/**
+	 * Space above and below the box, in ems of its own font size (`<p>` 1, `<h1>` 0.67). Adjoining margins collapse as on the
+	 * web: two siblings' meet at the larger, and a box's first and last child's margins become the box's own.
+	 */
+	readonly margin?: number;
+	/**
+	 * An inline-level box (`<a>`, `<button>`, `<input>`, `<img>`): it sits on its parent's line beside text and other such
+	 * boxes, and the line wraps at the parent's width, as the web places them, instead of stacking below the one before.
+	 */
+	readonly inline?: true;
+	/**
+	 * Chrome's look for a form control without CSS. `button`: a #efefef fill (#6b6b6b dark) inside a 1px #767676 border
+	 * (the fill's colour when dark), 2px corners, its text 6px in from the sides and 1px from the top and bottom, inside a 2px
+	 * border box. `field`: a white fill (#3b3b3b dark) inside a 1px #767676 border (#858585 dark), 2px corners, 153px wide,
+	 * its text 2px in and 1px down, inside a 2px border box. `select`: a field's fill and border round its chosen option's
+	 * text and a chevron. `tick`: a checkbox's 13px box or a radio button's circle, unchecked in a field's colours, checked in
+	 * Chrome's accent (#0075ff, #99c8ff dark), with a checkbox's margins 3px 3px 3px 4px and a radio's 3px 3px 0 5px.
+	 * `area`: a `<textarea>`, a field's fill, border and corners round monospace text 3px in from each side, sized by its
+	 * `cols` and `rows` (20 and 2 when absent or not a positive integer): each column one monospace character, each row one
+	 * line, plus Chrome's 16px scrollbar gutter at the end (182 by 36px by default).
+	 */
+	readonly control?: 'button' | 'field' | 'select' | 'tick' | 'area';
+	/** `<hr>`: Chrome's 2px inset line across the box (#9a9a9a over #eeeeee). */
 	readonly rule?: true;
-	/** On `<ul>` and `<ol>`: the marker each item shows before its content. */
-	readonly marker?: 'disc' | 'decimal';
-	/** Table structure: `<td>` and `<th>` cells line up in columns across the rows of their `<table>`. */
+	/**
+	 * On `<ul>` and `<ol>`: the marker each item shows before its content. A bulleted list inside another list shows
+	 * `circle` (◦), and one inside two or more shows `square` (▪), as Chrome's stylesheet has it.
+	 */
+	readonly marker?: 'disc' | 'circle' | 'square' | 'decimal';
+	/**
+	 * Table structure: `<td>` and `<th>` cells line up in columns across the rows of their `<table>`, as Chrome draws a table
+	 * without CSS: 2px apart and 2px in from the table's edges (`border-spacing: 2px`), each cell's content 1px inside it and
+	 * centred on the row's height (`vertical-align: middle`).
+	 */
 	readonly table?: 'table' | 'row' | 'cell';
+	/** Its content centred across its box (`<th>`'s `text-align: center`). */
+	readonly center?: true;
 };
 
 const MONOSPACE: NativeDefaultStyle = { monospace: true, size: 0.8125 };
 const SMALLER = 1 / 1.2;
+/** A form control's text: Chrome's 13.333px against the 16px body text. */
+const CONTROL_TEXT = 13.3333 / 16;
 
 /**
  * The HTML elements every native host builds, with their look under Chrome's default stylesheet where it is more than a box
@@ -244,24 +280,24 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	aside: {},
 	hgroup: {},
 	search: {},
-	p: {},
-	h1: { bold: true, size: 2 },
-	h2: { bold: true, size: 1.5 },
-	h3: { bold: true, size: 1.17 },
-	h4: { bold: true },
-	h5: { bold: true, size: 0.83 },
-	h6: { bold: true, size: 0.67 },
+	p: { margin: 1 },
+	h1: { bold: true, size: 2, margin: 0.67 },
+	h2: { bold: true, size: 1.5, margin: 0.83 },
+	h3: { bold: true, size: 1.17, margin: 1 },
+	h4: { bold: true, margin: 1.33 },
+	h5: { bold: true, size: 0.83, margin: 1.67 },
+	h6: { bold: true, size: 0.67, margin: 2.33 },
 	address: { italic: true },
-	blockquote: { indent: 40 },
-	figure: { indent: 40 },
+	blockquote: { indent: 40, margin: 1 },
+	figure: { indent: 40, margin: 1 },
 	figcaption: {},
-	hr: { rule: true },
-	pre: { ...MONOSPACE, preformatted: true },
-	ul: { indent: 40, marker: 'disc' },
-	ol: { indent: 40, marker: 'decimal' },
-	menu: { indent: 40, marker: 'disc' },
+	hr: { rule: true, margin: 0.5 },
+	pre: { ...MONOSPACE, preformatted: true, margin: 1 },
+	ul: { indent: 40, marker: 'disc', margin: 1 },
+	ol: { indent: 40, marker: 'decimal', margin: 1 },
+	menu: { indent: 40, marker: 'disc', margin: 1 },
 	li: {},
-	dl: {},
+	dl: { margin: 1 },
 	dt: {},
 	dd: { indent: 40 },
 	table: { table: 'table' },
@@ -271,7 +307,7 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	tfoot: {},
 	tr: { table: 'row' },
 	td: { table: 'cell' },
-	th: { table: 'cell', bold: true },
+	th: { table: 'cell', bold: true, center: true },
 	span: { flow: 'inline' },
 	b: { flow: 'inline', bold: true },
 	strong: { flow: 'inline', bold: true },
@@ -302,18 +338,18 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	bdo: { flow: 'inline' },
 	wbr: { flow: 'inline' },
 	br: { flow: 'break' },
-	button: {},
-	input: {},
-	textarea: {},
-	a: {},
-	img: {},
-	audio: {},
-	label: {},
+	button: { inline: true, size: CONTROL_TEXT, control: 'button' },
+	input: { inline: true, size: CONTROL_TEXT, control: 'field' },
+	textarea: { inline: true, monospace: true, size: CONTROL_TEXT, control: 'area' },
+	a: { inline: true, line: 'underline', link: true },
+	img: { inline: true },
+	audio: { inline: true },
+	label: { inline: true },
 	dialog: {},
 	form: {},
-	select: {},
+	select: { inline: true, size: CONTROL_TEXT, control: 'select' },
 	option: {},
-	svg: {},
+	svg: { inline: true },
 };
 
 /**
@@ -877,7 +913,12 @@ export type NativeJournalEntry =
 	 * An element marked `overlay` joined the overlay stack (its `hidden` binding showed it) or left it. A `modal` one (it or
 	 * an element inside it carries `aria-modal="true"`) goes in the host's top layer with the page behind inert.
 	 */
-	| { readonly op: 'overlay'; readonly node: string; readonly open: boolean; readonly modal: boolean }
+	| {
+			readonly op: 'overlay';
+			readonly node: string;
+			readonly open: boolean;
+			readonly modal: boolean;
+	  }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */
 	| {
 			readonly op: 'attribute';
@@ -1113,17 +1154,23 @@ export const NATIVE_SCRIPT_PAGE_GLOBALS: Readonly<Record<string, string>> = {
 	IntersectionObserver: 'the DOM, which a phone does not have',
 	customElements: 'the DOM, which a phone does not have',
 	FormData: 'an HTML form, which a phone does not have',
-	devicePixelRatio: 'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
-	innerWidth: 'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
-	innerHeight: 'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
+	devicePixelRatio:
+		'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
+	innerWidth:
+		'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
+	innerHeight:
+		'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
 	outerWidth: 'the browser window, which a phone does not have',
 	outerHeight: 'the browser window, which a phone does not have',
 	visualViewport: 'the browser window, which a phone does not have',
 	scrollX: "the page's scroll position, which a phone's views keep",
 	scrollY: "the page's scroll position, which a phone's views keep",
-	scrollTo: "the page's scroll position, which a phone's views keep; use an element's `scrollIntoView()`",
-	scrollBy: "the page's scroll position, which a phone's views keep; use an element's `scrollIntoView()`",
-	addEventListener: 'listening on the browser window, which a phone does not have; use an event attribute',
+	scrollTo:
+		"the page's scroll position, which a phone's views keep; use an element's `scrollIntoView()`",
+	scrollBy:
+		"the page's scroll position, which a phone's views keep; use an element's `scrollIntoView()`",
+	addEventListener:
+		'listening on the browser window, which a phone does not have; use an event attribute',
 	removeEventListener: 'listening on the browser window, which a phone does not have',
 	dispatchEvent: 'events on the browser window, which a phone does not have',
 	getSelection: 'a text selection in the web page, which a phone does not have',
@@ -1132,7 +1179,7 @@ export const NATIVE_SCRIPT_PAGE_GLOBALS: Readonly<Record<string, string>> = {
 	NodeFilter: 'the DOM, which a phone does not have',
 	DOMParser: 'parsing HTML into a DOM, which a phone does not have',
 	CSS: 'the CSS object model, which a phone does not have at run time',
-	XMLHttpRequest: 'the browser\'s old request API; use `fetch`, which a phone provides',
+	XMLHttpRequest: "the browser's old request API; use `fetch`, which a phone provides",
 	alert: 'a browser dialog, which a phone does not have',
 	confirm: 'a browser dialog, which a phone does not have',
 	prompt: 'a browser dialog, which a phone does not have',

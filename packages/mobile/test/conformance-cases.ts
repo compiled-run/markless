@@ -488,6 +488,11 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h6' }],
 	},
 	{
+		name: 'textarea-value',
+		fixture: 'test/fixtures/TextareaValue.tsrx',
+		actions: [{ event: 'activate', host: 'h3' }],
+	},
+	{
 		name: 'live',
 		fixture: 'test/fixtures/Live.tsrx',
 		actions: [
