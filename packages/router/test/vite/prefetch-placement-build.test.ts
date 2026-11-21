@@ -37,6 +37,7 @@ test('prefetch={false} on an anchor and on a component that forwards to one reac
 	expect(html).toMatch(
 		/<a [^>]*data-markless-router-prefetch="none"[^>]*data-part="nav-link"[^>]*>Forwarded<\/a>|<a [^>]*data-part="nav-link"[^>]*data-markless-router-prefetch="none"[^>]*>Forwarded<\/a>/,
 	);
+	expect(html).toMatch(/<a [^>]*data-markless-router-prefetch="viewport"[^>]*data-dynamic[^>]*>Dynamic<\/a>/);
 	expect(html).not.toMatch(/\sprefetch=/);
 }, 180_000);
 

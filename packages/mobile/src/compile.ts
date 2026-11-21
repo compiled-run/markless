@@ -21,8 +21,12 @@ import {
 import { iconSourceTransform, type IconsOptions } from '@markless/icons/vite';
 import type { NativeAppPayload, NativeViewPayload } from '@markless/serializer';
 import { uiIconsOptions } from '@markless/ui-tools';
-import { isNativeStyleStateAttribute, NATIVE_APP_VERSION } from '@markless/serializer/native-view';
-import { nativeStyleInputs, type NativeStyleInput } from './style-input.ts';
+import {
+	isNativeStyleStateAttribute,
+	NATIVE_APP_VERSION,
+	NATIVE_NOT_FOUND_ROUTE,
+} from '@markless/serializer/native-view';
+import { nativeStyleInputs, readsRow, rowAttributeOptions, type NativeStyleInput } from './style-input.ts';
 import type { NativeDeviceFeature } from '@markless/serializer/native-device';
 import { deviceManifest, type DeviceAppConfig, type DeviceManifest } from './permissions.ts';
 
@@ -257,6 +261,7 @@ export async function compileNativeComponent(input: {
 							pattern: entry.pattern,
 							params: entry.params.map((param) => param.name),
 						})),
+						...(input.manifest.statusPages.notFound ? { notFound: NATIVE_NOT_FOUND_ROUTE } : {}),
 						resolvePath: (path: string) => {
 							const matched = matchRouteManifest(path, input.manifest!);
 							return matched
@@ -307,16 +312,6 @@ function unstyledOnly(
 	styled: boolean,
 ): CompilerDiagnostic[] {
 	if (!styled) return [];
-	const rowCells = new Set(payload.cells.flatMap((cell) => (cell.row ? [cell.id] : [])));
-	// A row's item or its own state: what a list row reads, which differs from row to row.
-	const readsRow = (tree: unknown): boolean =>
-		Array.isArray(tree)
-			? tree.some(readsRow)
-			: tree !== null &&
-				typeof tree === 'object' &&
-				('item' in tree ||
-					('cell' in tree && rowCells.has((tree as { cell: string }).cell)) ||
-					Object.values(tree).some(readsRow));
 	return payload.nodes.flatMap((node) => {
 		if (node.kind !== 'element') return [];
 		const span = sources.get(node.id)?.span;
@@ -331,10 +326,11 @@ function unstyledOnly(
 		return (node.bindings ?? []).flatMap((binding) =>
 			'attribute' in binding &&
 			(binding.attribute === 'class' || isNativeStyleStateAttribute(binding.attribute)) &&
-			readsRow(binding.value)
+			readsRow(payload, binding.value) &&
+			!rowAttributeOptions(binding.attribute, binding.value)
 				? [
 						nativeUnsupported(
-							`the \`${binding.attribute}\` of <${node.element}> ${node.id} follows its @for row on a styled page; Dragon styles each node once, not per row, yet`,
+							`the \`${binding.attribute}\` of <${node.element}> ${node.id} follows its @for row on a styled page through a value the build cannot list; Dragon styles a row by each value it can give, so write it as literals chosen by conditions`,
 							span,
 						),
 					]
@@ -381,6 +377,8 @@ export async function compileNativeApp(input: {
 	readonly device?: DeviceAppConfig;
 	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
 	readonly target?: 'ios' | 'android';
+	/** Keep the routes whose page builds when others refuse (their diagnostics are still returned). */
+	readonly partial?: boolean;
 	/** The `icons` option of the app's `ui()` plugin, as `compileNativeComponent` takes it. */
 	readonly icons?: false | IconsOptions;
 }): Promise<NativeAppBuild> {
@@ -403,10 +401,24 @@ export async function compileNativeApp(input: {
 				input.readStylesheet,
 			)
 		: [];
-	for (const route of manifest.routes) {
+	// The app's 404 page rides as one more route, where links to paths no route matches open it.
+	const entries = [
+		...manifest.routes.map((route) => ({
+			file: route.file,
+			pattern: route.pattern,
+			params: route.params.map((param) => param.name),
+			routed: true,
+		})),
+		...(manifest.statusPages.notFound
+			? [{ file: manifest.statusPages.notFound, pattern: NATIVE_NOT_FOUND_ROUTE, params: [], routed: false }]
+			: []),
+	];
+	for (const route of entries) {
 		const page = input.pages.find((candidate) => candidate.page === route.file)!;
 		const build = await compileNativeComponent({
-			...page,
+			filename: page.filename,
+			source: page.source,
+			...(route.routed ? { page: page.page } : {}),
 			manifest,
 			...(input.readModule ? { readModule: input.readModule } : {}),
 			...(input.readStylesheet ? { readStylesheet: input.readStylesheet } : {}),
@@ -430,8 +442,9 @@ export async function compileNativeApp(input: {
 		}
 		routes.push({
 			pattern: route.pattern,
-			params: route.params.map((param) => param.name),
-			page: build.payload,
+			params: route.params,
+			// Each route's page names its route, as hosts check; the 404 page is routed here, not by the router.
+			page: route.routed ? build.payload : { ...build.payload, route: { pattern: route.pattern, params: [] } },
 		});
 		if (styled) {
 			const inputs = nativeStyleInputs(build.payload, build.styles, sheets);
@@ -444,8 +457,11 @@ export async function compileNativeApp(input: {
 		}
 	}
 	return {
-		payload: diagnostics.length > 0 ? null : { version: NATIVE_APP_VERSION, routes },
-		styleInputs: diagnostics.length > 0 ? [] : styleInputs,
+		payload:
+			diagnostics.length > 0 && !(input.partial && routes.length > 0)
+				? null
+				: { version: NATIVE_APP_VERSION, routes },
+		styleInputs: diagnostics.length > 0 && !input.partial ? [] : styleInputs,
 		manifest: deviceManifest([...features], input.device).manifest,
 		diagnostics,
 	};

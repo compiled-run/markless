@@ -1,0 +1,148 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 1082,
+			"reason": "router prefetch policy: the page link bridge (+89 B gzip, loaded with the page) and its run half (guessing state, budget, marks, held-text cap; loaded at idle): 12,375 chars run in this PR's CI run 44866023122 (3e4e5eddf) minus 11,293 in the merge base's merge-queue run 44863586284 (16cf7ad81) = +1,082, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 1440,
+			"reason": "router prefetch policy: the page link bridge (+89 B gzip, loaded with the page) and its run half (guessing state, budget, marks, held-text cap; loaded at idle): 96,669 B gzip downloaded in this PR's CI run 44866023122 (3e4e5eddf) minus 95,229 in the merge base's merge-queue run 44863586284 (16cf7ad81) = +1,440, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 1082,
+			"reason": "router prefetch policy: the page link bridge (+89 B gzip, loaded with the page) and its run half (guessing state, budget, marks, held-text cap; loaded at idle): 12,391 chars run in this PR's CI run 44866023122 (3e4e5eddf) minus 11,309 in the merge base's merge-queue run 44863586284 (16cf7ad81) = +1,082, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 1440,
+			"reason": "router prefetch policy: the page link bridge (+89 B gzip, loaded with the page) and its run half (guessing state, budget, marks, held-text cap; loaded at idle): 96,669 B gzip downloaded in this PR's CI run 44866023122 (3e4e5eddf) minus 95,229 in the merge base's merge-queue run 44863586284 (16cf7ad81) = +1,440, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 1082,
+			"reason": "router prefetch policy: the page link bridge (+89 B gzip, loaded with the page) and its run half (guessing state, budget, marks, held-text cap; loaded at idle): 12,341 chars run in this PR's CI run 44866023122 (3e4e5eddf) minus 11,259 in the merge base's merge-queue run 44863586284 (16cf7ad81) = +1,082, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 1440,
+			"reason": "router prefetch policy: the page link bridge (+89 B gzip, loaded with the page) and its run half (guessing state, budget, marks, held-text cap; loaded at idle): 96,669 B gzip downloaded in this PR's CI run 44866023122 (3e4e5eddf) minus 95,229 in the merge base's merge-queue run 44863586284 (16cf7ad81) = +1,440, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 1809,
+			"reason": "router prefetch policy: the page link bridge (+89 B gzip, loaded with the page) and its run half (guessing state, budget, marks, held-text cap; loaded at idle): 27,325 chars run in this PR's CI run 44866023122 (3e4e5eddf) minus 25,516 in the merge base's merge-queue run 44863586284 (16cf7ad81) = +1,809, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1443,
+			"reason": "router prefetch policy: the page link bridge (+89 B gzip, loaded with the page) and its run half (guessing state, budget, marks, held-text cap; loaded at idle): 514,799 B gzip downloaded in this PR's CI run 44866023122 (3e4e5eddf) minus 513,356 in the merge base's merge-queue run 44863586284 (16cf7ad81) = +1,443, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 1776,
+			"reason": "router prefetch policy: the page link bridge (+89 B gzip, loaded with the page) and its run half (guessing state, budget, marks, held-text cap; loaded at idle): 27,359 chars run in this PR's CI run 44866023122 (3e4e5eddf) minus 25,583 in the merge base's merge-queue run 44863586284 (16cf7ad81) = +1,776, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 1443,
+			"reason": "router prefetch policy: the page link bridge (+89 B gzip, loaded with the page) and its run half (guessing state, budget, marks, held-text cap; loaded at idle): 584,240 B gzip downloaded in this PR's CI run 44866023122 (3e4e5eddf) minus 582,797 in the merge base's merge-queue run 44863586284 (16cf7ad81) = +1,443, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 1809,
+			"reason": "router prefetch policy: the page link bridge (+89 B gzip, loaded with the page) and its run half (guessing state, budget, marks, held-text cap; loaded at idle): 26,117 chars run in this PR's CI run 44866023122 (3e4e5eddf) minus 24,308 in the merge base's merge-queue run 44863586284 (16cf7ad81) = +1,809, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 1443,
+			"reason": "router prefetch policy: the page link bridge (+89 B gzip, loaded with the page) and its run half (guessing state, budget, marks, held-text cap; loaded at idle): 466,232 B gzip downloaded in this PR's CI run 44866023122 (3e4e5eddf) minus 464,789 in the merge base's merge-queue run 44863586284 (16cf7ad81) = +1,443, both under the G16 measure of #951",
+			"date": "2026-11-21"
+		}
+	]
+}

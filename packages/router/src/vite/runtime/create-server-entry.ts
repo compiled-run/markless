@@ -77,9 +77,11 @@ import {
 	FRAGMENT_IDLE_FRAGMENTS,
 	FRAGMENT_IDLE_MEASURED_BYTES,
 	FRAGMENT_IDLE_FRAGMENT_BYTES,
+	FRAGMENT_IDLE_FRAGMENT_DECODED_BYTES,
 	FRAGMENT_IDLE_WITHOUT_CONNECTION_INFO,
 	FRAGMENT_PREFETCH_TTL_MS,
-	FRAGMENT_PREFETCH_CONNECTIONS,
+	FRAGMENT_HELD_CHARS,
+	PREFETCH_MARKS,
 	FRAGMENT_REGION_END,
 	FRAGMENT_PATH_PREFIX,
 	STYLESHEET_KEY_ATTRIBUTE,
@@ -87,17 +89,24 @@ import {
 	fragmentPageUrl,
 	runFragmentNavigation,
 	startFragmentNavigation,
+	watchViewport,
 	type FragmentNavigationConfig,
 } from '../fragment-navigation.ts';
 import type { FragmentPreload } from '../entries/fragment-entry.ts';
+import {
+	prefetches,
+	prefetchPolicy,
+	type PrefetchPolicy,
+	type RouterPrefetch,
+} from '../prefetch-policy.ts';
 
 export interface ServerEntryOptions {
 	readonly dev?: boolean;
 	// The app's public base path; the shared link bridge module sits under it.
 	readonly base?: string;
 	readonly navigationEntryPath?: string;
-	// false: nothing is downloaded before a click (no intent or idle prefetch); links still navigate.
-	readonly prefetch?: boolean;
+	// When links are fetched before their click; false fetches nothing early, and links still navigate.
+	readonly prefetch?: RouterPrefetch;
 	readonly resumeEntryPath?: string;
 	readonly prerenderWakeEntryPath?: string;
 	readonly routeModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
@@ -133,6 +142,8 @@ export interface ServerEntryOptions {
 	readonly fragmentNavigationSource?: string;
 	// The half of fragment navigation the bridge loads on the first link intent or at idle, minified the same way.
 	readonly fragmentNavigationRunSource?: string;
+	// The viewport tier, a file of its own the run half loads only when the app or a link asks for links in view.
+	readonly fragmentNavigationViewportSource?: string;
 	// The link bridge files the build wrote into the client output; without them the entry derives the paths itself.
 	readonly linkBridgePaths?: readonly [withoutHashLinks: string, withHashLinks: string];
 }
@@ -185,6 +196,7 @@ export type LinkBridgeOptions = Pick<
 	| 'fragmentEntryImports'
 	| 'fragmentNavigationSource'
 	| 'fragmentNavigationRunSource'
+	| 'fragmentNavigationViewportSource'
 	| 'routeFileIds'
 > & {
 	// The build computes the bridge outside the bundle, where markless()'s debug define does not reach.
@@ -201,7 +213,9 @@ function fragmentBridgeFor(
 				entryImports: options.fragmentEntryImports ?? [],
 				source: options.fragmentNavigationSource ?? startFragmentNavigation.toString(),
 				runSource: options.fragmentNavigationRunSource ?? runFragmentNavigation.toString(),
-				prefetch: options.prefetch !== false,
+				viewportSource:
+					options.fragmentNavigationViewportSource ?? watchViewport.toString(),
+				prefetch: prefetchPolicy(options.prefetch),
 				pages: manifest.routes.map((route) => route.pathname.replace(/:[^/]+/g, ':')),
 			}
 		: undefined;
@@ -217,7 +231,7 @@ export function routerLinkBridgeModules(
 	return linkBridgeModules(
 		options.base ?? '/',
 		options.navigationEntryPath,
-		fragmentBridge !== undefined || options.prefetch !== false,
+		fragmentBridge !== undefined || prefetches(prefetchPolicy(options.prefetch)),
 		options.documentNavigation === 'document',
 		fragmentBridge,
 		options.debug,
@@ -404,7 +418,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 			return new Response(fillDocumentChildren(shell, message), http.commit(status, headers));
 		}
 		const documentLoads = options.documentNavigation === 'document';
-		const linkIntent = fragmentNavigation || options.prefetch !== false;
+		const linkIntent = fragmentNavigation || prefetches(prefetchPolicy(options.prefetch));
 		// A document load or a fragment swap runs the destination's landing plan, not its client-navigation modules.
 		const destinationPreloads =
 			documentLoads || fragmentNavigation
@@ -1105,7 +1119,7 @@ function linkBridgeBody(
 	const fragmentNavigation = fragment !== undefined;
 	const fragmentSource = fragment
 		? `
-(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${JSON.stringify(LINK_TABLE_SCRIPT_ATTRIBUTE)},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${fragment.prefetch ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE, idleBytesPerSecond: FRAGMENT_IDLE_BYTES_PER_SECOND, idleMeasuredBytes: FRAGMENT_IDLE_MEASURED_BYTES }) : 'null'}),${MARKLESS_NAV_SETTLE_DEADLINE_MS}${inline ? `,${checkBridgeMove.toString()}` : ''});`
+(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${JSON.stringify(LINK_TABLE_SCRIPT_ATTRIBUTE)},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${prefetches(fragment.prefetch) ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], intent: fragment.prefetch.levels[0], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE, idleBytesPerSecond: FRAGMENT_IDLE_BYTES_PER_SECOND, idleMeasuredBytes: FRAGMENT_IDLE_MEASURED_BYTES }) : 'null'}),${MARKLESS_NAV_SETTLE_DEADLINE_MS}${inline ? `,${checkBridgeMove.toString()}` : ''});`
 		: '';
 	const indexed =
 		!fragmentNavigation && linkIntent
@@ -1222,7 +1236,13 @@ function linkBridgeModules(
 	fragment: FragmentBridge | undefined,
 	debug: boolean | undefined,
 ): LinkBridgeFiles {
-	const runSource = fragment && `export default ${boundFragmentRun(fragment, documentLoads)};`;
+	const viewportSource =
+		fragment && prefetches(fragment.prefetch) && `export default ${fragment.viewportSource};`;
+	const viewport: LinkBridgeModule | undefined = viewportSource
+		? { path: linkBridgeModulePath(base, contentHash(viewportSource)), source: viewportSource }
+		: undefined;
+	const runSource =
+		fragment && `export default ${boundFragmentRun(fragment, documentLoads, viewport?.path, true)};`;
 	const run: LinkBridgeModule | undefined = runSource
 		? { path: linkBridgeModulePath(base, contentHash(runSource)), source: runSource }
 		: undefined;
@@ -1235,7 +1255,7 @@ function linkBridgeModules(
 	};
 	const withoutHashLinks = variant(false);
 	const pages = [withoutHashLinks, fragment ? variant(true) : withoutHashLinks] as const;
-	return run ? [...pages, run] : pages;
+	return run ? [...pages, run, ...(viewport ? [viewport] : [])] : pages;
 }
 
 /** The two page-imported bridges (without and with '#/' links), then any file they load later. */
@@ -1305,14 +1325,26 @@ interface FragmentBridge {
 	readonly entry: string;
 	readonly source: string;
 	readonly runSource: string;
+	readonly viewportSource: string;
 	readonly entryImports: readonly string[];
-	readonly prefetch: boolean;
+	readonly prefetch: PrefetchPolicy;
 	readonly pages: readonly string[];
 }
 
 // The run half with the app's config bound in, so the page bridge never carries the config.
-function boundFragmentRun(fragment: FragmentBridge, documentLoads: boolean): string {
-	return `(d,...a)=>(${fragment.runSource})(d,${escapeScriptJson(fragmentConfig(fragment, documentLoads))},...a)`;
+// viewportPath: the built viewport file. Without one this is the development (inline) run half, which throws on a lifecycle move it does not allow.
+function boundFragmentRun(
+	fragment: FragmentBridge,
+	documentLoads: boolean,
+	viewportPath?: string,
+	built = viewportPath !== undefined,
+): string {
+	const viewport = !prefetches(fragment.prefetch)
+		? ''
+		: viewportPath
+			? `,()=>import(${JSON.stringify(viewportPath)}).then((m)=>m.default)`
+			: `,()=>Promise.resolve(${fragment.viewportSource})`;
+	return `(d,...a)=>(${fragment.runSource})(d,${escapeScriptJson({ ...fragmentConfig(fragment, documentLoads), strictMoves: !built })},...a${viewport})`;
 }
 
 function fragmentConfig(
@@ -1356,12 +1388,18 @@ function fragmentConfig(
 		documentLoads,
 		hoverDwellMs: FRAGMENT_HOVER_DWELL_MS,
 		prefetchTtlMs: FRAGMENT_PREFETCH_TTL_MS,
-		prefetchConnections: FRAGMENT_PREFETCH_CONNECTIONS,
+		heldChars: FRAGMENT_HELD_CHARS,
+		prefetchConnections: fragment.prefetch.concurrency,
+		guessBudget: fragment.prefetch.budget,
+		prefetchMarks: PREFETCH_MARKS,
+		strictMoves: false,
+		prefetchOn: fragment.prefetch.levels,
 		endpointPrefixes: [API_PATHNAME_PREFIX],
 		idleFragments: FRAGMENT_IDLE_FRAGMENTS,
 		idleFragmentBytes: FRAGMENT_IDLE_FRAGMENT_BYTES,
+		idleFragmentDecodedBytes: FRAGMENT_IDLE_FRAGMENT_DECODED_BYTES,
 		idleWithoutConnectionInfo: FRAGMENT_IDLE_WITHOUT_CONNECTION_INFO,
-		prefetch: fragment.prefetch,
+		prefetch: prefetches(fragment.prefetch),
 		pages: fragment.pages,
 	};
 }

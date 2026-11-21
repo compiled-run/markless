@@ -26,6 +26,7 @@ import android.view.MotionEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.EditorInfo
 import android.text.Editable
+import android.text.InputType
 import android.text.InputFilter
 import android.text.Spanned
 import android.text.TextWatcher
@@ -42,6 +43,7 @@ import dev.markless.mobile.core.ScrollBox
 import dev.markless.mobile.core.ScrollRange
 import dev.markless.mobile.core.ScrollRect
 import dev.markless.mobile.core.nativeMaxLength
+import dev.markless.mobile.core.nativeRangeValue
 import dev.markless.mobile.core.scrollIntoView
 import dev.markless.mobile.core.EventName
 import dev.markless.mobile.core.Instance
@@ -56,6 +58,8 @@ import dev.markless.mobile.core.Store
 import dev.markless.mobile.style.Assignment
 import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.StyleExport
+import dev.markless.mobile.style.shownRows
+import dev.markless.mobile.style.rowStates
 import dev.markless.mobile.style.StyleWrite
 import dev.markless.mobile.style.StyledNode
 import kotlin.math.roundToInt
@@ -151,6 +155,8 @@ class MarklessHost(
 		private set
 	/** The export as built, which Dragon's plan lays out again at each size. */
 	private val planned = style
+	/** Dragon's HarfBuzz over this phone's system fonts, made when a page first lays its rows out. */
+	private var rowShaper: RowShaper? = null
 	private var laidOutFor: Pair<Int, Int>? = null
 	private val fonts: FontSource = if (style?.systemFaces.isNullOrEmpty()) bundledFonts else SystemFonts(style!!.systemFaces, bundledFonts)
 	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine).apply {
@@ -185,12 +191,14 @@ class MarklessHost(
 	private val dpr = context.resources.displayMetrics.density.toDouble()
 	private var enterPressedAt = Long.MIN_VALUE / 2
 	private val styledCells = payload.cells.filter { it.styled }.map { it.id }
+	/** Each @if or @try outside list rows: its style state is the arm it shows. */
+	private val styledBranches = payload.nodes.filter { it is Node.Branch && it.row == null }.map { it.id }
 
 	/** One laid-out document (the page, or a sheet's content at one resting height) and the assignment it shows. */
 	private inner class Layout(export: StyleExport, everyCell: Boolean) {
 		var export = export
 			private set
-		var assignment = export.start(styledCells, runtime::value, isDark(context.resources.configuration), everyCell)
+		var assignment = export.start(styledCells, runtime::value, isDark(context.resources.configuration), everyCell, styledBranches, runtime::styleArm, export.rowStates(payload))
 		var absolutes: List<Map<String, Pair<Double, Double>>> = export.assignments.map { a -> absoluteOrigins(a.nodes) }
 			private set
 
@@ -543,6 +551,7 @@ class MarklessHost(
 						val key = entry.node.substringAfter('@')
 						rebuild { it.rowKey == key && inArm(it.node, branch) }
 					}
+					followArms()
 				}
 				is JournalEntry.Invalid -> invalid(entry.node, entry.message)
 				is JournalEntry.Timer -> scheduleTimer(entry.node, entry.ms)
@@ -571,6 +580,10 @@ class MarklessHost(
 		}
 		refreshRelations()
 		refreshSelects()
+		// A styled list's rows, a row's text or an attribute of a row's copy moved: the page is laid out again with its rows.
+		if (planned?.planRepeats?.isNotEmpty() == true && journal.any { it is JournalEntry.Rows || ((it is JournalEntry.Text || it is JournalEntry.Attribute) && '@' in it.node) }) {
+			laidOutFor?.let { (w, h) -> layOutAt(w, h, rowsMoved = true) }
+		}
 		onJournal?.invoke(journal)
 		scheduleLoadEvents()
 	}
@@ -604,11 +617,17 @@ class MarklessHost(
 	 * area. Chrome on Android lays a page out at a whole CSS px width, the screen's width in dp rounded up. Returns whether it
 	 * laid out again.
 	 */
-	fun layOutAt(widthPx: Int, heightPx: Int): Boolean {
+	fun layOutAt(widthPx: Int, heightPx: Int, rowsMoved: Boolean = false): Boolean {
 		val p = page ?: return false
 		val layout = planLayout ?: return false
-		if (planned?.plan == null || widthPx <= 0 || heightPx <= 0 || laidOutFor == widthPx to heightPx) return false
-		val next = planned.laidOut(Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout)
+		if (planned?.plan == null || widthPx <= 0 || heightPx <= 0 || (!rowsMoved && laidOutFor == widthPx to heightPx)) return false
+		val withRows = planned.planRepeats.isNotEmpty()
+		val shaper = if (withRows) rowShaper ?: RowShaper(planned.systemFaces).also { rowShaper = it } else null
+		val next = planned.laidOut(
+			Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout,
+			rows = if (withRows) planned.shownRows(payload, runtime) else null,
+			rowsLayout = shaper?.let { RowShaper.rowsLayout(it) ?: throw MarklessHostError("a page with styled rows needs Dragon's rows layout in the app") },
+		)
 		style = next
 		p.relaid(next)
 		laidOutFor = widthPx to heightPx
@@ -674,6 +693,20 @@ class MarklessHost(
 		s.current = at
 		repaint()
 		Log.i(TAG, "sheet $id at $snapPoint, style assignment ${layout.assignment}")
+	}
+
+	/** Moves each styled branch's style state to the arm it shows now, inner ones included, and lays the page out again. */
+	private fun followArms() {
+		if (page == null) return
+		var moved = false
+		for (b in styledBranches) {
+			val value = runtime.styleArm(b) ?: continue
+			for (l in allLayouts()) {
+				val before = l.assignment
+				if (l.advance(b, value)) moved = moved || l.assignment != before
+			}
+		}
+		if (moved) repaint()
 	}
 
 	private fun repaint() {
@@ -914,7 +947,8 @@ class MarklessHost(
 			}
 			// The select's list shows its options; their views only keep their text current.
 			"option" -> MarklessBox(context).apply { visibility = View.GONE }
-			"input", "textarea" -> MarklessField(context).apply {
+			"input", "textarea" -> if (node.attributes["type"] == "range") RangeBar(context).also { named(it, inst.id) } else MarklessField(context).apply {
+				filters = arrayOf(LengthLimit { nativeMaxLength(attrs[inst.id]?.get("maxlength")) })
 				val focusEvents = events[node.id].orEmpty().map { it.event }
 				setOnFocusChangeListener { v, focused ->
 					if (focused) bringIntoView(v, dev.markless.mobile.core.FOCUS_INTO_VIEW)
@@ -922,7 +956,8 @@ class MarklessHost(
 					if (event in focusEvents) apply(runtime.dispatch(inst.id, event))
 				}
 				if (node.element == "input") {
-					filters = arrayOf(LengthLimit { nativeMaxLength(attrs[inst.id]?.get("maxlength")) })
+					// Chrome gives an email field the email keyboard.
+					if (node.attributes["type"] == "email") inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
 					isSingleLine = true
 				} else {
 					// A textarea's Return is a new line, and Chrome's default `rows="2"` shows two lines.
@@ -953,7 +988,7 @@ class MarklessHost(
 		views[inst.id] = view
 		if (!unseen && type !in TICKABLE) for (b in node.bindings) if (b.property && b.name == "value") (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setAppText(runtime.property(b, inst.scope))
 		// A field's `value` attribute is its text until something sets it, as on the web.
-		if (view is EditText && node.bindings.none { it.property && it.name == "value" }) node.attributes["value"]?.let { view.setAppText(it) }
+		if (view is EditText && node.bindings.none { it.property && it.name == "value" }) (node.bindings.firstOrNull { !it.property && it.name == "value" }?.let { runtime.attribute(it, inst.scope) } ?: node.attributes["value"])?.let { view.setAppText(it) }
 		for (e in events[node.id].orEmpty()) when (e.event) {
 			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate, detail = pressCount(inst.id))) }
 			EventName.Dismiss -> if (OVERLAY_ATTRIBUTE !in node.attributes) throw MarklessHostError("dismiss event on \"${node.id}\", which is neither a sheet nor an overlay")
@@ -972,14 +1007,15 @@ class MarklessHost(
 						if (key.action == KeyEvent.ACTION_DOWN) { enterPressedAt = now; apply(runtime.dispatch(inst.id, EventName.Enter)) }
 						true
 					}
-					actionId == EditorInfo.IME_NULL -> false
-					// One press can arrive as the Enter key and then again as the keyboard's action: it submits once.
+					// One press can arrive as the Enter key and then again as the keyboard's action, or as IME_NULL with no key
+					// from some keyboards: it submits once, and focus stays in the field (Android's default would move it on).
 					now - enterPressedAt < 500 -> true
-					else -> { apply(runtime.dispatch(inst.id, EventName.Enter)); true }
+					else -> { enterPressedAt = now; apply(runtime.dispatch(inst.id, EventName.Enter)); true }
 				}
 			}
+			EventName.Commit -> (view as? RangeBar ?: throw MarklessHostError("commit event on \"${node.id}\", which is not a range")).onCommit = { value -> apply(runtime.dispatch(inst.id, EventName.Commit, value)) }
 			// A select's input handler runs when a choice lands, from the runtime's choose.
-			EventName.Input -> if (node.element == "select") Unit else (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
+			EventName.Input -> if (node.element == "select") Unit else if (view is RangeBar) view.onInput = { value -> apply(runtime.dispatch(inst.id, EventName.Input, value)) } else (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
 				override fun afterTextChanged(s: Editable) {
@@ -1104,6 +1140,7 @@ class MarklessHost(
 		val current = attrs.getOrPut(id) { HashMap() }
 		if (value == null) current.remove(name) else current[name] = value
 		if (id in inert && (name == "aria-hidden" || name == "hidden")) return
+		if (view is RangeBar && name in RangeBar.SHAPE) view.show(current)
 		when (name) {
 			// A label names its control, so TalkBack reads it there and not a second time on the label; a press on it activates the control.
 			"for" -> if (value != null) {
@@ -1497,3 +1534,66 @@ private fun EditText.setAppText(text: String) {
 	limit?.appWriting = true
 	try { setText(text) } finally { limit?.appWriting = false }
 }
+
+/**
+ * `<input type="range">`: a seek bar whose progress counts the input's steps from its minimum (a thousandth of the range
+ * for `step="any"`), its value kept as the web keeps it (`nativeRangeValue`). A move reports the value it lands on once,
+ * as the web's input event does while the thumb crosses a step.
+ */
+class RangeBar(context: Context) : android.widget.SeekBar(context) {
+	var onInput: ((String) -> Unit)? = null
+	/** Called when a drag ends with the value moved since it began, as the web's `change`. */
+	var onCommit: ((String) -> Unit)? = null
+	private var startValue = ""
+	private var attributes: Map<String, String> = emptyMap()
+	private var low = 0.0
+	private var unit = 1.0
+	private var reported = ""
+	private var showing = false
+
+	init {
+		// Chrome's unstyled range input is 129 px wide.
+		minimumWidth = Math.round(129 * resources.displayMetrics.density)
+		setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
+			override fun onProgressChanged(bar: android.widget.SeekBar, progress: Int, fromUser: Boolean) {
+				if (!fromUser || showing) return
+				val landed = valueOf((low + progress * unit).toString())
+				if (landed == reported) return
+				reported = landed
+				onInput?.invoke(landed)
+			}
+			override fun onStartTrackingTouch(bar: android.widget.SeekBar) {
+				startValue = reported
+			}
+			override fun onStopTrackingTouch(bar: android.widget.SeekBar) {
+				if (reported == startValue) return
+				startValue = reported
+				onCommit?.invoke(reported)
+			}
+		})
+	}
+
+	private fun valueOf(raw: String?) = nativeRangeValue(raw, attributes["min"], attributes["max"], attributes["step"])
+
+	/** Takes the input's attributes: its range, its step and the value the page gives it. */
+	fun show(current: Map<String, String>) {
+		attributes = HashMap(current)
+		low = valueOf(current["min"] ?: "0").toDouble()
+		val high = valueOf(current["max"] ?: "100").toDouble()
+		val step = current["step"]?.trim()
+		unit = if (step?.lowercase() == "any") maxOf((high - low) / 1000, Double.MIN_VALUE) else step?.toDoubleOrNull()?.takeIf { it > 0 } ?: 1.0
+		reported = valueOf(current["value"])
+		showing = true
+		max = Math.round((high - low) / unit).toInt()
+		progress = Math.round((reported.toDouble() - low) / unit).toInt()
+		showing = false
+		isEnabled = current["disabled"] == null
+		contentDescription = current["aria-label"]
+	}
+
+	companion object {
+		/** The attributes that shape the bar or its value. */
+		val SHAPE = setOf("min", "max", "step", "value", "disabled", "aria-label")
+	}
+}
+

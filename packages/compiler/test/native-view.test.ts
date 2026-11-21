@@ -453,6 +453,139 @@ export function Choice() @{
 		]);
 	});
 
+	it('leaves out a keypress handler on an element that is not a text field, as only a hardware keyboard presses it there', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Settings() @{
+	let open = state(false);
+	<main>
+		<span role="button" tabindex="0" onClick={() => (open = !open)} onKeyPress={() => (open = !open)}>Settings</span>
+		<p>{open ? 'open' : 'closed'}</p>
+	</main>
+}`);
+		expect(diagnostics.map((d) => [d.severity, d.code, d.message])).toEqual([
+			[
+				'warning',
+				'MARKLESS_NATIVE_KEYBOARD_ONLY',
+				'the keypress handler on <span> h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out',
+			],
+		]);
+		expect(payload?.events.map((event) => [event.host, event.event])).toEqual([['h1', 'activate']]);
+	});
+
+	it('lowers a range input with its min, max and step, reports its moves in a form, and runs its change when it is let go', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Mixer() @{
+	let sent = state('');
+	<main>
+		<form onSubmit={(event) => { event.preventDefault(); sent = String(new FormData(event.currentTarget).get('level')); }}>
+			<input type="range" name="level" aria-label="Level" min="0" max="10" step="2" />
+			<input name="note" aria-label="Note" />
+			<button>Send</button>
+		</form>
+		<p>{sent}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.forms?.[0]?.fields).toEqual([
+			{ node: 'h2', kind: 'text' },
+			{ node: 'h3', kind: 'text' },
+		]);
+		// The range reports its moves; only the text field has a return key.
+		expect(payload?.events.filter((event) => event.host === 'h2').map((event) => event.event)).toEqual(['input']);
+		expect(payload?.events.filter((event) => event.host === 'h3').map((event) => event.event).sort()).toEqual([
+			'enter',
+			'input',
+		]);
+		const changed = await nativeView(`import { state } from '@markless/core';
+export function Mixer() @{
+	let level = state('5');
+	<main>
+		<input type="range" aria-label="Level" onChange={(event) => (level = event.currentTarget.value)} />
+		<p>{level}</p>
+	</main>
+}`);
+		expect(changed.diagnostics).toEqual([]);
+		expect(changed.payload?.events.map((event) => [event.host, event.event])).toEqual([['h1', 'commit']]);
+	});
+
+	it('builds a dynamic element (`<{tag}>`) as the element its tag names for each use, with its attributes, events and children', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function Box({ asChild, children, ...rest }) @{
+	let pressed = state(0);
+	const tag = asChild === true ? 'div' : 'p';
+	<{tag} {...rest} class="box" onClick={() => (pressed = pressed + 1)}>{children} {pressed}</{tag}>
+}
+export function Page() @{
+	<main>
+		<Box aria-label="Note">Note</Box>
+		<Box asChild={true}>Panel</Box>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const elements = payload?.nodes.filter((node) => node.kind === 'element' && node.parent === 'h1');
+		expect(elements?.map((node) => node.kind === 'element' && [node.id, node.element, node.attributes])).toEqual([
+			['component-edge:0/h0', 'p', { 'aria-label': 'Note', class: 'box' }],
+			['component-edge:1/h0', 'div', { class: 'box' }],
+		]);
+		expect(payload?.events.map((event) => [event.host, event.event])).toEqual([
+			['component-edge:0/h0', 'activate'],
+			['component-edge:1/h0', 'activate'],
+		]);
+	});
+
+	it('refuses a dynamic element whose tag follows state by name', async () => {
+		const { payload, diagnostics } = await nativeView(`import { computed, state } from '@markless/core';
+export function Page() @{
+	let big = state(false);
+	const tag = computed(() => (big ? 'h1' : 'p'));
+	<main><{tag}>Title</{tag}><button onClick={() => (big = !big)}>Grow</button></main>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'a dynamic element (`<{tag}>`) whose tag is not one element name when the app is built; each use must name one',
+		]);
+	});
+
+	it('leaves out drop-target handlers with a warning, as a phone raises them only for a drag from another app', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Upload() @{
+	let note = state('Drop a file');
+	<main>
+		<div onDragEnter={() => (note = 'Release')} onDragOver={(event) => event.preventDefault()} onDragLeave={() => (note = 'Drop a file')} onDrop={() => (note = 'Dropped')}>{note}</div>
+		<button onClick={() => (note = 'Picked')}>Pick</button>
+	</main>
+}`);
+		expect(diagnostics.map((d) => [d.severity, d.code, d.message.split(' runs ')[0]])).toEqual(
+			['dragenter', 'dragover', 'dragleave', 'drop'].map((event) => [
+				'warning',
+				'MARKLESS_NATIVE_DROP_ONLY',
+				`the ${event} handler on <div> h1`,
+			]),
+		);
+		expect(payload?.events.map((event) => [event.host, event.event])).toEqual([['h2', 'activate']]);
+	});
+
+	it('leaves out a wheel handler with a warning, as a touch on a phone scrolls without wheel events', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Slides() @{
+	let slide = state(0);
+	<main>
+		<div onWheel={() => (slide = slide + 1)}>Slide {slide}</div>
+		<button onClick={() => (slide = slide + 1)}>Next</button>
+	</main>
+}`);
+		expect(diagnostics.map((d) => [d.severity, d.code, d.message])).toEqual([
+			[
+				'warning',
+				'MARKLESS_NATIVE_MOUSE_ONLY',
+				'the wheel handler on <div> h1 runs only from a mouse or trackpad on a phone; native hosts have none yet, so it is left out',
+			],
+		]);
+		expect(payload?.events.map((event) => [event.host, event.event])).toEqual([
+			['h2', 'activate'],
+		]);
+	});
+
 	it('gives a state field whose first value is undefined a null cell, as a native expression spells undefined', async () => {
 		const { payload, diagnostics } =
 			await nativeView(`import { shared, state } from '@markless/core';
@@ -592,7 +725,7 @@ export function Page() @{
 		}
 	});
 
-	it('builds a <textarea> as a text field, and refuses its change handler and its place in a form by name', async () => {
+	it('builds a <textarea> as a text field, and refuses its change handler by name', async () => {
 		const shown = await nativeView(`import { state } from '@markless/core';
 export function Page() @{
 	let note = state('');
@@ -613,18 +746,54 @@ export function Page() @{
 		expect(changed.diagnostics.map((d) => d.message)).toContain(
 			'the change handler on the <textarea> h1: a text field raises it when it loses focus, which a native build has no lowering for yet',
 		);
+	});
+
+	it("takes a <textarea>'s text as its default value, and submits it with its form", async () => {
 		const sent = await nativeView(`import { state } from '@markless/core';
 export function Page() @{
-	let note = state('');
+	let note = state('draft');
 	<form onSubmit={(event) => { event.preventDefault(); note = 'sent'; }}>
-		<textarea aria-label="Notes" name="notes" />
+		<textarea aria-label="Notes" name="notes">{note}</textarea>
+		<textarea aria-label="Sign" name="sign" value="Ada" />
+		<textarea aria-label="Fixed" name="fixed">as written</textarea>
 		<button>Send</button>
-		<p>{note}</p>
 	</form>
 }`);
-		expect(sent.payload).toBeNull();
-		expect(sent.diagnostics.map((d) => d.message)).toContain(
-			'the <textarea> h1 in the <form> h0, whose text a native build does not submit yet',
+		expect(sent.diagnostics).toEqual([]);
+		expect(sent.payload?.nodes.filter((node) => node.kind === 'element' && node.element === 'textarea')).toEqual([
+			{
+				kind: 'element',
+				id: 'h1',
+				element: 'textarea',
+				parent: 'h0',
+				attributes: { 'aria-label': 'Notes', name: 'notes' },
+				bindings: [
+					{
+						attribute: 'value',
+						value: { template: [{ logical: '??', left: { cell: 'state:note' }, right: { literal: '' } }] },
+					},
+				],
+			},
+			{ kind: 'element', id: 'h2', element: 'textarea', parent: 'h0', attributes: { 'aria-label': 'Sign', name: 'sign', value: 'Ada' } },
+			{ kind: 'element', id: 'h3', element: 'textarea', parent: 'h0', attributes: { 'aria-label': 'Fixed', name: 'fixed', value: 'as written' } },
+		]);
+		expect(sent.payload?.nodes.some((node) => node.kind === 'text' && ['h1', 'h2', 'h3'].includes(node.parent ?? ''))).toBe(false);
+		expect(sent.payload?.forms?.[0]?.fields).toEqual([
+			{ node: 'h1', kind: 'text' },
+			{ node: 'h2', kind: 'text' },
+			{ node: 'h3', kind: 'text' },
+		]);
+		expect(sent.payload?.events).toEqual(
+			expect.arrayContaining(['h1', 'h2', 'h3'].map((host) => expect.objectContaining({ host, event: 'input' }))),
+		);
+		const wrapped = await nativeView(`export function Page() @{
+	<form onSubmit={(event) => event.preventDefault()}>
+		<textarea aria-label="Notes" name="notes" wrap="hard" cols="20" />
+		<button>Send</button>
+	</form>
+}`);
+		expect(wrapped.diagnostics.map((d) => d.message)).toContain(
+			'the <textarea> h1 in the <form> h0 has `wrap`, whose hard wrapping the web adds to the text it sends and no native host adds yet',
 		);
 	});
 
@@ -2396,11 +2565,89 @@ export function Forms() @{
 			'the submit handler reads `event.submitter`, which a submit on a phone does not have',
 			'the <form> h1 has no onSubmit handler: the web sends it to its action and loads the answer (or sends a POST to an API route in place), and a phone app has no server or page to load',
 			'the submit handler on the <form> h4 does not call `event.preventDefault()` on every path before it awaits or returns: the web then sends the form to its action and loads a new page, which a phone app has no server or page for',
-			'the <input> h7 in the <form> h6 is an <input type="email">, which no native host draws or checks yet',
 			'the <input> h8 in the <form> h6 has `pattern`, which the web checks before a submit and no native host checks yet',
 			'the <input> h9 in the <form> h6 binds the `name` of a radio button, which a native build reads only as written',
 			'the <button> h10 in the <form> h6 is a reset button, which a native build has no lowering for yet',
 			'the <button> h11 in the <form> h6 has `formaction`, which says where the web sends the form; a phone app has no server to send it to',
+		]);
+	});
+
+	it('refuses an input type no phone draws by name outside a form too, instead of drawing it as a text field', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Profile() @{
+	<main>
+		<input type="file" aria-label="Photo" />
+		<input type="DATE" aria-label="Day" />
+		<input type="password" aria-label="Secret" />
+		<input type="search" aria-label="Find" />
+		<input type="checkbox" aria-label="News" />
+	</main>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'the <input type="file"> h1, which no native host draws or checks yet',
+			'the <input type="date"> h2, which no native host draws or checks yet',
+			'the <input type="password"> h3, which no native host draws or checks yet',
+		]);
+	});
+
+	it("lowers an email field as a text field, and carries Chromium's email messages only for a form that has one", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Join() @{
+	let sent = state('');
+	<main>
+		<form onSubmit={(event) => { event.preventDefault(); sent = 'sent'; }}>
+			<input type="email" name="email" aria-label="Email" />
+			<button>Join</button>
+		</form>
+		<form onSubmit={(event) => { event.preventDefault(); sent = 'other'; }}>
+			<input name="name" aria-label="Name" />
+		</form>
+		<p>{sent}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.forms?.map((form) => form.fields)).toEqual([
+			[{ node: 'h2', kind: 'text' }],
+			[{ node: 'h5', kind: 'text' }],
+		]);
+		expect(payload?.typeMismatch?.en?.noAt).toBe(
+			"Please include an '@' in the email address. '{value}' is missing an '@'.",
+		);
+		const plain = await nativeView(`export function Name() @{
+	<form onSubmit={(event) => event.preventDefault()}><input name="name" aria-label="Name" /></form>
+}`);
+		expect(plain.payload?.typeMismatch).toBeUndefined();
+	});
+
+	it('lowers a submit input as the button its value labels, and refuses one with no value or a bound one by name', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Join() @{
+	let sent = state('');
+	<main>
+		<form onSubmit={(event) => { event.preventDefault(); sent = 'sent'; }}>
+			<input name="name" aria-label="Name" />
+			<input type="submit" value="Join" />
+		</form>
+		<p>{sent}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.nodes.filter((node) => node.id.startsWith('h3'))).toEqual([
+			{ kind: 'element', id: 'h3', element: 'button', parent: 'h1', attributes: { type: 'submit' } },
+			{ kind: 'text', id: 'h3:text0', parent: 'h3', parts: [{ text: 'Join' }] },
+		]);
+		expect(payload?.forms?.[0]?.submitters).toEqual(['h3']);
+		const refused = await nativeView(`import { state } from '@markless/core';
+export function Join() @{
+	let label = state('Join');
+	<form onSubmit={(event) => event.preventDefault()}>
+		<input type="submit" />
+		<input type="submit" value={label} />
+	</form>
+}`);
+		expect(refused.diagnostics.map((d) => d.message)).toEqual([
+			"the <input type=\"submit\"> h1 has no `value`: the web labels it with the browser's own word for Submit, in the browser's language",
+			'the <input type="submit"> h2 binds its `value`, its label, which a native build reads only as written',
 		]);
 	});
 
@@ -3089,6 +3336,22 @@ export function Page() @{
 			expect.stringContaining("uses `import.meta.url`, which a phone's script cannot run"),
 			expect.stringContaining("uses `import.meta.env.BASE_URL`, which a phone's script cannot run"),
 		]);
+	});
+});
+
+describe('navigate() in JavaScript', () => {
+	it('needs the app\'s routes, which a build of one component does not have', async () => {
+		const text = `import { state } from '@markless/core';
+import { navigate } from '@markless/router';
+export function Page() @{
+	let id = state(1);
+	<button onClick={async () => { id++; await navigate(\`/orders/\${id}\`); }}>Next</button>
+}`;
+		const { payload, diagnostics } = await nativeView(text);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toContain(
+			"the click handler calls `navigate` from @markless/router inside JavaScript that runs on the phone, which needs the app's routes; build the app, not one component",
+		);
 	});
 });
 
