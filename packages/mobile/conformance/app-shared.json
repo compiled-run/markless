@@ -30,7 +30,8 @@
 							"storage": {
 								"key": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
 								"session": true
-							}
+							},
+							"styled": true
 						}
 					],
 					"nodes": [
@@ -209,7 +210,8 @@
 							"storage": {
 								"key": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
 								"session": true
-							}
+							},
+							"styled": true
 						}
 					],
 					"nodes": [
@@ -362,6 +364,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
+					"value": true
+				},
+				{
 					"op": "text",
 					"node": "component-edge:0/h1:text0",
 					"value": "Playing: Harbour Lights"
@@ -429,6 +436,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
+					"value": false
+				},
+				{
 					"op": "text",
 					"node": "component-edge:0/h1:text0",
 					"value": "Paused: Harbour Lights"
@@ -459,6 +471,11 @@
 				"event": "back"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "app:shared:packages/mobile/proofs/n7-app-shared/lib/player.tsrx#player/state:box.playing",
+					"value": false
+				},
 				{
 					"op": "text",
 					"node": "component-edge:0/h1:text0",

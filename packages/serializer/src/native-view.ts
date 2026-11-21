@@ -188,6 +188,19 @@ export type NativeScript = {
 	readonly services: ReadonlyArray<NativeScriptService>;
 };
 
+/** Every cell an expression reads. */
+export function nativeExprCells(expr: NativeExpr, into = new Set<string>()): Set<string> {
+	if ('cell' in expr) into.add(expr.cell);
+	for (const child of Object.values(expr)) {
+		if (Array.isArray(child)) {
+			for (const item of child)
+				if (item && typeof item === 'object')
+					nativeExprCells((Array.isArray(item) ? item[1] : item) as NativeExpr, into);
+		} else if (child && typeof child === 'object') nativeExprCells(child as NativeExpr, into);
+	}
+	return into;
+}
+
 export type NativeTextPart =
 	| { readonly text: string }
 	| { readonly cell: string }
@@ -776,6 +789,8 @@ export type NativeViewPayload = {
 		readonly storage?: { readonly key: string; readonly session?: true };
 		/** A class or `ui-*` attribute binding reads this cell, so Dragon's export has a state for it; its changes are journalled as `state`. */
 		readonly styled?: true;
+		/** A styled string cell's every value, its first value first, so Dragon lays out one assignment per value. */
+		readonly domain?: ReadonlyArray<string>;
 		/** A live device value (`network.online`): the host fills it at mount and sends a `device` action when it changes. */
 		readonly device?: NativeDeviceValue;
 		/** For a device object's field (`cam.ready`): the object (`object:cam`). */
@@ -1182,11 +1197,12 @@ export const PLATFORM_PIECES_NAMESPACE = 'native';
 
 /**
  * Bound attributes that reach Dragon in every combination of the styled states, besides `class`: the ones a selector keys
- * state off (`[ui-open]`, `[aria-expanded]`) and `hidden`, whose UA rule Dragon applies. Others (`disabled`, `value`) stay
- * out of the style input, since Dragon does not model their rendering effect.
+ * state off (`[ui-open]`, `[aria-expanded]`), `hidden`, whose UA rule Dragon applies, and `disabled`, which selects `:disabled`
+ * and Chrome's disabled colours in Dragon. Others (`value`) stay out of the style input, since Dragon does not model their
+ * rendering effect.
  */
 export const isNativeStyleStateAttribute = (name: string): boolean =>
-	name === 'hidden' || name === 'role' || /^(ui|aria|data)-/.test(name);
+	name === 'hidden' || name === 'disabled' || name === 'role' || /^(ui|aria|data)-/.test(name);
 
 /** ECMAScript's own globals, which every engine a host runs has (JavaScriptCore, Hermes); `eval` is left out. */
 export const NATIVE_SCRIPT_LANGUAGE_GLOBALS: ReadonlyArray<string> = [

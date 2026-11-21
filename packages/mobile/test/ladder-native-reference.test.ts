@@ -282,6 +282,9 @@ function mirror(
 			expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 			for (const text of step.absent ?? [])
 				expect(shown, `step ${index}`).not.toContain(text);
+			// Which texts a page's styles hide is Dragon's layout; the payload must still hold them.
+			for (const text of step.hidden ?? [])
+				expect([...open.values()], `step ${index}`).toContain(text);
 			if (step.order)
 				expect(shown.filter((text) => step.order!.includes(text))).toEqual(step.order);
 			if (step.title !== undefined)
@@ -362,8 +365,11 @@ function walkApp(
 			stack.pop();
 			for (const entry of journal)
 				if (entry.op !== 'abort' && entry.op !== 'clearTimer') stack.at(-1)!.apply(entry, index);
-		} else if (looksOnly(action) || (action && ('swipe' in action || 'scrollTo' in action))) {
-			// Neither the appearance nor a sheet's resting height or scroll changes state: the hosts restyle and lay out.
+		} else if (
+			looksOnly(action) ||
+			(action && ('swipe' in action || 'scrollTo' in action || 'orientation' in action))
+		) {
+			// Neither the appearance, a rotation, nor a sheet's resting height or scroll changes state: the hosts restyle and lay out.
 		} else if (action) {
 			const top = stack.at(-1)!;
 			const host = top.elementReading(

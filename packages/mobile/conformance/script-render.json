@@ -7,7 +7,12 @@
 			{
 				"id": "state:name",
 				"name": "name",
-				"initial": "Ada Lovelace"
+				"initial": "Ada Lovelace",
+				"styled": true,
+				"domain": [
+					"Ada Lovelace",
+					"Grace Hopper"
+				]
 			}
 		],
 		"nodes": [
@@ -178,6 +183,11 @@
 				"host": "h4"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:name",
+					"value": "Grace Hopper"
+				},
 				{
 					"op": "text",
 					"node": "h2:text0",

@@ -7,12 +7,18 @@
 			{
 				"id": "state:note",
 				"name": "note",
-				"initial": "hi"
+				"initial": "hi",
+				"styled": true,
+				"domain": [
+					"hi",
+					"bye"
+				]
 			},
 			{
 				"id": "state:editing",
 				"name": "editing",
-				"initial": false
+				"initial": false,
+				"styled": true
 			},
 			{
 				"id": "component-edge:0/state:draft",
@@ -288,6 +294,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:editing",
+					"value": true
+				},
+				{
 					"op": "text",
 					"node": "h6:text0",
 					"value": "Close"
@@ -319,6 +330,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:editing",
+					"value": false
+				},
+				{
 					"op": "text",
 					"node": "h6:text0",
 					"value": "Edit"
@@ -337,6 +353,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:note",
+					"value": "bye"
+				},
+				{
 					"op": "text",
 					"node": "h5:text0",
 					"value": "Note bye"
@@ -349,6 +370,11 @@
 				"host": "h6"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:editing",
+					"value": true
+				},
 				{
 					"op": "text",
 					"node": "h6:text0",

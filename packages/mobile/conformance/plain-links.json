@@ -17,7 +17,12 @@
 						{
 							"id": "state:pick",
 							"name": "pick",
-							"initial": "3"
+							"initial": "3",
+							"styled": true,
+							"domain": [
+								"3",
+								"9"
+							]
 						}
 					],
 					"nodes": [
@@ -486,6 +491,11 @@
 				"host": "h6"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:pick",
+					"value": "9"
+				},
 				{
 					"op": "attribute",
 					"node": "h5",

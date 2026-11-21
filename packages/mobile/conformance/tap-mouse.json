@@ -7,12 +7,24 @@
 			{
 				"id": "state:hovered",
 				"name": "hovered",
-				"initial": "nothing"
+				"initial": "nothing",
+				"styled": true,
+				"domain": [
+					"nothing",
+					"Apples",
+					"Pears"
+				]
 			},
 			{
 				"id": "state:left",
 				"name": "left",
-				"initial": "nothing"
+				"initial": "nothing",
+				"styled": true,
+				"domain": [
+					"nothing",
+					"Apples",
+					"Pears"
+				]
 			},
 			{
 				"id": "state:downs",
@@ -294,6 +306,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:hovered",
+					"value": "Apples"
+				},
+				{
 					"op": "text",
 					"node": "h5:text0",
 					"value": "Pointing at Apples"
@@ -322,6 +339,16 @@
 				"y": 80
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:hovered",
+					"value": "Pears"
+				},
+				{
+					"op": "state",
+					"cell": "state:left",
+					"value": "Apples"
+				},
 				{
 					"op": "text",
 					"node": "h5:text0",
@@ -398,6 +425,16 @@
 				"y": 40
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:hovered",
+					"value": "Apples"
+				},
+				{
+					"op": "state",
+					"cell": "state:left",
+					"value": "Pears"
+				},
 				{
 					"op": "text",
 					"node": "h5:text0",

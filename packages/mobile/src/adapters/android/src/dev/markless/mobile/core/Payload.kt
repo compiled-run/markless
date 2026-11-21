@@ -681,7 +681,9 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial", "storage", "styled", "device", "task", "object", "row", "clock", "async", "first", "rebuiltBy", "seed", "arm", "unset", "follows"), what)
+			o.only(setOf("id", "name", "initial", "storage", "styled", "domain", "device", "task", "object", "row", "clock", "async", "first", "rebuiltBy", "seed", "arm", "unset", "follows"), what)
+			// The style export carries each state's domain; the payload's copy is Dragon's input, checked here and not kept.
+			o["domain"]?.arr("$what.domain")?.forEach { it.str("$what.domain[]") }
 			val unset = o["unset"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.unset must be true when present"); true } ?: false
 			val clock = o["clock"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.clock must be true when present"); true } ?: false
 			val styled = o["styled"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.styled must be true when present"); true } ?: false

@@ -7,7 +7,8 @@
 			{
 				"id": "state:locked",
 				"name": "locked",
-				"initial": false
+				"initial": false,
+				"styled": true
 			},
 			{
 				"id": "state:sent",
@@ -681,6 +682,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:locked",
+					"value": true
+				},
+				{
 					"op": "attribute",
 					"node": "h3",
 					"name": "disabled",
@@ -718,6 +724,11 @@
 				"host": "h7"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:locked",
+					"value": false
+				},
 				{
 					"op": "attribute",
 					"node": "h3",

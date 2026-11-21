@@ -156,9 +156,46 @@
 			"kind": "text",
 			"id": "h11:text0",
 			"parent": "h11",
-			"text": "Not scrolled"
+			"text": "Not scrolled",
+			"textByState": [
+				{
+					"when": {
+						"state:scrolled": "Not scrolled"
+					},
+					"value": "Not scrolled"
+				},
+				{
+					"when": {
+						"state:scrolled": "Touching"
+					},
+					"value": "Touching"
+				},
+				{
+					"when": {
+						"state:scrolled": "Taken by the scroll"
+					},
+					"value": "Taken by the scroll"
+				},
+				{
+					"when": {
+						"state:scrolled": "Lifted"
+					},
+					"value": "Lifted"
+				}
+			]
 		}
 	],
 	"css": ".page.mk-clfw02 {\n\t\t\t\tpadding: 16px;\n\t\t\t}\n\t\t\t.pad.mk-clfw02 {\n\t\t\t\theight: 120px;\n\t\t\t\tborder: 2px solid #1d1b16;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #b7e4c7;\n\t\t\t\ttouch-action: none;\n\t\t\t}\n\t\t\t.label.mk-clfw02 {\n\t\t\t\tmargin: 0;\n\t\t\t\tpadding: 12px;\n\t\t\t\tfont-size: 18px;\n\t\t\t}\n\t\t\t.line.mk-clfw02 {\n\t\t\t\tmargin: 6px 0;\n\t\t\t\tfont-size: 18px;\n\t\t\t}\n\t\t\t.box.mk-clfw02 {\n\t\t\t\theight: 160px;\n\t\t\t\toverflow-y: auto;\n\t\t\t\tborder: 2px solid #1d1b16;\n\t\t\t}\n\t\t\t.tall.mk-clfw02 {\n\t\t\t\theight: 600px;\n\t\t\t\tbackground: #e9ecef;\n\t\t\t}",
-	"states": []
+	"states": [
+		{
+			"cell": "state:scrolled",
+			"domain": [
+				"Not scrolled",
+				"Touching",
+				"Taken by the scroll",
+				"Lifted"
+			],
+			"initial": "Not scrolled"
+		}
+	]
 }
