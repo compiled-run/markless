@@ -107,6 +107,8 @@ export function rowAttributeOptions(
 	name: string,
 	expr: NativeExpr,
 ): ReadonlyArray<string | null> | undefined {
+	if (givesBoolean(expr))
+		return [...new Set([marklessAttributeValue(name, true), marklessAttributeValue(name, false)])];
 	if ('literal' in expr) return [marklessAttributeValue(name, expr.literal)];
 	if ('if' in expr) {
 		const whenTrue = rowAttributeOptions(name, expr.whenTrue);
@@ -114,6 +116,17 @@ export function rowAttributeOptions(
 		return whenTrue && whenFalse ? [...new Set([...whenTrue, ...whenFalse])] : undefined;
 	}
 	return undefined;
+}
+
+/** Whether an expression's value is always true or false: a comparison, a negation, or `&&`, `||` and `?:` of those. */
+function givesBoolean(expr: NativeExpr): boolean {
+	if ('literal' in expr) return typeof expr.literal === 'boolean';
+	if ('unary' in expr) return expr.unary === '!';
+	if ('binary' in expr) return ['===', '!==', '<', '<=', '>', '>='].includes(expr.binary);
+	if ('logical' in expr)
+		return expr.logical !== '??' && givesBoolean(expr.left) && givesBoolean(expr.right);
+	if ('if' in expr) return givesBoolean(expr.whenTrue) && givesBoolean(expr.whenFalse);
+	return false;
 }
 
 /** Whether an expression reads what differs from row to row: a row's item or a row's own state. */

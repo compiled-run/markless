@@ -1,0 +1,25 @@
+{
+	"rung": "S23",
+	"name": "Styled @for rows whose aria-pressed a comparison gives: the pressed row's look moves with the pick, laid out on the phone as the web lays it out",
+	"steps": [
+		{
+			"visible": ["Sizes", "Small", "Medium", "Large", "Picked Medium"],
+			"absent": ["Picked Large", "Picked Small"],
+			"title": "Sizes"
+		},
+		{
+			"do": {
+				"tap": "Large"
+			},
+			"visible": ["Picked Large"],
+			"absent": ["Picked Medium"]
+		},
+		{
+			"do": {
+				"tap": "Small"
+			},
+			"visible": ["Picked Small"],
+			"absent": ["Picked Large"]
+		}
+	]
+}

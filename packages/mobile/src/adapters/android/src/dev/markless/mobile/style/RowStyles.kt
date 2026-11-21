@@ -12,7 +12,12 @@ import dev.markless.mobile.core.Runtime
  * The values a row's `class` or `ui-*` binding can give, as the style input lists them (style-input.ts `rowAttributeOptions`):
  * literals chosen by conditions, in first-seen order; null for any other binding.
  */
-fun rowAttributeOptions(name: String, expr: Expr): List<String?>? = when (expr) {
+fun rowAttributeOptions(name: String, expr: Expr): List<String?>? = when {
+	givesBoolean(expr) -> listOf(AttributeValue.of(name, JsValue.Bool(true)), AttributeValue.of(name, JsValue.Bool(false))).distinct()
+	else -> literalOptions(name, expr)
+}
+
+private fun literalOptions(name: String, expr: Expr): List<String?>? = when (expr) {
 	is Expr.Literal -> listOf(AttributeValue.of(name, expr.value))
 	is Expr.If -> {
 		val a = rowAttributeOptions(name, expr.whenTrue)
@@ -26,6 +31,16 @@ fun rowAttributeOptions(name: String, expr: Expr): List<String?>? = when (expr) 
 fun StyleExport.rowStates(payload: Payload): Set<String> {
 	val inRows = payload.nodes.filter { it.row != null }.map { it.id }.toSet()
 	return states.map { it.key }.filter { key -> key in inRows || key.substringBeforeLast('#', "") in inRows }.toSet()
+}
+
+/** Whether an expression's value is always true or false: a comparison, a negation, or `&&`, `||` and `?:` of those. */
+private fun givesBoolean(expr: Expr): Boolean = when (expr) {
+	is Expr.Literal -> expr.value is JsValue.Bool
+	is Expr.Unary -> expr.op == "!"
+	is Expr.Binary -> expr.op in setOf("===", "!==", "<", "<=", ">", ">=")
+	is Expr.Logical -> expr.op != "??" && givesBoolean(expr.left) && givesBoolean(expr.right)
+	is Expr.If -> givesBoolean(expr.whenTrue) && givesBoolean(expr.whenFalse)
+	else -> false
 }
 
 /**

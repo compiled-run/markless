@@ -682,6 +682,21 @@ private fun rowStyles(fixtures: File) {
 	check("a row's text is its own", rows[1].texts["h6:text0"] == "Call the plumber about the kitchen tap before Friday") { "${rows[1].texts}" }
 }
 
+/** The S23 rung's: each size's aria-pressed is a comparison with the picked size, so its row state lists "true" and "false". */
+private fun rowPressedStyles(fixtures: File) {
+	val style = StyleExport.decodeApp(File(fixtures, "s23-styled-row-pressed.native-app-style.json").readBytes()).getValue("/")
+	val page = AppPayload.decodeOrNull(Json.parse(File(fixtures, "s23-styled-row-pressed.payload.json").readBytes()))!!.routes.single { it.route.pattern == "/" }.page
+	val runtime = Runtime(page)
+	val branches = page.nodes.filter { it is Node.Branch && it.row == null }.map { it.id }
+	val start = runCatching { style.start(page.cells.filter { it.styled }.map { it.id }, runtime::value, false, true, branches, runtime::styleArm, style.rowStates(page)) }
+	check("a page whose rows' aria-pressed follows a comparison starts", start.isSuccess) { start.exceptionOrNull().toString() }
+	val k = start.getOrNull() ?: return
+	val rows = runCatching { style.shownRows(page, runtime)(k).getValue("repeat:0") }
+	check("each row's aria-pressed is a value its row state lists", rows.isSuccess) { rows.exceptionOrNull().toString() }
+	// The template is laid out pressed, the first value the comparison gives: the picked Medium's row.
+	check("only the picked row takes the pressed assignment", rows.getOrNull()?.map { it.assignment == k } == listOf(false, true, false)) { "${rows.getOrNull()?.map { it.key to it.assignment }} from $k" }
+}
+
 fun main(args: Array<String>) {
 	routes()
 	arrays()
@@ -698,6 +713,7 @@ fun main(args: Array<String>) {
 	systemFonts(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	sheetStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	rowStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	rowPressedStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	val dirs = args.map(::File)
 	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)

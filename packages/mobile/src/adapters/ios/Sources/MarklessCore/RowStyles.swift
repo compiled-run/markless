@@ -1,6 +1,10 @@
 /// The values a row's `class` or `ui-*` binding can give, as the style input lists them (style-input.ts `rowAttributeOptions`):
 /// literals chosen by conditions, in first-seen order; nil for any other binding.
 public func rowAttributeOptions(_ name: String, _ expr: NativeExpr) -> [String?]? {
+	if givesBoolean(expr) {
+		let options = [marklessAttributeValue(name, .bool(true)), marklessAttributeValue(name, .bool(false))]
+		return options[0] == options[1] ? [options[0]] : options
+	}
 	switch expr {
 	case let .literal(value):
 		return [marklessAttributeValue(name, value)]
@@ -11,6 +15,25 @@ public func rowAttributeOptions(_ name: String, _ expr: NativeExpr) -> [String?]
 		return out
 	default:
 		return nil
+	}
+}
+
+/// Whether an expression's value is always true or false: a comparison, a negation, or `&&`, `||` and `?:` of those.
+private func givesBoolean(_ expr: NativeExpr) -> Bool {
+	switch expr {
+	case let .literal(value):
+		if case .bool = value { return true }
+		return false
+	case let .unary(op, _):
+		return op == "!"
+	case let .binary(op, _, _):
+		return ["===", "!==", "<", "<=", ">", ">="].contains(op)
+	case let .logical(op, left, right):
+		return op != "??" && givesBoolean(left) && givesBoolean(right)
+	case let .conditional(_, whenTrue, whenFalse):
+		return givesBoolean(whenTrue) && givesBoolean(whenFalse)
+	default:
+		return false
 	}
 }
 

@@ -170,3 +170,37 @@ export default function List() @{
 	expect(rowState.domain).toEqual(['0', '1']);
 	expect(input.repeats?.length).toBe(1);
 });
+
+test("a styled page lays a row's aria-* attribute out at true and false when a comparison gives it", async () => {
+	const build = await compileNativeApp({
+		pages: [
+			{
+				page: 'pages/index.tsrx',
+				filename: 'packages/mobile/test/fixtures/pages/index.tsrx',
+				source: `import { state } from '@markless/core';
+
+export default function Sizes() @{
+	let picked = state('M');
+	<main>
+		<style>
+			.size { padding: 4px; }
+			.size[aria-pressed='true'] { padding: 8px; }
+		</style>
+		@for (const size of ['S', 'M', 'L']; key size) {
+			<button type="button" class="size" aria-pressed={size === picked} onClick={() => (picked = size)}>{size}</button>
+		}
+	</main>
+}`,
+			},
+		],
+	});
+	expect(build.diagnostics).toEqual([]);
+	const input = build.styleInputs[0]!.input;
+	const button = input.nodes.find((node) => node.kind === 'element' && node.element === 'button')!;
+	const rowState = input.states.find((state) => state.row !== undefined)!;
+	expect(rowState.cell).toBe(`${button.id}#aria-pressed`);
+	expect(rowState.domain).toEqual(['0', '1']);
+	expect(
+		button.kind === 'element' && button.attributesByState?.['aria-pressed']?.map((entry) => entry.value),
+	).toEqual(expect.arrayContaining(['true', 'false']));
+});
