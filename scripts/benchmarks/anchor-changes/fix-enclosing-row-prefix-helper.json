@@ -8,7 +8,7 @@
 				"web/fns/instance-scope"
 			],
 			"delta": 344,
-			"reason": "pages that compose components load instance-scope, whose helpers now prefix a list id, its enclosing list id and an arm's references to its lists together (the +344 includes #944's own +139, which was under budget and never recorded)",
+			"reason": "instance-scope helpers prefix a list id, its enclosing list id and an arm's references to its lists together; plain vitest run on main 6172dde60: 15,065 -> 15,409 B rendered (+344, including #944's unrecorded +139)",
 			"date": "2026-11-20"
 		},
 		{
@@ -19,7 +19,7 @@
 				"web/fns/instance-scope"
 			],
 			"delta": 344,
-			"reason": "pages that compose components load instance-scope, whose helpers now prefix a list id, its enclosing list id and an arm's references to its lists together (the +344 includes #944's own +139, which was under budget and never recorded)",
+			"reason": "instance-scope helpers prefix a list id, its enclosing list id and an arm's references to its lists together; plain vitest run: 15,065 -> 15,409 B rendered (+344, including #944's unrecorded +139)",
 			"date": "2026-11-20"
 		},
 		{
@@ -30,8 +30,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 42,
-			"reason": "pages that compose components load instance-scope, whose helpers now prefix a list id, its enclosing list id and an arm's references to its lists together (the +344 includes #944's own +139, which was under budget and never recorded)",
+			"delta": 51,
+			"reason": "the instance-scope helpers in the emitted runtime; plain vitest run: 27,890 B gzip measured against a wall of 27,839 B without this record (+51)",
 			"date": "2026-11-20"
 		},
 		{
@@ -42,8 +42,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": 75,
-			"reason": "pages that compose components load instance-scope, whose helpers now prefix a list id, its enclosing list id and an arm's references to its lists together (the +344 includes #944's own +139, which was under budget and never recorded)",
+			"delta": 82,
+			"reason": "the instance-scope helpers in the largest runtime chunk; plain vitest run: 7,347 B gzip against 7,265 B without this record (+82)",
 			"date": "2026-11-20"
 		},
 		{
@@ -54,8 +54,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 14,
-			"reason": "pages that compose components load instance-scope, whose helpers now prefix a list id, its enclosing list id and an arm's references to its lists together (the +344 includes #944's own +139, which was under budget and never recorded)",
+			"delta": 18,
+			"reason": "the instance-scope helpers in the emitted runtime; plain vitest run: 27,094 B gzip against 27,076 B without this record (+18)",
 			"date": "2026-11-20"
 		}
 	]
