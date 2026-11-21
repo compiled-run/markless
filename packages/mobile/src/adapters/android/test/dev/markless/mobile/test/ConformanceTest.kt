@@ -112,9 +112,20 @@ private fun touchOf(action: Map<String, Json>): TouchPoint? {
 	return TouchPoint(n("pointerId", 1.0), n("x", 0.0), n("y", 0.0), n("time", 0.0))
 }
 
+/** A vector's JSON with the engine text put back where the writer left markers (the files in conformance/engine, beside the vector). */
+private fun vectorBytes(file: File): ByteArray {
+	var text = file.readText()
+	for ((marker, name) in listOf("/*markless-engine:services*/" to "services.js", "/*markless-engine:entries*/" to "entries.js")) {
+		if (marker !in text) continue
+		val engine = File(File(file.parentFile, "engine"), name).readText().removeSuffix("\n")
+		text = text.replace(marker, jsonString(engine).removeSurrounding("\""))
+	}
+	return text.toByteArray()
+}
+
 /** One `markless.native-conformance/0` vector: the mounted texts must read `initial`, then each action's journal must match, byte for byte. */
 private fun runVector(file: File) {
-	val vector = Json.parse(file.readBytes()).obj(file.name)
+	val vector = Json.parse(vectorBytes(file)).obj(file.name)
 	val version = field(vector, "version", file.name).str("version")
 	if (version == APP_CONFORMANCE_VERSION) return runAppVector(file, vector)
 	check("${file.name} version", version == CONFORMANCE_VERSION) { "vector version is $version, this test reads $CONFORMANCE_VERSION" }

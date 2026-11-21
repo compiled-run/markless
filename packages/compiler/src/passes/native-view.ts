@@ -80,7 +80,7 @@ import type {
 } from '../artifacts.ts';
 import { isEventAttribute, normalizeEventName } from '../ast/events.ts';
 import { compileDrawing, type DrawingElement } from './native-drawing.ts';
-import { nativeScriptOf, type NativeScriptModuleInput } from './native-script.ts';
+import { nativeScriptOf, type NativeScriptEngine, type NativeScriptModuleInput } from './native-script.ts';
 import { scriptFactsOf, type ScriptFacts } from './semantic-graph/script-facts.ts';
 import { sharedDefinitionId } from './semantic-graph/collect-shared.ts';
 
@@ -1025,6 +1025,8 @@ export type NativeViewOptions = {
 	 * `never`: data only.
 	 */
 	readonly scriptHandlers?: 'fallback' | 'all' | 'never';
+	/** The engine text the payload's script carries; conformance vectors write markers in its place. */
+	readonly scriptEngine?: NativeScriptEngine;
 	/** A module's source as the build read it, by filename: where a native build finds a value's own JavaScript. */
 	readonly readSource?: (filename: string) => string | undefined;
 };
@@ -3089,6 +3091,7 @@ export function createNativeViewPayload(
 						routes: options.routes.map((route) => route.pattern),
 					}
 				: undefined,
+			options.scriptEngine,
 		);
 	}
 

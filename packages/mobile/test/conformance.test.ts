@@ -8,15 +8,10 @@ import {
 	nativeConformance,
 	nativeStyleInput,
 } from '../src/index.ts';
-import { compileRungApp, readWorkspaceModule } from '../src/harness/rung.ts';
-import {
-	APP_CONFORMANCE_CASES,
-	CONFORMANCE_CASES,
-	CONFORMANCE_SCRIPT_HOST,
-	readCaseModule,
-} from './conformance-cases.ts';
+import { APP_CONFORMANCE_CASES, CONFORMANCE_CASES } from './conformance-cases.ts';
 import { scrollVectors } from '../src/scroll.ts';
 import { SCROLL_CASES } from './scroll-cases.ts';
+import { appCaseVector, caseVector, CONFORMANCE_ENGINE_FILES } from './conformance-build.ts';
 
 const fixture = (name: string) =>
 	readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
@@ -47,27 +42,18 @@ describe('native conformance vectors', () => {
 	});
 
 	it('every committed vector file matches a fresh build (rewrite with test/write-conformance.ts)', async () => {
-		for (const entry of CONFORMANCE_CASES) {
-			const { payload } = await compileNativeComponent({
-				filename: entry.modules ? `packages/mobile/${entry.fixture}` : `src/${entry.name}.tsrx`,
-				...(entry.page ? { page: entry.page } : {}),
-				...(entry.device ? { device: entry.device } : {}),
-				source: readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8'),
-				readModule: entry.modules ? readWorkspaceModule : readCaseModule,
-			});
-			expect(committed(`${entry.name}.json`), entry.name).toEqual(
-				nativeConformance(payload!, entry.actions, entry.params, entry.preferredLanguages, entry.now, CONFORMANCE_SCRIPT_HOST()),
-			);
-		}
+		for (const entry of CONFORMANCE_CASES)
+			expect(committed(`${entry.name}.json`), entry.name).toEqual(await caseVector(entry));
 	});
 
 	it('every committed navigation vector file matches a fresh build of its app', async () => {
-		for (const entry of APP_CONFORMANCE_CASES) {
-			const { payload } = await compileRungApp(join(import.meta.dirname, '..', entry.app));
-			expect(committed(`${entry.name}.json`), entry.name).toEqual(
-				nativeAppConformance(payload!, entry.open, entry.actions, CONFORMANCE_SCRIPT_HOST()),
-			);
-		}
+		for (const entry of APP_CONFORMANCE_CASES)
+			expect(committed(`${entry.name}.json`), entry.name).toEqual(await appCaseVector(entry));
+	});
+
+	it('the committed engine files are the engine the hosts put back in each vector', () => {
+		for (const [name, text] of Object.entries(CONFORMANCE_ENGINE_FILES))
+			expect(readFileSync(new URL(`../conformance/${name}`, import.meta.url), 'utf8'), name).toBe(text);
 	});
 
 	it('navigation: a row link opens its row, Back shows the list as it was left, replace drops the screen it leaves', () => {

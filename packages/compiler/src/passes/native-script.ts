@@ -750,6 +750,10 @@ function contentId(text: string): string {
 	return a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0');
 }
 
+/** The engine text every payload's script carries around its own modules: the host services, then the entry points. */
+export type NativeScriptEngine = { readonly services: string; readonly entries: string };
+export const NATIVE_SCRIPT_ENGINE: NativeScriptEngine = { services: HOST_SERVICES, entries: ENTRIES };
+
 /**
  * The script a payload's `script` ops and computeds run. Every module is a function run once on first use, imports first,
  * as ES modules evaluate; each script function is defined inside its module, so the module's own names reach it.
@@ -759,6 +763,7 @@ export function nativeScriptOf(
 	services: ReadonlyArray<NativeScriptService>,
 	/** For `navigate()`: the page's route pattern, and the app's route patterns in the router's order. */
 	navigation?: { readonly here: string; readonly routes: ReadonlyArray<string> },
+	engine: NativeScriptEngine = NATIVE_SCRIPT_ENGINE,
 ): NativeScript {
 	const owners: Record<string, number> = {};
 	const definitions = modules.map((module, index) => {
@@ -779,9 +784,9 @@ export function nativeScriptOf(
 		`var owners = ${JSON.stringify(owners)};`,
 		`var navigation = ${JSON.stringify(navigation ?? null)};`,
 		...definitions,
-		ENTRIES,
+		engine.entries,
 	].join('\n');
 	const id = contentId(body);
-	const source = `(function (g, id) {\n${HOST_SERVICES}\ng.__markless = g.__markless || {};\n${body}\n})(globalThis, ${JSON.stringify(id)});\n`;
+	const source = `(function (g, id) {\n${engine.services}\ng.__markless = g.__markless || {};\n${body}\n})(globalThis, ${JSON.stringify(id)});\n`;
 	return { id, source, services };
 }
