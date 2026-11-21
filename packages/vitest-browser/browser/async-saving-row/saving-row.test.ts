@@ -85,6 +85,35 @@ test('CSR: text typed the moment the list appears reaches the submit handler, on
 	}
 });
 
+// The press lands while the list's arm still registers, and a cold server answers the submit handler's module first.
+test('CSR: a submit pressed as the list appears runs after the input before it, whichever handler loads first', async () => {
+	const artifact = Page as unknown as { readonly loadSymbol: (symbolId: string) => Promise<unknown> };
+	const inputHandlerLoadsLast = {
+		...artifact,
+		loadSymbol: async (symbolId: string) => {
+			if (symbolId.endsWith('symbol:1')) await new Promise((resolve) => setTimeout(resolve, 80));
+			return artifact.loadSymbol(symbolId);
+		},
+	};
+	let pressed = false;
+	const pressOnArrival = new MutationObserver(() => {
+		const input = document.querySelector('input');
+		if (pressed || !input) return;
+		pressed = true;
+		input.value = 'Walk dog';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		document.querySelector<HTMLButtonElement>('button[type=submit]')!.click();
+	});
+	pressOnArrival.observe(document.body, { childList: true, subtree: true });
+	try {
+		await render(inputHandlerLoadsLast as never);
+		await expect.poll(() => pressed, WAIT).toBe(true);
+	} finally {
+		pressOnArrival.disconnect();
+	}
+	await expect.poll(shown, WAIT).toBe('Walk dog (saving)');
+});
+
 test('SSR: the saving row shows while the save runs, list served inline', async () => {
 	await renderSSR(InstantPage);
 	await savingRowShowsWhileTheSaveRuns();
