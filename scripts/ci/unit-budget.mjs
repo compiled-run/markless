@@ -31,9 +31,13 @@ export const SLOT_HELD_SHARE = 0.5;
 const RECORDED_FILE_MB = 256;
 const PLATFORM = `${process.platform}-${process.arch}`;
 const ARTIFACT_PATTERN = 'unit-budget-*';
+// A run is compared with the median of main's last this-many landed merge-queue runs that measured the unit suite.
+export const MAIN_RUNS = 10;
 
 const USAGE = `usage: node scripts/ci/unit-budget.mjs measure -- <command...>
-       node scripts/ci/unit-budget.mjs check --measurements <dir> [--budget <file>] [--heavy <file>] [--changed <file>]
+       node scripts/ci/unit-budget.mjs check --measurements <dir> [--main <dir>] [--budget <file>] [--heavy <file>] [--changed <file>]
+       node scripts/ci/unit-budget.mjs main --out <dir> [--ref <git ref>]
+       node scripts/ci/unit-budget.mjs drift --main <dir> [--budget <file>]
        node scripts/ci/unit-budget.mjs accept --from <run id | dir>... --reason "<why>" [--budget <file>]
        node scripts/ci/unit-budget.mjs margin --from <run id | dir>... --reason "<why>" [--budget <file>]
        node scripts/ci/unit-budget.mjs models --from <run id | dir>... --reason "<why>" [--budget <file>]
@@ -41,9 +45,12 @@ const USAGE = `usage: node scripts/ci/unit-budget.mjs measure -- <command...>
 
   measure  runs the command; with MARKLESS_UNIT_BUDGET_OUT set (CI) it writes the process tree's
            CPU-seconds and sampled peak RSS there, for MARKLESS_UNIT_BUDGET_SHARD (Linux only)
-  check    fails when the shards' summed CPU-seconds or their largest peak RSS leaves the anchor's
-           noise band: above it is over budget, below it is a stale anchor. It reports test files over the
-           build-slot line and fails for one only when --changed (one path a line) lists it
+  check    fails when the shards' summed CPU-seconds or their largest peak RSS is over budget: above main's
+           median (--main, one folder a landed run) by more than the noise margin, or above the ceiling,
+           the committed anchor plus the margin, which no run may pass. Under main's band only warns. It
+           reports test files over the build-slot line and fails for one only when --changed lists it
+  main     downloads the unit budget measurements of main's last ${MAIN_RUNS} landed merge-queue runs (gh, GH_TOKEN)
+  drift    warns when main's median has moved more than half the margin from the committed anchors
   accept   takes new anchors from CI artifacts (the median per shard over every attempt of the runs)
   margin   derives the noise band from repeated CI measurements of one test set
   models   derives each CPU model's correction: how far the calibration misjudges its speed on the unit
@@ -580,8 +587,67 @@ export function slotFindings(measurements, heavy, changed) {
 	return { over: over.sort((a, b) => b.mb - a.mb), stale, held: held.sort((a, b) => a.shard.localeCompare(b.shard)) };
 }
 
-/** The verdict for one run's shards against the budget file. */
-export function evaluate(budget, measurements, heavy, changed = null) {
+/**
+ * Main's level: over the newest landed runs (newest first) whose shards match the anchors, the median of each run's
+ * total CPU counted as `check` counts it and of its largest shard peak. Null levels when fewer than MAIN_RUNS qualify.
+ */
+export function mainBaseline(budget, mainRuns) {
+	const levels = [];
+	for (const { source, measurements } of mainRuns) {
+		if (levels.length === MAIN_RUNS) break;
+		const latest = latestPerShard(measurements);
+		if (!latest.size || validate([...latest.values()], budget).length) continue;
+		if (shardList(latest.keys()) !== shardList(Object.keys(budget.anchors?.shards ?? {})))
+			continue;
+		const counted = countShards(budget, latest);
+		levels.push({
+			source,
+			cpuS: counted.shards.reduce((sum, r) => sum + r.cpuS, 0),
+			peakRssMb: Math.max(...[...latest.values()].map((m) => m.peakRssMb)),
+		});
+	}
+	const runs = levels.map((level) => level.source);
+	if (levels.length < MAIN_RUNS) return { runs, cpuS: null, peakRssMb: null };
+	return {
+		runs,
+		cpuS: round(median(levels.map((level) => level.cpuS))),
+		peakRssMb: Math.round(median(levels.map((level) => level.peakRssMb))),
+	};
+}
+
+/** Warnings for a main level more than half the margin away from its committed anchor. */
+export function driftWarnings(budget, main) {
+	const warnings = [];
+	if (!budget.anchors || !budget.margin) return warnings;
+	for (const [name, level, anchor, margin, unit] of [
+		[
+			"total CPU at the anchors' speed",
+			main.cpuS,
+			budget.anchors.cpuS,
+			budget.margin.cpu,
+			'CPU-s',
+		],
+		[
+			'largest shard peak RSS',
+			main.peakRssMb,
+			budget.anchors.peakRssMb,
+			budget.margin.rss,
+			'MB',
+		],
+	]) {
+		if (level === null || Math.abs(level / anchor - 1) <= margin / 2) continue;
+		warnings.push(
+			`main moved: ${name} on main's last ${main.runs.length} landed runs is ${level} ${unit}, ${level >= anchor ? '+' : ''}${round((level / anchor - 1) * 100)}% from the committed anchor of ${anchor} ${unit}, more than half the ±${round(margin * 100)}% margin. A re-anchor pull request with an attribution table (which merged changes moved it, by test file) is expected: \`node scripts/ci/unit-budget.mjs accept --from ${main.runs.join(' ')} --reason "..."\``,
+		);
+	}
+	return warnings;
+}
+
+/**
+ * The verdict for one run's shards against the budget file and, when given, main's last landed runs (`mainRuns`,
+ * newest first). A run may not exceed main's median by more than the margin, nor the committed anchor's ceiling.
+ */
+export function evaluate(budget, measurements, heavy, changed = null, mainRuns = null) {
 	const latest = latestPerShard(measurements);
 	const failures = validate([...latest.values()], budget);
 	const warnings = [];
@@ -643,19 +709,40 @@ export function evaluate(budget, measurements, heavy, changed = null) {
 		warnings.push(
 			'a shard has no file timings or no suite reading for its CPU model, so every shard counts its calibration alone',
 		);
+	const main = mainRuns && budget.anchors ? mainBaseline(budget, mainRuns) : null;
+	if (main && main.cpuS === null)
+		warnings.push(
+			`main's last landed runs gave ${main.runs.length} of ${MAIN_RUNS} usable unit budget measurements, so this run is held to the committed anchors alone`,
+		);
+	if (main && main.cpuS !== null) {
+		lines.push(
+			`  main: the median of its last ${main.runs.length} landed merge-queue runs (${main.runs.join(', ')})`,
+		);
+		warnings.push(...driftWarnings(budget, main));
+	}
 	if (budget.margin && budget.anchors) {
-		const band = (name, value, anchor, margin, unit) => {
-			const high = anchor * (1 + margin);
-			const low = anchor * (1 - margin);
-			const change = `${value} ${unit} against an anchor of ${anchor} ${unit} (${value >= anchor ? '+' : ''}${round(((value - anchor) / anchor) * 100)}%, noise margin ±${round(margin * 100)}%)`;
+		const percent = (value, base) =>
+			`${value >= base ? '+' : ''}${round(((value - base) / base) * 100)}%`;
+		const band = (name, value, anchor, level, margin, unit) => {
+			const ceiling = round(anchor * (1 + margin));
+			const base = level ?? anchor;
+			const low = base * (1 - margin);
+			const change =
+				level === null
+					? `${value} ${unit} against an anchor of ${anchor} ${unit} (${percent(value, anchor)}, noise margin ±${round(margin * 100)}%)`
+					: `${value} ${unit} against main's median of ${level} ${unit} (${percent(value, level)}, noise margin ±${round(margin * 100)}%; ceiling ${ceiling} ${unit}, the anchor of ${anchor} ${unit} plus the margin)`;
 			lines.push(`  ${name}: ${change}`);
-			if (value > high)
+			if (value > ceiling)
 				failures.push(
-					`over budget: ${name} ${change}. Find what made the unit suite heavier; if the cost is intended, re-anchor with a measured reason`,
+					`over budget: ${name} ${change}${level === null ? '' : `, over the ceiling no run may pass`}. Find what made the unit suite heavier; if the cost is intended, re-anchor with a measured reason`,
+				);
+			else if (value > base * (1 + margin))
+				failures.push(
+					`over budget: ${name} ${change}, more than the margin above main. Find what made the unit suite heavier; if the cost is intended, re-anchor with a measured reason`,
 				);
 			else if (value < low)
-				failures.push(
-					`stale anchor: ${name} ${change}. The suite got lighter, so the anchor no longer protects anything; re-anchor from this run`,
+				warnings.push(
+					`lighter: ${name} ${change}, under the band. Nothing fails for it; if main itself moved, main's push runs warn and a re-anchor is due`,
 				);
 		};
 		// A shard on a model with no factor gets the band measured before factors existed.
@@ -682,11 +769,19 @@ export function evaluate(budget, measurements, heavy, changed = null) {
 			warnings.push(
 				`shard ${shard} ran on ${m.cpuModel}, a CPU model with no factor, so its share of the CPU band is the ±${round(unknownMargin * 100)}% measured without factors. Once that model has 5 samples, refit with \`node scripts/ci/unit-budget.mjs models --from <run>... --reason "..."\`, then re-run \`margin\` and \`accept\``,
 			);
-		band("total CPU at the anchors' speed", cpuS, budget.anchors.cpuS, cpuMargin, 'CPU-s');
+		band(
+			"total CPU at the anchors' speed",
+			cpuS,
+			budget.anchors.cpuS,
+			main?.cpuS ?? null,
+			cpuMargin,
+			'CPU-s',
+		);
 		band(
 			'largest shard peak RSS',
 			peakRssMb,
 			budget.anchors.peakRssMb,
+			main?.peakRssMb ?? null,
 			budget.margin.rss,
 			'MB',
 		);
@@ -725,6 +820,76 @@ function collect(sources) {
 		}
 	}
 	return runs;
+}
+
+/** One folder per landed run under `dir`, newest first by folder name (`main` writes `<order>-<run id>`). */
+export function readMainRuns(dir) {
+	return readdirSync(dir)
+		.filter((name) => statSync(join(dir, name)).isDirectory())
+		.sort()
+		.map((name) => ({
+			source: name.split('-').at(-1),
+			measurements: readMeasurements(join(dir, name)),
+		}));
+}
+
+/**
+ * Downloads into `out` the unit budget measurements of main's newest landed commits whose green merge-queue run
+ * measured the unit suite (a queue run whose unit lane hit its marker has none), up to MAIN_RUNS of them. On an API
+ * failure it keeps what it has: `check` then holds the run to the committed anchors alone.
+ */
+function fetchMainRuns(out, ref) {
+	const repo = process.env.GITHUB_REPOSITORY ?? 'compiled-run/markless';
+	const gh = (...args) =>
+		execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
+	const got = [];
+	try {
+		const shas = execFileSync(
+			'git',
+			['-C', repoRoot, 'rev-list', '--first-parent', '--max-count=200', ref],
+			{
+				encoding: 'utf8',
+			},
+		)
+			.split('\n')
+			.filter(Boolean);
+		const runOf = new Map();
+		for (let page = 1; page <= 3; page += 1)
+			for (const line of gh(
+				'api',
+				`repos/${repo}/actions/workflows/ci.yml/runs?event=merge_group&status=success&per_page=100&page=${page}`,
+				'--jq',
+				'.workflow_runs[] | [.head_sha, (.id | tostring)] | join(" ")',
+			)
+				.split('\n')
+				.filter(Boolean)) {
+				const [sha, id] = line.split(' ');
+				if (!runOf.has(sha)) runOf.set(sha, id);
+			}
+		mkdirSync(out, { recursive: true });
+		for (const sha of shas) {
+			if (got.length === MAIN_RUNS) break;
+			const id = runOf.get(sha);
+			if (!id) continue;
+			const names = gh(
+				'api',
+				`repos/${repo}/actions/runs/${id}/artifacts?per_page=100`,
+				'--jq',
+				'.artifacts[].name',
+			)
+				.split('\n')
+				.filter((name) => name.startsWith('unit-budget-shard'));
+			if (!names.length) continue;
+			const dir = join(out, `${String(got.length).padStart(2, '0')}-${id}`);
+			gh('run', 'download', id, '--repo', repo, '--pattern', ARTIFACT_PATTERN, '--dir', dir);
+			got.push(id);
+		}
+	} catch (error) {
+		console.log(
+			`::warning::could not read main's landed runs (${error.message.split('\n')[0]}); kept ${got.length}`,
+		);
+	}
+	return got;
 }
 
 const readBudget = (path) => JSON.parse(readFileSync(path, 'utf8'));
@@ -1112,7 +1277,14 @@ async function main(argv) {
 		const changed = changedFile
 			? new Set(readFileSync(changedFile, 'utf8').split('\n').filter(Boolean))
 			: null;
-		const result = evaluate(budget, measurements, heavy, changed);
+		const mainDir = flags(args, '--main')[0];
+		const result = evaluate(
+			budget,
+			measurements,
+			heavy,
+			changed,
+			mainDir ? readMainRuns(mainDir) : null,
+		);
 		console.log(result.report);
 		for (const warning of result.warnings) console.log(`::warning::${warning}`);
 		if (process.env.GITHUB_STEP_SUMMARY)
@@ -1131,6 +1303,31 @@ async function main(argv) {
 		for (const failure of result.failures) console.error(`::error::${failure}`);
 		console.error(`To re-anchor after an intended or measured change: ${result.acceptCommand}`);
 		return 1;
+	}
+	if (command === 'main') {
+		const out = flags(args, '--out')[0];
+		if (!out) throw new Error(USAGE);
+		const got = fetchMainRuns(resolve(out), flags(args, '--ref')[0] ?? 'origin/main');
+		console.log(
+			`unit budget: measurements of ${got.length} landed merge-queue runs of main: ${got.join(' ')}`,
+		);
+		return 0;
+	}
+	if (command === 'drift') {
+		const mainDir = flags(args, '--main')[0];
+		if (!mainDir) throw new Error(USAGE);
+		const main = mainBaseline(budget, readMainRuns(mainDir));
+		if (main.cpuS === null) {
+			console.log(
+				`::warning::main's last landed runs gave ${main.runs.length} of ${MAIN_RUNS} usable unit budget measurements, so its drift is unknown`,
+			);
+			return 0;
+		}
+		console.log(
+			`unit budget on main, the median of its last ${main.runs.length} landed runs: ${main.cpuS} CPU-s against an anchor of ${budget.anchors.cpuS}, largest shard peak ${main.peakRssMb} MB against an anchor of ${budget.anchors.peakRssMb}`,
+		);
+		for (const warning of driftWarnings(budget, main)) console.log(`::warning::${warning}`);
+		return 0;
 	}
 	if (
 		command === 'accept' ||

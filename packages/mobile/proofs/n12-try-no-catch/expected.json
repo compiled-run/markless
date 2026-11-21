@@ -1,0 +1,12 @@
+{
+	"rung": "N12",
+	"name": "a page whose value fails under a @try with no @catch keeps the rest of the page and shows nothing for the @try, as the web renders it",
+	"steps": [
+		{ "visible": ["Home", "Open account"] },
+		{
+			"do": { "tap": "Open account" },
+			"visible": ["Account"],
+			"absent": ["Open account", "Loading account"]
+		}
+	]
+}

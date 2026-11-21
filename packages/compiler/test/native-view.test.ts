@@ -262,6 +262,42 @@ export function Logger() @{
 		]);
 	});
 
+	it("lowers Infinity, NaN and Number's constants, the non-finite ones by name", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Bounds() @{
+	let max = state(0);
+	<main>
+		<button onClick={() => (max = Number.POSITIVE_INFINITY)}>Uncap</button>
+		<button onClick={() => (max = -Infinity)}>Floor</button>
+		<button onClick={() => (max = Number.MAX_SAFE_INTEGER)}>Big</button>
+		<p>{String(max)}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const text = JSON.stringify(payload?.handlers);
+		expect(text).toContain('{"nonFinite":"Infinity"}');
+		expect(text).toContain(`{"literal":${Number.MAX_SAFE_INTEGER}}`);
+	});
+
+	it('folds a non-finite constant a widget writes while rendering, as a prop default', async () => {
+		const { payload, diagnostics } = await nativeView(`import { shared, state } from '@markless/core';
+const boxState = shared(() => {
+	const box = state({ max: 0 });
+	return { ...box };
+}, { scope: 'subtree' });
+function BoxRoot({ max = Number.POSITIVE_INFINITY }: { max?: number }) @{
+	const s = boxState();
+	s.max = max;
+	<p>{String(s.max)}</p>
+}
+export function Page() @{
+	<main><BoxRoot /></main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const cell = payload?.cells.find((c) => c.name === 'box.max');
+		expect(cell && [cell.initial, cell.nonFinite]).toEqual([null, [[[], 'Infinity']]]);
+	});
+
 	it('refuses constructs with no native lowering yet', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Field() @{
@@ -3278,6 +3314,93 @@ export function Page() @{
 		expect(payload!.nodes).toEqual([
 			{ kind: 'text', id: 'text0', parent: null, parts: [{ text: 'Only text' }] },
 		]);
+	});
+});
+
+it('lowers a @try with no @catch: its error shows nothing, and the rest of the page stays, as the web renders it', async () => {
+	const { payload, diagnostics } = await nativeView(`import { computed } from '@markless/core';
+async function load(): Promise<string> { throw new Error('down'); }
+export function Account() @{
+	const account = computed(async () => load());
+	<main>
+		<h1>Account</h1>
+		@try {
+			<p>{account}</p>
+		} @pending {
+			<p>Loading</p>
+		}
+	</main>
+}`);
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	const branch = payload!.nodes.find((node) => node.kind === 'branch')!;
+	expect(branch).toMatchObject({ kind: 'branch', arms: 3 });
+	expect(payload!.nodes.some((node) => node.kind === 'branch' && node.id.endsWith(':caught'))).toBe(false);
+	expect(payload!.nodes.some((node) => 'arm' in node && node.arm?.index === 2)).toBe(false);
+});
+
+it('runs a class a helper computes as JavaScript, keeping the style scope around it', async () => {
+	const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function cn(...parts: Array<string | false>): string { return parts.filter(Boolean).join(' '); }
+export function Note() @{
+	const shown = state({ loud: false });
+	<main>
+		<style>.note { color: red; }</style>
+		<p class={cn('note', shown.loud && 'loud')}>A</p>
+	</main>
+}`);
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	const note = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'p');
+	if (note?.kind !== 'element') throw new Error('no p');
+	expect(note.bindings).toMatchObject([{ attribute: 'class', value: { if: { script: expect.any(String) } } }]);
+});
+
+describe('linked stylesheets', () => {
+	const source = `export function Page() @{
+	<main>
+		<link rel="stylesheet" href="/static/site.css" />
+		<p>Hi</p>
+	</main>
+}`;
+
+	it('reads a <link rel="stylesheet"> the build can read, as the browser loads it, and refuses one it cannot', async () => {
+		const asked: string[] = [];
+		const read = await nativeView(source, { linkStylesheet: (href) => (asked.push(href), true) });
+		expect(read.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		expect(asked).toEqual(['/static/site.css']);
+		expect(read.payload!.nodes.some((node) => node.kind === 'element' && node.element === 'link')).toBe(false);
+		const unread = await nativeView(source, { linkStylesheet: () => false });
+		expect(unread.diagnostics.map((diagnostic) => diagnostic.message)).toContain(
+			'<link rel="stylesheet" href="/static/site.css"> loads styles while the page runs',
+		);
+	});
+});
+
+describe('class bindings', () => {
+	it('keeps the style scope class around a class that follows state, as the web writes it', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Notes() @{
+	const shown = state({ loud: false, tone: '' });
+	<main>
+		<style>.note { color: red; }</style>
+		<p class={\`note \${shown.loud ? 'loud' : 'quiet'}\`}>A</p>
+		<p class={shown.tone}>B</p>
+	</main>
+}`);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		const [first, second] = payload!.nodes.filter((node) => node.kind === 'element' && node.element === 'p');
+		if (first?.kind !== 'element' || second?.kind !== 'element') throw new Error('not elements');
+		const scope = /mk-[a-z0-9]+/.exec(JSON.stringify(first.bindings))![0];
+		expect(first.bindings).toEqual([
+			{
+				attribute: 'class',
+				value: {
+					if: expect.anything(),
+					whenTrue: { template: [expect.anything(), ` ${scope}`] },
+					whenFalse: { literal: scope },
+				},
+			},
+		]);
+		expect(second.bindings).toMatchObject([{ attribute: 'class', value: { whenFalse: { literal: scope } } }]);
 	});
 });
 

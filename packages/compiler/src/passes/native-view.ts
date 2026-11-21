@@ -17,6 +17,7 @@ import type {
 } from '@markless/serializer';
 import { PROTOCOL_IDLE_EVENT_NAME, PROTOCOL_VISIBLE_EVENT_NAME } from '@markless/serializer';
 import {
+	nativeNonFiniteSplit,
 	isNativeStyleStateAttribute,
 	NATIVE_EMAIL_MISMATCH_BY_LOCALE,
 	nativeExprCells,
@@ -384,11 +385,24 @@ type Item =
 			readonly path: ReadonlyArray<number>;
 	  };
 
+/** `Number`'s constants: the finite ones as literals, the non-finite ones by name. */
+const NUMBER_CONSTANTS: Readonly<Record<string, NativeExpr>> = {
+	POSITIVE_INFINITY: { nonFinite: 'Infinity' },
+	NEGATIVE_INFINITY: { nonFinite: '-Infinity' },
+	NaN: { nonFinite: 'NaN' },
+	MAX_SAFE_INTEGER: { literal: Number.MAX_SAFE_INTEGER },
+	MIN_SAFE_INTEGER: { literal: Number.MIN_SAFE_INTEGER },
+	MAX_VALUE: { literal: Number.MAX_VALUE },
+	MIN_VALUE: { literal: Number.MIN_VALUE },
+	EPSILON: { literal: Number.EPSILON },
+};
+
+// A non-finite number is a value too: the payload carries it beside its JSON (nativeNonFiniteSplit).
 const isNativeValue = (value: unknown): value is NativeValue =>
 	value === null ||
 	typeof value === 'string' ||
 	typeof value === 'boolean' ||
-	(typeof value === 'number' && Number.isFinite(value)) ||
+	typeof value === 'number' ||
 	(Array.isArray(value) && value.every(isNativeValue)) ||
 	(typeof value === 'object' &&
 		Object.getPrototypeOf(value) === Object.prototype &&
@@ -974,6 +988,11 @@ const isPrefix = (prefix: ReadonlyArray<number>, path: ReadonlyArray<number>): b
 
 /** Builds the native view of a module's root component from its semantic graph, or refuses with diagnostics. */
 export type NativeViewOptions = {
+	/**
+	 * A `<link rel="stylesheet">` with a fixed `href`: true when the build read that file (one the app serves), so it styles
+	 * the page as the browser's load does; else the link is refused.
+	 */
+	readonly linkStylesheet?: (href: string) => boolean;
 	/** The page's route when the module is a page: the router's pattern and its param names. */
 	readonly route?: { readonly pattern: string; readonly params: ReadonlyArray<string> };
 	/**
@@ -1196,6 +1215,7 @@ function foldConstant(
 ): { readonly value: unknown } | undefined {
 	const fold = (inner: NativeExpr) => foldConstant(inner, initial);
 	if ('literal' in expr) return { value: expr.literal };
+	if ('nonFinite' in expr) return { value: Number(expr.nonFinite) };
 	const element = elementOf(expr);
 	if (element !== undefined) {
 		const token = elementToken(element);
@@ -3781,6 +3801,10 @@ export function createNativeViewPayload(
 				if (scope.locals.has(expression.name)) return { local: expression.name };
 				const bound = scope.args.get(expression.name);
 				if (bound) return bound;
+				if (expression.name === 'Infinity')
+					return { nonFinite: 'Infinity' };
+				if (expression.name === 'NaN')
+					return { nonFinite: 'NaN' };
 				if (scope.opaque === expression.name || scope.carried?.name === expression.name)
 					return refuse(`${what} reads its event`);
 				if (scope.deviceObjects.has(expression.name))
@@ -4001,6 +4025,15 @@ export function createNativeViewPayload(
 			}
 			case 'member': {
 				const holder = expression.object;
+				// Number's constants, as JavaScript gives them; the non-finite ones travel as their names.
+				if (
+					holder.kind === 'read' &&
+					holder.name === 'Number' &&
+					!scope.locals.has('Number') &&
+					!scope.args.has('Number') &&
+					Object.hasOwn(NUMBER_CONSTANTS, expression.property)
+				)
+					return NUMBER_CONSTANTS[expression.property]!;
 				if (
 					holder.kind === 'read' &&
 					scope.objects.has(holder.name) &&
@@ -4661,26 +4694,37 @@ export function createNativeViewPayload(
 				);
 				return value ? [{ attribute: target.name, value }] : [];
 			}
-			if (
-				target.kind === 'class' &&
-				target.trueValue !== undefined &&
-				target.falseValue !== undefined &&
-				target.constantClass === undefined &&
-				target.leadingClass === undefined
-			) {
-				const test = exprOf(read.expression, 'the class test', scope);
-				return test
-					? [
-							{
-								attribute: 'class',
-								value: {
-									if: test,
-									whenTrue: { literal: target.trueValue },
-									whenFalse: { literal: target.falseValue },
-								},
-							},
-						]
-					: [];
+			if (target.kind === 'class') {
+				const given = renderValue(
+					read.expression,
+					() => readScript(scope.module, read.sourceSpan),
+					'the class',
+					scope,
+				);
+				if (!given) return [];
+				const value: NativeExpr =
+					target.trueValue !== undefined && target.falseValue !== undefined
+						? { if: given, whenTrue: { literal: target.trueValue }, whenFalse: { literal: target.falseValue } }
+						: given;
+				const lead = target.leadingClass || undefined;
+				const constant = target.constantClass || undefined;
+				// As the web writes it: `[leading, value, constant].filter(Boolean).join(' ')`, the scopes kept around the value.
+				const fixed = [lead, constant].filter(Boolean).join(' ');
+				return [
+					{
+						attribute: 'class',
+						value:
+							fixed === ''
+								? value
+								: {
+										if: value,
+										whenTrue: {
+											template: [...(lead ? [`${lead} `] : []), value, ...(constant ? [` ${constant}`] : [])],
+										},
+										whenFalse: { literal: fixed },
+									},
+					},
+				];
 			}
 			refuse(`a ${target.kind} binding${'name' in target ? ` (\`${target.name}\`)` : ''}`);
 			return [];
@@ -5047,7 +5091,13 @@ export function createNativeViewPayload(
 							);
 					} else if (element === 'link') {
 						const rel = written.rel?.trim().toLowerCase().split(/\s+/) ?? [];
-						if (bound.includes('rel') || rel.includes('stylesheet'))
+						const read =
+							!bound.includes('rel') &&
+							!bound.includes('href') &&
+							rel.includes('stylesheet') &&
+							written.href !== undefined &&
+							options.linkStylesheet?.(written.href) === true;
+						if (!read && (bound.includes('rel') || rel.includes('stylesheet')))
 							refuseAs(
 								'stylesheet',
 								`<link rel="stylesheet"${written.href ? ` href="${written.href}"` : ''}> loads styles while the page runs`,
@@ -5852,10 +5902,6 @@ export function createNativeViewPayload(
 				close();
 				const boundary = scope.module.boundaries.get(item.id);
 
-				if (item.arms.catch === undefined) {
-					refuse('a @try with no @catch; its error would leave this screen');
-					continue;
-				}
 				const branchId = scope.prefix + item.id;
 				const at = nodes.length;
 				const tasks = new Set<string>();
@@ -5944,7 +5990,7 @@ export function createNativeViewPayload(
 				}
 				// A handler that rejects keeps the shown content and opens @catch after it, as the web's spec says (a failed
 				// value on the first load still shows only @catch).
-				if (caught || refreshes) {
+				if ((caught || refreshes) && item.arms.catch !== undefined) {
 					const caughtId = `${branchId}:caught`;
 					const handlerFailed: NativeExpr = {
 						binary: '!==',
@@ -8259,21 +8305,26 @@ export function createNativeViewPayload(
 		...(options.route
 			? { route: { pattern: options.route.pattern, params: options.route.params } }
 			: {}),
-		cells: cells.map((cell) => ({
-			...cell,
-			...(styledCells.has(cell.id) && !rowCells.has(cell.id)
-				? {
-						styled: true as const,
-						...(styledDomains.has(cell.id)
-							? { domain: styledDomains.get(cell.id)! }
-							: {}),
-					}
-				: {}),
-			...(undefinedFirst.has(cell.id) && !cell.row && cell.initial === null
-				? { unset: true as const }
-				: {}),
-			...(appCells.has(cell.id) ? { app: true as const } : {}),
-		})),
+		cells: cells.map((cell) => {
+			// JSON writes Infinity and NaN as null: the cell carries where they were beside its first value.
+			const { json, nonFinite } = nativeNonFiniteSplit(cell.initial);
+			return {
+				...cell,
+				...(nonFinite.length > 0 ? { initial: json as NativeValue, nonFinite } : {}),
+				...(styledCells.has(cell.id) && !rowCells.has(cell.id)
+					? {
+							styled: true as const,
+							...(styledDomains.has(cell.id)
+								? { domain: styledDomains.get(cell.id)! }
+								: {}),
+						}
+					: {}),
+				...(undefinedFirst.has(cell.id) && !cell.row && cell.initial === null
+					? { unset: true as const }
+					: {}),
+				...(appCells.has(cell.id) ? { app: true as const } : {}),
+			};
+		}),
 		nodes,
 		events,
 		handlers,
