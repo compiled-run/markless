@@ -48,6 +48,15 @@ jobs:
                   java-version: 21
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
+            - name: Read the Dragon commit packages/mobile/dragon.json pins
+              id: dragon
+              run: echo "commit=$(jq -r .commit packages/mobile/dragon.json)" >> "$GITHUB_OUTPUT"
+            - uses: actions/checkout@v4
+              with:
+                  repository: compiled-run/dragoncss
+                  ref: ${{ steps.dragon.outputs.commit }}
+                  path: dragon
+                  persist-credentials: false
             - name: Install Maestro
               run: |
                   curl -fsSL "https://get.maestro.mobile.dev" | MAESTRO_VERSION="$MAESTRO_VERSION" bash
@@ -55,6 +64,7 @@ jobs:
             - name: Run the rungs on an iOS simulator
               env:
                   MARKLESS_PROOF_SIMULATOR: iPhone 16
+                  MARKLESS_DRAGON_DIR: ${{ github.workspace }}/dragon
               working-directory: packages/mobile
               run: node src/harness/cli.ts --platform ios --report "$RUNNER_TEMP/proof-reports" $RUNGS
             - uses: actions/upload-artifact@v4
@@ -85,6 +95,15 @@ jobs:
                   java-version: 21
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
+            - name: Read the Dragon commit packages/mobile/dragon.json pins
+              id: dragon
+              run: echo "commit=$(jq -r .commit packages/mobile/dragon.json)" >> "$GITHUB_OUTPUT"
+            - uses: actions/checkout@v4
+              with:
+                  repository: compiled-run/dragoncss
+                  ref: ${{ steps.dragon.outputs.commit }}
+                  path: dragon
+                  persist-credentials: false
             - name: Let the emulator use KVM
               run: |
                   echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -101,6 +120,8 @@ jobs:
                   curl -fsSL "https://get.maestro.mobile.dev" | MAESTRO_VERSION="$MAESTRO_VERSION" bash
                   echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
             - name: Run the rungs on an Android emulator
+              env:
+                  MARKLESS_DRAGON_DIR: ${{ github.workspace }}/dragon
               working-directory: packages/mobile
               run: node src/harness/cli.ts --platform android --report "$RUNNER_TEMP/proof-reports" $RUNGS
             - uses: actions/upload-artifact@v4

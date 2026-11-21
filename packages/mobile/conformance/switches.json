@@ -7,12 +7,18 @@
 			{
 				"id": "state:open",
 				"name": "open",
-				"initial": false
+				"initial": false,
+				"styled": true
 			},
 			{
 				"id": "state:tab",
 				"name": "tab",
-				"initial": "first"
+				"initial": "first",
+				"styled": true,
+				"domain": [
+					"first",
+					"second"
+				]
 			},
 			{
 				"id": "state:size",
@@ -182,6 +188,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:open",
+					"value": true
+				},
+				{
 					"op": "text",
 					"node": "h1:text0",
 					"value": "Open: true"
@@ -195,6 +206,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:open",
+					"value": false
+				},
+				{
 					"op": "text",
 					"node": "h1:text0",
 					"value": "Open: false"
@@ -207,6 +223,11 @@
 				"host": "h4"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:tab",
+					"value": "second"
+				},
 				{
 					"op": "text",
 					"node": "h2:text0",

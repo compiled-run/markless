@@ -8,6 +8,7 @@ public let nativeDocumentBody = "#body"
 /// The overlay behaviour's names, as `packages/web/src/overlay-protocol.ts` spells them.
 public enum OverlayProtocol {
 	public static let attribute = "overlay"
+	public static let hintAttribute = "overlay-hint"
 	public static let modalAttribute = "aria-modal"
 	public static let modalValue = "true"
 }
@@ -513,7 +514,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "async", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "domain", "device", "task", "async", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows"])
 			if field.has("clock"), try !field["clock"].bool() {
 				throw PayloadError(path: try field["clock"].path, reason: "clock is only ever true")
 			}
@@ -521,6 +522,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 				throw PayloadError(path: try field["unset"].path, reason: "unset is only ever true")
 			}
 			let initial = NativeValue(json: try field["initial"].value)
+			// The style export carries each state's domain; the payload's copy is Dragon's input, checked here and not kept.
+			if field.has("domain") { _ = try field["domain"].array().map { try $0.string() } }
 			var styled = false
 			if field.has("styled") {
 				guard try field["styled"].bool() else { throw PayloadError(path: try field["styled"].path, reason: "styled is only ever true") }
@@ -879,9 +882,10 @@ public struct NativeViewPayload: Equatable, Sendable {
 			case ["elements"]: return NativeScriptBinding(name: name, kind: .elements(try decodeExpr(try binding.field("elements"))))
 			case ["object"]: return NativeScriptBinding(name: name, kind: .object(try decodeBindings(try binding.field("object"))))
 			case ["shared"]: return NativeScriptBinding(name: name, kind: .shared(try decodeBindings(try binding.field("shared"))))
+			case ["callback"]: return NativeScriptBinding(name: name, kind: .callback(try binding.field("callback").string()))
 			case ["bindings", "method"], ["method", "bindings"]:
 				return NativeScriptBinding(name: name, kind: .method(try binding.field("method").string(), try decodeBindings(try binding.field("bindings"))))
-			default: throw binding.fail("a script binding is { cell }, { fields }, { value }, { elements }, { object }, { shared } or { method, bindings }")
+			default: throw binding.fail("a script binding is { cell }, { fields }, { value }, { elements }, { object }, { shared }, { callback } or { method, bindings }")
 			}
 		}
 	}

@@ -23,6 +23,7 @@ import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeScriptEngine } from './script-engine.ts';
 import {
 	OVERLAY_ATTRIBUTE,
+	OVERLAY_HINT_ATTRIBUTE,
 	OVERLAY_MODAL_ATTRIBUTE,
 	OVERLAY_MODAL_VALUE,
 } from '@markless/web/overlay-protocol';
@@ -487,7 +488,9 @@ export function evaluateWithScript(
 											? { fields: binding.fields }
 											: 'elements' in binding
 												? { elements: evaluate(binding.elements, values) }
-												: { value: evaluate(binding.value, values) },
+												: 'callback' in binding
+													? binding
+													: { value: evaluate(binding.value, values) },
 						]),
 					);
 				const frame = frameOf(bindings);
@@ -653,7 +656,9 @@ export function createNativeRuntime(
 							}
 						: 'elements' in binding
 							? { elements: evaluate(binding.elements, eventValue, scope) }
-							: { value: evaluate(binding.value, eventValue, scope) },
+							: 'callback' in binding
+								? binding
+								: { value: evaluate(binding.value, eventValue, scope) },
 			]),
 		);
 	/**
@@ -708,9 +713,16 @@ export function createNativeRuntime(
 			: {}),
 	});
 	/** One engine entry, then what it asked for: its writes land in cells; timers, clears and requests become entries. */
-	const enter = (entry: Record<string, unknown>): NativeJournalEntry[] => {
+	/** Submissions held by a script promise not settled yet, by the engine's run number. */
+	const scriptRuns = new Map<number, Submission>();
+	const enter = (
+		entry: Record<string, unknown>,
+		submission?: Submission,
+	): NativeJournalEntry[] => {
 		call('enter', { ...entry, ...entryCells() });
 		const result = JSON.parse(call('leave')) as {
+			readonly pending: ReadonlyArray<number>;
+			readonly settled: ReadonlyArray<number>;
 			readonly writes: ReadonlyArray<readonly [string, Value]>;
 			readonly aborts: ReadonlyArray<number>;
 			readonly timers: ReadonlyArray<readonly [number, number]>;
@@ -733,6 +745,19 @@ export function createNativeRuntime(
 			if (key !== undefined) store.set(key, value);
 		}
 		logs.push(...result.logs);
+		// A submit handler's promise keeps its submission running until the entry it settles in, as the web keeps the form busy.
+		for (const run of result.pending)
+			if (submission) {
+				submission.pending++;
+				scriptRuns.set(run, submission);
+			}
+		for (const run of result.settled) {
+			const kept = scriptRuns.get(run);
+			if (!kept) continue;
+			scriptRuns.delete(run);
+			kept.pending--;
+			settled(kept);
+		}
 		return [
 			...result.aborts.map((id): NativeJournalEntry => ({ op: 'abort', id })),
 			...result.clears.map((id): NativeJournalEntry => ({
@@ -817,6 +842,8 @@ export function createNativeRuntime(
 								? Object.values(binding.fields).map((cell) => read(cell, scope))
 								: 'elements' in binding
 									? evaluate(binding.elements, undefined, scope)
+									: 'callback' in binding
+										? null
 									: evaluate(binding.value, undefined, scope),
 		);
 	// As on the web, a computed is not run again while nothing it reads has changed.
@@ -1356,6 +1383,10 @@ export function createNativeRuntime(
 			instances(node).length > 0 && attributeNow(node.id, 'hidden') === null ? [node.id] : [],
 		);
 	};
+	const isHint = (overlay: string): boolean => {
+		const node = nodesById.get(overlay);
+		return node?.kind === 'element' && node.attributes?.[OVERLAY_HINT_ATTRIBUTE] !== undefined;
+	};
 	const isModal = (overlay: string): boolean => {
 		return payload.nodes.some(
 			(node) =>
@@ -1448,11 +1479,18 @@ export function createNativeRuntime(
 				if (!instance) throw new Error(`${action.host} is not shown`);
 				return change(undefined, undefined, () => {
 					if (
-						attributeNow(select.id, 'disabled') === null &&
-						attributeIn(option, 'disabled', instance.scope) === null
+						attributeNow(select.id, 'disabled') !== null ||
+						attributeIn(option, 'disabled', instance.scope) !== null
 					)
-						chosenNow = action.host;
-					return [];
+						return [];
+					chosenNow = action.host;
+					// A choice that changes the select fires its input handler, as the web does, with the option's value.
+					const was = optionsOf(select.id).find((one) => selectedness.get(one.id))?.id;
+					const handler = payload.events.find(
+						(candidate) => candidate.host === select.id && candidate.event === 'input',
+					);
+					if (was === action.host || !handler) return [];
+					return run(handlers.get(handler.handler) ?? [], optionValue(instance), instance.scope);
 				});
 			}
 			if (action.event === 'timer' && action.timer.startsWith(SCRIPT_TIMER))
@@ -1617,12 +1655,13 @@ export function createNativeRuntime(
 					if (touch.event === 'pointerdown') {
 						raise('pointerover', touch.host);
 						crossing('pointerenter', touch.host, null, null);
-						// The behaviour's document listener hears the press: the topmost overlay it landed outside is told.
-						const top = stack.at(-1);
-						const dismiss =
-							top !== undefined && !elements.contains(top, touch.host) ? handlerOf(top, 'dismiss') : undefined;
-						if (dismiss)
-							runs.push({ handler: dismiss.handler, fields: { reason: 'outside-press', pressTarget: touch.host } });
+						// The behaviour's document listener hears the press: the topmost hint and the topmost other overlay it landed outside are told.
+						for (const top of [stack.findLast(isHint), stack.findLast((overlay) => !isHint(overlay))]) {
+							const dismiss =
+								top !== undefined && !elements.contains(top, touch.host) ? handlerOf(top, 'dismiss') : undefined;
+							if (dismiss)
+								runs.push({ handler: dismiss.handler, fields: { reason: 'outside-press', pressTarget: touch.host } });
+						}
 						raise('pointerdown', touch.host);
 						return flush() ?? calls;
 					}
@@ -1854,7 +1893,7 @@ export function createNativeRuntime(
 							...Object.fromEntries(touch),
 						},
 						...(op.catch ? { catch: slotOf(op.catch, scope) } : {}),
-					}),
+					}, submission),
 				);
 				continue;
 			}
@@ -1981,6 +2020,20 @@ export function createNativeRuntime(
 			seedRows();
 			follow();
 			calls.push(...syncAsync());
+			// An overlay becoming shown supersedes every shown hint it is not inside, before it joins the stack.
+			const shownFirst = shownOverlays();
+			const working = stackBefore.filter((overlay) => shownFirst.includes(overlay));
+			for (const newcomer of shownFirst.filter((overlay) => !stackBefore.includes(overlay))) {
+				for (const hint of working.filter(isHint)) {
+					if (elements.contains(hint, newcomer)) continue;
+					const dismiss = handlerOf(hint, 'dismiss');
+					if (!dismiss) continue;
+					const out = run(handlers.get(dismiss.handler) ?? [], { reason: 'superseded', pressTarget: null }, base);
+					if (out[0]?.op === 'navigate') return out;
+					calls.push(...out);
+				}
+				working.push(newcomer);
+			}
 			const shownNow = shownOverlays();
 			const released = stackBefore.filter((overlay) => !shownNow.includes(overlay));
 			const enlisted = shownNow.filter((overlay) => !stackBefore.includes(overlay));
