@@ -44,6 +44,8 @@ import {
 	readJson,
 	rerunAfterPhoneLoss,
 	resultDir,
+	reusedFile,
+	type ReusedPass,
 	type RungResult,
 	runningDaemon,
 	rungsOn,
@@ -51,6 +53,8 @@ import {
 	transitionChunk,
 	writeJson,
 } from './store.ts';
+import { hostFingerprint, recordPass, rungFingerprint } from './reuse.ts';
+import { pickChunk } from './schedule.ts';
 import { spawnRunner } from './spawn-runner.ts';
 
 /** Machine-queue reservations: a chunk with host tests peaked at 0.9 GB (heavy-history, 2026-11-18); a boot holds a phone's memory. */
@@ -195,20 +199,13 @@ const chunkNames = (job: string) =>
 const chunksOf = (job: string) =>
 	chunkNames(job).map((name) => ({ name, chunk: readJson<Chunk>(chunkFile(job, name))! }));
 
-/** The oldest job's next queued chunk for this platform; while the runner waits to restart on origin/main, no new job starts. */
+/** The next chunk for a free phone of this platform; while the runner waits to restart on origin/main, no new job starts. */
 function nextChunk(
 	platform: PhoneSpec['platform'],
 ): { job: string; name: string; chunk: Chunk } | undefined {
 	const holding = refresh.state === 'pending' || refresh.state === 'moving';
-	for (const id of jobIds()) {
-		const job = jobDir(id);
-		const chunks = chunksOf(job);
-		if (holding && !jobStarted(chunks.map(({ chunk }) => chunk))) continue;
-		for (const { name, chunk } of chunks)
-			if (chunk.state === 'queued' && chunk.platform === platform)
-				return { job, name, chunk };
-	}
-	return undefined;
+	const jobs = jobIds().map((id) => ({ id: jobDir(id), chunks: chunksOf(jobDir(id)) }));
+	return pickChunk(jobs, platform, !holding);
 }
 
 let refresh: RefreshState = { state: 'idle', checkedAt: 0, kept: null };
@@ -325,6 +322,7 @@ async function run(phone: Phone, job: string, name: string, queued: Chunk): Prom
 			at: Date.now(),
 		});
 		writeJson(chunkFile(job, name), done);
+		rememberPasses(job, done);
 		const again = rerunAfterPhoneLoss(done);
 		if (again.length > 0)
 			writeJson(chunkFile(job, `${name}-rerun`), {
@@ -365,16 +363,46 @@ async function run(phone: Phone, job: string, name: string, queued: Chunk): Prom
 	finishJobs();
 }
 
+/** Files each passing rung of a finished chunk under its inputs' hash, so a later job with the same bytes reuses it. */
+function rememberPasses(job: string, chunk: Chunk): void {
+	if (chunk.state !== 'done') return;
+	try {
+		const spec = readJson<JobSpec>(join(job, 'job.json'))!;
+		const host = hostFingerprint(job, spec, chunk.platform);
+		for (const result of chunk.results)
+			if (!result.failure && !result.reusedFrom)
+				recordPass(
+					chunk.platform,
+					rungFingerprint(job, result.name, chunk.platform, host),
+					{
+						job: spec.id,
+						rung: result.name,
+						at: Date.now(),
+					},
+				);
+	} catch (error) {
+		log(
+			`passes of ${job} not remembered: ${error instanceof Error ? error.message : String(error)}`,
+		);
+	}
+}
+
 /** Writes a job's reports, in the order it named its rungs, once no chunk of it is queued or running. */
 function finishJobs(): void {
 	for (const id of jobIds()) {
 		const job = jobDir(id);
 		const spec = readJson<JobSpec>(join(job, 'job.json'))!;
 		const chunks = chunkNames(job).map((name) => readJson<Chunk>(chunkFile(job, name))!);
-		if (chunks.length === 0 || chunks.some((chunk) => chunk.state !== 'done')) continue;
+		const reused = readJson<ReusedPass[]>(reusedFile(job)) ?? [];
+		if (chunks.length + reused.length === 0 || chunks.some((chunk) => chunk.state !== 'done'))
+			continue;
 		const rerun = new Set<string>();
 		const reports: ProofReport[] = spec.platforms.map((platform) => {
-			const latest = new Map<string, RungResult>();
+			const latest = new Map<string, RungResult>(
+				reused
+					.filter((pass) => pass.platform === platform)
+					.map((pass) => [pass.result.name, pass.result]),
+			);
 			for (const chunk of chunks
 				.filter((c) => c.platform === platform)
 				.sort((a, b) => a.attempt - b.attempt)) {
@@ -407,6 +435,10 @@ function finishJobs(): void {
 					),
 			seconds: (Date.now() - spec.createdAt) / 1000,
 			rerun: [...rerun],
+			reused: reused.map(
+				(pass) =>
+					`${pass.result.name} on ${pass.platform}: reused pass from job ${pass.result.reusedFrom}`,
+			),
 		};
 		writeJson(join(resultDir(job), 'summary.json'), summary);
 		log(`job ${id} ${summary.passed ? 'passed' : 'failed'} in ${summary.seconds.toFixed(0)} s`);

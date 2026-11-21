@@ -60,6 +60,9 @@ export const bundleRung = (job: string, rung: string) => join(job, 'bundle', 'ru
 export const chunkFile = (job: string, chunk: string) => join(job, 'chunks', `${chunk}.json`);
 export const chunkResultFile = (job: string, chunk: string) =>
 	join(job, 'chunks', `${chunk}.result.json`);
+/** Passes a job takes from earlier runs instead of running the rungs again, written by the submit. */
+export const reusedFile = (job: string) => join(job, 'reused.json');
+export type ReusedPass = { readonly platform: ProofPlatform; readonly result: RungResult };
 export const chunkLog = (job: string, chunk: string) => join(job, 'logs', `${chunk}.log`);
 export const screenshotsDir = (job: string, rung: string, platform: ProofPlatform) =>
 	join(job, 'screenshots', rung, platform);
@@ -166,6 +169,8 @@ export type Summary = {
 	readonly seconds: number;
 	/** Rungs that ran a second time because their phone stopped answering during the first. */
 	readonly rerun: ReadonlyArray<string>;
+	/** Rungs that did not run because an earlier job passed with byte-identical inputs: `<rung> on <platform>: reused pass from job <id>`. */
+	readonly reused: ReadonlyArray<string>;
 };
 
 const alive = (pid: number) => {
