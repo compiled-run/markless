@@ -1556,6 +1556,23 @@ jobs:
                   key: ${{ needs.lanes.outputs.key_receipts }}
                   path: receipts-completed.txt
 
+            # Main's push runs warn when main's unit budget median has moved more than half the margin from the
+            # committed anchors, so a re-anchor pull request with an attribution table follows.
+            - name: Check out main's history for the unit budget drift
+              uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+                  fetch-depth: 200
+                  path: unit-budget-drift
+
+            - name: Warn when main's unit budget median has moved from the committed anchors
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              working-directory: unit-budget-drift
+              run: |
+                  node scripts/ci/unit-budget.mjs main --out "$RUNNER_TEMP/unit-budget-main" --ref HEAD
+                  node scripts/ci/unit-budget.mjs drift --main "$RUNNER_TEMP/unit-budget-main"
+
     # The unit shards' CPU-seconds and peak memory against the Linux anchors in
     # scripts/ci/unit-budget.json. A job of its own so it reports when another lane
     # fails, and the unit marker waits for it so a re-run after a red budget measures again.
@@ -1564,6 +1581,10 @@ jobs:
         if: needs.unit.result == 'success' && needs.unit.outputs.run == 'true'
         runs-on: ${{ github.event_name == 'merge_group' && vars.MERGE_QUEUE_RUNNER || 'ubuntu-26.04' }}
         timeout-minutes: 5
+        # Reading main's landed merge-queue runs and their measurement artifacts.
+        permissions:
+            contents: read
+            actions: read
         steps:
             - uses: actions/checkout@v4
               with:
@@ -1587,11 +1608,17 @@ jobs:
                     echo "$(wc -l < "$RUNNER_TEMP/changed-files.txt") files changed against $BASE"
                   fi
 
+            # The run is compared with main's median over its last landed runs, under the committed anchors' ceiling.
+            - name: Download the measurements of main's last landed merge-queue runs
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: node scripts/ci/unit-budget.mjs main --out "$RUNNER_TEMP/unit-budget-main"
+
             - name: Check the unit shards against their CPU and memory budget
               run: |
                   changed=()
                   if [ -f "$RUNNER_TEMP/changed-files.txt" ]; then changed=(--changed "$RUNNER_TEMP/changed-files.txt"); fi
-                  node scripts/ci/unit-budget.mjs check --measurements "$RUNNER_TEMP/unit-budget" "${changed[@]}"
+                  node scripts/ci/unit-budget.mjs check --measurements "$RUNNER_TEMP/unit-budget" --main "$RUNNER_TEMP/unit-budget-main" "${changed[@]}"
 
     save-lane-markers:
         needs: [unit, unit-budget, browser]

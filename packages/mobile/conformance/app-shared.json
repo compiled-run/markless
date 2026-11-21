@@ -293,13 +293,27 @@
 	},
 	"open": "/",
 	"initial": {
-		"stack": ["/"],
+		"stack": [
+			"/"
+		],
 		"title": "Home",
 		"texts": [
-			["h2:text0", "Home page"],
-			["component-edge:0/h0:text0", "Home sees 0"],
-			["component-edge:1/h1:text0", "Bump at home"],
-			["component-edge:2:text0", "Open other"]
+			[
+				"h2:text0",
+				"Home page"
+			],
+			[
+				"component-edge:0/h0:text0",
+				"Home sees 0"
+			],
+			[
+				"component-edge:1/h1:text0",
+				"Bump at home"
+			],
+			[
+				"component-edge:2:text0",
+				"Open other"
+			]
 		]
 	},
 	"steps": [
@@ -315,13 +329,27 @@
 					"value": "Home sees 1"
 				}
 			],
-			"stack": ["/"],
+			"stack": [
+				"/"
+			],
 			"title": "Home",
 			"texts": [
-				["h2:text0", "Home page"],
-				["component-edge:0/h0:text0", "Home sees 1"],
-				["component-edge:1/h1:text0", "Bump at home"],
-				["component-edge:2:text0", "Open other"]
+				[
+					"h2:text0",
+					"Home page"
+				],
+				[
+					"component-edge:0/h0:text0",
+					"Home sees 1"
+				],
+				[
+					"component-edge:1/h1:text0",
+					"Bump at home"
+				],
+				[
+					"component-edge:2:text0",
+					"Open other"
+				]
 			]
 		},
 		{
@@ -336,12 +364,24 @@
 					"params": {}
 				}
 			],
-			"stack": ["/", "/other"],
+			"stack": [
+				"/",
+				"/other"
+			],
 			"title": "Other",
 			"texts": [
-				["h2:text0", "Other page"],
-				["component-edge:0/h0:text0", "Other sees 1"],
-				["component-edge:1/h1:text0", "Bump here"]
+				[
+					"h2:text0",
+					"Other page"
+				],
+				[
+					"component-edge:0/h0:text0",
+					"Other sees 1"
+				],
+				[
+					"component-edge:1/h1:text0",
+					"Bump here"
+				]
 			]
 		},
 		{
@@ -356,12 +396,24 @@
 					"value": "Other sees 2"
 				}
 			],
-			"stack": ["/", "/other"],
+			"stack": [
+				"/",
+				"/other"
+			],
 			"title": "Other",
 			"texts": [
-				["h2:text0", "Other page"],
-				["component-edge:0/h0:text0", "Other sees 2"],
-				["component-edge:1/h1:text0", "Bump here"]
+				[
+					"h2:text0",
+					"Other page"
+				],
+				[
+					"component-edge:0/h0:text0",
+					"Other sees 2"
+				],
+				[
+					"component-edge:1/h1:text0",
+					"Bump here"
+				]
 			]
 		},
 		{
@@ -375,13 +427,27 @@
 					"value": "Home sees 2"
 				}
 			],
-			"stack": ["/"],
+			"stack": [
+				"/"
+			],
 			"title": "Home",
 			"texts": [
-				["h2:text0", "Home page"],
-				["component-edge:0/h0:text0", "Home sees 2"],
-				["component-edge:1/h1:text0", "Bump at home"],
-				["component-edge:2:text0", "Open other"]
+				[
+					"h2:text0",
+					"Home page"
+				],
+				[
+					"component-edge:0/h0:text0",
+					"Home sees 2"
+				],
+				[
+					"component-edge:1/h1:text0",
+					"Bump at home"
+				],
+				[
+					"component-edge:2:text0",
+					"Open other"
+				]
 			]
 		}
 	]
