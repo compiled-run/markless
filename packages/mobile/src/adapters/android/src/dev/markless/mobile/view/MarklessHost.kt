@@ -1300,7 +1300,11 @@ class MarklessHost(
 		val node = inst.node
 		val layout = layoutOf(node) ?: return
 		val styled = layout.export.assignments[layout.assignment]
-		val s = styled.byId[inst.id] ?: throw MarklessHostError("style export has no node \"${inst.id}\"")
+		val s = styled.byId[inst.id] ?: if (node.row != null && layout.export.planRepeats.isNotEmpty()) {
+			// A row not laid out yet (at mount, or just added): the page is laid out again with its rows, which places it.
+			view.visibility = View.GONE
+			return
+		} else throw MarklessHostError("style export has no node \"${inst.id}\"")
 		if (s.kind != (if (node is Node.Text) "text" else "element")) throw MarklessHostError("style node \"${inst.id}\" is a ${s.kind}")
 		val absolute = layout.absolutes[layout.assignment]
 		val frame = s.frame

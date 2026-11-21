@@ -106,15 +106,42 @@ export type NativeStyleInput = {
 export function rowAttributeOptions(
 	name: string,
 	expr: NativeExpr,
+	booleanCells: ReadonlySet<string> = new Set(),
 ): ReadonlyArray<string | null> | undefined {
+	if (givesBoolean(expr, booleanCells))
+		return [...new Set([marklessAttributeValue(name, true), marklessAttributeValue(name, false)])];
 	if ('literal' in expr) return [marklessAttributeValue(name, expr.literal)];
 	if ('if' in expr) {
-		const whenTrue = rowAttributeOptions(name, expr.whenTrue);
-		const whenFalse = rowAttributeOptions(name, expr.whenFalse);
+		const whenTrue = rowAttributeOptions(name, expr.whenTrue, booleanCells);
+		const whenFalse = rowAttributeOptions(name, expr.whenFalse, booleanCells);
 		return whenTrue && whenFalse ? [...new Set([...whenTrue, ...whenFalse])] : undefined;
 	}
 	return undefined;
 }
+
+/**
+ * Whether an expression's value is always true or false: a comparison, a negation, a cell whose first value is true or false
+ * (a boolean cell, as a styled cell's domain takes it), or `&&`, `||` and `?:` of those.
+ */
+function givesBoolean(expr: NativeExpr, booleanCells: ReadonlySet<string>): boolean {
+	if ('literal' in expr) return typeof expr.literal === 'boolean';
+	if ('cell' in expr) return booleanCells.has(expr.cell);
+	if ('unary' in expr) return expr.unary === '!';
+	if ('binary' in expr) return ['===', '!==', '<', '<=', '>', '>='].includes(expr.binary);
+	if ('logical' in expr)
+		return (
+			expr.logical !== '??' &&
+			givesBoolean(expr.left, booleanCells) &&
+			givesBoolean(expr.right, booleanCells)
+		);
+	if ('if' in expr)
+		return givesBoolean(expr.whenTrue, booleanCells) && givesBoolean(expr.whenFalse, booleanCells);
+	return false;
+}
+
+/** The payload's cells whose first value is true or false. */
+export const booleanCellsOf = (payload: NativeViewPayload): ReadonlySet<string> =>
+	new Set(payload.cells.flatMap((cell) => (typeof cell.initial === 'boolean' ? [cell.id] : [])));
 
 /** Whether an expression reads what differs from row to row: a row's item or a row's own state. */
 export function readsRow(payload: NativeViewPayload, tree: unknown): boolean {
@@ -321,7 +348,7 @@ export function nativeStyleInput(
 			if (!('attribute' in binding)) continue;
 			if (binding.attribute !== 'class' && !isNativeStyleStateAttribute(binding.attribute)) continue;
 			if (!readsRow(payload, binding.value)) continue;
-			const options = rowAttributeOptions(binding.attribute, binding.value);
+			const options = rowAttributeOptions(binding.attribute, binding.value, booleanCellsOf(payload));
 			if (options) rowOptions.set(`${node.id}#${binding.attribute}`, { node: node.id, attribute: binding.attribute, options });
 		}
 	}
@@ -471,13 +498,16 @@ export function nativeStyleInput(
 			for (const binding of node.bindings ?? []) {
 				if (!('attribute' in binding) || !isNativeStyleStateAttribute(binding.attribute))
 					continue;
-				const byState = combinations.map((when) => ({
-					when,
-					value:
-						byRow(binding.attribute, when)?.value ??
-						marklessAttributeValue(binding.attribute, evaluate(binding.value, when)) ??
-						null,
-				}));
+				const byState = combinations.map((when) => {
+					// A row's own value, absent (null) included: the binding reads a row's item, which no page state gives.
+					const row = byRow(binding.attribute, when);
+					return {
+						when,
+						value: row
+							? row.value
+							: (marklessAttributeValue(binding.attribute, evaluate(binding.value, when)) ?? null),
+					};
+				});
 				if (byState.every((entry) => entry.value === byState[0]!.value)) {
 					if (byState[0]!.value !== null)
 						attributes[binding.attribute] = byState[0]!.value;

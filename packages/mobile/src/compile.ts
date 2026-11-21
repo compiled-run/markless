@@ -26,7 +26,7 @@ import {
 	NATIVE_APP_VERSION,
 	NATIVE_NOT_FOUND_ROUTE,
 } from '@markless/serializer/native-view';
-import { nativeStyleInputs, readsRow, rowAttributeOptions, type NativeStyleInput } from './style-input.ts';
+import { booleanCellsOf, nativeStyleInputs, readsRow, rowAttributeOptions, type NativeStyleInput } from './style-input.ts';
 import type { NativeDeviceFeature } from '@markless/serializer/native-device';
 import { deviceManifest, type DeviceAppConfig, type DeviceManifest } from './permissions.ts';
 
@@ -327,7 +327,7 @@ function unstyledOnly(
 			'attribute' in binding &&
 			(binding.attribute === 'class' || isNativeStyleStateAttribute(binding.attribute)) &&
 			readsRow(payload, binding.value) &&
-			!rowAttributeOptions(binding.attribute, binding.value)
+			!rowAttributeOptions(binding.attribute, binding.value, booleanCellsOf(payload))
 				? [
 						nativeUnsupported(
 							`the \`${binding.attribute}\` of <${node.element}> ${node.id} follows its @for row on a styled page through a value the build cannot list; Dragon styles a row by each value it can give, so write it as literals chosen by conditions`,
