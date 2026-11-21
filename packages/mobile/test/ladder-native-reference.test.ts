@@ -24,7 +24,12 @@ import {
 	type NativeRuntime,
 	type NativeScreen,
 } from '../src/index.ts';
-import { compileRungApp, readAppConfig, readWorkspaceModule, servedReader } from '../src/harness/rung.ts';
+import {
+	compileRungApp,
+	readAppConfig,
+	readWorkspaceModule,
+	servedReader,
+} from '../src/harness/rung.ts';
 import { echoText } from '../src/harness/echo-server.ts';
 import { nativeMaxLength, nativeRangeValue } from '@markless/serializer/native-view';
 import { nodeScriptHost } from '../src/node-engine.ts';
@@ -71,12 +76,22 @@ const typedInto = (text: string, maxlength: string | null) => {
 // web build shows; a rung the compiler cannot lower yet must be refused by name, never emitted half right.
 const NATIVE_UNSUPPORTED = 'MARKLESS_NATIVE_UNSUPPORTED';
 /** Whether a field's `value` property is bound; any other `value` write is a textarea's default value. */
-const bindsValue = (nodeOf: ReadonlyMap<string, NativeViewPayload['nodes'][number]>, id: string) => {
+const bindsValue = (
+	nodeOf: ReadonlyMap<string, NativeViewPayload['nodes'][number]>,
+	id: string,
+) => {
 	const node = nodeOf.get(id.split('@')[0]!);
-	return node?.kind === 'element' && (node.bindings ?? []).some((binding) => 'property' in binding && binding.property === 'value');
+	return (
+		node?.kind === 'element' &&
+		(node.bindings ?? []).some(
+			(binding) => 'property' in binding && binding.property === 'value',
+		)
+	);
 };
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
 const REFUSED_RUNGS = new Set(['y4-sheet-beside-drawer', 'j7-page-refused']);
+// The <input> types a host draws as a control a press acts on; every other type is a text field that takes the keyboard.
+const PRESSED_INPUT_TYPES = new Set(['checkbox', 'radio', 'range', 'hidden']);
 
 /**
  * The script services as a phone's host provides them, on a clock that moves only when a step waits: a timer fires once
@@ -254,14 +269,17 @@ function mirror(
 			}
 			for (const [id, text] of runtime.texts()) {
 				const key = rowKeyIn(nodeOf, entry.node, id);
-				if (key !== undefined && entry.keys.includes(key)) texts.set(id, kept.get(id) ?? text);
+				if (key !== undefined && entry.keys.includes(key))
+					texts.set(id, kept.get(id) ?? text);
 			}
 			// A row's copy is built with its bound attributes, as an arm's nodes are; a row that left takes its own with it.
 			for (const key of attributes.keys())
-				if (rowKeyIn(nodeOf, entry.node, key.split('\0')[0]!) !== undefined) attributes.delete(key);
+				if (rowKeyIn(nodeOf, entry.node, key.split('\0')[0]!) !== undefined)
+					attributes.delete(key);
 			for (const [node, name, value] of runtime.attributes()) {
 				const key = rowKeyIn(nodeOf, entry.node, node);
-				if (key !== undefined && entry.keys.includes(key)) attributes.set(`${node}\0${name}`, value);
+				if (key !== undefined && entry.keys.includes(key))
+					attributes.set(`${node}\0${name}`, value);
 			}
 		} else if (entry.op === 'arm') {
 			chosen.set(entry.node, entry.index);
@@ -368,7 +386,11 @@ function walkApp(
 			if (!cell.device) continue;
 			if (cell.device !== 'location.access')
 				throw new Error(`no fake ${cell.device} in an app`);
-			for (const entry of runtime.dispatch({ event: 'device', cell: cell.id, value: 'granted' }))
+			for (const entry of runtime.dispatch({
+				event: 'device',
+				cell: cell.id,
+				value: 'granted',
+			}))
 				shown.apply(entry, -1);
 		}
 		for (const task of runtime.tasks())
@@ -380,7 +402,12 @@ function walkApp(
 				shown.apply(entry, -1);
 	};
 	const open = (screen: NativeScreen) => {
-		const shown = mirror(pageOf(screen.route), screen.runtime, new Map(), styled.has(screen.route));
+		const shown = mirror(
+			pageOf(screen.route),
+			screen.runtime,
+			new Map(),
+			styled.has(screen.route),
+		);
 		wake(screen, shown);
 		return shown;
 	};
@@ -396,10 +423,17 @@ function walkApp(
 			stack.pop();
 			// The screen shown again takes what a page above it changed in the app-wide cells; nothing else changes.
 			const resumed = appRuntime.screens().at(-1)!.runtime.resume();
-			expect(resumed, `step ${index}: the screen shown again had resumed already`).toEqual([]);
-			const shownAgain = journal.filter((entry) => entry.op !== 'abort' && entry.op !== 'clearTimer');
-			const appWide = pageOf(appRuntime.screens().at(-1)!.route).cells.some((cell) => cell.app);
-			if (!appWide) expect(shownAgain, `step ${index}: Back journals only what it cancels`).toEqual([]);
+			expect(resumed, `step ${index}: the screen shown again had resumed already`).toEqual(
+				[],
+			);
+			const shownAgain = journal.filter(
+				(entry) => entry.op !== 'abort' && entry.op !== 'clearTimer',
+			);
+			const appWide = pageOf(appRuntime.screens().at(-1)!.route).cells.some(
+				(cell) => cell.app,
+			);
+			if (!appWide)
+				expect(shownAgain, `step ${index}: Back journals only what it cancels`).toEqual([]);
 			for (const entry of shownAgain) stack.at(-1)!.apply(entry, -1);
 		} else if (
 			looksOnly(action) ||
@@ -517,7 +551,14 @@ function walk(
 	/** The text field that has the keyboard, if any. */
 	let focused: string | undefined;
 	const start = () => {
-		const r = createNativeRuntime(payload, store, params, undefined, () => clock, services.host);
+		const r = createNativeRuntime(
+			payload,
+			store,
+			params,
+			undefined,
+			() => clock,
+			services.host,
+		);
 		for (const cell of payload.cells)
 			if (cell.device)
 				r.dispatch({ event: 'device', cell: cell.id, value: deviceValue(cell.device) });
@@ -674,7 +715,11 @@ function walk(
 	const fieldReading = (text: string) =>
 		labels().find(([id, label]) => {
 			const element = nodeOf.get(id.split('@')[0]!);
-			return label === text && element?.kind === 'element' && (element.element === 'input' || element.element === 'textarea');
+			return (
+				label === text &&
+				element?.kind === 'element' &&
+				(element.element === 'input' || element.element === 'textarea')
+			);
 		})?.[0] ?? elementReading(text);
 	const elementReading = (text: string) => {
 		const labelled = labels().find(([, label]) => label === text)?.[0];
@@ -691,7 +736,12 @@ function walk(
 		if (node.element === 'input') return node.attributes?.['value'] ?? '';
 		// A textarea shows its `value` attribute as the host built it, then the default values the journal writes.
 		if (node.element === 'textarea')
-			return shownDefaults.get(id) ?? builtAttributes.get(`${id}\0value`) ?? node.attributes?.['value'] ?? '';
+			return (
+				shownDefaults.get(id) ??
+				builtAttributes.get(`${id}\0value`) ??
+				node.attributes?.['value'] ??
+				''
+			);
 		return undefined;
 	};
 	const typed = new Map<string, string>();
@@ -701,8 +751,13 @@ function walk(
 	// A closed select shows its chosen option's label; its options show only in its list.
 	const chosenLabels = () =>
 		payload.nodes.flatMap((node) =>
-			node.kind === 'element' && node.element === 'select' && shownNode(node.id) && !hiddenWithin(node.id)
-				? runtime.choices(node.id).flatMap((choice) => (selected.get(choice.option) ? [choice.label] : []))
+			node.kind === 'element' &&
+			node.element === 'select' &&
+			shownNode(node.id) &&
+			!hiddenWithin(node.id)
+				? runtime
+						.choices(node.id)
+						.flatMap((choice) => (selected.get(choice.option) ? [choice.label] : []))
 				: [],
 		);
 	const attributeNow = (id: string, name: string) => {
@@ -796,8 +851,10 @@ function walk(
 						payload.cells.some((cell) => cell.object === object && cell.device === name)
 					)
 						answered.push(() => setObject(object, name, value));
-			} else if (entry.op === 'timer') timers.push({ timer: entry.timer, due: at + entry.ms });
-			else if (entry.op === 'clearTimer') timers = timers.filter((timer) => timer.timer !== entry.timer);
+			} else if (entry.op === 'timer')
+				timers.push({ timer: entry.timer, due: at + entry.ms });
+			else if (entry.op === 'clearTimer')
+				timers = timers.filter((timer) => timer.timer !== entry.timer);
 			else if (entry.op === 'invalid') invalid = entry.message;
 			else if (entry.op === 'text') texts.set(entry.node, entry.value);
 			else if (entry.op === 'dialog') openDialogs.set(entry.node, entry.open);
@@ -809,18 +866,21 @@ function walk(
 				selected.set(entry.node, entry.value);
 			else if (entry.op === 'property') {
 				const node = nodeOf.get(entry.node.split('@')[0]!);
-				const followsDefault = node?.kind === 'element' && node.element === 'textarea' && !bindsValue(nodeOf, entry.node);
+				const followsDefault =
+					node?.kind === 'element' &&
+					node.element === 'textarea' &&
+					!bindsValue(nodeOf, entry.node);
 				if (followsDefault) shownDefaults.set(entry.node, entry.value);
 				else properties.set(entry.node, entry.value);
 				typed.delete(entry.node);
-			}
-			else if (entry.op === 'navigate') {
+			} else if (entry.op === 'navigate') {
 				// One page per rung: a navigation opens this page again with the link's params.
 				expect(entry.route, `step ${index}: the link's route`).toBe(payload.route?.pattern);
 				runtime = createNativeRuntime(payload, store, entry.params);
 				mount();
 			} else if (entry.op === 'rows') {
-				for (const [node, index] of runtime.arms()) if (!chosen.has(node)) chosen.set(node, index);
+				for (const [node, index] of runtime.arms())
+					if (!chosen.has(node)) chosen.set(node, index);
 				const kept = new Map<string, string>();
 				for (const [id, text] of texts) {
 					const key = rowKeyIn(nodeOf, entry.node, id);
@@ -830,7 +890,8 @@ function walk(
 				}
 				for (const [id, text] of runtime.texts()) {
 					const key = rowKeyIn(nodeOf, entry.node, id);
-					if (key !== undefined && entry.keys.includes(key)) texts.set(id, kept.get(id) ?? text);
+					if (key !== undefined && entry.keys.includes(key))
+						texts.set(id, kept.get(id) ?? text);
 				}
 				// A row that stays keeps its attributes; a new row's are built from current values.
 				const keptAttributes = new Map<string, string | null>();
@@ -863,7 +924,8 @@ function walk(
 					if (inArm(node, entry.node)) checks.set(node, checked);
 				for (const id of typed.keys()) if (inArm(id, entry.node)) typed.delete(id);
 				// A sheet leaves with its arm, closed; one that comes is built open or closed as its state says.
-				for (const node of sheetOpen.keys()) if (inArm(node, entry.node)) sheetOpen.delete(node);
+				for (const node of sheetOpen.keys())
+					if (inArm(node, entry.node)) sheetOpen.delete(node);
 				for (const [node, open] of runtime.sheets())
 					if (inArm(node, entry.node)) sheetOpen.set(node, open);
 			} else if (entry.op === 'sheet') sheetOpen.set(entry.node, entry.open);
@@ -925,7 +987,8 @@ function walk(
 			else permission = given;
 			refreshAccess(index);
 			for (const cell of waiting.splice(0)) apply(answer(cell), index);
-			for (const continuation of waitingCalls.splice(0)) apply(answerCall(continuation), index);
+			for (const continuation of waitingCalls.splice(0))
+				apply(answerCall(continuation), index);
 			for (const object of waitingForMicrophone.splice(0))
 				if (given === 'granted') recording.set(object, 0);
 				else apply(setObject(object, 'recorder.active', false), index);
@@ -963,14 +1026,14 @@ function walk(
 		} else if (action && 'swipe' in action && action.swipe === 'up') openSheet(index);
 		else if (action && 'swipe' in action) {
 			// Scrolling changes what is on screen, not what the page holds; the devices and the web judge the screen.
-		}
-		else if (action && 'scrollTo' in action) {
+		} else if (action && 'scrollTo' in action) {
 			openSheet(index);
 			if (!shownTexts().some(([, text]) => text === action.scrollTo))
 				throw new Error(`step ${index}: "${action.scrollTo}" is not in the open sheet`);
 		} else if (action && ('escape' in action || 'pressBackdrop' in action)) {
 			const top = runtime.overlays().at(-1)?.[0];
-			if (!top) throw new Error(`step ${index}: no overlay is open to ${Object.keys(action)[0]}`);
+			if (!top)
+				throw new Error(`step ${index}: no overlay is open to ${Object.keys(action)[0]}`);
 			apply(
 				'escape' in action
 					? runtime.dispatch({ event: 'dismiss', host: top, reason: 'escape' })
@@ -986,13 +1049,18 @@ function walk(
 				throw new Error(`step ${index}: no select reads "${action.choose.field}"`);
 			if (attributeNow(select, 'disabled') != null)
 				throw new Error(`step ${index}: "${action.choose.field}" is disabled`);
-			const choice = runtime.choices(select).find((one) => one.label === action.choose.option);
+			const choice = runtime
+				.choices(select)
+				.find((one) => one.label === action.choose.option);
 			if (!choice || choice.disabled)
-				throw new Error(`step ${index}: "${action.choose.field}" has no option "${action.choose.option}" to pick`);
+				throw new Error(
+					`step ${index}: "${action.choose.field}" has no option "${action.choose.option}" to pick`,
+				);
 			apply(runtime.dispatch({ event: 'choose', host: choice.option }), index);
 		} else if (action && 'slide' in action) {
 			const slider = elementReading(action.slide.field);
-			if (!slider) throw new Error(`step ${index}: nothing reads "${action.slide.field}" to slide`);
+			if (!slider)
+				throw new Error(`step ${index}: nothing reads "${action.slide.field}" to slide`);
 			// The phone reports the end the thumb reaches, on the slider's step, as an input.
 			const end = attributeNow(slider, action.slide.to === 'max' ? 'max' : 'min');
 			const value = nativeRangeValue(
@@ -1011,8 +1079,18 @@ function walk(
 			// A finger's drag as a phone reports it: down, a move every 16 ms of 20 points, and up; the platform takes a drag along
 			// a box that scrolls after a few moves, as both phones' browsers do.
 			const step = action.drag.direction === 'right' ? { x: 20, y: 0 } : { x: 0, y: -20 };
-			const touch = (event: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel', n: number) =>
-				runtime.dispatch({ event, host, pointerId: 1, x: 100 + step.x * n, y: 300 + step.y * n, time: 16 * n });
+			const touch = (
+				event: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel',
+				n: number,
+			) =>
+				runtime.dispatch({
+					event,
+					host,
+					pointerId: 1,
+					x: 100 + step.x * n,
+					y: 300 + step.y * n,
+					time: 16 * n,
+				});
 			const out = [...touch('pointerdown', 0)];
 			const moves = action.drag.scrolls ? 3 : 10;
 			for (let n = 1; n <= moves; n++) out.push(...touch('pointermove', n));
@@ -1040,7 +1118,15 @@ function walk(
 				],
 				index,
 			);
-		} else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
+		} else if (
+			action &&
+			!('tap' in action) &&
+			!('doubleTap' in action) &&
+			!('type' in action) &&
+			!('submit' in action) &&
+			!('erase' in action) &&
+			!('dismissSheet' in action)
+		)
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
 			const sheet = openSheet(index);
@@ -1056,11 +1142,14 @@ function walk(
 					: 'doubleTap' in action
 						? action.doubleTap
 						: 'type' in action
-						? action.type.field
-						: 'erase' in action
-							? action.erase
-							: action.submit;
-			const host = 'tap' in action || 'doubleTap' in action ? elementReading(name) : fieldReading(name);
+							? action.type.field
+							: 'erase' in action
+								? action.erase
+								: action.submit;
+			const host =
+				'tap' in action || 'doubleTap' in action
+					? elementReading(name)
+					: fieldReading(name);
 			if (!host)
 				throw new Error(
 					`step ${index}: nothing reads "${name}" to ${'tap' in action ? 'tap' : 'type into'}`,
@@ -1099,32 +1188,78 @@ function walk(
 				node = nodeOf.get(node)?.parent;
 				pressed = node && nodeOf.get(node)?.row ? `${node}${key}` : node;
 			}
+			// A press on a <label> acts on the control it names, as the web does: a text field takes the keyboard, any other is pressed.
+			let focusing: string | undefined;
+			if ('tap' in action && !pressed) {
+				let climb: string | null | undefined = at < 0 ? host : host.slice(0, at);
+				while (climb) {
+					const element = nodeOf.get(climb);
+					if (element?.kind === 'element' && element.element === 'label') break;
+					climb = element?.parent;
+				}
+				const named = climb
+					? attributeNow(nodeOf.get(climb)?.row ? `${climb}${key}` : climb, 'for')
+					: null;
+				const control = named ? nodeOf.get(named.split('@')[0]!) : undefined;
+				if (named && control?.kind === 'element') {
+					const type = control.attributes?.['type'] ?? 'text';
+					if (
+						control.element === 'textarea' ||
+						(control.element === 'input' && !PRESSED_INPUT_TYPES.has(type))
+					)
+						focusing = named;
+					else pressed = named;
+				}
+			}
 			// The return key in a field that submits nothing only puts the keyboard away.
 			const returns = payload.events.some(
 				(event) => event.host === host && event.event === 'enter',
 			);
 			// A row's copy (`<node>@<key>`) is not in the tree by that id: it activates as itself.
 			const activates = !!pressed || host.includes('@');
-			if ('tap' in action && !activates && touched.length === 0)
-				throw new Error(`step ${index}: "${name}" is not a control and the press changed nothing`);
+			if ('tap' in action && !activates && !focusing && touched.length === 0)
+				throw new Error(
+					`step ${index}: "${name}" is not a control and the press changed nothing`,
+				);
 			// A field takes the keyboard when typed into, and gives it up when anything else is tapped: its focus and blur run.
-			const handles = (node: string, event: 'input' | 'focus' | 'blur' | 'keydown' | 'keyup') =>
-				payload.events.some((candidate) => candidate.host === node.split('@')[0] && candidate.event === event);
+			const handles = (
+				node: string,
+				event: 'input' | 'focus' | 'blur' | 'keydown' | 'keyup',
+			) =>
+				payload.events.some(
+					(candidate) =>
+						candidate.host === node.split('@')[0] && candidate.event === event,
+				);
 			if ('type' in action && focused !== host) {
-				if (focused && handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
+				if (focused && handles(focused, 'blur'))
+					apply(runtime.dispatch({ event: 'blur', host: focused }), index);
 				focused = host;
-				if (handles(host, 'focus')) apply(runtime.dispatch({ event: 'focus', host }), index);
+				if (handles(host, 'focus'))
+					apply(runtime.dispatch({ event: 'focus', host }), index);
 			}
-			if (('tap' in action || 'doubleTap' in action) && focused && focused !== host) {
-				if (handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
+			if (
+				('tap' in action || 'doubleTap' in action) &&
+				focused &&
+				focused !== host &&
+				focused !== focusing
+			) {
+				if (handles(focused, 'blur'))
+					apply(runtime.dispatch({ event: 'blur', host: focused }), index);
 				focused = undefined;
+			}
+			if (focusing && focused !== focusing) {
+				focused = focusing;
+				if (handles(focusing, 'focus'))
+					apply(runtime.dispatch({ event: 'focus', host: focusing }), index);
 			}
 			// Backspace with the cursor at the end takes the last character; the input event then runs the handler.
 			const erased = (field: string): ReturnType<typeof runtime.dispatch> => {
 				const text = [...fieldText(field)].slice(0, -1).join('');
 				if (properties.has(field)) properties.set(field, text);
 				else typed.set(field, text);
-				return handles(field, 'input') ? runtime.dispatch({ event: 'input', host: field, value: text }) : [];
+				return handles(field, 'input')
+					? runtime.dispatch({ event: 'input', host: field, value: text })
+					: [];
 			};
 			// A key runs the field's keydown handler first; preventDefault() there leaves out what the key does.
 			const keyed = (key: string): boolean => {
@@ -1135,7 +1270,8 @@ function walk(
 			};
 			// A key's keyup runs after what the key did, or after its keydown left that out.
 			const keyedUp = (key: string) => {
-				if (handles(host, 'keyup')) apply(runtime.dispatch({ event: 'keyup', host, key }), index);
+				if (handles(host, 'keyup'))
+					apply(runtime.dispatch({ event: 'keyup', host, key }), index);
 			};
 			// With a keyup handler, typing is key by key, each key's edit between its keydown and its keyup, as on the web.
 			const byKey = 'type' in action && handles(host, 'keyup');
@@ -1150,39 +1286,45 @@ function walk(
 						sofar += kept[[...sofar].length];
 						if (properties.has(host)) properties.set(host, sofar);
 						else typed.set(host, sofar);
-						if (handles(host, 'input')) apply(runtime.dispatch({ event: 'input', host, value: sofar }), index);
+						if (handles(host, 'input'))
+							apply(runtime.dispatch({ event: 'input', host, value: sofar }), index);
 					}
 					keyedUp(key);
 				}
 			}
 			// A double tap is two presses, the second counted 2.
 			if ('doubleTap' in action)
-				apply(runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 1 }), index);
+				apply(
+					runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 1 }),
+					index,
+				);
 			const dispatched =
 				'tap' in action
-					? activates
+					? activates && !focusing
 						? runtime.dispatch({ event: 'activate', host: pressed ?? host })
 						: []
 					: 'doubleTap' in action
 						? runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 2 })
-					: 'type' in action
-						? handles(host, 'input') && !byKey
-							? runtime.dispatch({ event: 'input', host, value: text! })
-							: []
-						: 'erase' in action
-							? keyed('Backspace') || fieldText(host) === ''
-								? []
-								: erased(host)
-							: keyed('Enter') || !returns
-								? []
-								: runtime.dispatch({ event: 'enter', host });
+						: 'type' in action
+							? handles(host, 'input') && !byKey
+								? runtime.dispatch({ event: 'input', host, value: text! })
+								: []
+							: 'erase' in action
+								? keyed('Backspace') || fieldText(host) === ''
+									? []
+									: erased(host)
+								: keyed('Enter') || !returns
+									? []
+									: runtime.dispatch({ event: 'enter', host });
 			apply(dispatched, index);
 			// A focus() a handler asks for gives a text field the keyboard, as the host does: its focus handler runs.
 			for (const entry of dispatched)
 				if (entry.op === 'command' && entry.command === 'focus' && entry.node !== focused) {
-					if (focused && handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
+					if (focused && handles(focused, 'blur'))
+						apply(runtime.dispatch({ event: 'blur', host: focused }), index);
 					focused = entry.node;
-					if (handles(entry.node, 'focus')) apply(runtime.dispatch({ event: 'focus', host: entry.node }), index);
+					if (handles(entry.node, 'focus'))
+						apply(runtime.dispatch({ event: 'focus', host: entry.node }), index);
 				}
 			if ('erase' in action) keyedUp('Backspace');
 			else if ('submit' in action) keyedUp('Enter');
@@ -1193,16 +1335,28 @@ function walk(
 	}
 	// What a host raises once the screen is drawn: `idle` for every element due one, `visible` for each above the fold.
 	function raiseLoadEvents(index: number) {
-		const foldText = belowFold === undefined ? undefined : [...texts].find(([, text]) => text === belowFold)?.[0];
-		const foldNode = foldText === undefined ? -1 : payload.nodes.findIndex((node) => node.id === nodeOf.get(foldText.split('@')[0]!)?.parent);
+		const foldText =
+			belowFold === undefined
+				? undefined
+				: [...texts].find(([, text]) => text === belowFold)?.[0];
+		const foldNode =
+			foldText === undefined
+				? -1
+				: payload.nodes.findIndex(
+						(node) => node.id === nodeOf.get(foldText.split('@')[0]!)?.parent,
+					);
 		const aboveFold = (instance: string) =>
-			foldNode < 0 || payload.nodes.findIndex((node) => node.id === instance.split('@')[0]) < foldNode;
+			foldNode < 0 ||
+			payload.nodes.findIndex((node) => node.id === instance.split('@')[0]) < foldNode;
 		for (;;) {
 			const idle = runtime.due('idle')[0];
 			const visible = runtime.due('visible').find(aboveFold);
 			const host = idle ?? visible;
 			if (host === undefined) return;
-			apply(runtime.dispatch({ event: idle === undefined ? 'visible' : 'idle', host }), index);
+			apply(
+				runtime.dispatch({ event: idle === undefined ? 'visible' : 'idle', host }),
+				index,
+			);
 		}
 	}
 	function check(index: number, step: LadderStep) {
@@ -1246,7 +1400,10 @@ function walk(
 		expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 		for (const text of step.absent ?? []) expect(shown, `step ${index}`).not.toContain(text);
 		for (const [node, value] of runtime.selections())
-			expect(selected.get(node) ?? false, `step ${index}: the journal left ${node}'s selectedness stale`).toBe(value);
+			expect(
+				selected.get(node) ?? false,
+				`step ${index}: the journal left ${node}'s selectedness stale`,
+			).toBe(value);
 		expect(shown, `step ${index}: scrolled out of sight, still held`).toEqual(
 			expect.arrayContaining([...(step.offScreen ?? [])]),
 		);
@@ -1312,7 +1469,9 @@ test.each(
 		).toBe(REFUSED_RUNGS.has(folder));
 		if (build.payload === null) {
 			// Every refusal is named; a keyboard-only handler left out is a warning beside them, never the reason.
-			expect(build.diagnostics.some((diagnostic) => diagnostic.severity === 'error')).toBe(true);
+			expect(build.diagnostics.some((diagnostic) => diagnostic.severity === 'error')).toBe(
+				true,
+			);
 			const refusalCodes = new Set<string>([
 				NATIVE_UNSUPPORTED,
 				...Object.values(NATIVE_REFUSALS).map((refusal) => refusal.code),
@@ -1325,7 +1484,9 @@ test.each(
 						? ['error', diagnostic.code]
 						: [
 								'warning',
-								[NATIVE_MOUSE_ONLY_CODE, NATIVE_DROP_ONLY_CODE].includes(diagnostic.code)
+								[NATIVE_MOUSE_ONLY_CODE, NATIVE_DROP_ONLY_CODE].includes(
+									diagnostic.code,
+								)
 									? diagnostic.code
 									: NATIVE_KEYBOARD_ONLY_CODE,
 							],
@@ -1357,7 +1518,10 @@ test.each([...navRungFolders(), ...styleRungFolders(), ...sheetStyleRungFolders(
 	'%s: the app payload walks the steps as a stack of screens',
 	async (folder) => {
 		const rung = readRung(folder);
-		const build = await compileRungApp(join(proofsDir, folder), readAppConfig(join(proofsDir, folder)));
+		const build = await compileRungApp(
+			join(proofsDir, folder),
+			readAppConfig(join(proofsDir, folder)),
+		);
 		expect(
 			build.diagnostics.map((diagnostic) => `${diagnostic.page}: ${diagnostic.message}`),
 		).toEqual([]);

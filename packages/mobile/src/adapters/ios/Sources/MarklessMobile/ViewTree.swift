@@ -742,13 +742,14 @@ final class ViewTree {
 	}
 
 	/// The text an element shows, in view order: what `aria-labelledby` and `aria-describedby` read from it.
-	private func text(within view: UIView) -> String {
+	private func text(within view: UIView, skipping skipped: UIView? = nil) -> String {
+		if view === skipped { return "" }
 		if let label = view as? UILabel { return label.text ?? "" }
-		return view.subviews.map { text(within: $0) }.filter { !$0.isEmpty }.joined(separator: " ")
+		return view.subviews.map { text(within: $0, skipping: skipped) }.filter { !$0.isEmpty }.joined(separator: " ")
 	}
 
-	/// Labels and hints taken from the elements an attribute names by id, kept current after every journal; a `<label for>`
-	/// names its control, so VoiceOver reads it there and not a second time on the label.
+	/// Labels and hints taken from the elements an attribute names by id, kept current after every journal; a `<label>` names
+	/// its control with its text, so VoiceOver reads it there and not a second time on the label.
 	private func refreshRelations() {
 		for (id, view) in elements {
 			let current = attributes[id] ?? [:]
@@ -759,7 +760,12 @@ final class ViewTree {
 			}
 			if current["aria-label"] == nil, let label = named("aria-labelledby") { view.accessibilityLabel = label }
 			if let hint = named("aria-describedby") { view.accessibilityHint = hint }
-			if current["for"].flatMap({ elements[$0] }) != nil { view.accessibilityElementsHidden = true }
+			guard let target = current["for"], let control = elements[target] else { continue }
+			let own = attributes[target] ?? [:]
+			let unnamed = own["aria-label"] == nil && own["aria-labelledby"] == nil
+			if unnamed { control.accessibilityLabel = text(within: view, skipping: control) }
+			if !control.isDescendant(of: view) { view.accessibilityElementsHidden = true }
+			else if unnamed { for sub in view.subviews where sub !== control && !control.isDescendant(of: sub) { sub.accessibilityElementsHidden = true } }
 		}
 	}
 
@@ -1125,7 +1131,7 @@ final class ViewTree {
 				let boundFor = try bindings.first { $0.name == "for" }.map { try runtime.evaluate($0.value, in: context.scope).text }
 				if element == "label", let target = staticAttributes["for"] ?? boundFor {
 					// A press on a label activates its control, as a browser does.
-					let forward = LabelForward(target: target, onAction: onAction)
+					let forward = LabelForward(target: target, control: { [weak self] in self?.elements[target] }, onAction: onAction)
 					forwards.append(forward)
 					view.isUserInteractionEnabled = true
 					view.addGestureRecognizer(UITapGestureRecognizer(target: forward, action: #selector(LabelForward.press)))
@@ -1933,12 +1939,21 @@ final class LengthLimit: NSObject, UITextFieldDelegate {
 @MainActor
 final class LabelForward: NSObject {
 	private let target: String
+	private let control: () -> UIView?
 	private let onAction: (NativeAction) -> Void
-	init(target: String, onAction: @escaping (NativeAction) -> Void) {
+	init(target: String, control: @escaping () -> UIView?, onAction: @escaping (NativeAction) -> Void) {
 		self.target = target
+		self.control = control
 		self.onAction = onAction
 	}
-	@objc func press() { onAction(NativeAction(event: .activate, host: target)) }
+	/// A text field takes the keyboard, as a browser focuses it; any other control is pressed.
+	@objc func press() {
+		if let field = control(), field is UITextField || field is UITextView {
+			field.becomeFirstResponder()
+			return
+		}
+		onAction(NativeAction(event: .activate, host: target))
+	}
 }
 
 /// A tap or drag outside a field puts the keyboard away, as a scrolling screen does.
