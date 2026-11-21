@@ -1,0 +1,17 @@
+{
+	"rung": 203,
+	"name": "A handler that runs as JavaScript calls a plain function from @markless/ui (toaster.say): the script carries only the members it reads",
+	"steps": [
+		{ "visible": ["Library helper", "Save", "Copy", "Messages 0"] },
+		{
+			"do": { "tap": "Save" },
+			"visible": ["Messages 1", "Said Saved"],
+			"absent": ["Messages 0"]
+		},
+		{
+			"do": { "tap": "Copy" },
+			"visible": ["Messages 2", "Said Copied", "Said Saved"],
+			"absent": ["Messages 1"]
+		}
+	]
+}

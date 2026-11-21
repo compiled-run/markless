@@ -19,6 +19,12 @@ type Reference = ModuleSemantics['references'][number];
 
 const PRINT = { strip: true, format: 'pretty', indent: 1, comments: false } as const;
 const FRAMEWORK_PREFIX = '@markless/';
+/** A Markless package whose functions are plain code a phone's script can run (@markless/ui's helpers), not the framework. */
+const LIBRARY_PACKAGES: ReadonlyArray<string> = ['@markless/ui'];
+/** Whether an import is the framework's own, which a phone's script reaches only through host services. */
+const isFrameworkImport = (specifier: string): boolean =>
+	specifier.startsWith(FRAMEWORK_PREFIX) &&
+	!LIBRARY_PACKAGES.some((name) => specifier === name || specifier.startsWith(`${name}/`));
 const GLOBAL_OBJECTS = new Set(['window', 'globalThis', 'self']);
 
 const isNode = (value: unknown): value is AnyNode =>
@@ -326,6 +332,19 @@ function methodCalledOn(semantic: ModuleSemantics, node: AnyNode): string | unde
 	return String((read.property as AnyNode).name);
 }
 
+/** The member a reference reads by name (`toasts.queue`), or undefined when it is used otherwise. */
+function memberReadOn(semantic: ModuleSemantics, node: AnyNode): string | undefined {
+	let object: AnyNode = node;
+	let read = semantic.parentOf(node as never) as AnyNode | null;
+	// A shared accessor called with no arguments and read at once: `toasterState().dismiss(id)`.
+	if (read?.type === 'CallExpression' && read.callee === node && ((read.arguments as AnyNode[]) ?? []).length === 0) {
+		object = read;
+		read = semantic.parentOf(read as never) as AnyNode | null;
+	}
+	if (read?.type !== 'MemberExpression' || read.object !== object || read.computed) return undefined;
+	return String((read.property as AnyNode).name);
+}
+
 /** The import record a binding comes from, when it is a value import. */
 function importOf(semantic: ModuleSemantics, binding: Binding) {
 	if (!binding.has(BindingFlags.Import) || binding.has(BindingFlags.TypeImport)) return undefined;
@@ -393,7 +412,7 @@ function importSlots(semantic: ModuleSemantics) {
 		{ readonly index: number; readonly name: string | null; readonly specifier: string }
 	>();
 	for (const entry of semantic.imports) {
-		if (entry.typeOnly || !entry.local || entry.specifier.startsWith(FRAMEWORK_PREFIX))
+		if (entry.typeOnly || !entry.local || isFrameworkImport(entry.specifier))
 			continue;
 		if (entry.kind !== 'named' && entry.kind !== 'namespace') continue;
 		byBinding.set(entry.local.id, {
@@ -403,7 +422,7 @@ function importSlots(semantic: ModuleSemantics) {
 		});
 	}
 	for (const entry of semantic.exports)
-		if (!entry.typeOnly && entry.specifier && !entry.specifier.startsWith(FRAMEWORK_PREFIX))
+		if (!entry.typeOnly && entry.specifier && !isFrameworkImport(entry.specifier))
 			slot(entry.specifier, entry.node as AnyNode);
 	const record = (binding: Binding) => byBinding.get(binding.id);
 	const reach = (binding: Binding): AnyNode | undefined => {
@@ -501,7 +520,7 @@ export function scriptFunctionOf(
 	const viaState = new Map<number, Binding>();
 	const names = new Map<
 		string,
-		{ name: string; written: boolean; span: SourceSpan; calledOnly?: string[] }
+		{ name: string; written: boolean; span: SourceSpan; calledOnly?: string[]; membersOnly?: string[] }
 	>();
 	const framework: { name: string; source: string; span: SourceSpan }[] = [];
 	const navigates: SourceSpan[] = [];
@@ -510,7 +529,7 @@ export function scriptFunctionOf(
 	const replaced = new Map<AnyNode, AnyNode>();
 	const unsupported: { construct: string; span: SourceSpan }[] = [];
 	const moduleNames = new Set<string>();
-	const usedImports = new Map<string, { slot: number; name: string | null }>();
+	const usedImports = new Map<string, { slot: number; name: string | null; members?: string[] }>();
 	for (let index = 0; index < parts.length; index++) {
 		const part = parts[index]!;
 		const dead = deadIn(part);
@@ -539,7 +558,7 @@ export function scriptFunctionOf(
 				devices.push({ call: device[0], span: spanOf(node as never, filename) });
 				continue;
 			}
-			if (entry?.specifier.startsWith(FRAMEWORK_PREFIX)) {
+			if (entry && isFrameworkImport(entry.specifier)) {
 				framework.push({
 					name: reference.name,
 					source: entry.specifier,
@@ -551,9 +570,18 @@ export function scriptFunctionOf(
 			if (imported) {
 				replaced.set(node, imported);
 				const slot = imports.record(binding)!;
-				usedImports.set(`${slot.index}\0${slot.name}`, {
+				const key = `${slot.index}\0${slot.name}`;
+				// `toaster.say(...)`: only the members read reach the script, so a namespace's other exports stay out.
+				const member = memberReadOn(semantic, node);
+				const known = usedImports.get(key);
+				const members =
+					(known === undefined || known.members !== undefined) && member !== undefined
+						? [...new Set([...(known?.members ?? []), member])]
+						: undefined;
+				usedImports.set(key, {
 					slot: slot.index,
 					name: slot.name,
+					...(members ? { members } : {}),
 				});
 				continue;
 			}
@@ -594,11 +622,17 @@ export function scriptFunctionOf(
 				(known === undefined || known.calledOnly !== undefined) && method !== undefined
 					? [...new Set([...(known?.calledOnly ?? []), method])]
 					: undefined;
+			const memberRead = memberReadOn(semantic, node);
+			const membersOnly =
+				(known === undefined || known.membersOnly !== undefined) && memberRead !== undefined
+					? [...new Set([...(known?.membersOnly ?? []), memberRead])]
+					: undefined;
 			names.set(binding.name, {
 				name: binding.name,
 				written: (known?.written ?? false) || reference.isWrite,
 				span: known?.span ?? spanOf(node as never, filename),
 				...(calledOnly ? { calledOnly } : {}),
+				...(membersOnly ? { membersOnly } : {}),
 			});
 		}
 	}
@@ -723,7 +757,7 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 				devices.push({ call: device[0], span: spanOf(at as never, filename) });
 				continue;
 			}
-			if (entry?.specifier.startsWith(FRAMEWORK_PREFIX)) {
+			if (entry && isFrameworkImport(entry.specifier)) {
 				framework.push({
 					name: reference.name,
 					source: entry.specifier,
@@ -826,7 +860,7 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 		describe(declaration, declares, declares.length === 0);
 	}
 	for (const entry of semantic.exports) {
-		if (entry.typeOnly || entry.specifier?.startsWith(FRAMEWORK_PREFIX)) continue;
+		if (entry.typeOnly || (entry.specifier && isFrameworkImport(entry.specifier))) continue;
 		if (entry.kind === 'named') {
 			if (
 				!entry.local ||
