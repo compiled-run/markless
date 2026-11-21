@@ -135,7 +135,10 @@
 	"states": [
 		{
 			"cell": "case:h4",
-			"domain": [false, true],
+			"domain": [
+				false,
+				true
+			],
 			"initial": true
 		}
 	],

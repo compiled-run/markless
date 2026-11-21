@@ -480,7 +480,10 @@ public final class NativeRuntime {
 	}
 
 	/// The current value of a cell.
-	public func value(of cell: String) throws -> NativeValue { try read(cell) }
+	public func value(of cell: String) throws -> NativeValue {
+		if let styleCase = payload.styleCases.first(where: { $0.id == cell }) { return .bool(try evaluate(styleCase.value).isTruthy) }
+		return try read(cell)
+	}
 
 	public func evaluate(_ expr: NativeExpr, in scope: NativeScope = .empty) throws -> NativeValue {
 		let evaluate = { (inner: NativeExpr) throws -> NativeValue in try self.evaluate(inner, in: scope) }

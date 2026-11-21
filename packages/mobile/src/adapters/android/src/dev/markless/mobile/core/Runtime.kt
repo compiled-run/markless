@@ -240,7 +240,7 @@ class Runtime(
 	/** The fields of the event whose handler is running, by the name an `event` expression reads. */
 	private var fields: Map<String, JsValue>? = null
 
-	fun value(cell: String): JsValue = values[cell] ?: throw MarklessRuntimeError("unknown cell \"$cell\"")
+	fun value(cell: String): JsValue = values[cell] ?: styleCases().firstOrNull { it.first == cell }?.let { JsValue.Bool(it.second) } ?: throw MarklessRuntimeError("unknown cell \"$cell\"")
 
 	/** Where a cell's value is kept: its id, or `<id>@<key>` for a row's own state, read in that row. */
 	private fun slot(cell: String, scope: Scope): String {

@@ -203,7 +203,8 @@ class MarklessHost(
 	private val scrollers = HashMap<String, Pair<List<FrameLayout>, MarklessBox>>()
 	private val dpr = context.resources.displayMetrics.density.toDouble()
 	private var enterPressedAt = Long.MIN_VALUE / 2
-	private val styledCells = payload.cells.filter { it.styled }.map { it.id }
+	// A style case is a state of the export as a styled cell is; the runtime answers its value.
+	private val styledCells = payload.cells.filter { it.styled }.map { it.id } + payload.styleCases.map { it.id }
 	/** Each @if or @try outside list rows: its style state is the arm it shows. */
 	private val styledBranches = payload.nodes.filter { it is Node.Branch && it.row == null }.map { it.id }
 
