@@ -51,7 +51,21 @@
 			"kind": "text",
 			"id": "h2:text0",
 			"parent": "h2",
-			"text": "Quiet note"
+			"text": "Quiet note",
+			"textByState": [
+				{
+					"when": {
+						"state:shown.loud": false
+					},
+					"value": "Quiet note"
+				},
+				{
+					"when": {
+						"state:shown.loud": true
+					},
+					"value": "Loud note"
+				}
+			]
 		},
 		{
 			"kind": "element",

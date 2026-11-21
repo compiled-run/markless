@@ -8,7 +8,7 @@
 			"element": "main",
 			"parent": null,
 			"attributes": {
-				"class": "screen mk-w9vukk"
+				"class": "screen mk-1ww6lsm"
 			}
 		},
 		{
@@ -17,7 +17,7 @@
 			"element": "h1",
 			"parent": "h0",
 			"attributes": {
-				"class": "mk-w9vukk"
+				"class": "mk-1ww6lsm"
 			}
 		},
 		{
@@ -38,28 +38,28 @@
 						"state:shown.open": false,
 						"state:shown.loud": false
 					},
-					"value": "shut mk-w9vukk"
+					"value": "shut mk-1ww6lsm"
 				},
 				{
 					"when": {
 						"state:shown.open": false,
 						"state:shown.loud": true
 					},
-					"value": "shut mk-w9vukk"
+					"value": "shut mk-1ww6lsm"
 				},
 				{
 					"when": {
 						"state:shown.open": true,
 						"state:shown.loud": false
 					},
-					"value": "open mk-w9vukk"
+					"value": "open mk-1ww6lsm"
 				},
 				{
 					"when": {
 						"state:shown.open": true,
 						"state:shown.loud": true
 					},
-					"value": "open mk-w9vukk"
+					"value": "open mk-1ww6lsm"
 				}
 			]
 		},
@@ -67,7 +67,37 @@
 			"kind": "text",
 			"id": "h2:text0",
 			"parent": "h2",
-			"text": "Door shut"
+			"text": "Door shut",
+			"textByState": [
+				{
+					"when": {
+						"state:shown.open": false,
+						"state:shown.loud": false
+					},
+					"value": "Door shut"
+				},
+				{
+					"when": {
+						"state:shown.open": false,
+						"state:shown.loud": true
+					},
+					"value": "Door shut"
+				},
+				{
+					"when": {
+						"state:shown.open": true,
+						"state:shown.loud": false
+					},
+					"value": "Door open"
+				},
+				{
+					"when": {
+						"state:shown.open": true,
+						"state:shown.loud": true
+					},
+					"value": "Door open"
+				}
+			]
 		},
 		{
 			"kind": "element",
@@ -81,28 +111,28 @@
 						"state:shown.open": false,
 						"state:shown.loud": false
 					},
-					"value": "note quiet mk-w9vukk"
+					"value": "note quiet mk-1ww6lsm"
 				},
 				{
 					"when": {
 						"state:shown.open": false,
 						"state:shown.loud": true
 					},
-					"value": "note loud mk-w9vukk"
+					"value": "note loud mk-1ww6lsm"
 				},
 				{
 					"when": {
 						"state:shown.open": true,
 						"state:shown.loud": false
 					},
-					"value": "note quiet mk-w9vukk"
+					"value": "note quiet mk-1ww6lsm"
 				},
 				{
 					"when": {
 						"state:shown.open": true,
 						"state:shown.loud": true
 					},
-					"value": "note loud mk-w9vukk"
+					"value": "note loud mk-1ww6lsm"
 				}
 			]
 		},
@@ -110,7 +140,37 @@
 			"kind": "text",
 			"id": "h3:text0",
 			"parent": "h3",
-			"text": "Quiet note"
+			"text": "Quiet note",
+			"textByState": [
+				{
+					"when": {
+						"state:shown.open": false,
+						"state:shown.loud": false
+					},
+					"value": "Quiet note"
+				},
+				{
+					"when": {
+						"state:shown.open": false,
+						"state:shown.loud": true
+					},
+					"value": "Loud note"
+				},
+				{
+					"when": {
+						"state:shown.open": true,
+						"state:shown.loud": false
+					},
+					"value": "Quiet note"
+				},
+				{
+					"when": {
+						"state:shown.open": true,
+						"state:shown.loud": true
+					},
+					"value": "Loud note"
+				}
+			]
 		},
 		{
 			"kind": "element",
@@ -118,7 +178,7 @@
 			"element": "button",
 			"parent": "h0",
 			"attributes": {
-				"class": "tap mk-w9vukk"
+				"class": "tap mk-1ww6lsm"
 			}
 		},
 		{
@@ -133,7 +193,7 @@
 			"element": "button",
 			"parent": "h0",
 			"attributes": {
-				"class": "tap mk-w9vukk"
+				"class": "tap mk-1ww6lsm"
 			}
 		},
 		{
@@ -143,7 +203,7 @@
 			"text": "Toggle loud"
 		}
 	],
-	"css": ".screen.mk-w9vukk {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\t.shut.mk-w9vukk {\n\t\t\t\tcolor: #8a8a8a;\n\t\t\t}\n\t\t\t.open.mk-w9vukk {\n\t\t\t\tcolor: #1b6b2e;\n\t\t\t}\n\t\t\t.note.loud.mk-w9vukk {\n\t\t\t\tfont-weight: 700;\n\t\t\t\tfont-size: 24px;\n\t\t\t}\n\t\t\t.tap.mk-w9vukk {\n\t\t\t\tdisplay: block;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 12px 20px;\n\t\t\t\tborder: 2px solid #1d1b16;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffd166;\n\t\t\t\tcolor: #1d1b16;\n\t\t\t\tfont-size: 18px;\n\t\t\t}",
+	"css": ".screen.mk-1ww6lsm {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\t.shut.mk-1ww6lsm {\n\t\t\t\tcolor: #8a8a8a;\n\t\t\t}\n\t\t\t.open.mk-1ww6lsm {\n\t\t\t\tcolor: #1b6b2e;\n\t\t\t}\n\t\t\t.note.loud.mk-1ww6lsm {\n\t\t\t\tfont-weight: 700;\n\t\t\t\tfont-size: 24px;\n\t\t\t}\n\t\t\t.tap.mk-1ww6lsm {\n\t\t\t\tdisplay: block;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 12px 20px;\n\t\t\t\tborder: 2px solid #1d1b16;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffd166;\n\t\t\t\tcolor: #1d1b16;\n\t\t\t\tfont-size: 18px;\n\t\t\t}",
 	"states": [
 		{
 			"cell": "state:shown.open",
