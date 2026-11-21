@@ -21,6 +21,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewParent
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -59,6 +60,7 @@ import dev.markless.mobile.core.Scope
 import dev.markless.mobile.core.Store
 import dev.markless.mobile.style.Assignment
 import dev.markless.mobile.style.BAND_KEY
+import dev.markless.mobile.style.ShadowPaint
 import dev.markless.mobile.style.StyleExport
 import dev.markless.mobile.style.shownRows
 import dev.markless.mobile.style.rowStates
@@ -187,6 +189,8 @@ class MarklessHost(
 	private val glyphLines = HashMap<TextView, GlyphLines>()
 	/** Each styled text view's node and its frame origin inside the view, for drawing its lines again when its text changes. */
 	private val lineSources = HashMap<TextView, Pair<StyledNode, Pair<Double, Double>>>()
+	/** The shadow each box's bitmaps were rastered for. */
+	private val shadowsDrawn = HashMap<View, ShadowPaint>()
 	/** Without a style export, text flows in paragraphs (one text view each); with one, Dragon lays out every text node. */
 	private val flow: TextFlow? = if (style == null) TextFlow(payload) else null
 	/** Each shown text instance's current string, which its paragraph view is rendered from. */
@@ -1445,6 +1449,7 @@ class MarklessHost(
 			if (view is MarklessBox) sizeScroller(inst.id, view, s, rect)
 		}
 		paint(view, s)
+		paintShadow(view, s, styled)
 		if (view is TextView && node is Node.Text) {
 			lineSources[view] = s to inView
 			drawLines(view)
@@ -1452,6 +1457,34 @@ class MarklessHost(
 		// A box that paints nothing (an empty clip) has no order to keep.
 		val paintsNothing = (view as? MarklessBox)?.clip?.isEmpty == true
 		(view.parent as? MarklessBox)?.order(view, s.writes.filterIsInstance<StyleWrite.PaintOrder>().firstOrNull()?.takeIf { !paintsNothing }?.let { checkSiblingOrderSuffices(s, it, styled); it.bucket * 100_000 + it.rank + 1 } ?: 0)
+	}
+
+	/** box-shadow: rastered by Dragon's translated painter after a layout that moves or changes the box or what is beneath it. */
+	private fun paintShadow(view: View, s: StyledNode, styled: Assignment) {
+		val shadow = ShadowPaint.of(s, styled, dpr)
+		val parent = view.parent as? MarklessBox
+		if (shadow == null) {
+			shadowsDrawn.remove(view)
+			parent?.childShadow(view, null)
+			(view as? MarklessBox)?.insetShadow = null
+			return
+		}
+		if (shadowsDrawn[view] == shadow) return
+		if (shadow.hasOuter && parent == null) throw MarklessHostError("\"${s.id}\" has an outer box-shadow outside any box; not implemented on Android")
+		if (shadow.hasInset && view !is MarklessBox) throw MarklessHostError("\"${s.id}\" has an inset box-shadow on a ${view.javaClass.simpleName}; not implemented on Android")
+		if (shadow.hasOuter && (view as? MarklessBox)?.clip != null) throw MarklessHostError("\"${s.id}\" has a box-shadow and a clip-path; not implemented on Android")
+		val raster = ShadowRaster.dragon ?: throw MarklessHostError("box-shadow is rastered by Dragon's translated painter, which this build does not link")
+		val (outer, inset) = raster.raster(shadow)
+		parent?.childShadow(view, outer)
+		(view as? MarklessBox)?.insetShadow = inset
+		shadowsDrawn[view] = shadow
+		// The shadow reaches past its box: each box around it up to one that clips its overflow lets its children draw outside them.
+		var at: ViewParent? = parent
+		while (outer != null && at is MarklessBox && !at.clipsOverflow) {
+			val around = at.parent as? MarklessBox ?: break
+			around.clipChildren = false
+			at = around
+		}
 	}
 
 	/** Draws Dragon's lines over a text view whose text is still the one Dragon laid out; otherwise the view draws its own text. */
@@ -1565,7 +1598,9 @@ class MarklessHost(
 			}
 			StyleWrite.ClipText -> {}
 			is StyleWrite.PaintOrder -> {}
+			is StyleWrite.BoxShadow -> {}
 		}
+		if (view is MarklessBox) view.clipsOverflow = clipsChildren
 		if (s.kind != "text") {
 			val edges = s.borderWidths
 			if (clipsChildren && edges != null && listOf(edges.top, edges.right, edges.bottom, edges.left).any { it != 0.0 }) throw MarklessHostError("\"${s.id}\" clips overflow to its padding box past borders, which is not implemented on Android")

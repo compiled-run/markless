@@ -427,6 +427,7 @@ async function dragonHarfBuzz(tools: AndroidTools): Promise<string> {
 	return library;
 }
 
+// largeHeap: Dragon's translated shadow painter boxes every channel; a 1072 by 497 px layer needs about 300 MB (JVM), past the default 192 MB.
 const androidManifest = (
 	permissions: ReadonlyArray<string>,
 	cleartextToTestServer = false,
@@ -434,7 +435,7 @@ const androidManifest = (
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="${PROOF_APP_ID}" android:versionCode="1" android:versionName="1.0">
 	<uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />
 ${permissions.map((name) => `\t<uses-permission android:name="${name}" />\n`).join('')}
-	<application android:label="${PROOF_APP_NAME}" android:hasCode="true"${cleartextToTestServer ? ` android:networkSecurityConfig="@xml/${NETWORK_CONFIG}"` : ''}>
+	<application android:label="${PROOF_APP_NAME}" android:hasCode="true" android:largeHeap="true"${cleartextToTestServer ? ` android:networkSecurityConfig="@xml/${NETWORK_CONFIG}"` : ''}>
 		<activity android:name="${ANDROID_SHELL_ACTIVITY}" android:exported="true" android:windowSoftInputMode="adjustResize" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode">
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN" />

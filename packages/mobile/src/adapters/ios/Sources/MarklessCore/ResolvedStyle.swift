@@ -23,13 +23,15 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var paintOrder: (bucket: Int, rank: Int)?
 	/// Set on a scroll container: the axes CSS lets scroll, its offset range in points, and its scroll view's look.
 	public var scroll: ResolvedScroll?
+	/// box-shadow, rastered by Dragon's translated painter after every layout.
+	public var shadow: BoxShadow?
 
 	public static func == (a: ResolvedStyle, b: ResolvedStyle) -> Bool {
 		a.frame == b.frame && a.background == b.background && a.borderWidth == b.borderWidth && a.borderColor == b.borderColor
 			&& a.cornerRadius == b.cornerRadius && a.font?.family == b.font?.family && a.font?.size == b.font?.size
 			&& a.textColor == b.textColor && a.lines == b.lines && a.linesText == b.linesText && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll
 			&& a.clipsChildren == b.clipsChildren && a.clipRect == b.clipRect
-			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank
+			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank && a.shadow == b.shadow
 	}
 
 	public struct DashedBorder: Equatable, Sendable {
@@ -184,7 +186,9 @@ extension StyleExport {
 		}
 		return StyleLayout(
 			assignments: try assignments.indices.map { index in
-				try resolveNodes(assignments[index].nodes, for: nodes, root: root, initialTexts: index == start ? initialTexts : nil)
+				try resolveNodes(
+					assignments[index].nodes, for: nodes, root: root, initialTexts: index == start ? initialTexts : nil,
+					canvas: assignments[index].canvas, body: assignments[index].body)
 			},
 			canvases: assignments.map(\.canvas),
 			bodies: try assignments.map { assignment in
@@ -210,7 +214,8 @@ extension StyleExport {
 	}
 
 	private func resolveNodes(
-		_ nodes: [StyleNode], for payloadNodes: [NativeNode], root: String?, initialTexts: [(node: String, text: String)]?
+		_ nodes: [StyleNode], for payloadNodes: [NativeNode], root: String?, initialTexts: [(node: String, text: String)]?,
+		canvas: RGBA?, body: RGBA?
 	) throws -> [String: ResolvedStyle] {
 		let byId = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
 		let payloadIds = Set(payloadNodes.map(\.id))
@@ -244,6 +249,7 @@ extension StyleExport {
 				throw styleError("\(node.id)'s parent is \(node.parent ?? "none") in the payload, \(cursor ?? "none") in the style export")
 			}
 			var style = try resolve(styled, styled.writes)
+			style.shadow = try BoxShadow.of(styled, byId: byId, canvas: canvas, body: body, dpr: dpr)
 			// A box that paints nothing (an empty clip) has no order to keep.
 			if style.clipRect.map({ $0.width == 0 || $0.height == 0 }) ?? false { style.paintOrder = nil }
 			if style.paintOrder != nil, let host = reHostOf(styled.writes) { try checkSiblingOrderSuffices(styled, host: host, byId: byId, nodes: nodes) }
@@ -265,6 +271,7 @@ extension StyleExport {
 				cursor = skipped.parent
 			}
 			var style = try resolve(styled, styled.writes)
+			style.shadow = try BoxShadow.of(styled, byId: byId, canvas: canvas, body: body, dpr: dpr)
 			if let frame = style.frame {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
 			}
@@ -343,6 +350,7 @@ extension StyleExport {
 				style.clipRect = r <= l || b <= t ? Frame(x: 0, y: 0, width: 0, height: 0) : Frame(x: l, y: t, width: r - l, height: b - t)
 			case .clipText: break
 			case let .paintOrder(_, bucket, rank): style.paintOrder = (bucket, rank)
+			case .boxShadow: break
 			}
 		}
 		// A scroll view clips its own content; any other box clips its children.

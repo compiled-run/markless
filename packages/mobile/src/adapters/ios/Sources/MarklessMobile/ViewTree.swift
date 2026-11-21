@@ -328,6 +328,8 @@ final class ViewTree {
 	private var topLayer: (layer: TopLayerView, home: UIView, index: Int)?
 	/// The scroll view each scroll container hosts its children in.
 	private var scrollViews: [String: ContainerScrollView] = [:]
+	/// Each box's shadow layers, while it has a shadow.
+	private var shadows: [String: ShadowLayers] = [:]
 	/// What a stopped submit says, shown until the person's next action.
 	private var message: UILabel?
 	private var touches: TouchWatcher?
@@ -406,6 +408,7 @@ final class ViewTree {
 		if layout != nil {
 			root.layer.insertSublayer(bodyLayer, at: 0)
 			paintBody()
+			restackShadows()
 		}
 	}
 
@@ -736,6 +739,7 @@ final class ViewTree {
 		refreshRelations()
 		refreshSelects()
 		if layout == nil { alignTables() }
+		restackShadows()
 		overlays.flush()
 		announce(liveChanges)
 	}
@@ -866,12 +870,29 @@ final class ViewTree {
 		try paint(view, style, faces: faces)
 		if let label = view as? UILabel { drawLines(label, style) }
 		if let host = view.superview as? ContainerScrollView { view.frame.origin = CGPoint(x: view.frame.minX - host.inset.left, y: view.frame.minY - host.inset.top) }
+		try paintShadow(id, view, style)
 		guard let scroll = scrollViews[id] else {
 			if style.scroll != nil { throw HostError("\(id) became a scroll container after it was built") }
 			return
 		}
 		guard let s = style.scroll else { throw HostError("\(id) stopped being a scroll container after it was built") }
 		scroll.configure(s, in: view.bounds.size, cornerRadius: style.cornerRadius)
+	}
+
+	/// Views inserted beside a box since its shadow was placed go beneath that shadow again.
+	private func restackShadows() {
+		for (id, layers) in shadows { if let view = elements[id] { layers.restack(beneath: view) } }
+	}
+
+	private func paintShadow(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws {
+		guard let shadow = style.shadow else {
+			shadows.removeValue(forKey: id)?.remove()
+			return
+		}
+		if style.clipRect != nil { throw HostError("\(id): box-shadow on a box with a clip-path is not implemented on iOS") }
+		let layers = shadows[id] ?? ShadowLayers()
+		shadows[id] = layers
+		try layers.apply(shadow, to: view)
 	}
 
 	/// Draws Dragon's lines over a label in a system face while its text is the one Dragon laid out; otherwise the label draws its own.
@@ -1393,6 +1414,7 @@ final class ViewTree {
 		}
 		labels.removeValue(forKey: id)?.removeFromSuperview()
 		scrollViews.removeValue(forKey: id)
+		shadows.removeValue(forKey: id)?.remove()
 		paragraphs.removeValue(forKey: id)?.view.removeFromSuperview()
 		paragraphTexts.removeValue(forKey: id)
 		flowing.remove(id)

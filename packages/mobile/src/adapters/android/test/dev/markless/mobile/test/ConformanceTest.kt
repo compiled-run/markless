@@ -36,6 +36,8 @@ import dev.markless.mobile.style.BandAtom
 import dev.markless.mobile.style.BandComparison
 import dev.markless.mobile.style.Bands
 import dev.markless.mobile.style.Rgba
+import dev.markless.mobile.style.Shadow
+import dev.markless.mobile.style.ShadowPaint
 import dev.markless.mobile.style.GlyphRun
 import dev.markless.mobile.style.StyleExport
 import dev.markless.mobile.style.shownRows
@@ -367,7 +369,7 @@ private fun styleExport(fixtures: File) {
 		val err = try { StyleExport.decode(changed.toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
 		check("style export refuses $name", err != null && err.contains(fragment)) { "error was: $err" }
 	}
-	refusesStyle("an unknown write kind", text.replace("\"kind\": \"text-color\"", "\"kind\": \"box-shadow\""), "unknown style write kind \"box-shadow\"")
+	refusesStyle("an unknown write kind", text.replace("\"kind\": \"text-color\"", "\"kind\": \"text-shadow\""), "unknown style write kind \"text-shadow\"")
 	refusesStyle("an unknown schema", text.replace("native-style-export/0", "native-style-export/9"), "unknown style export schema")
 }
 
@@ -383,6 +385,32 @@ private fun dashedBorders(fixtures: File) {
 	}
 	val err = try { StyleExport.decode(text.replace("\"op\": \"dot\"", "\"op\": \"arc\"").toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
 	check("style export refuses an unknown border operation", err?.contains("unknown border operation \"arc\"") == true) { "error was: $err" }
+}
+
+// The u122 rung's export (proofs/u122-box-shadow): an outer, an inset and a rounded spread shadow.
+private fun boxShadows(fixtures: File) {
+	val text = File(fixtures, "u122-box-shadow.native-style.json").readText()
+	val export = runCatching { StyleExport.decode(text.toByteArray()) }
+	check("decodes the u122 export's box-shadow writes", export.isSuccess) { export.exceptionOrNull().toString() }
+	export.getOrNull()?.let { e ->
+		val short = e.assignments[0]
+		val outer = ShadowPaint.of(short.byId.getValue("h2"), short, e.dpr)
+		check("an outer shadow keeps its computed values", outer?.shadows == listOf(Shadow(false, 0.0, 2.0, 6.0, 0.0, Rgba(0, 0, 0, 51)))) { "$outer" }
+		check("an outer shadow is only outer", outer?.hasOuter == true && outer.hasInset == false) { "$outer" }
+		// 52.5 and 222.03125 device px from the page, 974 by 125.5: the snapped border box.
+		check("the box is snapped in page device px", outer?.box?.edges == listOf(53.0, 222.0, 1027.0, 348.0)) { "${outer?.box}" }
+		// The white canvas, then main's background; html's and body's transparent writes paint nothing.
+		check("the backdrop is the canvas and main", outer?.backdrop?.map { it.background } == listOf(Rgba(255, 255, 255, 255), Rgba(244, 241, 234, 255))) { "${outer?.backdrop}" }
+		val inset = ShadowPaint.of(short.byId.getValue("h3"), short, e.dpr)
+		check("an inset shadow is only inset", inset?.hasInset == true && inset.hasOuter == false) { "$inset" }
+		val rounded = ShadowPaint.of(short.byId.getValue("h4"), short, e.dpr)
+		check("a rounded shadow has its radii and spread", rounded?.box?.radii == List(8) { 14.0 } && rounded.shadows.single().spread == 3.0) { "$rounded" }
+		check("a box without box-shadow has none", ShadowPaint.of(short.byId.getValue("h5"), short, e.dpr) == null) { "" }
+		val tall = e.assignments[1]
+		check("the shadow follows the box into another assignment", ShadowPaint.of(tall.byId.getValue("h4"), tall, e.dpr) != rounded) { "" }
+	}
+	val err = try { StyleExport.decode(text.replace("\"dragonShadow.shadows\"", "\"dragonShadow.list\"").toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
+	check("style export refuses a box-shadow write with another key", err?.contains("dragonShadow.shadows") == true) { "error was: $err" }
 }
 
 private fun textLines(fixtures: File) {
@@ -759,6 +787,7 @@ fun main(args: Array<String>) {
 	appStyle(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	appCanvas(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	dashedBorders(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	boxShadows(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	textLines(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	systemFonts(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	sheetStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
