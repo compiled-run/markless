@@ -6052,13 +6052,6 @@ export function createNativeViewPayload(
 			);
 			if (known) continue;
 			readsMissing = true;
-			if (touch && read.path[0] && read.path[0] in EVENT_FIELDS.pointer) {
-				refuseScript(
-					`${what} reads \`event.${read.path.join('.')}\`, an element, which JavaScript on a phone cannot hold yet`,
-					read.span,
-				);
-				continue;
-			}
 			const doing =
 				semantic === 'input'
 					? 'a text edit'
