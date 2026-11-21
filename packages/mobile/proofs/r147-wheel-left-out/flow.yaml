@@ -1,0 +1,18 @@
+appId: ${APP_ID}
+name: r147-wheel-left-out
+---
+- launchApp:
+    clearState: true
+- assertVisible: Slides
+- assertVisible: Slide 1
+- assertVisible: Next slide
+- assertNotVisible: Slide 2
+- tapOn: Next slide
+- assertVisible: Slide 2
+- assertNotVisible: Slide 1
+- assertVisible: Slide 2
+- assertNotVisible: Slide 1
+- tapOn: Next slide
+- assertNotVisible: Slide 2
+- assertVisible: Slide 3
+- assertNotVisible: Slide 2

@@ -268,6 +268,11 @@ async function act(page: Page, step: LadderStep) {
 			await backdrop!.dispatchEvent(type, { button: 0, isPrimary: true, pointerType: 'touch' });
 	}
 	else if ('drag' in action) await drag(page, action.drag.on, action.drag.direction);
+	else if ('slide' in action) {
+		const slider = page.getByRole('slider', { name: action.slide.field, exact: true });
+		await slider.focus();
+		await slider.press(action.slide.to === 'max' ? 'End' : 'Home');
+	}
 	else if ('appearance' in action) await page.emulateMedia({ colorScheme: action.appearance });
 	else if ('orientation' in action) {
 		const { width, height } = page.viewportSize()!;
@@ -437,7 +442,7 @@ describe.each(allRungFolders())('%s', (folder) => {
 					});
 				}
 			}
-			expect(errors).toEqual([]);
+			expect(errors).toEqual(rung.web?.consoleErrors ?? []);
 			await context.close();
 		},
 	);
