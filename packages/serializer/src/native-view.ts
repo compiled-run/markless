@@ -156,6 +156,9 @@ export type NativeExpr =
  */
 export const NATIVE_DOCUMENT_BODY = '#body';
 
+/** A handle whose element is not on the page, as JavaScript on the phone receives it: it reads as `undefined`, as on the web. */
+export const NATIVE_UNBOUND_HANDLE = '#unbound';
+
 /**
  * What the names of a script function mean, resolved where it runs: a cell it may write (inside a list row the host reads
  * and writes that row's value, `<cell>@<key>`), a state object as one cell per field, or a value it only reads.

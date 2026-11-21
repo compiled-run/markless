@@ -25,6 +25,7 @@ import {
 	NATIVE_DATA_SCRIPT_TYPES,
 	NATIVE_ELEMENTS,
 	NATIVE_DOCUMENT_BODY,
+	NATIVE_UNBOUND_HANDLE,
 	NATIVE_UNSHOWN_ELEMENTS,
 	NATIVE_SCRIPT_EVENT_MEMBERS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
@@ -807,6 +808,7 @@ function mentionsElement(expr: unknown): boolean {
 	if (!expr || typeof expr !== 'object') return false;
 	if ('element' in expr && typeof (expr as ElementValue).element === 'string') return true;
 	if ('drawn' in expr && typeof expr.drawn === 'string') return true;
+	if ('literal' in expr && expr.literal === NATIVE_UNBOUND_HANDLE) return true;
 	return Object.values(expr).some((child) =>
 		Array.isArray(child) ? child.some(mentionsElement) : mentionsElement(child),
 	);
@@ -3060,9 +3062,12 @@ export function createNativeViewPayload(
 			const unarmed = bound.filter((id) => !byId.get(id)?.arm);
 			if (unarmed.length > 0 && bound.length > 1)
 				return refuse(`${what}, a handle bound to more than one element`);
-			return bound
+			const drawn = bound
 				.map((id): NativeExpr => ({ drawn: id }))
 				.reduceRight((right, left) => ({ logical: '??', left, right }));
+			return scriptReading
+				? { logical: '??', left: drawn, right: { literal: NATIVE_UNBOUND_HANDLE } }
+				: drawn;
 		}
 		if (bound.some((id) => byId.get(id)?.arm))
 			return refuse(`${what}, a handle bound inside an @if arm within a @for row`);
@@ -3103,7 +3108,8 @@ export function createNativeViewPayload(
 		if (plural)
 			return { array: bound.map((id) => ({ spread: false, value: elementValue(id) })) };
 		if (bound.length > 1) return refuse(`${what}, a handle bound to more than one element`);
-		return bound[0] ? elementValue(bound[0]) : { literal: null };
+		if (bound[0]) return elementValue(bound[0]);
+		return scriptReading ? { literal: NATIVE_UNBOUND_HANDLE } : { literal: null };
 	};
 
 	/** Whether a node is an `<input>` a person ticks: a checkbox or a radio button. */

@@ -15,7 +15,7 @@ export default function App() @{
 		<button
 			onClick={() => {
 				let seen = 'Script sees';
-				for (const one of [field]) seen += one ? ' the field' : ' nothing';
+				for (const one of [field]) seen += one === undefined ? ' nothing' : ' the field';
 				note = seen;
 				field?.focus();
 			}}
