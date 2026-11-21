@@ -1,4 +1,4 @@
-import type { NativeAction, NativeAppAction } from '../src/index.ts';
+import type { NativeAction, NativeAppAction, NativeElementBox } from '../src/index.ts';
 import type { DeviceAppConfig } from '../src/permissions.ts';
 import { nodeScriptHost } from '../src/node-engine.ts';
 
@@ -22,6 +22,8 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	readonly params?: Readonly<Record<string, string>>;
 	/** What the device's clock reads, for a component that reads it. */
 	readonly now?: number;
+	/** Each measured element's box and direction, for a script that measures. */
+	readonly layout?: Readonly<Record<string, NativeElementBox>>;
 	/** The app config's usage text, for a component that uses a device feature that asks. */
 	readonly device?: DeviceAppConfig;
 	/** The device's preferred languages, when the vector shows a message in one. */
@@ -1237,6 +1239,28 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h5' },
 			{ event: 'activate', host: 'component-edge:1/h1' },
 			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		name: 'element-measure',
+		fixture: 'test/fixtures/TrackMeasure.tsrx',
+		layout: {
+			h1: { x: 20, y: 40, width: 320, height: 24, direction: 'ltr' },
+			h2: { x: 20, y: 80, width: 320, height: 24, direction: 'rtl' },
+		},
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		name: 'script-clock-errors',
+		fixture: 'test/fixtures/ClockAndErrors.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
 		],
 	},
 	{

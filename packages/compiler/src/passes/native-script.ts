@@ -118,6 +118,18 @@ if (!host) {
 		return Class;
 	};
 	for (var domName in domClasses) defineClass(domName);
+	if (typeof g.performance !== 'object' || typeof g.performance.now !== 'function') {
+		var origin = Date.now(), last = 0;
+		// Date.now() can step back when the device clock is set; elapsed time never does.
+		g.performance = { timeOrigin: origin, now: function () { return (last = Math.max(last, Date.now() - origin)); } };
+	}
+	if (typeof g.DOMException !== 'function') {
+		g.DOMException = function DOMException(message, name) {
+			this.message = message === undefined ? '' : String(message);
+			this.name = name === undefined ? 'Error' : String(name);
+		};
+		g.DOMException.prototype = Object.create(Error.prototype, { constructor: { value: g.DOMException, writable: true, configurable: true } });
+	}
 	var Headers = function (pairs) {
 		this.get = function (name) {
 			var key = String(name).toLowerCase(), found = [];
@@ -343,6 +355,10 @@ if (!host) {
 		if (!deviceCalls[call].object) host.devices[device] = callsOn(device, null);
 	});
 	host.deviceObject = callsOn;
+	g.getComputedStyle = function (element) {
+		if (!element || typeof element.__style !== 'function') throw new TypeError('getComputedStyle() takes an element');
+		return element.__style();
+	};
 	g.window = g.self = g;
 	// The page's one member a phone answers: the focused element (the body when none is), which the build allows alone.
 	g.document = { get activeElement() { return host.focus(); } };
@@ -536,7 +552,8 @@ var pathOf = function (pattern, params) {
 	}).join('/');
 };
 // An element is a proxy that offers only what the host answers: the attributes it has now, whether it holds another
-// element, and the commands a handler's data can run. No tree walking, no selectors, no layout.
+// element, its box and direction as the host measured them when the entry began, and the commands a handler's data can
+// run. No tree walking, no selectors.
 var elementFacts = {};
 var BODY = ${JSON.stringify(NATIVE_DOCUMENT_BODY)};
 var proxies = {};
@@ -586,12 +603,26 @@ var elementOf = function (id) {
 		showModal: function () { command('showModal', false); },
 		close: function () { command('close', false); },
 		getBoundingClientRect: function () {
-			throw new Error('getBoundingClientRect() asks the host to measure while JavaScript waits, which a phone does not answer');
+			var box = facts().box;
+			if (!box) throw new Error('the host measured no box for ' + id);
+			return { x: box.x, y: box.y, left: box.x, top: box.y, width: box.width, height: box.height, right: box.x + box.width, bottom: box.y + box.height };
 		},
 	};
 	var tag = (typeof classes === 'object' && classes[id.split('@')[0]]) || 'HTMLElement';
 	if (g[tag] && g[tag].__dom) Object.setPrototypeOf(proxy, g[tag].prototype);
 	Object.defineProperty(proxy, '__node', { value: id });
+	Object.defineProperty(proxy, '__style', {
+		value: function () {
+			var direction = facts().direction || 'ltr';
+			return {
+				direction: direction,
+				getPropertyValue: function (name) {
+					if (name === 'direction') return direction;
+					throw new Error('a phone answers only an element\'s direction from getComputedStyle(), not ' + name);
+				},
+			};
+		},
+	});
 	proxies[id] = proxy;
 	return proxy;
 };

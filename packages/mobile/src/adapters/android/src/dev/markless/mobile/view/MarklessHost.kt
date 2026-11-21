@@ -46,6 +46,7 @@ import dev.markless.mobile.core.ScrollRect
 import dev.markless.mobile.core.nativeMaxLength
 import dev.markless.mobile.core.nativeRangeValue
 import dev.markless.mobile.core.scrollIntoView
+import dev.markless.mobile.core.ElementBox
 import dev.markless.mobile.core.EventName
 import dev.markless.mobile.core.Instance
 import dev.markless.mobile.core.JournalEntry
@@ -163,6 +164,7 @@ class MarklessHost(
 	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine).apply {
 		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
 		onScriptEntry = AppScriptEngine::entryRan
+		measure = this@MarklessHost::measureBox
 	}
 	private val scriptServices = ScriptServices()
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
@@ -362,6 +364,22 @@ class MarklessHost(
 			}
 		}
 		raiseVisible()
+	}
+
+	/** An element's box in CSS pixels from the top left of the page's part of the screen, as `getBoundingClientRect()` gives it; null before it is laid out. */
+	private fun measureBox(id: String): ElementBox? {
+		val view = views[id] ?: return null
+		if (!view.isAttachedToWindow) return null
+		val viewport = root.parent as? View ?: root
+		val origin = IntArray(2).also(viewport::getLocationInWindow)
+		val at = IntArray(2).also(view::getLocationInWindow)
+		return ElementBox(
+			(at[0] - origin[0] - viewport.paddingLeft) / dpr,
+			(at[1] - origin[1] - viewport.paddingTop) / dpr,
+			view.width / dpr,
+			view.height / dpr,
+			view.layoutDirection == View.LAYOUT_DIRECTION_RTL,
+		)
 	}
 
 	/** Raises `visible` for each instance due one that has any of its box inside the page's part of the screen. */
