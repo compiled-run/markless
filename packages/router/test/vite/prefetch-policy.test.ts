@@ -6,6 +6,7 @@ import {
 	prefetchPolicy,
 	prefetches,
 } from '../../src/vite/prefetch-policy.ts';
+import { fragmentRequestUrl } from '../../src/vite/fragment-navigation.ts';
 import * as routerVite from '../../src/vite/index.ts';
 
 describe('router prefetch policy', () => {
@@ -66,5 +67,12 @@ describe('router prefetch policy', () => {
 		]);
 		for (const trigger of PREFETCH_TRIGGERS)
 			expect(PREFETCH_NETWORKS).toContain(PREFETCH_DEFAULTS[trigger]);
+	});
+
+	test('the entry tells a fragment request from any other by the page it asks for', () => {
+		const page = new URL('https://example.com/ui/combobox?tab=api');
+		expect(routerVite.fragmentPageUrl(fragmentRequestUrl(page))?.href).toBe(page.href);
+		expect(routerVite.fragmentPageUrl(page)).toBeUndefined();
+		expect(routerVite.fragmentPageUrl(new URL('https://example.com/api/x'))).toBeUndefined();
 	});
 });

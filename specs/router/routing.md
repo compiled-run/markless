@@ -265,6 +265,9 @@ networks, `'fast'` ones, or `'none'`:
   budget of 0 (`detail: { page, bytes }`, `page` the pathname only), and
   `markless:prefetch-skipped` once per page shown when guessing it would do is
   ruled out (`detail: { page, reason: 'save-data' | 'hidden' | 'network', triggers }`).
+- A click or Back/Forward cancels every guess still arriving except the one for
+  its own page, and the navigation still lands. A test or tool tells those
+  fetches from other requests with `fragmentPageUrl` from `@markless/router/vite`.
 - Guessing reads only two things from navigation: a navigation started, and a
   page is shown; the swap module's own navigation phase stays its own (#569).
 - The viewport trigger observes the page's page links when a page is shown,

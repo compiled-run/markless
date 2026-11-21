@@ -602,7 +602,11 @@ export function runFragmentNavigation(
 	};
 	const move = (entry: FragmentPrefetch, next: number) => {
 		if (entry.phase === next) return;
-		if (entry.phase === GONE || (entry.phase === ARRIVED && next !== GONE) || next < entry.phase)
+		if (
+			entry.phase === GONE ||
+			(entry.phase === ARRIVED && next !== GONE) ||
+			next < entry.phase
+		)
 			return illegal(`no prefetch move from ${entry.phase} to ${next}`);
 		entry.phase = next;
 	};
@@ -954,7 +958,10 @@ export function runFragmentNavigation(
 					? 'save-data'
 					: d.visibilityState === 'hidden'
 						? 'hidden'
-						: would.some((trigger) => !onNetwork(trigger === 'idle' ? idleLevel : viewportLevel))
+						: would.some(
+									(trigger) =>
+										!onNetwork(trigger === 'idle' ? idleLevel : viewportLevel),
+							  )
 							? 'network'
 							: '';
 				if (would.length && reason)
@@ -968,7 +975,8 @@ export function runFragmentNavigation(
 					});
 				if (
 					loadViewport &&
-					(viewportLevel || d.querySelector(`a[href][${config.prefetchAttribute}="viewport"]`))
+					(viewportLevel ||
+						d.querySelector(`a[href][${config.prefetchAttribute}="viewport"]`))
 				)
 					startViewport().then(
 						(started) => current() && speculation.phase >= ARMED && started.watch(),
@@ -985,13 +993,17 @@ export function runFragmentNavigation(
 					const box = anchor.getBoundingClientRect();
 					if (!box.width || box.bottom < 0 || box.top > w.innerHeight) continue;
 					if (box.right < 0 || box.left > w.innerWidth) continue;
-					const hit = d.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+					const hit = d.elementFromPoint(
+						box.left + box.width / 2,
+						box.top + box.height / 2,
+					);
 					if (!hit || (hit !== anchor && !anchor.contains(hit))) continue;
 					visible.set(pageKey(url), url);
 				}
 				idleQueue = [];
 				for (const url of visible.values())
-					if (idleQueue.length < config.idleFragments && unfetched(url)) idleQueue.push(url);
+					if (idleQueue.length < config.idleFragments && unfetched(url))
+						idleQueue.push(url);
 				pumpIdle();
 			};
 			if (w.requestIdleCallback) w.requestIdleCallback(arm, { timeout: 3000 });
@@ -1251,7 +1263,8 @@ export function watchViewport(
 		)) {
 			if (more && levels.has(anchor)) continue;
 			const asked = anchor.getAttribute(prefetchAttribute);
-			const linkLevel = asked === 'viewport' ? Math.max(level, 1) : asked === 'intent' ? 0 : level;
+			const linkLevel =
+				asked === 'viewport' ? Math.max(level, 1) : asked === 'intent' ? 0 : level;
 			const url = linkLevel ? candidate(anchor) : undefined;
 			if (!url) continue;
 			levels.set(anchor, [url, linkLevel]);
@@ -1290,7 +1303,10 @@ export function fragmentRequestUrl(url: string | URL): URL {
 	return target;
 }
 
-// The page URL a fragment request names, or undefined for any other request.
+/**
+ * The page URL a request to the router's fragment endpoint asks for, or `undefined` when the URL is not a fragment request.
+ * Lets a service worker, host rule or test tell the router's page fetches from other requests without restating the endpoint path.
+ */
 export function fragmentPageUrl(url: URL): URL | undefined {
 	if (!url.pathname.startsWith(`${FRAGMENT_PATH_PREFIX}/`)) return undefined;
 	const page = new URL(url);
@@ -1312,7 +1328,10 @@ export const FRAGMENT_PREFETCH_CONNECTIONS = 2;
 // Wire bytes viewport and idle fetches may spend per page shown: about what the Next.js original of the shadcn docs prefetched (1.5 MB).
 export const FRAGMENT_GUESS_BUDGET_BYTES = 2 * 1024 * 1024;
 /** Performance marks a tool can read: the page's guess budget ran out; guessing was ruled out (detail.reason). */
-export const PREFETCH_MARKS = ['markless:prefetch-budget-spent', 'markless:prefetch-skipped'] as const;
+export const PREFETCH_MARKS = [
+	'markless:prefetch-budget-spent',
+	'markless:prefetch-skipped',
+] as const;
 export const FRAGMENT_IDLE_FRAGMENTS = 6;
 // Characters of page text kept for pages fetched ahead: 8 MB as one-byte strings, 16 MB if a page has text outside Latin-1.
 // Parsed documents (pages intent wanted, the page shown) are not counted.
