@@ -1591,6 +1591,11 @@ export function createNativeRuntime(
 	// Rows take their first values, and following cells theirs, before anything reads them, the overlays served shown included.
 	seedRows();
 	follow();
+	// A box's `checked` binding reads cells only now settled (a group's value following its prop): it sets the box again.
+	for (const node of ticked) {
+		const bound = checkedBinding(node.id);
+		if (bound !== undefined) checkedness.set(node.id, bound);
+	}
 	// Served shown: the document's focus is the body.
 	for (const overlay of shownOverlays()) {
 		stack.push(overlay);
