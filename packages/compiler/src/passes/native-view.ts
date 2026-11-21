@@ -2279,6 +2279,20 @@ export function createNativeViewPayload(
 		diagnostics.push(nativeRefusal('javascript', message, span));
 		return null;
 	};
+	/** Whether a script's `navigate()` calls can open a page: the host matches each path against the app's routes. */
+	function checkNavigates(navigates: ReadonlyArray<SourceSpan>, what: string): boolean {
+		if (navigates.length === 0) return true;
+		if (options.routes && options.route) {
+			scriptServices.add('navigate');
+			return true;
+		}
+		for (const span of navigates)
+			refuseScript(
+				`${what} calls \`navigate\` from @markless/router inside JavaScript that runs on the phone, which needs the app's routes; build the app, not one component`,
+				span,
+			);
+		return false;
+	}
 
 	/** Whether every global a script reads is one a phone's engine has; refuses each other one by name, file and line. */
 	function checkGlobals(
@@ -2330,6 +2344,7 @@ export function createNativeViewPayload(
 		const known = scriptFunctions.get(key);
 		if (known) return known.id;
 		let ok = checkGlobals(fact.globals, what, forms);
+		if (!checkNavigates(fact.navigates, what)) ok = false;
 		for (const use of fact.framework) {
 			ok = false;
 			refuseScript(
@@ -2768,6 +2783,7 @@ export function createNativeViewPayload(
 					construct.span,
 				);
 			checkGlobals(statement.globals, at, forms);
+			checkNavigates(statement.navigates, at);
 			for (const name of statement.uses) local(entry, name);
 			for (const use of statement.imports) imported(entry, use.slot, use.name);
 		};
@@ -2868,7 +2884,16 @@ export function createNativeViewPayload(
 					.map((fn) => ({ id: fn.id, code: fn.fact.code })),
 			};
 		});
-		return nativeScriptOf(inputs, [...scriptServices].sort());
+		return nativeScriptOf(
+			inputs,
+			[...scriptServices].sort(),
+			scriptServices.has('navigate') && options.routes && options.route
+				? {
+						here: options.route.pattern,
+						routes: options.routes.map((route) => route.pattern),
+					}
+				: undefined,
+		);
 	}
 
 	const inlining = new Set<string>();
@@ -5946,6 +5971,7 @@ export function createNativeViewPayload(
 					imports: [],
 					globals: [],
 					framework: [],
+					navigates: [],
 					unsupported: [],
 					span: { filename: module.graph.filename, start: 0, end: 0 },
 				},
