@@ -12,6 +12,7 @@ import {
 	NATIVE_FACT_COLLECTORS,
 	nativeUnsupported,
 	selectorAttributes,
+	type NativeScriptEngine,
 	type NativeViewArtifact,
 } from '@markless/compiler/native';
 import {
@@ -144,6 +145,8 @@ export async function compileNativeComponent(input: {
 	readonly target?: 'ios' | 'android';
 	/** Where handlers run (`NativeViewOptions['scriptHandlers']`); the default runs each as data where it lowers. */
 	readonly scriptHandlers?: 'fallback' | 'all' | 'never';
+	/** The engine text a payload's script carries (`NativeViewOptions['scriptEngine']`). */
+	readonly scriptEngine?: NativeScriptEngine;
 }): Promise<NativeBuild> {
 	const manifest =
 		input.manifest ?? (input.page ? buildRouteManifestFromFileIds([input.page]) : undefined);
@@ -272,6 +275,7 @@ export async function compileNativeComponent(input: {
 			modules: { graphs, resolve },
 			readSource: (file: string) => (file === input.filename ? own.source : read.get(file)?.source),
 			...(input.scriptHandlers ? { scriptHandlers: input.scriptHandlers } : {}),
+			...(input.scriptEngine ? { scriptEngine: input.scriptEngine } : {}),
 			...(input.manifest
 				? {
 						routes: input.manifest.routes.map((entry) => ({
@@ -413,6 +417,7 @@ export async function compileNativeApp(input: {
 	readonly target?: 'ios' | 'android';
 	/** Keep the routes whose page builds when others refuse (their diagnostics are still returned). */
 	readonly partial?: boolean;
+	readonly scriptEngine?: NativeScriptEngine;
 	/** The `icons` option of the app's `ui()` plugin, as `compileNativeComponent` takes it. */
 	readonly icons?: false | IconsOptions;
 }): Promise<NativeAppBuild> {
@@ -459,6 +464,7 @@ export async function compileNativeApp(input: {
 			...(input.readServedStylesheet ? { readServedStylesheet: input.readServedStylesheet } : {}),
 			...(input.device ? { device: input.device } : {}),
 			...(input.target ? { target: input.target } : {}),
+			...(input.scriptEngine ? { scriptEngine: input.scriptEngine } : {}),
 			icons,
 		});
 		for (const feature of build.features) features.add(feature);

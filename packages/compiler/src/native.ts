@@ -17,3 +17,4 @@ export {
 	type NativeViewOptions,
 } from './passes/native-view.ts';
 export { fontFaceSources } from './passes/native-font-faces.ts';
+export { NATIVE_SCRIPT_ENGINE, type NativeScriptEngine } from './passes/native-script.ts';

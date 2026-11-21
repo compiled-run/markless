@@ -10,6 +10,7 @@ import {
 	writeFileSync,
 } from 'node:fs';
 import { createRequire, findPackageJSON } from 'node:module';
+import type { NativeScriptEngine } from '@markless/compiler/native';
 import { pathToFileURL } from 'node:url';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { LadderRung } from '../../proofs/ladder.ts';
@@ -112,7 +113,11 @@ const APP_DOCUMENT = 'document.tsrx';
 /** Compiles a navigation rung's app: every page under `pages/`, with repo-relative filenames as for one-screen rungs. */
 export function compileRungApp(
 	dir: string,
-	options: { readonly target?: ProofPlatform; readonly device?: DeviceAppConfig } = {},
+	options: {
+		readonly target?: ProofPlatform;
+		readonly device?: DeviceAppConfig;
+		readonly scriptEngine?: NativeScriptEngine;
+	} = {},
 ) {
 	const document = join(dir, APP_DOCUMENT);
 	return compileNativeApp({
