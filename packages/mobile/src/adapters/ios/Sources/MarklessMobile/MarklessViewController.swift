@@ -379,7 +379,7 @@ extension NativeJournalEntry {
 	/// Every entry but the ones the page's device runs and the title, which the screen's navigation bar shows.
 	var isForViews: Bool {
 		switch self {
-		case .call, .release, .title, .fetch, .abort, .preventDefault: false
+		case .call, .release, .title, .fetch, .preventDefault, .abort: false
 		default: true
 		}
 	}

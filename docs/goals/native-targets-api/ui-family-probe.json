@@ -19,12 +19,10 @@
 		]
 	},
 	"calendar": {
-		"payload": false,
+		"payload": true,
 		"diagnostics": [
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focusin handler on <div> component-edge:2/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:2/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: `calendarState.month` makes a date from a value (`new Date(…)`); only the clock (`new Date()`, `Date.now()`) has a native meaning yet",
-			"MARKLESS_NATIVE_UNSUPPORTED: calendarState.title makes a date from a value (`new Date(…)`); only the clock (`new Date()`, `Date.now()`) has a native meaning yet"
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:2/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out"
 		]
 	},
 	"carousel": {
@@ -37,7 +35,8 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <button> component-edge:5/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:5/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_UNSUPPORTED: the wheel event has no native meaning yet",
-			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`carouselState.show` runs as data), so this handler stays data",
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/carousel/carousel-engine.ts uses `getComputedStyle`: computed CSS, which a phone does not have at run time",
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/carousel/carousel-engine.ts uses `performance`, which a phone's script engine does not provide",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet"
 		]
 	},
@@ -50,9 +49,6 @@
 	"checklist": {
 		"payload": false,
 		"diagnostics": [
-			"MARKLESS_NATIVE_UNSUPPORTED: CheckboxRoot while rendering sets `checkbox.checked` from a value that follows state; pass a fixed value or leave the prop out",
-			"MARKLESS_NATIVE_UNSUPPORTED: CheckboxRoot while rendering sets `checkbox.disabled` from a value that follows state; pass a fixed value or leave the prop out",
-			"MARKLESS_NATIVE_UNSUPPORTED: CheckboxRoot while rendering sets `checkbox.value` from a value that follows state; pass a fixed value or leave the prop out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:7/component-edge:7/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:9/component-edge:4/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_UNSUPPORTED: `checkboxState.triggerEl`, a handle bound to more than one element"
@@ -67,14 +63,12 @@
 		"diagnostics": [
 			"MARKLESS_NATIVE_UNSUPPORTED: a style binding",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focusin handler on <div> component-edge:1/h7 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the function `parseColor`'s `if` test uses a call to `raw.charAt`, which needs a script engine",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:1/component-edge:0/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:1/component-edge:1/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:9/h9 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/colorpicker/colorpicker-math.ts uses `window.getComputedStyle`: computed CSS, which a phone does not have at run time",
 			"MARKLESS_NATIVE_JAVASCRIPT: the dismiss handler reads `event.detail.reason`, which a tap on a phone does not have",
-			"MARKLESS_NATIVE_JAVASCRIPT: the dismiss handler uses `document`: the web page, which a phone does not have",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler assigns `field.value`, which is not a field of state",
-			"MARKLESS_NATIVE_JAVASCRIPT: the blur handler reads `boxShown`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)"
+			"MARKLESS_NATIVE_JAVASCRIPT: the dismiss handler uses `document`: the web page, which a phone does not have"
 		]
 	},
 	"combobox": {
@@ -112,28 +106,32 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the `ui-dragging` attribute reads `crop.moving` as a value",
 			"MARKLESS_NATIVE_UNSUPPORTED: the `ui-resizing` attribute reads `crop.resizing` as a value",
 			"MARKLESS_NATIVE_JAVASCRIPT: the computed `held` reads `crop`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
+			"MARKLESS_NATIVE_JAVASCRIPT: the computed `cropState.readoutText` reads `held`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focusin handler on <div> component-edge:1/h5 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_UNSUPPORTED: CropError while rendering writes `crop.invalid`, which is not state",
 			"MARKLESS_NATIVE_UNSUPPORTED: the `name` attribute reads `crop.name` as a value",
-			"MARKLESS_NATIVE_UNSUPPORTED: `cropState.held` reads `crop`, which is not state of this component",
+			"MARKLESS_NATIVE_JAVASCRIPT: the computed `cropState.fieldValue` reads `held`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
+			"MARKLESS_NATIVE_UNSUPPORTED: cropState.held reads `crop`, which is not state of this component",
+			"MARKLESS_NATIVE_JAVASCRIPT: the computed `cropState.held` reads `crop`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_UNSUPPORTED: the `required` attribute reads `crop.required` as a value",
 			"MARKLESS_NATIVE_UNSUPPORTED: the `disabled` attribute reads `crop.disabled` as a value",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:7/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:8/h7 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out"
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:8/h7 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
+			"MARKLESS_NATIVE_JAVASCRIPT: the pointerdown handler reads `event.target`, an element, which JavaScript on a phone cannot hold yet"
 		]
 	},
 	"datebox": {
-		"payload": false,
+		"payload": true,
 		"diagnostics": [
-			"MARKLESS_NATIVE_UNSUPPORTED: the function `isIsoDate` uses a call to `isoPattern.test`, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: the function `isoPart` uses a destructuring declaration, which needs a script engine",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <span> component-edge:1/component-edge:1/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the blur handler on <span> component-edge:1/component-edge:1/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: a paste handler on <span>; a native build runs one only on a text field",
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the paste handler on <span> component-edge:1/component-edge:1/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <span> component-edge:6/component-edge:2/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the blur handler on <span> component-edge:6/component-edge:2/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the paste handler on <span> component-edge:6/component-edge:2/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <span> component-edge:7/component-edge:3/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_KEYBOARD_ONLY: the blur handler on <span> component-edge:7/component-edge:3/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out"
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the blur handler on <span> component-edge:7/component-edge:3/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the paste handler on <span> component-edge:7/component-edge:3/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out"
 		]
 	},
 	"drawer": {
@@ -155,11 +153,16 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the `ui-dragging` attribute reads `drawer.dragging` as a value",
 			"MARKLESS_NATIVE_UNSUPPORTED: the `hidden` attribute reads `drawer.open` as a value",
 			"MARKLESS_NATIVE_UNSUPPORTED: drawerState.ariaModal reads `drawer`, which is not state of this component",
+			"MARKLESS_NATIVE_JAVASCRIPT: the computed `drawerState.ariaModal` reads `drawer`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
 			"MARKLESS_NATIVE_UNSUPPORTED: a style binding",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:3/h3 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focusin handler on <div> component-edge:3/h3 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_UNSUPPORTED: the `aria-expanded` attribute reads `drawer.open` as a value",
-			"MARKLESS_NATIVE_UNSUPPORTED: `drawerState.snaps` reads `drawer`, which is not state of this component"
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/drawer/drawer-focus.ts uses `HTMLElement`: the DOM, which a phone does not have",
+			"MARKLESS_NATIVE_UNSUPPORTED: drawerState.snaps reads `drawer`, which is not state of this component",
+			"MARKLESS_NATIVE_JAVASCRIPT: the computed `drawerState.snaps` reads `drawer`, which JavaScript on a phone cannot reach (not state, a prop value, a row item or a computed)",
+			"MARKLESS_NATIVE_JAVASCRIPT: the pointerup handler reads `event.target`, an element, which JavaScript on a phone cannot hold yet",
+			"MARKLESS_NATIVE_JAVASCRIPT: the pointerdown handler reads `event.target`, an element, which JavaScript on a phone cannot hold yet"
 		]
 	},
 	"editable": {
@@ -178,9 +181,8 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: FileUploadItem while rendering sets `item.id` from a value that follows state; pass a fixed value or leave the prop out",
 			"MARKLESS_NATIVE_UNSUPPORTED: FileUploadItem while rendering sets `item.name` from a value that follows state; pass a fixed value or leave the prop out",
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `storeFor` uses a call to `stores.get`, which needs a script engine",
-			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`fileuploadState.open` runs as data), so this handler stays data",
-			"MARKLESS_NATIVE_UNSUPPORTED: the change handler on the <input> component-edge:2/h4: a text field raises it when it loses focus, which a native build has no lowering for yet",
-			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/fileupload/fileupload-files.ts uses `DOMException`, which a phone's script engine does not provide"
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/fileupload/fileupload-files.ts uses `DOMException`, which a phone's script engine does not provide",
+			"MARKLESS_NATIVE_UNSUPPORTED: the change handler on the <input> component-edge:2/h4: a text field raises it when it loses focus, which a native build has no lowering for yet"
 		]
 	},
 	"gridlist": {
@@ -198,7 +200,6 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: an `overlay-hint` surface (a tooltip or hovercard), which phones do not show yet",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler uses `PointerEvent`, which a phone's script engine does not provide",
-			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`hovercardState.setOpen` runs as data), so this handler stays data",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler uses `document`: the web page, which a phone does not have",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler uses `PointerEvent`, which a phone's script engine does not provide"
@@ -216,7 +217,7 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <svg> component-edge:1/h5 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_ELEMENT: the <line> element has no native view yet",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerdown handler reads `event.pressure`, which a touch on a phone does not have",
-			"MARKLESS_NATIVE_UNSUPPORTED: the function `spacedPoints` uses a `for` loop other than over an array's indices, which needs a script engine",
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/ink/ink-stroke.ts uses `DOMException`, which a phone's script engine does not provide",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointermove handler reads `event.getCoalescedEvents`, which a touch on a phone does not have"
 		]
 	},
@@ -235,12 +236,13 @@
 			"MARKLESS_NATIVE_JAVASCRIPT: the dismiss handler reads `event.detail.pressTarget`, which a tap on a phone does not have",
 			"MARKLESS_NATIVE_JAVASCRIPT: the dismiss handler reads `event.detail.reason`, which a tap on a phone does not have",
 			"MARKLESS_NATIVE_JAVASCRIPT: the dismiss handler uses `document`: the web page, which a phone does not have",
-			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`menuState.show` runs as data), so this handler stays data",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerdown handler uses `MouseEvent`, which a phone's script engine does not provide",
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/menu/menu-walk.ts uses `CustomEvent`: the DOM, which a phone does not have",
+			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler reads `event.target`, an element, which JavaScript on a phone cannot hold yet",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler uses `PointerEvent`, which a phone's script engine does not provide",
+			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler reads `event.target`, an element, which JavaScript on a phone cannot hold yet",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet",
-			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler uses `PointerEvent`, which a phone's script engine does not provide",
-			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/menu/menu-walk.ts uses `CustomEvent`: the DOM, which a phone does not have"
+			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler uses `PointerEvent`, which a phone's script engine does not provide"
 		]
 	},
 	"menubar": {
@@ -251,7 +253,9 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:1/component-edge:2/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_UNSUPPORTED: the contextmenu event has no native meaning yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:2/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`menubarState.report` runs as data), so this handler stays data",
+			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler reads `event.target`, an element, which JavaScript on a phone cannot hold yet",
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/menubar/menubar-walk.ts uses `HTMLElement`: the DOM, which a phone does not have",
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/menubar/menubar-walk.ts uses `MouseEvent`, which a phone's script engine does not provide",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `event.isTrusted`, which a tap on a phone does not have",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `event.detail`, which a tap on a phone does not have",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler uses `KeyboardEvent`, which a phone's script engine does not provide"
@@ -271,18 +275,19 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:4/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler uses `PointerEvent`, which a phone's script engine does not provide",
-			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`navbarState.show` runs as data), so this handler stays data",
-			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet"
+			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet",
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/navbar/navbar-safe-zone.ts uses `PointerEvent`, which a phone's script engine does not provide",
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/navbar/navbar-safe-zone.ts uses `document`: the web page, which a phone does not have",
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/navbar/navbar-walk.ts uses `Node`: the DOM, which a phone does not have"
 		]
 	},
 	"numberbox": {
 		"payload": false,
 		"diagnostics": [
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `activeLocale`'s `if` test uses `typeof` other than compared with 'string', 'number' or 'boolean'; a native value does not tell undefined from null",
-			"MARKLESS_NATIVE_UNSUPPORTED: the function `currencyScale` uses a TryStatement, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler assigns `box.value`, which is not a field of state",
-			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null",
-			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/numberbox/numberbox-math.ts uses `document`: the web page, which a phone does not have"
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/numberbox/numberbox-math.ts uses `document`: the web page, which a phone does not have",
+			"MARKLESS_NATIVE_UNSUPPORTED: the function `formatNumber`'s `if` test compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null",
+			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null"
 		]
 	},
 	"otp": {
@@ -299,7 +304,7 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: a style binding",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focusin handler on <div> component-edge:7/h5 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:7/h5 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`padState.stepTo` runs as data), so this handler stays data"
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/pad/pad-math.ts uses `DOMException`, which a phone's script engine does not provide"
 		]
 	},
 	"pagination": {
@@ -313,6 +318,9 @@
 	"progress": {
 		"payload": false,
 		"diagnostics": [
+			"MARKLESS_NATIVE_UNSUPPORTED: progressState.reported compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null",
+			"MARKLESS_NATIVE_UNSUPPORTED: progressState.valueText compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null",
+			"MARKLESS_NATIVE_UNSUPPORTED: progressState.status compares with `null` a value whose first value is `undefined`; a native value does not tell undefined from null",
 			"MARKLESS_NATIVE_UNSUPPORTED: a style binding"
 		]
 	},
@@ -335,9 +343,9 @@
 	"rating": {
 		"payload": false,
 		"diagnostics": [
-			"MARKLESS_NATIVE_UNSUPPORTED: the function `positionsOf` uses a `for` loop other than over an array's indices, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: a style binding",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:4/h4 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
+			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/rating/rating-walk.ts uses `window.getComputedStyle`: computed CSS, which a phone does not have at run time",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `event.clientX`, which a tap on a phone does not have",
 			"MARKLESS_NATIVE_JAVASCRIPT: the click handler reads `event.detail`, which a tap on a phone does not have"
 		]
@@ -347,7 +355,8 @@
 		"diagnostics": [
 			"MARKLESS_NATIVE_UNSUPPORTED: a style binding",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:2/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`resizableState.beginDrag` runs as data), so this handler stays data"
+			"MARKLESS_NATIVE_JAVASCRIPT: the pointerdown handler reads `event.target`, an element, which JavaScript on a phone cannot hold yet",
+			"MARKLESS_NATIVE_JAVASCRIPT: `resizableState.beginDrag` uses `HTMLElement`: the DOM, which a phone does not have"
 		]
 	},
 	"select": {
@@ -360,7 +369,9 @@
 	"slider": {
 		"payload": false,
 		"diagnostics": [
-			"MARKLESS_NATIVE_UNSUPPORTED: the function `startSeed`'s `if` test uses a call to `Array.isArray`, which needs a script engine"
+			"MARKLESS_NATIVE_UNSUPPORTED: a style binding",
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:2/h4 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
+			"MARKLESS_NATIVE_UNSUPPORTED: `sliderState.labelEl`, a handle bound inside an @if arm"
 		]
 	},
 	"table": {
@@ -383,7 +394,6 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:5/h4 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <button> component-edge:6/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:6/h6 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`taglistState.take` runs as data), so this handler stays data",
 			"MARKLESS_NATIVE_UNSUPPORTED: the paste handler uses a ForOfStatement, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `elementForValue` uses a call to `elements.find`, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the keydown handler uses a ForOfStatement, which needs a script engine",
@@ -400,15 +410,16 @@
 		"diagnostics": []
 	},
 	"timebox": {
-		"payload": false,
+		"payload": true,
 		"diagnostics": [
-			"MARKLESS_NATIVE_UNSUPPORTED: the function `timeParts` uses a call to `(value).formatToParts`, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: the function `localeOrder` uses `new Set`, which needs a script engine",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <span> component-edge:1/component-edge:4/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: a paste handler on <span>; a native build runs one only on a text field",
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the paste handler on <span> component-edge:1/component-edge:4/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <span> component-edge:5/component-edge:1/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the paste handler on <span> component-edge:5/component-edge:1/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <span> component-edge:7/component-edge:2/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <span> component-edge:8/component-edge:3/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out"
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the paste handler on <span> component-edge:7/component-edge:2/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <span> component-edge:8/component-edge:3/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the paste handler on <span> component-edge:8/component-edge:3/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out"
 		]
 	},
 	"toaster": {
@@ -439,13 +450,12 @@
 		"payload": false,
 		"diagnostics": [
 			"MARKLESS_NATIVE_UNSUPPORTED: the beforeinput event has no native meaning yet",
-			"MARKLESS_NATIVE_UNSUPPORTED: a paste handler on <div>; a native build runs one only on a text field",
+			"MARKLESS_NATIVE_UNSUPPORTED: a paste handler on an editable <div>; a native build runs one only on a text field",
 			"MARKLESS_NATIVE_UNSUPPORTED: the compositionstart event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the compositionend event has no native meaning yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keyup handler on <div> component-edge:4/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <div> component-edge:4/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: @if inside a @for row",
-			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`tokenboxState.settle` runs as data), so this handler stays data"
+			"MARKLESS_NATIVE_UNSUPPORTED: @if inside a @for row"
 		]
 	},
 	"toolbar": {
@@ -463,7 +473,6 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the blur handler on <button> component-edge:2/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerover handler uses `PointerEvent`, which a phone's script engine does not provide",
-			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`tooltipState.setOpen` runs as data), so this handler stays data",
 			"MARKLESS_NATIVE_JAVASCRIPT: the pointerout handler reads `event.relatedTarget`, an element, which JavaScript on a phone cannot hold yet"
 		]
 	},
@@ -474,7 +483,6 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <div> component-edge:6/component-edge:0/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:6/component-edge:0/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_JAVASCRIPT: the dismiss handler reads `event.detail`, which a tap on a phone does not have",
-			"MARKLESS_NATIVE_JAVASCRIPT: JavaScript on a phone calls no method of a shared object (`tourState.enter` runs as data), so this handler stays data",
 			"MARKLESS_NATIVE_JAVASCRIPT: packages/headless/components/src/tour/tour-anchor.ts uses `HTMLElement`: the DOM, which a phone does not have"
 		]
 	},
