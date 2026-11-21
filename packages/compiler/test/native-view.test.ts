@@ -2959,6 +2959,44 @@ export function Page() @{
 		});
 		expect(payload!.script!.source).toContain('function total(text)');
 	});
+
+	it("reads import.meta.env as the web's client build does and leaves out the branch only a server runs", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+async function load(): Promise<string> {
+	if (import.meta.env.SSR) {
+		const { fromDisk } = await import('./server-only.ts');
+		return fromDisk(serverPath);
+	}
+	return \`\${import.meta.env.MODE} \${import.meta.env?.DEV ? 'dev' : 'built'} \${!import.meta.env.PROD}\`;
+}
+export function Page() @{
+	let text = state('');
+	<button onClick={async () => (text = await load())}>{text}</button>
+}`);
+		expect(diagnostics).toEqual([]);
+		const source = payload!.script!.source;
+		expect(source).toContain('"production"');
+		expect(source).toContain("'built'");
+		expect(source).not.toContain('import');
+		expect(source).not.toContain('serverPath');
+	});
+
+	it('refuses another import.meta and a dynamic import() a client build would keep, by name', async () => {
+		const { diagnostics } = await nativeView(`import { state } from '@markless/core';
+async function load(): Promise<string> {
+	const { word } = await import('./words.ts');
+	return word + import.meta.url + import.meta.env.BASE_URL;
+}
+export function Page() @{
+	let text = state('');
+	<button onClick={async () => (text = await load())}>{text}</button>
+}`);
+		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			expect.stringContaining("uses a dynamic `import()`, which a phone's script cannot run"),
+			expect.stringContaining("uses `import.meta.url`, which a phone's script cannot run"),
+			expect.stringContaining("uses `import.meta.env.BASE_URL`, which a phone's script cannot run"),
+		]);
+	});
 });
 
 describe('element proxies', () => {
