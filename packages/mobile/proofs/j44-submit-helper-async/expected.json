@@ -1,0 +1,80 @@
+{
+	"rung": "J44",
+	"name": "A submit handler runs as JavaScript when its parent's function awaits: an app function it calls reads the form through FormData",
+	"steps": [
+		{
+			"visible": ["Notes", "Save note", "Sent: 0", "Nothing saved"]
+		},
+		{
+			"do": {
+				"tap": "Save note"
+			},
+			"visible": ["Sent: 0", "Nothing saved"],
+			"invalid": "Please fill out this field."
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Title",
+					"text": "Groceries"
+				}
+			},
+			"visible": ["Sent: 0", "Nothing saved"],
+			"fields": {
+				"Title": "Groceries"
+			}
+		},
+		{
+			"do": {
+				"tap": "Save note"
+			},
+			"visible": ["Sent: 1", "Nothing saved"],
+			"absent": ["Sent: 0"]
+		},
+		{
+			"do": {
+				"wait": 2000
+			},
+			"visible": ["Saved Groceries (home): 1 notes, 1 tags"],
+			"absent": ["Nothing saved"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Title",
+					"text": "Call Ada"
+				}
+			},
+			"visible": ["Sent: 1", "Saved Groceries (home): 1 notes, 1 tags"],
+			"fields": {
+				"Title": "Call Ada"
+			}
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Tag",
+					"text": "work"
+				}
+			},
+			"visible": ["Sent: 1", "Saved Groceries (home): 1 notes, 1 tags"],
+			"fields": {
+				"Tag": "work"
+			}
+		},
+		{
+			"do": {
+				"tap": "Save note"
+			},
+			"visible": ["Sent: 2", "Saved Groceries (home): 1 notes, 1 tags"],
+			"absent": ["Sent: 1"]
+		},
+		{
+			"do": {
+				"wait": 2000
+			},
+			"visible": ["Saved Call Ada (work): 2 notes, 2 tags"],
+			"absent": ["Saved Groceries (home): 1 notes, 1 tags"]
+		}
+	]
+}

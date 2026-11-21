@@ -1,0 +1,60 @@
+appId: ${APP_ID}
+name: j44-submit-helper-async
+---
+- launchApp:
+    clearState: true
+- assertVisible: Notes
+- assertVisible: Save note
+- assertVisible: "Sent: 0"
+- assertVisible: Nothing saved
+- tapOn: Save note
+- assertVisible: Please fill out this field\.
+- assertVisible: "Sent: 0"
+- assertVisible: Nothing saved
+- assertVisible: Please fill out this field\.
+- tapOn: Title
+- eraseText
+- inputText: Groceries
+- hideKeyboard
+- assertVisible: Groceries
+- assertVisible: "Sent: 0"
+- assertVisible: Nothing saved
+- assertVisible: Groceries
+- tapOn: Save note
+- assertNotVisible: "Sent: 0"
+- assertVisible: "Sent: 1"
+- assertVisible: Nothing saved
+- assertNotVisible: "Sent: 0"
+- extendedWaitUntil:
+    visible: "Saved Groceries \\(home\\): 1 notes, 1 tags"
+    timeout: 12000
+- assertNotVisible: Nothing saved
+- assertVisible: "Saved Groceries \\(home\\): 1 notes, 1 tags"
+- assertNotVisible: Nothing saved
+- tapOn: Title
+- eraseText
+- inputText: Call Ada
+- hideKeyboard
+- assertVisible: Call Ada
+- assertVisible: "Sent: 1"
+- assertVisible: "Saved Groceries \\(home\\): 1 notes, 1 tags"
+- assertVisible: Call Ada
+- tapOn: Tag
+- eraseText
+- inputText: work
+- hideKeyboard
+- assertVisible: work
+- assertVisible: "Sent: 1"
+- assertVisible: "Saved Groceries \\(home\\): 1 notes, 1 tags"
+- assertVisible: work
+- tapOn: Save note
+- assertNotVisible: "Sent: 1"
+- assertVisible: "Sent: 2"
+- assertVisible: "Saved Groceries \\(home\\): 1 notes, 1 tags"
+- assertNotVisible: "Sent: 1"
+- extendedWaitUntil:
+    visible: "Saved Call Ada \\(work\\): 2 notes, 2 tags"
+    timeout: 12000
+- assertNotVisible: "Saved Groceries \\(home\\): 1 notes, 1 tags"
+- assertVisible: "Saved Call Ada \\(work\\): 2 notes, 2 tags"
+- assertNotVisible: "Saved Groceries \\(home\\): 1 notes, 1 tags"

@@ -2722,6 +2722,37 @@ export function App() @{
 			'the click handler uses `FormData`: an HTML form, which a phone does not have',
 		);
 	});
+	it('runs a submit handler as JavaScript when an app function it calls builds FormData from the form', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function draftOf(form: HTMLFormElement): string {
+	return JSON.stringify(Object.fromEntries(new FormData(form)));
+}
+function Editor({ onSave }: { readonly onSave: (title: string) => void }) @{
+	<form onSubmit={(event) => {
+		event.preventDefault();
+		onSave(draftOf(event.currentTarget));
+	}}>
+		<input name="title" />
+		<button type="submit">Save</button>
+	</form>
+}
+export function App() @{
+	let saved = state('none');
+	<main>
+		<Editor onSave={(title) => (saved = title)} />
+		<p>{saved}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.handlers[0]?.ops).toMatchObject([
+			{
+				op: 'script',
+				type: 'submit',
+				bindings: { 'submitted form': { value: { formData: 'component-edge:0/h0' } } },
+			},
+		]);
+		expect(payload?.script?.source).toContain('new FormData(form)');
+	});
 	it('binds a typed callback parameter by its name, as data', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Pick({ onPick }: { readonly onPick: (value: string) => void }) @{

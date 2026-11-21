@@ -2349,7 +2349,7 @@ export function createNativeViewPayload(
 		// What the function reaches in its modules is refused now, while the handler can still stay data.
 		const before = diagnostics.length;
 		const services = [...scriptServices];
-		buildScript([entry]);
+		buildScript([entry], forms || scriptSubmits.size > 0);
 		scriptServices.clear();
 		for (const service of services) scriptServices.add(service);
 		if (diagnostics.slice(before).some((diagnostic) => diagnostic.severity === 'error'))
@@ -2687,6 +2687,7 @@ export function createNativeViewPayload(
 			readonly module: ModuleFacts;
 			readonly fact: SemanticScriptFunction;
 		}>,
+		forms = scriptSubmits.size > 0,
 	): NativeViewPayload['script'] | undefined {
 		if (!only && scriptFunctions.size === 0) return undefined;
 		type Included = {
@@ -2766,7 +2767,7 @@ export function createNativeViewPayload(
 					`${at} uses ${construct.construct}, which a phone's script cannot run`,
 					construct.span,
 				);
-			checkGlobals(statement.globals, at, scriptSubmits.size > 0);
+			checkGlobals(statement.globals, at, forms);
 			for (const name of statement.uses) local(entry, name);
 			for (const use of statement.imports) imported(entry, use.slot, use.name);
 		};

@@ -752,6 +752,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'script-submit-helper',
+		fixture: 'proofs/j44-submit-helper-async/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'input', host: 'component-edge:0/h1', value: 'Groceries' },
+			{ event: 'activate', host: 'component-edge:0/h3' },
+			{ event: 'input', host: 'component-edge:0/h1', value: 'Call Ada' },
+			{ event: 'input', host: 'component-edge:0/h2', value: 'work' },
+			{ event: 'activate', host: 'component-edge:0/h3' },
+		],
+	},
+	{
 		name: 'script-submit-async',
 		fixture: 'proofs/j41-async-submit-script/App.tsrx',
 		modules: true,
