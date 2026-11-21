@@ -13,33 +13,12 @@ public enum DragonPlan {
 		}
 	}
 
-	/// `runMarklessRowsLayout`: the page with each list's rows in it. Text the build did not record is shaped by `shape`: face, size
-	/// in device px, text, start and end (UTF-16 offsets), language and Dragon's feature integers, giving Dragon's glyph records.
+	/// `runMarklessRowsLayout`: the page with each list's rows in it. The Dragon `dragon.json` pins has no rows layout yet (it
+	/// comes with compiled-run/dragoncss#605), and its plans hold no row repeats, so a page never asks for one; asked, it says so.
 	public static func rowsLayout(
 		_ line: String, shape: @escaping (String, Double, String, Int, Int, String, [Double]) throws -> [Double]
 	) -> String {
-		// The translated harness turns any error into ["threw"]; the shaper's own reason is kept to report it by name.
-		var refused: String?
-		let shaper = GlyphShaper { face, size, text, start, end, _, rtl, language, features in
-			do {
-				if rtl { throw RowShapingError(description: "right-to-left text in a row is not shaped on iOS yet") }
-				return JsArray(try shape(face.description, size, text.description, Int(start), Int(end), language.description, features.items))
-			} catch {
-				refused = "\(error)"
-				throw error
-			}
-		}
-		let out: String
-		do {
-			out = try harness_runMarklessRowsLayout(JsString(line), shaper).description
-		} catch {
-			out = "[\"threw\"]"
-		}
-		if let refused {
-			let escaped = refused.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-			return "[\"harness-error\",\"\(escaped)\"]"
-		}
-		return out
+		"[\"harness-error\",\"the pinned Dragon has no runMarklessRowsLayout yet\"]"
 	}
 
 	/// Dragon's translated library cases; `rt-band` looks a page's `@media` band up by its size.
@@ -50,9 +29,4 @@ public enum DragonPlan {
 			return "[\"threw\"]"
 		}
 	}
-}
-
-/// A row's text this host cannot shape as the build does.
-struct RowShapingError: Error, CustomStringConvertible {
-	let description: String
 }

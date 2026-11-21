@@ -15,6 +15,13 @@ export function retitle(text: string) {
 	document.title = text;
 }
 `,
+	'app/drafts.ts': `export function siteFrom(form: HTMLFormElement): string {
+	const data = new FormData(form);
+	let out = '';
+	for (const char of String(data.get('site') ?? '')) out += char.toUpperCase();
+	return out;
+}
+`,
 	'app/words.json': '{ "greeting": "hello", "count": 2 }',
 	'app/legacy.js': `exports.twice = function (value) { return value * 2; };\n`,
 	'app/entries.ts': `export function addEntry(saved: string, site: string): { saved: string; id: string } {
@@ -120,6 +127,49 @@ export default function App() @{
 		const [id, saved] = texts as [string, string];
 		expect(JSON.parse(saved)).toEqual([{ site: 'North yard', id }]);
 		expect(parseInt(id, 36)).toBeGreaterThanOrEqual(before);
+	});
+
+	it("reads the submitted form through an app helper that builds FormData from it, as the browser does", async () => {
+		const { payload, diagnostics } = await compileNativeComponent({
+			filename: 'app/App.tsrx',
+			source: `import { state } from '@markless/core';
+import { siteFrom } from './drafts.ts';
+export default function App() @{
+	let last = state('none');
+	<main>
+		<form
+			onSubmit={(event) => {
+				event.preventDefault();
+				last = siteFrom(event.currentTarget);
+			}}
+		>
+			<input name="site" value="North yard" />
+			<button>Add</button>
+		</form>
+		<p>{last}</p>
+	</main>
+}
+`,
+			readModule,
+		});
+		expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		const runtime = createNativeRuntime(payload!, new Map(), {}, undefined, undefined, nodeScriptHost());
+		const button = payload!.events.find((event) => event.event === 'activate')!.host;
+		const texts = runtime
+			.dispatch({ event: 'activate', host: button })
+			.flatMap((entry) => (entry.op === 'text' ? [entry.value] : []));
+		expect(texts).toEqual(['NORTH YARD']);
+	});
+
+	it('still refuses that helper where no form is submitted, from a click', async () => {
+		const { payload, diagnostics } = await build(
+			"text = siteFrom(text as unknown as HTMLFormElement);",
+			"import { siteFrom } from './drafts.ts';",
+		);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toContain(
+			'app/drafts.ts uses `FormData`: an HTML form, which a phone does not have',
+		);
 	});
 
 	it('refuses a CommonJS module by name', async () => {

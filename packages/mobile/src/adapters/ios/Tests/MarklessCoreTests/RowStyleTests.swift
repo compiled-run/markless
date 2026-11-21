@@ -31,3 +31,17 @@ private func notes() throws -> (StyleExport, NativeViewPayload) {
 	#expect(rows[0].assignment != layout.start)
 	#expect(rows[1].texts["h6:text0"] == "Call the plumber about the kitchen tap before Friday")
 }
+
+// The S23 rung's: each size's aria-pressed is a comparison with the picked size, so its row state lists "true" and "false".
+@Test func aRowsPressedStateFollowsAComparison() throws {
+	let styles = try StyleExport.decodeApp(try fixture("s23-styled-row-pressed.native-app-style"))
+	guard case let .app(app) = try NativePayload.decode(try fixture("s23-styled-row-pressed.payload")) else { throw PayloadError(path: "fixture", reason: "not an app") }
+	let style = try #require(styles["/"])
+	let page = try #require(app.routes.first { $0.pattern == "/" }).page
+	let runtime = NativeRuntime(payload: page)
+	let layout = try style.resolve(for: page, initialTexts: try runtime.texts(), value: runtime.value(of:), arm: runtime.styleArm(of:))
+	let rows = try #require(try style.shownRows(page, runtime: runtime)(layout.start)["repeat:0"])
+	#expect(rows.map(\.key) == ["Small", "Medium", "Large"])
+	// The template is laid out pressed, the first value the comparison gives: the picked Medium's row.
+	#expect(rows.map { $0.assignment == layout.start } == [false, true, false])
+}

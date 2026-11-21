@@ -40,8 +40,10 @@ internal class SystemSheet(
 			addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
 		}
 		dialog.setContentView(body, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-		// Snap points are fractions of the screen, so the sheet is screen-tall and its resting heights are offsets.
-		dialog.findViewById<FrameLayout>(com.google.android.material.R.id.design_bottom_sheet)!!.layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT
+		// Snap points are fractions of the screen: one height is the sheet's own; with two the sheet is screen-tall and they are offsets.
+		val only = node.snapPoints.singleOrNull()
+		dialog.findViewById<FrameLayout>(com.google.android.material.R.id.design_bottom_sheet)!!.layoutParams.height =
+			if (only != null && only < 1) (context.resources.displayMetrics.heightPixels * only).toInt() else ViewGroup.LayoutParams.MATCH_PARENT
 		dialog.setCancelable(node.dismissible)
 		dialog.setCanceledOnTouchOutside(node.dismissible)
 		dialog.behavior.apply {

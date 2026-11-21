@@ -24,7 +24,33 @@ permissions:
     contents: read
 
 jobs:
+    # On a pull request, the iOS host's tests skip their macOS runner when the exact inputs they read (host-tests.ts
+    # iosHostTestSources) already passed on main or on an earlier push of the same pull request; main always runs them.
+    ios-host-inputs:
+        if: github.event_name == 'pull_request'
+        runs-on: ubuntu-26.04
+        timeout-minutes: 5
+        outputs:
+            passed: ${{ steps.passed.outputs.cache-hit }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+            - id: key
+              run: echo "key=ios-host-tests-passed-$(node packages/mobile/src/harness/host-tests-key.ts)" >> "$GITHUB_OUTPUT"
+            - id: passed
+              uses: actions/cache/restore@v4
+              with:
+                  path: .ios-host-tests-passed
+                  key: ${{ steps.key.outputs.key }}
+                  lookup-only: true
+
     ios-host:
+        needs: ios-host-inputs
+        if: ${{ !cancelled() && needs.ios-host-inputs.outputs.passed != 'true' }}
         runs-on: macos-15
         timeout-minutes: 45
         steps:
@@ -38,6 +64,8 @@ jobs:
               with:
                   node-version: 24
                   cache: pnpm
+            - id: key
+              run: echo "key=ios-host-tests-passed-$(node packages/mobile/src/harness/host-tests-key.ts)" >> "$GITHUB_OUTPUT"
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
             - name: The iOS host's tests on a simulator
@@ -46,6 +74,11 @@ jobs:
                   MARKLESS_PROOF_SIMULATOR: iPhone 16
               working-directory: packages/mobile
               run: node src/harness/cli.ts host-tests --platform ios
+            - run: touch .ios-host-tests-passed
+            - uses: actions/cache/save@v4
+              with:
+                  path: .ios-host-tests-passed
+                  key: ${{ steps.key.outputs.key }}
 
     android-host:
         runs-on: ubuntu-26.04

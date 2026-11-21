@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { answer, requested, resetCalls } from './gate.ts';
+import JoinedOrders from './orders-joined.tsrx';
 import Orders from './orders.tsrx';
 import {
 	fakeClock,
@@ -80,3 +81,34 @@ test('CSR: a poll that lands while the last one is still out replaces it, and th
 	await vi.advanceTimersByTimeAsync(1_000);
 	expect(orders()).toEqual(['Saucer']);
 });
+
+for (const [shape, Page] of [
+	['a plain key', Orders],
+	['a key joined from the row fields', JoinedOrders],
+] as const)
+	test(`CSR: a poll answered while the first rows are still wiring up shows its answer, not the rows painted before it (${shape})`, async () => {
+		resetCalls();
+		fakeClock();
+		await render(Page);
+		// Answers the next poll from inside the task that paints the first rows, before their keyed list has wired.
+		const observer = new MutationObserver(() => {
+			if (orders().length === 0) return;
+			observer.disconnect();
+			vi.advanceTimersByTime(5_000);
+			let turns = 50;
+			const answerOnceAsked = (): void => {
+				if (requested('orders') === 2) return answer('orders', { value: [{ id: 3, item: 'Saucer' }] });
+				if (--turns > 0) queueMicrotask(answerOnceAsked);
+			};
+			answerOnceAsked();
+		});
+		observer.observe(document.body, { childList: true, subtree: true });
+		try {
+			await until(() => requested('orders'), 1);
+			answer('orders');
+			await until(orders, ['Saucer']);
+		} finally {
+			observer.disconnect();
+		}
+		expect(requested('orders')).toBe(2);
+	});
