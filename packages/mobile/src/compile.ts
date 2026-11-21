@@ -292,14 +292,29 @@ export async function compileNativeComponent(input: {
 		native.features,
 		input.device,
 	);
-	const styles = [...importedStyles, ...compiled.publicRenderPlan.styleScopes].filter(
-		(style, index, all) => all.findIndex((other) => other.scopeId === style.scopeId) === index,
-	);
 	const sheets = stylesheets.filter(
 		(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
 	);
+	const authored = [...importedStyles, ...compiled.publicRenderPlan.styleScopes];
+	const styled = sheets.length > 0 || authored.some((style) => style.cssText.length > 0);
+	// A styled page gets every component module's <style> blocks it is built from, as the web bundle does (a family's
+	// defaults); an unstyled page keeps the phone's own look, which those defaults do not change.
+	const built: NativeBuild['styles'][number][] = [];
+	if (styled)
+		for (const file of graphs.keys()) {
+			const module = read.get(file);
+			if (file === input.filename || !module || !file.endsWith('.tsrx')) continue;
+			built.push(...(await compileTsrxModule({ ...module, symbols: [] })).publicRenderPlan.styleScopes);
+		}
+	const styles = [...importedStyles, ...built, ...compiled.publicRenderPlan.styleScopes].filter(
+		(style, index, all) => all.findIndex((other) => other.scopeId === style.scopeId) === index,
+	);
 	const unstyled = native.payload
-		? unstyledOnly(native.payload, native.elementSources, [...sheets, ...styles].map((style) => style.cssText))
+		? unstyledOnly(
+				native.payload,
+				native.elementSources,
+				styled ? [...sheets, ...styles].map((style) => style.cssText) : [],
+			)
 		: [];
 	return {
 		payload: errors.length > 0 || usage.length > 0 || unstyled.length > 0 ? null : native.payload,

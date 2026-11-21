@@ -178,7 +178,7 @@ data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: D
 /** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Dismiss] is a sheet's platform close or an overlay's Escape or outside press. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
 /** [pointer]: an event a touch raises; [touch]: one of those a host reports, from which the runtime raises the rest. */
 enum class EventName(val wire: String, val pointer: Boolean = false, val touch: Boolean = false) {
-	Activate("activate"), Input("input"), Focus("focus"), Blur("blur"), Keydown("keydown"), Paste("paste"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"),
+	Activate("activate"), Input("input"), Focus("focus"), Blur("blur"), Keydown("keydown"), Keyup("keyup"), Paste("paste"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"),
 	PointerDown("pointerdown", true, true), PointerMove("pointermove", true, true), PointerUp("pointerup", true, true), PointerCancel("pointercancel", true, true),
 	PointerOver("pointerover", true), PointerOut("pointerout", true), PointerEnter("pointerenter", true), PointerLeave("pointerleave", true),
 	Choose("choose"),

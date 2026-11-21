@@ -45,6 +45,8 @@ export type NativeAction =
 	| { readonly event: 'commit'; readonly host: string; readonly value: string }
 	/** A key of the on-screen keyboard in a text field, before it edits the text; `key` as the phone's browser names it. */
 	| { readonly event: 'keydown'; readonly host: string; readonly key: string }
+	/** The same key after what it did to the text (or did not, when its keydown was prevented). */
+	| { readonly event: 'keyup'; readonly host: string; readonly key: string }
 	/** A paste into a text field from its edit menu, before the text goes in. */
 	| { readonly event: 'paste'; readonly host: string; readonly text: string }
 	/** A live device value changed (connectivity, permission): the host writes the device cell. */
@@ -147,7 +149,7 @@ const RAISED: ReadonlySet<string> = new Set(['pointerover', 'pointerout', 'point
 /** What the event running a handler carries, by the field a `{ event }` expression names. */
 export type NativeEventFields = {
 	readonly value?: string;
-	/** A text field's `keydown`: the key as the phone's browser names it. */
+	/** A text field's `keydown` or `keyup`: the key as the phone's browser names it. */
 	readonly key?: string;
 	/** A `paste`: the pasted plain text. */
 	readonly text?: string;
@@ -536,11 +538,16 @@ export function evaluateWithScript(
 						]),
 					);
 				const frame = frameOf(bindings);
+				// A cell `undefined` on the web at first is still so here: no caller gives it a value of its own.
+				const unset = payload.cells
+					.filter((cell) => cell.unset && (values.get(cell.id) ?? null) === null)
+					.map((cell) => cell.id);
 				const entry = {
 					kind: 'compute',
 					fn,
 					frame,
 					cells: Object.fromEntries(values),
+					...(unset.length > 0 ? { unset } : {}),
 					...(host.seed ? { seed: host.seed() } : {}),
 				};
 				return JSON.parse(
@@ -791,6 +798,8 @@ export function createNativeRuntime(
 			readonly commands?: ReadonlyArray<
 				readonly [string, 'focus' | 'scrollIntoView' | 'showModal' | 'close', boolean]
 			>;
+			/** A key or paste handler called `preventDefault()` before it first awaited. */
+			readonly prevented?: true;
 		};
 		for (const [slot, value] of result.writes) {
 			const at = slot.indexOf('@');
@@ -859,6 +868,7 @@ export function createNativeRuntime(
 					];
 				},
 			),
+			...(result.prevented ? [{ op: 'preventDefault' } as NativeJournalEntry] : []),
 			...(result.navigate
 				? [
 						{
@@ -1853,10 +1863,10 @@ export function createNativeRuntime(
 			const edit =
 				action.event === 'input' || action.event === 'commit' ? action.value : undefined;
 			const eventValue: string | NativeEventFields | undefined =
-				action.event === 'keydown'
-					? { key: action.key }
+				action.event === 'keydown' || action.event === 'keyup'
+					? { key: action.key, value: textOf(action.host) }
 					: action.event === 'paste'
-						? { text: action.text }
+						? { text: action.text, value: textOf(action.host) }
 						: action.event === 'activate'
 							? { detail: action.detail ?? 1 }
 							: edit;
@@ -2030,6 +2040,8 @@ export function createNativeRuntime(
 						event: {
 							type: op.type,
 							...(text === undefined ? {} : { value: text }),
+							...(typeof eventValue === 'object' && eventValue.key !== undefined ? { key: eventValue.key } : {}),
+							...(typeof eventValue === 'object' && eventValue.text !== undefined ? { text: eventValue.text } : {}),
 							...Object.fromEntries(touch),
 						},
 						...(op.catch ? { catch: slotOf(op.catch, scope) } : {}),

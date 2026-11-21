@@ -1,0 +1,50 @@
+appId: ${APP_ID}
+name: f21-text-keyup
+---
+- launchApp:
+      clearState: true
+- assertVisible: Chips
+- assertVisible: Removed 0
+- tapOn: Chip
+- eraseText
+- inputText: ab
+- hideKeyboard
+- assertVisible: ab
+- assertVisible: Removed 0
+- assertNotVisible: Backspace left \[a\]
+- assertVisible: ab
+- tapOn: Chip
+- pressKey: Backspace
+- assertVisible: Backspace left \[a\]
+- assertVisible: a
+- assertVisible: Backspace left \[a\]
+- assertVisible: Removed 0
+- assertVisible: a
+- tapOn: Chip
+- pressKey: Backspace
+- assertNotVisible: Backspace left \[a\]
+- assertVisible: ''
+- assertVisible: Backspace left \[\]
+- assertVisible: Removed 0
+- assertNotVisible: Backspace left \[a\]
+- assertVisible: ''
+- tapOn: Chip
+- pressKey: Backspace
+- assertNotVisible: Removed 0
+- assertVisible: Backspace left \[\]
+- assertVisible: Removed 1
+- assertNotVisible: Removed 0
+- tapOn: Chip
+- eraseText
+- inputText: c
+- hideKeyboard
+- assertVisible: c
+- assertVisible: Removed 1
+- assertNotVisible: Enter left \[c\]
+- assertVisible: c
+- tapOn: Chip
+- pressKey: Enter
+- assertVisible: Enter left \[c\]
+- assertVisible: Enter left \[c\]
+- assertVisible: Removed 1
+- assertNotVisible: Backspace left \[\]
