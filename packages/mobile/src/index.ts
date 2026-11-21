@@ -14,6 +14,7 @@ export {
 	type NativeAppBuild,
 	type NativeBuild,
 	type NativeStylesheet,
+	type ReadServedStylesheet,
 	type ReadStylesheet,
 } from './compile.ts';
 export {
