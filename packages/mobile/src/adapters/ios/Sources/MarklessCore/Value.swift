@@ -111,3 +111,54 @@ public enum NativeValue: Equatable, Sendable {
 		}
 	}
 }
+
+/// JSON writes Infinity, -Infinity and NaN as null: a value crosses JSON with where each was (nativeNonFiniteSplit/Join).
+extension NativeValue {
+	/// The value as JSON carries it, and each non-finite number's path (keys and indices) and name; an empty list when it has none.
+	public var nonFiniteSplit: (json: JSONValue, nonFinite: JSONValue) {
+		var found: [JSONValue] = []
+		func walk(_ value: NativeValue, _ path: [JSONValue]) -> JSONValue {
+			switch value {
+			case let .number(n) where !n.isFinite:
+				found.append(.array([.array(path), .string(n.isNaN ? "NaN" : n > 0 ? "Infinity" : "-Infinity")]))
+				return .null
+			case let .array(array): return .array(array.items.enumerated().map { walk($0.element, path + [.number(Double($0.offset))]) })
+			case let .object(object): return .object(object.fields.map { ($0.key, walk($0.value, path + [.string($0.key)])) })
+			default: return value.json
+			}
+		}
+		let json = walk(self, [])
+		return (json, .array(found))
+	}
+
+	/// A value JSON carried, with the non-finite numbers `nonFinite` lists put back at their paths.
+	public static func nonFiniteJoin(_ json: JSONValue, _ nonFinite: JSONValue?) throws -> NativeValue {
+		var value = NativeValue(json: json)
+		guard case let .array(entries)? = nonFinite else { return value }
+		for entry in entries {
+			guard case let .array(pair) = entry, pair.count == 2, case let .array(path) = pair[0], case let .string(name) = pair[1] else {
+				throw RuntimeError(reason: "a non-finite entry is [path, name], not \(entry.jsonText)")
+			}
+			let number: Double
+			switch name {
+			case "Infinity": number = .infinity
+			case "-Infinity": number = -.infinity
+			case "NaN": number = .nan
+			default: throw RuntimeError(reason: "\(name) is not Infinity, -Infinity or NaN")
+			}
+			if path.isEmpty { value = .number(number); continue }
+			var at = value
+			for (k, key) in path.enumerated() {
+				let last = k == path.count - 1
+				switch (at, key) {
+				case let (.array(array), .number(index)) where Int(index) >= 0 && Int(index) < array.items.count:
+					if last { array.items[Int(index)] = .number(number) } else { at = array.items[Int(index)] }
+				case let (.object(object), .string(field)) where object.get(field) != nil:
+					if last { object.set(field, .number(number)) } else { at = object.get(field)! }
+				default: throw RuntimeError(reason: "the non-finite path \(JSONValue.array(path).jsonText) names nothing in the value")
+				}
+			}
+		}
+		return value
+	}
+}

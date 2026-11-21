@@ -58,6 +58,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'infinite-bounds',
+		fixture: 'proofs/r159-infinite-bounds/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+		],
+	},
+	{
 		name: 'switches',
 		fixture: 'test/fixtures/Switches.tsrx',
 		actions: [
