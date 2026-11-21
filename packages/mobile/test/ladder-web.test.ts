@@ -103,8 +103,8 @@ async function serveRung(
 	}
 	// Components a rung imports live in proofs/lib, which a page reaches as `../lib/...` from pages/ here too.
 	await cp(join(proofsDir, 'lib'), join(root, 'lib'), { recursive: true });
-	// An app rung may bring its own components, stylesheets, served files and document (whose stylesheet imports reach every page).
-	for (const own of ['lib', 'styles', 'public'])
+	// An app rung may bring its own components, stylesheets, served files, API routes and document (whose stylesheet imports reach every page).
+	for (const own of ['lib', 'styles', 'public', 'api'])
 		if (existsSync(join(proofsDir, folder, own)))
 			await cp(join(proofsDir, folder, own), join(root, own), { recursive: true });
 	if (existsSync(join(proofsDir, folder, 'document.tsrx')))

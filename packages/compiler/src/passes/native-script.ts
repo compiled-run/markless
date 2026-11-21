@@ -96,8 +96,11 @@ if (!host) {
 	g.fetch = function (input, init) {
 		return new Promise(function (resolve, reject) {
 			var url = typeof input === 'string' ? input : input && (input.href || input.url);
+			// A URL from the root reaches the app's site, as the web's reaches the page's origin; the phone shows no page URL.
+			if (typeof url === 'string' && host.origin && url.charAt(0) === '/')
+				url = url.charAt(1) === '/' ? host.origin.slice(0, host.origin.indexOf(':') + 1) + url : host.origin + url;
 			if (typeof url !== 'string' || !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) {
-				reject(new TypeError('Failed to parse URL from ' + String(url)));
+				reject(new TypeError('Failed to parse URL from ' + String(url) + (host.origin ? '' : ": a phone resolves a URL from the root ('/…') only against the app's origin (app.json \"origin\")")));
 				return;
 			}
 			var options = init || {};
@@ -559,6 +562,7 @@ var stable = function (value) {
 	return JSON.stringify([s.json, s.nonFinite]);
 };
 var begin = function (entry) {
+	host.origin = origin;
 	elementFacts = entry.elements || {};
 	proxies = {};
 	cells = join(entry.cells, entry.nonFinite);
@@ -759,6 +763,8 @@ export function nativeScriptOf(
 	services: ReadonlyArray<NativeScriptService>,
 	/** For `navigate()`: the page's route pattern, and the app's route patterns in the router's order. */
 	navigation?: { readonly here: string; readonly routes: ReadonlyArray<string> },
+	/** The app's origin (app.json `origin`), which a URL from the root resolves against. */
+	origin?: string,
 ): NativeScript {
 	const owners: Record<string, number> = {};
 	const definitions = modules.map((module, index) => {
@@ -776,6 +782,7 @@ export function nativeScriptOf(
 	});
 	const body = [
 		'var modules = [];',
+		`var origin = ${JSON.stringify(origin ?? null)};`,
 		`var owners = ${JSON.stringify(owners)};`,
 		`var navigation = ${JSON.stringify(navigation ?? null)};`,
 		...definitions,

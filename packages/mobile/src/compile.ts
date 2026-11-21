@@ -82,8 +82,7 @@ type ReadModule = (
 ) => { readonly filename: string; readonly source: string } | undefined;
 
 /** A JSON file imports as a module whose default export is its value, as the web build loads it. */
-const withJsonModules =
-	(read: ReadModule | undefined): ReadModule | undefined =>
+const withJsonModules = (read: ReadModule | undefined): ReadModule | undefined =>
 	read &&
 	((specifier, importer) => {
 		const module = read(specifier, importer);
@@ -93,7 +92,10 @@ const withJsonModules =
 		} catch {
 			return undefined;
 		}
-		return { filename: module.filename, source: `const json = ${module.source};\nexport default json;\n` };
+		return {
+			filename: module.filename,
+			source: `const json = ${module.source};\nexport default json;\n`,
+		};
 	});
 
 /** Compiles one `.tsrx` module through the real compiler, then lowers its analysis to the native view payload. */
@@ -144,7 +146,10 @@ export async function compileNativeComponent(input: {
 	readonly target?: 'ios' | 'android';
 	/** Where handlers run (`NativeViewOptions['scriptHandlers']`); the default runs each as data where it lowers. */
 	readonly scriptHandlers?: 'fallback' | 'all' | 'never';
+	/** The app config's `origin`: where the app's site is served, which a URL from the root fetched on a phone reaches. */
+	readonly origin?: string;
 }): Promise<NativeBuild> {
+	if (input.origin !== undefined) checkOrigin(input.origin);
 	const manifest =
 		input.manifest ?? (input.page ? buildRouteManifestFromFileIds([input.page]) : undefined);
 	const route = input.page
@@ -272,6 +277,7 @@ export async function compileNativeComponent(input: {
 			modules: { graphs, resolve },
 			readSource: (file: string) => (file === input.filename ? own.source : read.get(file)?.source),
 			...(input.scriptHandlers ? { scriptHandlers: input.scriptHandlers } : {}),
+			...(input.origin !== undefined ? { origin: input.origin } : {}),
 			...(input.manifest
 				? {
 						routes: input.manifest.routes.map((entry) => ({
@@ -327,7 +333,8 @@ export async function compileNativeComponent(input: {
 			)
 		: [];
 	return {
-		payload: errors.length > 0 || usage.length > 0 || unstyled.length > 0 ? null : native.payload,
+		payload:
+			errors.length > 0 || usage.length > 0 || unstyled.length > 0 ? null : native.payload,
 		styles,
 		stylesheets: sheets,
 		features: native.features,
@@ -415,6 +422,8 @@ export async function compileNativeApp(input: {
 	readonly partial?: boolean;
 	/** The `icons` option of the app's `ui()` plugin, as `compileNativeComponent` takes it. */
 	readonly icons?: false | IconsOptions;
+	/** The app config's `origin`, for every page (see `compileNativeComponent`). */
+	readonly origin?: string;
 }): Promise<NativeAppBuild> {
 	const icons = sourceTransformOf(input.icons) ?? (false as const);
 	const manifest = buildRouteManifestFromFileIds(input.pages.map((page) => page.page));
@@ -460,6 +469,7 @@ export async function compileNativeApp(input: {
 			...(input.device ? { device: input.device } : {}),
 			...(input.target ? { target: input.target } : {}),
 			icons,
+			...(input.origin !== undefined ? { origin: input.origin } : {}),
 		});
 		for (const feature of build.features) features.add(feature);
 		diagnostics.push(
@@ -504,4 +514,20 @@ export async function compileNativeApp(input: {
 		manifest: deviceManifest([...features], input.device).manifest,
 		diagnostics,
 	};
+}
+
+/** An app's `origin` is a site's origin as the web writes it: `http` or `https`, a host, maybe a port, and no path. */
+function checkOrigin(origin: string): void {
+	let parsed: URL | undefined;
+	try {
+		parsed = new URL(origin);
+	} catch {}
+	if (
+		!parsed ||
+		(parsed.protocol !== 'https:' && parsed.protocol !== 'http:') ||
+		parsed.origin !== origin
+	)
+		throw new Error(
+			`app.json "origin" is ${JSON.stringify(origin)}; write the site's origin, as in "https://shop.example" (http or https, no path or trailing slash)`,
+		);
 }
