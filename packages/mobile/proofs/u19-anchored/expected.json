@@ -1,0 +1,20 @@
+{
+	"rung": 119,
+	"name": "Anchor positioning through Dragon: a panel and a hint placed against a button (position-area, anchor-size), a box that flips above its anchor (position-try-fallbacks)",
+	"steps": [
+		{
+			"visible": ["Anchored", "Details", "Tap for details", "Low anchor", "Flipped above", "Open no"],
+			"absent": ["Ships in two days"]
+		},
+		{
+			"do": { "tap": "Details" },
+			"visible": ["Ships in two days", "Open yes"],
+			"absent": ["Open no"]
+		},
+		{
+			"do": { "tap": "Details" },
+			"visible": ["Open no"],
+			"absent": ["Ships in two days", "Open yes"]
+		}
+	]
+}

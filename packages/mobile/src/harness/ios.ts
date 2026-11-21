@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { exec } from './exec.ts';
 import { simulatorRuntime, type SimctlRuntime } from './simulator-runtime.ts';
@@ -6,6 +6,7 @@ import { PROOF_APP_ID, PROOF_APP_NAME, PROOF_LINK_SCHEME } from './proof-app.ts'
 import type { DeviceManifest } from '../permissions.ts';
 import type { ProofAssets } from './rung.ts';
 import { cachedFolder, cacheRoot, contentKey, filesUnder, SHELL_CACHE_FORMAT } from './tools.ts';
+import { assertDragonPin, dragonDir } from '../style-export.ts';
 
 export type BootedSimulator = {
 	readonly udid: string;
@@ -102,8 +103,9 @@ export async function buildIosShell(hostPackage: string, shellDir: string): Prom
 	const sdk = (
 		await exec('xcrun', ['--sdk', 'iphonesimulator', '--show-sdk-path'])
 	).stdout.trim();
+	const dragon = dragonModules(hostPackage);
 	const inputs = [...filesUnder(hostPackage, '.swift'), ...filesUnder(shellDir, '.swift')];
-	const key = contentKey(hostPackage, inputs, [sdk, PROOF_APP_ID, SHELL_CACHE_FORMAT, infoPlist('')]);
+	const key = contentKey(hostPackage, inputs, [sdk, PROOF_APP_ID, SHELL_CACHE_FORMAT, infoPlist(''), dragon.key]);
 	const root = await cachedFolder(join(cacheRoot(), 'ios-shell', key), async (scratch) => {
 		const modules = join(scratch, 'modules');
 		const app = join(scratch, `${PROOF_APP_NAME}.app`);
@@ -119,6 +121,27 @@ export async function buildIosShell(hostPackage: string, shellDir: string): Prom
 			'-target',
 			`arm64-apple-ios${deploymentTarget}-simulator`,
 		];
+		// Dragon's translated engine and its plan layout, before the host targets that import them.
+		for (const target of dragon.modules) {
+			await exec('xcrun', [
+				...common,
+				'-parse-as-library',
+				'-wmo',
+				'-O',
+				'-module-name',
+				target.name,
+				'-emit-module',
+				'-emit-module-path',
+				join(modules, `${target.name}.swiftmodule`),
+				'-emit-library',
+				'-static',
+				'-o',
+				join(modules, `lib${target.name}.a`),
+				'-I',
+				modules,
+				...target.sources,
+			]);
+		}
 		for (const target of ordered) {
 			await exec('xcrun', [
 				...common,
@@ -146,6 +169,7 @@ export async function buildIosShell(hostPackage: string, shellDir: string): Prom
 			'-L',
 			modules,
 			...ordered.toReversed().map((target) => `-l${target.name}`),
+			...dragon.modules.toReversed().map((target) => `-l${target.name}`),
 			...filesUnder(shellDir, '.swift'),
 			'-o',
 			join(app, PROOF_APP_NAME),
@@ -153,6 +177,27 @@ export async function buildIosShell(hostPackage: string, shellDir: string): Prom
 		writeFileSync(join(app, 'Info.plist'), infoPlist(deploymentTarget));
 	});
 	return join(root, `${PROOF_APP_NAME}.app`);
+}
+
+/**
+ * Dragon's translated layout engine (`DragonLayout`) and its Markless plan layout (`DragonPlan`: the translated harness, whose
+ * entry point is internal, with this host's one-function glue), from the Dragon checkout the styles come from.
+ */
+function dragonModules(hostPackage: string) {
+	assertDragonPin();
+	const generated = join(dragonDir(), 'packages', 'layout', 'generated', 'swift', 'Sources');
+	const engine = filesUnder(join(generated, 'DragonLayout'), '.swift');
+	const harness = ['Harness.swift', 'Host.swift'].map((file) => join(generated, 'DragonLayoutHarness', file));
+	if (engine.length === 0 || !harness.every((file) => existsSync(file)))
+		throw new Error(`${generated} has no translated engine and harness; set MARKLESS_DRAGON_DIR to a Dragon checkout`);
+	const glue = join(hostPackage, 'DragonPlan', 'DragonPlan.swift');
+	return {
+		key: contentKey(generated, [...engine, ...harness]),
+		modules: [
+			{ name: 'DragonLayout', sources: engine },
+			{ name: 'DragonPlan', sources: [...harness, glue] },
+		],
+	};
 }
 
 const infoPlist = (minimumOs: string) => `<?xml version="1.0" encoding="UTF-8"?>
@@ -165,7 +210,9 @@ const infoPlist = (minimumOs: string) => `<?xml version="1.0" encoding="UTF-8"?>
 <key>CFBundleVersion</key><string>1</string>
 <key>CFBundleShortVersionString</key><string>1.0</string>
 <key>MinimumOSVersion</key><string>${minimumOs}</string>
-<key>UIDeviceFamily</key><array><integer>1</integer></array>
+<key>UIDeviceFamily</key><array><integer>1</integer><integer>2</integer></array>
+<key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
+<key>UISupportedInterfaceOrientations~ipad</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
 <key>UILaunchScreen</key><dict/>
 <key>CFBundleSupportedPlatforms</key><array><string>iPhoneSimulator</string></array>
 <key>UIApplicationSceneManifest</key><dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>

@@ -7,7 +7,8 @@
 			{
 				"id": "state:open",
 				"name": "open",
-				"initial": false
+				"initial": false,
+				"styled": true
 			},
 			{
 				"id": "state:fruits",
@@ -380,6 +381,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:open",
+					"value": true
+				},
+				{
 					"op": "text",
 					"node": "h1:text0",
 					"value": "Hide list"
@@ -419,6 +425,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:open",
+					"value": false
+				},
+				{
 					"op": "text",
 					"node": "h1:text0",
 					"value": "Show list"
@@ -449,6 +460,11 @@
 				"host": "h1"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:open",
+					"value": true
+				},
 				{
 					"op": "text",
 					"node": "h1:text0",

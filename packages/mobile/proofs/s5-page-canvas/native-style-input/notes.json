@@ -1,0 +1,47 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Notes",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "notes mk-13vccud"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "heading mk-13vccud"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Watering"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "line mk-13vccud"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Mist the tray each morning"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n\tbackground: #f4efe6;\n}\n\n@media (prefers-color-scheme: dark) {\n\tbody {\n\t\tbackground: #1d1b16;\n\t}\n}\n\n.notes.mk-13vccud {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\t.heading.mk-13vccud {\n\t\t\t\tfont-size: 24px;\n\t\t\t\tfont-weight: 700;\n\t\t\t\tcolor: #3d405b;\n\t\t\t}\n\t\t\t.line.mk-13vccud {\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tfont-size: 17px;\n\t\t\t\tcolor: #3d405b;\n\t\t\t}\n\t\t\t@media (prefers-color-scheme: dark) {\n\t\t\t\t.heading.mk-13vccud,\n\t\t\t\t.line.mk-13vccud {\n\t\t\t\t\tcolor: #f4efe6;\n\t\t\t\t}\n\t\t\t}",
+	"states": []
+}

@@ -1,0 +1,47 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Boats",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "boats mk-nwnsv6"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "heading mk-nwnsv6"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Moorings"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "line mk-nwnsv6"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Three boats are out"
+		}
+	],
+	"css": "html {\n\tbackground: rgba(38, 70, 83, 0.8);\n}\n\nbody {\n\tmargin: 16px;\n\tfont-family: sans-serif;\n\tbackground: #fefae0;\n}\n\n@media (prefers-color-scheme: dark) {\n\thtml {\n\t\tbackground: #10212a;\n\t}\n\n\tbody {\n\t\tbackground: rgba(231, 111, 81, 0.35);\n\t}\n}\n\n.boats.mk-nwnsv6 {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\t.heading.mk-nwnsv6 {\n\t\t\t\tfont-size: 24px;\n\t\t\t\tfont-weight: 700;\n\t\t\t\tcolor: #3d405b;\n\t\t\t}\n\t\t\t.line.mk-nwnsv6 {\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tfont-size: 17px;\n\t\t\t\tcolor: #3d405b;\n\t\t\t}\n\t\t\t@media (prefers-color-scheme: dark) {\n\t\t\t\t.heading.mk-nwnsv6,\n\t\t\t\t.line.mk-nwnsv6 {\n\t\t\t\t\tcolor: #f4efe6;\n\t\t\t\t}\n\t\t\t}",
+	"states": []
+}

@@ -1,0 +1,47 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Care",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "care mk-1p3ucar"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "heading mk-1p3ucar"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Watering"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "tip mk-1p3ucar"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Soak the soil, then let it dry."
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.care.mk-1p3ucar {\n\t\t\t\tpadding: 32px 20px;\n\t\t\t\tbackground: #264653;\n\t\t\t}\n\t\t\t.heading.mk-1p3ucar {\n\t\t\t\tfont-size: 24px;\n\t\t\t\tfont-weight: 700;\n\t\t\t\tcolor: #e9f5f2;\n\t\t\t}\n\t\t\t.tip.mk-1p3ucar {\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tpadding: 12px;\n\t\t\t\tborder-left: 6px solid #e9c46a;\n\t\t\t\tbackground: #2f5b6b;\n\t\t\t\tcolor: #ffffff;\n\t\t\t\tfont-size: 16px;\n\t\t\t}",
+	"states": []
+}

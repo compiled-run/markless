@@ -7,17 +7,28 @@
 			{
 				"id": "state:shown",
 				"name": "shown",
-				"initial": true
+				"initial": true,
+				"styled": true
 			},
 			{
 				"id": "state:word",
 				"name": "word",
-				"initial": "apple"
+				"initial": "apple",
+				"styled": true,
+				"domain": [
+					"apple",
+					"banana"
+				]
 			},
 			{
 				"id": "state:detail",
 				"name": "detail",
-				"initial": "pear"
+				"initial": "pear",
+				"styled": true,
+				"domain": [
+					"pear",
+					"missing"
+				]
 			},
 			{
 				"id": "task:computed:entry",
@@ -820,6 +831,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:detail",
+					"value": "missing"
+				},
+				{
 					"op": "text",
 					"node": "h3:text0",
 					"value": "Detail asked: missing"
@@ -851,6 +867,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:shown",
+					"value": false
+				},
+				{
 					"op": "text",
 					"node": "h4:text0",
 					"value": "Show"
@@ -868,6 +889,11 @@
 				"host": "h4"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:shown",
+					"value": true
+				},
 				{
 					"op": "text",
 					"node": "h4:text0",
@@ -887,6 +913,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:word",
+					"value": "banana"
+				},
+				{
 					"op": "text",
 					"node": "h2:text0",
 					"value": "Asked: banana"
@@ -904,6 +935,11 @@
 				"host": "h4"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:shown",
+					"value": false
+				},
 				{
 					"op": "text",
 					"node": "h4:text0",
@@ -926,6 +962,11 @@
 				"host": "h4"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:shown",
+					"value": true
+				},
 				{
 					"op": "text",
 					"node": "h4:text0",
