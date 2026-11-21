@@ -1055,7 +1055,7 @@ function walk(
 			if ('tap' in action && !activates && touched.length === 0)
 				throw new Error(`step ${index}: "${name}" is not a control and the press changed nothing`);
 			// A field takes the keyboard when typed into, and gives it up when anything else is tapped: its focus and blur run.
-			const handles = (node: string, event: 'input' | 'focus' | 'blur' | 'keydown') =>
+			const handles = (node: string, event: 'input' | 'focus' | 'blur' | 'keydown' | 'keyup') =>
 				payload.events.some((candidate) => candidate.host === node.split('@')[0] && candidate.event === event);
 			if ('type' in action && focused !== host) {
 				if (focused && handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
@@ -1080,7 +1080,28 @@ function walk(
 				apply(journal, index);
 				return journal.some((entry) => entry.op === 'preventDefault');
 			};
-			if ('type' in action) for (const key of action.type.text) keyed(key);
+			// A key's keyup runs after what the key did, or after its keydown left that out.
+			const keyedUp = (key: string) => {
+				if (handles(host, 'keyup')) apply(runtime.dispatch({ event: 'keyup', host, key }), index);
+			};
+			// With a keyup handler, typing is key by key, each key's edit between its keydown and its keyup, as on the web.
+			const byKey = 'type' in action && handles(host, 'keyup');
+			if ('type' in action && !byKey) for (const key of action.type.text) keyed(key);
+			if (byKey) {
+				// The field was erased before typing; keys past its maxlength still go down and up, and edit nothing.
+				const kept = [...text!];
+				let sofar = '';
+				for (const key of action.type.text) {
+					const prevented = keyed(key);
+					if (!prevented && [...sofar].length < kept.length) {
+						sofar += kept[[...sofar].length];
+						if (properties.has(host)) properties.set(host, sofar);
+						else typed.set(host, sofar);
+						if (handles(host, 'input')) apply(runtime.dispatch({ event: 'input', host, value: sofar }), index);
+					}
+					keyedUp(key);
+				}
+			}
 			// A double tap is two presses, the second counted 2.
 			if ('doubleTap' in action)
 				apply(runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 1 }), index);
@@ -1092,7 +1113,7 @@ function walk(
 					: 'doubleTap' in action
 						? runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 2 })
 					: 'type' in action
-						? handles(host, 'input')
+						? handles(host, 'input') && !byKey
 							? runtime.dispatch({ event: 'input', host, value: text! })
 							: []
 						: 'erase' in action
@@ -1103,6 +1124,8 @@ function walk(
 								? []
 								: runtime.dispatch({ event: 'enter', host });
 			apply(dispatched, index);
+			if ('erase' in action) keyedUp('Backspace');
+			else if ('submit' in action) keyedUp('Enter');
 		}
 		raiseLoadEvents(index);
 		check(index, step);

@@ -1,0 +1,40 @@
+{
+	"rung": 202,
+	"name": "A text field's keyup runs for the on-screen keyboard's delete and return keys after what each did, with the text it left",
+	"steps": [
+		{ "visible": ["Chips", "Removed 0"] },
+		{
+			"do": { "type": { "field": "Chip", "text": "ab" } },
+			"visible": ["Removed 0"],
+			"absent": ["Backspace left [a]"],
+			"fields": { "Chip": "ab" }
+		},
+		{
+			"do": { "erase": "Chip" },
+			"visible": ["Backspace left [a]", "Removed 0"],
+			"fields": { "Chip": "a" }
+		},
+		{
+			"do": { "erase": "Chip" },
+			"visible": ["Backspace left []", "Removed 0"],
+			"absent": ["Backspace left [a]"],
+			"fields": { "Chip": "" }
+		},
+		{
+			"do": { "erase": "Chip" },
+			"visible": ["Backspace left []", "Removed 1"],
+			"absent": ["Removed 0"]
+		},
+		{
+			"do": { "type": { "field": "Chip", "text": "c" } },
+			"visible": ["Removed 1"],
+			"absent": ["Enter left [c]"],
+			"fields": { "Chip": "c" }
+		},
+		{
+			"do": { "submit": "Chip" },
+			"visible": ["Enter left [c]", "Removed 1"],
+			"absent": ["Backspace left []"]
+		}
+	]
+}
