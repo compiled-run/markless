@@ -958,6 +958,57 @@ export function Page() @{
 		]);
 	});
 
+	it("reads where a part stands among its family's parts as its place in the tree, and refuses it for parts a @for row shows", async () => {
+		const source = (
+			parts: string,
+		) => `import { computed, element, shared, state } from '@markless/core';
+const stepsState = shared(() => {
+	const steps = state({ current: 0 });
+	const itemEls = element<HTMLDivElement[]>();
+	return { ...steps, itemEls };
+}, { scope: 'subtree' });
+function Steps({ children }: { readonly children?: unknown }) @{
+	const steps = stepsState();
+	<section>{children}</section>
+}
+function Step({ title }: { readonly title: string }) @{
+	const steps = stepsState();
+	const mine = element<HTMLDivElement>();
+	const at = computed(() => steps.itemEls.indexOf(mine as HTMLDivElement));
+	<div el={[steps.itemEls, mine]} ui-first={at === 0}>{at}{title}</div>
+}
+export function Page() @{
+	const titles = state(['a', 'b']);
+	<main><Steps>${parts}</Steps></main>
+}`;
+		const written = await nativeView(
+			source('<Step title="a" /><Step title="b" /><Step title="c" />'),
+		);
+		expect(written.diagnostics.map((d) => d.message)).toEqual([]);
+		const positions = written.payload!.nodes.flatMap((node) =>
+			node.kind === 'text'
+				? node.parts.flatMap((part) =>
+						'expr' in part &&
+						'literal' in part.expr &&
+						typeof part.expr.literal === 'number'
+							? [part.expr.literal]
+							: [],
+					)
+				: [],
+		);
+		expect(positions).toEqual([0, 1, 2]);
+		const rows = await nativeView(
+			source('@for (const title of titles; key title) { <Step title={title} /> }'),
+		);
+		expect(rows.diagnostics.map((d) => d.message)).toEqual(
+			expect.arrayContaining([
+				expect.stringContaining(
+					"where a part stands among its family's parts inside a @for row",
+				),
+			]),
+		);
+	});
+
 	it("seeds a row part's state from the row's item, and reads a handle bound in rows only to find the tapped row", async () => {
 		const source = (find: string) => `import { element, shared, state } from '@markless/core';
 const listState = shared(() => {
