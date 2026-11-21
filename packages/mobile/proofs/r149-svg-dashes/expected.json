@@ -1,0 +1,5 @@
+{
+	"rung": 149,
+	"name": "Dashed SVG strokes: stroke-dasharray (an odd list repeats, dots from zero dashes with round caps) and stroke-dashoffset, as the browser dashes them",
+	"steps": [{ "visible": ["Dashes", "Dashes drawn"] }]
+}

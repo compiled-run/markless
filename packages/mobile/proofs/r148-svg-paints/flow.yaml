@@ -1,0 +1,7 @@
+appId: ${APP_ID}
+name: r148-svg-paints
+---
+- launchApp:
+      clearState: true
+- assertVisible: Paints
+- assertVisible: Sunrise drawn

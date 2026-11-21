@@ -1,0 +1,150 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Dashes"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "svg",
+				"parent": "h0",
+				"attributes": {
+					"width": "240",
+					"height": "120",
+					"viewBox": "0 0 120 60",
+					"stroke": "#1e3a8a",
+					"stroke-width": "3",
+					"fill": "none",
+					"aria-label": "Three lines and a ring"
+				},
+				"drawing": {
+					"viewBox": [0, 0, 120, 60],
+					"width": 240,
+					"height": 120,
+					"shapes": [
+						{
+							"path": [0, 10, 10, 1, 110, 10],
+							"fill": null,
+							"fillRule": "nonzero",
+							"stroke": {
+								"r": 30,
+								"g": 58,
+								"b": 138,
+								"alpha": 255
+							},
+							"width": 3,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						},
+						{
+							"path": [0, 10, 25, 1, 110, 25],
+							"fill": null,
+							"fillRule": "nonzero",
+							"stroke": {
+								"r": 30,
+								"g": 58,
+								"b": 138,
+								"alpha": 255
+							},
+							"width": 3,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4,
+							"dash": [8, 4]
+						},
+						{
+							"path": [0, 10, 40, 1, 110, 40],
+							"fill": null,
+							"fillRule": "nonzero",
+							"stroke": {
+								"r": 30,
+								"g": 58,
+								"b": 138,
+								"alpha": 255
+							},
+							"width": 3,
+							"cap": "round",
+							"join": "miter",
+							"miterLimit": 4,
+							"dash": [0, 6]
+						},
+						{
+							"path": [
+								0, 108, 48, 3, 108, 52.418277998646346, 104.41827799864635, 56, 100,
+								56, 3, 95.58172200135365, 56, 92, 52.418277998646346, 92, 48, 3, 92,
+								43.581722001353654, 95.58172200135365, 40, 100, 40, 3,
+								104.41827799864635, 40, 108, 43.581722001353654, 108, 48, 4
+							],
+							"fill": null,
+							"fillRule": "nonzero",
+							"stroke": {
+								"r": 230,
+								"g": 115,
+								"b": 0,
+								"alpha": 255
+							},
+							"width": 3,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4,
+							"dash": [5, 5],
+							"dashOffset": 2
+						}
+					]
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h9:text0",
+				"parent": "h9",
+				"parts": [
+					{
+						"text": "Dashes drawn"
+					}
+				]
+			}
+		],
+		"events": [],
+		"handlers": []
+	},
+	"initial": [
+		["h1:text0", "Dashes"],
+		["h9:text0", "Dashes drawn"]
+	],
+	"steps": []
+}

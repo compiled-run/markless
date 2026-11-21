@@ -1,0 +1,5 @@
+{
+	"rung": 150,
+	"name": "SVG <text> as diagram exports write it: anchored, on a middle or central baseline, its font from the text or its group",
+	"steps": [{ "visible": ["Diagram", "Diagram drawn"] }]
+}

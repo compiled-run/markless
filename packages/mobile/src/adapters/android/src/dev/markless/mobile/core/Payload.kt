@@ -74,6 +74,8 @@ sealed interface Expr {
 	data class Checked(val node: String) : Expr
 	/** A text field's text now: what a person typed since, else its `value` binding, else its `value` attribute. */
 	data class Field(val node: String) : Expr
+	/** A box's scroll position now ([top] true for `scrollTop`), as its last `scroll` event reported it; 0 before that. */
+	data class Scroll(val node: String, val top: Boolean) : Expr
 	/** A computed whose body runs in the script engine: function [fn] of the payload's script, called with [bindings]. */
 	data class Script(val fn: String, val bindings: Map<String, ScriptBinding>) : Expr
 }
@@ -148,6 +150,10 @@ data class DefaultStyle(
 	val rule: Boolean = false,
 	/** "disc" or "decimal", on a list. */
 	val marker: String? = null,
+	/** On a summary: a ▸ (collapsed) or ▾ (expanded) before its content, by its aria-expanded. */
+	val disclosure: Boolean = false,
+	/** On a center: its blocks in the middle of the line and its text centred, which what is inside inherits. */
+	val center: Boolean = false,
 	/** "table", "row" or "cell". */
 	val table: String? = null,
 )
@@ -161,18 +167,26 @@ data class Rgba(val r: Int, val g: Int, val b: Int, val alpha: Int) {
 sealed interface ShapePaint {
 	data class Color(val color: Rgba) : ShapePaint
 	data object Current : ShapePaint
+	/** A pad gradient: [points] linear x1 y1 x2 y2, radial cx cy r fx fy fr, in gradient space; [transform] maps it to the shape's units. */
+	data class Gradient(val radial: Boolean, val points: List<Double>, val offsets: List<Double>, val colors: List<Rgba>, val transform: List<Double>) : ShapePaint
 }
 
 /** One shape: verb-coded path (0 move, 1 line, 3 cubic, 4 close), its paint and stroke, and an optional affine map [a,b,c,d,e,f]. */
-data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?)
+/** What a drawing paints, in order: a [Shape] or a [DrawingText]. */
+sealed interface DrawingPart
+
+/** A run of SVG text at one point: [anchor] start/middle/end at x, [baseline] alphabetic/middle/central at y. */
+data class DrawingText(val text: String, val x: Double, val y: Double, val size: Double, val weight: Int, val italic: Boolean, val family: String?, val anchor: String, val baseline: String, val fill: ShapePaint, val transform: List<Double>?, val letterSpacing: Double = 0.0) : DrawingPart
+
+data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val dash: List<Double>? = null, val dashOffset: Double = 0.0) : DrawingPart
 
 /** An inline `<svg>` compiled to shapes. */
-data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false)
+data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<DrawingPart>, val em: Boolean = false)
 
 /** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Dismiss] is a sheet's platform close or an overlay's Escape or outside press. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
 /** [pointer]: an event a touch raises; [touch]: one of those a host reports, from which the runtime raises the rest. */
 enum class EventName(val wire: String, val pointer: Boolean = false, val touch: Boolean = false) {
-	Activate("activate"), Input("input"), Focus("focus"), Blur("blur"), Keydown("keydown"), Paste("paste"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"),
+	Activate("activate"), Input("input"), Focus("focus"), Blur("blur"), Keydown("keydown"), Paste("paste"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"), Scroll("scroll"),
 	PointerDown("pointerdown", true, true), PointerMove("pointermove", true, true), PointerUp("pointerup", true, true), PointerCancel("pointercancel", true, true),
 	PointerOver("pointerover", true), PointerOut("pointerout", true), PointerEnter("pointerenter", true), PointerLeave("pointerleave", true),
 	Choose("choose"),
@@ -398,7 +412,7 @@ data class Payload(
 			is Expr.Method -> hasScript(e.target) || e.arguments.any(::hasScript)
 			is Expr.Lambda -> hasScript(e.body)
 			is Expr.Call -> e.arguments.any(::hasScript)
-			is Expr.CellRef, is Expr.Literal, is Expr.Local, is Expr.Item, Expr.RouteParams, is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field -> false
+			is Expr.CellRef, is Expr.Literal, is Expr.Local, is Expr.Item, Expr.RouteParams, is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field, is Expr.Scroll -> false
 			is Expr.Contains -> hasScript(e.within) || hasScript(e.node)
 			is Expr.Captures -> hasScript(e.node) || hasScript(e.pointer)
 			is Expr.FocusOrigin -> hasScript(e.overlay)
@@ -435,7 +449,7 @@ data class Payload(
 			is Expr.Lambda -> cellsOf(e.body)
 			is Expr.Local, is Expr.Item, Expr.RouteParams -> emptyList()
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
-			is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field -> emptyList()
+			is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field, is Expr.Scroll -> emptyList()
 			is Expr.Contains -> cellsOf(e.within) + cellsOf(e.node)
 			is Expr.Captures -> cellsOf(e.node) + cellsOf(e.pointer)
 			is Expr.FocusOrigin -> cellsOf(e.overlay)
@@ -547,6 +561,12 @@ data class Payload(
 				o.containsKey("isElement") -> { o.only(setOf("isElement"), what); Expr.IsElement(sub("isElement")) }
 				o.containsKey("checked") -> { o.only(setOf("checked"), what); Expr.Checked(o.field("checked", what).str("$what.checked")) }
 				o.containsKey("field") -> { o.only(setOf("field"), what); Expr.Field(o.field("field", what).str("$what.field")) }
+				o.containsKey("scroll") -> {
+					o.only(setOf("scroll", "axis"), what)
+					val axis = o.field("axis", what).str("$what.axis")
+					if (axis != "top" && axis != "left") throw MarklessDecodeError("$what.axis: unknown scroll axis \"$axis\"")
+					Expr.Scroll(o.field("scroll", what).str("$what.scroll"), axis == "top")
+				}
 				o.containsKey("formData") -> { o.only(setOf("formData"), what); Expr.FormData(o.field("formData", what).str("$what.formData")) }
 				o.containsKey("script") -> { o.only(setOf("script", "bindings"), what); Expr.Script(o.field("script", what).str("$what.script"), scriptBindings(o.field("bindings", what), "$what.bindings")) }
 				else -> throw MarklessDecodeError("$what is an unknown expression (fields ${o.keys})")
@@ -592,7 +612,7 @@ data class Payload(
 
 		private fun defaultStyle(v: Json, what: String): DefaultStyle {
 			val o = v.obj(what)
-			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "rule", "marker", "table"), what)
+			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "rule", "marker", "disclosure", "center", "table"), what)
 			fun flag(name: String): Boolean = o[name]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.$name must be true when present"); true } ?: false
 			fun word(name: String, allowed: Set<String>): String? = o[name]?.let { oneOf(o, name, allowed, what) }
 			return DefaultStyle(
@@ -605,6 +625,8 @@ data class Payload(
 				indent = o["indent"]?.num("$what.indent") ?: 0.0,
 				rule = flag("rule"),
 				marker = word("marker", setOf("disc", "decimal")),
+				disclosure = flag("disclosure"),
+				center = flag("center"),
 				table = word("table", setOf("table", "row", "cell")),
 			)
 		}
@@ -612,7 +634,22 @@ data class Payload(
 		private fun paint(v: Json, what: String): ShapePaint? = when (v) {
 			Json.Null -> null
 			is Json.Str -> if (v.value == "currentColor") ShapePaint.Current else throw MarklessDecodeError("$what must be a colour, \"currentColor\" or null")
-			else -> {
+			is Json.Obj -> if ("gradient" in v.fields) {
+				val o = v.obj(what)
+				o.only(setOf("gradient", "points", "stops", "transform"), what)
+				val radial = when (o.field("gradient", what).str("$what.gradient")) { "linear" -> false; "radial" -> true; else -> throw MarklessDecodeError("$what.gradient must be linear or radial") }
+				val points = o.field("points", what).arr("$what.points").map { it.num("$what.points") }
+				if (points.size != if (radial) 6 else 4) throw MarklessDecodeError("$what.points has ${points.size} numbers")
+				val transform = o.field("transform", what).arr("$what.transform").map { it.num("$what.transform") }
+				if (transform.size != 6) throw MarklessDecodeError("$what.transform has six numbers")
+				val stops = o.field("stops", what).arr("$what.stops").map { s ->
+					val stop = s.obj("$what.stops")
+					stop.only(setOf("offset", "color"), "$what.stops")
+					stop.field("offset", "$what.stops").num("$what.stops.offset") to (paint(stop.field("color", "$what.stops"), "$what.stops.color") as? ShapePaint.Color ?: throw MarklessDecodeError("$what.stops.color must be a colour")).color
+				}
+				if (stops.isEmpty()) throw MarklessDecodeError("$what.stops is empty")
+				ShapePaint.Gradient(radial, points, stops.map { it.first }, stops.map { it.second }, transform)
+			} else {
 				val o = v.obj(what)
 				o.only(setOf("r", "g", "b", "alpha"), what)
 				fun channel(name: String): Int {
@@ -622,6 +659,7 @@ data class Payload(
 				}
 				ShapePaint.Color(Rgba(channel("r"), channel("g"), channel("b"), channel("alpha")))
 			}
+			else -> throw MarklessDecodeError("$what must be a colour, a gradient, \"currentColor\" or null")
 		}
 
 		private fun live(v: Json, what: String): Live {
@@ -642,7 +680,23 @@ data class Payload(
 			val shapes = o.field("shapes", what).arr("$what.shapes").mapIndexed { n, sv ->
 				val w = "$what.shapes[$n]"
 				val so = sv.obj(w)
-				so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform"), w)
+				if ("text" in so) {
+					so.only(setOf("text", "x", "y", "size", "weight", "italic", "family", "anchor", "baseline", "letterSpacing", "fill", "transform"), w)
+					val transform = so["transform"]?.arr("$w.transform")?.map { it.num("$w.transform[]") }
+					if (transform != null && transform.size != 6) throw MarklessDecodeError("$w.transform must hold six numbers")
+					return@mapIndexed DrawingText(
+						so.field("text", w).str("$w.text"), so.field("x", w).num("$w.x"), so.field("y", w).num("$w.y"),
+						so.field("size", w).num("$w.size"), so.field("weight", w).num("$w.weight").toInt(),
+						so["italic"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$w.italic must be true when present"); true } ?: false,
+						so["family"]?.str("$w.family"), oneOf(so, "anchor", setOf("start", "middle", "end"), w),
+						oneOf(so, "baseline", setOf("alphabetic", "middle", "central"), w),
+						paint(so.field("fill", w), "$w.fill") ?: throw MarklessDecodeError("$w.fill must be a paint"), transform,
+						so["letterSpacing"]?.num("$w.letterSpacing") ?: 0.0,
+					)
+				}
+				so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "dash", "dashOffset"), w)
+				val dash = so["dash"]?.arr("$w.dash")?.map { it.num("$w.dash[]") }
+				if (dash != null && (dash.isEmpty() || dash.size % 2 != 0 || dash.any { it < 0 })) throw MarklessDecodeError("$w.dash must hold an even count of lengths")
 				val path = so.field("path", w).arr("$w.path").map { it.num("$w.path[]") }
 				val transform = so["transform"]?.arr("$w.transform")?.map { it.num("$w.transform[]") }
 				if (transform != null && transform.size != 6) throw MarklessDecodeError("$w.transform must hold six numbers")
@@ -650,7 +704,7 @@ data class Payload(
 					path, paint(so.field("fill", w), "$w.fill"), oneOf(so, "fillRule", setOf("nonzero", "evenodd"), w) == "evenodd",
 					paint(so.field("stroke", w), "$w.stroke"), so.field("width", w).num("$w.width"),
 					oneOf(so, "cap", setOf("butt", "round", "square"), w), oneOf(so, "join", setOf("miter", "round", "bevel"), w),
-					so.field("miterLimit", w).num("$w.miterLimit"), transform,
+					so.field("miterLimit", w).num("$w.miterLimit"), transform, dash, so["dashOffset"]?.num("$w.dashOffset") ?: 0.0,
 				)
 			}
 			return Drawing(viewBox, o["width"]?.num("$what.width"), o["height"]?.num("$what.height"), shapes, em)

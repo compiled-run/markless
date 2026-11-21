@@ -20,15 +20,20 @@ public struct NativeAction: Equatable, Sendable {
 	public let x: Double?
 	public let y: Double?
 	public let time: Double?
+	/// For `scroll`: the box's scroll position now, in points from where its content starts.
+	public let top: Double?
+	public let left: Double?
 
 	public init(
 		event: NativeEventName, host: String, value: String? = nil, reason: String? = nil, detail: Int? = nil, pointerId: Double? = nil,
-		x: Double? = nil, y: Double? = nil, time: Double? = nil
+		x: Double? = nil, y: Double? = nil, time: Double? = nil, top: Double? = nil, left: Double? = nil
 	) {
 		self.event = event
 		self.host = host
 		self.value = value
 		self.detail = detail
+		self.top = top
+		self.left = left
 		timer = nil
 		self.reason = reason
 		self.pointerId = pointerId
@@ -42,6 +47,8 @@ public struct NativeAction: Equatable, Sendable {
 		host = ""
 		value = nil
 		detail = nil
+		top = nil
+		left = nil
 		self.timer = timer
 		reason = nil
 		pointerId = nil
@@ -241,7 +248,7 @@ public final class NativeRuntime {
 	/// What a dismiss or pointer event carries while its handlers run.
 	private var eventFields: [NativeEventField: NativeValue]?
 	/// What a touch adds to a script pointer handler's event, in the order the reference writes them.
-	private let touchFields: [NativeEventField] = [.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp]
+	private let touchFields: [NativeEventField] = [.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp, .scrollTop, .scrollLeft]
 	/// The element that has focus, or nil.
 	public private(set) var focused: String?
 	/// The overlay stack, topmost last, and the focus each overlay found when it joined, as the web's overlay behaviour keeps them.
@@ -254,6 +261,8 @@ public final class NativeRuntime {
 	private let forms: [String: NativeForm]
 	/// A field's text a person typed since its `value` binding last changed it.
 	private var edited: [String: String] = [:]
+	/// Each box's scroll position as its last `scroll` event reported it.
+	private var scrolled: [String: (top: Double, left: Double)] = [:]
 	private var running: [String: [Submission]] = [:]
 	private var timers: [String: (ops: [NativeOp], context: Context)] = [:]
 	private var timerCount = 0
@@ -492,6 +501,7 @@ public final class NativeRuntime {
 		case .routeParams: return .object(params.map { (key: $0.name, value: .string($0.value)) })
 		case let .checked(node): return .bool(try isChecked(node))
 		case let .field(node): return .string(try textOf(field: node))
+		case let .scroll(node, top): return .number(top ? scrolled[node]?.top ?? 0 : scrolled[node]?.left ?? 0)
 		case let .formData(form): return .array(try entries(of: form).map { .array($0.map(NativeValue.string)) })
 		case .event(.value):
 			guard let eventValue else { throw RuntimeError(reason: "the event's value read where the event has none") }
@@ -620,7 +630,9 @@ public final class NativeRuntime {
 				ancestors.append(.string(!key.isEmpty && nodesById[parent]?.row != nil ? parent + key : parent))
 				up = nodesById[parent]?.parent
 			}
-			facts.append((id, .object([("attributes", .object(attributes)), ("ancestors", .array(ancestors))])))
+			var fact: [(String, JSONValue)] = [("attributes", .object(attributes)), ("ancestors", .array(ancestors))]
+			if let at = scrolled[id] { fact.append(("scroll", .object([("top", .number(at.top)), ("left", .number(at.left))]))) }
+			facts.append((id, .object(fact)))
 		}
 		func visit(_ frame: JSONValue) throws {
 			guard case let .object(names) = frame else { return }
@@ -1187,6 +1199,7 @@ public final class NativeRuntime {
 			guard !fired.contains(key), try due(action.event).contains(action.host) else { return [] }
 			fired.insert(key)
 		}
+		if action.event == .scroll { scrolled[action.host] = (action.top ?? 0, action.left ?? 0) }
 		let handlerOf = { (host: String, name: NativeEventName) in self.payload.events.first { $0.host == host && $0.event == name } }
 		if action.event == .dismiss, let reason = action.reason {
 			guard stack.last == action.host else { throw RuntimeError(reason: "\(action.host) is not the topmost overlay") }
@@ -1217,6 +1230,7 @@ public final class NativeRuntime {
 		case .keydown: eventFields = [.key: .string(action.value ?? "")]
 		case .paste: eventFields = [.text: .string(action.value ?? "")]
 		case .activate: eventFields = [.detail: .number(Double(action.detail ?? 1))]
+		case .scroll: eventFields = [.scrollTop: .number(action.top ?? 0), .scrollLeft: .number(action.left ?? 0)]
 		default: break
 		}
 		defer { eventValue = nil; edit = nil; eventFields = nil }

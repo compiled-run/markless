@@ -2817,14 +2817,170 @@ describe('inline svg', () => {
 		).toEqual([20, 10]);
 	});
 
+	it('paints gradients in the shape\'s box, falls back as the browser does, and reads hsl() colours', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Logo() @{
+	<svg viewBox="0 0 20 10">
+		<linearGradient id="a" gradientTransform="rotate(90)"><stop offset="0.2" stop-color="hsl(120 100% 25%)" /><stop offset="0.1" stop-color="red" stop-opacity="0.5" /></linearGradient>
+		<radialGradient id="flat" r="0"><stop stop-color="blue" /></radialGradient>
+		<rect x="2" y="4" width="10" height="4" fill="url(#a)" opacity="0.5" />
+		<rect width="4" height="4" fill="url(#missing) hsl(0, 100%, 50%)" />
+		<rect width="4" height="4" fill="url(#flat)" />
+		<path d="M0 0h10" fill="url(#a)" />
+	</svg>
+}`);
+		expect(diagnostics).toEqual([]);
+		const shapes = (payload!.nodes.find((node) => 'drawing' in node && node.drawing) as { drawing: { shapes: { fill: unknown }[] } }).drawing.shapes;
+		expect(shapes.map((shape) => shape.fill)).toEqual([
+			{
+				gradient: 'linear',
+				points: [0, 0, 1, 0],
+				// Offsets never go back; each opacity is folded into alpha.
+				stops: [
+					{ offset: 0.2, color: { r: 0, g: 128, b: 0, alpha: 128 } },
+					{ offset: 0.2, color: { r: 255, g: 0, b: 0, alpha: 64 } },
+				],
+				transform: [6.123233995736766e-16, 4, -10, 2.4492935982947064e-16, 2, 4],
+			},
+			{ r: 255, g: 0, b: 0, alpha: 255 },
+			{ r: 0, g: 0, b: 255, alpha: 255 },
+			// A box of no height has no gradient space: nothing is painted.
+			null,
+		]);
+		const refused = await nativeView(`export function Logo() @{
+	<svg viewBox="0 0 10 10"><linearGradient id="r" spreadMethod="reflect"><stop stop-color="red" /></linearGradient><rect width="2" height="2" fill="url(#r)" /></svg>
+}`);
+		expect(refused.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			'`spreadMethod="reflect"` on <linearGradient>; a native drawing draws pad only yet',
+		]);
+	});
+
+	it('dashes strokes as the browser does: odd lists repeat, groups pass them down, zeros and invalid values draw solid', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Lines() @{
+	<svg viewBox="0 0 10 10" stroke="red">
+		<g stroke-dasharray="1 2 3" stroke-dashoffset="1"><path d="M0 0h10" /><path d="M0 2h10" stroke-dasharray="none" /></g>
+		<path d="M0 4h10" stroke-dasharray="0 0" />
+		<path d="M0 6h10" stroke-dasharray="2 -1" />
+		<path d="M0 8h10" stroke-dasharray="2" fill="none" stroke="none" />
+	</svg>
+}`);
+		expect(diagnostics).toEqual([]);
+		const shapes = (payload!.nodes.find((node) => 'drawing' in node && node.drawing) as { drawing: { shapes: { dash?: number[]; dashOffset?: number }[] } }).drawing.shapes;
+		expect(shapes.map((shape) => [shape.dash, shape.dashOffset])).toEqual([
+			[[1, 2, 3, 1, 2, 3], 1],
+			[undefined, undefined],
+			[undefined, undefined],
+			[undefined, undefined],
+			[undefined, undefined],
+		]);
+	});
+
+	it('draws <text> runs among the shapes, its font from it or its groups; refuses tspans, outlines and styles by name', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Chart() @{
+	<svg viewBox="0 0 100 50" font-family="'Helvetica Neue', sans-serif" font-size="10">
+		<rect width="100" height="20" fill="#eee" />
+		<text x="50" y="10" text-anchor="end" font-weight="bold" opacity="0.5" fill="#000">  Two   words  </text>
+		<text {...{ 'xml:space': 'preserve' }} y="30" font-size="6">a  b</text>
+	</svg>
+}`);
+		expect(diagnostics).toEqual([]);
+		const parts = (payload!.nodes.find((node) => 'drawing' in node && node.drawing) as { drawing: { shapes: object[] } }).drawing.shapes;
+		expect(parts.slice(1)).toEqual([
+			{ text: 'Two words', x: 50, y: 10, size: 10, weight: 700, family: 'Helvetica Neue', anchor: 'end', baseline: 'alphabetic', fill: { r: 0, g: 0, b: 0, alpha: 128 } },
+			{ text: 'a  b', x: 0, y: 30, size: 6, weight: 400, family: 'Helvetica Neue', anchor: 'start', baseline: 'alphabetic', fill: { r: 0, g: 0, b: 0, alpha: 255 } },
+		]);
+		const refused = await nativeView(`export function Chart() @{
+	<svg viewBox="0 0 10 10">
+		<text>a<tspan x="1" y="1">b</tspan></text>
+		<text><tspan>d</tspan></text>
+		<text stroke="red" style="font-size: 4px; text-shadow: 1px 1px red">c</text>
+	</svg>
+}`);
+		expect(refused.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			'text beside <tspan>s in a <text>, which a native drawing does not place after them yet',
+			'a <tspan> with no `x` of its own, which a native drawing does not place after the run before it yet',
+			'a <tspan> with no `y` of its own, which a native drawing does not place after the run before it yet',
+			'`text-shadow: 1px 1px red` in the `style` of <text>, which a native drawing does not read from styles yet',
+			'a stroke on <text>, which a native drawing does not outline yet',
+		]);
+	});
+
+	it('writes what an object-literal spread holds, as the web writes each value; declared attributes win; refuses any other spread by name', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Note() @{
+	<p {...{ title: 'spread', 'aria-hidden': true, hidden: false, lang: 'en' }} lang="fr">Hi</p>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect((payload!.nodes[0] as { attributes?: object }).attributes).toEqual({
+			title: 'spread',
+			'aria-hidden': 'true',
+			lang: 'fr',
+		});
+		const unread = await nativeView(`const extra = { title: 'x' };
+export function Note() @{
+	<p {...extra}>Hi</p>
+}`);
+		expect(unread.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			'a spread of attributes from `extra`, which a native build cannot read; write them as attributes or an object literal',
+		]);
+	});
+
+	it('draws each positioned <tspan> as its own run, with letter-spacing and white-space: pre from its <text>', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Figure() @{
+	<svg viewBox="0 0 100 100">
+		<text style="white-space: pre" font-size="20" letter-spacing="0.5em" fill="#000"><tspan x="5" y="10">a  b</tspan><tspan x="5" y="40" fill="red">c</tspan></text>
+	</svg>
+}`);
+		expect(diagnostics).toEqual([]);
+		const runs = (payload!.nodes.find((node) => 'drawing' in node && node.drawing) as { drawing: { shapes: object[] } }).drawing.shapes;
+		expect(runs).toEqual([
+			{ text: 'a  b', x: 5, y: 10, size: 20, weight: 400, anchor: 'start', baseline: 'alphabetic', letterSpacing: 10, fill: { r: 0, g: 0, b: 0, alpha: 255 } },
+			{ text: 'c', x: 5, y: 40, size: 20, weight: 400, anchor: 'start', baseline: 'alphabetic', letterSpacing: 10, fill: { r: 255, g: 0, b: 0, alpha: 255 } },
+		]);
+	});
+
+	it('draws an <svg> holding an @if as one drawing per arm, shown as the arms of that @if', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Icon() @{
+	let open = state(false);
+	<button onClick={() => (open = !open)}>
+		<svg viewBox="0 0 10 10"><rect width="10" height="10" />@if (open) { <path d="M0 0h10" /> } @else { <g><path d="M0 5h10" /><path d="M0 9h10" /></g> }</svg>
+	</button>
+}`);
+		expect(diagnostics).toEqual([]);
+		const nodes = payload!.nodes as { kind: string; id: string; arm?: object; drawing?: { shapes: unknown[] }; test?: object }[];
+		const branch = nodes.find((node) => node.kind === 'branch')!;
+		expect(branch.test).toEqual({ cell: 'state:open' });
+		expect(nodes.filter((node) => node.drawing).map((node) => [node.arm, node.drawing!.shapes.length])).toEqual([
+			[{ branch: branch.id, index: 0 }, 2],
+			[{ branch: branch.id, index: 1 }, 3],
+		]);
+		const refused = await nativeView(`import { state } from '@markless/core';
+export function Icon() @{
+	let n = state(1);
+	<svg viewBox="0 0 10 10">@if (n > 0) { <circle cx="5" cy="5" r={n} /> }</svg>
+}`);
+		expect(refused.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			'an @if arm inside an <svg> that holds a value, a component, a block or an attribute that follows state, which a native drawing does not draw per arm yet',
+		]);
+	});
+
+	it('reads the style declarations mermaid writes on <text> over its presentation attributes', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Diagram() @{
+	<svg viewBox="0 0 100 50"><text x="50" y="20" text-anchor="start" font-size="8" style="text-anchor: middle; font-size: 16px; font-weight: 400;">Actor</text></svg>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect((payload!.nodes.find((node) => 'drawing' in node && node.drawing) as { drawing: { shapes: object[] } }).drawing.shapes).toEqual([
+			{ text: 'Actor', x: 50, y: 20, size: 16, weight: 400, anchor: 'middle', baseline: 'alphabetic', fill: { r: 0, g: 0, b: 0, alpha: 255 } },
+		]);
+	});
+
 	it('refuses what a drawing cannot hold by name, at the shape that holds it', async () => {
 		const text = `import { state } from '@markless/core';
 export function Chart() @{
 	let w = state(4);
-	<svg viewBox="0 0 10 10">
-		<path d="M0 0h10" stroke-dasharray="2 2" />
+	<svg viewBox="0 0 10 10"><defs><pattern id="g" /></defs>
+		<path d="M0 0h10" stroke-dasharray="2%" />
 		<rect width={w} height="2" fill="url(#g)" />
-		<text x="0" y="5">label</text>
+		<text x="0 1" y="5">label</text>
 	</svg>
 }`;
 		const { payload, diagnostics } = await nativeView(text);
@@ -2836,16 +2992,16 @@ export function Chart() @{
 				text.slice(0, d.primarySpan!.start).split('\n').length,
 			]),
 		).toEqual([
-			['`stroke-dasharray` on <path>: dashed strokes are not drawn natively yet', 5],
+			['`stroke-dasharray="2%"` on <path>, which is not a list of lengths in user units', 5],
 			[
 				'`width` on <rect> follows state; a native drawing is compiled when the app is built',
 				6,
 			],
 			[
-				'`fill="url(#g)"` on <rect>, a paint a native drawing does not have (gradients and patterns are not drawn yet)',
+				'`fill="url(#g)"` on <rect>, a paint a native drawing does not have (patterns are not drawn yet)',
 				6,
 			],
-			['the SVG <text> element, which a native drawing does not draw yet', 7],
+			['`x="0 1"` on <text>, a position per character, which a native drawing does not place yet', 7],
 		]);
 	});
 
@@ -2886,6 +3042,109 @@ export function Page() @{
 	<p aria-label={name.toUpperCase()}>{name.toUpperCase()}</p>
 }`);
 		expect(plain.payload!.script).toBeUndefined();
+	});
+
+	it('runs URL and URLSearchParams in the script, adding their code only to a script that reads them', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function nextPage(query: string): string {
+	const params = new URLSearchParams(query);
+	params.set('page', String(Number(params.get('page')) + 1));
+	return new URL('?' + params, 'https://shop.example/list').href;
+}
+export function Page() @{
+	let query = state('page=1');
+	let link = state('');
+	<button onClick={() => (link = nextPage(query))}>{link}</button>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.script!.services).toEqual([]);
+		expect(payload!.script!.source).toContain('g.URLSearchParams = URLSearchParams');
+		const timers = await nativeView(`import { state } from '@markless/core';
+function later(fn: () => void): void {
+	for (const ms of [1]) setTimeout(fn, ms);
+}
+export function Page() @{
+	let count = state(0);
+	<button onClick={() => later(() => (count += 1))}>{count}</button>
+}`);
+		expect(timers.diagnostics).toEqual([]);
+		expect(timers.payload!.script!.source).not.toContain('g.URLSearchParams');
+	});
+
+	it('opens a <details> from a press on its <summary>, after the summary\'s own handler; refuses what it cannot keep', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let peeks = state(0);
+	<details open>
+		<summary onClick={() => peeks++}>More {peeks}</summary>
+		<p>Body</p>
+	</details>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.cells).toContainEqual({ id: 'details:h0', name: 'open', initial: true });
+		const toggle = { op: 'assign', cell: 'details:h0', value: { unary: '!', value: { cell: 'details:h0' } } };
+		expect(payload!.handlers[0]!.ops.at(-1)).toEqual(toggle);
+		const node = (id: string) => payload!.nodes.find((one) => one.id === id) as { attributes?: object; bindings?: unknown[] };
+		expect(node('h0').attributes).toBeUndefined();
+		expect(node('h2').bindings).toEqual([{ attribute: 'hidden', value: { unary: '!', value: { cell: 'details:h0' } } }]);
+		const refused = async (source: string) =>
+			(await nativeView(`import { state } from '@markless/core';\n${source}`)).diagnostics.map((diagnostic) => diagnostic.message);
+		expect(await refused(`export function Page() @{ <details><p>No legend</p></details> }`)).toEqual([
+			'the <details> h0 has no <summary>, so the browser writes its label, which a native build does not yet',
+		]);
+		expect(
+			await refused(`export function Page() @{
+	let shown = state(false);
+	<details open={shown}><summary>S</summary><p>B</p></details>
+}`),
+		).toEqual(['the <details> h0 binds `open`; a native build opens it from a press on its <summary>']);
+		expect(await refused(`export function Page() @{ <details name="faq"><summary>S</summary><p>B</p></details> }`)).toEqual([
+			'the <details> h0 has `name`, an exclusive group a native build does not keep yet',
+		]);
+		expect(
+			await refused(`export function Page() @{
+	let n = state(0);
+	<details><summary onClick={(event) => { n++; if (n > 1) event.preventDefault(); }}>S</summary><p>B</p></details>
+}`),
+		).toEqual([
+			'the click handler on the <summary> h1 may call `event.preventDefault()` in JavaScript, which a phone cannot report before the toggle yet',
+		]);
+	});
+
+	it('runs a scroll handler on its box and reads the box\'s scroll position, which the box then reports even without a handler', async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
+export function Page() @{
+	let top = state(0);
+	let left = state(0);
+	const box = element<HTMLDivElement>();
+	const other = element<HTMLDivElement>();
+	<main>
+		<div el={box} onScroll={() => { top = box.scrollTop; }}><p>Tall</p></div>
+		<div el={other}><p>Wide</p></div>
+		<button onClick={() => { left = other.scrollLeft; }}>{top} {left}</button>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.events.filter((event) => event.event === 'scroll').map((event) => event.host)).toEqual(['h1', 'h3']);
+		const ops = (host: string, name: string) => {
+			const event = payload!.events.find((one) => one.host === host && one.event === name)!;
+			return payload!.handlers.find((handler) => handler.id === event.handler)!.ops;
+		};
+		expect(ops('h1', 'scroll')).toEqual([{ op: 'assign', cell: expect.any(String), value: { scroll: 'h1', axis: 'top' } }]);
+		expect(ops('h3', 'scroll')).toEqual([]);
+		expect(ops('h5', 'activate')).toEqual([{ op: 'assign', cell: expect.any(String), value: { scroll: 'h3', axis: 'left' } }]);
+	});
+
+	it('draws <center> with its default look: its blocks in the middle of the line, its text centred', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Page() @{
+	<center><h1>Poll</h1><p>Once</p></center>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.nodes.flatMap((node) => (node.kind === 'element' ? [[node.element, node.defaultStyle]] : []))).toEqual([
+			['center', { center: true }],
+			['h1', { bold: true, size: 2 }],
+			['p', undefined],
+		]);
 	});
 
 	it('passes a component a prop that calls app code through the script', async () => {

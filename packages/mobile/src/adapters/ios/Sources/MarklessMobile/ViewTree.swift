@@ -6,8 +6,8 @@ import UIKit.UIGestureRecognizerSubclass
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"canvas", "details", "embed", "iframe", "object",
-	"picture", "summary", "video",
+	"canvas", "embed", "iframe", "object",
+	"picture", "video",
 ]
 
 /// Where an instance is built: its row (`@key`, empty outside lists), the names its expressions see, and what encloses it.
@@ -30,6 +30,8 @@ struct TextLook: Equatable {
 	var shift: String?
 	var highlight = false
 	var preformatted = false
+	/// Inside a `<center>`: blocks sit in the middle of the line and text is centred (`text-align: -webkit-center`).
+	var centered = false
 
 	func applying(_ style: NativeDefaultStyle?) -> TextLook {
 		guard let style else { return self }
@@ -42,6 +44,7 @@ struct TextLook: Equatable {
 		next.shift = style.shift ?? shift
 		next.highlight = highlight || style.highlight
 		next.preformatted = preformatted || style.preformatted
+		next.centered = centered || style.center
 		return next
 	}
 
@@ -116,7 +119,14 @@ final class DrawingView: UIView {
 			context.translateBy(x: -box[0] * scale + (bounds.width - box[2] * scale) / 2, y: -box[1] * scale + (bounds.height - box[3] * scale) / 2)
 			context.scaleBy(x: scale, y: scale)
 		}
-		for shape in drawing.shapes {
+		for part in drawing.shapes {
+			let shape: NativeShape
+			switch part {
+			case let .text(text):
+				draw(text, in: context)
+				continue
+			case let .shape(one): shape = one
+			}
 			let path = CGMutablePath()
 			var i = 0
 			let p = shape.path
@@ -135,17 +145,33 @@ final class DrawingView: UIView {
 			if let t = shape.transform { context.concatenate(CGAffineTransform(a: t[0], b: t[1], c: t[2], d: t[3], tx: t[4], ty: t[5])) }
 			if let fill = shape.fill {
 				context.addPath(path)
-				context.setFillColor(color(fill).cgColor)
-				context.fillPath(using: shape.evenOdd ? .evenOdd : .winding)
+				if case let .gradient(gradient) = fill {
+					context.saveGState()
+					context.clip(using: shape.evenOdd ? .evenOdd : .winding)
+					draw(gradient, in: context)
+					context.restoreGState()
+				} else {
+					context.setFillColor(color(fill).cgColor)
+					context.fillPath(using: shape.evenOdd ? .evenOdd : .winding)
+				}
 			}
 			if let stroke = shape.stroke, shape.width > 0 {
 				context.addPath(path)
-				context.setStrokeColor(color(stroke).cgColor)
 				context.setLineWidth(shape.width)
 				context.setLineCap(shape.cap == "round" ? .round : shape.cap == "square" ? .square : .butt)
 				context.setLineJoin(shape.join == "round" ? .round : shape.join == "bevel" ? .bevel : .miter)
 				context.setMiterLimit(shape.miterLimit)
-				context.strokePath()
+				if let dash = shape.dash { context.setLineDash(phase: shape.dashOffset, lengths: dash.map { CGFloat($0) }) }
+				if case let .gradient(gradient) = stroke {
+					context.saveGState()
+					context.replacePathWithStrokedPath()
+					context.clip()
+					draw(gradient, in: context)
+					context.restoreGState()
+				} else {
+					context.setStrokeColor(color(stroke).cgColor)
+					context.strokePath()
+				}
 			}
 			context.restoreGState()
 		}
@@ -155,6 +181,47 @@ final class DrawingView: UIView {
 		switch paint {
 		case .currentColor: currentColor
 		case let .color(c): UIColor(red: c.r / 255, green: c.g / 255, blue: c.b / 255, alpha: c.alpha / 255)
+		case .gradient: .clear
+		}
+	}
+
+	/// A run of SVG text: its anchor at x and its baseline at y, in the drawing's user units.
+	private func draw(_ text: NativeDrawingText, in context: CGContext) {
+		context.saveGState()
+		if let t = text.transform { context.concatenate(CGAffineTransform(a: t[0], b: t[1], c: t[2], d: t[3], tx: t[4], ty: t[5])) }
+		let size = CGFloat(text.size)
+		let weights: [(Int, UIFont.Weight)] = [(100, .ultraLight), (200, .thin), (300, .light), (400, .regular), (500, .medium), (600, .semibold), (700, .bold), (800, .heavy), (900, .black)]
+		let weight = weights.min(by: { abs($0.0 - text.weight) < abs($1.0 - text.weight) })!.1
+		var font = text.family.flatMap { UIFont(name: $0, size: size) } ?? UIFont.systemFont(ofSize: size, weight: weight)
+		var traits = font.fontDescriptor.symbolicTraits
+		if text.weight >= 600 { traits.insert(.traitBold) }
+		if text.italic { traits.insert(.traitItalic) }
+		if let descriptor = font.fontDescriptor.withSymbolicTraits(traits) { font = UIFont(descriptor: descriptor, size: size) }
+		let string = NSAttributedString(string: text.text, attributes: [.font: font, .foregroundColor: color(text.fill), .kern: CGFloat(text.letterSpacing)])
+		let width = string.size().width
+		let x = CGFloat(text.x) - (text.anchor == "middle" ? width / 2 : text.anchor == "end" ? width : 0)
+		// draw(at:) places the line's top; move from the requested baseline to it.
+		let baseline: CGFloat = switch text.baseline {
+		case "middle": font.xHeight / 2
+		case "central": (font.ascender + font.descender) / 2
+		default: 0
+		}
+		string.draw(at: CGPoint(x: x, y: CGFloat(text.y) + baseline - font.ascender))
+		context.restoreGState()
+	}
+
+	/// Paints a pad gradient over the clipped area, in its own space mapped into the shape's.
+	private func draw(_ gradient: NativeShape.Gradient, in context: CGContext) {
+		let t = gradient.transform
+		context.concatenate(CGAffineTransform(a: t[0], b: t[1], c: t[2], d: t[3], tx: t[4], ty: t[5]))
+		let colors = gradient.colors.map { UIColor(red: $0.r / 255, green: $0.g / 255, blue: $0.b / 255, alpha: $0.alpha / 255).cgColor }
+		guard let shading = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colors as CFArray, locations: gradient.offsets.map { CGFloat($0) }) else { return }
+		let pad: CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+		let p = gradient.points
+		if gradient.radial {
+			context.drawRadialGradient(shading, startCenter: CGPoint(x: p[3], y: p[4]), startRadius: p[5], endCenter: CGPoint(x: p[0], y: p[1]), endRadius: p[2], options: pad)
+		} else {
+			context.drawLinearGradient(shading, start: CGPoint(x: p[0], y: p[1]), end: CGPoint(x: p[2], y: p[3]), options: pad)
 		}
 	}
 }
@@ -217,6 +284,10 @@ final class ViewTree {
 	/// Lists and the marker kind their items show; each item's marker label.
 	private var listMarkers: [ObjectIdentifier: String] = [:]
 	private var itemMarkers: [ObjectIdentifier: UILabel] = [:]
+	/// Containers whose children sit in the middle of the line (inside a `<center>`).
+	private var centered: Set<ObjectIdentifier> = []
+	/// Each summary's disclosure triangle, in its start inset.
+	private var disclosures: [ObjectIdentifier: UILabel] = [:]
 	/// Table structure: tables, their rows and the rows' cells.
 	private var tables = Set<ObjectIdentifier>()
 	private var tableRows = Set<ObjectIdentifier>()
@@ -229,6 +300,8 @@ final class ViewTree {
 	private var topLayer: (layer: TopLayerView, home: UIView, index: Int)?
 	/// The scroll view each scroll container hosts its children in.
 	private var scrollViews: [String: ContainerScrollView] = [:]
+	/// The `scroll` handlers' sources, by the scroll container's id.
+	private var scrollReporters: [String: ScrollReporter] = [:]
 	/// What a stopped submit says, shown until the person's next action.
 	private var message: UILabel?
 	private var touches: TouchWatcher?
@@ -832,7 +905,7 @@ final class ViewTree {
 						}
 					}
 					view = drawn
-				} else if element == "button" || element == "a" {
+				} else if element == "button" || element == "a" || element == "summary" {
 					if context.button != nil { throw HostError("<\(element)> \(id) is inside another control") }
 					let control = UIButton(type: .custom)
 					control.isAccessibilityElement = true
@@ -954,6 +1027,7 @@ final class ViewTree {
 				inner.heading = context.heading || headings.contains(element)
 				inner.look = context.look.applying(node.defaultStyle)
 				if layout == nil, let style = node.defaultStyle { applyBlockStyle(style, to: view) }
+				if layout == nil, inner.look.centered { centered.insert(ObjectIdentifier(view)) }
 				if layout == nil, element == "li", listMarkers[ObjectIdentifier(container)] != nil { addMarker(to: view) }
 				view.accessibilityIdentifier = id
 				elements[id] = view
@@ -1102,6 +1176,10 @@ final class ViewTree {
 				area.onPaste = { text in ask(NativeAction(event: .paste, host: id, value: text)) }
 			case let (.enter, field as UITextField):
 				field.addAction(UIAction { _ in onAction(NativeAction(event: .enter, host: id)) }, for: .editingDidEndOnExit)
+			case (.scroll, _):
+				// Only a scroll container scrolls; any other box's handler never runs, as on the web.
+				guard let scroll = scrollViews[id] else { continue }
+				scrollReporters[id] = ScrollReporter(scroll) { top, left in onAction(NativeAction(event: .scroll, host: id, top: top, left: left)) }
 			case (.idle, _), (.visible, _), (.dismiss, _), (_, _) where event.event.isPointer:
 				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host.
 				continue
@@ -1126,6 +1204,7 @@ final class ViewTree {
 		}
 		labels.removeValue(forKey: id)?.removeFromSuperview()
 		scrollViews.removeValue(forKey: id)
+		scrollReporters.removeValue(forKey: id)
 		paragraphs.removeValue(forKey: id)?.view.removeFromSuperview()
 		paragraphTexts.removeValue(forKey: id)
 		flowing.remove(id)
@@ -1182,6 +1261,7 @@ final class ViewTree {
 			}
 			view.accessibilityValue = current["aria-expanded"].map { $0 == "true" ? "expanded" : "collapsed" }
 		}
+		disclosures[ObjectIdentifier(view)]?.text = current["aria-expanded"] == "true" ? "\u{25BE}" : "\u{25B8}"
 		view.accessibilityElementsHidden = current["aria-hidden"] == "true"
 		// With a style export Dragon decides visibility (a hidden element has no frame); the stacking layout reads `hidden`.
 		if layout == nil, !dialogIds.contains(id) {
@@ -1223,7 +1303,7 @@ final class ViewTree {
 		}
 		func texts(_ view: UIView) -> [String] {
 			view.subviews.flatMap { child -> [String] in
-				if let label = child as? UILabel { return [label.text ?? ""] }
+				if let label = child as? UILabel { return decorations.contains(ObjectIdentifier(label)) ? [] : [label.text ?? ""] }
 				return texts(child)
 			}
 		}
@@ -1246,6 +1326,7 @@ final class ViewTree {
 		var constraints: [NSLayoutConstraint] = []
 		var above = container.topAnchor
 		let indent = indents[ObjectIdentifier(container)] ?? 0
+		let middle = centered.contains(ObjectIdentifier(container))
 		var top = container
 		while let parent = top.superview { top = parent }
 		for child in stacked(container) {
@@ -1253,11 +1334,14 @@ final class ViewTree {
 			let wide = fullWidth.contains(ObjectIdentifier(child))
 			constraints += [
 				child.topAnchor.constraint(equalTo: above),
-				child.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: indent),
+				middle && !wide
+					? child.centerXAnchor.constraint(equalTo: container.centerXAnchor, constant: indent / 2)
+					: child.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: indent),
 				wide
 					? child.trailingAnchor.constraint(equalTo: container.trailingAnchor)
 					: child.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor),
 			]
+			if middle && !wide { constraints.append(child.leadingAnchor.constraint(greaterThanOrEqualTo: container.leadingAnchor, constant: indent)) }
 			if wide {
 				// As wide as the page allows: a box with no width of its own (a rule, a code block) takes the line.
 				let page = child.widthAnchor.constraint(equalTo: top.widthAnchor)
@@ -1358,6 +1442,7 @@ final class ViewTree {
 			])
 		}
 		if let marker = style.marker { listMarkers[id] = marker }
+		if style.disclosure { addDisclosure(to: view) }
 		switch style.table {
 		case "table":
 			tables.insert(id)
@@ -1366,6 +1451,24 @@ final class ViewTree {
 		case "cell": tableCells.insert(id)
 		default: break
 		}
+	}
+
+	/// A summary's triangle (`list-style: disclosure-closed inside`), in an inset before its content; it is not read.
+	private func addDisclosure(to summary: UIView) {
+		let marker = UILabel()
+		marker.isAccessibilityElement = false
+		marker.isUserInteractionEnabled = false
+		marker.translatesAutoresizingMaskIntoConstraints = false
+		marker.text = "\u{25B8}"
+		summary.addSubview(marker)
+		decorations.insert(ObjectIdentifier(marker))
+		disclosures[ObjectIdentifier(summary)] = marker
+		let glyphs = ["\u{25B8} ", "\u{25BE} "].map { ($0 as NSString).size(withAttributes: [.font: marker.font as Any]).width }
+		indents[ObjectIdentifier(summary)] = ceil(glyphs.max() ?? 0)
+		NSLayoutConstraint.activate([
+			marker.leadingAnchor.constraint(equalTo: summary.leadingAnchor),
+			marker.topAnchor.constraint(equalTo: summary.topAnchor),
+		])
 	}
 
 	/// A list item's marker, beside it in its list's inset; it is neither read nor part of the item's text.
@@ -1388,6 +1491,7 @@ final class ViewTree {
 		let label = UILabel()
 		label.isUserInteractionEnabled = false
 		label.numberOfLines = 0
+		if context.look.centered { label.textAlignment = .center }
 		label.accessibilityIdentifier = run[0] + context.suffix
 		if context.button != nil {
 			label.isAccessibilityElement = false
@@ -1757,6 +1861,39 @@ private final class ActivateGesture: UITapGestureRecognizer {
 
 /// How many quick taps in one place a button's current press is: its `event.detail`.
 final class TapCount { var value = 1 }
+
+/// Reports a scroll container's position after it moved, at most once per main run loop turn (a frame while it scrolls), as
+/// the web fires `scroll` once per frame after the position changed.
+@MainActor
+final class ScrollReporter {
+	private var observation: NSKeyValueObservation?
+	private var pending = false
+	private var last: CGPoint
+	private let report: @MainActor (Double, Double) -> Void
+
+	init(_ scroll: UIScrollView, report: @escaping @MainActor (Double, Double) -> Void) {
+		last = scroll.contentOffset
+		self.report = report
+		observation = scroll.observe(\.contentOffset) { [weak self] scroll, _ in
+			MainActor.assumeIsolated { self?.moved(scroll) }
+		}
+	}
+
+	private func moved(_ scroll: UIScrollView) {
+		guard !pending else { return }
+		pending = true
+		DispatchQueue.main.async { [weak self, weak scroll] in
+			MainActor.assumeIsolated {
+				guard let self, let scroll else { return }
+				self.pending = false
+				let now = scroll.contentOffset
+				guard now != self.last else { return }
+				self.last = now
+				self.report(Double(now.y), Double(now.x))
+			}
+		}
+	}
+}
 
 /// A scroll container's scroll view over its padding box. A drag that starts toward an edge it is already at goes to the
 /// scroll view around it, as the web chains a scroll to the page once a box is at its end.

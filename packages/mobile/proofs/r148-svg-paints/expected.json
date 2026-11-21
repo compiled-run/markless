@@ -1,0 +1,5 @@
+{
+	"rung": 148,
+	"name": "SVG gradient paints (a linear sky, a radial sun with a focal point) and hsl() colours, drawn as the browser paints them",
+	"steps": [{ "visible": ["Paints", "Sunrise drawn"] }]
+}

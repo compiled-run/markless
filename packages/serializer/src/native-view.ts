@@ -128,6 +128,11 @@ export type NativeExpr =
 	| { readonly checked: string }
 	/** A text field's text now (`field.value`): what a person typed since, else its `value` binding, else its `value` attribute. */
 	| { readonly field: string }
+	/**
+	 * A scroll container's scroll position now (`box.scrollTop`, `box.scrollLeft`), in CSS px from where its content starts:
+	 * what the host reported with its last `scroll` event, 0 before it first scrolls. A box that does not scroll stays at 0.
+	 */
+	| { readonly scroll: string; readonly axis: 'top' | 'left' }
 	/** The element that has focus (`document.activeElement`), or the document body when none has. */
 	| { readonly focused: true }
 	/** Whether the element `node` is `within` or inside it (`within.contains(node)`); false when either is not an element. */
@@ -222,6 +227,10 @@ export type NativeDefaultStyle = {
 	readonly rule?: true;
 	/** On `<ul>` and `<ol>`: the marker each item shows before its content. */
 	readonly marker?: 'disc' | 'decimal';
+	/** On `<summary>`: a triangle before its content, not read aloud: ▸ while its `aria-expanded` is false, ▾ while true. */
+	readonly disclosure?: true;
+	/** On `<center>`: its blocks in the middle of the line and its text centred (`text-align: -webkit-center`), inherited. */
+	readonly center?: true;
 	/** Table structure: `<td>` and `<th>` cells line up in columns across the rows of their `<table>`. */
 	readonly table?: 'table' | 'row' | 'cell';
 };
@@ -310,6 +319,9 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	audio: {},
 	label: {},
 	dialog: {},
+	details: {},
+	summary: { disclosure: true },
+	center: { center: true },
 	form: {},
 	select: {},
 	option: {},
@@ -349,6 +361,19 @@ export type NativeColor = {
 	readonly alpha: number;
 };
 
+/**
+ * A gradient paint, as the browser paints an SVG `<linearGradient>` or `<radialGradient>` with `spreadMethod="pad"`.
+ * `points` are in the gradient's own space: linear `x1 y1 x2 y2`; radial `cx cy r fx fy fr` (the focal circle `fx fy fr`
+ * is where offset 0 starts). `transform` maps that space to the shape's units: the shape's bounding box for
+ * `objectBoundingBox`, then `gradientTransform`. Stops are in order, offsets 0 to 1, with every opacity folded into alpha.
+ */
+export type NativeGradient = {
+	readonly gradient: 'linear' | 'radial';
+	readonly points: ReadonlyArray<number>;
+	readonly stops: ReadonlyArray<{ readonly offset: number; readonly color: NativeColor }>;
+	readonly transform: readonly [number, number, number, number, number, number];
+};
+
 /** One shape of a drawing; numbers are in the drawing's user units. */
 export type NativeShape = {
 	/**
@@ -357,14 +382,39 @@ export type NativeShape = {
 	 */
 	readonly path: ReadonlyArray<number>;
 	/** `currentColor` is the svg's text colour: its style export's, else the page's default black. */
-	readonly fill: NativeColor | 'currentColor' | null;
+	readonly fill: NativeColor | 'currentColor' | NativeGradient | null;
 	readonly fillRule: 'nonzero' | 'evenodd';
-	readonly stroke: NativeColor | 'currentColor' | null;
+	readonly stroke: NativeColor | 'currentColor' | NativeGradient | null;
 	readonly width: number;
 	readonly cap: 'butt' | 'round' | 'square';
 	readonly join: 'miter' | 'round' | 'bevel';
 	readonly miterLimit: number;
+	/** `stroke-dasharray`: dash and gap lengths in turn, an even count; absent for a solid stroke. */
+	readonly dash?: ReadonlyArray<number>;
+	/** `stroke-dashoffset`: how far into the dash pattern the stroke starts; absent when 0. */
+	readonly dashOffset?: number;
 	/** The affine map from the shape's units to the drawing's (`[a, b, c, d, e, f]`), from `transform` on it and its groups. */
+	readonly transform?: readonly [number, number, number, number, number, number];
+};
+
+/**
+ * A run of SVG `<text>` at one point in the drawing's user units, painted in its place among the shapes: `x` is where
+ * its `anchor` falls, `y` where its `baseline` does (`middle`: half the x-height above the alphabetic baseline;
+ * `central`: the middle of the em box). `family` is the first family written; a host without it uses its own sans-serif.
+ */
+export type NativeDrawingText = {
+	readonly text: string;
+	readonly x: number;
+	readonly y: number;
+	readonly size: number;
+	readonly weight: number;
+	readonly italic?: true;
+	readonly family?: string;
+	readonly anchor: 'start' | 'middle' | 'end';
+	readonly baseline: 'alphabetic' | 'middle' | 'central';
+	/** Space added after each character, in user units. */
+	readonly letterSpacing?: number;
+	readonly fill: NativeColor | 'currentColor';
 	readonly transform?: readonly [number, number, number, number, number, number];
 };
 
@@ -377,7 +427,7 @@ export type NativeDrawing = {
 	readonly height?: number;
 	/** `width` and `height` are in ems of the svg's font size (`width="1em"`), not CSS pixels. */
 	readonly em?: true;
-	readonly shapes: ReadonlyArray<NativeShape>;
+	readonly shapes: ReadonlyArray<NativeShape | NativeDrawingText>;
 };
 
 export type NativeNode = NativePlace &
@@ -491,6 +541,7 @@ export type NativeEventName =
 	| 'submit'
 	| 'idle'
 	| 'visible'
+	| 'scroll'
 	| NativePointerEventName;
 
 /**
@@ -1039,18 +1090,21 @@ export const NATIVE_SCRIPT_LANGUAGE_GLOBALS: ReadonlyArray<string> = [
 	'globalThis',
 ];
 
-/** Globals a host provides to scripts, by the service that backs each. */
-export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptService | 'engine'>> =
-	{
-		setTimeout: 'timers',
-		clearTimeout: 'timers',
-		setInterval: 'timers',
-		clearInterval: 'timers',
-		queueMicrotask: 'engine',
-		console: 'console',
-		fetch: 'fetch',
-		crypto: 'crypto',
-	};
+/** Globals a host provides to scripts, by the service behind each; for `url` the build adds the URL Standard's code. */
+export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<
+	Record<string, NativeScriptService | 'engine' | 'url'>
+> = {
+	setTimeout: 'timers',
+	clearTimeout: 'timers',
+	setInterval: 'timers',
+	clearInterval: 'timers',
+	queueMicrotask: 'engine',
+	URL: 'url',
+	URLSearchParams: 'url',
+	console: 'console',
+	fetch: 'fetch',
+	crypto: 'crypto',
+};
 
 /**
  * What a script handler's event has on a phone, as member paths: a deeper read below `target.value` is a string's. Any
@@ -1081,6 +1135,9 @@ export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [
 	'isPrimary',
 	'timeStamp',
 ];
+
+/** What a `scroll` adds to a script handler's event: the scroll container's position, which its `target` reads. */
+export const NATIVE_SCRIPT_SCROLL_FIELDS: ReadonlyArray<string> = ['scrollTop', 'scrollLeft'];
 
 /** Names for the global object itself: `window.setTimeout` reads a provided global, `window.document` does not. */
 export const NATIVE_SCRIPT_GLOBAL_OBJECTS: ReadonlyArray<string> = ['window', 'self', 'globalThis'];

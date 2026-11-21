@@ -26,6 +26,7 @@ import {
 	NATIVE_UNSHOWN_ELEMENTS,
 	NATIVE_SCRIPT_EVENT_MEMBERS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
+	NATIVE_SCRIPT_SCROLL_FIELDS,
 	NATIVE_SCRIPT_GLOBAL_OBJECTS,
 	NATIVE_SCRIPT_HOST_GLOBALS,
 	NATIVE_SCRIPT_LANGUAGE_GLOBALS,
@@ -192,6 +193,8 @@ const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][numbe
 	pointerout: 'pointerout',
 	pointerenter: 'pointerenter',
 	pointerleave: 'pointerleave',
+	// A scroll container's, after its scroll position changed, at most once per frame; a box that does not scroll never fires it.
+	scroll: 'scroll',
 };
 
 const CAPTURE_METHODS: ReadonlySet<string> = new Set([
@@ -2245,6 +2248,7 @@ export function createNativeViewPayload(
 		{ readonly id: string; readonly module: ModuleFacts; readonly fact: SemanticScriptFunction }
 	>();
 	const scriptServices = new Set<NativeScriptService>();
+	let scriptReadsUrl = false;
 	const refuseScript = (message: string, span?: SourceSpan): null => {
 		diagnostics.push(nativeRefusal('javascript', message, span));
 		return null;
@@ -2266,7 +2270,8 @@ export function createNativeViewPayload(
 				? NATIVE_SCRIPT_HOST_GLOBALS[name]
 				: undefined;
 			if (service) {
-				if (service !== 'engine') scriptServices.add(service);
+				if (service === 'url') scriptReadsUrl = true;
+				else if (service !== 'engine') scriptServices.add(service);
 				continue;
 			}
 			ok = false;
@@ -2385,7 +2390,7 @@ export function createNativeViewPayload(
 	): Record<string, NativeScriptBinding> | null {
 		const bindings: Record<string, NativeScriptBinding> = {};
 		let ok = true;
-		for (const { name, written, span } of fact.names) {
+		for (const { name, written, span, members } of fact.names) {
 			const object = scope.objects.get(name);
 			if (object?.kind === 'fields') {
 				bindings[name] = { fields: Object.fromEntries(object.cells) };
@@ -2445,6 +2450,10 @@ export function createNativeViewPayload(
 			}
 			// An element handle (or a list of them) reaches the script as proxies the host answers.
 			if (mentionsElement(read.value)) {
+				// A box whose scroll position the script reads reports it, as one a data handler reads does.
+				const box = elementOf(read.value);
+				if (box !== undefined && !nodeById().get(box)?.row && members?.some((member) => member === 'scrollTop' || member === 'scrollLeft'))
+					scrollReads.add(box);
 				bindings[name] = { elements: read.value };
 				continue;
 			}
@@ -2807,7 +2816,7 @@ export function createNativeViewPayload(
 					.map((fn) => ({ id: fn.id, code: fn.fact.code })),
 			};
 		});
-		return nativeScriptOf(inputs, [...scriptServices].sort());
+		return nativeScriptOf(inputs, [...scriptServices].sort(), { url: scriptReadsUrl });
 	}
 
 	const inlining = new Set<string>();
@@ -2867,6 +2876,8 @@ export function createNativeViewPayload(
 	let typedField: string | undefined;
 	/** Text fields whose text a handler reads (`field.value`). */
 	const readFields = new Set<string>();
+	/** The boxes whose scroll position a handler reads (`box.scrollTop`). */
+	const scrollReads = new Set<string>();
 	const nodeById = () => new Map(nodes.map((node) => [node.id, node]));
 
 	/** A handle read as a value in a handler: its element (null when unbound), or its elements in order when plural. */
@@ -3827,6 +3838,17 @@ export function createNativeViewPayload(
 						return { field: element };
 					}
 				}
+				if (
+					element !== undefined &&
+					(expression.property === 'scrollTop' || expression.property === 'scrollLeft')
+				) {
+					if (nodeById().get(element)?.row)
+						return refuse(
+							`${what} reads the scroll position of a box in a @for row, which a native build cannot name yet`,
+						);
+					scrollReads.add(element);
+					return { scroll: element, axis: expression.property === 'scrollTop' ? 'top' : 'left' };
+				}
 				if (element !== undefined && isTicked(element)) {
 					if (expression.property === 'checked') return { checked: element };
 					if (expression.property === 'value')
@@ -4382,6 +4404,32 @@ export function createNativeViewPayload(
 		readonly host: string;
 	}[] = [];
 	const loweredEvents = new Set<string>();
+	/** An @if's (or @switch's) test, or one per arm; null, with a refusal, when the compiler did not record them. */
+	const branchTestsOf = (
+		item: Extract<Item, { kind: 'branch' }>,
+		site: NonNullable<ReturnType<ModuleFacts['branchSites']['get']>>,
+		scope: Scope,
+	): { test: NativeExpr } | { tests: (NativeExpr | null)[] } | null => {
+		const plain = site.kind === 'if' && site.armIndexSource === undefined;
+		const testScope: Scope = { ...scope, live: site.testComputedGraphNodeId !== undefined };
+		const test = plain ? testOf(site.testExpression, 'the @if test', testScope) : undefined;
+		const recorded = site.armTestExpressions?.map((expression) =>
+			expression === null ? null : testOf(expression, `the @${site.kind} test`, testScope),
+		);
+		// A chain with no @else still has an empty last arm; showing it when nothing matches shows nothing.
+		const tests =
+			plain || !recorded
+				? undefined
+				: recorded.length === item.arms.length - 1 && !recorded.includes(null)
+					? [...recorded, null]
+					: recorded;
+		if (plain ? !test : !tests || tests.length !== item.arms.length) {
+			if (!plain && !tests) refuse(`a @${site.kind} whose arm tests the compiler did not record`);
+			if (tests && tests.length !== item.arms.length) refuse(`a @${site.kind} with an empty arm`);
+			return null;
+		}
+		return test ? { test } : { tests: tests! as (NativeExpr | null)[] };
+	};
 	const lowerChunk = (
 		chunk: SemanticMarkupChunk,
 		baseParent: string | null,
@@ -4553,12 +4601,33 @@ export function createNativeViewPayload(
 			});
 			open = null;
 		};
-		const attributesAt = (path: ReadonlyArray<number>) =>
-			Object.fromEntries(
+		/** What an object-literal spread on the element at `path` writes, as the web writes each value; declared names win. */
+		const spreadLiteralsAt = (path: ReadonlyArray<number>): Record<string, string> => {
+			const written: Record<string, string> = {};
+			for (const slot of chunk.slots) {
+				if (slot.kind !== 'spread-attributes' || comparePaths(slot.coordinate.path, path) !== 0) continue;
+				if (!slot.carriesProps && !slot.literalEntries)
+					refuse(
+						`a spread of attributes from \`${slot.residue.kind === 'authored-expression' ? slot.residue.source : 'a value'}\`, which a native build cannot read; write them as attributes or an object literal`,
+						scope.module.hostSpans.get(chunk.hosts.find((host) => comparePaths(host.coordinate.path, path) === 0)?.hostNodeId ?? ''),
+					);
+				for (const [name, value] of slot.literalEntries ?? []) {
+					if (slot.excludeNames.includes(name)) continue;
+					const attribute = marklessAttributeValue(name, value);
+					if (attribute === null) delete written[name];
+					else written[name] = attribute;
+				}
+			}
+			return written;
+		};
+		const attributesAt = (path: ReadonlyArray<number>) => ({
+			...spreadLiteralsAt(path),
+			...(Object.fromEntries(
 				(chunk.attributes ?? [])
 					.filter((attribute) => comparePaths(attribute.coordinate.path, path) === 0)
 					.map((attribute) => [attribute.name, attribute.value]),
-			) as Record<string, string>;
+			) as Record<string, string>),
+		});
 		const boundAt = (path: ReadonlyArray<number>) =>
 			chunk.slots.flatMap((slot) =>
 				slot.kind === 'attribute' && comparePaths(slot.coordinate.path, path) === 0
@@ -4663,6 +4732,7 @@ export function createNativeViewPayload(
 				);
 				const attributes: Record<string, string> = {
 					...restAttributes,
+					...spreadLiteralsAt(item.path),
 					...staticAttributes,
 					...(scope.module.overlayHosts.has(item.id) ? { [OVERLAY_ATTRIBUTE]: '' } : {}),
 				};
@@ -4753,7 +4823,11 @@ export function createNativeViewPayload(
 					const relative = (path: ReadonlyArray<number>) => path.slice(item.path.length);
 					const drawn: DrawingElement[] = [];
 					const texts: { path: ReadonlyArray<number>; text: string }[] = [];
+					const branches = inside.filter(
+						(other): other is Extract<Item, { kind: 'branch' }> => other.kind === 'branch',
+					);
 					for (const other of inside) {
+						if (other.kind === 'branch' && branches.length === 1) continue;
 						if (other.kind === 'host') {
 							const tag = scope.module.tagOf.get(other.id) ?? '*';
 							drawn.push({
@@ -4780,13 +4854,77 @@ export function createNativeViewPayload(
 								span,
 							);
 					}
-					const result = compileDrawing(attributes, drawn, texts, item.id);
-					for (const refusal of result.refusals)
-						refuseAs(
-							'svg',
-							refusal.message,
-							scope.module.hostSpans.get(refusal.element) ?? span,
+					const drawingOf = (
+						elements: DrawingElement[],
+						runs: { path: ReadonlyArray<number>; text: string }[],
+					) => {
+						const result = compileDrawing(
+							attributes,
+							[...elements].sort((a, b) => comparePaths(a.path, b.path)),
+							runs,
+							item.id,
 						);
+						for (const refusal of result.refusals)
+							refuseAs('svg', refusal.message, scope.module.hostSpans.get(refusal.element) ?? span);
+						return result;
+					};
+					if (branches.length === 1) {
+						// An icon that switches on state: one drawing per arm, shown as the arms of an @if.
+						const branch = branches[0]!;
+						const site = scope.module.branchSites.get(branch.id);
+						const resolved = site ? branchTestsOf(branch, site, scope) : refuse(`the branch ${branch.id}`);
+						if ((scope.module.eventsByHost.get(item.id) ?? []).length > 0 || (scope.module.handleBindingsByHost.get(item.id) ?? []).length > 0 || bindings.length > 0)
+							refuseAs('svg', 'an <svg> holding an @if that also has handlers, a handle or attributes that follow state, which a native build does not draw per arm yet', span);
+						else if (resolved) {
+							const at = (path: ReadonlyArray<number>) =>
+								relative([...branch.path.slice(0, -1), branch.path.at(-1)! + path[0]!, ...path.slice(1)]);
+							const variants = branch.arms.map((armId) => {
+								const arm = scope.module.chunks.get(armId);
+								if (!arm) return refuse(`arm ${armId} has no markup`);
+								if (scope.module === rootModule) lowered.add(arm.id);
+								if (arm.slots.length > 0)
+									return refuseAs('svg', 'an @if arm inside an <svg> that holds a value, a component, a block or an attribute that follows state, which a native drawing does not draw per arm yet', span);
+								for (const host of arm.hosts)
+									for (const event of scope.module.eventsByHost.get(host.hostNodeId) ?? []) {
+										if (scope.module === rootModule) loweredEvents.add(event.id);
+										refuseAs('svg', `the ${event.eventName} handler on <${scope.module.tagOf.get(host.hostNodeId) ?? '*'}> inside an <svg>: its shapes are drawn, not views`, event.handlerSpan);
+									}
+								const armDrawn: DrawingElement[] = arm.hosts.map((host) => ({
+									id: host.hostNodeId,
+									tag: scope.module.tagOf.get(host.hostNodeId) ?? '*',
+									path: at(host.coordinate.path),
+									attributes: Object.fromEntries(
+										(arm.attributes ?? [])
+											.filter((attribute) => comparePaths(attribute.coordinate.path, host.coordinate.path) === 0)
+											.map((attribute) => [attribute.name, attribute.value]),
+									) as Record<string, string>,
+									bound: [],
+								}));
+								const armTexts = (arm.texts ?? []).map((text) => ({ path: at(text.coordinate.path), text: text.text }));
+								return drawingOf([...drawn, ...armDrawn], [...texts, ...armTexts]);
+							});
+							if (variants.every((variant) => variant !== null)) {
+								const branchId = scope.prefix + branch.id;
+								nodes.push({ kind: 'branch', id: branchId, parent, ...resolved, arms: variants.length, ...place });
+								variants.forEach((variant, index) => {
+									const own: Record<string, string> = { ...attributes };
+									if (variant!.title !== undefined && !('aria-label' in attributes)) own['aria-label'] = variant!.title;
+									nodes.push({
+										kind: 'element',
+										id: `${id}~${index}`,
+										element: 'svg',
+										parent,
+										...(Object.keys(own).length > 0 ? { attributes: own } : {}),
+										drawing: variant!.drawing,
+										arm: { branch: branchId, index },
+									});
+									elementSources.set(`${id}~${index}`, { element: 'svg', ...(item.span ? { span: item.span } : {}) });
+								});
+							}
+						}
+						continue;
+					}
+					const result = drawingOf(drawn, texts);
 					drawing = result.drawing;
 					if (result.title !== undefined && !('aria-label' in attributes))
 						attributes['aria-label'] = result.title;
@@ -5474,42 +5612,10 @@ export function createNativeViewPayload(
 					refuse(`the branch ${item.id}`);
 					continue;
 				}
-				const plain = site.kind === 'if' && site.armIndexSource === undefined;
-				const testScope: Scope = {
-					...scope,
-					live: site.testComputedGraphNodeId !== undefined,
-				};
-				const test = plain
-					? testOf(site.testExpression, 'the @if test', testScope)
-					: undefined;
-				const recorded = site.armTestExpressions?.map((expression) =>
-					expression === null
-						? null
-						: testOf(expression, `the @${site.kind} test`, testScope),
-				);
-				// A chain with no @else still has an empty last arm; showing it when nothing matches shows nothing.
-				const tests =
-					plain || !recorded
-						? undefined
-						: recorded.length === item.arms.length - 1 && !recorded.includes(null)
-							? [...recorded, null]
-							: recorded;
-				if (plain ? !test : !tests || tests.length !== item.arms.length) {
-					if (!plain && !tests)
-						refuse(`a @${site.kind} whose arm tests the compiler did not record`);
-					if (tests && tests.length !== item.arms.length)
-						refuse(`a @${site.kind} with an empty arm`);
-					continue;
-				}
+				const resolved = branchTestsOf(item, site, scope);
+				if (!resolved) continue;
 				const branchId = scope.prefix + item.id;
-				nodes.push({
-					kind: 'branch',
-					id: branchId,
-					parent,
-					...(test ? { test } : { tests: tests! as (NativeExpr | null)[] }),
-					arms: item.arms.length,
-					...place,
-				});
+				nodes.push({ kind: 'branch', id: branchId, parent, ...resolved, arms: item.arms.length, ...place });
 				item.arms.forEach((armId, index) => {
 					const armChunk = scope.module.chunks.get(armId);
 					if (armChunk)
@@ -5880,8 +5986,14 @@ export function createNativeViewPayload(
 		return { method: fn, bindings };
 	}
 
+	/** Script ops whose handler may call `event.preventDefault()`: it reads it, or hands the whole event on. */
+	const mayPreventDefault = new WeakSet<NativeOp>();
 	function scriptOp(event: SemanticEvent, scope: Scope): NativeOp | null {
-		return keepingFunctions(() => scriptOpOf(event, scope));
+		const op = keepingFunctions(() => scriptOpOf(event, scope));
+		const fact = event.handlerSpan && scriptFacts(scope.module)?.handler(event.handlerSpan);
+		if (op && fact && (fact.event ?? []).some((read) => read.path.length === 0 || read.path[0] === 'preventDefault'))
+			mayPreventDefault.add(op);
+		return op;
 	}
 
 	function scriptOpOf(event: SemanticEvent, scope: Scope): NativeOp | null {
@@ -5906,6 +6018,14 @@ export function createNativeViewPayload(
 				);
 				continue;
 			}
+			// A scroll handler's target is its scroll container, whose position the event carries.
+			if (
+				semantic === 'scroll' &&
+				read.path.length === 2 &&
+				(read.path[0] === 'target' || read.path[0] === 'currentTarget') &&
+				NATIVE_SCRIPT_SCROLL_FIELDS.includes(read.path[1]!)
+			)
+				continue;
 			const known = NATIVE_SCRIPT_EVENT_MEMBERS.some(
 				(members) =>
 					members.every(
@@ -7466,8 +7586,16 @@ export function createNativeViewPayload(
 	tapRun = false;
 	wireTicks();
 	checkSelects();
+	wireDetails();
 	let lengthLimited = false;
 	const forms = wireForms();
+	// The runtime keeps a box's scroll position from its scroll events, so a box whose position a handler reads reports each one.
+	for (const box of scrollReads)
+		if (!events.some((event) => event.host === box && event.event === 'scroll')) {
+			const handler = { id: `handler:${box}/scroll`, ops: [] as NativeOp[] };
+			events.push({ host: box, event: 'scroll', handler: handler.id });
+			handlers.push(handler);
+		}
 	// The runtime keeps a field's text from its edits, so a field whose text a handler reads reports each edit.
 	for (const field of readFields)
 		if (!events.some((event) => event.host === field && event.event === 'input')) {
@@ -7557,6 +7685,96 @@ export function createNativeViewPayload(
 	 * A checkbox or radio button is pressed as on the web: the press ticks it, then its click handlers run, then (when the
 	 * tick changed it) its input and change handlers. A radio button already checked only runs its click handlers.
 	 */
+	/**
+	 * A `<details>` shows its first `<summary>` child, and its other children only while open: a cell holds whether it is
+	 * open (its `open` attribute first), a press on the summary flips it after the summary's own click handler, and the
+	 * summary reads it as expanded or collapsed. What a native build cannot keep per element yet is refused by name.
+	 */
+	function wireDetails() {
+		for (const [index, node] of nodes.entries()) {
+			if (node.kind !== 'element' || node.element !== 'details') continue;
+			const span = nodeSpans.get(node.id);
+			const where = `the <details> ${node.id}`;
+			if (node.row) {
+				refuse(`${where} sits inside a @for row, which keeps no open state per row yet`, span);
+				continue;
+			}
+			const bound = (name: string, of: typeof node) =>
+				of.attributes?.[name] !== undefined ||
+				(of.bindings ?? []).some((binding) => 'attribute' in binding && binding.attribute === name);
+			if (node.bindings?.some((binding) => 'attribute' in binding && binding.attribute === 'open')) {
+				refuse(`${where} binds \`open\`; a native build opens it from a press on its <summary>`, span);
+				continue;
+			}
+			if (bound('name', node)) {
+				refuse(`${where} has \`name\`, an exclusive group a native build does not keep yet`, span);
+				continue;
+			}
+			const children = nodes.filter((child) => child.parent === node.id);
+			const summaryAt = children.findIndex(
+				(child) => child.kind === 'element' && child.element === 'summary',
+			);
+			if (summaryAt < 0) {
+				refuse(`${where} has no <summary>, so the browser writes its label, which a native build does not yet`, span);
+				continue;
+			}
+			const summary = children[summaryAt] as Extract<NativeNode, { kind: 'element' }>;
+			const cell = `details:${node.id}`;
+			const open: NativeExpr = { cell };
+			let ok = true;
+			for (const child of children) {
+				if (child === summary) continue;
+				if (child.kind === 'element') {
+					if (bound('hidden', child)) {
+						refuse(`the <${child.element}> ${child.id} in ${where} has \`hidden\` of its own, which a native build does not combine with the details' yet`, nodeSpans.get(child.id));
+						ok = false;
+					}
+					continue;
+				}
+				if (child.kind === 'text' && child.parts.every((part) => 'text' in part && part.text.trim() === '')) continue;
+				refuse(`${child.kind === 'text' ? 'text' : `a ${child.kind}`} directly inside ${where}, outside an element a native build can hide while it is closed`, span);
+				ok = false;
+			}
+			const handler = events.find((entry) => entry.host === summary.id && entry.event === 'activate');
+			const ops = handler ? handlers.find((entry) => entry.id === handler.handler)?.ops : undefined;
+			if (ops?.some((op) => mayPreventDefault.has(op))) {
+				refuse(`the click handler on the <summary> ${summary.id} may call \`event.preventDefault()\` in JavaScript, which a phone cannot report before the toggle yet`, nodeSpans.get(summary.id));
+				ok = false;
+			}
+			if (!ok) continue;
+			cells.push({ id: cell, name: 'open', initial: node.attributes?.['open'] !== undefined });
+			const toggle: NativeOp = { op: 'assign', cell, value: { unary: '!', value: open } };
+			if (ops) ops.push(toggle);
+			else {
+				const id = `toggle:${node.id}`;
+				handlers.push({ id, ops: [toggle] });
+				events.push({ host: summary.id, event: 'activate', handler: id });
+			}
+			const { attributes: written, ...rest } = node;
+			const { open: _open, ...attributes } = written ?? {};
+			nodes[index] = {
+				...rest,
+				...(Object.keys(attributes).length > 0 ? { attributes } : {}),
+				bindings: [...(node.bindings ?? []), { attribute: 'open', value: open }],
+			};
+			for (const [at, child] of nodes.entries()) {
+				if (child.kind !== 'element' || child.parent !== node.id) continue;
+				nodes[at] = {
+					...child,
+					bindings: [
+						...(child.bindings ?? []),
+						child.id === summary.id
+							? {
+									attribute: 'aria-expanded',
+									value: { if: open, whenTrue: { literal: 'true' }, whenFalse: { literal: 'false' } },
+								}
+							: { attribute: 'hidden', value: { unary: '!', value: open } },
+					],
+				};
+			}
+		}
+	}
+
 	/**
 	 * A `<select>` is a pop-up list of its `<option>`s, one chosen. What a native build does not draw or run yet is refused
 	 * by name: a list box (`multiple`, `size`), a select whose choice a binding sets, handlers on either element, and

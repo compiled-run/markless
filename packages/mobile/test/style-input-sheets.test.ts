@@ -138,3 +138,27 @@ export default function List() @{
 		),
 	]);
 });
+
+test("a styled page refuses <summary> and <center> by name, since Dragon has no default look for them yet", async () => {
+	const build = await compileNativeApp({
+		pages: [
+			{
+				page: 'pages/index.tsrx',
+				filename: 'packages/mobile/test/fixtures/pages/index.tsrx',
+				source: `export default function Help() @{
+	<main>
+		<style>
+			p { padding: 4px; }
+		</style>
+		<details><summary>Shipping</summary><p>Two days.</p></details>
+		<center><p>Vote</p></center>
+	</main>
+}`,
+			},
+		],
+	});
+	expect(build.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+		'the <summary> h2 on a styled page, whose disclosure triangle Dragon does not draw yet',
+		'the <center> h4 on a styled page, whose default look Dragon does not have yet',
+	]);
+});

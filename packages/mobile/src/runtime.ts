@@ -15,6 +15,7 @@ import type {
 import {
 	NATIVE_DOCUMENT_BODY,
 	NATIVE_SCRIPT_POINTER_FIELDS,
+	NATIVE_SCRIPT_SCROLL_FIELDS,
 	nativeLocale,
 	nativeMaxLength,
 	nativeTooLongMessage,
@@ -91,7 +92,12 @@ export type NativeAction =
 	 */
 	| { readonly event: 'idle' | 'visible'; readonly host: string }
 	/** The host's answer to a `fetch` entry. */
-	| { readonly event: 'response'; readonly id: number; readonly response: NativeFetchResponse };
+	| { readonly event: 'response'; readonly id: number; readonly response: NativeFetchResponse }
+	/**
+	 * A scroll container's scroll position changed (a person's drag, a fling, or a programmatic scroll), reported at most once
+	 * a frame: `top` and `left` are where it is now, in points or dp from where its content starts.
+	 */
+	| { readonly event: 'scroll'; readonly host: string; readonly top: number; readonly left: number };
 
 /** The prefix of a timer the script set, as its `timer` entries name it (`script:3`); other timers are `after` ops. */
 export const SCRIPT_TIMER = 'script:';
@@ -118,6 +124,9 @@ export type NativeEventFields = {
 	readonly text?: string;
 	/** A press: how many presses in a row on the element. */
 	readonly detail?: number;
+	/** A `scroll`: where the scroll container is now. */
+	readonly scrollTop?: number;
+	readonly scrollLeft?: number;
 	readonly reason?: string;
 	readonly pressTarget?: string | null;
 	readonly target?: string;
@@ -157,6 +166,8 @@ export type NativeScope = {
 	readonly checked?: (node: string) => boolean;
 	/** A text field's text now, for `{ field }`. */
 	readonly fieldText?: (node: string) => string;
+	/** A box's scroll position now, for `{ scroll }`. */
+	readonly scrollOf?: (node: string, axis: 'top' | 'left') => number;
 	/** The device's clock, in milliseconds since 1970 (UTC). */
 	readonly now?: () => number;
 };
@@ -327,6 +338,7 @@ export function evaluateNativeExpr(
 								...(scope.formData ? { formData: scope.formData } : {}),
 								...(scope.checked ? { checked: scope.checked } : {}),
 								...(scope.fieldText ? { fieldText: scope.fieldText } : {}),
+								...(scope.scrollOf ? { scrollOf: scope.scrollOf } : {}),
 							},
 							compute,
 							elements,
@@ -355,6 +367,10 @@ export function evaluateNativeExpr(
 	if ('field' in expr) {
 		if (!scope.fieldText) throw new Error(`the text of ${expr.field} read outside a runtime`);
 		return scope.fieldText(expr.field);
+	}
+	if ('scroll' in expr) {
+		if (!scope.scrollOf) throw new Error(`the scroll position of ${expr.scroll} read outside a runtime`);
+		return scope.scrollOf(expr.scroll, expr.axis);
 	}
 	if ('checked' in expr) {
 		if (!scope.checked)
@@ -526,6 +542,7 @@ export function createNativeRuntime(
 		formData: (form) => entriesOf(form),
 		checked: (node) => checkedOf(node),
 		fieldText: (node) => textOf(node),
+		scrollOf: (node, axis) => scrolled.get(node)?.[axis] ?? 0,
 		now,
 	};
 	// Each write moves `version`, so a script computed is run again only once a cell may have changed.
@@ -655,11 +672,14 @@ export function createNativeRuntime(
 			]),
 		);
 	/**
-	 * What the host tells a script about the elements its frame passes as proxies: each one's attributes now and the
-	 * elements it is inside, nearest first.
+	 * What the host tells a script about the elements its frame passes as proxies: each one's attributes now, the
+	 * elements it is inside, nearest first, and its scroll position once it has scrolled.
 	 */
 	const elementFacts = (frame: Record<string, unknown>) => {
-		const facts: Record<string, { attributes: Record<string, string>; ancestors: string[] }> = {};
+		const facts: Record<
+			string,
+			{ attributes: Record<string, string>; ancestors: string[]; scroll?: { top: number; left: number } }
+		> = {};
 		const add = (id: unknown) => {
 			if (typeof id !== 'string' || facts[id] || !elements.isElement(id)) return;
 			const at = id.indexOf('@');
@@ -677,7 +697,8 @@ export function createNativeRuntime(
 			const ancestors: string[] = [];
 			for (let up = node?.parent; up; up = nodesById.get(up)?.parent)
 				ancestors.push(key && nodesById.get(up)?.row ? `${up}${key}` : up);
-			facts[id] = { attributes, ancestors };
+			const scroll = scrolled.get(id);
+			facts[id] = { attributes, ancestors, ...(scroll ? { scroll: { top: scroll.top, left: scroll.left } } : {}) };
 		};
 		const visit = (names: Record<string, unknown>) => {
 			for (const entry of Object.values(names)) {
@@ -1046,6 +1067,8 @@ export function createNativeRuntime(
 	const forms = new Map((payload.forms ?? []).map((form) => [form.node, form]));
 	/** A field's text a person typed since its `value` binding last changed it. */
 	const edited = new Map<string, string>();
+	/** Each box's scroll position as its last `scroll` event reported it. */
+	const scrolled = new Map<string, { readonly top: number; readonly left: number }>();
 	type Submission = {
 		readonly sent: string;
 		readonly submitter: string | null;
@@ -1653,6 +1676,7 @@ export function createNativeRuntime(
 				if (fired.has(key) || !due(action.event).includes(action.host)) return [];
 				fired.add(key);
 			}
+			if (action.event === 'scroll') scrolled.set(action.host, { top: action.top, left: action.left });
 			// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
 			const at = action.host.indexOf('@');
 			const host = at < 0 ? action.host : action.host.slice(0, at);
@@ -1673,7 +1697,9 @@ export function createNativeRuntime(
 						? { text: action.text }
 						: action.event === 'activate'
 							? { detail: action.detail ?? 1 }
-							: edit;
+							: action.event === 'scroll'
+								? { scrollTop: action.top, scrollLeft: action.left }
+								: edit;
 			// A press focuses the control it presses, as the browser does.
 			if (action.event === 'activate') focused = action.host;
 			return change(action.host, edit, () =>
@@ -1830,7 +1856,7 @@ export function createNativeRuntime(
 				const frame = frameOf(op.bindings, text, scope);
 				const touch =
 					typeof eventValue === 'object'
-						? NATIVE_SCRIPT_POINTER_FIELDS.flatMap((field) => {
+						? [...NATIVE_SCRIPT_POINTER_FIELDS, ...NATIVE_SCRIPT_SCROLL_FIELDS].flatMap((field) => {
 								const value = eventValue[field as keyof NativeEventFields];
 								return value === undefined ? [] : [[field, value] as const];
 							})

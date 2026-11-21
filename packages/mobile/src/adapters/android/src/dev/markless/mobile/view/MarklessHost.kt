@@ -38,6 +38,7 @@ import android.widget.HorizontalScrollView
 import android.widget.ScrollView
 import android.widget.TextView
 import dev.markless.mobile.core.ScrollAlignment
+import dev.markless.mobile.core.ScrollPosition
 import dev.markless.mobile.core.ScrollBox
 import dev.markless.mobile.core.ScrollRange
 import dev.markless.mobile.core.ScrollRect
@@ -661,7 +662,8 @@ class MarklessHost(
 			isFocusable = false
 			named(this, inst.id, heading = parent.isAccessibilityHeading)
 		}
-		if (view !is Button || block != BlockText(false, false, false, 1.0, false)) {
+		if (block.centered) view.gravity = Gravity.CENTER_HORIZONTAL
+		if (view !is Button || block.copy(centered = false) != BlockText(false, false, false, 1.0, false)) {
 			view.typeface = Typeface.create(if (block.monospace) Typeface.MONOSPACE else Typeface.DEFAULT, when {
 				block.bold && block.italic -> Typeface.BOLD_ITALIC
 				block.bold -> Typeface.BOLD
@@ -822,7 +824,9 @@ class MarklessHost(
 				unstyled?.let { s ->
 					table = s.table?.takeIf { it != "cell" }
 					if (s.indent > 0) setPaddingRelative((s.indent * dpr).roundToInt(), 0, 0, 0)
+					if (s.disclosure) disclosure = false
 				}
+				if (flow?.blockText(node.id)?.centered == true) centred = true
 			}
 		}
 		layoutOf(inst.node)?.let { l -> l.export.assignments[l.assignment].byId[inst.id] }?.let { styled -> scrollContainer(inst.id, view, styled) }
@@ -837,6 +841,8 @@ class MarklessHost(
 			EventName.Focus, EventName.Blur -> if (view !is EditText) throw MarklessHostError("${e.event.wire} event on \"${node.id}\", which is not a text field")
 			EventName.Keydown -> (view as? MarklessField ?: throw MarklessHostError("keydown event on \"${node.id}\", which is not a text field")).onKey = { key -> prevents(runtime.dispatch(inst.id, EventName.Keydown, key)) }
 			EventName.Paste -> (view as? MarklessField ?: throw MarklessHostError("paste event on \"${node.id}\", which is not a text field")).onPaste = { text -> prevents(runtime.dispatch(inst.id, EventName.Paste, text)) }
+			// Only a scroll container scrolls; any other box's handler never runs, as on the web.
+			EventName.Scroll -> scrollers[inst.id]?.let { (chain, _) -> reportScrolls(inst.id, chain) }
 			EventName.Cancel, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
 			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.Choose -> {}
 			// The keyboard's action key arrives as its action id; a hardware Enter as IME_NULL with the key down, then up.
@@ -901,6 +907,31 @@ class MarklessHost(
 		chain.last().addView(content)
 		box.addView(chain.first())
 		scrollers[id] = chain to content
+	}
+
+	/**
+	 * Reports a scroll container's position after it moved, at most once per frame, as the web fires `scroll` once per
+	 * frame after the position changed: the block axis from its ScrollView, the inline axis from its HorizontalScrollView.
+	 */
+	private fun reportScrolls(id: String, chain: List<FrameLayout>) {
+		val vertical = chain.firstOrNull { it is ScrollView }
+		val horizontal = chain.firstOrNull { it is HorizontalScrollView }
+		var last = 0 to 0
+		var pending = false
+		val report = Runnable {
+			pending = false
+			val now = (vertical?.scrollY ?: 0) to (horizontal?.scrollX ?: 0)
+			if (now != last) {
+				last = now
+				apply(runtime.dispatch(id, EventName.Scroll, scroll = ScrollPosition(now.first / dpr, now.second / dpr)))
+			}
+		}
+		for (view in chain) view.setOnScrollChangeListener { v, _, _, _, _ ->
+			if (!pending) {
+				pending = true
+				v.postOnAnimation(report)
+			}
+		}
 	}
 
 	/** Puts a scroll container's scroll views over its padding box and sizes its content to the range. */
@@ -997,7 +1028,10 @@ class MarklessHost(
 			"controls" -> if (view is AudioButton) view.visibility = if (value == null) View.GONE else View.VISIBLE
 			"disabled" -> view.isEnabled = value == null
 			"aria-pressed", "aria-selected" -> view.isSelected = value == "true"
-			"aria-expanded" -> expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }
+			"aria-expanded" -> {
+				expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }
+				if (view is MarklessBox && view.disclosure != null) view.disclosure = value == "true"
+			}
 			"aria-hidden" -> view.importantForAccessibility = if (value == "true") View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else if (view is DrawingView) (if (view.contentDescription != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO) else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
 			// With a style export Dragon decides visibility (a hidden element has no frame); the stacking layout reads `hidden`.
 			"hidden" -> if (style == null) view.visibility = if (value != null) View.GONE else View.VISIBLE

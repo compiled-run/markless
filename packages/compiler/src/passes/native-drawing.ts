@@ -1,4 +1,10 @@
-import type { NativeColor, NativeDrawing, NativeShape } from '@markless/serializer';
+import type {
+	NativeColor,
+	NativeDrawing,
+	NativeDrawingText,
+	NativeGradient,
+	NativeShape,
+} from '@markless/serializer';
 
 // An inline <svg> as data a native host draws: SVG 2's attribute grammars (path data, points, transforms, viewBox, paint)
 // read once when the app is built, so no phone parses SVG.
@@ -25,7 +31,8 @@ export type DrawingResult = {
 type Matrix = readonly [number, number, number, number, number, number];
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
 
-type Paint = NativeColor | 'currentColor' | null;
+/** A paint as inherited: a gradient stays the element it names until a shape's box resolves it. */
+type Paint = NativeColor | 'currentColor' | null | { readonly gradient: DrawingElement };
 /** The inherited presentation properties (SVG 2 §13 and §6.6), with `opacity` folded into each paint's alpha. */
 type Inherited = {
 	readonly fill: Paint;
@@ -38,6 +45,17 @@ type Inherited = {
 	readonly cap: NativeShape['cap'];
 	readonly join: NativeShape['join'];
 	readonly miterLimit: number;
+	/** `stroke-dasharray` with an even count (an odd list repeats itself), or null for a solid stroke. */
+	readonly dash: ReadonlyArray<number> | null;
+	readonly dashOffset: number;
+	readonly fontSize: number;
+	readonly fontFamily: string | null;
+	readonly fontWeight: number;
+	readonly italic: boolean;
+	readonly anchor: NativeDrawingText['anchor'];
+	readonly baseline: NativeDrawingText['baseline'];
+	/** `letter-spacing` in user units, an `em` resolved against the font size where it is written. */
+	readonly letterSpacing: number;
 	/** What `currentColor` is, when an ancestor's `color` attribute says; else the svg's text colour. */
 	readonly color: NativeColor | null;
 };
@@ -52,12 +70,44 @@ const INITIAL: Inherited = {
 	cap: 'butt',
 	join: 'miter',
 	miterLimit: 4,
+	dash: null,
+	dashOffset: 0,
+	fontSize: 16,
+	fontFamily: null,
+	fontWeight: 400,
+	italic: false,
+	anchor: 'start',
+	baseline: 'alphabetic',
+	letterSpacing: 0,
 	color: null,
 };
 
 const SHAPES = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
 /** Elements that draw nothing themselves and whose content is never drawn in place. */
-const NEVER_DRAWN = new Set(['defs', 'symbol', 'title', 'desc', 'metadata']);
+/** The `style` declarations a `<text>` may carry: those a native drawing reads as presentation attributes. */
+const TEXT_STYLE_PROPERTIES: ReadonlySet<string> = new Set([
+	'text-anchor',
+	'dominant-baseline',
+	'font-size',
+	'font-family',
+	'font-weight',
+	'font-style',
+	'letter-spacing',
+	'fill',
+	'fill-opacity',
+	'opacity',
+	'white-space',
+]);
+const NEVER_DRAWN = new Set([
+	'defs',
+	'symbol',
+	'title',
+	'desc',
+	'metadata',
+	'linearGradient',
+	'radialGradient',
+	'stop',
+]);
 /** Attributes that change nothing a native drawing shows. */
 const NO_DRAWING_EFFECT = new Set([
 	'class',
@@ -89,6 +139,8 @@ const GEOMETRY: Readonly<Record<string, ReadonlyArray<string>>> = {
 	polygon: ['points'],
 	use: ['href', 'xlink:href', 'x', 'y', 'width', 'height'],
 	symbol: ['viewBox', 'width', 'height', 'x', 'y'],
+	text: ['x', 'y', 'xml:space'],
+	tspan: ['x', 'y'],
 };
 const PRESENTATION = new Set([
 	'fill',
@@ -103,6 +155,14 @@ const PRESENTATION = new Set([
 	'stroke-miterlimit',
 	'transform',
 	'stroke-dasharray',
+	'stroke-dashoffset',
+	'font-size',
+	'font-family',
+	'font-weight',
+	'font-style',
+	'text-anchor',
+	'dominant-baseline',
+	'letter-spacing',
 	'color',
 ]);
 
@@ -154,6 +214,24 @@ export function compileDrawing(
 		const paint = (name: 'fill' | 'stroke') => {
 			const raw = attribute(name);
 			if (raw === undefined) return;
+			const reference = /^url\(\s*(['"]?)#([^'")\s]+)\1\s*\)\s*(.*)$/.exec(raw.trim());
+			if (reference) {
+				const target = byId.get(reference[2]!);
+				if (target?.tag === 'linearGradient' || target?.tag === 'radialGradient') {
+					next[name] = { gradient: target };
+					return;
+				}
+				// A reference to nothing paints the fallback colour after it, or nothing at all, as the browser does.
+				const fallback = reference[3]!.trim();
+				const parsed = fallback === '' ? null : parsePaint(fallback);
+				if (parsed === undefined || (target && fallback === ''))
+					refuse(
+						element.id,
+						`\`${name}="${raw}"\` on <${element.tag}>, a paint a native drawing does not have (patterns are not drawn yet)`,
+					);
+				else next[name] = parsed;
+				return;
+			}
 			const parsed = parsePaint(raw);
 			if (parsed === undefined)
 				refuse(
@@ -214,12 +292,162 @@ export function compileDrawing(
 			else next.miterLimit = value;
 		}
 		const dashes = attribute('stroke-dasharray')?.trim();
-		if (dashes !== undefined && dashes !== 'none')
-			refuse(
-				element.id,
-				`\`stroke-dasharray\` on <${element.tag}>: dashed strokes are not drawn natively yet`,
-			);
+		if (dashes === 'none') next.dash = null;
+		else if (dashes !== undefined && dashes !== 'inherit') {
+			const lengths = dashes.split(/[\s,]+/).filter((part) => part !== '').map(parseLength);
+			if (lengths.some((length) => length === null))
+				refuse(element.id, `\`stroke-dasharray="${dashes}"\` on <${element.tag}>, which is not a list of lengths in user units`);
+			// A negative length makes the value invalid, which the browser ignores; all zeros draw a solid stroke.
+			else if (lengths.length > 0 && !lengths.some((length) => length! < 0)) {
+				const list = lengths as number[];
+				next.dash = list.every((length) => length === 0) ? null : list.length % 2 === 1 ? [...list, ...list] : list;
+			}
+		}
+		const offset = attribute('stroke-dashoffset')?.trim();
+		if (offset !== undefined && offset !== 'inherit') {
+			const value = parseLength(offset);
+			if (value === null) refuse(element.id, `\`stroke-dashoffset="${offset}"\` on <${element.tag}>, which is not a length in user units`);
+			else next.dashOffset = value;
+		}
+		const size = attribute('font-size')?.trim();
+		if (size !== undefined) {
+			const value = parseLength(size);
+			if (value === null || value < 0) refuse(element.id, `\`font-size="${size}"\` on <${element.tag}>, which is not a length in user units`);
+			else next.fontSize = value;
+		}
+		const family = attribute('font-family')?.trim();
+		if (family !== undefined) next.fontFamily = family.split(',')[0]!.trim().replace(/^['"]|['"]$/g, '') || null;
+		const weight = attribute('font-weight')?.trim();
+		if (weight !== undefined) {
+			const value = weight === 'normal' ? 400 : weight === 'bold' ? 700 : Number(weight);
+			if (!Number.isInteger(value) || value < 1 || value > 1000) refuse(element.id, `\`font-weight="${weight}"\` on <${element.tag}>`);
+			else next.fontWeight = value;
+		}
+		const fontStyle = attribute('font-style')?.trim();
+		if (fontStyle !== undefined) {
+			if (fontStyle === 'italic' || fontStyle === 'oblique') next.italic = true;
+			else if (fontStyle === 'normal') next.italic = false;
+			else refuse(element.id, `\`font-style="${fontStyle}"\` on <${element.tag}>`);
+		}
+		const anchor = attribute('text-anchor')?.trim();
+		if (anchor !== undefined) {
+			if (anchor === 'start' || anchor === 'middle' || anchor === 'end') next.anchor = anchor;
+			else refuse(element.id, `\`text-anchor="${anchor}"\` on <${element.tag}>`);
+		}
+		const spacing = attribute('letter-spacing')?.trim();
+		if (spacing !== undefined) {
+			const em = /^(-?[\d.]+)em$/.exec(spacing);
+			const value = spacing === 'normal' ? 0 : em ? Number(em[1]) * next.fontSize : parseLength(spacing);
+			if (value === null || !Number.isFinite(value)) refuse(element.id, `\`letter-spacing="${spacing}"\` on <${element.tag}>`);
+			else next.letterSpacing = value;
+		}
+		const baseline = attribute('dominant-baseline')?.trim();
+		if (baseline !== undefined) {
+			if (baseline === 'auto' || baseline === 'alphabetic') next.baseline = 'alphabetic';
+			else if (baseline === 'middle' || baseline === 'central') next.baseline = baseline;
+			else refuse(element.id, `\`dominant-baseline="${baseline}"\` on <${element.tag}>, a baseline a native drawing does not place yet`);
+		}
 		return next;
+	};
+
+	/**
+	 * A `<text>` whose `style` declarations replace the presentation attributes they name, as the browser's cascade puts
+	 * a style above them; `white-space: pre` is `xml:space="preserve"`. Any other declaration is refused by name.
+	 */
+	const withTextStyle = (element: DrawingElement): DrawingElement => {
+		const declared = element.attributes.style?.trim();
+		if (!declared) return element;
+		const { style: _style, ...attributes } = element.attributes;
+		const written: Record<string, string> = { ...attributes };
+		for (const declaration of declared.split(';')) {
+			if (declaration.trim() === '') continue;
+			const colon = declaration.indexOf(':');
+			const name = declaration.slice(0, colon).trim().toLowerCase();
+			const value = declaration.slice(colon + 1).trim();
+			if (colon < 0 || value === '' || /!important$/i.test(value) || !TEXT_STYLE_PROPERTIES.has(name)) {
+				refuse(element.id, `\`${declaration.trim()}\` in the \`style\` of <text>, which a native drawing does not read from styles yet`);
+				continue;
+			}
+			if (name === 'white-space') {
+				if (value === 'pre') written['xml:space'] = 'preserve';
+				else if (value === 'normal') delete written['xml:space'];
+				else refuse(element.id, `\`white-space: ${value}\` on <text>`);
+			} else written[name] = value;
+		}
+		return { ...element, attributes: written };
+	};
+
+	/**
+	 * A `<text>` as runs: its own text at its x and y, or each `<tspan>` at the x and y it gives (as diagram exports
+	 * write them), each filled and not stroked.
+	 */
+	const emitText = (element: DrawingElement, style: Inherited, matrix: Matrix) => {
+		const preserve = element.attributes['xml:space'] === 'preserve';
+		const ownText = (of: DrawingElement) =>
+			texts
+				.filter((text) => text.path.length === of.path.length + 1 && isPrefix(of.path, text.path))
+				.map((text) => text.text)
+				.join('');
+		const position = (of: DrawingElement, name: 'x' | 'y', required: boolean): number | null => {
+			const raw = of.attributes[name]?.trim();
+			if (raw === undefined) {
+				if (required) refuse(of.id, `a <${of.tag}> with no \`${name}\` of its own, which a native drawing does not place after the run before it yet`);
+				return required ? null : 0;
+			}
+			const parts = raw.split(/[\s,]+/).filter((part) => part !== '');
+			if (parts.length > 1) refuse(of.id, `\`${name}="${raw}"\` on <${of.tag}>, a position per character, which a native drawing does not place yet`);
+			const value = parseLength(parts[0] ?? '0');
+			if (value === null) refuse(of.id, `\`${name}="${raw}"\` on <${of.tag}>, which is not a length in user units`);
+			return value ?? 0;
+		};
+		const run = (of: DrawingElement, runStyle: Inherited, x: number, y: number) => {
+			const written = ownText(of);
+			// Preserved white space keeps every space and turns line breaks into spaces; otherwise runs of it collapse.
+			const text = preserve ? written.replace(/[\n\r\t]/g, ' ') : written.replace(/\s+/g, ' ').trim();
+			if (runStyle.stroke !== null && runStyle.width > 0)
+				refuse(of.id, `a stroke on <${of.tag}>, which a native drawing does not outline yet`);
+			const fill = runStyle.fill;
+			if (fill !== null && typeof fill === 'object' && 'gradient' in fill) {
+				refuse(of.id, `a gradient fill on <${of.tag}>, which a native drawing does not paint yet`);
+				return;
+			}
+			if (fill === null || text === '') return;
+			const opacity = runStyle.fillOpacity * runStyle.opacity;
+			const resolved = fill === 'currentColor' && runStyle.color ? runStyle.color : fill;
+			if (resolved === 'currentColor' && opacity !== 1)
+				refuse(of.id, `a see-through \`currentColor\` paint on <${of.tag}>: its colour comes from the page's styles`);
+			shapes.push({
+				text,
+				x,
+				y,
+				size: runStyle.fontSize,
+				weight: runStyle.fontWeight,
+				...(runStyle.italic ? { italic: true as const } : {}),
+				...(runStyle.fontFamily ? { family: runStyle.fontFamily } : {}),
+				anchor: runStyle.anchor,
+				baseline: runStyle.baseline,
+				...(runStyle.letterSpacing !== 0 ? { letterSpacing: runStyle.letterSpacing } : {}),
+				fill: resolved === 'currentColor' || opacity === 1 ? resolved : { ...resolved, alpha: Math.round(resolved.alpha * opacity) },
+				...(matrix.every((value, index) => value === IDENTITY[index]) ? {} : { transform: matrix }),
+			});
+		};
+		const spans = childrenOf(element.path);
+		if (spans.length === 0) {
+			run(element, style, position(element, 'x', false)!, position(element, 'y', false)!);
+			return;
+		}
+		if (ownText(element).trim() !== '')
+			refuse(element.id, 'text beside <tspan>s in a <text>, which a native drawing does not place after them yet');
+		for (const span of spans) {
+			if (span.tag !== 'tspan' || childrenOf(span.path).length > 0) {
+				refuse(span.id, `a <${span.tag}> inside <${span.tag === 'tspan' ? 'tspan' : 'text'}>, which a native drawing does not place yet`);
+				continue;
+			}
+			checkAttributes(span);
+			const x = position(span, 'x', true);
+			const y = position(span, 'y', true);
+			if (x !== null && y !== null) run(span, inherit(span, style), x, y);
+		}
 	};
 
 	const checkAttributes = (element: DrawingElement) => {
@@ -250,9 +478,89 @@ export function compileDrawing(
 		}
 	};
 
-	const shapes: NativeShape[] = [];
+	/** A gradient element as a paint for one shape (`outline` gives its bounding box); null where the browser paints none. */
+	const gradientOf = (
+		element: DrawingElement,
+		outline: ReadonlyArray<number>,
+		opacity: number,
+		style: Inherited,
+	): NativeGradient | NativeColor | null => {
+		const attributes = element.attributes;
+		for (const name of ['href', 'xlink:href'])
+			if (attributes[name] !== undefined)
+				refuse(element.id, `\`${name}\` on <${element.tag}>, a gradient built on another, which a native drawing does not draw yet`);
+		const spread = attributes.spreadMethod?.trim() ?? 'pad';
+		if (spread !== 'pad')
+			refuse(element.id, `\`spreadMethod="${spread}"\` on <${element.tag}>; a native drawing draws pad only yet`);
+		const units = attributes.gradientUnits?.trim() ?? 'objectBoundingBox';
+		const box = units === 'objectBoundingBox';
+		if (!box && units !== 'userSpaceOnUse')
+			refuse(element.id, `\`gradientUnits="${units}"\` on <${element.tag}>`);
+		const coordinate = (name: string, fallback: number): number => {
+			const raw = attributes[name]?.trim();
+			if (raw === undefined) return fallback;
+			if (raw.endsWith('%') && box) return Number(raw.slice(0, -1)) / 100;
+			const value = Number(raw);
+			if (raw === '' || !Number.isFinite(value)) {
+				refuse(element.id, `\`${name}="${raw}"\` on <${element.tag}>, which is not a number${box ? ' or a percentage' : ' in user units'}`);
+				return fallback;
+			}
+			return value;
+		};
+		const points =
+			element.tag === 'linearGradient'
+				? [coordinate('x1', 0), coordinate('y1', 0), coordinate('x2', box ? 1 : 0), coordinate('y2', 0)]
+				: (() => {
+						const cx = coordinate('cx', box ? 0.5 : 0);
+						const cy = coordinate('cy', box ? 0.5 : 0);
+						return [cx, cy, coordinate('r', box ? 0.5 : 0), coordinate('fx', cx), coordinate('fy', cy), coordinate('fr', 0)];
+					})();
+		if (!box && ['x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'fx', 'fy', 'fr'].some((name) => attributes[name]?.trim().endsWith('%')))
+			refuse(element.id, `a percentage on <${element.tag} gradientUnits="userSpaceOnUse">, which a native drawing does not resolve yet`);
+		const stops: { offset: number; color: NativeColor }[] = [];
+		for (const stop of elements.filter((child) => child.tag === 'stop' && child.path.length === element.path.length + 1 && isPrefix(element.path, child.path))) {
+			const raw = stop.attributes.offset?.trim() ?? '0';
+			const parsed = raw.endsWith('%') ? Number(raw.slice(0, -1)) / 100 : Number(raw);
+			const offset = Math.min(1, Math.max(0, Number.isFinite(parsed) ? parsed : 0, stops.at(-1)?.offset ?? 0));
+			if ((stop.attributes.style ?? '').trim() !== '')
+				refuse(stop.id, `\`style\` on <stop>, whose stop-color a native drawing does not read from styles yet`);
+			const written = stop.attributes['stop-color']?.trim() ?? 'black';
+			const color = written === 'currentColor' || written === 'currentcolor' ? style.color : parseColor(written);
+			if (!color) {
+				refuse(stop.id, `\`stop-color="${written}"\` on <stop>${written.startsWith('current') ? ', whose colour comes from the page\'s styles' : ''}`);
+				continue;
+			}
+			const stopOpacity = parseOpacity(stop.attributes['stop-opacity'] ?? '1') ?? 1;
+			stops.push({ offset, color: { ...color, alpha: Math.round(color.alpha * stopOpacity * opacity) } });
+		}
+		if (stops.length === 0) return null;
+		// A gradient of no length (or no radius) paints its last stop's colour, as SVG 2 says.
+		const degenerate =
+			element.tag === 'linearGradient'
+				? points[0] === points[2] && points[1] === points[3]
+				: points[2]! <= 0;
+		if (degenerate) return stops.at(-1)!.color;
+		let transform: Matrix = IDENTITY;
+		if (box) {
+			const bounds = outlineBounds(outline);
+			// A box of no width or height has no gradient space: the browser paints nothing.
+			if (!bounds || bounds[2] === 0 || bounds[3] === 0) return null;
+			transform = [bounds[2], 0, 0, bounds[3], bounds[0], bounds[1]];
+		}
+		const own = attributes.gradientTransform;
+		if (own !== undefined) {
+			const parsed = parseTransform(own);
+			if (parsed === null) refuse(element.id, `\`gradientTransform="${own}"\` on <${element.tag}>`);
+			else transform = multiply(transform, parsed);
+		}
+		return { gradient: element.tag === 'linearGradient' ? 'linear' : 'radial', points, stops, transform };
+	};
+
+	const shapes: (NativeShape | NativeDrawingText)[] = [];
 	const emit = (element: DrawingElement, outline: number[], style: Inherited, matrix: Matrix) => {
-		const alpha = (given: Paint, opacity: number): Paint => {
+		const alpha = (given: Paint, opacity: number): NativeShape['fill'] => {
+			if (given !== null && typeof given === 'object' && 'gradient' in given)
+				return gradientOf(given.gradient, outline, opacity, style);
 			const paint = given === 'currentColor' && style.color ? style.color : given;
 			if (paint === null || paint === 'currentColor' || opacity === 1) return paint;
 			return { ...paint, alpha: Math.round(paint.alpha * opacity) };
@@ -277,6 +585,9 @@ export function compileDrawing(
 			cap: style.cap,
 			join: style.join,
 			miterLimit: style.miterLimit,
+			...(style.dash && style.stroke !== null && style.width > 0
+				? { dash: style.dash, ...(style.dashOffset !== 0 ? { dashOffset: style.dashOffset } : {}) }
+				: {}),
 			...(matrix.every((value, index) => value === IDENTITY[index])
 				? {}
 				: { transform: matrix }),
@@ -369,11 +680,16 @@ export function compileDrawing(
 			);
 			return;
 		}
+		if (element.tag === 'text') element = withTextStyle(element);
 		checkAttributes(element);
 		const style = inherit(element, from);
 		const own = multiply(matrix, transformOf(element));
 		if (SHAPES.has(element.tag)) {
 			emit(element, outlineOf(element), style, own);
+			return;
+		}
+		if (element.tag === 'text') {
+			emitText(element, style, own);
 			return;
 		}
 		if (element.tag === 'use') {
@@ -452,6 +768,57 @@ export function compileDrawing(
 }
 
 // Geometry.
+
+/** The bounding box `[x, y, width, height]` of a verb-coded outline, curves by their extremes; null when it is empty. */
+export function outlineBounds(outline: ReadonlyArray<number>): [number, number, number, number] | null {
+	let minX = Infinity;
+	let minY = Infinity;
+	let maxX = -Infinity;
+	let maxY = -Infinity;
+	const add = (x: number, y: number) => {
+		minX = Math.min(minX, x);
+		maxX = Math.max(maxX, x);
+		minY = Math.min(minY, y);
+		maxY = Math.max(maxY, y);
+	};
+	// The t in (0, 1) where one coordinate of a cubic from p0 through p1, p2 to p3 turns.
+	const turns = (p0: number, p1: number, p2: number, p3: number): number[] => {
+		const a = -p0 + 3 * p1 - 3 * p2 + p3;
+		const b = 2 * (p0 - 2 * p1 + p2);
+		const c = p1 - p0;
+		if (Math.abs(a) < 1e-12) return Math.abs(b) < 1e-12 ? [] : [-c / b];
+		const d = b * b - 4 * a * c;
+		if (d < 0) return [];
+		const root = Math.sqrt(d);
+		return [(-b + root) / (2 * a), (-b - root) / (2 * a)];
+	};
+	let x = 0;
+	let y = 0;
+	for (let index = 0; index < outline.length; ) {
+		const verb = outline[index]!;
+		if (verb === 0 || verb === 1) {
+			x = outline[index + 1]!;
+			y = outline[index + 2]!;
+			add(x, y);
+			index += 3;
+		} else if (verb === 3) {
+			const [x1, y1, x2, y2, x3, y3] = outline.slice(index + 1, index + 7) as [number, number, number, number, number, number];
+			add(x3, y3);
+			for (const t of [...turns(x, x1, x2, x3), ...turns(y, y1, y2, y3)]) {
+				if (!(t > 0 && t < 1)) continue;
+				const u = 1 - t;
+				add(
+					u * u * u * x + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3,
+					u * u * u * y + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3,
+				);
+			}
+			x = x3;
+			y = y3;
+			index += 7;
+		} else index += 1;
+	}
+	return Number.isFinite(minX) ? [minX, minY, maxX - minX, maxY - minY] : null;
+}
 
 function multiply(m: Matrix, n: Matrix): Matrix {
 	return [
@@ -996,6 +1363,28 @@ export function parseColor(raw: string): NativeColor | null {
 					: Number(alphaPart);
 		if (r == null || g == null || b == null || !Number.isFinite(alpha)) return null;
 		return { r, g, b, alpha: Math.round(Math.min(Math.max(alpha, 0), 1) * 255) };
+	}
+	const hsl = /^hsla?\(([^)]*)\)$/.exec(text);
+	if (hsl) {
+		const parts = hsl[1]!.split(/\s*[,/]\s*|\s+/).filter((part) => part !== '');
+		if (parts.length !== 3 && parts.length !== 4) return null;
+		const angle = /^(-?[\d.]+(?:e-?\d+)?)(deg|rad|grad|turn)?$/.exec(parts[0]!);
+		const percent = (part: string) => (part.endsWith('%') ? Number(part.slice(0, -1)) / 100 : NaN);
+		const turns = { deg: 1 / 360, rad: 1 / (2 * Math.PI), grad: 1 / 400, turn: 1 } as const;
+		const hue = angle ? Number(angle[1]) * turns[(angle[2] ?? 'deg') as keyof typeof turns] : NaN;
+		const saturation = Math.min(Math.max(percent(parts[1]!), 0), 1);
+		const lightness = Math.min(Math.max(percent(parts[2]!), 0), 1);
+		const alphaPart = parts[3];
+		const alpha = alphaPart === undefined ? 1 : alphaPart.endsWith('%') ? Number(alphaPart.slice(0, -1)) / 100 : Number(alphaPart);
+		if (![hue, saturation, lightness, alpha].every(Number.isFinite)) return null;
+		// CSS Color 4's hsl-to-rgb.
+		const h = ((hue % 1) + 1) % 1;
+		const channel = (n: number) => {
+			const k = (n + h * 12) % 12;
+			const a = saturation * Math.min(lightness, 1 - lightness);
+			return Math.round((lightness - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))) * 255);
+		};
+		return { r: channel(0), g: channel(8), b: channel(4), alpha: Math.round(Math.min(Math.max(alpha, 0), 1) * 255) };
 	}
 	const named = NAMED_COLORS[text];
 	if (named === undefined) return null;

@@ -17,6 +17,8 @@ public enum NativeEventField: String, Sendable {
 	case value, reason, pressTarget, key, text, detail
 	/// A pointer event's, as a phone's browser reports a touch.
 	case target, currentTarget, relatedTarget, button, buttons, clientX, clientY, pointerId, pointerType, isPrimary, timeStamp
+	/// A `scroll`'s scroll container position, which a script handler's `event.target` reads.
+	case scrollTop, scrollLeft
 }
 
 public enum NativeBuiltin: String, Sendable {
@@ -77,11 +79,13 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case script(fn: String, bindings: [NativeScriptBinding])
 	/// A text field's text now: what a person typed since, else its `value` binding, else its `value` attribute.
 	case field(String)
+	/// A box's scroll position now (`top` true for `scrollTop`), as its last `scroll` event reported it; 0 before that.
+	case scroll(String, top: Bool)
 
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .event, .focused, .local, .item, .routeParams, .formData, .checked, .field: return []
+		case .literal, .event, .focused, .local, .item, .routeParams, .formData, .checked, .field, .scroll: return []
 		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
 		case let .contains(within, node): return within.cells + node.cells
 		case let .captures(node, pointer): return node.cells + pointer.cells
@@ -185,6 +189,10 @@ public struct NativeDefaultStyle: Equatable, Sendable {
 	public var rule = false
 	/// `disc` or `decimal`, on a list.
 	public var marker: String?
+	/// On a summary: a ▸ (collapsed) or ▾ (expanded) before its content, by its `aria-expanded`.
+	public var disclosure = false
+	/// On a center: its blocks in the middle of the line and its text centred, which what is inside inherits.
+	public var center = false
 	/// `table`, `row` or `cell`.
 	public var table: String?
 	public init() {}
@@ -195,6 +203,16 @@ public struct NativeShape: Equatable, Sendable {
 	public enum Paint: Equatable, Sendable {
 		case color(RGBA)
 		case currentColor
+		case gradient(Gradient)
+	}
+	/// A pad gradient: `points` linear x1 y1 x2 y2, radial cx cy r fx fy fr, in gradient space; `transform` maps it to the
+	/// shape's units.
+	public struct Gradient: Equatable, Sendable {
+		public let radial: Bool
+		public let points: [Double]
+		public let offsets: [Double]
+		public let colors: [RGBA]
+		public let transform: [Double]
 	}
 	/// Verb-coded: 0 move x y, 1 line x y, 3 cubic x1 y1 x2 y2 x y, 4 close.
 	public let path: [Double]
@@ -207,6 +225,32 @@ public struct NativeShape: Equatable, Sendable {
 	public let miterLimit: Double
 	/// `[a, b, c, d, e, f]`.
 	public let transform: [Double]?
+	/// Dash and gap lengths in turn, an even count; nil for a solid stroke.
+	public var dash: [Double]? = nil
+	public var dashOffset: Double = 0
+}
+
+/// A run of SVG text at one point: `anchor` start/middle/end at x, `baseline` alphabetic/middle/central at y.
+public struct NativeDrawingText: Equatable, Sendable {
+	public let text: String
+	public let x: Double
+	public let y: Double
+	public let size: Double
+	public let weight: Int
+	public let italic: Bool
+	public let family: String?
+	public let anchor: String
+	public let baseline: String
+	public let fill: NativeShape.Paint
+	public let transform: [Double]?
+	/// Space added after each character, in user units.
+	public var letterSpacing: Double = 0
+}
+
+/// What a drawing paints, in order.
+public enum NativeDrawingPart: Equatable, Sendable {
+	case shape(NativeShape)
+	case text(NativeDrawingText)
 }
 
 /// An inline `<svg>` compiled when the app was built.
@@ -215,7 +259,7 @@ public struct NativeDrawing: Equatable, Sendable {
 	public let viewBox: [Double]?
 	public let width: Double?
 	public let height: Double?
-	public let shapes: [NativeShape]
+	public let shapes: [NativeDrawingPart]
 	/// `width` and `height` are in ems of the font size of the text the svg sits in, not CSS px.
 	public var em = false
 }
@@ -241,6 +285,8 @@ public enum NativeEventName: String, Sendable {
 	case idle
 	/// Some of the element is on the screen; once for each shown instance.
 	case visible
+	/// A scroll container's scroll position changed, at most once a frame; the action carries where it is now.
+	case scroll
 	/// A person chose an option (its instance id is the action's host) in its `<select>`'s list; never a payload event.
 	case choose
 	/// A touch going down, moving, lifting, or taken by the platform for a scroll: the runtime raises the browser's pointer
@@ -791,7 +837,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 	private static func decodeDefaultStyle(_ reader: Reader) throws -> NativeDefaultStyle {
 		let field = try reader.object(required: [], optional: [
 			"flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "rule",
-			"marker", "table",
+			"marker", "disclosure", "center", "table",
 		])
 		func oneOf(_ key: String, _ allowed: [String]) throws -> String? {
 			guard field.has(key) else { return nil }
@@ -814,6 +860,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 		style.indent = field.has("indent") ? try field["indent"].number() : nil
 		style.rule = try flag("rule")
 		style.marker = try oneOf("marker", ["disc", "decimal"])
+		style.disclosure = try flag("disclosure")
+		style.center = try flag("center")
 		style.table = try oneOf("table", ["table", "row", "cell"])
 		return style
 	}
@@ -835,19 +883,56 @@ public struct NativeViewPayload: Equatable, Sendable {
 				guard try reader.string() == "currentColor" else { throw reader.fail("unknown paint") }
 				return .currentColor
 			}
+			if try reader.object(required: [], optional: ["gradient", "points", "stops", "transform", "r", "g", "b", "alpha"]).has("gradient") {
+				let g = try reader.object(["gradient", "points", "stops", "transform"])
+				let kind = try g["gradient"].string()
+				guard kind == "linear" || kind == "radial" else { throw reader.fail("unknown gradient \(kind)") }
+				let points = try g["points"].array().map { try $0.number() }
+				guard points.count == (kind == "radial" ? 6 : 4) else { throw reader.fail("a \(kind) gradient has \(kind == "radial" ? 6 : 4) points") }
+				let transform = try g["transform"].array().map { try $0.number() }
+				guard transform.count == 6 else { throw reader.fail("a transform has six numbers") }
+				var offsets: [Double] = []
+				var colors: [RGBA] = []
+				for stop in try g["stops"].array() {
+					let s = try stop.object(["offset", "color"])
+					offsets.append(try s["offset"].number())
+					guard case let .color(rgba)? = try paint(try s["color"]) else { throw stop.fail("a stop's colour is a colour") }
+					colors.append(rgba)
+				}
+				guard !colors.isEmpty else { throw reader.fail("a gradient has stops") }
+				return .gradient(NativeShape.Gradient(radial: kind == "radial", points: points, offsets: offsets, colors: colors, transform: transform))
+			}
 			let color = try reader.object(["r", "g", "b", "alpha"])
 			return .color(RGBA(r: try color["r"].number(), g: try color["g"].number(), b: try color["b"].number(), alpha: try color["alpha"].number()))
 		}
-		let shapes = try field["shapes"].array().map { shape -> NativeShape in
-			let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform"])
+		let shapes = try field["shapes"].array().map { shape -> NativeDrawingPart in
+			if try shape.object(required: [], optional: ["text", "x", "y", "size", "weight", "italic", "family", "anchor", "baseline", "letterSpacing", "fill", "transform", "path", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "dash", "dashOffset"]).has("text") {
+				let t = try shape.object(required: ["text", "x", "y", "size", "weight", "anchor", "baseline", "fill"], optional: ["italic", "family", "transform", "letterSpacing"])
+				let anchor = try t["anchor"].string()
+				guard ["start", "middle", "end"].contains(anchor) else { throw shape.fail("unknown anchor \(anchor)") }
+				let baseline = try t["baseline"].string()
+				guard ["alphabetic", "middle", "central"].contains(baseline) else { throw shape.fail("unknown baseline \(baseline)") }
+				let transform = t.has("transform") ? try t["transform"].array().map { try $0.number() } : nil
+				if let transform, transform.count != 6 { throw shape.fail("a transform has six numbers") }
+				guard let fill = try paint(try t["fill"]) else { throw shape.fail("a text's fill is a paint") }
+				return .text(NativeDrawingText(
+					text: try t["text"].string(), x: try t["x"].number(), y: try t["y"].number(), size: try t["size"].number(),
+					weight: Int(try t["weight"].number()), italic: t.has("italic") ? try t["italic"].bool() : false,
+					family: t.has("family") ? try t["family"].string() : nil, anchor: anchor, baseline: baseline, fill: fill, transform: transform,
+					letterSpacing: t.has("letterSpacing") ? try t["letterSpacing"].number() : 0))
+			}
+			let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "dash", "dashOffset"])
+			let dash = s.has("dash") ? try s["dash"].array().map { try $0.number() } : nil
+			if let dash, dash.isEmpty || dash.count % 2 != 0 || dash.contains(where: { $0 < 0 }) { throw shape.fail("a dash list holds an even count of lengths") }
 			let transform = s.has("transform") ? try s["transform"].array().map { try $0.number() } : nil
 			if let transform, transform.count != 6 { throw shape.fail("a transform has six numbers") }
 			let rule = try s["fillRule"].string()
 			guard rule == "nonzero" || rule == "evenodd" else { throw shape.fail("unknown fillRule \(rule)") }
-			return NativeShape(
+			return .shape(NativeShape(
 				path: try s["path"].array().map { try $0.number() }, fill: try paint(try s["fill"]), evenOdd: rule == "evenodd",
 				stroke: try paint(try s["stroke"]), width: try s["width"].number(), cap: try s["cap"].string(), join: try s["join"].string(),
-				miterLimit: try s["miterLimit"].number(), transform: transform)
+				miterLimit: try s["miterLimit"].number(), transform: transform, dash: dash,
+				dashOffset: s.has("dashOffset") ? try s["dashOffset"].number() : 0))
 		}
 		return NativeDrawing(
 			viewBox: viewBox, width: field.has("width") ? try field["width"].number() : nil,
@@ -986,6 +1071,10 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["checked"]: return .checked(try field("checked").string())
 		case ["bindings", "script"]: return .script(fn: try field("script").string(), bindings: try decodeBindings(try field("bindings")))
 		case ["field"]: return .field(try field("field").string())
+		case ["axis", "scroll"]:
+			let axis = try field("axis").string()
+			guard axis == "top" || axis == "left" else { throw PayloadError(path: reader.path + ".axis", reason: "unknown scroll axis \"\(axis)\"") }
+			return .scroll(try field("scroll").string(), top: axis == "top")
 		case ["arguments", "call"]:
 			let name = try field("call").string()
 			guard let builtin = NativeBuiltin(rawValue: name) else { throw PayloadError(path: reader.path + ".call", reason: "unknown call \"\(name)\"") }

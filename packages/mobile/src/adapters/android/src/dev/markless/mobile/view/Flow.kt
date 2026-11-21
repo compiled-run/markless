@@ -2,6 +2,11 @@ package dev.markless.mobile.view
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.DashPathEffect
+import android.graphics.LinearGradient
+import android.graphics.RadialGradient
+import android.graphics.Rect
+import android.graphics.Shader
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
@@ -21,12 +26,14 @@ import android.text.style.UnderlineSpan
 import android.view.View
 import dev.markless.mobile.core.DefaultStyle
 import dev.markless.mobile.core.Drawing
+import dev.markless.mobile.core.DrawingText
+import dev.markless.mobile.core.Shape
 import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.ShapePaint
 
 /** The text style a block gives the text inside it: its own default style and its ancestors', combined. */
-data class BlockText(val bold: Boolean, val italic: Boolean, val monospace: Boolean, val size: Double, val preformatted: Boolean)
+data class BlockText(val bold: Boolean, val italic: Boolean, val monospace: Boolean, val size: Double, val preformatted: Boolean, val centered: Boolean = false)
 
 /**
  * Text flow without a style export, as `nativeParagraphs` (packages/mobile/src/paragraphs.ts) defines it: among one parent's
@@ -73,16 +80,16 @@ class TextFlow(payload: Payload) {
 
 	/** The style text inherits inside [parent]: every non-flowing ancestor's default style, nearest last. */
 	fun blockText(parent: String?): BlockText {
-		var bold = false; var italic = false; var mono = false; var size = 1.0; var pre = false
+		var bold = false; var italic = false; var mono = false; var size = 1.0; var pre = false; var centered = false
 		var at = parent
 		while (at != null) {
 			val n = byId[at] ?: break
 			if (n is Node.Element && !flowing(n)) n.defaultStyle?.let { s ->
-				bold = bold || s.bold; italic = italic || s.italic; mono = mono || s.monospace; size *= s.size; pre = pre || s.preformatted
+				bold = bold || s.bold; italic = italic || s.italic; mono = mono || s.monospace; size *= s.size; pre = pre || s.preformatted; centered = centered || s.center
 			}
 			at = n.parent
 		}
-		return BlockText(bold, italic, mono, size, pre)
+		return BlockText(bold, italic, mono, size, pre, centered)
 	}
 
 	/**
@@ -157,7 +164,8 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 	/** What `currentColor` paints: the svg's text colour from a style export, else black. */
 	var currentColor: Int = Color.BLACK
 		set(value) { field = value; invalidate() }
-	private val paths = drawing.shapes.map { shape ->
+	private val paths = drawing.shapes.map { part ->
+		val shape = part as? Shape ?: return@map Path()
 		Path().apply {
 			fillType = if (shape.evenOdd) Path.FillType.EVEN_ODD else Path.FillType.WINDING
 			val v = shape.path
@@ -192,7 +200,12 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 			canvas.translate((-x * scale + (width - w * scale) / 2).toFloat(), (-y * scale + (height - h * scale) / 2).toFloat())
 			canvas.scale(scale.toFloat(), scale.toFloat())
 		} ?: canvas.scale(density, density)
-		for ((index, shape) in drawing.shapes.withIndex()) {
+		for ((index, part) in drawing.shapes.withIndex()) {
+			if (part is DrawingText) {
+				drawText(canvas, part)
+				continue
+			}
+			val shape = part as Shape
 			canvas.save()
 			shape.transform?.let { (a, b, c, d, e, f) ->
 				canvas.concat(Matrix().apply { setValues(floatArrayOf(a.toFloat(), c.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) })
@@ -200,17 +213,18 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 			shape.fill?.let { fill ->
 				paint.reset(); paint.isAntiAlias = true
 				paint.style = Paint.Style.FILL
-				paint.color = colorOf(fill)
+				use(paint, fill)
 				canvas.drawPath(paths[index], paint)
 			}
 			shape.stroke?.let { stroke ->
 				paint.reset(); paint.isAntiAlias = true
 				paint.style = Paint.Style.STROKE
-				paint.color = colorOf(stroke)
+				use(paint, stroke)
 				paint.strokeWidth = shape.width.toFloat()
 				paint.strokeCap = when (shape.cap) { "round" -> Paint.Cap.ROUND; "square" -> Paint.Cap.SQUARE; else -> Paint.Cap.BUTT }
 				paint.strokeJoin = when (shape.join) { "round" -> Paint.Join.ROUND; "bevel" -> Paint.Join.BEVEL; else -> Paint.Join.MITER }
 				paint.strokeMiter = shape.miterLimit.toFloat()
+				shape.dash?.let { paint.pathEffect = DashPathEffect(it.map(Double::toFloat).toFloatArray(), shape.dashOffset.toFloat()) }
 				canvas.drawPath(paths[index], paint)
 			}
 			canvas.restore()
@@ -218,9 +232,51 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 		canvas.restore()
 	}
 
+	/** Sets [paint] to draw [given]: a colour, or a gradient as a shader whose local matrix maps its space to the shape's. */
+	private fun use(paint: Paint, given: ShapePaint) {
+		if (given !is ShapePaint.Gradient) {
+			paint.color = colorOf(given)
+			return
+		}
+		val p = given.points.map { it.toFloat() }
+		val colors = given.colors.map { it.argb }.toIntArray()
+		val offsets = given.offsets.map { it.toFloat() }.toFloatArray()
+		// One stop paints its colour everywhere, as the web does; a shader needs two.
+		val (c, o) = if (colors.size == 1) intArrayOf(colors[0], colors[0]) to floatArrayOf(0f, 1f) else colors to offsets
+		paint.shader = (if (given.radial) RadialGradient(p[3], p[4], p[5], p[0], p[1], p[2], c.map { Color.pack(it) }.toLongArray(), o, Shader.TileMode.CLAMP)
+			else LinearGradient(p[0], p[1], p[2], p[3], c, o, Shader.TileMode.CLAMP)).apply {
+			val (a, b, cc, d, e, f) = given.transform
+			setLocalMatrix(Matrix().apply { setValues(floatArrayOf(a.toFloat(), cc.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) })
+		}
+	}
+
+	/** A run of SVG text: its anchor at x and its baseline at y, in the drawing's user units. */
+	private fun drawText(canvas: Canvas, part: DrawingText) {
+		canvas.save()
+		part.transform?.let { (a, b, c, d, e, f) ->
+			canvas.concat(Matrix().apply { setValues(floatArrayOf(a.toFloat(), c.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) })
+		}
+		paint.reset(); paint.isAntiAlias = true
+		paint.style = Paint.Style.FILL
+		use(paint, part.fill)
+		paint.textSize = part.size.toFloat()
+		if (part.size > 0) paint.letterSpacing = (part.letterSpacing / part.size).toFloat()
+		paint.typeface = Typeface.create(Typeface.create(part.family ?: "sans-serif", Typeface.NORMAL), part.weight.coerceIn(1, 1000), part.italic)
+		paint.textAlign = when (part.anchor) { "middle" -> Paint.Align.CENTER; "end" -> Paint.Align.RIGHT; else -> Paint.Align.LEFT }
+		val metrics = paint.fontMetrics
+		val shift = when (part.baseline) {
+			"middle" -> Rect().also { paint.getTextBounds("x", 0, 1, it) }.height() / 2f
+			"central" -> -(metrics.ascent + metrics.descent) / 2f
+			else -> 0f
+		}
+		canvas.drawText(part.text, part.x.toFloat(), part.y.toFloat() + shift, paint)
+		canvas.restore()
+	}
+
 	private fun colorOf(paint: ShapePaint): Int = when (paint) {
 		is ShapePaint.Color -> paint.color.argb
 		ShapePaint.Current -> currentColor
+		is ShapePaint.Gradient -> throw MarklessHostError("a gradient is not one colour")
 	}
 }
 

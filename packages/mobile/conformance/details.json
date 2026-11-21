@@ -1,0 +1,439 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:peeks",
+				"name": "peeks",
+				"initial": 0
+			},
+			{
+				"id": "details:h2",
+				"name": "open",
+				"initial": false
+			},
+			{
+				"id": "details:h5",
+				"name": "open",
+				"initial": true
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Help"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "details",
+				"parent": "h0",
+				"bindings": [
+					{
+						"attribute": "open",
+						"value": {
+							"cell": "details:h2"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "summary",
+				"parent": "h2",
+				"defaultStyle": {
+					"disclosure": true
+				},
+				"bindings": [
+					{
+						"attribute": "aria-expanded",
+						"value": {
+							"if": {
+								"cell": "details:h2"
+							},
+							"whenTrue": {
+								"literal": "true"
+							},
+							"whenFalse": {
+								"literal": "false"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Shipping"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h2",
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "details:h2"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Orders leave in two days."
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "details",
+				"parent": "h0",
+				"bindings": [
+					{
+						"attribute": "open",
+						"value": {
+							"cell": "details:h5"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "summary",
+				"parent": "h5",
+				"defaultStyle": {
+					"disclosure": true
+				},
+				"bindings": [
+					{
+						"attribute": "aria-expanded",
+						"value": {
+							"if": {
+								"cell": "details:h5"
+							},
+							"whenTrue": {
+								"literal": "true"
+							},
+							"whenFalse": {
+								"literal": "false"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Returns, peeked "
+					},
+					{
+						"cell": "state:peeks"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "p",
+				"parent": "h5",
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "details:h5"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Send it back within a month."
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "p",
+				"parent": "h5",
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "details:h5"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h8:text0",
+				"parent": "h8",
+				"parts": [
+					{
+						"text": "Refunds take a week."
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h6",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "toggle:h2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:peeks",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "state:peeks"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "details:h5",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "details:h5"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "toggle:h2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "details:h2",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "details:h2"
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		["h1:text0", "Help"],
+		["h3:text0", "Shipping"],
+		["h4:text0", "Orders leave in two days."],
+		["h6:text0", "Returns, peeked 0"],
+		["h7:text0", "Send it back within a month."],
+		["h8:text0", "Refunds take a week."]
+	],
+	"initialAttributes": [
+		["h2", "open", null],
+		["h3", "aria-expanded", "false"],
+		["h4", "hidden", ""],
+		["h5", "open", ""],
+		["h6", "aria-expanded", "true"],
+		["h7", "hidden", null],
+		["h8", "hidden", null]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "h3",
+					"name": "aria-expanded",
+					"value": "true"
+				},
+				{
+					"op": "attribute",
+					"node": "h4",
+					"name": "hidden",
+					"value": null
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "h5",
+					"name": "open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "h6",
+					"name": "aria-expanded",
+					"value": "false"
+				},
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "Returns, peeked 1"
+				},
+				{
+					"op": "attribute",
+					"node": "h7",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "h8",
+					"name": "hidden",
+					"value": ""
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "h5",
+					"name": "open",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "h6",
+					"name": "aria-expanded",
+					"value": "true"
+				},
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "Returns, peeked 2"
+				},
+				{
+					"op": "attribute",
+					"node": "h7",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "h8",
+					"name": "hidden",
+					"value": null
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "open",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "h3",
+					"name": "aria-expanded",
+					"value": "false"
+				},
+				{
+					"op": "attribute",
+					"node": "h4",
+					"name": "hidden",
+					"value": ""
+				}
+			]
+		}
+	]
+}

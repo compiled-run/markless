@@ -946,6 +946,80 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h4' }],
 	},
 	{
+		name: 'svg-if',
+		fixture: 'proofs/r151-svg-if/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h2' },
+		],
+	},
+	{
+		name: 'svg-text',
+		fixture: 'proofs/r150-svg-text/App.tsrx',
+		modules: true,
+		actions: [],
+	},
+	{
+		name: 'svg-dashes',
+		fixture: 'proofs/r149-svg-dashes/App.tsrx',
+		modules: true,
+		actions: [],
+	},
+	{
+		name: 'svg-paints',
+		fixture: 'proofs/r148-svg-paints/App.tsrx',
+		modules: true,
+		actions: [],
+	},
+	{
+		name: 'center',
+		fixture: 'proofs/r147-center/App.tsrx',
+		modules: true,
+		actions: [{ event: 'activate', host: 'h4' }],
+	},
+	{
+		name: 'details',
+		fixture: 'proofs/r145-details/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
+		// A scroll container's scroll events carry where it is; its handler reads scrollTop, 0 before the first one.
+		name: 'scroll',
+		fixture: 'proofs/r152-scroll/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'scroll', host: 'h4', top: 40, left: 0 },
+			{ event: 'scroll', host: 'h4', top: 1020, left: 0 },
+			{ event: 'scroll', host: 'h4', top: 0, left: 0 },
+		],
+	},
+	{
+		// A scroll handler reads its own box's position through `event.target` and `event.currentTarget`.
+		name: 'scroll-target',
+		fixture: 'test/fixtures/ScrollTarget.tsrx',
+		actions: [
+			{ event: 'scroll', host: 'h1', top: 12.5, left: 0 },
+			{ event: 'scroll', host: 'h1', top: 300, left: 40 },
+		],
+	},
+	{
+		name: 'script-url',
+		fixture: 'proofs/j16-url/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h7' },
+		],
+	},
+	{
 		// The real modal family: trigger, a press inside the dialog, a press on its backdrop, an alert that refuses one, Escape.
 		name: 'overlay',
 		fixture: 'proofs/u20-modal/App.tsrx',

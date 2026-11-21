@@ -1,0 +1,178 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Diagram"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "svg",
+				"parent": "h0",
+				"attributes": {
+					"width": "240",
+					"height": "120",
+					"viewBox": "0 0 120 60",
+					"aria-label": "Dev server to runtime"
+				},
+				"drawing": {
+					"viewBox": [0, 0, 120, 60],
+					"width": 240,
+					"height": 120,
+					"shapes": [
+						{
+							"path": [0, 4, 8, 1, 116, 8, 1, 116, 32, 1, 4, 32, 4],
+							"fill": {
+								"r": 242,
+								"g": 236,
+								"b": 252,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": {
+								"r": 194,
+								"g": 194,
+								"b": 196,
+								"alpha": 255
+							},
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						},
+						{
+							"text": "Vite Dev Server",
+							"x": 60,
+							"y": 20,
+							"size": 9,
+							"weight": 400,
+							"family": "Arial",
+							"anchor": "middle",
+							"baseline": "central",
+							"fill": {
+								"r": 60,
+								"g": 60,
+								"b": 67,
+								"alpha": 255
+							}
+						},
+						{
+							"text": "module",
+							"x": 78,
+							"y": 50,
+							"size": 6,
+							"weight": 600,
+							"anchor": "start",
+							"baseline": "alphabetic",
+							"letterSpacing": 0.6000000000000001,
+							"fill": {
+								"r": 21,
+								"g": 80,
+								"b": 92,
+								"alpha": 255
+							}
+						},
+						{
+							"text": "graph",
+							"x": 78,
+							"y": 57,
+							"size": 6,
+							"weight": 600,
+							"anchor": "start",
+							"baseline": "alphabetic",
+							"letterSpacing": 0.6000000000000001,
+							"fill": {
+								"r": 21,
+								"g": 80,
+								"b": 92,
+								"alpha": 255
+							}
+						},
+						{
+							"text": "mermaid label",
+							"x": 60,
+							"y": 40,
+							"size": 6,
+							"weight": 400,
+							"anchor": "middle",
+							"baseline": "alphabetic",
+							"fill": {
+								"r": 60,
+								"g": 60,
+								"b": 67,
+								"alpha": 255
+							}
+						},
+						{
+							"text": "runs code",
+							"x": 0,
+							"y": 0,
+							"size": 8,
+							"weight": 400,
+							"italic": true,
+							"anchor": "start",
+							"baseline": "middle",
+							"fill": {
+								"r": 204,
+								"g": 102,
+								"b": 0,
+								"alpha": 255
+							},
+							"transform": [1, 0, 0, 1, 4, 48]
+						}
+					]
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h12",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h12:text0",
+				"parent": "h12",
+				"parts": [
+					{
+						"text": "Diagram drawn"
+					}
+				]
+			}
+		],
+		"events": [],
+		"handlers": []
+	},
+	"initial": [
+		["h1:text0", "Diagram"],
+		["h12:text0", "Diagram drawn"]
+	],
+	"steps": []
+}
