@@ -120,10 +120,10 @@ export default function App() @{
 		expect(result.payload?.script?.services).toEqual(['fetch']);
 	});
 
-	it('refuses a device call inside JavaScript by name, file and position', async () => {
-		const source = handler('() => (n = location.current())');
+	it('refuses a device value read inside JavaScript by name, file and position', async () => {
+		const source = handler('() => { for (const access of [location.access]) n = access.length; }');
 		const result = await build(source, { location: 'x' });
-		const start = source.indexOf('location.current');
+		const start = source.indexOf('location.access');
 		expect(result.diagnostics.map((d) => [d.code, d.message, d.primarySpan])).toEqual([
 			[
 				'MARKLESS_NATIVE_JAVASCRIPT',

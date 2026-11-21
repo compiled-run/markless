@@ -42,8 +42,11 @@ export function retargetProjectedRepeatHosts(input: {
 				: {}),
 		};
 	}
+	const unplaced = repeats.filter((repeat) => repeat.parentHostNodeId === '');
+	if (unplaced.length === 0) return;
 	for (let index = repeats.length - 1; index >= 0; index--)
 		if (repeats[index]!.parentHostNodeId === '') repeats.splice(index, 1);
+	(input.graph as { unplacedProjectedRepeats?: SemanticKeyedRepeat[] }).unplacedProjectedRepeats = unplaced;
 }
 
 type ProjectedRepeatPlacement =

@@ -1,0 +1,19 @@
+{
+	"rung": "J47",
+	"name": "a @for written straight inside an imported component's tag renders its rows",
+	"steps": [
+		{
+			"visible": ["Help", "When does it ship?", "How do I return it?"],
+			"absent": ["Within two working days.", "Start a return from your orders."]
+		},
+		{
+			"do": { "tap": "How do I return it?" },
+			"visible": ["Start a return from your orders."],
+			"absent": ["Within two working days."]
+		},
+		{
+			"do": { "tap": "When does it ship?" },
+			"visible": ["Within two working days."]
+		}
+	]
+}

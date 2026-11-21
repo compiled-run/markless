@@ -1,0 +1,36 @@
+appId: ${APP_ID}
+name: j51-live-follows
+---
+- launchApp:
+    clearState: true
+- assertVisible: Uploads
+- assertVisible: Slide 1
+- assertVisible: Upload saved
+- assertVisible: Slides moving
+- assertNotVisible: Slide 2
+- assertNotVisible: Upload failed
+- assertNotVisible: Slides held
+- tapOn: Next
+- assertVisible: Slide 2
+- assertNotVisible: Slide 1
+- assertVisible: Slide 2
+- assertVisible: Slides moving
+- assertNotVisible: Slide 1
+- assertNotVisible: Slides held
+- tapOn: Hold slides
+- assertVisible: Slides held
+- assertNotVisible: Slides moving
+- assertVisible: Slides held
+- assertNotVisible: Slides moving
+- assertNotVisible: Slide 3
+- tapOn: Next
+- assertVisible: Slide 3
+- assertVisible: Slide 3
+- assertVisible: Upload saved
+- assertNotVisible: Slide 2
+- assertNotVisible: Upload failed
+- tapOn: Fail
+- assertVisible: Upload failed
+- assertNotVisible: Upload saved
+- assertVisible: Upload failed
+- assertNotVisible: Upload saved

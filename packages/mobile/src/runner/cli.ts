@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { allRungFolders } from '../../proofs/ladder.ts';
 import { PROOF_PLATFORMS, type ProofPlatform } from '../harness/proof-app.ts';
@@ -25,6 +25,7 @@ import {
 	type Summary,
 	writeJson,
 } from './store.ts';
+import { checkoutFacts, commitsBehind, describeCheckout } from './refresh.ts';
 import { spawnRunner } from './spawn-runner.ts';
 
 const USAGE = `usage: phones <command>
@@ -92,11 +93,17 @@ const chunksOf = (job: string): Chunk[] =>
 				.map((file) => readJson<Chunk>(join(job, 'chunks', file))!)
 		: [];
 
-function status(): void {
+async function status(): Promise<void> {
 	const running = runningDaemon();
 	console.log(
 		running ? `runner pid ${running.pid}, code from ${running.code}` : 'no runner runs',
 	);
+	if (running) {
+		const checkout = resolve(running.code, '..', '..', '..', '..');
+		console.log(
+			`  ${describeCheckout(await checkoutFacts(checkout, false), await commitsBehind(checkout))}`,
+		);
+	}
 	for (const phone of readJson<
 		Array<{ id: string; state: string; reason?: string; chunk?: string }>
 	>(phonesFile()) ?? [])
@@ -320,7 +327,7 @@ async function main(argv: string[]): Promise<number> {
 			await stop(rest.includes('--phones'));
 			return 0;
 		case 'status':
-			status();
+			await status();
 			return 0;
 		case 'submit':
 			return submit(rest);

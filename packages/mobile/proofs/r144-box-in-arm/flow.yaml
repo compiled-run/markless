@@ -1,0 +1,35 @@
+appId: ${APP_ID}
+name: r144-box-in-arm
+---
+- launchApp:
+    clearState: true
+- assertVisible: Task
+- assertVisible: No task
+- assertVisible: "Box: untouched"
+- assertNotVisible: Water plants
+- tapOn: Load done
+- assertVisible: Water plants
+- assertNotVisible: No task
+- assertVisible: Water plants
+- assertVisible: "Box: untouched"
+- assertNotVisible: No task
+- tapOn: Done
+- assertNotVisible: "Box: untouched"
+- assertVisible: Water plants
+- assertVisible: "Box: cleared"
+- assertNotVisible: "Box: untouched"
+- tapOn: Clear
+- assertNotVisible: Water plants
+- assertVisible: No task
+- assertVisible: "Box: cleared"
+- assertNotVisible: Water plants
+- tapOn: Load open
+- assertNotVisible: No task
+- assertVisible: Feed cat
+- assertVisible: "Box: cleared"
+- assertNotVisible: No task
+- tapOn: Done
+- assertNotVisible: "Box: cleared"
+- assertVisible: Feed cat
+- assertVisible: "Box: ticked"
+- assertNotVisible: "Box: cleared"

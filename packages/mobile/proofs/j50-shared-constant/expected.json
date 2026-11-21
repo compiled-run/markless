@@ -1,0 +1,8 @@
+{
+	"rung": "J50",
+	"name": "a shared state's first value read from constants another module exports",
+	"steps": [
+		{ "visible": ["Sizes", "Sizes Small and Large", "Chosen Small"], "absent": ["Chosen Large"] },
+		{ "do": { "tap": "Switch size" }, "visible": ["Chosen Large"], "absent": ["Chosen Small"] }
+	]
+}
