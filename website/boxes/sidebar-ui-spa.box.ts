@@ -20,12 +20,14 @@ export default box(
 		await page.click('.sidebar a[href="/ui/combobox"]', WAIT);
 		await expect.page.text(page, 'h1', 'combobox', WAIT);
 		await expect.page.exists(page, '.site-navbar', WAIT);
-		if (
-			(await page.networkRequests()).filter((request) => request.resourceType === 'Document')
-				.length !== 1
-		)
+		const requests = await page.networkRequests();
+		if (requests.filter((request) => request.resourceType === 'Document').length !== 1)
 			throw new Error('UI sidebar reloaded the document');
-		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
+		// The click cancels every guess still arriving for another page: the router's own abort, not a failed request.
+		const cancelled = requests.filter(
+			(request) => request.resourceType === 'Fetch' && request.failedReason === 'net::ERR_ABORTED',
+		).length;
+		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: cancelled }, WAIT);
 		await receipt.capture('UI sidebar rendered combobox from select without reloading');
 	},
 );
