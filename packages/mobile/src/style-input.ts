@@ -477,7 +477,7 @@ export function nativeStyleInput(
 				const list = nodes.find((candidate) => candidate.id === node.row)!;
 				return rows.map((key, index): NativeStyleInput['nodes'][number] => {
 					const parent = node.parent === list.parent ? node.parent! : `${node.parent}@${index}`;
-					const arm = node.arm ? { arm: node.arm } : {};
+					const arm = node.arm ? { arm: node.arm } : list.arm ? { arm: list.arm } : {};
 					if (node.kind === 'text')
 						return { kind: 'text', id: `${node.id}@${index}`, parent, text: initial.get(`${node.id}@${key}`) ?? '', ...arm };
 					if (node.kind !== 'element') throw new Error(`${node.id}: a <select>'s option row holds a ${node.kind}`);
