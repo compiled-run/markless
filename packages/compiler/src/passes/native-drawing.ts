@@ -1,3 +1,4 @@
+import { parse as parseCss } from 'yuku-css';
 import type {
 	NativeColor,
 	NativeDrawing,
@@ -93,7 +94,7 @@ const INITIAL: Inherited = {
 
 export const SHAPES: ReadonlySet<string> = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
 /** Elements that draw nothing themselves and whose content is never drawn in place. */
-const NEVER_DRAWN = new Set(['defs', 'symbol', 'title', 'desc', 'metadata', 'clipPath', 'marker', 'linearGradient', 'radialGradient', 'stop']);
+const NEVER_DRAWN = new Set(['defs', 'symbol', 'title', 'desc', 'metadata', 'clipPath', 'mask', 'marker', 'linearGradient', 'radialGradient', 'stop']);
 /** Each gradient's own geometry, which an `href` passes on only to a gradient of its kind. */
 const GRADIENT_GEOMETRY: Readonly<Record<string, ReadonlyArray<string>>> = {
 	linearGradient: ['x1', 'y1', 'x2', 'y2'],
@@ -105,6 +106,8 @@ const GRADIENT_SHARED = new Set(['gradientUnits', 'gradientTransform', 'spreadMe
 const STOP_ATTRIBUTES = new Set(['offset', 'stop-color', 'stop-opacity', 'color']);
 /** Segments a blend of two stops that differ in colour and alpha is cut into, so premultiplied and unpremultiplied blends agree to within a level. */
 const ALPHA_BLEND_STEPS = 16;
+/** What a <mask> may carry: its region, its units and its type. */
+const MASK_ATTRIBUTES: ReadonlySet<string> = new Set(['id', 'x', 'y', 'width', 'height', 'maskUnits', 'maskContentUnits', 'mask-type']);
 /** Shapes that get markers at their vertices. */
 const MARKABLE = new Set(['path', 'line', 'polyline', 'polygon']);
 /** Attributes that change nothing a native drawing shows. */
@@ -165,6 +168,7 @@ const PRESENTATION = new Set([
 	'dominant-baseline',
 	'letter-spacing',
 	'clip-path',
+	'mask',
 	'marker-start',
 	'marker-mid',
 	'marker-end',
@@ -183,6 +187,33 @@ const BASELINES: Readonly<Record<string, NativeDrawingText['baseline']>> = {
 	'text-bottom': 'text-bottom',
 	ideographic: 'ideographic',
 };
+
+/** CSS properties an SVG file's `style` attribute may set that a native drawing reads as the presentation attribute of that name. */
+const STYLE_AS_ATTRIBUTES: ReadonlySet<string> = new Set(['mask-type']);
+
+/**
+ * An SVG file's `style` attribute as the presentation attributes it sets, when each of its declarations is one a native
+ * drawing reads that way with a single keyword (`style="mask-type:alpha"`); null when it holds anything else.
+ */
+export function svgStyleAttributes(style: string): Record<string, string> | null {
+	let list;
+	try {
+		list = parseCss(style, { context: 'declarationList' }).ast;
+	} catch {
+		return null;
+	}
+	if (list.type !== 'DeclarationList') return null;
+	const attributes: Record<string, string> = {};
+	for (const declaration of list.children) {
+		if (declaration.type !== 'Declaration' || declaration.important || !STYLE_AS_ATTRIBUTES.has(declaration.property))
+			return null;
+		const value = declaration.value.type === 'Value' ? declaration.value.children : [];
+		const only = value.length === 1 ? value[0] : undefined;
+		if (only?.type !== 'Identifier') return null;
+		attributes[declaration.property] = only.name;
+	}
+	return attributes;
+}
 
 export function compileDrawing(
 	svg: Readonly<Record<string, string>>,
@@ -843,6 +874,72 @@ export function compileDrawing(
 	};
 
 	/**
+	 * `mask="url(#id)"` (CSS Masking 1 §7): a <mask> in user space whose content is shapes filled with one opaque colour (any
+	 * colour for `mask-type="alpha"`, white for the default luminance) lets through exactly what those shapes cover inside its
+	 * region, so it draws as a clip by them; any other mask is refused by name.
+	 */
+	const masked = (element: DrawingElement, style: Inherited, own: Matrix): Inherited => {
+		const raw = element.attributes.mask?.trim();
+		if (raw === undefined || raw === 'none') return style;
+		const id = raw.startsWith('url(#') && raw.endsWith(')') ? raw.slice(5, -1).trim() : undefined;
+		const target = id === undefined ? undefined : byId.get(id);
+		if (!target || target.tag !== 'mask') {
+			refuse(element.id, `\`mask="${raw}"\` on <${element.tag}>, which names no <mask> inside this <svg>`);
+			return style;
+		}
+		for (const name of Object.keys(target.attributes))
+			if (!MASK_ATTRIBUTES.has(name) && !PRESENTATION.has(name) && !NO_DRAWING_EFFECT.has(name) && !name.startsWith('data-'))
+				refuse(target.id, `\`${name}\` on <mask>, which a native drawing does not draw yet`);
+		const units = target.attributes.maskUnits?.trim() ?? 'objectBoundingBox';
+		if (units !== 'userSpaceOnUse') {
+			refuse(target.id, `\`maskUnits="${units}"\` on <mask>: a mask's region is drawn in user space only`);
+			return style;
+		}
+		const contentUnits = target.attributes.maskContentUnits?.trim();
+		if (contentUnits !== undefined && contentUnits !== 'userSpaceOnUse')
+			refuse(target.id, `\`maskContentUnits="${contentUnits}"\` on <mask>: a mask's content is drawn in user space only`);
+		const type = target.attributes['mask-type']?.trim() ?? 'luminance';
+		if (type !== 'luminance' && type !== 'alpha') {
+			refuse(target.id, `\`mask-type="${type}"\` on <mask>`);
+			return style;
+		}
+		const sides = ['x', 'y', 'width', 'height'] as const;
+		if (sides.some((side) => target.attributes[side] === undefined)) {
+			refuse(target.id, '<mask> without `x`, `y`, `width` and `height`: its default region depends on the box of what it masks');
+			return style;
+		}
+		const [x, y, width, height] = sides.map((side) => number(target, side));
+		const base = multiply(own, transformOf(target));
+		const region = mapOutline([0, x, y, 1, x + width, y, 1, x + width, y + height, 1, x, y + height, 4], base);
+		const outline: number[] = [];
+		const maskStyle = inherit(target, INITIAL);
+		for (const child of childrenOf(target.path)) {
+			if (!SHAPES.has(child.tag)) {
+				if (!NEVER_DRAWN.has(child.tag))
+					refuse(child.id, `<${child.tag}> inside <mask>, whose filled shapes alone mask natively yet`);
+				continue;
+			}
+			for (const name of ['clip-path', 'mask', 'filter'])
+				if (child.attributes[name] !== undefined) refuse(child.id, `\`${name}\` on a shape inside <mask>`);
+			const shape = inherit(child, maskStyle);
+			const fill = shape.fill === 'currentColor' ? shape.color : shape.fill;
+			if (fill === null) continue;
+			const colour = 'url' in fill ? null : fill;
+			const opaque = colour !== null && colour.alpha === 255 && shape.fillOpacity === 1 && shape.opacity === 1;
+			const white = colour !== null && colour.r === 255 && colour.g === 255 && colour.b === 255;
+			if (!opaque || (type === 'luminance' && !white) || shape.stroke !== null || shape.fillRule !== 'nonzero') {
+				refuse(
+					child.id,
+					`a <${child.tag}> inside a ${type} <mask> that is not one opaque ${type === 'luminance' ? 'white ' : ''}fill with no stroke: a mask of partial coverage is not drawn natively yet`,
+				);
+				continue;
+			}
+			outline.push(...mapOutline(outlineOf(child), multiply(base, transformOf(child))));
+		}
+		return { ...style, clips: [...style.clips, region, outline] };
+	};
+
+	/**
 	 * SVG 2 §11.6: each <marker> drawn at the vertices it marks, rotated by its `orient`, scaled by the stroke width
 	 * (`markerUnits="strokeWidth"`) and its viewBox, its `refX`/`refY` on the vertex, clipped to its box; its content takes
 	 * its styles from where the marker is written, not from the shape.
@@ -918,7 +1015,7 @@ export function compileDrawing(
 		}
 		checkAttributes(element);
 		const own = multiply(matrix, transformOf(element));
-		const style = clipped(element, inherit(element, from), own);
+		const style = masked(element, clipped(element, inherit(element, from), own), own);
 		if (SHAPES.has(element.tag)) {
 			const outline = outlineOf(element);
 			emit(

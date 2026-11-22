@@ -841,11 +841,14 @@ final class ViewTree {
 		return nil
 	}
 
-	/// How a live region speaks now: as built, or, when its attributes follow state, as they read at this moment.
-	private func liveNow(_ node: String) -> NativeLive? {
-		guard let follows = nodes[node]?.liveFollows else { return nodes[node]?.live }
-		guard case let .string(politeness) = try? runtime.evaluate(follows.politeness) else { return nil }
-		return NativeLive(assertive: politeness == "assertive", atomic: (try? runtime.evaluate(follows.atomic)) == .bool(true))
+	/// How a live region (a row's copy keeps its `@key`) speaks now: as built, or, when its attributes follow state, as they
+	/// read at this moment in its own row.
+	private func liveNow(_ region: String) -> NativeLive? {
+		let base = region.split(separator: "@").first.map(String.init) ?? region
+		guard let node = nodes[base], let follows = node.liveFollows else { return nodes[base]?.live }
+		let scope = (try? runtime.instances(of: node).first { $0.id == region }?.scope) ?? .empty
+		guard case let .string(politeness) = try? runtime.evaluate(follows.politeness, in: scope) else { return nil }
+		return NativeLive(assertive: politeness == "assertive", atomic: (try? runtime.evaluate(follows.atomic, in: scope)) == .bool(true))
 	}
 
 	/// Each live region a journal changed, spoken once: whole when atomic, else the text that changed.
@@ -857,8 +860,7 @@ final class ViewTree {
 			changed[region, default: []].append(text)
 		}
 		for region in order {
-			let base = region.split(separator: "@").first.map(String.init) ?? region
-			guard let live = liveNow(base), let view = elements[region] ?? paragraphs[region]?.view else { continue }
+			guard let live = liveNow(region), let view = elements[region] ?? paragraphs[region]?.view else { continue }
 			let spoken = live.atomic ? text(within: view) : changed[region, default: []].joined(separator: " ")
 			if !spoken.isEmpty { announce(spoken, live.assertive) }
 		}
@@ -916,7 +918,8 @@ final class ViewTree {
 
 	/// The text an element shows, in view order: what `aria-labelledby` and `aria-describedby` read from it.
 	private func text(within view: UIView, skipping skipped: UIView? = nil) -> String {
-		if view === skipped { return "" }
+		// A list item's marker is a decoration (CSS's ::marker), not text of the element.
+		if view === skipped || decorations.contains(ObjectIdentifier(view)) { return "" }
 		if let label = view as? UILabel { return label.text ?? "" }
 		return view.subviews.map { text(within: $0, skipping: skipped) }.filter { !$0.isEmpty }.joined(separator: " ")
 	}

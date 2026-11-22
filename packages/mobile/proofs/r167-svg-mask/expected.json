@@ -1,0 +1,9 @@
+{
+	"rung": 167,
+	"name": "an svg group masked by a <mask> of opaque fills is drawn only where they cover, as the browser composites it",
+	"steps": [
+		{ "visible": ["Masked mark", "Half disc", "Toggle mark"] },
+		{ "do": { "tap": "Toggle mark" }, "visible": ["Masked mark"], "absent": ["Half disc"] },
+		{ "do": { "tap": "Toggle mark" }, "visible": ["Half disc"] }
+	]
+}

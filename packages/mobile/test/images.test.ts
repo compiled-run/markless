@@ -115,3 +115,27 @@ test("an SVG file's gradients paint its shapes, their stops read from the file a
 	});
 	expect(second?.fill).toMatchObject({ radial: [0.5, 0.5, 0, 0.5, 0.5, 0.5], transform: [20, 0, 0, 20, 20, 0] });
 });
+
+test("an SVG file's style that only sets mask-type is read as that attribute; any other style is still refused", () => {
+	const svg = (style: string) =>
+		new TextEncoder().encode(
+			`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><mask id="m" style="${style}" maskUnits="userSpaceOnUse" x="0" y="0" width="10" height="10"><rect width="5" height="10" fill="black" /></mask><g mask="url(#m)"><rect width="10" height="10" /></g></svg>`,
+		);
+	const alpha = svgImage(svg('mask-type:alpha'))!;
+	expect(alpha.refusals).toEqual([]);
+	expect(alpha.image.drawing.shapes[0]?.clip).toHaveLength(2);
+	expect(svgImage(svg('mask-type:alpha; opacity: 0.5'))!.refusals).toContain(
+		'`style="mask-type:alpha; opacity: 0.5"` on <mask> in an SVG file: its CSS is not read for a native drawing yet',
+	);
+});
+
+test('a gradient fill inside a <mask> is refused as partial coverage', () => {
+	const image = svg(`<svg ${NS} width="20" height="20" viewBox="0 0 20 20">
+	<defs>
+		<linearGradient id="g"><stop stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+		<mask id="m" x="0" y="0" width="20" height="20" maskUnits="userSpaceOnUse"><rect width="20" height="20" fill="url(#g)"/></mask>
+	</defs>
+	<rect width="20" height="20" fill="#000" mask="url(#m)"/>
+</svg>`);
+	expect(image?.refusals.join('\n')).toContain('a mask of partial coverage is not drawn natively yet');
+});
