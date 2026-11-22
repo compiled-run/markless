@@ -3764,8 +3764,6 @@ export function createNativeViewPayload(
 		element: string,
 		attributes: Readonly<Record<string, string>>,
 		bindings: ReadonlyArray<{ readonly attribute: string } | { readonly property: string }>,
-		span: SourceSpan | undefined,
-		row: string | undefined,
 	): Pick<Extract<NativeNode, { kind: 'element' }>, 'live' | 'liveFollows'> => {
 		const LIVE_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
 			role: new Set(['status', 'alert', 'log']),
@@ -3783,14 +3781,8 @@ export function createNativeViewPayload(
 			const values = writtenValuesOf(bound.value);
 			return !values || [...values].some((value) => live.has(value));
 		});
+		// In a @for row each copy is its own live region, its rule read in that row.
 		if (follows) {
-			if (row !== undefined) {
-				refuse(
-					`a <${element}> in a @for row whose \`role\`, \`aria-live\` or \`aria-atomic\` follows state; a native host makes such a live region only outside a row`,
-					span,
-				);
-				return {};
-			}
 			return {
 				liveFollows: liveRuleOf(element, (name) => {
 					const bound = boundTo(name);
@@ -6020,8 +6012,6 @@ export function createNativeViewPayload(
 					element ?? '*',
 					attributes,
 					bindings,
-					item.span,
-					place.row,
 				);
 				const parts = styleParts.get(id);
 				if (parts && place.row !== undefined)
