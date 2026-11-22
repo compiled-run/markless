@@ -8,8 +8,8 @@ import WebKit
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"canvas", "details", "embed", "object",
-	"picture", "summary", "video",
+	"canvas", "embed", "object",
+	"picture", "video",
 ]
 
 /// Where an instance is built: its row (`@key`, empty outside lists), the names its expressions see, and what encloses it.
@@ -139,9 +139,24 @@ final class DrawingView: UIView {
 		for (shape, p) in drawing.shapes.map({ ($0, $0.path) }) + live.map({ ($0.shape, $0.path) }) {
 			let path = Self.path(p)
 			context.saveGState()
-			for clip in shape.clip {
+			for (index, clip) in shape.clip.enumerated() {
 				context.addPath(Self.path(clip))
+				context.clip(using: shape.clipEvenOdd.indices.contains(index) && shape.clipEvenOdd[index] ? .evenOdd : .winding)
+			}
+			// A blur draws the shape far off to the side and only its shadow, offset back, inside the filter region.
+			var shadow: ((UIColor) -> UIColor)? = nil
+			if let blur = shape.blur {
+				context.addPath(Self.path(blur.region))
 				context.clip(using: .winding)
+				let ctm = context.ctm, scale = contentScaleFactor, far: CGFloat = 100_000
+				let linear = CGAffineTransform(a: ctm.a, b: ctm.b, c: ctm.c, d: ctm.d, tx: 0, ty: 0)
+				let shift = CGPoint(x: far, y: 0).applying(linear.inverted())
+				let sigma = blur.deviation * sqrt(abs(ctm.a * ctm.d - ctm.b * ctm.c))
+				context.translateBy(x: shift.x, y: shift.y)
+				shadow = { paint in
+					context.setShadow(offset: CGSize(width: -far / scale, height: 0), blur: 2 * sigma / scale, color: paint.cgColor)
+					return .black
+				}
 			}
 			if let t = shape.transform { context.concatenate(CGAffineTransform(a: t[0], b: t[1], c: t[2], d: t[3], tx: t[4], ty: t[5])) }
 			if let text = shape.text {
@@ -157,7 +172,7 @@ final class DrawingView: UIView {
 					Self.draw(gradient, in: context)
 					context.restoreGState()
 				} else {
-					context.setFillColor(color(fill).cgColor)
+					context.setFillColor((shadow?(color(fill)) ?? color(fill)).cgColor)
 					context.fillPath(using: shape.evenOdd ? .evenOdd : .winding)
 				}
 			}
@@ -174,7 +189,7 @@ final class DrawingView: UIView {
 					Self.draw(gradient, in: context)
 					context.restoreGState()
 				} else {
-					context.setStrokeColor(color(stroke).cgColor)
+					context.setStrokeColor((shadow?(color(stroke)) ?? color(stroke)).cgColor)
 					context.strokePath()
 				}
 			}
@@ -383,6 +398,8 @@ final class ViewTree {
 	/// Lists and the marker kind their items show; each item's marker label.
 	private var listMarkers: [ObjectIdentifier: String] = [:]
 	private var itemMarkers: [ObjectIdentifier: UILabel] = [:]
+	/// Each summary's disclosure triangle, in its start inset.
+	private var disclosures: [ObjectIdentifier: UILabel] = [:]
 	/// Table structure: tables, their rows and the rows' cells.
 	private var tables = Set<ObjectIdentifier>()
 	private var tableRows = Set<ObjectIdentifier>()
@@ -1185,7 +1202,7 @@ final class ViewTree {
 						}
 					}
 					view = drawn
-				} else if element == "button" || element == "a" {
+				} else if element == "button" || element == "a" || element == "summary" {
 					if context.button != nil { throw HostError("<\(element)> \(id) is inside another control") }
 					let control = UIButton(type: .custom)
 					control.isAccessibilityElement = true
@@ -1591,6 +1608,7 @@ final class ViewTree {
 			}
 			view.accessibilityValue = current["aria-expanded"].map { $0 == "true" ? "expanded" : "collapsed" }
 		}
+		disclosures[ObjectIdentifier(view)]?.text = current["aria-expanded"] == "true" ? "\u{25BE}" : "\u{25B8}"
 		view.accessibilityElementsHidden = current["aria-hidden"] == "true"
 		// With a style export Dragon decides visibility (a hidden element has no frame); the stacking layout reads `hidden`.
 		if layout == nil, !dialogIds.contains(id) {
@@ -1633,7 +1651,7 @@ final class ViewTree {
 		// As the web names a button from its content: its text, and the label of an image or svg inside it.
 		func texts(_ view: UIView) -> [String] {
 			view.subviews.flatMap { child -> [String] in
-				if let label = child as? UILabel { return [label.text ?? ""] }
+				if let label = child as? UILabel { return decorations.contains(ObjectIdentifier(label)) ? [] : [label.text ?? ""] }
 				if child is DrawingView || child is UIImageView {
 					let own = child.accessibilityIdentifier.flatMap { attributes[$0] }
 					if own?["aria-hidden"] == "true" { return [] }
@@ -1773,6 +1791,7 @@ final class ViewTree {
 			])
 		}
 		if let marker = style.marker { listMarkers[id] = marker }
+		if style.disclosure { addDisclosure(to: view) }
 		switch style.table {
 		case "table":
 			tables.insert(id)
@@ -1781,6 +1800,24 @@ final class ViewTree {
 		case "cell": tableCells.insert(id)
 		default: break
 		}
+	}
+
+	/// A summary's triangle (`list-style: disclosure-closed inside`), in an inset before its content; it is not read.
+	private func addDisclosure(to summary: UIView) {
+		let marker = UILabel()
+		marker.isAccessibilityElement = false
+		marker.isUserInteractionEnabled = false
+		marker.translatesAutoresizingMaskIntoConstraints = false
+		marker.text = "\u{25B8}"
+		summary.addSubview(marker)
+		decorations.insert(ObjectIdentifier(marker))
+		disclosures[ObjectIdentifier(summary)] = marker
+		let glyphs = ["\u{25B8} ", "\u{25BE} "].map { ($0 as NSString).size(withAttributes: [.font: marker.font as Any]).width }
+		indents[ObjectIdentifier(summary)] = ceil(glyphs.max() ?? 0)
+		NSLayoutConstraint.activate([
+			marker.leadingAnchor.constraint(equalTo: summary.leadingAnchor),
+			marker.topAnchor.constraint(equalTo: summary.topAnchor),
+		])
 	}
 
 	/// A list item's marker, beside it in its list's inset; it is neither read nor part of the item's text.

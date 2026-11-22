@@ -139,3 +139,14 @@ test('a gradient fill inside a <mask> is refused as partial coverage', () => {
 </svg>`);
 	expect(image?.refusals.join('\n')).toContain('a mask of partial coverage is not drawn natively yet');
 });
+
+test('a gradient fill under a blur filter is refused', () => {
+	const image = svg(`<svg ${NS} width="20" height="20" viewBox="0 0 20 20">
+	<defs>
+		<linearGradient id="g"><stop stop-color="#41D1FF"/><stop offset="1" stop-color="#BD34FE"/></linearGradient>
+		<filter id="f" x="0" y="0" width="20" height="20" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="2"/></filter>
+	</defs>
+	<rect width="20" height="20" fill="url(#g)" filter="url(#f)"/>
+</svg>`);
+	expect(image?.refusals.join('\n')).toContain('a gradient `fill` under a `filter`');
+});
