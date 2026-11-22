@@ -12,7 +12,6 @@ export default function Sizing() @{
 			.field {
 				display: grid;
 				gap: 6px;
-				font-weight: 600;
 			}
 			.field select {
 				width: 100%;
@@ -20,7 +19,6 @@ export default function Sizing() @{
 				border: 1px solid #c9c2ad;
 				border-radius: 10px;
 				background: #fffdf7;
-				font-weight: 400;
 			}
 			.natural {
 				display: block;
