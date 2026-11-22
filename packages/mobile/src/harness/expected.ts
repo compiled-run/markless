@@ -1,7 +1,24 @@
-import { PERMISSION_PROMPTS, SYSTEM_SCREENS, type LadderRung } from '../../proofs/ladder.ts';
+import {
+	PERMISSION_PROMPTS,
+	SYSTEM_SCREENS,
+	type LadderRung,
+	type LadderText,
+} from '../../proofs/ladder.ts';
 
 const isStringList = (value: unknown): value is ReadonlyArray<string> =>
 	Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+const isText = (value: unknown): value is LadderText =>
+	typeof value === 'string' ||
+	(typeof value === 'object' &&
+		value !== null &&
+		Object.keys(value).length === 1 &&
+		'startsWith' in value &&
+		typeof value.startsWith === 'string' &&
+		value.startsWith !== '');
+
+const isTextList = (value: unknown): value is ReadonlyArray<LadderText> =>
+	Array.isArray(value) && value.every(isText);
 
 /** Reads a rung's expected.json, refusing a shape the harness cannot check rather than checking less. */
 export function readProofExpected(json: unknown, source: string): LadderRung {
@@ -21,8 +38,10 @@ export function readProofExpected(json: unknown, source: string): LadderRung {
 		if (typeof step !== 'object' || step === null)
 			return fail(`step ${index} is not an object`);
 		const fields = step as Record<string, unknown>;
-		if (!isStringList(fields.visible)) fail(`step ${index} has no "visible" text list`);
-		for (const key of ['absent', 'disabled', 'order', 'calls'] as const) {
+		if (!isTextList(fields.visible)) fail(`step ${index} has no "visible" text list`);
+		if (fields.absent !== undefined && !isTextList(fields.absent))
+			fail(`step ${index} "absent" is not a text list`);
+		for (const key of ['disabled', 'order', 'calls'] as const) {
 			if (fields[key] !== undefined && !isStringList(fields[key]))
 				fail(`step ${index} "${key}" is not a text list`);
 		}
@@ -36,6 +55,11 @@ export function readProofExpected(json: unknown, source: string): LadderRung {
 		if (index === 0 && fields.do !== undefined) fail('step 0 is the launch and takes no "do"');
 		if (index > 0 && (typeof fields.do !== 'object' || fields.do === null))
 			fail(`step ${index} has no "do" action`);
+		const action = fields.do as Record<string, unknown> | undefined;
+		for (const key of ['tap', 'doubleTap'] as const) {
+			if (action?.[key] !== undefined && !isText(action[key]))
+				fail(`step ${index} "${key}" is neither a text nor { "startsWith": <text> }`);
+		}
 	});
 	return json as LadderRung;
 }

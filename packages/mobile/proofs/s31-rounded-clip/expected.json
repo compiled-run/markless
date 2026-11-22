@@ -1,0 +1,17 @@
+{
+	"rung": "S31",
+	"name": "A box with a border radius and overflow: hidden clips its children to its rounded padding box, so a full-width coloured band shows round top corners on the web, iOS and Android",
+	"steps": [
+		{
+			"visible": ["Garden cards", "Basil, rounded at the top", "Opened 0"],
+			"absent": ["Opened 1"],
+			"title": "Cards"
+		},
+		{
+			"do": { "tap": "Open card" },
+			"visible": ["Opened 1", "Basil, rounded at the top"],
+			"absent": ["Opened 0"],
+			"title": "Cards"
+		}
+	]
+}

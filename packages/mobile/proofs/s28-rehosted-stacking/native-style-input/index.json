@@ -1,0 +1,95 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "App",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "mk-1xqsewl"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-1xqsewl"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Re-hosted"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "card mk-1xqsewl"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "div",
+			"parent": "h3",
+			"attributes": {
+				"class": "actions mk-1xqsewl"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "button",
+			"parent": "h4",
+			"attributes": {
+				"class": "lifted mk-1xqsewl"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Lifted 0"
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "p",
+			"parent": "h3",
+			"attributes": {
+				"class": "footer mk-1xqsewl"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h6:text0",
+			"parent": "h6",
+			"text": "Card footer"
+		},
+		{
+			"kind": "element",
+			"id": "h7",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"class": "later mk-1xqsewl"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h7:text0",
+			"parent": "h7",
+			"text": "Later 0"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\nmain.mk-1xqsewl { padding: 16px; }\n\t\t\t.card.mk-1xqsewl { padding: 12px; border: 1px solid #c9c2b4; border-radius: 12px; background: #fbf8f1; }\n\t\t\t.actions.mk-1xqsewl { display: flex; gap: 8px; }\n\t\t\t.lifted.mk-1xqsewl {\n\t\t\t\tposition: relative;\n\t\t\t\tz-index: 1;\n\t\t\t\ttop: 96px;\n\t\t\t\tpadding: 10px 16px;\n\t\t\t\tborder: 2px solid #1d4ed8;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #dbeafe;\n\t\t\t\tcolor: #1e3a8a;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 16px;\n\t\t\t}\n\t\t\t.footer.mk-1xqsewl { margin: 12px 0 0; color: #6b645a; }\n\t\t\t.later.mk-1xqsewl {\n\t\t\t\tdisplay: block;\n\t\t\t\twidth: 100%;\n\t\t\t\theight: 96px;\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tpadding: 0 0 8px 0;\n\t\t\t\tborder: 0;\n\t\t\t\tbackground: #fde68a;\n\t\t\t\tcolor: #78350f;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 16px;\n\t\t\t\ttext-align: right;\n\t\t\t\tvertical-align: bottom;\n\t\t\t}",
+	"states": []
+}
