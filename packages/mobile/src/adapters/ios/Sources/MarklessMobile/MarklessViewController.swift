@@ -151,6 +151,12 @@ public final class MarklessViewController: UIViewController {
 	/// Fills the device cells from the device, then builds the views and starts the page's async device calls.
 	private func buildPage() throws {
 		runtime.measure = { [weak self] id in self?.measureBox(id) }
+		runtime.media = { [weak self] in
+			[
+				("prefers-reduced-motion", UIAccessibility.isReduceMotionEnabled ? "reduce" : "no-preference"),
+				("prefers-color-scheme", self?.traitCollection.userInterfaceStyle == .dark ? "dark" : "light"),
+			]
+		}
 		#if !canImport(DragonPlan)
 		if let style, !style.slots.isEmpty {
 			throw HostError("style values that follow state need Dragon's layout plan, which this host does not link")

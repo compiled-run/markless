@@ -166,6 +166,14 @@ class MarklessHost(
 		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
 		onScriptEntry = AppScriptEngine::entryRan
 		measure = this@MarklessHost::measureBox
+		// "Remove animations" sets the animator duration scale to 0, as Chrome on Android reads prefers-reduced-motion.
+		media = {
+			val scale = android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+			listOf(
+				"prefers-reduced-motion" to if (scale == 0f) "reduce" else "no-preference",
+				"prefers-color-scheme" to if (isDark(context.resources.configuration)) "dark" else "light",
+			)
+		}
 	}
 	/** Each style slot's current value, from the runtime at mount and then its `slot` entries. */
 	private val slotValues = HashMap(runtime.slots().toMap()).also { values ->
