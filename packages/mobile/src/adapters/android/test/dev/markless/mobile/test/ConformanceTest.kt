@@ -41,6 +41,7 @@ import dev.markless.mobile.style.paddingBox
 import dev.markless.mobile.style.BandAtom
 import dev.markless.mobile.style.BandComparison
 import dev.markless.mobile.style.Bands
+import dev.markless.mobile.style.OutlinePaint
 import dev.markless.mobile.style.Rgba
 import dev.markless.mobile.style.Shadow
 import dev.markless.mobile.style.ShadowPaint
@@ -410,6 +411,70 @@ private fun dashedBorders(fixtures: File) {
 	}
 	val err = try { StyleExport.decode(text.replace("\"op\": \"dot\"", "\"op\": \"arc\"").toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
 	check("style export refuses an unknown border operation", err?.contains("unknown border operation \"arc\"") == true) { "error was: $err" }
+}
+
+// The u134 rung's export (proofs/u134-outline): a rounded solid ring with an offset, a double, a dashed and a groove ring, and an
+// outline on the middle of three cells in a row.
+private fun outlines(fixtures: File) {
+	val text = File(fixtures, "u134-outline.native-style.json").readText()
+	fun editing(id: String, change: (LinkedHashMap<String, Json>) -> Unit): String {
+		val root = Json.parse(text) as Json.Obj
+		val android = ((root.fields.getValue("targets") as Json.Obj).fields.getValue("android") as Json.Obj).fields
+		for (a in (android.getValue("assignments") as Json.Arr).items) for (n in ((a as Json.Obj).fields.getValue("nodes") as Json.Arr).items) {
+			val node = (n as Json.Obj).fields
+			if (node["id"] == Json.Str(id)) change(node)
+		}
+		return root.text()
+	}
+	fun adding(write: String, id: String) = editing(id) { node -> node["writes"] = Json.Arr((node.getValue("writes") as Json.Arr).items + Json.parse(write)) }
+	fun outlineWrite(id: String, change: (LinkedHashMap<String, Json>) -> Unit) = editing(id) { node ->
+		for (w in (node.getValue("writes") as Json.Arr).items) (w as Json.Obj).fields.takeIf { it["kind"] == Json.Str("outline") }?.let(change)
+	}
+	fun refusal(changed: String): String? {
+		val e = try { StyleExport.decode(changed.toByteArray()) } catch (x: MarklessDecodeError) { return x.message }
+		return try {
+			for (a in e.assignments) for (n in a.nodes) OutlinePaint.of(n, a, { it != "html" && it != "body" }, OutlinePaint.postOrder(a.nodes), e.dpr)
+			null
+		} catch (x: MarklessDecodeError) { x.message }
+	}
+	val export = runCatching { StyleExport.decode(text.toByteArray()) }
+	check("decodes the u134 export's outline writes", export.isSuccess) { export.exceptionOrNull().toString() }
+	export.getOrNull()?.let { e ->
+		val narrow = e.assignments[0]
+		val isView = { id: String -> id != "html" && id != "body" }
+		fun outline(a: dev.markless.mobile.style.Assignment, id: String) = OutlinePaint.of(a.byId.getValue(id), a, isView, OutlinePaint.postOrder(a.nodes), e.dpr)
+		val ring = outline(narrow, "h2")
+		check("a rounded outline keeps its computed values", ring?.style == "solid" && ring.width == 3.0 && ring.offset == 4.0 && ring.color == Rgba(230, 57, 70, 255)) { "$ring" }
+		// 222.03125 device px from the page, 953 by 125: the snapped border box.
+		check("the outlined box is snapped in page device px", ring?.edges == listOf(63.0, 222.0, 1016.0, 347.0)) { "$ring" }
+		check("a rounded outline has its radii and borders", ring?.radii == List(8) { false to 14.0 } && ring.borders.all { it > 0.0 }) { "$ring" }
+		check("html's outline is drawn in the page's top view", ring?.host == "h0" && ring.hostX == 0.0 && ring.hostY == 0.0) { "$ring" }
+		val groove = outline(narrow, "h5")
+		check("a groove outline has its lighter and darker tones", groove?.tones == listOf(Rgba(141, 153, 174, 255), Rgba(141, 153, 174, 255), Rgba(73, 79, 90, 255))) { "$groove" }
+		check("a double outline is square and one colour", outline(narrow, "h3")?.let { it.style == "double" && it.radii.all { r -> r.second == 0.0 } && it.tones.distinct().size == 1 } == true) { "" }
+		check("a box without an outline has none", outline(narrow, "h7") == null) { "" }
+		val marked = outline(narrow, "h8")
+		check("an outline in a row is drawn in the page's top view", marked?.host == "h0" && marked.edges == listOf(381.0, 860.0, 698.0, 972.0)) { "$marked" }
+		val orders = listOf("h2", "h3", "h4", "h5", "h8").map { outline(narrow, it)?.order ?: -1 }
+		check("outlines are ordered as the boxes are in the tree", orders == orders.sorted() && orders.distinct().size == 5 && orders.all { it >= 0 }) { "$orders" }
+		val wide = outline(e.assignments[1], "h2")
+		check("the outline follows its write into another assignment", wide?.width == 6.0 && wide.offset == 8.0) { "$wide" }
+	}
+	val solid = """{ "kind": "outline", "style": "solid", "width": 2, "offset": 0, "color": { "r": 0, "g": 0, "b": 0, "alpha": 255 }, "tones": null, "radii": null, "layer": "html", "key": "dragonOutline.rings" }"""
+	val withRow = StyleExport.decode(adding(solid, "h6").toByteArray()).assignments[0]
+	val rowOrder = OutlinePaint.of(withRow.byId.getValue("h6"), withRow, { it != "html" && it != "body" }, OutlinePaint.postOrder(withRow.nodes), 2.625)?.order
+	val cellOrder = OutlinePaint.of(withRow.byId.getValue("h8"), withRow, { it != "html" && it != "body" }, OutlinePaint.postOrder(withRow.nodes), 2.625)?.order
+	check("a box's own outline is drawn after its descendants' outlines", rowOrder != null && cellOrder != null && cellOrder < rowOrder) { "$cellOrder $rowOrder" }
+	fun refuses(name: String, changed: String, fragment: String) {
+		val err = refusal(changed)
+		check("outline refuses $name", err?.contains(fragment) == true) { "error was: $err" }
+	}
+	refuses("a later layer box placed outside its view", adding("""{ "kind": "paint-order", "host": "html", "bucket": 1, "rank": 0, "index": 0, "key": "dragonStacking.order" }""", "h0"), "which html paints over outlines, is placed in the page")
+	refuses("an outline inside a clip", adding("""{ "kind": "padding-box-clip", "key": "dragonClip.frame" }""", "h6"), "past h6, which clips or scrolls")
+	refuses("another key", outlineWrite("h2") { it["key"] = Json.Str("dragonOutline.frame") }, "an outline write's key is dragonOutline.rings")
+	refuses("auto", outlineWrite("h2") { it["style"] = Json.Str("auto") }, "outline style auto has no native paint")
+	refuses("a groove outline without tones", outlineWrite("h5") { it["tones"] = Json.Null }, "a groove outline needs lighter and darker colours")
+	refuses("a zero width", outlineWrite("h3") { it["width"] = Json.Num(0.0) }, "outline width 0.0 or offset 0.0 is out of range")
 }
 
 // The u122 rung's export (proofs/u122-box-shadow): an outer, an inset and a rounded spread shadow.
@@ -970,6 +1035,7 @@ fun main(args: Array<String>) {
 	appStyle(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	appCanvas(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	dashedBorders(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	outlines(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	boxShadows(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	paddingBoxes()
 	textLines(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))

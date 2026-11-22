@@ -502,6 +502,14 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h2' }],
 	},
 	{
+		name: 'svg-gradients',
+		fixture: 'proofs/u128-svg-gradients/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h20' },
+			{ event: 'activate', host: 'h20' },
+		],
+	},
+	{
 		name: 'types',
 		fixture: 'test/fixtures/Types.tsrx',
 		actions: [
@@ -1772,6 +1780,12 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h6' },
 			{ event: 'activate', host: 'h7' },
 		],
+	},
+	{
+		name: 'center',
+		fixture: 'proofs/r171-center/App.tsrx',
+		modules: true,
+		actions: [{ event: 'activate', host: 'h4' }],
 	},
 	{
 		name: 'details',

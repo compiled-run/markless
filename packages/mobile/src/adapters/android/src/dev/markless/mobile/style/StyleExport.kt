@@ -63,7 +63,15 @@ sealed interface StyleWrite {
 	data class Visibility(val value: String) : StyleWrite
 	/** A select whose appearance devolves to menulist-button: its drop-down arrow is stroked in [color], along [StyledNode.selectArrow]. */
 	data class SelectArrow(val color: Rgba) : StyleWrite
+	/**
+	 * `outline`: [style], [width] and [offset] in CSS px, [color], a 3D style's lighter and darker [tones], the box's corner radius
+	 * lengths (percent, value; null: square) and the node whose paint layer paints it, after that layer's flow content.
+	 */
+	data class Outline(val style: String, val width: Double, val offset: Double, val color: Rgba, val tones: Pair<Rgba, Rgba>?, val radii: List<Pair<Boolean, Double>>?, val layer: String) : StyleWrite
 }
+
+/** The outline styles Dragon draws natively: solid and double rings, the others with Blink's side painter. */
+val OUTLINE_STYLES = listOf("solid", "double", "dotted", "dashed", "groove", "ridge", "inset", "outset")
 
 /**
  * A select's drop-down arrow as Dragon's plan layout gives it: an open path of [points] (x, y pairs, the first moved to), stroked
@@ -869,6 +877,26 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					StyleWrite.Visibility(value)
 				}
 				"select-arrow" -> StyleWrite.SelectArrow(color(o.field("color", what), "$what.color"))
+				"outline" -> {
+					if (o.field("key", what) != Json.Str("dragonOutline.rings")) throw MarklessDecodeError("$what: an outline write's key is dragonOutline.rings")
+					val style = o.field("style", what).str("$what.style")
+					if (style !in OUTLINE_STYLES) throw MarklessDecodeError("$what: outline style $style has no native paint")
+					val width = o.field("width", what).num("$what.width")
+					val offset = o.field("offset", what).num("$what.offset")
+					if (!(width > 0.0) || width.isInfinite() || !offset.isFinite()) throw MarklessDecodeError("$what: outline width $width or offset $offset is out of range")
+					val threeD = style in listOf("groove", "ridge", "inset", "outset")
+					val tones = o.field("tones", what).takeIf { it != Json.Null }?.arr("$what.tones")?.let { pair ->
+						if (pair.size != 2) throw MarklessDecodeError("$what.tones: expected a lighter and a darker colour")
+						color(pair[0], "$what.tones[0]") to color(pair[1], "$what.tones[1]")
+					}
+					if ((tones != null) != threeD) throw MarklessDecodeError("$what: a $style outline ${if (threeD) "needs" else "has no"} lighter and darker colours")
+					val radii = o.field("radii", what).takeIf { it != Json.Null }?.arr("$what.radii")?.map {
+						val l = it.obj("$what.radii[]")
+						val percent = l.field("percent", what) as? Json.Bool ?: throw MarklessDecodeError("$what.radii[].percent must be a boolean")
+						percent.value to l.field("value", what).num("$what.radii[].value")
+					}?.also { if (it.size != 8) throw MarklessDecodeError("$what: an outline's radii are 8 lengths, not ${it.size}") }
+					StyleWrite.Outline(style, width, offset, color(o.field("color", what), "$what.color"), tones, radii, o.field("layer", what).str("$what.layer"))
+				}
 				else -> throw MarklessDecodeError("$what has unknown style write kind \"$kind\"")
 			}
 		}
