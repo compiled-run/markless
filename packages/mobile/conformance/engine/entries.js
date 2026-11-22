@@ -205,6 +205,7 @@ var begin = function (entry) {
 	host.seed = entry.seed || null;
 	host.focused = entry.focused || null;
 	host.media = entry.media || null;
+	host.screen = entry.screen || null;
 	for (var known in entry.focusElements || {}) if (!elementFacts[known]) elementFacts[known] = entry.focusElements[known];
 	host.focus = function () { return elementOf(host.focused || BODY); };
 	host.counter = 0;

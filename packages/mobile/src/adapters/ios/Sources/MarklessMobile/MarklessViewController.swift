@@ -154,6 +154,8 @@ public final class MarklessViewController: UIViewController {
 	/// Fills the device cells from the device, then builds the views and starts the page's async device calls.
 	private func buildPage() throws {
 		runtime.measure = { [weak self] id in self?.measureBox(id) }
+		// Safari reports the screen's scale as devicePixelRatio.
+		runtime.devicePixelRatio = { [weak self] in Double(self?.traitCollection.displayScale ?? 1) }
 		runtime.media = { [weak self] in
 			[
 				("prefers-reduced-motion", UIAccessibility.isReduceMotionEnabled ? "reduce" : "no-preference"),
@@ -352,7 +354,8 @@ public final class MarklessViewController: UIViewController {
 		let started = CFAbsoluteTimeGetCurrent()
 		do {
 			let slots = try style.slots.map { slot in
-				guard let value = slotValues[slot.id] else { throw HostError("the style export lays out slot \(slot.id), which the payload does not compute") }
+				// A slot inside a row has a value per row copy, which the rows carry; the page lays its template out at the first value.
+				guard let value = slotValues[slot.id] ?? (isRowSlot(slot.id) ? slot.initial : nil) else { throw HostError("the style export lays out slot \(slot.id), which the payload does not compute") }
 				return value
 			}
 			let pageRows = Dictionary(payload.nodes.map { ($0.id, $0.row) }, uniquingKeysWith: { a, _ in a })
@@ -381,14 +384,18 @@ public final class MarklessViewController: UIViewController {
 	/// A `slot` entry's value, or a page text's change, lays the page out again at its current size, once the rest of the journal is applied.
 	private func followSlots(_ journal: [NativeJournalEntry]) {
 		var moved = false
+		var rowMoved = false
 		for case let .slot(slot, value) in journal {
 			slotValues[slot] = value
 			moved = true
+			if slot.contains("@") { rowMoved = true }
 		}
 		// A page text that changes may change its box: the layout compares the texts it last laid out with.
 		for case let .text(node, _) in journal where !node.contains("@") { moved = true }
-		if moved, isViewLoaded { layOutAtScreenSize() }
+		if moved, isViewLoaded { layOutAtScreenSize(rowsMoved: rowMoved) }
 	}
+
+	private func isRowSlot(_ id: String) -> Bool { payload.slots.contains { $0.id == id && $0.row != nil } }
 
 	/// With the launch argument `-markless-layout-dump`, every shown box in points from the page's top left, written to
 	/// Documents/markless-layout.json after each layout and each journal, for a check against the phone's browser.

@@ -36,9 +36,15 @@ export function stylesShapeText(assets: ReadonlyMap<string, Uint8Array>): boolea
 	const bytes = assets.get(PROOF_STYLE_PATH);
 	if (!bytes) return false;
 	const style = JSON.parse(new TextDecoder().decode(bytes)) as {
-		readonly targets?: { readonly android?: { readonly routes?: ReadonlyArray<{ readonly planRepeats?: ReadonlyArray<unknown> }> } };
+		readonly targets?: {
+			readonly android?: {
+				readonly planRepeats?: ReadonlyArray<unknown>;
+				readonly routes?: ReadonlyArray<{ readonly planRepeats?: ReadonlyArray<unknown> }>;
+			};
+		};
 	};
-	if ((style.targets?.android?.routes ?? []).some((route) => (route.planRepeats ?? []).length > 0)) return true;
+	const android = style.targets?.android;
+	if ([android, ...(android?.routes ?? [])].some((page) => (page?.planRepeats ?? []).length > 0)) return true;
 	const payload = assets.get(PROOF_PAYLOAD_PATH);
 	if (!payload) return false;
 	const read = JSON.parse(new TextDecoder().decode(payload)) as NativeViewPayload | NativeAppPayload;

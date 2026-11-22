@@ -612,7 +612,11 @@ export function nativeStyleInput(
 			? {
 					slots: slots.map((slot) => ({
 						id: slot.id,
-						initial: slotAtMount.get(slot.id)!,
+						// A row's slot is laid out at its first row's value, as the template row is; with no row at mount, at 0.
+						initial:
+							slotAtMount.get(slot.id) ??
+							[...slotAtMount].find(([id]) => id.startsWith(`${slot.id}@`))?.[1] ??
+							0,
 						...(slot.integer ? { integer: true as const } : {}),
 					})),
 				}
