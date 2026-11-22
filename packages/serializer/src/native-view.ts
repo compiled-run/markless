@@ -486,6 +486,8 @@ export type NativeShape = {
 	 * drawn only where every one of them covers, as the browser clips it.
 	 */
 	readonly clip?: ReadonlyArray<ReadonlyArray<number>>;
+	/** The rule that fills each `clip` outline, present only when one is `evenodd` (a luminance mask with black shapes cut out). */
+	readonly clipRule?: ReadonlyArray<'nonzero' | 'evenodd'>;
 	/**
 	 * An SVG `filter` that blurs the shape alone (`feGaussianBlur` of its source graphic, in sRGB): the blur's standard
 	 * deviation in the drawing's units, and the filter region the blurred shape is drawn inside (verb-coded, in the drawing's

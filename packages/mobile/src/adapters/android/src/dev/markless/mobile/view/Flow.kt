@@ -163,7 +163,7 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double, 
 	/** What `currentColor` paints: the svg's text colour from a style export, else black. */
 	var currentColor: Int = Color.BLACK
 		set(value) { field = value; invalidate() }
-	private val clips = drawing.shapes.map { shape -> shape.clip.map { pathOf(it) } }
+	private val clips = drawing.shapes.map { shape -> shape.clip.mapIndexed { i, clip -> pathOf(clip).apply { if (shape.clipEvenOdd.getOrElse(i) { false }) fillType = Path.FillType.EVEN_ODD } } }
 	private fun pathOf(shape: Shape, v: List<Double>) = pathOf(v).apply {
 		fillType = if (shape.evenOdd) Path.FillType.EVEN_ODD else Path.FillType.WINDING
 	}

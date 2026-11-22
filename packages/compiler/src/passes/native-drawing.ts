@@ -55,8 +55,8 @@ type Inherited = {
 	/** In user units, or in ems of the font size. */
 	readonly letterSpacing: { readonly value: number; readonly em: boolean };
 	readonly preserve: boolean;
-	/** The clip outlines of it and its groups, in the drawing's units. */
-	readonly clips: ReadonlyArray<ReadonlyArray<number>>;
+	/** The clip outlines of it and its groups, in the drawing's units, each with the rule that fills it. */
+	readonly clips: ReadonlyArray<Clip>;
 	/** The `filter` blur over it: its deviation and region in the drawing's units, the clips that apply after it, and how many shapes it holds. */
 	readonly blur?: {
 		readonly element: string;
@@ -72,6 +72,14 @@ type Inherited = {
 		readonly end?: DrawingElement;
 	};
 };
+type Clip = { readonly outline: ReadonlyArray<number>; readonly rule: 'nonzero' | 'evenodd' };
+const clipFields = (clips: ReadonlyArray<Clip>) =>
+	clips.length === 0
+		? {}
+		: {
+				clip: clips.map((clip) => clip.outline),
+				...(clips.some((clip) => clip.rule === 'evenodd') ? { clipRule: clips.map((clip) => clip.rule) } : {}),
+			};
 const INITIAL: Inherited = {
 	fill: { r: 0, g: 0, b: 0, alpha: 255 },
 	stroke: null,
@@ -445,7 +453,7 @@ export function compileDrawing(
 				refuse(style.blur.element, `a \`filter\` over more than one shape: a native drawing blurs one shape at a time`);
 		}
 		shapes.push({
-			...(style.clips.length > 0 ? { clip: style.clips } : {}),
+			...clipFields(style.clips),
 			...(style.blur ? { blur: { deviation: style.blur.deviation, region: style.blur.region } } : {}),
 			path: outline,
 			fill: alpha(style.fill, style.fillOpacity * style.opacity),
@@ -606,7 +614,7 @@ export function compileDrawing(
 		if (style.blur) refuse(style.blur.element, `a \`filter\` over text, which a native drawing does not blur yet`);
 		spoken.push(shown.map((run) => run.text).join('').trim());
 		shapes.push({
-			...(style.clips.length > 0 ? { clip: style.clips } : {}),
+			...clipFields(style.clips),
 			path: [],
 			fill: paintOf(style),
 			fillRule: 'nonzero',
@@ -658,7 +666,7 @@ export function compileDrawing(
 				refuse(child.id, `\`clip-path\` on a shape inside <clipPath>`);
 			outline.push(...mapOutline(outlineOf(child), multiply(base, transformOf(child))));
 		}
-		return { ...style, clips: [...style.clips, outline] };
+		return { ...style, clips: [...style.clips, { outline, rule: 'nonzero' }] };
 	};
 
 	/**
@@ -700,6 +708,7 @@ export function compileDrawing(
 		const base = multiply(own, transformOf(target));
 		const region = mapOutline([0, x, y, 1, x + width, y, 1, x + width, y + height, 1, x, y + height, 4], base);
 		const outline: number[] = [];
+		const cuts: Clip[] = [];
 		const maskStyle = inherit(target, INITIAL);
 		for (const child of childrenOf(target.path)) {
 			if (!SHAPES.has(child.tag)) {
@@ -714,6 +723,19 @@ export function compileDrawing(
 			if (fill === null) continue;
 			const opaque = fill.alpha === 255 && shape.fillOpacity === 1 && shape.opacity === 1;
 			const white = fill.r === 255 && fill.g === 255 && fill.b === 255;
+			const black = fill.r === 0 && fill.g === 0 && fill.b === 0;
+			const mapped = () => mapOutline(outlineOf(child), multiply(base, transformOf(child)));
+			// Black painted over white in a luminance mask hides what it covers: the region with that shape cut out, filled even-odd.
+			if (type === 'luminance' && opaque && black && shape.stroke === null) {
+				if (shape.fillRule !== 'evenodd' && !['rect', 'circle', 'ellipse'].includes(child.tag) && !simpleOutline(outlineOf(child)))
+					refuse(child.id, `a black <${child.tag}> filled nonzero that crosses itself or has several parts, inside a luminance <mask>: only an even-odd fill or one simple outline cuts a mask natively yet`);
+				else cuts.push({ outline: [...region, ...mapped()], rule: 'evenodd' });
+				continue;
+			}
+			if (cuts.length > 0 && white) {
+				refuse(child.id, `a white <${child.tag}> after a black shape inside a luminance <mask>, which would show through the cut again`);
+				continue;
+			}
 			if (!opaque || (type === 'luminance' && !white) || shape.stroke !== null || shape.fillRule !== 'nonzero') {
 				refuse(
 					child.id,
@@ -721,9 +743,12 @@ export function compileDrawing(
 				);
 				continue;
 			}
-			outline.push(...mapOutline(outlineOf(child), multiply(base, transformOf(child))));
+			outline.push(...mapped());
 		}
-		return { ...style, clips: [...style.clips, region, outline] };
+		return {
+			...style,
+			clips: [...style.clips, { outline: region, rule: 'nonzero' }, { outline, rule: 'nonzero' }, ...cuts],
+		};
 	};
 
 	/**
@@ -774,7 +799,7 @@ export function compileDrawing(
 			const content = multiply(viewport, fit);
 			const markerStyle: Inherited = {
 				...inherit(marker, rootStyle),
-				clips: [...style.clips, mapOutline([0, 0, 0, 1, width, 0, 1, width, height, 1, 0, height, 4], viewport)],
+				clips: [...style.clips, { outline: mapOutline([0, 0, 0, 1, width, 0, 1, width, height, 1, 0, height, 4], viewport), rule: 'nonzero' }],
 			};
 			const inner = new Set([...using, marker.id]);
 			for (const child of childrenOf(marker.path)) visit(child, markerStyle, content, inner);
@@ -1050,6 +1075,60 @@ function parseAngle(raw: string): number | null {
 	const unit = raw.slice(match[0].length);
 	const scale: Readonly<Record<string, number>> = { '': 1, deg: 1, rad: 180 / Math.PI, grad: 0.9, turn: 360 };
 	return scale[unit] === undefined ? null : value * scale[unit]!;
+}
+
+/**
+ * Whether a verb-coded outline is one closed subpath that never crosses itself (its cubics flattened), so that its nonzero
+ * fill is its even-odd fill.
+ */
+function simpleOutline(outline: ReadonlyArray<number>): boolean {
+	const points: Array<[number, number]> = [];
+	let i = 0;
+	while (i < outline.length) {
+		const verb = outline[i++]!;
+		if (verb === 0) {
+			if (points.length > 0) return false;
+			points.push([outline[i]!, outline[i + 1]!]);
+			i += 2;
+		} else if (verb === 1) {
+			points.push([outline[i]!, outline[i + 1]!]);
+			i += 2;
+		} else if (verb === 3) {
+			const [x0, y0] = points[points.length - 1]!;
+			const [x1, y1, x2, y2, x3, y3] = outline.slice(i, i + 6) as [number, number, number, number, number, number];
+			for (let step = 1; step <= 16; step++) {
+				const t = step / 16;
+				const u = 1 - t;
+				points.push([
+					u * u * u * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3,
+					u * u * u * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3,
+				]);
+			}
+			i += 6;
+		} else if (verb === 4) {
+			if (i !== outline.length) return false;
+		} else return false;
+	}
+	const [first] = points;
+	const last = points[points.length - 1];
+	if (first && last && (first[0] !== last[0] || first[1] !== last[1])) points.push(first);
+	const n = points.length - 1;
+	if (n < 3) return false;
+	const cross = (a: [number, number], b: [number, number], c: [number, number]) =>
+		(b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+	const meet = (a: [number, number], b: [number, number], c: [number, number], d: [number, number]) => {
+		const [d1, d2, d3, d4] = [cross(c, d, a), cross(c, d, b), cross(a, b, c), cross(a, b, d)];
+		if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+		const on = (p: [number, number], q: [number, number], r: [number, number], side: number) =>
+			side === 0 && Math.min(p[0], q[0]) <= r[0] && r[0] <= Math.max(p[0], q[0]) && Math.min(p[1], q[1]) <= r[1] && r[1] <= Math.max(p[1], q[1]);
+		return on(c, d, a, d1) || on(c, d, b, d2) || on(a, b, c, d3) || on(a, b, d, d4);
+	};
+	for (let a = 0; a < n; a++)
+		for (let b = a + 2; b < n; b++) {
+			if (a === 0 && b === n - 1) continue;
+			if (meet(points[a]!, points[a + 1]!, points[b]!, points[b + 1]!)) return false;
+		}
+	return true;
 }
 
 /** A verb-coded outline with every point mapped by `m`; an affine map keeps lines and cubics what they are. */

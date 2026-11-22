@@ -193,7 +193,7 @@ sealed interface ShapePaint {
 }
 
 /** One shape: verb-coded path (0 move, 1 line, 3 cubic, 4 close), its paint and stroke, and an optional affine map [a,b,c,d,e,f]. */
-data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val text: DrawingText? = null, val clip: List<List<Double>> = emptyList(), val blur: Blur? = null) {
+data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val text: DrawingText? = null, val clip: List<List<Double>> = emptyList(), val blur: Blur? = null, val clipEvenOdd: List<Boolean> = emptyList()) {
 	data class Blur(val deviation: Double, val region: List<Double>)
 }
 
@@ -953,7 +953,7 @@ data class Payload(
 
 		private fun shape(sv: Json, w: String): Shape {
 			val so = sv.obj(w)
-			so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "text", "clip", "blur"), w)
+			so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "text", "clip", "clipRule", "blur"), w)
 			val path = so.field("path", w).arr("$w.path").map { it.num("$w.path[]") }
 			val transform = so["transform"]?.arr("$w.transform")?.map { it.num("$w.transform[]") }
 			if (transform != null && transform.size != 6) throw MarklessDecodeError("$w.transform must hold six numbers")
@@ -987,7 +987,10 @@ data class Payload(
 					bo.only(setOf("deviation", "region"), "$w.blur")
 					Shape.Blur(bo.field("deviation", "$w.blur").num("$w.blur.deviation"), bo.field("region", "$w.blur").arr("$w.blur.region").map { it.num("$w.blur.region[]") })
 				},
-			)
+				so["clipRule"]?.arr("$w.clipRule")?.map {
+					when (val rule = it.str("$w.clipRule[]")) { "evenodd" -> true; "nonzero" -> false; else -> throw MarklessDecodeError("$w has unknown clipRule \"$rule\"") }
+				} ?: emptyList(),
+			).also { if (it.clipEvenOdd.isNotEmpty() && it.clipEvenOdd.size != it.clip.size) throw MarklessDecodeError("$w.clipRule must hold a rule for each clip") }
 		}
 
 		private fun node(v: Json, what: String): Node {

@@ -139,9 +139,9 @@ final class DrawingView: UIView {
 		for (shape, p) in drawing.shapes.map({ ($0, $0.path) }) + live.map({ ($0.shape, $0.path) }) {
 			let path = Self.path(p)
 			context.saveGState()
-			for clip in shape.clip {
+			for (index, clip) in shape.clip.enumerated() {
 				context.addPath(Self.path(clip))
-				context.clip(using: .winding)
+				context.clip(using: shape.clipEvenOdd.indices.contains(index) && shape.clipEvenOdd[index] ? .evenOdd : .winding)
 			}
 			// A blur draws the shape far off to the side and only its shadow, offset back, inside the filter region.
 			var shadow: ((UIColor) -> UIColor)? = nil

@@ -4354,6 +4354,32 @@ export function Chart() @{
 		).toContain('<mask> without `x`, `y`, `width` and `height`: its default region depends on the box of what it masks');
 	});
 
+	it('cuts the black shapes over a white region out of a luminance <mask> as even-odd clips; refuses a crossing nonzero cut', async () => {
+		const shapesOf = async (cut: string) => {
+			const { payload, diagnostics } = await nativeView(`export function Card() @{
+	<svg viewBox="0 0 10 10"><defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="10" height="10" fill="black"><rect fill="white" width="10" height="10" />${cut}</mask></defs><rect width="10" height="10" mask="url(#m)" /></svg>
+}`);
+			const svg = payload?.nodes.find((node) => node.kind === 'element' && node.drawing);
+			return {
+				shape: svg?.kind === 'element' ? svg.drawing?.shapes[0] : undefined,
+				messages: diagnostics.map((d) => d.message),
+			};
+		};
+		const region = [0, 0, 0, 1, 10, 0, 1, 10, 10, 1, 0, 10, 4];
+		const simple = await shapesOf('<path d="M2 2L8 2L8 8Z" />');
+		expect(simple.messages).toEqual([]);
+		expect(simple.shape?.clip).toEqual([region, region, [...region, 0, 2, 2, 1, 8, 2, 1, 8, 8, 4]]);
+		expect(simple.shape?.clipRule).toEqual(['nonzero', 'nonzero', 'evenodd']);
+		expect((await shapesOf('<path fill-rule="evenodd" d="M2 2L8 8L8 2L2 8Z" />')).messages).toEqual([]);
+		expect((await shapesOf('<path d="M2 2L8 8L8 2L2 8Z" />')).messages).toContain(
+			'a black <path> filled nonzero that crosses itself or has several parts, inside a luminance <mask>: only an even-odd fill or one simple outline cuts a mask natively yet',
+		);
+		expect((await shapesOf('<path d="M1 1H3V3ZM5 5H7V7Z" />')).messages).toHaveLength(1);
+		expect((await shapesOf('<rect x="2" y="2" width="2" height="2" /><rect fill="white" width="5" height="5" />')).messages).toContain(
+			'a white <rect> after a black shape inside a luminance <mask>, which would show through the cut again',
+		);
+	});
+
 	it('blurs the one shape under a <filter> of one feGaussianBlur inside its region, after a flood and blend; refuses other filters', async () => {
 		const shapesOf = async (filter: string, inside = '<rect width="4" height="4" />') => {
 			const { payload, diagnostics } = await nativeView(`export function Glow() @{
