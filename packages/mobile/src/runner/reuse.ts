@@ -25,7 +25,8 @@ const hostFolders = (platform: ProofPlatform) => [
 /** Build output the host leaves beside its sources: never an input. */
 const SKIPPED = new Set(['.build', 'build', 'out', 'screenshots', '.swiftpm', 'node_modules']);
 
-function hashFolder(hash: Hash, root: string): void {
+/** Every file under `root` but build output and the folders in `except` (absolute paths), path and bytes, in name order. */
+export function hashFolder(hash: Hash, root: string, except: ReadonlySet<string> = new Set()): void {
 	if (!existsSync(root)) return;
 	const walk = (dir: string) => {
 		for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
@@ -33,6 +34,7 @@ function hashFolder(hash: Hash, root: string): void {
 		)) {
 			if (SKIPPED.has(entry.name)) continue;
 			const path = join(dir, entry.name);
+			if (except.has(path)) continue;
 			if (entry.isDirectory()) walk(path);
 			else if (entry.isFile()) {
 				hash.update(`${relative(root, path)}\0`);
