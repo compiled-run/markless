@@ -205,6 +205,8 @@ public struct NativeDefaultStyle: Equatable, Sendable {
 	public var rule = false
 	/// `disc` or `decimal`, on a list.
 	public var marker: String?
+	/// On a summary: a ▸ (collapsed) or ▾ (expanded) before its content, by its `aria-expanded`.
+	public var disclosure = false
 	/// `table`, `row` or `cell`.
 	public var table: String?
 	public init() {}
@@ -231,6 +233,14 @@ public struct NativeShape: Equatable, Sendable {
 	public var text: NativeDrawingText?
 	/// Clip outlines in the drawing's units (nonzero); the shape shows only where all of them cover.
 	public var clip: [[Double]] = []
+	/// Whether each `clip` outline is filled even-odd (a luminance mask's black shapes cut out) rather than nonzero.
+	public var clipEvenOdd: [Bool] = []
+	/// An SVG `feGaussianBlur` of the shape alone: its standard deviation and the filter region (verb-coded), in the drawing's units.
+	public var blur: Blur?
+	public struct Blur: Equatable, Sendable {
+		public let deviation: Double
+		public let region: [Double]
+	}
 }
 
 /// An SVG `<text>`: runs laid out from the pen, each chunk placed by `anchor`, glyphs on `baseline` relative to the pen.
@@ -1175,7 +1185,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 	private static func decodeDefaultStyle(_ reader: Reader) throws -> NativeDefaultStyle {
 		let field = try reader.object(required: [], optional: [
 			"flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "rule",
-			"marker", "table",
+			"marker", "disclosure", "table",
 		])
 		func oneOf(_ key: String, _ allowed: [String]) throws -> String? {
 			guard field.has(key) else { return nil }
@@ -1198,6 +1208,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		style.indent = field.has("indent") ? try field["indent"].number() : nil
 		style.rule = try flag("rule")
 		style.marker = try oneOf("marker", ["disc", "decimal"])
+		style.disclosure = try flag("disclosure")
 		style.table = try oneOf("table", ["table", "row", "cell"])
 		return style
 	}
@@ -1224,7 +1235,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let color = try reader.object(["r", "g", "b", "alpha"])
 			return .color(RGBA(r: try color["r"].number(), g: try color["g"].number(), b: try color["b"].number(), alpha: try color["alpha"].number()))
 		}
-		let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "text", "clip"])
+		let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "text", "clip", "clipRule", "blur"])
 		let transform = s.has("transform") ? try s["transform"].array().map { try $0.number() } : nil
 		if let transform, transform.count != 6 { throw shape.fail("a transform has six numbers") }
 		let rule = try s["fillRule"].string()
@@ -1234,6 +1245,18 @@ public struct NativeViewPayload: Equatable, Sendable {
 			stroke: try paint(try s["stroke"]), width: try s["width"].number(), cap: try s["cap"].string(), join: try s["join"].string(),
 			miterLimit: try s["miterLimit"].number(), transform: transform)
 		if s.has("clip") { decoded.clip = try s["clip"].array().map { try $0.array().map { try $0.number() } } }
+		if s.has("clipRule") {
+			decoded.clipEvenOdd = try s["clipRule"].array().map { rule in
+				let name = try rule.string()
+				guard name == "nonzero" || name == "evenodd" else { throw shape.fail("unknown clipRule \(name)") }
+				return name == "evenodd"
+			}
+			guard decoded.clipEvenOdd.count == decoded.clip.count else { throw shape.fail("a clipRule for each clip") }
+		}
+		if s.has("blur") {
+			let b = try s["blur"].object(["deviation", "region"])
+			decoded.blur = NativeShape.Blur(deviation: try b["deviation"].number(), region: try b["region"].array().map { try $0.number() })
+		}
 		if s.has("text") {
 			let t = try s["text"].object(["anchor", "baseline", "runs"])
 			let anchor = try t["anchor"].string()
@@ -1741,5 +1764,18 @@ func decodeKeyParts(_ reader: Reader) throws -> [NativeKeyPart] {
 	try reader.array().map { part in
 		if case .string = part.value { return .text(try part.string()) }
 		return .path(try part.array().map { try $0.string() })
+	}
+}
+
+extension NativeViewPayload {
+	/// Each node inside a `<select>`: its options and their text, which show only in the select's picker.
+	public var pickerContent: Set<String> {
+		var selects = Set<String>()
+		var inside = Set<String>()
+		for node in nodes {
+			if case .element("select", _, _) = node.kind { selects.insert(node.id) }
+			if let parent = node.parent, selects.contains(parent) || inside.contains(parent) { inside.insert(node.id) }
+		}
+		return inside
 	}
 }

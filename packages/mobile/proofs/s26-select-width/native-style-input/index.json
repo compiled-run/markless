@@ -1,0 +1,174 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Sizing",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "sizing mk-i73a21"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "label",
+			"parent": "h0",
+			"attributes": {
+				"class": "field mk-i73a21"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "span",
+			"parent": "h2",
+			"attributes": {
+				"class": "mk-i73a21"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Category"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "select",
+			"parent": "h2",
+			"attributes": {
+				"aria-label": "Tag",
+				"class": "mk-i73a21"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h5@0",
+			"element": "option",
+			"parent": "h4",
+			"attributes": {
+				"class": "mk-i73a21"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h5@1",
+			"element": "option",
+			"parent": "h4",
+			"attributes": {
+				"class": "mk-i73a21"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h5@2",
+			"element": "option",
+			"parent": "h4",
+			"attributes": {
+				"class": "mk-i73a21"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h5@3",
+			"element": "option",
+			"parent": "h4",
+			"attributes": {
+				"class": "mk-i73a21"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0@0",
+			"parent": "h5@0",
+			"text": "Work"
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0@1",
+			"parent": "h5@1",
+			"text": "Home"
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0@2",
+			"parent": "h5@2",
+			"text": "Ideas"
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0@3",
+			"parent": "h5@3",
+			"text": "Groceries"
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "select",
+			"parent": "h0",
+			"attributes": {
+				"class": "natural mk-i73a21",
+				"aria-label": "Size"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h7",
+			"element": "option",
+			"parent": "h6",
+			"attributes": {
+				"value": "s",
+				"class": "mk-i73a21"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h7:text0",
+			"parent": "h7",
+			"text": "Small"
+		},
+		{
+			"kind": "element",
+			"id": "h8",
+			"element": "option",
+			"parent": "h6",
+			"attributes": {
+				"value": "l",
+				"class": "mk-i73a21"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h8:text0",
+			"parent": "h8",
+			"text": "Extra large"
+		},
+		{
+			"kind": "element",
+			"id": "h9",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-i73a21"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h9:text0",
+			"parent": "h9",
+			"text": "Tagged Home"
+		}
+	],
+	"css": "@font-face {\n\tfont-family: 'Harbour Lato';\n\tsrc: url('./fonts/Lato-Regular.woff2') format('woff2');\n\tfont-weight: 400;\n}\n\nbody {\n\tmargin: 0;\n\tfont-family: 'Harbour Lato';\n\tcolor: #1d2a24;\n\tbackground: #f6f3ea;\n}\n\nselect {\n\tfont: inherit;\n\tcolor: inherit;\n}\n\n.sizing.mk-i73a21 {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\t.field.mk-i73a21 {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgap: 6px;\n\t\t\t}\n\t\t\t.field select.mk-i73a21 {\n\t\t\t\twidth: 100%;\n\t\t\t\tpadding: 12px 14px;\n\t\t\t\tborder: 1px solid #c9c2ad;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #fffdf7;\n\t\t\t}\n\t\t\t.natural.mk-i73a21 {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 6px 8px;\n\t\t\t\tborder: 1px solid #c9c2ad;\n\t\t\t\tbackground: #fffdf7;\n\t\t\t}",
+	"states": [],
+	"fonts": [
+		{
+			"url": "./fonts/Lato-Regular.woff2",
+			"file": "../styles/fonts/Lato-Regular.woff2"
+		}
+	]
+}

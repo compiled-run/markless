@@ -8,8 +8,8 @@ import WebKit
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"canvas", "details", "embed", "object",
-	"picture", "summary", "video",
+	"canvas", "embed", "object",
+	"picture", "video",
 ]
 
 /// Where an instance is built: its row (`@key`, empty outside lists), the names its expressions see, and what encloses it.
@@ -139,9 +139,24 @@ final class DrawingView: UIView {
 		for (shape, p) in drawing.shapes.map({ ($0, $0.path) }) + live.map({ ($0.shape, $0.path) }) {
 			let path = Self.path(p)
 			context.saveGState()
-			for clip in shape.clip {
+			for (index, clip) in shape.clip.enumerated() {
 				context.addPath(Self.path(clip))
+				context.clip(using: shape.clipEvenOdd.indices.contains(index) && shape.clipEvenOdd[index] ? .evenOdd : .winding)
+			}
+			// A blur draws the shape far off to the side and only its shadow, offset back, inside the filter region.
+			var shadow: ((UIColor) -> UIColor)? = nil
+			if let blur = shape.blur {
+				context.addPath(Self.path(blur.region))
 				context.clip(using: .winding)
+				let ctm = context.ctm, scale = contentScaleFactor, far: CGFloat = 100_000
+				let linear = CGAffineTransform(a: ctm.a, b: ctm.b, c: ctm.c, d: ctm.d, tx: 0, ty: 0)
+				let shift = CGPoint(x: far, y: 0).applying(linear.inverted())
+				let sigma = blur.deviation * sqrt(abs(ctm.a * ctm.d - ctm.b * ctm.c))
+				context.translateBy(x: shift.x, y: shift.y)
+				shadow = { paint in
+					context.setShadow(offset: CGSize(width: -far / scale, height: 0), blur: 2 * sigma / scale, color: paint.cgColor)
+					return .black
+				}
 			}
 			if let t = shape.transform { context.concatenate(CGAffineTransform(a: t[0], b: t[1], c: t[2], d: t[3], tx: t[4], ty: t[5])) }
 			if let text = shape.text {
@@ -151,12 +166,12 @@ final class DrawingView: UIView {
 			}
 			if let fill = shape.fill {
 				context.addPath(path)
-				context.setFillColor(color(fill).cgColor)
+				context.setFillColor((shadow?(color(fill)) ?? color(fill)).cgColor)
 				context.fillPath(using: shape.evenOdd ? .evenOdd : .winding)
 			}
 			if let stroke = shape.stroke, shape.width > 0 {
 				context.addPath(path)
-				context.setStrokeColor(color(stroke).cgColor)
+				context.setStrokeColor((shadow?(color(stroke)) ?? color(stroke)).cgColor)
 				context.setLineWidth(shape.width)
 				context.setLineCap(shape.cap == "round" ? .round : shape.cap == "square" ? .square : .butt)
 				context.setLineJoin(shape.join == "round" ? .round : shape.join == "bevel" ? .bevel : .miter)
@@ -350,6 +365,8 @@ final class ViewTree {
 	/// Lists and the marker kind their items show; each item's marker label.
 	private var listMarkers: [ObjectIdentifier: String] = [:]
 	private var itemMarkers: [ObjectIdentifier: UILabel] = [:]
+	/// Each summary's disclosure triangle, in its start inset.
+	private var disclosures: [ObjectIdentifier: UILabel] = [:]
 	/// Table structure: tables, their rows and the rows' cells.
 	private var tables = Set<ObjectIdentifier>()
 	private var tableRows = Set<ObjectIdentifier>()
@@ -1152,7 +1169,7 @@ final class ViewTree {
 						}
 					}
 					view = drawn
-				} else if element == "button" || element == "a" {
+				} else if element == "button" || element == "a" || element == "summary" {
 					if context.button != nil { throw HostError("<\(element)> \(id) is inside another control") }
 					let control = UIButton(type: .custom)
 					control.isAccessibilityElement = true
@@ -1227,7 +1244,7 @@ final class ViewTree {
 				} else if element == "input", ["checkbox", "radio"].contains(staticAttributes["type"]) {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					if !context.suffix.isEmpty { throw HostError("a checkbox in a list row (\(id)) has no iOS host support yet") }
-					let control = UIButton(type: .custom)
+					let control = CheckboxButton(type: .custom)
 					control.isAccessibilityElement = true
 					control.accessibilityTraits = staticAttributes["type"] == "checkbox" ? [.button, .toggleButton] : .button
 					ticks[id] = (staticAttributes["type"] == "radio", try runtime.isChecked(id))
@@ -1558,6 +1575,7 @@ final class ViewTree {
 			}
 			view.accessibilityValue = current["aria-expanded"].map { $0 == "true" ? "expanded" : "collapsed" }
 		}
+		disclosures[ObjectIdentifier(view)]?.text = current["aria-expanded"] == "true" ? "\u{25BE}" : "\u{25B8}"
 		view.accessibilityElementsHidden = current["aria-hidden"] == "true"
 		// With a style export Dragon decides visibility (a hidden element has no frame); the stacking layout reads `hidden`.
 		if layout == nil, !dialogIds.contains(id) {
@@ -1572,9 +1590,13 @@ final class ViewTree {
 
 	private func drawTick(_ id: String, _ view: UIView) {
 		guard let tick = ticks[id], let button = view as? UIButton else { return }
+		button.accessibilityValue = tick.checked ? "1" : "0"
+		if let box = button as? CheckboxButton {
+			box.show(checked: tick.checked)
+			if box.themed { return }
+		}
 		let symbol = tick.radio ? (tick.checked ? "largecircle.fill.circle" : "circle") : (tick.checked ? "checkmark.square.fill" : "square")
 		button.setImage(UIImage(systemName: symbol), for: .normal)
-		button.accessibilityValue = tick.checked ? "1" : "0"
 	}
 
 	/// Each select shows its chosen option's label, as the web's closed `<select>` does.
@@ -1600,7 +1622,7 @@ final class ViewTree {
 		// As the web names a button from its content: its text, and the label of an image or svg inside it.
 		func texts(_ view: UIView) -> [String] {
 			view.subviews.flatMap { child -> [String] in
-				if let label = child as? UILabel { return [label.text ?? ""] }
+				if let label = child as? UILabel { return decorations.contains(ObjectIdentifier(label)) ? [] : [label.text ?? ""] }
 				if child is DrawingView || child is UIImageView {
 					let own = child.accessibilityIdentifier.flatMap { attributes[$0] }
 					if own?["aria-hidden"] == "true" { return [] }
@@ -1740,6 +1762,7 @@ final class ViewTree {
 			])
 		}
 		if let marker = style.marker { listMarkers[id] = marker }
+		if style.disclosure { addDisclosure(to: view) }
 		switch style.table {
 		case "table":
 			tables.insert(id)
@@ -1748,6 +1771,24 @@ final class ViewTree {
 		case "cell": tableCells.insert(id)
 		default: break
 		}
+	}
+
+	/// A summary's triangle (`list-style: disclosure-closed inside`), in an inset before its content; it is not read.
+	private func addDisclosure(to summary: UIView) {
+		let marker = UILabel()
+		marker.isAccessibilityElement = false
+		marker.isUserInteractionEnabled = false
+		marker.translatesAutoresizingMaskIntoConstraints = false
+		marker.text = "\u{25B8}"
+		summary.addSubview(marker)
+		decorations.insert(ObjectIdentifier(marker))
+		disclosures[ObjectIdentifier(summary)] = marker
+		let glyphs = ["\u{25B8} ", "\u{25BE} "].map { ($0 as NSString).size(withAttributes: [.font: marker.font as Any]).width }
+		indents[ObjectIdentifier(summary)] = ceil(glyphs.max() ?? 0)
+		NSLayoutConstraint.activate([
+			marker.leadingAnchor.constraint(equalTo: summary.leadingAnchor),
+			marker.topAnchor.constraint(equalTo: summary.topAnchor),
+		])
 	}
 
 	/// A list item's marker, beside it in its list's inset; it is neither read nor part of the item's text.
@@ -1988,6 +2029,40 @@ final class SelectButton: UIButton {
 		display.text = label
 		accessibilityValue = label
 	}
+
+	private let arrow = CAShapeLayer()
+
+	/// On a styled page: the label in Dragon's box for it, vertically centred, and Dragon's arrow stroked over the background
+	/// and under the border, as Chrome paints a menulist-button.
+	func paint(arrow paint: ResolvedStyle.SelectArrowPaint?, label: ResolvedStyle.SelectLabel?, faces: [String: UIFontDescriptor]) throws {
+		if let label {
+			guard let face = faces[label.fontFamily] else { throw HostError("font \(label.fontFamily) was not registered") }
+			display.font = UIFont(descriptor: face, size: label.fontSize)
+			if let color = label.color { display.textColor = uiColor(color) }
+			display.lineBreakMode = .byClipping
+			display.frame = CGRect(x: label.frame.x, y: label.frame.y, width: label.frame.width, height: label.frame.height)
+		}
+		display.isHidden = label == nil
+		guard let paint else {
+			arrow.removeFromSuperlayer()
+			return
+		}
+		let a = paint.arrow
+		let point = { (k: Int) in CGPoint(x: (a.originX + a.points[k]) / paint.scale, y: (a.originY + a.points[k + 1]) / paint.scale) }
+		let path = CGMutablePath()
+		path.move(to: point(0))
+		for k in stride(from: 2, to: a.points.count, by: 2) { path.addLine(to: point(k)) }
+		arrow.path = path
+		arrow.fillColor = nil
+		arrow.strokeColor = uiColor(paint.color).cgColor
+		arrow.lineWidth = a.strokeWidth / paint.scale
+		arrow.lineCap = .butt
+		arrow.lineJoin = .miter
+		arrow.miterLimit = 4
+		arrow.frame = bounds
+		arrow.contentsScale = paint.scale
+		if arrow.superlayer == nil { layer.addSublayer(arrow) }
+	}
 }
 
 final class TopLayerView: UIView {
@@ -2216,6 +2291,15 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 		drawing.isHidden = style.hidden
 		return
 	}
+	if let select = view as? SelectButton {
+		try select.paint(arrow: style.selectArrow, label: style.selectLabel, faces: faces)
+		return
+	}
+	if let box = view as? CheckboxButton {
+		box.paint(style.checkbox)
+		return
+	}
+	if style.checkbox != nil { throw HostError("\(view.accessibilityIdentifier ?? "a box") draws a themed checkbox but is not a checkbox") }
 	guard let label = view as? UILabel else {
 		if style.font != nil || style.textColor != nil { throw HostError("\(view.accessibilityIdentifier ?? "a box") has text styles but is not text") }
 		return
@@ -2362,6 +2446,95 @@ private final class DashedBorderLayer: CALayer {
 		path.addLines(between: stride(from: 0, to: pts.count - 1, by: 2).map { CGPoint(x: pts[$0], y: pts[$0 + 1]) })
 		path.closeSubpath()
 		return path
+	}
+}
+
+/// A checkbox or radio button. On a styled page a checkbox draws Chrome's theme marks from Dragon's plan, in the checkedness the
+/// runtime keeps (`show`); otherwise the platform's symbol.
+final class CheckboxButton: UIButton {
+	private var drawn: CheckboxLayer?
+	private var checked = false
+	var themed: Bool { drawn != nil }
+
+	func show(checked: Bool) {
+		self.checked = checked
+		drawn?.checked = checked
+		drawn?.setNeedsDisplay()
+	}
+
+	func paint(_ paint: ResolvedStyle.CheckboxPaint?) {
+		guard let paint else {
+			drawn?.removeFromSuperlayer()
+			drawn = nil
+			return
+		}
+		let marks = drawn ?? CheckboxLayer()
+		marks.paint = paint
+		marks.checked = checked
+		marks.frame = bounds
+		marks.contentsScale = paint.scale
+		// Over the background and under the border, as Chrome paints the theme's checkbox.
+		if drawn == nil { layer.insertSublayer(marks, at: 0) }
+		drawn = marks
+		setImage(nil, for: .normal)
+		marks.setNeedsDisplay()
+	}
+
+	override func layoutSubviews() {
+		super.layoutSubviews()
+		drawn?.frame = bounds
+	}
+}
+
+/// Dragon's `dragonPaintCheckbox`: the marks in device px from the snapped border box.
+private final class CheckboxLayer: CALayer {
+	var paint: ResolvedStyle.CheckboxPaint?
+	var checked = false
+
+	override func draw(in ctx: CGContext) {
+		guard let paint else { return }
+		let m = paint.marks, c = paint.colors
+		ctx.saveGState()
+		ctx.scaleBy(x: 1 / paint.scale, y: 1 / paint.scale)
+		ctx.translateBy(x: m.originX, y: m.originY)
+		ctx.setShouldAntialias(true)
+		let square = CGRect(x: m.x, y: m.y, width: m.side, height: m.side)
+		let rounded = { (r: CGRect) -> CGPath in
+			let k = min(CGFloat(m.radius), min(r.width, r.height) / 2)
+			return CGPath(roundedRect: r, cornerWidth: k, cornerHeight: k, transform: nil)
+		}
+		if m.plain {
+			ctx.setFillColor(uiColor(checked ? c.check : c.uncheckedBorder).cgColor)
+			ctx.fill(square)
+			ctx.restoreGState()
+			return
+		}
+		let inset = CGFloat(m.backgroundInset)
+		ctx.addPath(rounded(square.insetBy(dx: inset, dy: inset)))
+		ctx.setFillColor(uiColor(checked ? c.checkedBackground : c.uncheckedBackground).cgColor)
+		ctx.fillPath()
+		if checked {
+			ctx.addPath(rounded(square))
+			ctx.setFillColor(uiColor(c.fill).cgColor)
+			ctx.fillPath()
+			let p = m.check
+			ctx.move(to: CGPoint(x: p[0], y: p[1]))
+			ctx.addLine(to: CGPoint(x: p[2], y: p[3]))
+			ctx.addLine(to: CGPoint(x: p[4], y: p[5]))
+			ctx.setLineWidth(CGFloat(m.checkWidth))
+			ctx.setLineCap(.butt)
+			ctx.setLineJoin(.miter)
+			ctx.setMiterLimit(4)
+			ctx.setStrokeColor(uiColor(c.check).cgColor)
+			ctx.strokePath()
+		} else {
+			let border = CGFloat(m.borderInset)
+			ctx.addPath(rounded(square.insetBy(dx: border, dy: border)))
+			ctx.setLineWidth(CGFloat(m.borderWidth))
+			ctx.setStrokeColor(uiColor(c.uncheckedBorder).cgColor)
+			ctx.strokePath()
+		}
+		ctx.restoreGState()
 	}
 }
 

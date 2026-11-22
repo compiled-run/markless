@@ -10,6 +10,7 @@ import {
 	writeFileSync,
 } from 'node:fs';
 import { createRequire, findPackageJSON } from 'node:module';
+import type { NativeScriptEngine } from '@markless/compiler/native';
 import { pathToFileURL } from 'node:url';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { APP_SERVER_PORT, type LadderRung } from '../../proofs/ladder.ts';
@@ -176,6 +177,7 @@ export function compileRungApp(
 		/** Keep the pages that build when others refuse (a rung's `refusedPages`). */
 		readonly partial?: boolean;
 		readonly origin?: string;
+		readonly scriptEngine?: NativeScriptEngine;
 	} = {},
 ) {
 	const document = join(dir, APP_DOCUMENT);

@@ -93,7 +93,7 @@ import type {
 } from '../artifacts.ts';
 import { isEventAttribute, normalizeEventName } from '../ast/events.ts';
 import { compileDrawing, compileLiveShape, SHAPES, type DrawingElement } from './native-drawing.ts';
-import { nativeScriptOf, type NativeScriptModuleInput } from './native-script.ts';
+import { nativeScriptOf, type NativeScriptEngine, type NativeScriptModuleInput } from './native-script.ts';
 import { scriptFactsOf, type ScriptFacts } from './semantic-graph/script-facts.ts';
 import { sharedDefinitionId } from './semantic-graph/collect-shared.ts';
 
@@ -1223,6 +1223,8 @@ export type NativeViewOptions = {
 	 * `never`: data only.
 	 */
 	readonly scriptHandlers?: 'fallback' | 'all' | 'never';
+	/** The engine text the payload's script carries; conformance vectors write markers in its place. */
+	readonly scriptEngine?: NativeScriptEngine;
 	/** Keep elements' keydown handlers, which a script's `KeyboardEvent` can raise though a phone has no hardware keyboard. */
 	readonly keyHandlers?: boolean;
 	/** A module's source as the build read it, by filename: where a native build finds a value's own JavaScript. */
@@ -3569,6 +3571,7 @@ export function createNativeViewPayload(
 				: undefined,
 			svgGeometry,
 			options.origin,
+			options.scriptEngine,
 		);
 	}
 
@@ -7357,8 +7360,14 @@ export function createNativeViewPayload(
 		return { method: fn, bindings };
 	}
 
+	/** Script ops whose handler may call `event.preventDefault()`: it reads it, or hands the whole event on. */
+	const mayPreventDefault = new WeakSet<NativeOp>();
 	function scriptOp(event: SemanticEvent, scope: Scope, form?: string): NativeOp | null {
-		return keepingFunctions(() => scriptOpOf(event, scope, form));
+		const op = keepingFunctions(() => scriptOpOf(event, scope, form));
+		const fact = event.handlerSpan && scriptFacts(scope.module)?.handler(event.handlerSpan);
+		if (op && fact && (fact.event ?? []).some((read) => read.path.length === 0 || read.path[0] === 'preventDefault'))
+			mayPreventDefault.add(op);
+		return op;
 	}
 
 	function scriptOpOf(event: SemanticEvent, scope: Scope, form?: string): NativeOp | null {
@@ -9131,6 +9140,7 @@ export function createNativeViewPayload(
 	wireFieldsets();
 	wireLinks();
 	checkSelects();
+	wireDetails();
 	let lengthLimited = false;
 	let numbered = false;
 	let emailChecked = false;
@@ -9323,6 +9333,96 @@ export function createNativeViewPayload(
 	 * A checkbox or radio button is pressed as on the web: the press ticks it, then its click handlers run, then (when the
 	 * tick changed it) its input and change handlers. A radio button already checked only runs its click handlers.
 	 */
+	/**
+	 * A `<details>` shows its first `<summary>` child, and its other children only while open: a cell holds whether it is
+	 * open (its `open` attribute first), a press on the summary flips it after the summary's own click handler, and the
+	 * summary reads it as expanded or collapsed. What a native build cannot keep per element yet is refused by name.
+	 */
+	function wireDetails() {
+		for (const [index, node] of nodes.entries()) {
+			if (node.kind !== 'element' || node.element !== 'details') continue;
+			const span = nodeSpans.get(node.id);
+			const where = `the <details> ${node.id}`;
+			if (node.row) {
+				refuse(`${where} sits inside a @for row, which keeps no open state per row yet`, span);
+				continue;
+			}
+			const bound = (name: string, of: typeof node) =>
+				of.attributes?.[name] !== undefined ||
+				(of.bindings ?? []).some((binding) => 'attribute' in binding && binding.attribute === name);
+			if (node.bindings?.some((binding) => 'attribute' in binding && binding.attribute === 'open')) {
+				refuse(`${where} binds \`open\`; a native build opens it from a press on its <summary>`, span);
+				continue;
+			}
+			if (bound('name', node)) {
+				refuse(`${where} has \`name\`, an exclusive group a native build does not keep yet`, span);
+				continue;
+			}
+			const children = nodes.filter((child) => child.parent === node.id);
+			const summaryAt = children.findIndex(
+				(child) => child.kind === 'element' && child.element === 'summary',
+			);
+			if (summaryAt < 0) {
+				refuse(`${where} has no <summary>, so the browser writes its label, which a native build does not yet`, span);
+				continue;
+			}
+			const summary = children[summaryAt] as Extract<NativeNode, { kind: 'element' }>;
+			const cell = `details:${node.id}`;
+			const open: NativeExpr = { cell };
+			let ok = true;
+			for (const child of children) {
+				if (child === summary) continue;
+				if (child.kind === 'element') {
+					if (bound('hidden', child)) {
+						refuse(`the <${child.element}> ${child.id} in ${where} has \`hidden\` of its own, which a native build does not combine with the details' yet`, nodeSpans.get(child.id));
+						ok = false;
+					}
+					continue;
+				}
+				if (child.kind === 'text' && child.parts.every((part) => 'text' in part && part.text.trim() === '')) continue;
+				refuse(`${child.kind === 'text' ? 'text' : `a ${child.kind}`} directly inside ${where}, outside an element a native build can hide while it is closed`, span);
+				ok = false;
+			}
+			const handler = events.find((entry) => entry.host === summary.id && entry.event === 'activate');
+			const ops = handler ? handlers.find((entry) => entry.id === handler.handler)?.ops : undefined;
+			if (ops?.some((op) => mayPreventDefault.has(op))) {
+				refuse(`the click handler on the <summary> ${summary.id} may call \`event.preventDefault()\` in JavaScript, which a phone cannot report before the toggle yet`, nodeSpans.get(summary.id));
+				ok = false;
+			}
+			if (!ok) continue;
+			cells.push({ id: cell, name: 'open', initial: node.attributes?.['open'] !== undefined });
+			const toggle: NativeOp = { op: 'assign', cell, value: { unary: '!', value: open } };
+			if (ops) ops.push(toggle);
+			else {
+				const id = `toggle:${node.id}`;
+				handlers.push({ id, ops: [toggle] });
+				events.push({ host: summary.id, event: 'activate', handler: id });
+			}
+			const { attributes: written, ...rest } = node;
+			const { open: _open, ...attributes } = written ?? {};
+			nodes[index] = {
+				...rest,
+				...(Object.keys(attributes).length > 0 ? { attributes } : {}),
+				bindings: [...(node.bindings ?? []), { attribute: 'open', value: open }],
+			};
+			for (const [at, child] of nodes.entries()) {
+				if (child.kind !== 'element' || child.parent !== node.id) continue;
+				nodes[at] = {
+					...child,
+					bindings: [
+						...(child.bindings ?? []),
+						child.id === summary.id
+							? {
+									attribute: 'aria-expanded',
+									value: { if: open, whenTrue: { literal: 'true' }, whenFalse: { literal: 'false' } },
+								}
+							: { attribute: 'hidden', value: { unary: '!', value: open } },
+					],
+				};
+			}
+		}
+	}
+
 	/**
 	 * A `<select>` is a pop-up list of its `<option>`s, one chosen. What a native build does not draw or run yet is refused
 	 * by name: a list box (`multiple`, `size`), a select whose choice a binding sets, handlers on either element other

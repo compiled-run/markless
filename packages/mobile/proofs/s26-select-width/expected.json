@@ -1,0 +1,17 @@
+{
+	"rung": "S26",
+	"name": "A styled <select> laid out at its widest option's width, as Chrome does: the notes form's tag field (a width: 100% grid item with min-width: auto, its options an @for over a constant list) and a block select with an auto width",
+	"steps": [
+		{
+			"visible": ["Category", "Home", "Small", "Tagged Home"],
+			"absent": ["Work", "Ideas", "Extra large"],
+			"title": "Sizing"
+		},
+		{
+			"do": { "choose": { "field": "Tag", "option": "Groceries" } },
+			"visible": ["Groceries", "Tagged Groceries", "Small"],
+			"absent": ["Tagged Home"],
+			"title": "Sizing"
+		}
+	]
+}

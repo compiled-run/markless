@@ -236,6 +236,18 @@ const cellsOf = (expr: unknown, into: Set<string>): Set<string> => {
 	return into;
 };
 
+/** Each payload node's system sheet: the nearest sheet among its ancestors, or null for the page's own content. */
+export function sheetsOf(payload: NativeViewPayload): ReadonlyMap<string, string | null> {
+	const byId = new Map(payload.nodes.map((node) => [node.id, node]));
+	return new Map(
+		payload.nodes.map((node): [string, string | null] => {
+			for (let at = node.parent; at !== null; at = byId.get(at)?.parent ?? null)
+				if (byId.get(at)?.kind === 'sheet') return [node.id, at];
+			return [node.id, null];
+		}),
+	);
+}
+
 /**
  * A page's style inputs: the page without its system sheets, then each sheet's content once per resting height. Each
  * sheet's content is laid out as a document of its own, the size of the sheet's content area, with the page's CSS: the
@@ -254,12 +266,7 @@ export function nativeStyleInputs(
 	}>;
 } {
 	const byId = new Map(payload.nodes.map((node) => [node.id, node]));
-	const sheetOf = (node: PayloadNode): string | null => {
-		for (let at = node.parent; at !== null; at = byId.get(at)?.parent ?? null)
-			if (byId.get(at)?.kind === 'sheet') return at;
-		return null;
-	};
-	const rootOf = new Map(payload.nodes.map((node) => [node.id, sheetOf(node)]));
+	const rootOf = sheetsOf(payload);
 	const page = nativeStyleInput(
 		payload,
 		styles,
@@ -405,9 +412,24 @@ export function nativeStyleInput(
 		[{}],
 	);
 	const initialCells = new Map(payload.cells.map((cell) => [cell.id, cell.initial]));
+	// A <select>'s @for over a constant list becomes plain options, so Dragon can measure its widest option.
+	const optionRows = new Map<string, ReadonlyArray<string>>();
+	for (const node of nodes) {
+		if (node.kind !== 'repeat' || node.row || node.keyParts || (!node.byIndex && node.key.length > 0)) continue;
+		const parent = nodes.find((candidate) => candidate.id === node.parent);
+		if (parent?.kind !== 'element' || parent.element !== 'select' || !('array' in node.list)) continue;
+		const items = node.list.array;
+		if (!items.every((item) => !item.spread && 'literal' in item.value)) continue;
+		optionRows.set(
+			node.id,
+			items.map((item, index) =>
+				node.byIndex ? String(index) : String((item.value as { readonly literal: unknown }).literal),
+			),
+		);
+	}
 	// A branch an outer arm hides keeps a value no box reads, since each arm inside it also needs that outer arm: its first.
 	const repeats = nodes.flatMap((node) =>
-		node.kind === 'repeat' && !node.row
+		node.kind === 'repeat' && !node.row && !optionRows.has(node.id)
 			? [
 					{
 						id: node.id,
@@ -450,6 +472,18 @@ export function nativeStyleInput(
 			// A row's nodes name their list: Dragon refuses them by name until rows are laid out on the phone.
 			const place = { ...(node.arm ? { arm: node.arm } : {}), ...(node.row ? { row: node.row } : {}) };
 			if (node.kind === 'branch' || node.kind === 'repeat') return [];
+			const rows = node.row ? optionRows.get(node.row) : undefined;
+			if (rows) {
+				const list = nodes.find((candidate) => candidate.id === node.row)!;
+				return rows.map((key, index): NativeStyleInput['nodes'][number] => {
+					const parent = node.parent === list.parent ? node.parent! : `${node.parent}@${index}`;
+					const arm = node.arm ? { arm: node.arm } : list.arm ? { arm: list.arm } : {};
+					if (node.kind === 'text')
+						return { kind: 'text', id: `${node.id}@${index}`, parent, text: initial.get(`${node.id}@${key}`) ?? '', ...arm };
+					if (node.kind !== 'element') throw new Error(`${node.id}: a <select>'s option row holds a ${node.kind}`);
+					return { kind: 'element', id: `${node.id}@${index}`, element: node.element, parent, attributes: { ...node.attributes }, ...arm };
+				});
+			}
 			if (node.kind === 'sheet')
 				throw new Error(
 					`${node.id}: a styled system sheet's content is laid out as its own document, which only the app style file carries (an app's pages/ folder)`,
