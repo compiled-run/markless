@@ -2786,6 +2786,8 @@ export function createNativeViewPayload(
 		{ readonly id: string; readonly module: ModuleFacts; readonly fact: SemanticScriptFunction }
 	>();
 	const scriptServices = new Set<NativeScriptService>();
+	/** A script adds listeners to the document, so the hosts report every touch for them. */
+	let documentEvents = false;
 	scriptsMakeKeys = () =>
 		[...scriptFunctions.values()].some(({ fact }) =>
 			fact.globals.some(
@@ -2882,7 +2884,8 @@ export function createNativeViewPayload(
 				Object.hasOwn(NATIVE_SCRIPT_PAGE_MEMBERS, name) &&
 				NATIVE_SCRIPT_PAGE_MEMBERS[name]!.includes(global.member)
 			) {
-				if (!rendering) continue;
+				if (name === 'document' && global.member !== 'activeElement') documentEvents = true;
+				if (!rendering || global.deferred) continue;
 				ok = false;
 				refuseScript(
 					`${what} reads \`${name}.${global.member}\` while rendering; a phone answers it only in a handler`,
@@ -9337,6 +9340,7 @@ export function createNativeViewPayload(
 		...(emailChecked ? { typeMismatch: NATIVE_EMAIL_MISMATCH_BY_LOCALE } : {}),
 		...(script ? { script } : {}),
 		...(tapPoints ? { tapPoints: true as const } : {}),
+		...(documentEvents ? { documentEvents: true as const } : {}),
 	});
 
 	/**

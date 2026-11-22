@@ -272,13 +272,13 @@ export const rungFolders = (): string[] =>
 /** A rung that is an app of several routes (`pages/`) rather than one screen (`App.tsrx`). */
 const isApp = (folder: string): boolean => existsSync(join(proofsDir, folder, 'pages'));
 
-/** The navigation ladder: each folder an app (`pages/`) of several routes; an `r<n>` or `j<n>` rung with `pages/` too. */
+/** The navigation ladder: each folder an app (`pages/`) of several routes; a `j<n>`, `r<n>` or `u<n>` rung with `pages/` too. */
 export const navRungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
 		.filter(
 			(entry) =>
 				entry.isDirectory() &&
-				(/^n\d+-/.test(entry.name) || (/^[jr]\d+-/.test(entry.name) && isApp(entry.name))),
+				(/^n\d+-/.test(entry.name) || (/^[jru]\d+-/.test(entry.name) && isApp(entry.name))),
 		)
 		.map((entry) => entry.name)
 		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));

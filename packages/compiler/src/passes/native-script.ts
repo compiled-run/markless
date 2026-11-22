@@ -399,9 +399,23 @@ if (!host) {
 		};
 	};
 	g.window = g.self = g;
-	// The page's one member a phone answers: the focused element (the body when none is), which the build allows alone.
-	// A page whose <html> has no lang, as code guarded by typeof document read it before the page had a document.
-	g.document = { get activeElement() { return host.focus(); }, documentElement: { lang: '' } };
+	// The page answers its focused element (the body when none is) and keeps listeners a handler adds; the host passes each
+	// pointer event to them after the element's own handlers, as the browser bubbles it to the document.
+	host.listeners = {};
+	g.document = {
+		get activeElement() { return host.focus(); },
+		// A page whose <html> has no lang, as code guarded by typeof document read it before the page had a document.
+		documentElement: { lang: '' },
+		addEventListener: function (type, listener) {
+			var list = host.listeners[String(type)] || (host.listeners[String(type)] = []);
+			if (typeof listener === 'function' && list.indexOf(listener) < 0) { list.push(listener); host.listened = true; }
+		},
+		removeEventListener: function (type, listener) {
+			var list = host.listeners[String(type)] || [];
+			var at = list.indexOf(listener);
+			if (at >= 0) { list.splice(at, 1); host.listened = true; }
+		},
+	};
 	host.Response = Response;
 	// The HTML structured clone, as Chromium runs it, for an engine that has none.
 	if (typeof g.structuredClone !== 'function') {
@@ -852,6 +866,10 @@ g.__markless[id] = {
 			if (event && event.defaultPrevented && (entry.event.type === 'keydown' || entry.event.type === 'paste')) host.out.prevented = true;
 			// A handler that sets its text field's value writes the field, as the DOM's value setter does.
 			if (event && typeof entry.event.value === 'string' && event.target && !(event.target instanceof host.Form) && typeof event.target.value === 'string' && event.target.value !== entry.event.value) host.out.value = event.target.value;
+		} else if (entry.kind === 'document') {
+			var heard = (host.listeners[entry.event.type] || []).slice();
+			var bubbled = heard.length > 0 ? eventOf(entry.event, {}) : null;
+			heard.forEach(function (listener) { try { listener(bubbled); } catch (error) { fail(null, error); } });
 		} else if (entry.kind === 'timer') {
 			var timer = host.timers[entry.timer];
 			if (timer) {
@@ -907,6 +925,12 @@ g.__markless[id] = {
 		if (out.prevented) left.prevented = true;
 		if (out.value !== undefined) left.value = out.value;
 		if (out.navigate) left.navigate = out.navigate;
+		// The document's listener types now, and the elements the entry that changed them held, whose facts later entries need.
+		if (host.listened) {
+			left.listening = Object.keys(host.listeners).filter(function (type) { return host.listeners[type].length > 0; });
+			left.watch = Object.keys(proxies);
+			host.listened = false;
+		}
 		return JSON.stringify(left);
 	},
 };`;

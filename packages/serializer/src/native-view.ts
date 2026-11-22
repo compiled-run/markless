@@ -1093,6 +1093,8 @@ export type NativeViewPayload = {
 	readonly script?: NativeScript;
 	/** A click handler reads where its tap landed: the host reports touches even with no pointer handler, as a browser fires them. */
 	readonly tapPoints?: true;
+	/** A script adds listeners to the document: the host reports every touch and its moves, which bubble to them. */
+	readonly documentEvents?: true;
 };
 
 export const NATIVE_APP_VERSION = 'markless.native-app/0';
@@ -1711,7 +1713,7 @@ export const NATIVE_SCRIPT_SUBMITTED_FORM = 'submitted form';
 
 /** Members of a page global a phone answers, read straight off it: the focused element, as a proxy. */
 export const NATIVE_SCRIPT_PAGE_MEMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
-	document: ['activeElement'],
+	document: ['activeElement', 'addEventListener', 'removeEventListener'],
 };
 
 /** What a touch adds to a script pointer handler's event: its plain values. The elements it names reach only data handlers. */
