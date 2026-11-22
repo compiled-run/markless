@@ -1,0 +1,17 @@
+{
+	"rung": "S32",
+	"name": "a styled text that follows state with no finite domain is laid out around its current string, so a longer value wraps and pushes what follows, as the web lays it out",
+	"steps": [
+		{ "visible": ["Tagged Home", "Below the tag", "Grow tag"], "title": "Growing text" },
+		{
+			"do": { "tap": "Grow tag" },
+			"visible": ["Tagged Home and the garden shed out back", "Below the tag"],
+			"absent": ["Tagged Home"]
+		},
+		{
+			"do": { "tap": "Grow tag" },
+			"visible": ["Tagged Home and the garden shed out back and the garden shed out back", "Below the tag"],
+			"absent": ["Tagged Home and the garden shed out back"]
+		}
+	]
+}

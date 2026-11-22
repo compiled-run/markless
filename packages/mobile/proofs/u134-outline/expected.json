@@ -1,0 +1,54 @@
+{
+	"rung": 236,
+	"name": "outline: a solid ring with an offset round a rounded box, a double ring, a dashed and a groove ring, and an outline over its neighbours, drawn after the content with Dragon's translated ring and side painters, as Chrome draws them",
+	"steps": [
+		{
+			"visible": [
+				"Outline",
+				"Rounded ring",
+				"Double ring",
+				"Dashed ring",
+				"Groove ring",
+				"Left",
+				"Marked",
+				"Right",
+				"Widen",
+				"Narrow"
+			],
+			"placed": [
+				"Rounded ring",
+				"Double ring",
+				"Dashed ring",
+				"Groove ring",
+				"Marked",
+				"Widen"
+			]
+		},
+		{
+			"do": { "tap": "Widen" },
+			"visible": ["Wide"],
+			"absent": ["Narrow"],
+			"placed": [
+				"Rounded ring",
+				"Double ring",
+				"Dashed ring",
+				"Groove ring",
+				"Marked",
+				"Widen"
+			]
+		},
+		{
+			"do": { "tap": "Widen" },
+			"visible": ["Narrow"],
+			"absent": ["Wide"],
+			"placed": [
+				"Rounded ring",
+				"Double ring",
+				"Dashed ring",
+				"Groove ring",
+				"Marked",
+				"Widen"
+			]
+		}
+	]
+}

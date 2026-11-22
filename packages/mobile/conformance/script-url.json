@@ -1,0 +1,304 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:query",
+				"name": "query",
+				"initial": "q=shoes&page=1"
+			},
+			{
+				"id": "state:opened",
+				"name": "opened",
+				"initial": "nothing yet"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Shop links"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Query: "
+					},
+					{
+						"cell": "state:query"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Page "
+					},
+					{
+						"expr": {
+							"script": "fn:0",
+							"bindings": {
+								"query": {
+									"cell": "state:query"
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Opened: "
+					},
+					{
+						"cell": "state:opened"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Next page"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Search hats"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Open order"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h5",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h6",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h7",
+				"event": "activate",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:1",
+						"type": "click",
+						"bindings": {
+							"query": {
+								"cell": "state:query"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:2",
+						"type": "click",
+						"bindings": {
+							"query": {
+								"cell": "state:query"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:3",
+						"type": "click",
+						"bindings": {
+							"opened": {
+								"cell": "state:opened"
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "7f7e8128f7ae9f8c",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\nif (typeof g.URL !== 'function' || typeof g.URLSearchParams !== 'function') (function () {\n\tvar FAILURE = {};\n\tvar SPECIAL = { 'ftp:': 21, 'file:': null, 'http:': 80, 'https:': 443, 'ws:': 80, 'wss:': 443 };\n\tvar isSpecialScheme = function (scheme) { return Object.prototype.hasOwnProperty.call(SPECIAL, scheme + ':'); };\n\tvar defaultPort = function (scheme) { return isSpecialScheme(scheme) ? SPECIAL[scheme + ':'] : null; };\n\tvar codePoints = function (text) {\n\t\tvar out = [];\n\t\tfor (var index = 0; index < text.length; index++) {\n\t\t\tvar unit = text.charCodeAt(index);\n\t\t\tif (unit >= 0xd800 && unit <= 0xdbff && index + 1 < text.length) {\n\t\t\t\tvar next = text.charCodeAt(index + 1);\n\t\t\t\tif (next >= 0xdc00 && next <= 0xdfff) { out.push(text.slice(index, index + 2)); index++; continue; }\n\t\t\t}\n\t\t\tout.push(text.charAt(index));\n\t\t}\n\t\treturn out;\n\t};\n\tvar toUSV = function (value) {\n\t\tvar text = String(value), out = '';\n\t\tfor (var index = 0; index < text.length; index++) {\n\t\t\tvar unit = text.charCodeAt(index);\n\t\t\tif (unit >= 0xd800 && unit <= 0xdbff && index + 1 < text.length && text.charCodeAt(index + 1) >= 0xdc00 && text.charCodeAt(index + 1) <= 0xdfff) {\n\t\t\t\tout += text.slice(index, index + 2);\n\t\t\t\tindex++;\n\t\t\t} else out += unit >= 0xd800 && unit <= 0xdfff ? '\\ufffd' : text.charAt(index);\n\t\t}\n\t\treturn out;\n\t};\n\tvar codeOf = function (c) { return c.length === 2 ? (c.charCodeAt(0) - 0xd800) * 0x400 + c.charCodeAt(1) - 0xdc00 + 0x10000 : c.charCodeAt(0); };\n\tvar utf8 = function (c) {\n\t\tvar code = codeOf(c);\n\t\tif (c.length === 1 && code >= 0xd800 && code <= 0xdfff) code = 0xfffd;\n\t\tif (code < 0x80) return [code];\n\t\tif (code < 0x800) return [0xc0 | (code >> 6), 0x80 | (code & 63)];\n\t\tif (code < 0x10000) return [0xe0 | (code >> 12), 0x80 | ((code >> 6) & 63), 0x80 | (code & 63)];\n\t\treturn [0xf0 | (code >> 18), 0x80 | ((code >> 12) & 63), 0x80 | ((code >> 6) & 63), 0x80 | (code & 63)];\n\t};\n\tvar hex = '0123456789ABCDEF';\n\tvar byteText = function (byte) { return '%' + hex.charAt(byte >> 4) + hex.charAt(byte & 15); };\n\tvar C0 = function (code) { return code <= 0x1f || code > 0x7e; };\n\tvar inChars = function (chars, inner) { return function (code) { return inner(code) || chars.indexOf(String.fromCharCode(code)) >= 0; }; };\n\tvar FRAGMENT_SET = inChars(' \"<>\\x60', C0);\n\tvar QUERY_SET = inChars(' \"#<>', C0);\n\tvar SPECIAL_QUERY_SET = inChars(\"'\", QUERY_SET);\n\tvar PATH_SET = inChars('?^\\x60{}', QUERY_SET);\n\tvar USERINFO_SET = inChars('/:;=@[\\\\]^|', PATH_SET);\n\tvar COMPONENT_SET = inChars('$%&+,', USERINFO_SET);\n\tvar FORM_SET = inChars(\"!'()~\", COMPONENT_SET);\n\tvar encode = function (c, set, spaceAsPlus) {\n\t\tif (spaceAsPlus && c === ' ') return '+';\n\t\tvar bytes = utf8(c), out = '';\n\t\tif (bytes.length === 1 && !set(bytes[0])) return c;\n\t\tfor (var index = 0; index < bytes.length; index++) out += byteText(bytes[index]);\n\t\treturn out;\n\t};\n\tvar encodeText = function (text, set, spaceAsPlus) {\n\t\tvar cps = codePoints(text), out = '';\n\t\tfor (var index = 0; index < cps.length; index++) out += encode(cps[index], set, spaceAsPlus);\n\t\treturn out;\n\t};\n\tvar isHex = function (c) { return /^[0-9A-Fa-f]$/.test(c); };\n\tvar percentDecode = function (text) {\n\t\tvar bytes = [], cps = codePoints(text);\n\t\tfor (var index = 0; index < cps.length; index++) {\n\t\t\tvar c = cps[index];\n\t\t\tif (c === '%' && index + 2 < cps.length && isHex(cps[index + 1]) && isHex(cps[index + 2])) {\n\t\t\t\tbytes.push(parseInt(cps[index + 1] + cps[index + 2], 16));\n\t\t\t\tindex += 2;\n\t\t\t} else bytes = bytes.concat(utf8(c));\n\t\t}\n\t\treturn bytes;\n\t};\n\tvar fromCode = function (code) {\n\t\tif (code < 0x10000) return String.fromCharCode(code);\n\t\tcode -= 0x10000;\n\t\treturn String.fromCharCode(0xd800 + (code >> 10), 0xdc00 + (code & 0x3ff));\n\t};\n\tvar utf8Decode = function (bytes) {\n\t\tvar out = '', index = 0;\n\t\tif (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) index = 3;\n\t\twhile (index < bytes.length) {\n\t\t\tvar byte = bytes[index];\n\t\t\tif (byte < 0x80) { out += String.fromCharCode(byte); index++; continue; }\n\t\t\tvar need = 0, code = 0, lower = 0x80, upper = 0xbf;\n\t\t\tif (byte >= 0xc2 && byte <= 0xdf) { need = 1; code = byte & 31; }\n\t\t\telse if (byte >= 0xe0 && byte <= 0xef) { need = 2; code = byte & 15; if (byte === 0xe0) lower = 0xa0; if (byte === 0xed) upper = 0x9f; }\n\t\t\telse if (byte >= 0xf0 && byte <= 0xf4) { need = 3; code = byte & 7; if (byte === 0xf0) lower = 0x90; if (byte === 0xf4) upper = 0x8f; }\n\t\t\telse { out += '\\ufffd'; index++; continue; }\n\t\t\tvar seen = 1;\n\t\t\tfor (; seen <= need; seen++) {\n\t\t\t\tvar next = bytes[index + seen];\n\t\t\t\tif (next === undefined || next < lower || next > upper) break;\n\t\t\t\tlower = 0x80; upper = 0xbf;\n\t\t\t\tcode = (code << 6) | (next & 63);\n\t\t\t}\n\t\t\tif (seen <= need) { out += '\\ufffd'; index += seen; continue; }\n\t\t\tout += fromCode(code);\n\t\t\tindex += need + 1;\n\t\t}\n\t\treturn out;\n\t};\n\n\tvar punycode = function (label) {\n\t\tvar input = codePoints(label).map(codeOf), output = '', n = 128, delta = 0, bias = 72, basic = 0;\n\t\tvar digit = function (d) { return String.fromCharCode(d < 26 ? d + 97 : d + 22); };\n\t\tvar adapt = function (value, points, first) {\n\t\t\tvalue = first ? Math.floor(value / 700) : value >> 1;\n\t\t\tvalue += Math.floor(value / points);\n\t\t\tvar k = 0;\n\t\t\tfor (; value > 455; k += 36) value = Math.floor(value / 35);\n\t\t\treturn k + Math.floor((36 * value) / (value + 38));\n\t\t};\n\t\tfor (var i = 0; i < input.length; i++) if (input[i] < 128) { output += String.fromCharCode(input[i]); basic++; }\n\t\tvar handled = basic;\n\t\tif (basic > 0) output += '-';\n\t\twhile (handled < input.length) {\n\t\t\tvar m = Infinity;\n\t\t\tfor (i = 0; i < input.length; i++) if (input[i] >= n && input[i] < m) m = input[i];\n\t\t\tdelta += (m - n) * (handled + 1);\n\t\t\tn = m;\n\t\t\tfor (i = 0; i < input.length; i++) {\n\t\t\t\tif (input[i] < n) delta++;\n\t\t\t\tif (input[i] === n) {\n\t\t\t\t\tvar q = delta;\n\t\t\t\t\tfor (var k = 36; ; k += 36) {\n\t\t\t\t\t\tvar t = k <= bias ? 1 : k >= bias + 26 ? 26 : k - bias;\n\t\t\t\t\t\tif (q < t) break;\n\t\t\t\t\t\toutput += digit(t + ((q - t) % (36 - t)));\n\t\t\t\t\t\tq = Math.floor((q - t) / (36 - t));\n\t\t\t\t\t}\n\t\t\t\t\toutput += digit(q);\n\t\t\t\t\tbias = adapt(delta, handled + 1, handled === basic);\n\t\t\t\t\tdelta = 0;\n\t\t\t\t\thandled++;\n\t\t\t\t}\n\t\t\t}\n\t\t\tdelta++;\n\t\t\tn++;\n\t\t}\n\t\treturn output;\n\t};\n\tvar domainToASCII = function (domain) {\n\t\tif (/[^\\x00-\\x7f]/.test(domain)) {\n\t\t\tvar mapped = domain.toLowerCase();\n\t\t\tif (typeof mapped.normalize === 'function') mapped = mapped.normalize('NFKC').toLowerCase();\n\t\t\tmapped = mapped.replace(/[\\u3002\\uff0e\\uff61]/g, '.');\n\t\t\tdomain = mapped.split('.').map(function (label) { return /[^\\x00-\\x7f]/.test(label) ? 'xn--' + punycode(label) : label; }).join('.');\n\t\t}\n\t\tdomain = domain.toLowerCase();\n\t\treturn domain === '' ? FAILURE : domain;\n\t};\n\tvar ipv4Number = function (text) {\n\t\tif (text === '') return FAILURE;\n\t\tvar radix = 10;\n\t\tif (/^0[xX]/.test(text)) { radix = 16; text = text.slice(2); }\n\t\telse if (text.length > 1 && text.charAt(0) === '0') { radix = 8; text = text.slice(1); }\n\t\tif (text === '') return 0;\n\t\tif (!(radix === 10 ? /^[0-9]+$/ : radix === 16 ? /^[0-9A-Fa-f]+$/ : /^[0-7]+$/).test(text)) return FAILURE;\n\t\treturn parseInt(text, radix);\n\t};\n\tvar endsInNumber = function (text) {\n\t\tvar parts = text.split('.');\n\t\tif (parts[parts.length - 1] === '') {\n\t\t\tif (parts.length === 1) return false;\n\t\t\tparts.pop();\n\t\t}\n\t\tvar last = parts[parts.length - 1];\n\t\tif (last !== '' && /^[0-9]+$/.test(last)) return true;\n\t\treturn ipv4Number(last) !== FAILURE;\n\t};\n\tvar parseIPv4 = function (text) {\n\t\tvar parts = text.split('.');\n\t\tif (parts[parts.length - 1] === '' && parts.length > 1) parts.pop();\n\t\tif (parts.length > 4) return FAILURE;\n\t\tvar numbers = [];\n\t\tfor (var index = 0; index < parts.length; index++) {\n\t\t\tvar number = ipv4Number(parts[index]);\n\t\t\tif (number === FAILURE) return FAILURE;\n\t\t\tnumbers.push(number);\n\t\t}\n\t\tfor (index = 0; index < numbers.length - 1; index++) if (numbers[index] > 255) return FAILURE;\n\t\tif (numbers[numbers.length - 1] >= Math.pow(256, 5 - numbers.length)) return FAILURE;\n\t\tvar address = numbers[numbers.length - 1];\n\t\tfor (index = 0; index < numbers.length - 1; index++) address += numbers[index] * Math.pow(256, 3 - index);\n\t\tvar out = [];\n\t\tfor (index = 0; index < 4; index++) { out.unshift(String(address % 256)); address = Math.floor(address / 256); }\n\t\treturn out.join('.');\n\t};\n\tvar parseIPv6 = function (text) {\n\t\tvar address = [0, 0, 0, 0, 0, 0, 0, 0], piece = 0, compress = null, pointer = 0, cps = codePoints(text);\n\t\tvar at = function (offset) { return cps[pointer + (offset || 0)]; };\n\t\tif (at() === ':') {\n\t\t\tif (at(1) !== ':') return FAILURE;\n\t\t\tpointer += 2;\n\t\t\tcompress = ++piece;\n\t\t}\n\t\twhile (at() !== undefined) {\n\t\t\tif (piece === 8) return FAILURE;\n\t\t\tif (at() === ':') {\n\t\t\t\tif (compress !== null) return FAILURE;\n\t\t\t\tpointer++;\n\t\t\t\tcompress = ++piece;\n\t\t\t\tcontinue;\n\t\t\t}\n\t\t\tvar value = 0, length = 0;\n\t\t\twhile (length < 4 && at() !== undefined && isHex(at())) { value = value * 16 + parseInt(at(), 16); pointer++; length++; }\n\t\t\tif (at() === '.') {\n\t\t\t\tif (length === 0) return FAILURE;\n\t\t\t\tpointer -= length;\n\t\t\t\tif (piece > 6) return FAILURE;\n\t\t\t\tvar numbersSeen = 0;\n\t\t\t\twhile (at() !== undefined) {\n\t\t\t\t\tvar ipv4Piece = null;\n\t\t\t\t\tif (numbersSeen > 0) {\n\t\t\t\t\t\tif (at() === '.' && numbersSeen < 4) pointer++;\n\t\t\t\t\t\telse return FAILURE;\n\t\t\t\t\t}\n\t\t\t\t\tif (at() === undefined || !/^[0-9]$/.test(at())) return FAILURE;\n\t\t\t\t\twhile (at() !== undefined && /^[0-9]$/.test(at())) {\n\t\t\t\t\t\tvar number = parseInt(at(), 10);\n\t\t\t\t\t\tif (ipv4Piece === null) ipv4Piece = number;\n\t\t\t\t\t\telse if (ipv4Piece === 0) return FAILURE;\n\t\t\t\t\t\telse ipv4Piece = ipv4Piece * 10 + number;\n\t\t\t\t\t\tif (ipv4Piece > 255) return FAILURE;\n\t\t\t\t\t\tpointer++;\n\t\t\t\t\t}\n\t\t\t\t\taddress[piece] = address[piece] * 0x100 + ipv4Piece;\n\t\t\t\t\tnumbersSeen++;\n\t\t\t\t\tif (numbersSeen === 2 || numbersSeen === 4) piece++;\n\t\t\t\t}\n\t\t\t\tif (numbersSeen !== 4) return FAILURE;\n\t\t\t\tbreak;\n\t\t\t} else if (at() === ':') {\n\t\t\t\tpointer++;\n\t\t\t\tif (at() === undefined) return FAILURE;\n\t\t\t} else if (at() !== undefined) return FAILURE;\n\t\t\taddress[piece] = value;\n\t\t\tpiece++;\n\t\t}\n\t\tif (compress !== null) {\n\t\t\tvar swaps = piece - compress;\n\t\t\tpiece = 7;\n\t\t\twhile (piece !== 0 && swaps > 0) {\n\t\t\t\tvar swap = address[compress + swaps - 1];\n\t\t\t\taddress[compress + swaps - 1] = address[piece];\n\t\t\t\taddress[piece] = swap;\n\t\t\t\tpiece--;\n\t\t\t\tswaps--;\n\t\t\t}\n\t\t} else if (piece !== 8) return FAILURE;\n\t\tvar start = -1, best = 1;\n\t\tfor (var index = 0; index < 8; ) {\n\t\t\tif (address[index] !== 0) { index++; continue; }\n\t\t\tvar end = index;\n\t\t\twhile (end < 8 && address[end] === 0) end++;\n\t\t\tif (end - index > best) { best = end - index; start = index; }\n\t\t\tindex = end;\n\t\t}\n\t\tvar out = '', ignore0 = false;\n\t\tfor (index = 0; index < 8; index++) {\n\t\t\tif (ignore0 && address[index] === 0) continue;\n\t\t\tignore0 = false;\n\t\t\tif (start === index) { out += index === 0 ? '::' : ':'; ignore0 = true; continue; }\n\t\t\tout += address[index].toString(16);\n\t\t\tif (index !== 7) out += ':';\n\t\t}\n\t\treturn '[' + out + ']';\n\t};\n\tvar parseHost = function (input, opaque) {\n\t\tif (input.charAt(0) === '[') {\n\t\t\tif (input.charAt(input.length - 1) !== ']') return FAILURE;\n\t\t\treturn parseIPv6(input.slice(1, -1));\n\t\t}\n\t\tif (opaque) {\n\t\t\tif (/[\\x00\\t\\n\\r #/:<>?@[\\\\\\]^|]/.test(input)) return FAILURE;\n\t\t\treturn encodeText(input, C0);\n\t\t}\n\t\tvar ascii = domainToASCII(utf8Decode(percentDecode(input)));\n\t\tif (ascii === FAILURE || /[\\x00-\\x20#%/:<>?@[\\\\\\]^|\\x7f]/.test(ascii)) return FAILURE;\n\t\treturn endsInNumber(ascii) ? parseIPv4(ascii) : ascii;\n\t};\n\n\tvar isDrive = function (text, normalized) { return text.length === 2 && /[A-Za-z]/.test(text.charAt(0)) && (text.charAt(1) === ':' || (!normalized && text.charAt(1) === '|')); };\n\tvar startsWithDrive = function (cps, from) {\n\t\treturn cps.length - from >= 2 && isDrive(cps[from] + cps[from + 1], false) && (cps.length - from === 2 || '/\\\\?#'.indexOf(cps[from + 2]) >= 0);\n\t};\n\tvar shorten = function (url) {\n\t\tif (url.scheme === 'file' && url.path.length === 1 && isDrive(url.path[0], true)) return;\n\t\turl.path.pop();\n\t};\n\tvar copyPath = function (path) { return typeof path === 'string' ? path : path.slice(); };\n\tvar hasCredentials = function (url) { return url.username !== '' || url.password !== ''; };\n\tvar stripTrailingSpaces = function (url) {\n\t\tif (typeof url.path !== 'string' || url.fragment !== null || url.query !== null) return;\n\t\turl.path = url.path.replace(/ +$/, '');\n\t};\n\n\tvar parse = function (input, base, url, override) {\n\t\tif (!url) {\n\t\t\turl = { scheme: '', username: '', password: '', host: null, port: null, path: [], query: null, fragment: null };\n\t\t\tinput = input.replace(/^[\\x00-\\x20]+|[\\x00-\\x20]+$/g, '');\n\t\t}\n\t\tinput = input.replace(/[\\t\\n\\r]/g, '');\n\t\tvar state = override || 'scheme start', buffer = '', atSign = false, inBrackets = false, passwordToken = false;\n\t\tvar cps = codePoints(input), pointer = 0;\n\t\tvar special = function () { return isSpecialScheme(url.scheme); };\n\t\tvar rest = function (offset) { return cps[pointer + offset]; };\n\t\tfor (;;) {\n\t\t\tvar c = cps[pointer];\n\t\t\tswitch (state) {\n\t\t\t\tcase 'scheme start':\n\t\t\t\t\tif (c !== undefined && /[A-Za-z]/.test(c)) { buffer += c.toLowerCase(); state = 'scheme'; }\n\t\t\t\t\telse if (!override) { state = 'no scheme'; pointer--; }\n\t\t\t\t\telse return FAILURE;\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'scheme':\n\t\t\t\t\tif (c !== undefined && /[A-Za-z0-9+.-]/.test(c)) buffer += c.toLowerCase();\n\t\t\t\t\telse if (c === ':') {\n\t\t\t\t\t\tif (override) {\n\t\t\t\t\t\t\tif (special() !== isSpecialScheme(buffer)) return url;\n\t\t\t\t\t\t\tif ((hasCredentials(url) || url.port !== null) && buffer === 'file') return url;\n\t\t\t\t\t\t\tif (url.scheme === 'file' && url.host === '') return url;\n\t\t\t\t\t\t}\n\t\t\t\t\t\turl.scheme = buffer;\n\t\t\t\t\t\tif (override) {\n\t\t\t\t\t\t\tif (url.port === defaultPort(url.scheme)) url.port = null;\n\t\t\t\t\t\t\treturn url;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tbuffer = '';\n\t\t\t\t\t\tif (url.scheme === 'file') state = 'file';\n\t\t\t\t\t\telse if (special() && base && base.scheme === url.scheme) state = 'special relative or authority';\n\t\t\t\t\t\telse if (special()) state = 'special authority slashes';\n\t\t\t\t\t\telse if (rest(1) === '/') { state = 'path or authority'; pointer++; }\n\t\t\t\t\t\telse { url.path = ''; state = 'opaque path'; }\n\t\t\t\t\t} else if (!override) { buffer = ''; state = 'no scheme'; pointer = -1; }\n\t\t\t\t\telse return FAILURE;\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'no scheme':\n\t\t\t\t\tif (!base || (typeof base.path === 'string' && c !== '#')) return FAILURE;\n\t\t\t\t\tif (typeof base.path === 'string' && c === '#') {\n\t\t\t\t\t\turl.scheme = base.scheme; url.path = base.path; url.query = base.query; url.fragment = ''; state = 'fragment';\n\t\t\t\t\t} else if (base.scheme !== 'file') { state = 'relative'; pointer--; }\n\t\t\t\t\telse { state = 'file'; pointer--; }\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'special relative or authority':\n\t\t\t\t\tif (c === '/' && rest(1) === '/') { state = 'special authority ignore slashes'; pointer++; }\n\t\t\t\t\telse { state = 'relative'; pointer--; }\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'path or authority':\n\t\t\t\t\tif (c === '/') state = 'authority';\n\t\t\t\t\telse { state = 'path'; pointer--; }\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'relative':\n\t\t\t\t\turl.scheme = base.scheme;\n\t\t\t\t\tif (c === '/' || (special() && c === '\\\\')) state = 'relative slash';\n\t\t\t\t\telse {\n\t\t\t\t\t\turl.username = base.username; url.password = base.password; url.host = base.host; url.port = base.port;\n\t\t\t\t\t\turl.path = copyPath(base.path); url.query = base.query;\n\t\t\t\t\t\tif (c === '?') { url.query = ''; state = 'query'; }\n\t\t\t\t\t\telse if (c === '#') { url.fragment = ''; state = 'fragment'; }\n\t\t\t\t\t\telse if (c !== undefined) { url.query = null; shorten(url); state = 'path'; pointer--; }\n\t\t\t\t\t}\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'relative slash':\n\t\t\t\t\tif (special() && (c === '/' || c === '\\\\')) state = 'special authority ignore slashes';\n\t\t\t\t\telse if (c === '/') state = 'authority';\n\t\t\t\t\telse {\n\t\t\t\t\t\turl.username = base.username; url.password = base.password; url.host = base.host; url.port = base.port;\n\t\t\t\t\t\tstate = 'path'; pointer--;\n\t\t\t\t\t}\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'special authority slashes':\n\t\t\t\t\tstate = 'special authority ignore slashes';\n\t\t\t\t\tif (c === '/' && rest(1) === '/') pointer++;\n\t\t\t\t\telse pointer--;\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'special authority ignore slashes':\n\t\t\t\t\tif (c !== '/' && c !== '\\\\') { state = 'authority'; pointer--; }\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'authority':\n\t\t\t\t\tif (c === '@') {\n\t\t\t\t\t\tif (atSign) buffer = '%40' + buffer;\n\t\t\t\t\t\tatSign = true;\n\t\t\t\t\t\tvar userinfo = codePoints(buffer);\n\t\t\t\t\t\tfor (var index = 0; index < userinfo.length; index++) {\n\t\t\t\t\t\t\tif (userinfo[index] === ':' && !passwordToken) { passwordToken = true; continue; }\n\t\t\t\t\t\t\tif (passwordToken) url.password += encode(userinfo[index], USERINFO_SET);\n\t\t\t\t\t\t\telse url.username += encode(userinfo[index], USERINFO_SET);\n\t\t\t\t\t\t}\n\t\t\t\t\t\tbuffer = '';\n\t\t\t\t\t} else if (c === undefined || c === '/' || c === '?' || c === '#' || (special() && c === '\\\\')) {\n\t\t\t\t\t\tif (atSign && buffer === '') return FAILURE;\n\t\t\t\t\t\tpointer -= codePoints(buffer).length + 1;\n\t\t\t\t\t\tbuffer = '';\n\t\t\t\t\t\tstate = 'host';\n\t\t\t\t\t} else buffer += c;\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'host':\n\t\t\t\tcase 'hostname':\n\t\t\t\t\tif (override && url.scheme === 'file') { pointer--; state = 'file host'; }\n\t\t\t\t\telse if (c === ':' && !inBrackets) {\n\t\t\t\t\t\tif (buffer === '') return FAILURE;\n\t\t\t\t\t\tif (override === 'hostname') return FAILURE;\n\t\t\t\t\t\tvar host = parseHost(buffer, !special());\n\t\t\t\t\t\tif (host === FAILURE) return FAILURE;\n\t\t\t\t\t\turl.host = host; buffer = ''; state = 'port';\n\t\t\t\t\t} else if (c === undefined || c === '/' || c === '?' || c === '#' || (special() && c === '\\\\')) {\n\t\t\t\t\t\tpointer--;\n\t\t\t\t\t\tif (special() && buffer === '') return FAILURE;\n\t\t\t\t\t\tif (override && buffer === '' && (hasCredentials(url) || url.port !== null)) return FAILURE;\n\t\t\t\t\t\thost = parseHost(buffer, !special());\n\t\t\t\t\t\tif (host === FAILURE) return FAILURE;\n\t\t\t\t\t\turl.host = host; buffer = ''; state = 'path start';\n\t\t\t\t\t\tif (override) return url;\n\t\t\t\t\t} else {\n\t\t\t\t\t\tif (c === '[') inBrackets = true;\n\t\t\t\t\t\tif (c === ']') inBrackets = false;\n\t\t\t\t\t\tbuffer += c;\n\t\t\t\t\t}\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'port':\n\t\t\t\t\tif (c !== undefined && /[0-9]/.test(c)) buffer += c;\n\t\t\t\t\telse if (c === undefined || c === '/' || c === '?' || c === '#' || (special() && c === '\\\\') || override) {\n\t\t\t\t\t\tif (buffer !== '') {\n\t\t\t\t\t\t\tvar port = parseInt(buffer, 10);\n\t\t\t\t\t\t\tif (port > 65535) return FAILURE;\n\t\t\t\t\t\t\turl.port = port === defaultPort(url.scheme) ? null : port;\n\t\t\t\t\t\t\tbuffer = '';\n\t\t\t\t\t\t\tif (override) return url;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (override) return FAILURE;\n\t\t\t\t\t\tstate = 'path start'; pointer--;\n\t\t\t\t\t} else return FAILURE;\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'file':\n\t\t\t\t\turl.scheme = 'file';\n\t\t\t\t\turl.host = '';\n\t\t\t\t\tif (c === '/' || c === '\\\\') state = 'file slash';\n\t\t\t\t\telse if (base && base.scheme === 'file') {\n\t\t\t\t\t\turl.host = base.host; url.path = copyPath(base.path); url.query = base.query;\n\t\t\t\t\t\tif (c === '?') { url.query = ''; state = 'query'; }\n\t\t\t\t\t\telse if (c === '#') { url.fragment = ''; state = 'fragment'; }\n\t\t\t\t\t\telse if (c !== undefined) {\n\t\t\t\t\t\t\turl.query = null;\n\t\t\t\t\t\t\tif (!startsWithDrive(cps, pointer)) shorten(url);\n\t\t\t\t\t\t\telse url.path = [];\n\t\t\t\t\t\t\tstate = 'path'; pointer--;\n\t\t\t\t\t\t}\n\t\t\t\t\t} else { state = 'path'; pointer--; }\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'file slash':\n\t\t\t\t\tif (c === '/' || c === '\\\\') state = 'file host';\n\t\t\t\t\telse {\n\t\t\t\t\t\tif (base && base.scheme === 'file') {\n\t\t\t\t\t\t\turl.host = base.host;\n\t\t\t\t\t\t\tif (!startsWithDrive(cps, pointer) && typeof base.path !== 'string' && base.path.length > 0 && isDrive(base.path[0], true)) url.path.push(base.path[0]);\n\t\t\t\t\t\t}\n\t\t\t\t\t\tstate = 'path'; pointer--;\n\t\t\t\t\t}\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'file host':\n\t\t\t\t\tif (c === undefined || c === '/' || c === '\\\\' || c === '?' || c === '#') {\n\t\t\t\t\t\tpointer--;\n\t\t\t\t\t\tif (!override && isDrive(buffer, false)) state = 'path';\n\t\t\t\t\t\telse if (buffer === '') {\n\t\t\t\t\t\t\turl.host = '';\n\t\t\t\t\t\t\tif (override) return url;\n\t\t\t\t\t\t\tstate = 'path start';\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\thost = parseHost(buffer, !special());\n\t\t\t\t\t\t\tif (host === FAILURE) return FAILURE;\n\t\t\t\t\t\t\tif (host === 'localhost') host = '';\n\t\t\t\t\t\t\turl.host = host;\n\t\t\t\t\t\t\tif (override) return url;\n\t\t\t\t\t\t\tbuffer = ''; state = 'path start';\n\t\t\t\t\t\t}\n\t\t\t\t\t} else buffer += c;\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'path start':\n\t\t\t\t\tif (special()) { state = 'path'; if (c !== '/' && c !== '\\\\') pointer--; }\n\t\t\t\t\telse if (!override && c === '?') { url.query = ''; state = 'query'; }\n\t\t\t\t\telse if (!override && c === '#') { url.fragment = ''; state = 'fragment'; }\n\t\t\t\t\telse if (c !== undefined) { state = 'path'; if (c !== '/') pointer--; }\n\t\t\t\t\telse if (override && url.host === null) url.path.push('');\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'path':\n\t\t\t\t\tif (c === undefined || c === '/' || (special() && c === '\\\\') || (!override && (c === '?' || c === '#'))) {\n\t\t\t\t\t\tvar slash = c === '/' || (special() && c === '\\\\');\n\t\t\t\t\t\tvar lower = buffer.toLowerCase();\n\t\t\t\t\t\tif (lower === '..' || lower === '.%2e' || lower === '%2e.' || lower === '%2e%2e') {\n\t\t\t\t\t\t\tshorten(url);\n\t\t\t\t\t\t\tif (!slash) url.path.push('');\n\t\t\t\t\t\t} else if (lower === '.' || lower === '%2e') {\n\t\t\t\t\t\t\tif (!slash) url.path.push('');\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tif (url.scheme === 'file' && url.path.length === 0 && isDrive(buffer, false)) buffer = buffer.charAt(0) + ':';\n\t\t\t\t\t\t\turl.path.push(buffer);\n\t\t\t\t\t\t}\n\t\t\t\t\t\tbuffer = '';\n\t\t\t\t\t\tif (c === '?') { url.query = ''; state = 'query'; }\n\t\t\t\t\t\tif (c === '#') { url.fragment = ''; state = 'fragment'; }\n\t\t\t\t\t} else buffer += encode(c, PATH_SET);\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'opaque path':\n\t\t\t\t\tif (c === '?') { url.query = ''; state = 'query'; }\n\t\t\t\t\telse if (c === '#') { url.fragment = ''; state = 'fragment'; }\n\t\t\t\t\telse if (c === ' ') url.path += rest(1) === '?' || rest(1) === '#' ? '%20' : ' ';\n\t\t\t\t\telse if (c !== undefined) url.path += encode(c, C0);\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'query':\n\t\t\t\t\tif ((!override && c === '#') || c === undefined) {\n\t\t\t\t\t\turl.query += encodeText(buffer, special() ? SPECIAL_QUERY_SET : QUERY_SET);\n\t\t\t\t\t\tbuffer = '';\n\t\t\t\t\t\tif (c === '#') { url.fragment = ''; state = 'fragment'; }\n\t\t\t\t\t} else buffer += c;\n\t\t\t\t\tbreak;\n\t\t\t\tcase 'fragment':\n\t\t\t\t\tif (c !== undefined) url.fragment += encode(c, FRAGMENT_SET);\n\t\t\t\t\tbreak;\n\t\t\t}\n\t\t\tif (pointer >= cps.length) break;\n\t\t\tpointer++;\n\t\t}\n\t\treturn url;\n\t};\n\tvar pathText = function (url) { return typeof url.path === 'string' ? url.path : url.path.length === 0 ? '' : '/' + url.path.join('/'); };\n\tvar serialize = function (url, excludeFragment) {\n\t\tvar out = url.scheme + ':';\n\t\tif (url.host !== null) {\n\t\t\tout += '//';\n\t\t\tif (hasCredentials(url)) out += url.username + (url.password !== '' ? ':' + url.password : '') + '@';\n\t\t\tout += url.host;\n\t\t\tif (url.port !== null) out += ':' + url.port;\n\t\t} else if (typeof url.path !== 'string' && url.path.length > 1 && url.path[0] === '') out += '/.';\n\t\tout += pathText(url);\n\t\tif (url.query !== null) out += '?' + url.query;\n\t\tif (!excludeFragment && url.fragment !== null) out += '#' + url.fragment;\n\t\treturn out;\n\t};\n\tvar originOf = function (url) {\n\t\tif (url.scheme === 'blob') {\n\t\t\tvar inner = parse(pathText(url), null);\n\t\t\treturn inner !== FAILURE && (inner.scheme === 'http' || inner.scheme === 'https') ? originOf(inner) : 'null';\n\t\t}\n\t\tif (!isSpecialScheme(url.scheme) || url.scheme === 'file') return 'null';\n\t\treturn url.scheme + '://' + url.host + (url.port !== null ? ':' + url.port : '');\n\t};\n\n\tvar formParse = function (text) {\n\t\tvar list = [], sequences = text.split('&');\n\t\tfor (var index = 0; index < sequences.length; index++) {\n\t\t\tvar bytes = sequences[index];\n\t\t\tif (bytes === '') continue;\n\t\t\tvar at = bytes.indexOf('='), name = at < 0 ? bytes : bytes.slice(0, at), value = at < 0 ? '' : bytes.slice(at + 1);\n\t\t\tlist.push([utf8Decode(percentDecode(name.replace(/\\+/g, ' '))), utf8Decode(percentDecode(value.replace(/\\+/g, ' ')))]);\n\t\t}\n\t\treturn list;\n\t};\n\tvar formSerialize = function (list) {\n\t\treturn list.map(function (pair) { return encodeText(pair[0], FORM_SET, true) + '=' + encodeText(pair[1], FORM_SET, true); }).join('&');\n\t};\n\tvar iterate = function (source, kind) {\n\t\tvar index = 0;\n\t\tvar iterator = {\n\t\t\tnext: function () {\n\t\t\t\tvar list = source._list;\n\t\t\t\tif (index >= list.length) return { value: undefined, done: true };\n\t\t\t\tvar pair = list[index++];\n\t\t\t\treturn { value: kind === 'key' ? pair[0] : kind === 'value' ? pair[1] : [pair[0], pair[1]], done: false };\n\t\t\t},\n\t\t};\n\t\tif (typeof Symbol === 'function' && Symbol.iterator) iterator[Symbol.iterator] = function () { return this; };\n\t\treturn iterator;\n\t};\n\tvar toList = function (value) {\n\t\tif (Array.isArray(value)) return value;\n\t\tvar out = [], iterator = value[Symbol.iterator](), step;\n\t\twhile (!(step = iterator.next()).done) out.push(step.value);\n\t\treturn out;\n\t};\n\n\tvar URLSearchParams = function URLSearchParams(init) {\n\t\tif (!(this instanceof URLSearchParams)) throw new TypeError(\"Failed to construct 'URLSearchParams': Please use the 'new' operator.\");\n\t\tvar list = [];\n\t\tObject.defineProperty(this, '_list', { value: list, writable: true });\n\t\tObject.defineProperty(this, '_url', { value: null, writable: true });\n\t\tif (init === undefined) return;\n\t\tif (init !== null && (typeof init === 'object' || typeof init === 'function')) {\n\t\t\tif (typeof Symbol === 'function' && typeof init[Symbol.iterator] === 'function') {\n\t\t\t\tvar pairs = toList(init);\n\t\t\t\tfor (var index = 0; index < pairs.length; index++) {\n\t\t\t\t\tvar pair = pairs[index];\n\t\t\t\t\tif (pair === null || (typeof pair !== 'object' && typeof pair !== 'function')) throw new TypeError(\"Failed to construct 'URLSearchParams': The provided value cannot be converted to a sequence.\");\n\t\t\t\t\tpair = toList(pair);\n\t\t\t\t\tif (pair.length !== 2) throw new TypeError(\"Failed to construct 'URLSearchParams': Sequence initializer must only contain pair elements\");\n\t\t\t\t\tlist.push([toUSV(pair[0]), toUSV(pair[1])]);\n\t\t\t\t}\n\t\t\t} else {\n\t\t\t\tvar keys = Object.keys(init);\n\t\t\t\tfor (index = 0; index < keys.length; index++) list.push([toUSV(keys[index]), toUSV(init[keys[index]])]);\n\t\t\t}\n\t\t\treturn;\n\t\t}\n\t\tvar text = toUSV(init);\n\t\tthis._list = formParse(text.charAt(0) === '?' ? text.slice(1) : text);\n\t};\n\tvar update = function (params) {\n\t\tvar url = params._url;\n\t\tif (!url) return;\n\t\tvar query = formSerialize(params._list);\n\t\turl._record.query = query === '' ? null : query;\n\t\tif (query === '') stripTrailingSpaces(url._record);\n\t};\n\tvar needs = function (count, given, method) {\n\t\tif (given < count) throw new TypeError(\"Failed to execute '\" + method + \"' on 'URLSearchParams': \" + count + ' argument' + (count > 1 ? 's' : '') + ' required, but only ' + given + ' present.');\n\t};\n\tURLSearchParams.prototype = {\n\t\tconstructor: URLSearchParams,\n\t\tappend: function (name, value) { needs(2, arguments.length, 'append'); this._list.push([toUSV(name), toUSV(value)]); update(this); },\n\t\tdelete: function (name, value) {\n\t\t\tneeds(1, arguments.length, 'delete');\n\t\t\tname = toUSV(name);\n\t\t\tvar match = value === undefined ? null : toUSV(value);\n\t\t\tthis._list = this._list.filter(function (pair) { return !(pair[0] === name && (match === null || pair[1] === match)); });\n\t\t\tupdate(this);\n\t\t},\n\t\tget: function (name) {\n\t\t\tneeds(1, arguments.length, 'get');\n\t\t\tname = toUSV(name);\n\t\t\tfor (var index = 0; index < this._list.length; index++) if (this._list[index][0] === name) return this._list[index][1];\n\t\t\treturn null;\n\t\t},\n\t\tgetAll: function (name) {\n\t\t\tneeds(1, arguments.length, 'getAll');\n\t\t\tname = toUSV(name);\n\t\t\treturn this._list.filter(function (pair) { return pair[0] === name; }).map(function (pair) { return pair[1]; });\n\t\t},\n\t\thas: function (name, value) {\n\t\t\tneeds(1, arguments.length, 'has');\n\t\t\tname = toUSV(name);\n\t\t\tvar match = value === undefined ? null : toUSV(value);\n\t\t\treturn this._list.some(function (pair) { return pair[0] === name && (match === null || pair[1] === match); });\n\t\t},\n\t\tset: function (name, value) {\n\t\t\tneeds(2, arguments.length, 'set');\n\t\t\tname = toUSV(name);\n\t\t\tvalue = toUSV(value);\n\t\t\tvar found = false;\n\t\t\tthis._list = this._list.filter(function (pair) {\n\t\t\t\tif (pair[0] !== name) return true;\n\t\t\t\tif (found) return false;\n\t\t\t\tfound = true;\n\t\t\t\tpair[1] = value;\n\t\t\t\treturn true;\n\t\t\t});\n\t\t\tif (!found) this._list.push([name, value]);\n\t\t\tupdate(this);\n\t\t},\n\t\tsort: function () {\n\t\t\tthis._list = this._list\n\t\t\t\t.map(function (pair, index) { return [pair, index]; })\n\t\t\t\t.sort(function (a, b) { return a[0][0] < b[0][0] ? -1 : a[0][0] > b[0][0] ? 1 : a[1] - b[1]; })\n\t\t\t\t.map(function (entry) { return entry[0]; });\n\t\t\tupdate(this);\n\t\t},\n\t\tforEach: function (callback, thisArg) {\n\t\t\tneeds(1, arguments.length, 'forEach');\n\t\t\tfor (var index = 0; index < this._list.length; index++) callback.call(thisArg, this._list[index][1], this._list[index][0], this);\n\t\t},\n\t\tkeys: function () { return iterate(this, 'key'); },\n\t\tvalues: function () { return iterate(this, 'value'); },\n\t\tentries: function () { return iterate(this, 'pair'); },\n\t\ttoString: function () { return formSerialize(this._list); },\n\t};\n\tObject.defineProperty(URLSearchParams.prototype, 'size', { get: function () { return this._list.length; } });\n\tif (typeof Symbol === 'function' && Symbol.iterator) URLSearchParams.prototype[Symbol.iterator] = URLSearchParams.prototype.entries;\n\n\tvar URL = function URL(url, base) {\n\t\tif (!(this instanceof URL)) throw new TypeError(\"Failed to construct 'URL': Please use the 'new' operator.\");\n\t\tif (arguments.length < 1) throw new TypeError(\"Failed to construct 'URL': 1 argument required, but only 0 present.\");\n\t\tvar parsedBase = null;\n\t\tif (base !== undefined) {\n\t\t\tparsedBase = parse(toUSV(base), null);\n\t\t\tif (parsedBase === FAILURE) throw new TypeError(\"Failed to construct 'URL': Invalid base URL\");\n\t\t}\n\t\tvar record = parse(toUSV(url), parsedBase);\n\t\tif (record === FAILURE) throw new TypeError(\"Failed to construct 'URL': Invalid URL\");\n\t\tObject.defineProperty(this, '_record', { value: record, writable: true });\n\t\tvar params = new URLSearchParams(record.query || '');\n\t\tparams._url = this;\n\t\tObject.defineProperty(this, '_params', { value: params });\n\t};\n\tvar cannotHaveCredentials = function (record) { return record.host === null || record.host === '' || record.scheme === 'file'; };\n\tvar accessor = function (name, get, set) {\n\t\tObject.defineProperty(URL.prototype, name, { enumerable: true, configurable: true, get: get, set: set });\n\t};\n\tURL.prototype = {\n\t\tconstructor: URL,\n\t\ttoString: function () { return serialize(this._record); },\n\t\ttoJSON: function () { return serialize(this._record); },\n\t};\n\taccessor('href', function () { return serialize(this._record); }, function (value) {\n\t\tvar record = parse(toUSV(value), null);\n\t\tif (record === FAILURE) throw new TypeError(\"Failed to set the 'href' property on 'URL': Invalid URL\");\n\t\tthis._record = record;\n\t\tthis._params._list = record.query ? formParse(record.query) : [];\n\t});\n\taccessor('origin', function () { return originOf(this._record); });\n\taccessor('protocol', function () { return this._record.scheme + ':'; }, function (value) { parse(toUSV(value) + ':', null, this._record, 'scheme start'); });\n\taccessor('username', function () { return this._record.username; }, function (value) {\n\t\tif (!cannotHaveCredentials(this._record)) this._record.username = encodeText(toUSV(value), USERINFO_SET);\n\t});\n\taccessor('password', function () { return this._record.password; }, function (value) {\n\t\tif (!cannotHaveCredentials(this._record)) this._record.password = encodeText(toUSV(value), USERINFO_SET);\n\t});\n\taccessor('host', function () {\n\t\tvar record = this._record;\n\t\tif (record.host === null) return '';\n\t\treturn record.port === null ? record.host : record.host + ':' + record.port;\n\t}, function (value) { if (typeof this._record.path !== 'string') parse(toUSV(value), null, this._record, 'host'); });\n\taccessor('hostname', function () { return this._record.host === null ? '' : this._record.host; }, function (value) {\n\t\tif (typeof this._record.path !== 'string') parse(toUSV(value), null, this._record, 'hostname');\n\t});\n\taccessor('port', function () { return this._record.port === null ? '' : String(this._record.port); }, function (value) {\n\t\tif (cannotHaveCredentials(this._record)) return;\n\t\tvalue = toUSV(value);\n\t\tif (value === '') this._record.port = null;\n\t\telse parse(value, null, this._record, 'port');\n\t});\n\taccessor('pathname', function () { return pathText(this._record); }, function (value) {\n\t\tif (typeof this._record.path === 'string') return;\n\t\tthis._record.path = [];\n\t\tparse(toUSV(value), null, this._record, 'path start');\n\t});\n\taccessor('search', function () { var query = this._record.query; return query === null || query === '' ? '' : '?' + query; }, function (value) {\n\t\tvalue = toUSV(value);\n\t\tif (value === '') {\n\t\t\tthis._record.query = null;\n\t\t\tthis._params._list = [];\n\t\t\tstripTrailingSpaces(this._record);\n\t\t\treturn;\n\t\t}\n\t\tvar input = value.charAt(0) === '?' ? value.slice(1) : value;\n\t\tthis._record.query = '';\n\t\tparse(input, null, this._record, 'query');\n\t\tthis._params._list = formParse(input);\n\t});\n\taccessor('searchParams', function () { return this._params; });\n\taccessor('hash', function () { var fragment = this._record.fragment; return fragment === null || fragment === '' ? '' : '#' + fragment; }, function (value) {\n\t\tvalue = toUSV(value);\n\t\tif (value === '') {\n\t\t\tthis._record.fragment = null;\n\t\t\tstripTrailingSpaces(this._record);\n\t\t\treturn;\n\t\t}\n\t\tthis._record.fragment = '';\n\t\tparse(value.charAt(0) === '#' ? value.slice(1) : value, null, this._record, 'fragment');\n\t});\n\tURL.canParse = function (url, base) {\n\t\ttry { new URL(url, base); return true; } catch (error) { return false; }\n\t};\n\tURL.parse = function (url, base) {\n\t\ttry { return new URL(url, base); } catch (error) { return null; }\n\t};\n\tg.URL = URL;\n\tg.URLSearchParams = URLSearchParams;\n})();\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0,\"fn:2\":0,\"fn:3\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => new URLSearchParams(__s.query).get('page'));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => {\n const params = new URLSearchParams(__s.query);\n params.set('page', String(Number(params.get('page')) + 1));\n __s.query = params.toString();\n});\n};\nfunctions[\"fn:2\"] = function (__s) {\nreturn (() => {\n const params = new URLSearchParams(__s.query);\n params.set('q', 'hats & caps');\n __s.query = params.toString();\n});\n};\nfunctions[\"fn:3\"] = function (__s) {\nreturn (() => {\n const url = new URL('../orders/7?tab=items#top', 'https://shop.example/account/settings/');\n url.searchParams.append('from', 'ä');\n __s.opened = `${url.host}${url.pathname}${url.search}`;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"7f7e8128f7ae9f8c\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Shop links"
+		],
+		[
+			"h2:text0",
+			"Query: q=shoes&page=1"
+		],
+		[
+			"h3:text0",
+			"Page 1"
+		],
+		[
+			"h4:text0",
+			"Opened: nothing yet"
+		],
+		[
+			"h5:text0",
+			"Next page"
+		],
+		[
+			"h6:text0",
+			"Search hats"
+		],
+		[
+			"h7:text0",
+			"Open order"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Query: q=shoes&page=2"
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Page 2"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Query: q=hats+%26+caps&page=2"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h7"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Opened: shop.example/account/orders/7?tab=items&from=%C3%A4"
+				}
+			]
+		}
+	]
+}

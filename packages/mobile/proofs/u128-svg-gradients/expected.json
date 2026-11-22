@@ -1,0 +1,13 @@
+{
+	"rung": 233,
+	"name": "svg gradients, linear and radial, in bounding-box and user units, fill and stroke shapes on phones as the browser paints them, in an inline <svg> and in an SVG file",
+	"steps": [
+		{ "visible": ["Gradients", "Gradient swatches", "Vite logo", "Toggle swatches"] },
+		{
+			"do": { "tap": "Toggle swatches" },
+			"visible": ["Gradients", "Vite logo"],
+			"absent": ["Gradient swatches"]
+		},
+		{ "do": { "tap": "Toggle swatches" }, "visible": ["Gradient swatches", "Vite logo"] }
+	]
+}

@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: j52-url
+---
+- launchApp:
+      clearState: true
+- assertVisible: Shop links
+- assertVisible: 'Query: q=shoes&page=1'
+- assertVisible: Page 1
+- assertVisible: 'Opened: nothing yet'
+- tapOn: Next page
+- assertNotVisible: Page 1
+- assertVisible: 'Query: q=shoes&page=2'
+- assertVisible: Page 2
+- assertNotVisible: Page 1
+- tapOn: Search hats
+- assertNotVisible: 'Query: q=shoes&page=2'
+- assertVisible: "Query: q=hats\\+%26\\+caps&page=2"
+- assertVisible: Page 2
+- assertVisible: 'Opened: nothing yet'
+- assertNotVisible: 'Query: q=shoes&page=2'
+- tapOn: Open order
+- assertNotVisible: 'Opened: nothing yet'
+- assertVisible: "Opened: shop\\.example/account/orders/7\\?tab=items&from=%C3%A4"
+- assertNotVisible: 'Opened: nothing yet'

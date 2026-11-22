@@ -10,12 +10,15 @@ public struct NativeImageAsset: Sendable {
 	public let drawing: NativeDrawing?
 	public let width: Double?
 	public let height: Double?
+	/// A JPEG's EXIF orientation the build applied to its size, 2 to 8; without one the picture is drawn as stored.
+	public let orientation: Int?
 
-	public init(data: Data, width: Double, height: Double) {
+	public init(data: Data, width: Double, height: Double, orientation: Int? = nil) {
 		self.data = data
 		self.drawing = nil
 		self.width = width
 		self.height = height
+		self.orientation = orientation
 	}
 
 	public init(drawing: NativeDrawing, width: Double?, height: Double?) {
@@ -23,6 +26,15 @@ public struct NativeImageAsset: Sendable {
 		self.drawing = drawing
 		self.width = width
 		self.height = height
+		self.orientation = nil
+	}
+
+	/// The picture, turned as the browser draws it: by the orientation the build read, and never by one the build left out
+	/// (a WebP's EXIF orientation, which Chrome does not apply).
+	var picture: UIImage? {
+		guard let image = data.flatMap({ UIImage(data: $0) }) else { return nil }
+		guard orientation == nil, image.imageOrientation != .up, let stored = image.cgImage else { return image }
+		return UIImage(cgImage: stored, scale: image.scale, orientation: .up)
 	}
 
 	/// The app's packaged images, from `markless/images.json` and the files it names, in `bundle`.
@@ -39,7 +51,7 @@ public struct NativeImageAsset: Sendable {
 				images[src] = NativeImageAsset(drawing: decoded, width: number("width"), height: number("height"))
 			} else if case let .string(file)? = field("file"), let width = number("width"), let height = number("height"),
 			          let data = try? Data(contentsOf: bundle.appending(path: file)) {
-				images[src] = NativeImageAsset(data: data, width: width, height: height)
+				images[src] = NativeImageAsset(data: data, width: width, height: height, orientation: number("orientation").map { Int($0) })
 			}
 		}
 		return images

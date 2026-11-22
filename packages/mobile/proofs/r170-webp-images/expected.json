@@ -1,0 +1,8 @@
+{
+	"rung": 170,
+	"name": "WebP images, lossy, lossless and extended, are drawn at the size their header gives, and a WebP's EXIF orientation is left unapplied, as Chrome draws it",
+	"steps": [
+		{ "visible": ["WebP images", "Orange photo", "Badge as stored", "Show square"], "absent": ["Blue square"] },
+		{ "do": { "tap": "Show square" }, "visible": ["Blue square", "Hide square"], "absent": ["Show square"] }
+	]
+}
