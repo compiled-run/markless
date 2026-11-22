@@ -60,6 +60,8 @@ import dev.markless.mobile.core.Runtime
 import dev.markless.mobile.core.Scope
 import dev.markless.mobile.core.Store
 import dev.markless.mobile.style.Assignment
+import dev.markless.mobile.style.Edges
+import dev.markless.mobile.style.paddingBox
 import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.OutlinePaint
 import dev.markless.mobile.style.StyleExport
@@ -1697,11 +1699,12 @@ class MarklessHost(
 		}
 		if (view is MarklessBox) view.clipsOverflow = clipsChildren
 		if (s.kind != "text") {
-			val edges = s.borderWidths
-			if (clipsChildren && edges != null && listOf(edges.top, edges.right, edges.bottom, edges.left).any { it != 0.0 }) throw MarklessHostError("\"${s.id}\" clips overflow to its padding box past borders, which is not implemented on Android")
+			val edges = s.borderWidths ?: Edges(0.0, 0.0, 0.0, 0.0)
+			val bordered = listOf(edges.top, edges.right, edges.bottom, edges.left).any { it != 0.0 }
+			if (clipsChildren && bordered && s.borderOps != null) throw MarklessHostError("\"${s.id}\" clips overflow to its padding box inside a dashed or dotted border, which is not implemented on Android")
 			if (view is MarklessBox) {
 				view.clip = clip
-				view.childClipRadii = if (clipsChildren) radii?.takeIf { r -> r.any { it != 0.0 } }?.map { it.toFloat() }?.toFloatArray() else null
+				view.childClip = if (clipsChildren) paddingBox(edges, radii).takeIf { bordered || it.rounded } else null
 			}
 			else if (clip != null) throw MarklessHostError("\"${s.id}\" has a clip-path on a ${view.javaClass.simpleName}, which is not implemented on Android")
 		}
@@ -1738,7 +1741,14 @@ class MarklessHost(
 		val anyBorder = widths.any { it > 0 }
 		if ((fill == null || (fill ushr 24) == 0) && !anyBorder) { view.background = arrow; return }
 		if (anyBorder && (widths.distinct().size != 1 || colors?.distinct()?.size != 1)) {
-			if (radii?.any { it != 0.0 } == true) throw MarklessHostError("\"${s.id}\" has unequal border sides with rounded corners; not implemented on Android")
+			val rounded = radii?.takeIf { r -> r.any { it != 0.0 } }
+			if (rounded != null) {
+				val drawn = colors?.filterIndexed { i, _ -> widths[i] > 0 }?.distinct()
+				if (drawn?.size != 1) throw MarklessHostError("\"${s.id}\" has border sides of different colours with rounded corners; not implemented on Android")
+				val inner = paddingBox(Edges(widths[0], widths[1], widths[2], widths[3]), rounded)
+				view.background = withArrow { RoundedSides(it, drawn[0], rounded, inner) }
+				return
+			}
 			val sides = colors ?: throw MarklessHostError("\"${s.id}\" has border sides but no colours")
 			view.background = withArrow { SideBorders(it, widths.map { w -> w.toFloat() }, sides) }
 			return

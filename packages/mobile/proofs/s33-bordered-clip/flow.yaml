@@ -1,0 +1,19 @@
+appId: ${APP_ID}
+name: s33-bordered-clip
+---
+- launchApp:
+    clearState: true
+- assertVisible: Bordered cards
+- assertVisible: Basil, inside the border
+- assertVisible: Thyme, uneven sides
+- assertVisible: Opened 0
+- assertNotVisible: Opened 1
+- assertVisible: Cards
+- tapOn: Open card
+- assertVisible: Opened 1
+- assertNotVisible: Opened 0
+- assertVisible: Opened 1
+- assertVisible: Basil, inside the border
+- assertVisible: Thyme, uneven sides
+- assertNotVisible: Opened 0
+- assertVisible: Cards
