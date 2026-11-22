@@ -11,9 +11,10 @@ import java.nio.ByteBuffer
 /**
  * Shapes a row's text as Dragon's build shapes an Android system face (parity/src/system-fonts/provider.ts androidSystemFonts):
  * HarfBuzz through Dragon's shim (`libdragon_hb.so`, found by name as the translated harness is) over `/system/fonts/<file>` at
- * the instance the build measured. A face the export does not name is refused by name.
+ * the instance the build measured, and a face the app bundles (a web font) from its bytes as Dragon's build shapes it. Any other
+ * face is refused by name.
  */
-class RowShaper(private val faces: Map<String, SystemFace>) {
+class RowShaper(private val faces: Map<String, SystemFace>, private val bundled: (String) -> ByteArray? = { null }) {
 	private val hb: Class<*> = Class.forName("dev.dragon.text.DragonHB")
 	private fun method(name: String): Method = hb.methods.first { it.name == name }
 	private val faceCreate = method("faceCreate")
@@ -46,7 +47,7 @@ class RowShaper(private val faces: Map<String, SystemFace>) {
 	}
 
 	private fun fontAt(id: String, size: Double): Long = fonts.getOrPut("$id@$size") {
-		val face = faces[id] ?: run { unshapedFace = true; refuse("a row's text in $id, which this host does not shape on the phone yet") }
+		val face = faces[id] ?: return@getOrPut bundledFontAt(id, size)
 		val bytes = File("/system/fonts", face.file).readBytes()
 		val handle = hbFaces.getOrPut("${face.file}#${face.index}") {
 			(call(faceCreate, bytes, face.index) as Long).also { if (it == 0L) refuse("HarfBuzz cannot read /system/fonts/${face.file}") }
@@ -59,6 +60,16 @@ class RowShaper(private val faces: Map<String, SystemFace>) {
 			fontCreate, handle, size.toFloat(), size.toFloat(), (instance["wght"] ?: 400.0).toFloat(), (instance["wdth"] ?: 100.0).toFloat(),
 			(-(instance["slnt"] ?: 0.0)).toFloat(), false, if (tags.isEmpty()) null else tags, if (values.isEmpty()) null else values,
 		) as Long).also { if (it == 0L) refuse("HarfBuzz cannot make $id at $size px") }
+	}
+
+	/** A face the app bundles (a web font, decoded to its sfnt at build time), made as Dragon's build shapes it: at its default instance. */
+	private fun bundledFontAt(id: String, size: Double): Long {
+		val bytes = bundled(id) ?: run { unshapedFace = true; refuse("a row's text in $id, which this host does not shape on the phone yet") }
+		val handle = hbFaces.getOrPut(id) {
+			(call(faceCreate, bytes, 0) as Long).also { if (it == 0L) refuse("HarfBuzz cannot read the bundled face $id") }
+		}
+		return (call(fontCreate, handle, size.toFloat(), size.toFloat(), 400f, 100f, 0f, true, null, null) as Long)
+			.also { if (it == 0L) refuse("HarfBuzz cannot make $id at $size px") }
 	}
 
 	/** Dragon's GlyphShaper call: glyph records (7 numbers per glyph) for text[start, end) in `face` at `size` device px. */

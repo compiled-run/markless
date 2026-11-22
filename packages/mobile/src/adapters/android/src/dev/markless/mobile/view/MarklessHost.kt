@@ -86,6 +86,9 @@ fun interface FontSource {
 
 	/** The face as a [android.graphics.fonts.Font], which draws a style export's glyph ids. */
 	fun font(id: String): android.graphics.fonts.Font = throw MarklessHostError("this font source has no glyph font for \"$id\"")
+
+	/** The face's sfnt bytes, which the row shaper reads; null when this source has none. */
+	fun bytes(id: String): ByteArray? = null
 }
 
 /** Faces bundled as APK assets at `markless-fonts/<hex>.ttf`, the hex of the font file's SHA-256. */
@@ -96,6 +99,11 @@ class AssetFonts(private val context: Context) : FontSource {
 	}
 	private val faces = HashMap<String, android.graphics.fonts.Font>()
 	override fun font(id: String): android.graphics.fonts.Font = faces.getOrPut(id) { android.graphics.fonts.Font.Builder(context.assets, path(id)).build() }
+	override fun bytes(id: String): ByteArray? = try {
+		context.assets.open(path(id)).use { it.readBytes() }
+	} catch (_: java.io.IOException) {
+		null
+	}
 
 	private fun path(id: String): String {
 		if (!id.startsWith("sha256:")) throw MarklessHostError("font id \"$id\" is not a sha256 id")
@@ -123,6 +131,8 @@ class SystemFonts(private val faces: Map<String, dev.markless.mobile.style.Syste
 			}
 		}
 	}
+
+	override fun bytes(id: String): ByteArray? = if (id in faces) null else bundled.bytes(id)
 
 	override fun typeface(id: String): Typeface {
 		if (id !in faces) return bundled.typeface(id)
@@ -707,7 +717,7 @@ class MarklessHost(
 		if (!rowsMoved && laidOutFor == at) return false
 		val withRows = planned.planRepeats.isNotEmpty()
 		val live: (String) -> String = { line ->
-			val shaper = rowShaper ?: RowShaper(planned.systemFaces).also { rowShaper = it }
+			val shaper = rowShaper ?: RowShaper(planned.systemFaces, fonts::bytes).also { rowShaper = it }
 			(RowShaper.rowsLayout(shaper) ?: throw MarklessHostError("a page with styled rows or texts that follow state needs Dragon's live layout in the app"))(line)
 		}
 		val rows = if (withRows) planned.shownRows(payload, runtime) else null

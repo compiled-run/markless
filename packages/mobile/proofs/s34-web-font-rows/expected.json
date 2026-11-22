@@ -1,0 +1,37 @@
+{
+	"rung": "S34",
+	"name": "Styled @for rows in a web font the app bundles: each row's text shaped on the phone as the build shapes it, so the rows and the boxes after them lay out as the web lays them out",
+	"steps": [
+		{
+			"visible": [
+				"Notes",
+				"Groceries",
+				"Call the plumber about the kitchen tap before Friday",
+				"End of list"
+			],
+			"absent": ["No notes yet", "Water the plants"],
+			"title": "Notes"
+		},
+		{
+			"do": {
+				"tap": "Add note"
+			},
+			"visible": ["Groceries", "Water the plants", "End of list"],
+			"absent": ["No notes yet"]
+		},
+		{
+			"do": {
+				"tap": "Clear notes"
+			},
+			"visible": ["No notes yet", "End of list"],
+			"absent": ["Groceries", "Water the plants"]
+		},
+		{
+			"do": {
+				"tap": "Add note"
+			},
+			"visible": ["Water the plants", "End of list"],
+			"absent": ["No notes yet"]
+		}
+	]
+}

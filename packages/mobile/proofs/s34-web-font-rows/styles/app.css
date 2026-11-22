@@ -1,0 +1,10 @@
+@font-face {
+	font-family: 'Harbour Lato';
+	src: url('./fonts/Lato-Regular.woff2') format('woff2');
+	font-weight: 400;
+}
+
+body {
+	margin: 0;
+	font-family: 'Harbour Lato';
+}
