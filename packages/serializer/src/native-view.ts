@@ -311,6 +311,8 @@ export type NativeDefaultStyle = {
 	readonly marker?: 'disc' | 'decimal';
 	/** On `<summary>`: a triangle before its content, not read aloud: ▸ while its `aria-expanded` is false, ▾ while true. */
 	readonly disclosure?: true;
+	/** On `<center>`: its blocks in the middle of the line and its text centred (`text-align: -webkit-center`), inherited. */
+	readonly center?: true;
 	/** Table structure: `<td>` and `<th>` cells line up in columns across the rows of their `<table>`. */
 	readonly table?: 'table' | 'row' | 'cell';
 };
@@ -406,6 +408,7 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	dialog: {},
 	details: {},
 	summary: { disclosure: true },
+	center: { center: true },
 	form: {},
 	select: {},
 	option: {},
@@ -470,6 +473,25 @@ export type NativeColor = {
 	readonly alpha: number;
 };
 
+/** A gradient's colour at `offset` (0 to 1, never less than the stop before it). */
+export type NativeGradientStop = { readonly offset: number; readonly color: NativeColor };
+
+/**
+ * An SVG `<linearGradient>` or `<radialGradient>` paint (SVG 2 §14.2), padded: the first stop's colour before it, the last
+ * one's after it. The first stop is at 0 and the last at 1. Colours blend unpremultiplied in sRGB, as the browser blends
+ * them; where two stops differ in both colour and alpha the compiler adds stops between them, so a host that blends
+ * premultiplied draws the same colours.
+ */
+export type NativeGradient = (
+	| { readonly linear: readonly [x1: number, y1: number, x2: number, y2: number] }
+	/** From the focal circle (fx, fy, fr) to the circle (cx, cy, r), which holds it. */
+	| { readonly radial: readonly [fx: number, fy: number, fr: number, cx: number, cy: number, r: number] }
+) & {
+	readonly stops: ReadonlyArray<NativeGradientStop>;
+	/** The affine map from the gradient's units to the shape's: its bounding box, then `gradientTransform`. */
+	readonly transform?: readonly [number, number, number, number, number, number];
+};
+
 /** One shape of a drawing; numbers are in the drawing's user units. */
 export type NativeShape = {
 	/**
@@ -478,9 +500,9 @@ export type NativeShape = {
 	 */
 	readonly path: ReadonlyArray<number>;
 	/** `currentColor` is the svg's text colour: its style export's, else the page's default black. */
-	readonly fill: NativeColor | 'currentColor' | null;
+	readonly fill: NativeColor | 'currentColor' | NativeGradient | null;
 	readonly fillRule: 'nonzero' | 'evenodd';
-	readonly stroke: NativeColor | 'currentColor' | null;
+	readonly stroke: NativeColor | 'currentColor' | NativeGradient | null;
 	readonly width: number;
 	readonly cap: 'butt' | 'round' | 'square';
 	readonly join: 'miter' | 'round' | 'bevel';
@@ -1674,35 +1696,38 @@ export const NATIVE_SCRIPT_DOM_CLASSES: Readonly<Record<string, string | null>> 
 	),
 };
 
-/** Globals a host provides to scripts, by the service that backs each. */
-export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptService | 'engine'>> =
-	{
-		setTimeout: 'timers',
-		clearTimeout: 'timers',
-		setInterval: 'timers',
-		clearInterval: 'timers',
-		queueMicrotask: 'engine',
-		structuredClone: 'engine',
-		performance: 'engine',
-		DOMException: 'engine',
-		File: 'engine',
-		DataTransfer: 'engine',
-		// Answers an element's `direction` only, from the host's facts.
-		getComputedStyle: 'engine',
-		console: 'console',
-		fetch: 'fetch',
-		crypto: 'crypto',
-		matchMedia: 'media',
-		devicePixelRatio: 'screen',
-		Event: 'engine',
-		CustomEvent: 'engine',
-		MouseEvent: 'engine',
-		PointerEvent: 'engine',
-		KeyboardEvent: 'engine',
-		...Object.fromEntries(
-			Object.keys(NATIVE_SCRIPT_DOM_CLASSES).map((name) => [name, 'engine' as const]),
-		),
-	};
+/** Globals a host provides to scripts, by the service behind each; for `url` the build adds the URL Standard's code. */
+export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<
+	Record<string, NativeScriptService | 'engine' | 'url'>
+> = {
+	setTimeout: 'timers',
+	clearTimeout: 'timers',
+	setInterval: 'timers',
+	clearInterval: 'timers',
+	queueMicrotask: 'engine',
+	structuredClone: 'engine',
+	performance: 'engine',
+	DOMException: 'engine',
+	File: 'engine',
+	DataTransfer: 'engine',
+	// Answers an element's `direction` only, from the host's facts.
+	getComputedStyle: 'engine',
+	URL: 'url',
+	URLSearchParams: 'url',
+	console: 'console',
+	fetch: 'fetch',
+	crypto: 'crypto',
+	matchMedia: 'media',
+	devicePixelRatio: 'screen',
+	Event: 'engine',
+	CustomEvent: 'engine',
+	MouseEvent: 'engine',
+	PointerEvent: 'engine',
+	KeyboardEvent: 'engine',
+	...Object.fromEntries(
+		Object.keys(NATIVE_SCRIPT_DOM_CLASSES).map((name) => [name, 'engine' as const]),
+	),
+};
 
 /**
  * What a script handler's event has on a phone, as member paths: a deeper read below `target.value` is a string's. Any

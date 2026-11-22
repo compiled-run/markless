@@ -10,6 +10,7 @@ import {
 	NATIVE_SCRIPT_SUBMITTED_FORM,
 	NATIVE_UNBOUND_HANDLE,
 } from '@markless/serializer/native-view';
+import { NATIVE_SCRIPT_URL } from './native-script-url.ts';
 import { SVG_GEOMETRY_SOURCE } from './native-svg-geometry.ts';
 
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
@@ -1002,6 +1003,8 @@ export function nativeScriptOf(
 	/** The app's origin (app.json `origin`), which a URL from the root resolves against. */
 	origin?: string,
 	engine: NativeScriptEngine = NATIVE_SCRIPT_ENGINE,
+	/** The script reads `URL` or `URLSearchParams`: the engine carries the URL Standard's code for engines without them. */
+	url = false,
 ): NativeScript {
 	const owners: Record<string, number> = {};
 	const definitions = modules.map((module, index) => {
@@ -1036,6 +1039,6 @@ export function nativeScriptOf(
 		engine.entries,
 	].join('\n');
 	const id = contentId(body);
-	const source = `(function (g, id) {\n${engine.services}\ng.__markless = g.__markless || {};\n${body}\n})(globalThis, ${JSON.stringify(id)});\n`;
+	const source = `(function (g, id) {\n${engine.services}\n${url ? `${NATIVE_SCRIPT_URL}\n` : ''}g.__markless = g.__markless || {};\n${body}\n})(globalThis, ${JSON.stringify(id)});\n`;
 	return { id, source, services };
 }

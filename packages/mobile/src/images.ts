@@ -14,7 +14,7 @@ export type NativeImage = {
 	readonly src: string;
 	readonly file: string;
 	readonly bytes: Uint8Array;
-	readonly format: 'png' | 'jpeg' | 'gif' | 'svg';
+	readonly format: 'png' | 'jpeg' | 'gif' | 'webp' | 'svg';
 	readonly width?: number;
 	readonly height?: number;
 	/** An SVG file's shapes, drawn in the image's box. */
@@ -40,6 +40,7 @@ export type NativeImageManifest = Readonly<
 
 const u16be = (b: Uint8Array, at: number) => (b[at]! << 8) | b[at + 1]!;
 const u16le = (b: Uint8Array, at: number) => b[at]! | (b[at + 1]! << 8);
+const u24le = (b: Uint8Array, at: number) => b[at]! | (b[at + 1]! << 8) | (b[at + 2]! << 16);
 const u32be = (b: Uint8Array, at: number) => ((b[at]! << 24) | (b[at + 1]! << 16) | (b[at + 2]! << 8) | b[at + 3]!) >>> 0;
 
 const EXIF_ID = [0x45, 0x78, 0x69, 0x66, 0, 0];
@@ -72,17 +73,31 @@ function exifOrientation(segment: Uint8Array): number | null {
 
 /**
  * The format and natural size an image's header gives, with a JPEG's EXIF orientation applied (the browser's default
- * `image-orientation: from-image`); null for bytes that are not a PNG, JPEG or GIF this reads.
+ * `image-orientation: from-image`); null for bytes that are not a PNG, JPEG, GIF or WebP this reads. A WebP's EXIF
+ * orientation is not applied, as Chrome draws it as stored.
  */
 export function imageHeader(
 	bytes: Uint8Array,
-): { readonly format: 'png' | 'jpeg' | 'gif'; readonly width: number; readonly height: number; readonly orientation?: number } | null {
+): { readonly format: 'png' | 'jpeg' | 'gif' | 'webp'; readonly width: number; readonly height: number; readonly orientation?: number } | null {
 	// PNG: the signature, then IHDR's width and height.
 	if (bytes.length >= 24 && u32be(bytes, 0) === 0x89504e47 && u32be(bytes, 12) === 0x49484452)
 		return { format: 'png', width: u32be(bytes, 16), height: u32be(bytes, 20) };
 	// GIF: GIF87a or GIF89a, then the logical screen's width and height.
 	if (bytes.length >= 10 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46)
 		return { format: 'gif', width: u16le(bytes, 6), height: u16le(bytes, 8) };
+	// WebP: a RIFF file whose first chunk is a simple lossy (VP8) or lossless (VP8L) bitstream, or the extended format's
+	// canvas (VP8X).
+	if (bytes.length >= 30 && u32be(bytes, 0) === 0x52494646 && u32be(bytes, 8) === 0x57454250) {
+		const chunk = String.fromCharCode(...bytes.subarray(12, 16));
+		if (chunk === 'VP8 ' && bytes[23] === 0x9d && bytes[24] === 0x01 && bytes[25] === 0x2a)
+			return { format: 'webp', width: u16le(bytes, 26) & 0x3fff, height: u16le(bytes, 28) & 0x3fff };
+		if (chunk === 'VP8L' && bytes[20] === 0x2f) {
+			const bits = (u16le(bytes, 21) | (u16le(bytes, 23) << 16)) >>> 0;
+			return { format: 'webp', width: (bits & 0x3fff) + 1, height: ((bits >>> 14) & 0x3fff) + 1 };
+		}
+		if (chunk === 'VP8X') return { format: 'webp', width: u24le(bytes, 24) + 1, height: u24le(bytes, 27) + 1 };
+		return null;
+	}
 	// JPEG: walk the segments to the first start-of-frame; its height and width.
 	if (bytes.length >= 4 && bytes[0] === 0xff && bytes[1] === 0xd8) {
 		let at = 2;
