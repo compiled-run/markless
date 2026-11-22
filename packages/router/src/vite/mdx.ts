@@ -19,7 +19,6 @@ import { protocolIslandSegment } from '../../../serializer/src/protocol-constant
 import {
 	emitQueuedResumeContainerEvent,
 	emitAsyncPlanesLoaderInstall,
-	emitComposedArmRecordsInstall,
 	emitRosterResumeLoaderInstall,
 	emitSharedInstancesLoaderInstall,
 } from '../../../bundler/src/source-module.ts';
@@ -161,8 +160,6 @@ function emitMdxClientRoute(route: MdxRoute, id: string, resume: boolean): strin
 		emitRosterResumeLoaderInstall(),
 		emitSharedInstancesLoaderInstall(),
 		...(resume ? [emitAsyncPlanesLoaderInstall()] : []),
-		// Every island composes under its own instance segment, so its arm records need re-spelling at flip time.
-		...(route.components.length > 0 ? [emitComposedArmRecordsInstall()] : []),
 		'const marklessMdxPage = {',
 		'  renderData: marklessMdxRenderData,',
 		'  loadSymbol: marklessMdxLoadSymbol,',

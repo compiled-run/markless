@@ -25,9 +25,8 @@ async function entry(source: string, load: (specifier: string) => Promise<Runtim
 		'load',
 		'globalThis',
 		'mdxSymbolLoader',
-		'installMarklessComposedArmRecords',
 		`${executable}; return resumeContainerEvent;`,
-	)((input: Input) => input.scalar === true, load, {}, mdxSymbolLoader, () => {}) as (input: Input) => Promise<void>;
+	)((input: Input) => input.scalar === true, load, {}, mdxSymbolLoader) as (input: Input) => Promise<void>;
 }
 
 test.each([
