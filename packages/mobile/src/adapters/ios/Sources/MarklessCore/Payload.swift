@@ -277,6 +277,13 @@ public struct NativeDrawing: Equatable, Sendable {
 	}
 }
 
+extension NativeDrawing {
+	/// A drawing on its own, as an SVG file's image travels in the app's image manifest.
+	public static func decode(_ json: JSONValue, at path: String) throws -> NativeDrawing {
+		try NativeViewPayload.decodeDrawing(Reader(json, at: path))
+	}
+}
+
 public enum NativeEventName: String, Sendable {
 	case activate
 	case input
@@ -1231,7 +1238,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		return decoded
 	}
 
-	private static func decodeDrawing(_ reader: Reader) throws -> NativeDrawing {
+	static func decodeDrawing(_ reader: Reader) throws -> NativeDrawing {
 		let field = try reader.object(required: ["viewBox", "shapes"], optional: ["width", "height", "em", "label", "aspect"])
 		let viewBox = try field["viewBox"].isNull ? nil : try field["viewBox"].array().map { try $0.number() }
 		if let viewBox, viewBox.count != 4 { throw PayloadError(path: "\(reader.path).viewBox", reason: "expected four numbers") }

@@ -906,7 +906,8 @@ data class Payload(
 			return LiveFollows(expr(o.field("politeness", what), "$what.politeness"), expr(o.field("atomic", what), "$what.atomic"))
 		}
 
-		private fun drawing(v: Json, what: String): Drawing {
+		/** A drawing; also how an SVG file's image travels in the app's image manifest. */
+		fun drawing(v: Json, what: String): Drawing {
 			val o = v.obj(what)
 			o.only(setOf("viewBox", "width", "height", "shapes", "em", "label", "aspect"), what)
 			val em = o["em"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.em must be true when present"); true } ?: false
