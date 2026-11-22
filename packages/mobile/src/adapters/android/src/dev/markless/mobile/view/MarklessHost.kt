@@ -1263,6 +1263,8 @@ class MarklessHost(
 			"for" -> if (value != null) view.setOnClickListener {
 				when (val control = views[value]) {
 					is EditText -> command(control, "focus", false)
+					// A select is only focused, as a browser does; its picker opens from a press on the select itself.
+					is SelectBox -> Unit
 					else -> control?.performClick()
 				}
 			}
@@ -1471,7 +1473,7 @@ class MarklessHost(
 			if (parentId == null) rootFrame = rect else (scrollers[parentId]?.second ?: views.getValue(parentId) as MarklessBox).frames[view] = rect
 			if (view is MarklessBox) sizeScroller(inst.id, view, s, rect)
 		}
-		paint(view, s)
+		paint(view, s, styled)
 		if (view is TextView && node is Node.Text) {
 			lineSources[view] = s to inView
 			drawLines(view)
@@ -1560,7 +1562,10 @@ class MarklessHost(
 		if (cursor == null) throw MarklessHostError("\"${s.id}\"'s stacking context ${order.host} is not an ancestor")
 	}
 
-	private fun paint(view: View, s: StyledNode) {
+	private fun paint(view: View, s: StyledNode, styled: Assignment) {
+		fun notVisible(n: StyledNode?) = n?.writes?.any { it is StyleWrite.Visibility && it.value != "visible" } == true
+		// A text takes its element's visibility, which Dragon writes on the element only.
+		val hidden = notVisible(s) || (s.kind == "text" && notVisible(s.parent?.let { styled.byId[it] }))
 		var fill: Int? = null
 		var styles: List<String>? = null
 		var colors: List<Int>? = null
@@ -1592,6 +1597,7 @@ class MarklessHost(
 			}
 			StyleWrite.ClipText -> {}
 			is StyleWrite.PaintOrder -> {}
+			is StyleWrite.Visibility -> {}
 		}
 		if (s.kind != "text") {
 			val edges = s.borderWidths
@@ -1601,6 +1607,15 @@ class MarklessHost(
 		}
 		if (s.kind == "text") {
 			if (view !is Button) view.background = null
+			// Text that is not visible keeps its place but neither shows nor reads out, as the web hides it.
+			// Only between shown and invisible: a view an arm or `hidden` took out (GONE) stays out.
+			if (hidden && view.visibility == View.VISIBLE) view.visibility = View.INVISIBLE
+			else if (!hidden && view.visibility == View.INVISIBLE) view.visibility = View.VISIBLE
+			return
+		}
+		// A box that is not visible paints none of its own decorations; its children paint as their own visibility says.
+		if (hidden) {
+			view.background = null
 			return
 		}
 		val bw = s.borderWidths ?: throw MarklessHostError("element \"${s.id}\" has no border widths")
