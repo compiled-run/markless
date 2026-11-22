@@ -3,7 +3,9 @@ package dev.markless.mobile.view
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Rect
+import android.graphics.RectF
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
@@ -157,8 +159,22 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 		}
 	}
 
+	/** overflow clipping to a rounded padding box: its corner radii in px (x, y per corner from top left), which its children draw inside. */
+	internal var childClipRadii: FloatArray? = null
+		set(value) {
+			if (!(field contentEquals value)) invalidate()
+			field = value
+		}
+
 	override fun dispatchDraw(canvas: Canvas) {
-		super.dispatchDraw(canvas)
+		val radii = childClipRadii
+		if (radii == null) super.dispatchDraw(canvas)
+		else {
+			val saved = canvas.save()
+			canvas.clipPath(Path().apply { addRoundRect(RectF(0f, 0f, width.toFloat(), height.toFloat()), radii, Path.Direction.CW) })
+			super.dispatchDraw(canvas)
+			canvas.restoreToCount(saved)
+		}
 		for ((child, marker) in markers) {
 			if (child.parent !== this || child.visibility == View.GONE) continue
 			val baseline = baselineIn(child) ?: markerPaint.textSize.toInt()
