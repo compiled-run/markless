@@ -14,7 +14,7 @@ private let mobilePackage: URL = {
 private func counterPayload() throws -> Data { try vectorPayload("counter") }
 
 private func vectorPayload(_ name: String) throws -> Data {
-	guard case let .object(fields) = try JSONValue.parse(Data(contentsOf: mobilePackage.appendingPathComponent("conformance/\(name).json"))),
+	guard case let .object(fields) = try JSONValue.parse(ConformanceEngine.vectorData(mobilePackage.appendingPathComponent("conformance/\(name).json"))),
 		let payload = fields.first(where: { $0.0 == "payload" })?.1
 	else { throw HostError("no payload in the counter vector") }
 	return Data(payload.jsonText.utf8)
@@ -296,7 +296,7 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) {
 	var url = URL(fileURLWithPath: #filePath)
 	for _ in 0..<6 { url.deleteLastPathComponent() }
-	guard case let .object(fields) = try JSONValue.parse(Data(contentsOf: url.appendingPathComponent("conformance/attributes.json"))),
+	guard case let .object(fields) = try JSONValue.parse(ConformanceEngine.vectorData(url.appendingPathComponent("conformance/attributes.json"))),
 		let json = fields.first(where: { $0.0 == "payload" })?.1
 	else { throw PayloadError(path: "vector", reason: "no payload") }
 	let payload = try NativeViewPayload.decode(json)
@@ -535,5 +535,20 @@ private func scrollingCounterExport() throws -> Data {
 	controller.perform(NativeAction(event: .activate, host: "h5"))
 	#expect(spoken.map(\.text) == ["Upload failed"])
 	#expect(spoken.first?.assertive == true)
+}
+@MainActor @Test func aRowsLiveRegionSpeaksByItsOwnRowsRule() throws {
+	var spoken: [(text: String, assertive: Bool)] = []
+	let controller = try MarklessViewController(payload: vectorPayload("row-live"), store: MemoryStore())
+	let views = try tree(controller)
+	views.announce = { spoken.append(($0, $1)) }
+	// The report's row turns role="alert": its own change is read at once.
+	controller.perform(NativeAction(event: .activate, host: "h4"))
+	#expect(spoken.map(\.text) == ["Report failed"], "\(spoken)")
+	#expect(spoken.first?.assertive == true)
+	// Back to role="status": read politely; the photo's row, unchanged, says nothing.
+	spoken = []
+	controller.perform(NativeAction(event: .activate, host: "h4"))
+	#expect(spoken.map(\.text) == ["Report saved"], "\(spoken)")
+	#expect(spoken.first?.assertive == false)
 }
 #endif

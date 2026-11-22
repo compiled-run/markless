@@ -1238,6 +1238,9 @@ function composedBoundaryArmRecords(
 						id: prefix + branch.id,
 						sourceId: branch.sourceId ?? branch.id,
 						testReads: branch.testReads.map(qualifyRead),
+						...(branch.armSeeds && {
+							armSeeds: branch.armSeeds.map((seed) => ({ ...seed, graphNodeId: node(seed.graphNodeId) })),
+						}),
 						...(contentReadsOf(branch)
 							? { contentReads: contentReadsOf(branch)!.map(qualifyRead) }
 							: {}),
@@ -1434,14 +1437,7 @@ function composedBoundaryGraph(
 	};
 }
 
-/**
- * Teaches this app's settle path to re-spell a composed child's arm records in
- * page space. The bundler emits a call to it in the generated source/resume
- * module when, and only when, the page has component edges (the same gate that
- * emits its symbol routes), so a non-composing page never loads this module and
- * its settle path registers arm records untouched. The call is explicit because
- * `@markless/web` declares `sideEffects: false`.
- */
+/** Re-spells a composed child's arm records in page space; a page with component edges and each MDX island's loader call it. */
 export function installMarklessComposedArmRecords(): void {
 	liveRoute = (page, instancePath, graphNodeId, path) =>
 		marklessPropRoute(liveProps.get(page)?.get(instancePath)?.routes, graphNodeId, path);

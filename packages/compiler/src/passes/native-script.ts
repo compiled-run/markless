@@ -789,7 +789,8 @@ var eventOf = function (given, frame) {
 		isComposing: false,
 		defaultPrevented: false,
 		preventDefault: function () { this.defaultPrevented = true; },
-		stopPropagation: function () {},
+		propagationStopped: false,
+		stopPropagation: function () { this.propagationStopped = true; },
 	};
 	${JSON.stringify([...new Set([...NATIVE_SCRIPT_POINTER_FIELDS, ...NATIVE_SCRIPT_CLICK_FIELDS, ...NATIVE_SCRIPT_KEY_FIELDS])])}.forEach(function (field) { if (field in given) event[field] = given[field]; });
 	// A dismiss's detail is an object whose pressTarget is an element; a click's detail is its press count.
@@ -888,6 +889,8 @@ g.__markless[id] = {
 			}
 			// A key's or paste's cancel reaches the host, as a browser reads defaultPrevented before the handler first awaits.
 			if (event && event.defaultPrevented && (entry.event.type === 'keydown' || entry.event.type === 'paste')) host.out.prevented = true;
+			// A click's stopPropagation() before it first awaits keeps the press from the handlers around it, as a browser's.
+			if (event && event.propagationStopped && entry.event.type === 'click') host.out.stopped = true;
 			// A handler that sets its text field's value writes the field, as the DOM's value setter does.
 			if (event && typeof entry.event.value === 'string' && event.target && !(event.target instanceof host.Form) && typeof event.target.value === 'string' && event.target.value !== entry.event.value) host.out.value = event.target.value;
 		} else if (entry.kind === 'document') {
@@ -947,6 +950,7 @@ g.__markless[id] = {
 		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands, pending: out.pending, settled: out.settled, raises: out.raises };
 		if (out.calls.length > 0) left.calls = out.calls;
 		if (out.prevented) left.prevented = true;
+		if (out.stopped) left.stopped = true;
 		if (out.value !== undefined) left.value = out.value;
 		if (out.navigate) left.navigate = out.navigate;
 		// The document's listener types now, and the elements the entry that changed them held, whose facts later entries need.
@@ -971,6 +975,10 @@ function contentId(text: string): string {
 	return a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0');
 }
 
+/** The engine text every payload's script carries around its own modules: the host services, then the entry points. */
+export type NativeScriptEngine = { readonly services: string; readonly entries: string };
+export const NATIVE_SCRIPT_ENGINE: NativeScriptEngine = { services: HOST_SERVICES, entries: ENTRIES };
+
 /**
  * The script a payload's `script` ops and computeds run. Every module is a function run once on first use, imports first,
  * as ES modules evaluate; each script function is defined inside its module, so the module's own names reach it.
@@ -986,6 +994,7 @@ export function nativeScriptOf(
 	svg = false,
 	/** The app's origin (app.json `origin`), which a URL from the root resolves against. */
 	origin?: string,
+	engine: NativeScriptEngine = NATIVE_SCRIPT_ENGINE,
 ): NativeScript {
 	const owners: Record<string, number> = {};
 	const definitions = modules.map((module, index) => {
@@ -1017,9 +1026,9 @@ export function nativeScriptOf(
 		`var navigation = ${JSON.stringify(navigation ?? null)};`,
 		...definitions,
 		...(svg ? [SVG_GEOMETRY_SOURCE] : []),
-		ENTRIES,
+		engine.entries,
 	].join('\n');
 	const id = contentId(body);
-	const source = `(function (g, id) {\n${HOST_SERVICES}\ng.__markless = g.__markless || {};\n${body}\n})(globalThis, ${JSON.stringify(id)});\n`;
+	const source = `(function (g, id) {\n${engine.services}\ng.__markless = g.__markless || {};\n${body}\n})(globalThis, ${JSON.stringify(id)});\n`;
 	return { id, source, services };
 }

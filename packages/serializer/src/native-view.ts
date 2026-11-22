@@ -305,6 +305,8 @@ export type NativeDefaultStyle = {
 	readonly rule?: true;
 	/** On `<ul>` and `<ol>`: the marker each item shows before its content. */
 	readonly marker?: 'disc' | 'decimal';
+	/** On `<summary>`: a triangle before its content, not read aloud: ▸ while its `aria-expanded` is false, ▾ while true. */
+	readonly disclosure?: true;
 	/** Table structure: `<td>` and `<th>` cells line up in columns across the rows of their `<table>`. */
 	readonly table?: 'table' | 'row' | 'cell';
 };
@@ -398,6 +400,8 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	audio: {},
 	label: {},
 	dialog: {},
+	details: {},
+	summary: { disclosure: true },
 	form: {},
 	select: {},
 	option: {},
@@ -486,6 +490,14 @@ export type NativeShape = {
 	 * drawn only where every one of them covers, as the browser clips it.
 	 */
 	readonly clip?: ReadonlyArray<ReadonlyArray<number>>;
+	/** The rule that fills each `clip` outline, present only when one is `evenodd` (a luminance mask with black shapes cut out). */
+	readonly clipRule?: ReadonlyArray<'nonzero' | 'evenodd'>;
+	/**
+	 * An SVG `filter` that blurs the shape alone (`feGaussianBlur` of its source graphic, in sRGB): the blur's standard
+	 * deviation in the drawing's units, and the filter region the blurred shape is drawn inside (verb-coded, in the drawing's
+	 * units). Its `clip`s apply to the blurred result, as they do on the web.
+	 */
+	readonly blur?: { readonly deviation: number; readonly region: ReadonlyArray<number> };
 };
 
 /**
@@ -830,6 +842,8 @@ export type NativeOp =
 	  }
 	/** `event.preventDefault()` in a text field's `keydown` or `paste` handler: the host leaves out what the key or paste does. */
 	| { readonly op: 'preventDefault' }
+	/** `event.stopPropagation()` in a click handler: the press runs no handler of the elements around this one. */
+	| { readonly op: 'stopPropagation' }
 	/**
 	 * `field.value = text` on a text field: its text becomes `value` (as a string), as if typed but with no input event; the
 	 * journal's `property` entry carries it to the field. `node` is a fixed id or an expression giving one (null: nothing).

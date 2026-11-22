@@ -3,7 +3,7 @@
 // bytes; it never measures an image. An SVG file is compiled to the shapes a phone draws, as an inline <svg> is.
 
 import { DOMParser, type Element as XmlElement } from '@xmldom/xmldom';
-import { compileDrawing, type DrawingElement } from '@markless/compiler/native';
+import { compileDrawing, svgStyleAttributes, type DrawingElement } from '@markless/compiler/native';
 import type { NativeDrawing } from '@markless/serializer';
 
 /**
@@ -161,7 +161,14 @@ export function svgImage(bytes: Uint8Array): SvgImage | null {
 				const attributes = attributesOf(element);
 				// An inline <svg>'s styles are the page's, which Dragon applies; an SVG file's own styles are not read yet.
 				if (element.localName === 'style') refusals.push('a <style> element in an SVG file: its CSS is not read for a native drawing yet');
-				if (attributes.style?.trim()) refusals.push(`\`style="${attributes.style}"\` on <${element.localName}> in an SVG file: its CSS is not read for a native drawing yet`);
+				if (attributes.style?.trim()) {
+					// A style that only sets what the drawing reads as attributes (`mask-type:alpha`) is those attributes, as the browser applies it.
+					const lifted = svgStyleAttributes(attributes.style);
+					if (lifted) {
+						delete attributes.style;
+						Object.assign(attributes, lifted);
+					} else refusals.push(`\`style="${attributes.style}"\` on <${element.localName}> in an SVG file: its CSS is not read for a native drawing yet`);
+				}
 				elements.push({ id: at.join('.'), tag: element.localName ?? element.tagName, path: at, attributes, bound: [] });
 				walk(element, at);
 			} else if ((node.nodeType === node.TEXT_NODE || node.nodeType === node.CDATA_SECTION_NODE) && node.nodeValue?.trim())
