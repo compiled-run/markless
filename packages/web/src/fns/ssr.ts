@@ -1866,7 +1866,10 @@ function marklessSsrLiftBranch(
 		...(keepSymbol ? { symbolId: marklessBoundSymbolId(child, childSymbolId!) } : {}),
 		...(armRecords ? { armRecords } : {}),
 		...(branch.armSeeds && {
-			armSeeds: branch.armSeeds.map((seed) => ({ ...seed, graphNodeId: marklessComposedGraphNodeId(seed.graphNodeId, instancePath) })),
+			armSeeds: branch.armSeeds.map((seed) => ({
+				...seed,
+				graphNodeId: marklessComposedGraphNodeId(seed.graphNodeId, instancePath),
+			})),
 		}),
 		...(keepSymbol && marklessSsrComposedRoutes(branch, child, instancePath)),
 		// The served arm keeps its arm-relative coordinates; only ids and symbols take the prefixes.

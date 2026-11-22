@@ -124,27 +124,27 @@ test('MDX islands: state declared in an @if starts over when it reopens', async 
 
 // An @if and a @switch inside an island's open @if keep updating, and each arm's state starts over.
 for (const path of ['/nested', '/nested-host'])
-test(`MDX islands: branches nested in an open @if update while it stays open: ${path}`, async () => {
-	const page = await browser!.newPage();
-	const errors: string[] = [];
-	page.on('pageerror', (error) => errors.push(error.message));
-	page.on('console', (message) => void (message.type() === 'error' && errors.push(message.text())));
-	await page.goto(`${server!.origin}${path}`);
-	const shown = (...selectors: string[]) => Promise.all(selectors.map((selector) => shownText(page, selector)));
-	await page.click('[data-outer]');
-	await expect.poll(() => shown('[data-a]', '[data-off]', '[data-move]')).toEqual(['0', 'off', 'pick']);
-	await page.click('[data-a]');
-	await page.click('[data-inner]');
-	await page.click('[data-ember]');
-	await expect.poll(() => shown('[data-a]', '[data-b]', '[data-move]')).toEqual(['1', '0', 'ember']);
-	await page.click('[data-b]');
-	await expect.poll(() => shown('[data-b]')).toEqual(['1']);
-	await page.click('[data-inner]');
-	await page.click('[data-inner]');
-	await expect.poll(() => shown('[data-a]', '[data-b]')).toEqual(['1', '0']);
-	await page.click('[data-outer]');
-	await page.click('[data-outer]');
-	await expect.poll(() => shown('[data-a]', '[data-b]', '[data-move]')).toEqual(['0', '0', 'ember']);
-	expect(errors).toEqual([]);
-	await page.close();
-}, 60_000);
+	test(`MDX islands: branches nested in an open @if update while it stays open: ${path}`, async () => {
+		const page = await browser!.newPage();
+		const errors: string[] = [];
+		page.on('pageerror', (error) => errors.push(error.message));
+		page.on('console', (message) => void (message.type() === 'error' && errors.push(message.text())));
+		await page.goto(`${server!.origin}${path}`);
+		const shown = (...selectors: string[]) => Promise.all(selectors.map((selector) => shownText(page, selector)));
+		await page.click('[data-outer]');
+		await expect.poll(() => shown('[data-a]', '[data-off]', '[data-move]')).toEqual(['0', 'off', 'pick']);
+		await page.click('[data-a]');
+		await page.click('[data-inner]');
+		await page.click('[data-ember]');
+		await expect.poll(() => shown('[data-a]', '[data-b]', '[data-move]')).toEqual(['1', '0', 'ember']);
+		await page.click('[data-b]');
+		await expect.poll(() => shown('[data-b]')).toEqual(['1']);
+		await page.click('[data-inner]');
+		await page.click('[data-inner]');
+		await expect.poll(() => shown('[data-a]', '[data-b]')).toEqual(['1', '0']);
+		await page.click('[data-outer]');
+		await page.click('[data-outer]');
+		await expect.poll(() => shown('[data-a]', '[data-b]', '[data-move]')).toEqual(['0', '0', 'ember']);
+		expect(errors).toEqual([]);
+		await page.close();
+	}, 60_000);
