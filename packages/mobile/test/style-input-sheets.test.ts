@@ -277,3 +277,46 @@ export default function App() @{
 		),
 	]);
 });
+
+test("a styled <select>'s @for over a constant list reaches Dragon as every option, and one over state keeps its template row", async () => {
+	const page = (list: string) =>
+		compileNativeApp({
+			pages: [
+				{
+					page: 'pages/index.tsrx',
+					filename: 'packages/mobile/test/fixtures/pages/index.tsrx',
+					source: `import { state } from '@markless/core';
+
+const TAGS = ['Work', 'Home', 'Ideas'];
+
+export default function Tags() @{
+	let tags = state(['Work', 'Home']);
+	<main>
+		<style>
+			select { padding: 4px; border: 1px solid; }
+		</style>
+		<select aria-label="Tag">
+			@for (const option of ${list}; key option) {
+				<option value={option}>{option}</option>
+			}
+		</select>
+		<button type="button" onClick={() => (tags = [...tags, 'More'])}>Add</button>
+	</main>
+}`,
+				},
+			],
+		});
+	const constant = await page('TAGS');
+	expect(constant.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([]);
+	const input = constant.styleInputs[0]!.input;
+	const options = input.nodes.filter((node) => node.kind === 'element' && node.element === 'option');
+	expect(options.map((node) => node.row)).toEqual([undefined, undefined, undefined]);
+	expect(
+		input.nodes.filter((node) => node.kind === 'text' && options.some((option) => option.id === node.parent)).map((node) => node.kind === 'text' && node.text),
+	).toEqual(['Work', 'Home', 'Ideas']);
+	expect(input.repeats ?? []).toEqual([]);
+	const listed = await page('tags');
+	const rows = listed.styleInputs[0]!.input.nodes.filter((node) => node.kind === 'element' && node.element === 'option');
+	expect(rows.length).toBe(1);
+	expect(rows[0]!.row).toBeDefined();
+});
