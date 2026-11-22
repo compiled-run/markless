@@ -1,0 +1,13 @@
+# THROWAWAY negative test: a pull_request job aimed at the PC's label must be refused by the PC's pre-job hook.
+name: PC refuse probe
+on:
+    pull_request:
+permissions:
+    contents: read
+jobs:
+    probe:
+        runs-on: [self-hosted, markless-pc]
+        timeout-minutes: 5
+        steps:
+            - name: This step must never run on the PC
+              run: echo "PC RAN A PULL_REQUEST JOB"; id; exit 1
