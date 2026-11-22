@@ -55,6 +55,8 @@ sealed interface StyleWrite {
 	data object ClipText : StyleWrite
 	/** The box paints in another stacking context's order (Dragon's re-hosting); [host] is that context's node. */
 	data class PaintOrder(val host: String, val bucket: Int, val rank: Int) : StyleWrite
+	/** box-shadow: the computed shadows in list order. */
+	data class BoxShadow(val shadows: List<Shadow>) : StyleWrite
 	/** A themed checkbox (`appearance: auto`): drawn in [colors] over [StyledNode.checkboxMarks], checked or not as the input's live checkedness says. */
 	data class Checkbox(val colors: CheckboxColors) : StyleWrite
 	/** `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own. */
@@ -271,7 +273,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 	 * `runMarklessLayout`; [slotValues] are the current values of [slots], in their order, and the writes they move are written
 	 * in. Without a plan the export is returned as it is.
 	 */
-	fun laidOut(width: Double, height: Double, scale: Double, layout: (String) -> String, slotValues: List<Double> = emptyList(), rows: ((Int) -> Map<String, List<LaidOutRow>>)? = null, rowsLayout: ((String) -> String)? = null): StyleExport {
+	fun laidOut(width: Double, height: Double, scale: Double, layout: (String) -> String, slotValues: List<Double> = emptyList(), rows: ((Int) -> Map<String, List<LaidOutRow>>)? = null, rowsLayout: ((String) -> String)? = null, texts: Map<String, String> = emptyMap()): StyleExport {
 		val plan = plan ?: return this
 		if (slotValues.size != slots.size) throw MarklessDecodeError("the style export reads ${slots.size} slots; the layout was given ${slotValues.size} values")
 		val hex = { list: List<Double> -> Json.Arr(list.map { Json.Str(java.lang.Long.toHexString(it.toRawBits()).padStart(16, '0')) }) }
@@ -292,9 +294,13 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					}))
 				}).text()
 			}
-			val line = "{\"assignment\":$k,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":$plan$slotsText${if (lists != null) ",\"rows\":$lists" else ""}}"
-			if (lists != null && rowsLayout == null) throw MarklessDecodeError("a page with rows needs Dragon's rows layout")
-			val result = Json.parse(if (lists == null) layout(line) else rowsLayout!!(line))
+			// The page's own texts whose current string is not the one this assignment was laid out with, by Dragon id.
+			val changed = texts.entries.filter { (id, text) -> assignments[k].byId[id]?.text?.let { it != text } ?: false }.sortedBy { it.key }
+			val live = lists != null || changed.isNotEmpty()
+			val textsText = if (changed.isEmpty()) "" else (if (lists == null) ",\"rows\":[]" else "") + ",\"texts\":" + Json.Arr(changed.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }).text()
+			val line = "{\"assignment\":$k,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":$plan$slotsText${if (lists != null) ",\"rows\":$lists" else ""}$textsText}"
+			if (live && rowsLayout == null) throw MarklessDecodeError("a page whose rows or texts follow state needs Dragon's live layout")
+			val result = Json.parse(if (live) rowsLayout!!(line) else layout(line))
 			val parts = result.arr("plan layout")
 			val slotted = slots.isNotEmpty()
 			val fixed = if (!slotted) 3 else if (lists == null) 4 else 5
@@ -829,6 +835,15 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				}.also { if (it.size != 4) throw MarklessDecodeError("$what has ${it.size} inset edges, not 4") })
 				"clip-text" -> StyleWrite.ClipText.also { o.field("texts", what).arr("texts").forEach { t -> t.str("$what.texts[]") } }
 				"paint-order" -> StyleWrite.PaintOrder(o.field("host", what).str("host"), o.field("bucket", what).num("bucket").toInt(), o.field("rank", what).num("rank").toInt())
+				"box-shadow" -> {
+					if (o.field("key", what) != Json.Str("dragonShadow.shadows")) throw MarklessDecodeError("$what: a box-shadow write's key is dragonShadow.shadows")
+					StyleWrite.BoxShadow(o.field("shadows", what).arr("$what.shadows").mapIndexed { n, x ->
+						val at = "$what.shadows[$n]"
+						val sh = x.obj(at)
+						fun length(k: String) = sh.field(k, at).num("$at.$k")
+						Shadow((sh.field("inset", at) as? Json.Bool ?: throw MarklessDecodeError("$at.inset must be a boolean")).value, length("x"), length("y"), length("blur"), length("spread"), color(sh.field("color", at), "$at.color"))
+					})
+				}
 				"checkbox" -> {
 					// The initial checkedness; the runtime keeps the live one, which a tap changes and a re-render does not reset.
 					if (o.field("checked", what) !is Json.Bool) throw MarklessDecodeError("$what.checked must be a boolean")

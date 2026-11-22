@@ -38,6 +38,8 @@ public enum StyleWrite: Sendable {
 	case clipText
 	/// The box paints in another stacking context's order (Dragon's re-hosting); `host` is that context's node.
 	case paintOrder(host: String, bucket: Int, rank: Int)
+	/// box-shadow: the computed shadows in list order.
+	case boxShadow([BoxShadow.Shadow])
 	/// `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own.
 	case visibility(String)
 	/// A select whose appearance devolves to menulist-button: its drop-down arrow is stroked in this colour, along the path
@@ -626,7 +628,8 @@ public struct StyleExport: Sendable {
 	/// that follow them are written into each assignment's nodes. Without a plan the export is returned as it is.
 	public func laidOut(
 		width: Double, height: Double, scale: Double, slots values: [Double] = [], layout: (String) -> String,
-		rows: ((Int) throws -> [String: [LaidOutRow]])? = nil, rowsLayout: ((String) -> String)? = nil
+		rows: ((Int) throws -> [String: [LaidOutRow]])? = nil, rowsLayout: ((String) -> String)? = nil,
+		texts: [String: String] = [:]
 	) throws -> StyleExport {
 		guard let plan else { return self }
 		guard values.count == slots.count else {
@@ -660,9 +663,18 @@ public struct StyleExport: Sendable {
 				}
 				line += ",\"rows\":\(JSONValue.array(lists).jsonText)"
 			}
+			// The page's own texts whose current string is not the one this assignment was laid out with, by Dragon id.
+			let nodeText = Dictionary(assignments[k].nodes.compactMap { node in node.text.map { (node.id, $0) } }, uniquingKeysWith: { a, _ in a })
+			let changed = texts.filter { id, text in nodeText[id].map { $0 != text } ?? false }.sorted { $0.key < $1.key }
+			let live = shown != nil || !changed.isEmpty
+			if !changed.isEmpty {
+				if shown == nil { line += ",\"rows\":[]" }
+				line += ",\"texts\":" + JSONValue.array(changed.map { .array([.string(dragonId[$0.key] ?? $0.key), .string($0.value)]) }).jsonText
+			}
 			line += "}"
+			guard !live || rowsLayout != nil else { throw PayloadError(path: "plan layout", reason: "a page whose texts follow state needs Dragon's live layout") }
 			guard shown == nil || rowsLayout != nil else { throw PayloadError(path: "plan layout", reason: "a page with rows needs Dragon's rows layout") }
-			let result = try Reader(JSONValue.parse(Data((shown == nil ? layout(line) : rowsLayout!(line)).utf8)), at: "plan layout")
+			let result = try Reader(JSONValue.parse(Data((live ? rowsLayout!(line) : layout(line)).utf8)), at: "plan layout")
 			let parts = try result.array()
 			let fixed = !slotted ? 3 : (shown == nil ? 4 : 5)
 			guard parts.count >= fixed, parts.count <= fixed + 2, try parts[0].string() == "ok" else {
@@ -1035,6 +1047,15 @@ public struct StyleExport: Sendable {
 			try expectKey(f, "dragonStacking.order")
 			_ = try f["index"].number()
 			return .paintOrder(host: try f["host"].string(), bucket: Int(try f["bucket"].number()), rank: Int(try f["rank"].number()))
+		case "box-shadow":
+			let f = try write.object(["kind", "shadows", "key"])
+			try expectKey(f, "dragonShadow.shadows")
+			return .boxShadow(try f["shadows"].array().map { shadow in
+				let s = try shadow.object(["inset", "x", "y", "blur", "spread", "color"])
+				return BoxShadow.Shadow(
+					inset: try s["inset"].bool(), x: try s["x"].number(), y: try s["y"].number(), blur: try s["blur"].number(),
+					spread: try s["spread"].number(), color: try decodeColor(try s["color"]))
+			})
 		case "checkbox":
 			let f = try write.object(["kind", "checked", "colors", "key"])
 			try expectKey(f, "dragonCheckbox")

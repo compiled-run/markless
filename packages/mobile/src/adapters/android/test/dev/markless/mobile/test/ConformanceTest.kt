@@ -42,6 +42,8 @@ import dev.markless.mobile.style.BandAtom
 import dev.markless.mobile.style.BandComparison
 import dev.markless.mobile.style.Bands
 import dev.markless.mobile.style.Rgba
+import dev.markless.mobile.style.Shadow
+import dev.markless.mobile.style.ShadowPaint
 import dev.markless.mobile.style.CheckboxColors
 import dev.markless.mobile.style.CheckboxMarks
 import dev.markless.mobile.style.GlyphRun
@@ -381,7 +383,7 @@ private fun styleExport(fixtures: File) {
 		val err = try { StyleExport.decode(changed.toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
 		check("style export refuses $name", err != null && err.contains(fragment)) { "error was: $err" }
 	}
-	refusesStyle("an unknown write kind", text.replace("\"kind\": \"text-color\"", "\"kind\": \"box-shadow\""), "unknown style write kind \"box-shadow\"")
+	refusesStyle("an unknown write kind", text.replace("\"kind\": \"text-color\"", "\"kind\": \"text-shadow\""), "unknown style write kind \"text-shadow\"")
 	refusesStyle("an unknown schema", text.replace("native-style-export/0", "native-style-export/9"), "unknown style export schema")
 	fun withVisibility(value: String) = text.replace("\"writes\": [\n      {", "\"writes\": [\n      { \"kind\": \"visibility\", \"value\": \"$value\", \"canvas\": false, \"key\": \"visibility\" },\n      {")
 	check("the fixture gains visibility writes", withVisibility("hidden") != text) { "" }
@@ -402,6 +404,32 @@ private fun dashedBorders(fixtures: File) {
 	}
 	val err = try { StyleExport.decode(text.replace("\"op\": \"dot\"", "\"op\": \"arc\"").toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
 	check("style export refuses an unknown border operation", err?.contains("unknown border operation \"arc\"") == true) { "error was: $err" }
+}
+
+// The u122 rung's export (proofs/u122-box-shadow): an outer, an inset and a rounded spread shadow.
+private fun boxShadows(fixtures: File) {
+	val text = File(fixtures, "u122-box-shadow.native-style.json").readText()
+	val export = runCatching { StyleExport.decode(text.toByteArray()) }
+	check("decodes the u122 export's box-shadow writes", export.isSuccess) { export.exceptionOrNull().toString() }
+	export.getOrNull()?.let { e ->
+		val short = e.assignments[0]
+		val outer = ShadowPaint.of(short.byId.getValue("h2"), short, e.dpr)
+		check("an outer shadow keeps its computed values", outer?.shadows == listOf(Shadow(false, 0.0, 2.0, 6.0, 0.0, Rgba(0, 0, 0, 51)))) { "$outer" }
+		check("an outer shadow is only outer", outer?.hasOuter == true && outer.hasInset == false) { "$outer" }
+		// 52.5 and 222.03125 device px from the page, 974 by 125.5: the snapped border box.
+		check("the box is snapped in page device px", outer?.box?.edges == listOf(53.0, 222.0, 1027.0, 348.0)) { "${outer?.box}" }
+		// The white canvas, then main's background; html's and body's transparent writes paint nothing.
+		check("the backdrop is the canvas and main", outer?.backdrop?.map { it.background } == listOf(Rgba(255, 255, 255, 255), Rgba(244, 241, 234, 255))) { "${outer?.backdrop}" }
+		val inset = ShadowPaint.of(short.byId.getValue("h3"), short, e.dpr)
+		check("an inset shadow is only inset", inset?.hasInset == true && inset.hasOuter == false) { "$inset" }
+		val rounded = ShadowPaint.of(short.byId.getValue("h4"), short, e.dpr)
+		check("a rounded shadow has its radii and spread", rounded?.box?.radii == List(8) { 14.0 } && rounded.shadows.single().spread == 3.0) { "$rounded" }
+		check("a box without box-shadow has none", ShadowPaint.of(short.byId.getValue("h5"), short, e.dpr) == null) { "" }
+		val tall = e.assignments[1]
+		check("the shadow follows the box into another assignment", ShadowPaint.of(tall.byId.getValue("h4"), tall, e.dpr) != rounded) { "" }
+	}
+	val err = try { StyleExport.decode(text.replace("\"dragonShadow.shadows\"", "\"dragonShadow.list\"").toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
+	check("style export refuses a box-shadow write with another key", err?.contains("dragonShadow.shadows") == true) { "error was: $err" }
 }
 
 private fun paddingBoxes() {
@@ -705,6 +733,25 @@ private fun overlays() {
 	refuses("focused other than true", payload.replace("{\"focusOrigin\":{\"literal\":\"h1\"}}", "{\"focused\":false}"), "focused must be true")
 }
 
+/** A page text whose current string is not the one laid out goes to the live layout as `texts`, beside no rows. */
+private fun planTexts() {
+	fun hex(v: Double) = "\"${java.lang.Long.toHexString(v.toRawBits()).padStart(16, '0')}\""
+	val export = """{"schema":"dragon.native-style-export/1","targets":{"android":{"backend":"android-views","viewport":{"width":100,"height":100},"dpr":2,"states":[],"initial":0,"next":[[]],"assignments":[{"values":{},"nodes":[{"id":"h0","parent":null,"kind":"element","frame":{"x":0,"y":0,"width":10,"height":10},"writes":[]},{"id":"h0:text0","parent":"h0","kind":"text","text":"Home","frame":{"x":0,"y":0,"width":10,"height":10},"writes":[]}]}],"plan":{"version":"dragon.markless-plan/1"}}}}"""
+	val style = StyleExport.decode(export.toByteArray())
+	fun answer(height: Double): String {
+		val zero = hex(0.0)
+		val box = "[$zero,$zero,${hex(10.0)},${hex(height)}]"
+		return """["ok",[$zero,$zero,$zero,$zero],[["h0",$box,null,null,null,null],["h0:text0",$box,null,null,null,null]]]"""
+	}
+	var live: String? = null
+	val laid = style.laidOut(100.0, 100.0, 2.0, { answer(10.0) }, rowsLayout = { line -> live = line; answer(30.0) }, texts = mapOf("h0:text0" to "Home and the garden shed"))
+	check("a changed page text goes to the live layout beside no rows", live?.endsWith(""","rows":[],"texts":[["h0:text0","Home and the garden shed"]]}""") == true) { "$live" }
+	check("the live layout's boxes are the page's", laid.assignments[0].byId.getValue("h0").frame?.height == 30.0) { "${laid.assignments[0].byId.getValue("h0").frame}" }
+	var replayed: String? = null
+	style.laidOut(100.0, 100.0, 2.0, { line -> replayed = line; answer(10.0) }, rowsLayout = { throw AssertionError("used the live layout") }, texts = mapOf("h0:text0" to "Home"))
+	check("a page text at its laid-out string keeps the recorded layout", replayed != null && "texts" !in replayed!!) { "$replayed" }
+}
+
 /** A style slot journals its new value; the plan's layout gets slot values and its moved write numbers patch the export. */
 private fun styleSlots() {
 	val payload = """{"version":"markless.native-view/0","component":"C","cells":[{"id":"c","name":"c","initial":1}],"slots":[{"id":"slot:x","value":{"binary":"*","left":{"cell":"c"},"right":{"literal":10}},"integer":true}],"nodes":[{"kind":"element","id":"h0","element":"div","parent":null,"style":["--x: ",{"slot":"slot:x"},"%"]},{"kind":"element","id":"h1","element":"button","parent":"h0"},{"kind":"element","id":"h2","element":"button","parent":"h0"},{"kind":"element","id":"h3","element":"button","parent":"h0"}],"events":[{"host":"h1","event":"activate","handler":"up"},{"host":"h2","event":"activate","handler":"same"},{"host":"h3","event":"activate","handler":"half"}],"handlers":[{"id":"up","ops":[{"op":"assign","cell":"c","value":{"binary":"+","left":{"cell":"c"},"right":{"literal":1}}}]},{"id":"same","ops":[{"op":"assign","cell":"c","value":{"cell":"c"}}]},{"id":"half","ops":[{"op":"assign","cell":"c","value":{"literal":0.25}}]}]}"""
@@ -917,6 +964,7 @@ fun main(args: Array<String>) {
 	appStyle(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	appCanvas(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	dashedBorders(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	boxShadows(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	paddingBoxes()
 	textLines(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	systemFonts(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
@@ -929,6 +977,7 @@ fun main(args: Array<String>) {
 	decoderStrictness()
 	styleSlots()
 	rehostedStacking(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	planTexts()
 	val dirs = args.map(::File)
 	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)
 	val files = dirs.flatMap { d -> d.listFiles { f -> f.name.endsWith(".json") }?.sortedBy { it.name } ?: error("no vector directory $d") }

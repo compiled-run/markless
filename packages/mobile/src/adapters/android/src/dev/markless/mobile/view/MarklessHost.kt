@@ -23,6 +23,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewParent
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -63,6 +64,7 @@ import dev.markless.mobile.style.Assignment
 import dev.markless.mobile.style.Edges
 import dev.markless.mobile.style.paddingBox
 import dev.markless.mobile.style.BAND_KEY
+import dev.markless.mobile.style.ShadowPaint
 import dev.markless.mobile.style.StyleExport
 import dev.markless.mobile.style.shownRows
 import dev.markless.mobile.core.pickerContent
@@ -168,7 +170,7 @@ class MarklessHost(
 	/** Dragon's HarfBuzz over this phone's system fonts, made when a page first lays its rows out. */
 	private var rowShaper: RowShaper? = null
 	/** The page size in device px and the slot values (export order) the page was last laid out at. */
-	private var laidOutFor: Triple<Int, Int, List<Double>>? = null
+	private var laidOutFor: Triple<Int, Int, Pair<List<Double>, Map<String, String>>>? = null
 	private val fonts: FontSource = if (style?.systemFaces.isNullOrEmpty()) bundledFonts else SystemFonts(style!!.systemFaces, bundledFonts)
 	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine).apply {
 		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
@@ -215,6 +217,8 @@ class MarklessHost(
 	private val glyphLines = HashMap<TextView, GlyphLines>()
 	/** Each styled text view's node and its frame origin inside the view, for drawing its lines again when its text changes. */
 	private val lineSources = HashMap<TextView, Pair<StyledNode, Pair<Double, Double>>>()
+	/** The shadow each box's bitmaps were rastered for. */
+	private val shadowsDrawn = HashMap<View, ShadowPaint>()
 	/** Without a style export, text flows in paragraphs (one text view each); with one, Dragon lays out every text node. */
 	private val flow: TextFlow? = if (style == null) TextFlow(payload) else null
 	/** Each shown text instance's current string, which its paragraph view is rendered from. */
@@ -648,7 +652,8 @@ class MarklessHost(
 			}
 			Log.i(TAG, "journal ${entry.toJson()}")
 		}
-		if (slotMoved) laidOutFor?.let { layOutAt(it.first, it.second, rowsMoved = rowSlotMoved) }
+		// A page text that changes may change its box: the layout compares the texts it last laid out with.
+		if (slotMoved || journal.any { it is JournalEntry.Text && '@' !in it.node }) laidOutFor?.let { layOutAt(it.first, it.second, rowsMoved = rowSlotMoved) }
 		syncSheets()
 		refreshRelations()
 		refreshSelects()
@@ -693,15 +698,27 @@ class MarklessHost(
 		val p = page ?: return false
 		val layout = planLayout ?: return false
 		if (planned?.plan == null || widthPx <= 0 || heightPx <= 0) return false
-		val at = Triple(widthPx, heightPx, planned.slots.map { slotValues.getValue(it.id) })
+		val pageTextNodes = payload.nodes.filterIsInstance<Node.Text>().filter { it.row == null }.map { it.id }.toSet()
+		val texts = runtime.texts().filter { it.first in pageTextNodes }.toMap()
+		val at = Triple(widthPx, heightPx, planned.slots.map { slotValues.getValue(it.id) } to texts)
 		if (!rowsMoved && laidOutFor == at) return false
 		val withRows = planned.planRepeats.isNotEmpty()
-		val shaper = if (withRows) rowShaper ?: RowShaper(planned.systemFaces).also { rowShaper = it } else null
-		val next = planned.laidOut(
-			Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout, at.third,
-			rows = if (withRows) planned.shownRows(payload, runtime) else null,
-			rowsLayout = shaper?.let { RowShaper.rowsLayout(it) ?: throw MarklessHostError("a page with styled rows needs Dragon's rows layout in the app") },
-		)
+		val live: (String) -> String = { line ->
+			val shaper = rowShaper ?: RowShaper(planned.systemFaces).also { rowShaper = it }
+			(RowShaper.rowsLayout(shaper) ?: throw MarklessHostError("a page with styled rows or texts that follow state needs Dragon's live layout in the app"))(line)
+		}
+		val rows = if (withRows) planned.shownRows(payload, runtime) else null
+		val lay = { shown: Map<String, String> ->
+			planned.laidOut(Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout, at.third.first, rows = rows, rowsLayout = live, texts = shown)
+		}
+		// Page texts in a face this host cannot shape keep the boxes the build laid them out in, as before they followed state.
+		rowShaper?.unshapedFace = false
+		val next = try {
+			lay(texts)
+		} catch (e: Exception) {
+			if (texts.isEmpty() || rowShaper?.unshapedFace != true) throw e
+			lay(emptyMap())
+		}
 		style = next
 		p.relaid(next)
 		laidOutFor = at
@@ -1526,6 +1543,7 @@ class MarklessHost(
 			if (view is MarklessBox) sizeScroller(inst.id, view, s, rect)
 		}
 		paint(view, s, styled)
+		paintShadow(view, s, styled)
 		if (view is SelectBox) selectLabel(view, s, styled, absolute)
 		if (view is TextView && node is Node.Text) {
 			lineSources[view] = s to inView
@@ -1555,6 +1573,34 @@ class MarklessHost(
 		} else {
 			view.accessibilityTraversalAfter = View.NO_ID
 			reorder(box)
+		}
+	}
+
+	/** box-shadow: rastered by Dragon's translated painter after a layout that moves or changes the box or what is beneath it. */
+	private fun paintShadow(view: View, s: StyledNode, styled: Assignment) {
+		val shadow = ShadowPaint.of(s, styled, dpr)
+		val parent = view.parent as? MarklessBox
+		if (shadow == null) {
+			shadowsDrawn.remove(view)
+			parent?.childShadow(view, null)
+			(view as? MarklessBox)?.insetShadow = null
+			return
+		}
+		if (shadowsDrawn[view] == shadow) return
+		if (shadow.hasOuter && parent == null) throw MarklessHostError("\"${s.id}\" has an outer box-shadow outside any box; not implemented on Android")
+		if (shadow.hasInset && view !is MarklessBox) throw MarklessHostError("\"${s.id}\" has an inset box-shadow on a ${view.javaClass.simpleName}; not implemented on Android")
+		if (shadow.hasOuter && (view as? MarklessBox)?.clip != null) throw MarklessHostError("\"${s.id}\" has a box-shadow and a clip-path; not implemented on Android")
+		val raster = ShadowRaster.dragon ?: throw MarklessHostError("box-shadow is rastered by Dragon's translated painter, which this build does not link")
+		val (outer, inset) = raster.raster(shadow)
+		parent?.childShadow(view, outer)
+		(view as? MarklessBox)?.insetShadow = inset
+		shadowsDrawn[view] = shadow
+		// The shadow reaches past its box: each box around it up to one that clips its overflow lets its children draw outside them.
+		var at: ViewParent? = parent
+		while (outer != null && at is MarklessBox && at.childClip == null) {
+			val around = at.parent as? MarklessBox ?: break
+			around.clipChildren = false
+			at = around
 		}
 	}
 
@@ -1655,6 +1701,7 @@ class MarklessHost(
 			}
 			StyleWrite.ClipText -> {}
 			is StyleWrite.PaintOrder -> {}
+			is StyleWrite.BoxShadow -> {}
 			is StyleWrite.Checkbox -> if (view !is CheckBox) throw MarklessHostError("\"${s.id}\" draws a themed checkbox but is not a checkbox")
 			is StyleWrite.Visibility -> {}
 			is StyleWrite.SelectArrow -> if (view !is SelectBox) throw MarklessHostError("\"${s.id}\" draws a drop-down arrow but is not a select")
@@ -1665,7 +1712,8 @@ class MarklessHost(
 			if (clipsChildren && bordered && s.borderOps != null) throw MarklessHostError("\"${s.id}\" clips overflow to its padding box inside a dashed or dotted border, which is not implemented on Android")
 			if (view is MarklessBox) {
 				view.clip = clip
-				view.childClip = if (clipsChildren) paddingBox(edges, radii).takeIf { bordered || it.rounded } else null
+				// Always its own clip: a shadow elsewhere may have turned off its parent's clipChildren.
+				view.childClip = if (clipsChildren) paddingBox(edges, radii) else null
 			}
 			else if (clip != null) throw MarklessHostError("\"${s.id}\" has a clip-path on a ${view.javaClass.simpleName}, which is not implemented on Android")
 		}

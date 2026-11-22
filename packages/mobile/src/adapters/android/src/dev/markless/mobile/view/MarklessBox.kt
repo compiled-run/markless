@@ -1,6 +1,7 @@
 package dev.markless.mobile.view
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
@@ -41,6 +42,37 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 			if (field != value) invalidate()
 			field = value
 		}
+
+	/** Each child's outer shadows: a bitmap drawn just before the child, at a device px offset from its top-left. */
+	private val childShadows = HashMap<View, Triple<Bitmap, Int, Int>>()
+
+	internal fun childShadow(child: View, shadow: Triple<Bitmap, Int, Int>?) {
+		if (childShadows[child] == shadow) return
+		if (shadow == null) childShadows.remove(child) else childShadows[child] = shadow
+		invalidate()
+	}
+
+	/** This box's inset shadows, over its background and under its children, at a device px offset from its top-left. */
+	internal var insetShadow: Triple<Bitmap, Int, Int>? = null
+		set(value) {
+			if (field != value) invalidate()
+			field = value
+		}
+
+	override fun drawChild(canvas: Canvas, child: View, drawingTime: Long): Boolean {
+		childShadows[child]?.let { (bitmap, dx, dy) -> canvas.drawBitmap(bitmap, (child.left + dx).toFloat(), (child.top + dy).toFloat(), null) }
+		return super.drawChild(canvas, child, drawingTime)
+	}
+
+	override fun onDraw(canvas: Canvas) {
+		super.onDraw(canvas)
+		insetShadow?.let { (bitmap, dx, dy) -> canvas.drawBitmap(bitmap, dx.toFloat(), dy.toFloat(), null) }
+	}
+
+	override fun onViewRemoved(child: View) {
+		super.onViewRemoved(child)
+		childShadows.remove(child)
+	}
 
 	override fun draw(canvas: Canvas) {
 		val c = clip ?: return super.draw(canvas)
@@ -167,7 +199,7 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 		}
 	}
 
-	/** overflow clipping past borders or round corners: the padding box its children draw inside; null leaves the view's own bounds. */
+	/** Overflow other than visible: the padding box its children, and their shadows, draw inside; null when overflow is visible. */
 	internal var childClip: PaddingBox? = null
 		set(value) {
 			if (field != value) invalidate()
