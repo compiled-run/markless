@@ -4293,7 +4293,8 @@ export function Chart() @{
 	let w = state(4);
 	<svg viewBox="0 0 10 10">
 		<path d="M0 0h10" stroke-dasharray="2 2" />
-		<rect width={w} height="2" fill="url(#g)" />
+		<rect width={w} height="2" />
+		<path d="M0 0h10v10z" fill="url(#g)" />
 		<text x="0 4" y="5">label</text>
 	</svg>
 }`;
@@ -4312,10 +4313,10 @@ export function Chart() @{
 				6,
 			],
 			[
-				'`fill="url(#g)"` on <rect>, a paint a native drawing does not have (gradients and patterns are not drawn yet)',
-				6,
+				'`fill="url(#g)"` on <path>, which names no <linearGradient> or <radialGradient> inside this <svg>',
+				7,
 			],
-			['`x="0 4"` on <text>: one length per text is drawn, not a list', 7],
+			['`x="0 4"` on <text>: one length per text is drawn, not a list', 8],
 		]);
 	});
 
@@ -4462,6 +4463,143 @@ export function Chart() @{
 		).toContain(
 			'`clipPathUnits="objectBoundingBox"` on <clipPath>: a clip is drawn in user space only',
 		);
+	});
+
+	describe('svg gradients', () => {
+		const drawn = async (defs: string, shapes: string, svgAttributes = 'viewBox="0 0 10 10"') => {
+			const { payload, diagnostics } = await nativeView(`export function Mark() @{
+	<svg ${svgAttributes}><defs>${defs}</defs>${shapes}</svg>
+}`);
+			const svg = payload?.nodes.find((node) => node.kind === 'element' && node.drawing);
+			return {
+				shapes: svg?.kind === 'element' ? (svg.drawing?.shapes ?? []) : [],
+				messages: diagnostics.map((d) => d.message),
+			};
+		};
+		const red = { r: 255, g: 0, b: 0, alpha: 255 };
+		const blue = { r: 0, g: 0, b: 255, alpha: 255 };
+		const yellow = { r: 255, g: 255, b: 0, alpha: 255 };
+		const green = { r: 0, g: 128, b: 0, alpha: 255 };
+
+		it('paints a shape with a gradient in user space as its coordinates say', async () => {
+			const { shapes, messages } = await drawn(
+				'<linearGradient id="g" x1="1" y1="2" x2="9" y2="8" gradientUnits="userSpaceOnUse"><stop stop-color="red" /><stop offset="1" stop-color="blue" /></linearGradient>',
+				'<rect width="10" height="10" fill="url(#g)" />',
+			);
+			expect(messages).toEqual([]);
+			expect(shapes[0]!.fill).toEqual({
+				linear: [1, 2, 9, 8],
+				stops: [
+					{ offset: 0, color: red },
+					{ offset: 1, color: blue },
+				],
+			});
+		});
+
+		it('maps a bounding-box gradient onto the shape, clamps its offsets in order and pads its ends', async () => {
+			const { shapes, messages } = await drawn(
+				'<linearGradient id="g" gradientTransform="matrix(0 1 -1 0 0 0)"><stop offset="50%" stop-color="yellow" /><stop offset="0.2" stop-color="green" /><stop offset="1.5" stop-color="blue" /></linearGradient>',
+				'<rect x="2" y="4" width="6" height="2" fill="url(\'#g\')" />',
+			);
+			expect(messages).toEqual([]);
+			expect(shapes[0]!.fill).toEqual({
+				linear: [0, 0, 1, 0],
+				stops: [
+					{ offset: 0, color: yellow },
+					{ offset: 0.5, color: yellow },
+					{ offset: 0.5, color: green },
+					{ offset: 1, color: blue },
+				],
+				// The box (6 by 2 at 2, 4), then the quarter turn.
+				transform: [0, 2, -6, 0, 2, 4],
+			});
+		});
+
+		it("takes what a radial gradient leaves out from the gradient its href names, and strokes with one", async () => {
+			const { shapes, messages } = await drawn(
+				'<linearGradient id="base" gradientUnits="userSpaceOnUse"><stop stop-color="red" /><stop offset="1" stop-color="blue" /></linearGradient><radialGradient id="g" href="#base" cx="5" cy="5" r="4" fx="4" />',
+				'<circle cx="5" cy="5" r="3" fill="none" stroke="url(#g)" stroke-width="2" />',
+			);
+			expect(messages).toEqual([]);
+			expect(shapes[0]!.fill).toBeNull();
+			expect(shapes[0]!.stroke).toEqual({
+				radial: [4, 5, 0, 5, 5, 4],
+				stops: [
+					{ offset: 0, color: red },
+					{ offset: 1, color: blue },
+				],
+			});
+		});
+
+		it('draws nothing for a bounding-box gradient on a shape with no height, as the browser ignores it', async () => {
+			const { shapes, messages } = await drawn(
+				'<linearGradient id="g"><stop stop-color="red" /><stop offset="1" stop-color="blue" /></linearGradient>',
+				'<line x1="1" y1="5" x2="9" y2="5" stroke="url(#g)" /><line x1="1" y1="1" x2="9" y2="9" stroke="url(#g)" />',
+			);
+			expect(messages).toEqual([]);
+			expect(shapes[0]!.stroke).toBeNull();
+			expect(shapes[1]!.stroke).toMatchObject({ linear: [0, 0, 1, 0], transform: [8, 0, 0, 8, 1, 1] });
+		});
+
+		it('measures the bounding box of a curve by where it turns, not by its control points', async () => {
+			const { shapes } = await drawn(
+				'<linearGradient id="g"><stop stop-color="red" /><stop offset="1" stop-color="blue" /></linearGradient>',
+				'<path d="M0 5 C0 0 10 0 10 5 Z" fill="url(#g)" />',
+			);
+			const [width, , , height, x, y] = (shapes[0]!.fill as { transform: number[] }).transform;
+			expect([width, height, x, y].map((n) => Math.round(n * 1e6) / 1e6)).toEqual([10, 3.75, 0, 1.25]);
+		});
+
+		it('takes fill-opacity into its stops, and adds stops between two that differ in colour and alpha', async () => {
+			const { shapes } = await drawn(
+				'<linearGradient id="g"><stop stop-color="red" /><stop offset="1" stop-color="blue" stop-opacity="0" /></linearGradient><linearGradient id="h"><stop stop-color="red" stop-opacity="0.5" /><stop offset="1" stop-color="blue" stop-opacity="0.5" /></linearGradient>',
+				'<rect width="10" height="10" fill="url(#g)" /><rect width="10" height="10" fill="url(#h)" fill-opacity="0.5" />',
+			);
+			const fade = shapes[0]!.fill as { stops: { offset: number; color: { r: number; b: number; alpha: number } }[] };
+			expect(fade.stops).toHaveLength(17);
+			// Halfway the browser blends unpremultiplied: half red, half blue, half alpha.
+			expect(fade.stops[8]).toEqual({ offset: 0.5, color: { r: 128, g: 0, b: 128, alpha: 128 } });
+			expect((shapes[1]!.fill as { stops: unknown[] }).stops).toEqual([
+				{ offset: 0, color: { ...red, alpha: 64 } },
+				{ offset: 1, color: { ...blue, alpha: 64 } },
+			]);
+		});
+
+		it('paints one colour for a gradient of one stop or no length, nothing for one without stops, and the fallback for a name that is not there', async () => {
+			const { shapes, messages } = await drawn(
+				'<linearGradient id="one"><stop stop-color="red" /></linearGradient><linearGradient id="none" /><linearGradient id="point" x2="0"><stop stop-color="red" /><stop offset="1" stop-color="blue" /></linearGradient>',
+				'<rect width="1" height="1" fill="url(#one)" /><rect width="1" height="1" fill="url(#none)" /><rect width="1" height="1" fill="url(#point)" /><rect width="1" height="1" fill="url(#missing) green" />',
+			);
+			expect(messages).toEqual([]);
+			expect(shapes.map((shape) => shape.fill)).toEqual([red, null, blue, green]);
+		});
+
+		it('refuses what it does not draw by the attribute that says it', async () => {
+			const refused = async (defs: string, shapes = '<rect width="10" height="10" fill="url(#g)" />', svg?: string) =>
+				(await drawn(defs, shapes, svg)).messages;
+			const stops = '<stop stop-color="red" /><stop offset="1" stop-color="blue" />';
+			expect(await refused(`<linearGradient id="g" spreadMethod="reflect" x2="0.5">${stops}</linearGradient>`)).toEqual([
+				'`spreadMethod="reflect"` on <linearGradient>: a gradient is drawn padded only natively yet',
+			]);
+			expect(await refused(`<radialGradient id="g" fx="0.95" fy="0.5" r="0.2">${stops}</radialGradient>`)).toEqual([
+				'`fx`, `fy` and `fr` on <radialGradient> put its focal circle outside its circle, which the browser draws as a cone: not drawn natively yet',
+			]);
+			expect(await refused(`<linearGradient id="g" color-interpolation="linearRGB">${stops}</linearGradient>`)).toEqual([
+				'`color-interpolation="linearRGB"` on <linearGradient>: a gradient blends in sRGB only natively yet',
+			]);
+			expect(await refused('<pattern id="g" />')).toEqual([
+				'`fill="url(#g)"` on <rect> names a <pattern>, which a native drawing does not paint with yet',
+			]);
+			expect(await refused(`<linearGradient id="g" gradientUnits="userSpaceOnUse">${stops}</linearGradient>`, undefined, '')).toEqual([
+				'`x2`, 100% when it is not written, on <linearGradient> in user space: a percentage is drawn natively only for a shape the outer <svg> draws, which has a viewBox or a size',
+			]);
+			expect(await refused('<linearGradient id="g"><stop style="stop-color: red" /><stop offset="1" /></linearGradient>')).toEqual([
+				'`style` on <stop>, which a native drawing does not draw yet',
+			]);
+			expect(await refused(`<linearGradient id="g">${stops}</linearGradient>`, '<text fill="url(#g)">Hi</text>')).toEqual([
+				'`fill="url(#g)"` on <text>: text is filled with one colour natively yet',
+			]);
+		});
 	});
 
 	it('places the viewBox by preserveAspectRatio, and refuses a value that is not one', async () => {

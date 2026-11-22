@@ -217,6 +217,7 @@ public struct NativeShape: Equatable, Sendable {
 	public enum Paint: Equatable, Sendable {
 		case color(RGBA)
 		case currentColor
+		case gradient(NativeGradient)
 	}
 	/// Verb-coded: 0 move x y, 1 line x y, 3 cubic x1 y1 x2 y2 x y, 4 close.
 	public let path: [Double]
@@ -241,6 +242,21 @@ public struct NativeShape: Equatable, Sendable {
 		public let deviation: Double
 		public let region: [Double]
 	}
+}
+
+/// An SVG gradient paint, padded, its first stop at 0 and its last at 1; colours blend in sRGB.
+public struct NativeGradient: Equatable, Sendable {
+	public struct Stop: Equatable, Sendable {
+		public let offset: Double
+		public let color: RGBA
+	}
+	/// x1 y1 x2 y2 for a linear gradient; nil for a radial one.
+	public let linear: [Double]?
+	/// fx fy fr cx cy r for a radial gradient: from the focal circle to the circle that holds it.
+	public let radial: [Double]?
+	public let stops: [Stop]
+	/// `[a, b, c, d, e, f]` from the gradient's units to the shape's.
+	public let transform: [Double]?
 }
 
 /// An SVG `<text>`: runs laid out from the pen, each chunk placed by `anchor`, glyphs on `baseline` relative to the pen.
@@ -1226,14 +1242,35 @@ public struct NativeViewPayload: Equatable, Sendable {
 	}
 
 	private static func decodeShape(_ shape: Reader) throws -> NativeShape {
-		func paint(_ reader: Reader) throws -> NativeShape.Paint? {
+		func color(_ reader: Reader) throws -> RGBA {
+			let color = try reader.object(["r", "g", "b", "alpha"])
+			return RGBA(r: try color["r"].number(), g: try color["g"].number(), b: try color["b"].number(), alpha: try color["alpha"].number())
+		}
+		func paint(_ reader: Reader, gradients: Bool = false) throws -> NativeShape.Paint? {
 			if reader.isNull { return nil }
 			if reader.isString {
 				guard try reader.string() == "currentColor" else { throw reader.fail("unknown paint") }
 				return .currentColor
 			}
-			let color = try reader.object(["r", "g", "b", "alpha"])
-			return .color(RGBA(r: try color["r"].number(), g: try color["g"].number(), b: try color["b"].number(), alpha: try color["alpha"].number()))
+			let keys = try reader.keys()
+			guard gradients, keys.contains("linear") || keys.contains("radial") else { return .color(try color(reader)) }
+			let g = try reader.object(required: ["stops"], optional: ["linear", "radial", "transform"])
+			func numbers(_ name: String, _ count: Int) throws -> [Double]? {
+				guard g.has(name) else { return nil }
+				let values = try g[name].array().map { try $0.number() }
+				guard values.count == count else { throw reader.fail("\(name) has \(count) numbers") }
+				return values
+			}
+			let linear = try numbers("linear", 4), radial = try numbers("radial", 6), transform = try numbers("transform", 6)
+			guard (linear == nil) != (radial == nil) else { throw reader.fail("a gradient is linear or radial") }
+			let stops = try g["stops"].array().map { stop -> NativeGradient.Stop in
+				let s = try stop.object(["offset", "color"])
+				return NativeGradient.Stop(offset: try s["offset"].number(), color: try color(try s["color"]))
+			}
+			guard stops.count >= 2, stops.first?.offset == 0, stops.last?.offset == 1,
+				zip(stops, stops.dropFirst()).allSatisfy({ $0.offset <= $1.offset })
+			else { throw reader.fail("a gradient's stops run in order from 0 to 1") }
+			return .gradient(NativeGradient(linear: linear, radial: radial, stops: stops, transform: transform))
 		}
 		let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "text", "clip", "clipRule", "blur"])
 		let transform = s.has("transform") ? try s["transform"].array().map { try $0.number() } : nil
@@ -1241,8 +1278,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 		let rule = try s["fillRule"].string()
 		guard rule == "nonzero" || rule == "evenodd" else { throw shape.fail("unknown fillRule \(rule)") }
 		var decoded = NativeShape(
-			path: try s["path"].array().map { try $0.number() }, fill: try paint(try s["fill"]), evenOdd: rule == "evenodd",
-			stroke: try paint(try s["stroke"]), width: try s["width"].number(), cap: try s["cap"].string(), join: try s["join"].string(),
+			path: try s["path"].array().map { try $0.number() }, fill: try paint(try s["fill"], gradients: true), evenOdd: rule == "evenodd",
+			stroke: try paint(try s["stroke"], gradients: true), width: try s["width"].number(), cap: try s["cap"].string(), join: try s["join"].string(),
 			miterLimit: try s["miterLimit"].number(), transform: transform)
 		if s.has("clip") { decoded.clip = try s["clip"].array().map { try $0.array().map { try $0.number() } } }
 		if s.has("clipRule") {
