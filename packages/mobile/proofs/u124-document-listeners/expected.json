@@ -1,0 +1,14 @@
+{
+	"rung": 231,
+	"name": "A press adds listeners to the document: the drag's moves and lift reach them after the element's own handlers, and the lift removes them",
+	"steps": [
+		{
+			"visible": ["Document listeners", "Drag here", "Idle"]
+		},
+		{
+			"do": { "drag": { "on": "Drag here", "direction": "right" } },
+			"visible": ["Released after moving"],
+			"absent": ["Idle", "Moving"]
+		}
+	]
+}

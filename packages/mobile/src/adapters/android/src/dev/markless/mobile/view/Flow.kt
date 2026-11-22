@@ -154,7 +154,8 @@ class RuleView(context: Context) : View(context) {
  * An inline `<svg>`: draws the shapes the compiler compiled, its viewBox centred and fitted in the view (xMidYMid meet).
  * [emPx] is the font size of the text it sits in, in device px, which sizes a drawing measured in ems.
  */
-class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) : View(context) {
+/** [fillsBox]: an SVG file's image, which takes the size its `<img>` box is given. */
+class DrawingView(context: Context, private val drawing: Drawing, emPx: Double, private val fillsBox: Boolean = false) : View(context) {
 	private val density = context.resources.displayMetrics.density
 	/** Device px per unit of the drawing's width and height. */
 	private val unit: Double = if (drawing.em) emPx else density.toDouble()
@@ -212,6 +213,7 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 	}
 
 	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+		if (fillsBox) return setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.getSize(heightMeasureSpec))
 		val available = MeasureSpec.getSize(widthMeasureSpec).toDouble()
 		val w = drawing.width?.let { it * unit } ?: drawing.height?.let { it * unit / ratio } ?: if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.UNSPECIFIED) 300.0 * density else available
 		val h = drawing.height?.let { it * unit } ?: (w * ratio)

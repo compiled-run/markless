@@ -166,6 +166,14 @@ class MarklessHost(
 		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
 		onScriptEntry = AppScriptEngine::entryRan
 		measure = this@MarklessHost::measureBox
+		// "Remove animations" sets the animator duration scale to 0, as Chrome on Android reads prefers-reduced-motion.
+		media = {
+			val scale = android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+			listOf(
+				"prefers-reduced-motion" to if (scale == 0f) "reduce" else "no-preference",
+				"prefers-color-scheme" to if (isDark(context.resources.configuration)) "dark" else "light",
+			)
+		}
 	}
 	/** Each style slot's current value, from the runtime at mount and then its `slot` entries. */
 	private val slotValues = HashMap(runtime.slots().toMap()).also { values ->
@@ -184,6 +192,8 @@ class MarklessHost(
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
 	private val events = payload.events.groupBy { it.host }
 	private val views = HashMap<String, View>()
+	/** The images the app packaged, by the src a page writes. */
+	private val packaged: Map<String, PackagedImage> by lazy { packagedImages(context) }
 	private val built = HashMap<String, Instance>()
 	/** Shapes inside an svg, by instance: the drawing that draws each one. */
 	private val shapeOwners = HashMap<String, DrawingView>()
@@ -1014,7 +1024,7 @@ class MarklessHost(
 				val device = payload.objects.firstOrNull { it.id == obj }?.device ?: throw MarklessHostError("<camera> \"${node.id}\" names unknown object \"$obj\"")
 				needDevice().view(obj, device).also { named(it, inst.id) }
 			}
-			"img" -> SizedImage(context).also { named(it, inst.id) }
+			"img" -> SizedImage(context, packaged, sized = style == null).also { named(it, inst.id) }
 			"iframe" -> EmbeddedPage(
 				context,
 				node.attributes["src"] ?: throw MarklessHostError("<iframe> ${inst.id} has no src"),
@@ -1278,9 +1288,15 @@ class MarklessHost(
 				view.contentDescription = value ?: (view as? DrawingView)?.label
 				if (view is DrawingView && current["aria-hidden"] != "true") view.importantForAccessibility = if (view.contentDescription != null) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO
 			}
-			"alt" -> if (view is SizedImage) view.contentDescription = value
+			"alt" -> if (view is SizedImage) {
+				view.alt(value)
+				view.contentDescription = current["aria-label"] ?: value
+				// `alt=""` marks a decorative image, which TalkBack skips, as the web leaves it out of the tree.
+				if (current["aria-hidden"] != "true") view.importantForAccessibility = if (value == "" && current["aria-label"] == null) View.IMPORTANT_FOR_ACCESSIBILITY_NO else View.IMPORTANT_FOR_ACCESSIBILITY_YES
+			}
+			"width", "height" -> if (view is SizedImage) view.length(name, value)
 			"src" -> when (view) {
-				is SizedImage -> view.show(value)
+				is SizedImage -> view.src(value)
 				is AudioButton -> view.source(value)
 			}
 			"controls" -> if (view is AudioButton) view.visibility = if (value == null) View.GONE else View.VISIBLE

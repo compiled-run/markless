@@ -24,7 +24,14 @@ import {
 	type NativeRuntime,
 	type NativeScreen,
 } from '../src/index.ts';
-import { compileRungApp, readAppConfig, readWorkspaceModule, servedReader } from '../src/harness/rung.ts';
+import {
+	assetReader,
+	compileRungApp,
+	readAppConfig,
+	readWorkspaceModule,
+	servedFileReader,
+	servedReader,
+} from '../src/harness/rung.ts';
 import { echoText } from '../src/harness/echo-server.ts';
 import { nativeMaxLength, nativeRangeValue } from '@markless/serializer/native-view';
 import { nodeScriptHost } from '../src/node-engine.ts';
@@ -406,12 +413,14 @@ function walkApp(
 		if (action && 'back' in action) {
 			const journal = appRuntime.dispatch({ event: 'back' });
 			stack.pop();
-			// The screen shown again takes what a page above it changed in the app-wide cells; nothing else changes.
+			// The screen shown again takes what a page above it changed in the app-wide and storage cells; nothing else changes.
 			const resumed = appRuntime.screens().at(-1)!.runtime.resume();
 			expect(resumed, `step ${index}: the screen shown again had resumed already`).toEqual([]);
 			const shownAgain = journal.filter((entry) => entry.op !== 'abort' && entry.op !== 'clearTimer');
-			const appWide = pageOf(appRuntime.screens().at(-1)!.route).cells.some((cell) => cell.app);
-			if (!appWide) expect(shownAgain, `step ${index}: Back journals only what it cancels`).toEqual([]);
+			const kept = pageOf(appRuntime.screens().at(-1)!.route).cells.some(
+				(cell) => cell.app || cell.storage,
+			);
+			if (!kept) expect(shownAgain, `step ${index}: Back journals only what it cancels`).toEqual([]);
 			for (const entry of shownAgain) stack.at(-1)!.apply(entry, -1);
 		} else if (
 			looksOnly(action) ||
@@ -541,6 +550,8 @@ function walk(
 	let clock = Date.now();
 	/** The text field that has the keyboard, if any. */
 	let focused: string | undefined;
+	// The device's appearance, as an `appearance` step sets it; a script's matchMedia reads it.
+	let scheme: 'light' | 'dark' = 'light';
 	const start = () => {
 		const r = createNativeRuntime(
 			payload,
@@ -551,6 +562,7 @@ function walk(
 			services.host,
 			undefined,
 			stacked,
+			() => ({ 'prefers-reduced-motion': 'no-preference', 'prefers-color-scheme': scheme }),
 		);
 		for (const cell of payload.cells)
 			if (cell.device)
@@ -1077,7 +1089,8 @@ function walk(
 				],
 				index,
 			);
-		} else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
+		} else if (action && 'appearance' in action) scheme = action.appearance;
+		else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
 			const sheet = openSheet(index);
@@ -1371,6 +1384,8 @@ test.each(
 			...(page ? { page } : {}),
 			readModule: readWorkspaceModule,
 			readServedStylesheet: servedReader(join(proofsDir, folder)),
+			readServedFile: servedFileReader(join(proofsDir, folder)),
+			readAsset: assetReader,
 			...readAppConfig(join(proofsDir, folder)),
 			target,
 		});

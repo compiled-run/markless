@@ -212,7 +212,31 @@ export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>
  * `navigate` from @markless/router (through a `navigate` entry; the host passes the page's route `params`), and
  * `@markless/device` calls (through `call` entries, answered with `resume` or `reject` actions).
  */
-export type NativeScriptService = 'timers' | 'fetch' | 'console' | 'crypto' | 'navigate' | 'device';
+export type NativeScriptService =
+	| 'timers'
+	| 'fetch'
+	| 'console'
+	| 'crypto'
+	| 'navigate'
+	| 'device'
+	| 'media';
+
+/** The media features a script's `matchMedia` reads, each with the values a phone answers from its settings, first the web's default. */
+export const NATIVE_SCRIPT_MEDIA_FEATURES = {
+	'prefers-reduced-motion': ['no-preference', 'reduce'],
+	'prefers-color-scheme': ['light', 'dark'],
+} as const;
+
+/** The device's answer to each media feature now, which every script entry of a page that reads `matchMedia` carries. */
+export type NativeScriptMedia = {
+	readonly [Feature in keyof typeof NATIVE_SCRIPT_MEDIA_FEATURES]: (typeof NATIVE_SCRIPT_MEDIA_FEATURES)[Feature][number];
+};
+
+/** The web's answers with no setting changed, which a host without a value for a feature reports. */
+export const NATIVE_SCRIPT_MEDIA_DEFAULTS: NativeScriptMedia = {
+	'prefers-reduced-motion': NATIVE_SCRIPT_MEDIA_FEATURES['prefers-reduced-motion'][0],
+	'prefers-color-scheme': NATIVE_SCRIPT_MEDIA_FEATURES['prefers-color-scheme'][0],
+};
 
 /** The JavaScript a payload's `script` ops and script computeds run, in the platform's engine, started on first use. */
 export type NativeScript = {
@@ -1071,6 +1095,8 @@ export type NativeViewPayload = {
 	readonly script?: NativeScript;
 	/** A click handler reads where its tap landed: the host reports touches even with no pointer handler, as a browser fires them. */
 	readonly tapPoints?: true;
+	/** A script adds listeners to the document: the host reports every touch and its moves, which bubble to them. */
+	readonly documentEvents?: true;
 };
 
 export const NATIVE_APP_VERSION = 'markless.native-app/0';
@@ -1641,11 +1667,14 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		structuredClone: 'engine',
 		performance: 'engine',
 		DOMException: 'engine',
+		File: 'engine',
+		DataTransfer: 'engine',
 		// Answers an element's `direction` only, from the host's facts.
 		getComputedStyle: 'engine',
 		console: 'console',
 		fetch: 'fetch',
 		crypto: 'crypto',
+		matchMedia: 'media',
 		Event: 'engine',
 		CustomEvent: 'engine',
 		MouseEvent: 'engine',
@@ -1688,7 +1717,7 @@ export const NATIVE_SCRIPT_SUBMITTED_FORM = 'submitted form';
 
 /** Members of a page global a phone answers, read straight off it: the focused element, as a proxy. */
 export const NATIVE_SCRIPT_PAGE_MEMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
-	document: ['activeElement'],
+	document: ['activeElement', 'addEventListener', 'removeEventListener'],
 };
 
 /** What a touch adds to a script pointer handler's event: its plain values. The elements it names reach only data handlers. */
@@ -1762,7 +1791,6 @@ export const NATIVE_SCRIPT_PAGE_GLOBALS: Readonly<Record<string, string>> = {
 	localStorage: "the browser's storage; use `storage()` from @markless/core, which a phone keeps",
 	sessionStorage:
 		"the browser's storage; use `storage()` from @markless/core, which a phone keeps",
-	matchMedia: 'a CSS media query, which a phone answers in its styles, not in a handler',
 	requestAnimationFrame: 'a browser frame, which a phone does not hand to handlers',
 	cancelAnimationFrame: 'a browser frame, which a phone does not hand to handlers',
 	Event: 'the DOM, which a phone does not have',

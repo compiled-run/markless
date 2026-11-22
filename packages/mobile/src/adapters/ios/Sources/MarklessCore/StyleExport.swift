@@ -245,7 +245,7 @@ public struct StyleExport: Sendable {
 	/// Each assignment's page scroll range in device px; nil when Dragon does not decide it (see `pageScrollUndecided`).
 	public private(set) var pageScrolls: [ScrollOffsetRange?]
 	/// Dragon's reason, for this target, when it leaves a page scroll range undecided.
-	public let pageScrollUndecided: String?
+	public private(set) var pageScrollUndecided: String?
 	/// Each system sheet's content, laid out as its own document at every resting height (app style files only).
 	public var sheets: [SheetStyle] = []
 	/// Each system face the export names, by id: the platform font this host draws it with.
@@ -580,6 +580,7 @@ public struct StyleExport: Sendable {
 		let slotLine = slotted ? ",\"slots\":\(hex(values).jsonText)" : ""
 		var out = self
 		var pages: [ScrollOffsetRange?] = []
+		var undecided: String?
 		out.assignments = try assignments.indices.map { k in
 			let names = k < planNames.count ? planNames[k] : [:]
 			let dragonId = Dictionary(names.map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
@@ -611,6 +612,8 @@ public struct StyleExport: Sendable {
 			}
 			let bits = { (reader: Reader) throws -> JSONValue in try planNumbers(reader.value) }
 			let page = try parts[1].array()
+			// Dragon's ["undecided", node, reason] when it could not decide the page's range at this size.
+			if page.count == 3 { undecided = "\(try page[1].string()): \(try page[2].string())" }
 			pages.append(page.count == 3 ? nil : try StyleExport.decodeRange(Reader(.object(zip(["minX", "maxX", "minY", "maxY"], try page.map { try bits($0) }).map { ($0, $1) }), at: parts[1].path)))
 			var geometry: [String: Reader] = [:]
 			for node in try parts[2].array() {
@@ -709,6 +712,7 @@ public struct StyleExport: Sendable {
 			return (assignment.values, nodes, assignment.canvas, assignment.body)
 		}
 		out.pageScrolls = pages
+		if let undecided { out.pageScrollUndecided = undecided }
 		out.viewport = (width, height)
 		out.dpr = scale
 		return out
