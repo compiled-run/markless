@@ -552,6 +552,8 @@ function walk(
 	let clock = Date.now();
 	/** The text field that has the keyboard, if any. */
 	let focused: string | undefined;
+	// The device's appearance, as an `appearance` step sets it; a script's matchMedia reads it.
+	let scheme: 'light' | 'dark' = 'light';
 	const start = () => {
 		const r = createNativeRuntime(
 			payload,
@@ -562,6 +564,7 @@ function walk(
 			services.host,
 			undefined,
 			stacked,
+			() => ({ 'prefers-reduced-motion': 'no-preference', 'prefers-color-scheme': scheme }),
 		);
 		for (const cell of payload.cells)
 			if (cell.device)
@@ -1088,7 +1091,8 @@ function walk(
 				],
 				index,
 			);
-		} else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
+		} else if (action && 'appearance' in action) scheme = action.appearance;
+		else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
 			const sheet = openSheet(index);
