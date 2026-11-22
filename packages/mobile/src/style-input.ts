@@ -412,9 +412,25 @@ export function nativeStyleInput(
 		[{}],
 	);
 	const initialCells = new Map(payload.cells.map((cell) => [cell.id, cell.initial]));
+	// A <select>'s @for over a list the build folds to literals (a constant array) is written as plain options, one per row in order,
+	// so Dragon measures the select's widest option; any other list keeps its template row, and Dragon keeps refusing what reads it.
+	const optionRows = new Map<string, ReadonlyArray<string>>();
+	for (const node of nodes) {
+		if (node.kind !== 'repeat' || node.row || node.keyParts || (!node.byIndex && node.key.length > 0)) continue;
+		const parent = nodes.find((candidate) => candidate.id === node.parent);
+		if (parent?.kind !== 'element' || parent.element !== 'select' || !('array' in node.list)) continue;
+		const items = node.list.array;
+		if (!items.every((item) => !item.spread && 'literal' in item.value)) continue;
+		optionRows.set(
+			node.id,
+			items.map((item, index) =>
+				node.byIndex ? String(index) : String((item.value as { readonly literal: unknown }).literal),
+			),
+		);
+	}
 	// A branch an outer arm hides keeps a value no box reads, since each arm inside it also needs that outer arm: its first.
 	const repeats = nodes.flatMap((node) =>
-		node.kind === 'repeat' && !node.row
+		node.kind === 'repeat' && !node.row && !optionRows.has(node.id)
 			? [
 					{
 						id: node.id,
@@ -457,6 +473,18 @@ export function nativeStyleInput(
 			// A row's nodes name their list: Dragon refuses them by name until rows are laid out on the phone.
 			const place = { ...(node.arm ? { arm: node.arm } : {}), ...(node.row ? { row: node.row } : {}) };
 			if (node.kind === 'branch' || node.kind === 'repeat') return [];
+			const rows = node.row ? optionRows.get(node.row) : undefined;
+			if (rows) {
+				const list = nodes.find((candidate) => candidate.id === node.row)!;
+				return rows.map((key, index): NativeStyleInput['nodes'][number] => {
+					const parent = node.parent === list.parent ? node.parent! : `${node.parent}@${index}`;
+					const arm = node.arm ? { arm: node.arm } : {};
+					if (node.kind === 'text')
+						return { kind: 'text', id: `${node.id}@${index}`, parent, text: initial.get(`${node.id}@${key}`) ?? '', ...arm };
+					if (node.kind !== 'element') throw new Error(`${node.id}: a <select>'s option row holds a ${node.kind}`);
+					return { kind: 'element', id: `${node.id}@${index}`, element: node.element, parent, attributes: { ...node.attributes }, ...arm };
+				});
+			}
 			if (node.kind === 'sheet')
 				throw new Error(
 					`${node.id}: a styled system sheet's content is laid out as its own document, which only the app style file carries (an app's pages/ folder)`,
