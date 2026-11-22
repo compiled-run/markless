@@ -23,13 +23,37 @@ name: notes
 - assertVisible: Groceries
 - assertVisible: Edit
 - assertNotVisible: Save note
-- tapOn: Notes
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertVisible: Save note
 - assertNotVisible: Edit
+- assertVisible: Save note
+- assertNotVisible: Edit
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertNotVisible: Save note
 - assertVisible: All notes
 - assertVisible: Groceries
-- assertNotVisible: Edit
+- assertNotVisible: Save note
 - tapOn: Groceries
-- assertVisible: Edit
 - assertVisible: Edit
 - assertNotVisible: Search notes
 - runFlow:
