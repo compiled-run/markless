@@ -3,7 +3,9 @@ import { cleanup, render, renderSSR } from '../src/index.ts';
 import ComposedPage from './arm-state-starts-over/composed-page.tsrx';
 import ElseArm from './arm-state-starts-over/else-arm.tsrx';
 import Fight from './arm-state-starts-over/fight.tsrx';
+import GrandchildPage from './arm-state-starts-over/grandchild-page.tsrx';
 import IfArm from './arm-state-starts-over/if-arm.tsrx';
+import RowArm from './arm-state-starts-over/row-arm.tsrx';
 import SwitchArm from './arm-state-starts-over/switch-arm.tsrx';
 import TryArm from './arm-state-starts-over/try-arm.tsrx';
 
@@ -71,8 +73,8 @@ const startsOver = async (root: ParentNode, start: string, afterTwo: string) => 
 	await expect.poll(() => count(root)).toBe(start);
 };
 const within = (root: ParentNode, name: string) => {
-	const scope = root.querySelector(`[data-case="${name}"]`);
-	if (!scope) throw new Error(`missing case ${name}`);
+	const scope = root.querySelector(name.startsWith('[') ? name : `[data-case="${name}"]`);
+	if (!scope) throw new Error(`missing ${name}`);
 	return scope;
 };
 
@@ -93,4 +95,31 @@ for (const mode of ['CSR', 'SSR'] as const)
 		press(fight, '[data-toggle]');
 		press(fight, '[data-toggle]');
 		await expect.poll(() => count(fight)).toBe('900');
+	});
+
+for (const mode of ['CSR', 'SSR'] as const)
+	test(`${mode}: arm state starts over in a grandchild (page, A, B)`, async () => {
+		const { container } = await (mode === 'CSR' ? render(GrandchildPage) : renderSSR(GrandchildPage));
+		await startsOver(container, '5', '15');
+	});
+
+const rowCounts = (root: ParentNode) =>
+	[...root.querySelectorAll('[data-row]')].map(
+		(row) => `${row.getAttribute('data-row')}:${row.querySelector('[data-count]')?.textContent?.trim() ?? '-'}`,
+	);
+
+for (const mode of ['CSR', 'SSR'] as const)
+	test(`${mode}: arm state in a row component survives the row moving, and starts over when the arm reopens`, async () => {
+		const { container } = await (mode === 'CSR' ? render(RowArm) : renderSSR(RowArm));
+		press(within(container, '[data-row="bo"]'), '[data-toggle]');
+		await expect.poll(() => rowCounts(container)).toEqual(['ann:-', 'bo:0']);
+		press(within(container, '[data-row="bo"]'), '[data-count]');
+		press(within(container, '[data-row="bo"]'), '[data-count]');
+		await expect.poll(() => rowCounts(container)).toEqual(['ann:-', 'bo:2']);
+		press(container, '[data-reverse]');
+		await expect.poll(() => rowCounts(container)).toEqual(['bo:2', 'ann:-']);
+		press(within(container, '[data-row="bo"]'), '[data-toggle]');
+		await expect.poll(() => rowCounts(container)).toEqual(['bo:-', 'ann:-']);
+		press(within(container, '[data-row="bo"]'), '[data-toggle]');
+		await expect.poll(() => rowCounts(container)).toEqual(['bo:0', 'ann:-']);
 	});

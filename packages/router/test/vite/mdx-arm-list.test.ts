@@ -103,24 +103,54 @@ const shownText = (page: Page, selector: string) =>
 	page.evaluate((s) => [...document.querySelectorAll(s)].map((node) => node.textContent?.trim()).join('|'), selector);
 
 // Spec 01 "Conditional identity": state an MDX island's arm declares starts over when the arm opens again.
-test('MDX islands: state declared in an @if starts over when it reopens', async () => {
+test('MDX islands: state declared in an @if starts over when it reopens, and the other island is untouched', async () => {
 	const page = await browser!.newPage();
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
 	await page.goto(`${server!.origin}/arm-state`);
-	const presses = page.locator('.presses').nth(1);
-	await presses.locator('[data-open]').click();
-	await expect.poll(() => shownText(page, '[data-press]')).toBe('0');
-	await presses.locator('[data-press]').click();
-	await presses.locator('[data-press]').click();
-	await expect.poll(() => shownText(page, '[data-press]')).toBe('2');
-	await presses.locator('[data-open]').click();
-	await expect.poll(() => shownText(page, '[data-press]')).toBe('');
-	await presses.locator('[data-open]').click();
-	await expect.poll(() => shownText(page, '[data-press]')).toBe('0');
+	const first = page.locator('.presses').nth(0);
+	const second = page.locator('.presses').nth(1);
+	const count = (island: typeof first) => island.locator('[data-press]').allTextContents();
+	await first.locator('[data-open]').click();
+	await first.locator('[data-press]').click();
+	await expect.poll(() => count(first)).toEqual(['1']);
+	await second.locator('[data-open]').click();
+	await expect.poll(() => count(second)).toEqual(['0']);
+	await second.locator('[data-press]').click();
+	await second.locator('[data-press]').click();
+	await expect.poll(() => count(second)).toEqual(['2']);
+	await second.locator('[data-open]').click();
+	await expect.poll(() => count(second)).toEqual([]);
+	await second.locator('[data-open]').click();
+	await expect.poll(() => count(second)).toEqual(['0']);
+	await expect.poll(() => count(first)).toEqual(['1']);
 	expect(errors).toEqual([]);
 	await page.close();
 }, 60_000);
+
+for (const [name, toggle, start, afterTwo] of [
+	['@else', 'Fight', '1000', '700'],
+	['@switch case', 'Switch', '3', '7'],
+] as const)
+	test(`MDX islands: state declared in an arm starts over when it reopens: ${name}`, async () => {
+		const page = await browser!.newPage();
+		const errors: string[] = [];
+		page.on('pageerror', (error) => errors.push(error.message));
+		await page.goto(`${server!.origin}/arm-state`);
+		const island = page.locator('[data-toggle]', { hasText: toggle }).locator('..');
+		const count = () => island.locator('[data-count]').allTextContents();
+		await island.locator('[data-toggle]').click();
+		await expect.poll(count).toEqual([start]);
+		await island.locator('[data-count]').click();
+		await island.locator('[data-count]').click();
+		await expect.poll(count).toEqual([afterTwo]);
+		await island.locator('[data-toggle]').click();
+		await expect.poll(count).toEqual([]);
+		await island.locator('[data-toggle]').click();
+		await expect.poll(count).toEqual([start]);
+		expect(errors).toEqual([]);
+		await page.close();
+	}, 60_000);
 
 // An @if and a @switch inside an island's open @if keep updating, and each arm's state starts over.
 for (const path of ['/nested', '/nested-host'])
@@ -148,3 +178,4 @@ for (const path of ['/nested', '/nested-host'])
 		expect(errors).toEqual([]);
 		await page.close();
 	}, 60_000);
+
