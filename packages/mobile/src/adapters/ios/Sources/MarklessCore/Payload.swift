@@ -20,6 +20,8 @@ public enum NativeEventField: String, Sendable {
 	case target, currentTarget, relatedTarget, button, buttons, clientX, clientY, pointerId, pointerType, isPrimary, timeStamp
 	/// An animation event's: its `@keyframes` name and its elapsed time in seconds.
 	case animationName, elapsedTime
+	/// A click's, as a phone's browser fills it for a tap; `isTrusted` is false only for an event a script raised.
+	case shiftKey, ctrlKey, altKey, metaKey, isTrusted
 }
 
 public enum NativeBuiltin: String, Sendable {
@@ -53,6 +55,8 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case at(NativeExpr, of: NativeExpr)
 	case array([NativeArrayItem])
 	case object([NativeObjectField])
+	/// An object from its parts in order (`{ ...row, name }`): each part's own fields, a later key winning; a null part adds nothing.
+	case merge([NativeExpr])
 	case method(NativeMethod, target: NativeExpr, arguments: [NativeExpr])
 	/// Only as a method argument; its parameters read as `local`.
 	case lambda(parameters: [String], body: NativeExpr)
@@ -74,6 +78,10 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case focusOrigin(NativeExpr)
 	/// Whether the value is an element id or the document body.
 	case isElement(NativeExpr)
+	/// Whether a node is shown now: every @if arm around it holds.
+	case shown(String)
+	/// `document.getElementById(value)`: the first shown element whose `id` attribute is the value now, else null.
+	case byId(NativeExpr)
 	/// The element `node`, in an `@if` arm, if it was on screen when the run began; else null.
 	case drawn(String)
 	/// The page's route params, an object of strings.
@@ -90,12 +98,13 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .event, .focused, .local, .item, .index, .routeParams, .formData, .checked, .field, .drawn: return []
-		case let .unary(_, inner), let .member(inner, _), let .optionalMember(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner): return inner.cells
+		case .literal, .event, .focused, .local, .item, .index, .routeParams, .formData, .checked, .field, .shown, .drawn: return []
+		case let .unary(_, inner), let .member(inner, _), let .optionalMember(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner), let .byId(inner): return inner.cells
 		case let .contains(within, node): return within.cells + node.cells
 		case let .captures(node, pointer): return node.cells + pointer.cells
 		case let .array(items): return items.flatMap(\.value.cells)
 		case let .object(fields): return fields.flatMap(\.value.cells)
+		case let .merge(parts): return parts.flatMap(\.cells)
 		case let .method(_, target, arguments): return target.cells + arguments.flatMap(\.cells)
 		case let .binary(_, a, b), let .logical(_, a, b), let .at(a, b): return a.cells + b.cells
 		case let .conditional(test, whenTrue, whenFalse): return test.cells + whenTrue.cells + whenFalse.cells
@@ -166,6 +175,8 @@ public struct NativeNode: Equatable, Sendable {
 	public var defaultStyle: NativeDefaultStyle? = nil
 	/// On an `<svg>`: the shapes it draws.
 	public var drawing: NativeDrawing? = nil
+	/// On a shape inside an `<svg>`: what it paints; its svg draws it after the svg's own shapes, in tree order.
+	public var shape: NativeShape? = nil
 	/// A live region: a change to the text inside is announced.
 	public var live: NativeLive? = nil
 	/// A live region whose `role`, `aria-live` or `aria-atomic` follows state: its politeness and atomicity, evaluated when it speaks.
@@ -218,6 +229,32 @@ public struct NativeShape: Equatable, Sendable {
 	public let miterLimit: Double
 	/// `[a, b, c, d, e, f]`.
 	public let transform: [Double]?
+	/// A `<text>`: the path is empty, and these runs are laid out and filled instead.
+	public var text: NativeDrawingText?
+	/// Clip outlines in the drawing's units (nonzero); the shape shows only where all of them cover.
+	public var clip: [[Double]] = []
+}
+
+/// An SVG `<text>`: runs laid out from the pen, each chunk placed by `anchor`, glyphs on `baseline` relative to the pen.
+public struct NativeDrawingText: Equatable, Sendable {
+	public struct Run: Equatable, Sendable {
+		public let text: String
+		public let x: Double?
+		public let y: Double?
+		public let dx: Double?
+		public let dy: Double?
+		public let size: Double
+		public let weight: Double
+		/// serif, sans-serif or monospace; the page's text font when nil.
+		public let family: String?
+		public let letterSpacing: Double
+		public let fill: NativeShape.Paint?
+	}
+	/// start, middle or end.
+	public let anchor: String
+	/// alphabetic, middle, central, hanging, text-top, text-bottom or ideographic.
+	public let baseline: String
+	public let runs: [Run]
 }
 
 /// An inline `<svg>` compiled when the app was built.
@@ -229,6 +266,24 @@ public struct NativeDrawing: Equatable, Sendable {
 	public let shapes: [NativeShape]
 	/// `width` and `height` are in ems of the font size of the text the svg sits in, not CSS px.
 	public var em = false
+	/// What its `<text>` elements say, read when the svg has no name.
+	public var label: String?
+	/// `preserveAspectRatio`; nil is `xMidYMid meet`.
+	public var aspect: Aspect?
+
+	public enum Aspect: Equatable, Sendable {
+		/// The viewBox stretched to the box.
+		case none
+		/// One scale that fits (or, sliced, fills) the box; each axis's `min`, `mid` or `max` aligned.
+		case align(x: String, y: String, slice: Bool)
+	}
+}
+
+extension NativeDrawing {
+	/// A drawing on its own, as an SVG file's image travels in the app's image manifest.
+	public static func decode(_ json: JSONValue, at path: String) throws -> NativeDrawing {
+		try NativeViewPayload.decodeDrawing(Reader(json, at: path))
+	}
 }
 
 public enum NativeEventName: String, Sendable {
@@ -243,6 +298,8 @@ public enum NativeEventName: String, Sendable {
 	case dismiss
 	/// The host's back gesture or Escape on an open `<dialog>`: it closes, as the browser's cancel does.
 	case cancel
+	/// A `<dialog>` closed; raised by the runtime after the handler or back gesture that closed it, never sent by a host.
+	case close
 	/// The keyboard's return key in a single-line text field.
 	case enter
 	/// A form's, run only by a `submit` op.
@@ -264,11 +321,23 @@ public enum NativeEventName: String, Sendable {
 	case pointerdown, pointermove, pointerup, pointercancel
 	/// Raised by the runtime around a touch; a host never sends them.
 	case pointerover, pointerout, pointerenter, pointerleave
+	/// A phone browser's compatibility mouse events, raised by the runtime after a tap's pointer events; a host never sends them.
+	case mouseover, mouseout, mouseenter, mouseleave, mousemove, mousedown, mouseup
+	/// A long press, as Chrome on Android raises `contextmenu`; Safari on iOS raises none, so this host never sends it.
+	case contextmenu
 
-	/// The pointer events a page's handlers may listen for.
+	/// The pointer events a page's handlers may listen for, and the mouse events a tap raises after them.
 	public var isPointer: Bool {
 		switch self {
 		case .pointerdown, .pointermove, .pointerup, .pointercancel, .pointerover, .pointerout, .pointerenter, .pointerleave: true
+		default: isMouse
+		}
+	}
+
+	/// The mouse events a tap raises.
+	public var isMouse: Bool {
+		switch self {
+		case .mouseover, .mouseout, .mouseenter, .mouseleave, .mousemove, .mousedown, .mouseup: true
 		default: false
 		}
 	}
@@ -324,7 +393,97 @@ public struct NativeCapture: Equatable, Sendable {
 }
 
 public enum NativeFieldKind: String, Sendable {
-	case text, checkbox, radio, hidden, select
+	case text, number, checkbox, radio, hidden, select
+}
+
+/// Chromium's messages for a number field in one language, with `{min}`, `{max}`, `{low}`, `{high}`, `{value}` for the numbers.
+public struct NativeNumberMessages: Equatable, Sendable {
+	public let underflow: String
+	public let overflow: String
+	public let step: String
+	public let stepOne: String
+	public let badInput: String
+	public let digits: [Character]
+	public let decimal: String
+
+	/// `key`'s message with these numbers written as Chromium writes them: no grouping, in the language's digits and mark.
+	public func message(_ problem: NativeNumberProblem) -> String {
+		func write(_ value: Double) -> String {
+			NativeValue.number(value).text.map { $0 == "." ? decimal : String(digits[Int(String($0)) ?? 0]) }.joined()
+		}
+		switch problem {
+		case .badInput: return badInput
+		case let .underflow(min): return underflow.replacingOccurrences(of: "{min}", with: write(min))
+		case let .overflow(max): return overflow.replacingOccurrences(of: "{max}", with: write(max))
+		case let .step(low, high):
+			return step.replacingOccurrences(of: "{low}", with: write(low)).replacingOccurrences(of: "{high}", with: write(high))
+		case let .stepOne(value): return stepOne.replacingOccurrences(of: "{value}", with: write(value))
+		}
+	}
+}
+
+/// Why a number field fails before a submit, after a missing value; see `nativeNumberProblem`.
+public enum NativeNumberProblem: Equatable, Sendable {
+	case badInput, underflow(Double), overflow(Double), step(Double, Double), stepOne(Double)
+}
+
+/// HTML's valid floating-point number: `-`? digits with an optional fraction (or a fraction alone), then an optional exponent.
+private func isValidFloat(_ text: String) -> Bool {
+	var rest = Substring(text)
+	if rest.first == "-" { rest = rest.dropFirst() }
+	let whole = rest.prefix { $0.isASCII && $0.isNumber }
+	rest = rest.dropFirst(whole.count)
+	var fraction = Substring("")
+	if rest.first == "." {
+		rest = rest.dropFirst()
+		fraction = rest.prefix { $0.isASCII && $0.isNumber }
+		if fraction.isEmpty { return false }
+		rest = rest.dropFirst(fraction.count)
+	}
+	if whole.isEmpty && fraction.isEmpty { return false }
+	if rest.first == "e" || rest.first == "E" {
+		rest = rest.dropFirst()
+		if rest.first == "+" || rest.first == "-" { rest = rest.dropFirst() }
+		let exponent = rest.prefix { $0.isASCII && $0.isNumber }
+		if exponent.isEmpty { return false }
+		rest = rest.dropFirst(exponent.count)
+	}
+	return rest.isEmpty
+}
+
+/// A number field's value from its text, by HTML's sanitization: text that is no valid number is the empty string.
+public func nativeNumberValue(_ text: String) -> String { isValidFloat(text) ? text : "" }
+
+private func floatOf(_ attribute: String?) -> Double? { attribute.flatMap { isValidFloat($0) ? Double($0) : nil } }
+
+private func decimalsOf(_ value: Double) -> Int {
+	let written = NativeValue.number(value).text
+	if let e = written.range(of: "e-") {
+		return (Int(written[e.upperBound...]) ?? 0) + (written[..<e.lowerBound].split(separator: ".").dropFirst().first?.count ?? 0)
+	}
+	return written.split(separator: ".").dropFirst().first?.count ?? 0
+}
+
+/// Why a number field holding `text` fails before a submit, in Chromium's order after a missing value (as the reference's).
+public func nativeNumberProblem(_ text: String, min minAttribute: String?, max maxAttribute: String?, step stepAttribute: String?, value valueAttribute: String?) -> NativeNumberProblem? {
+	if text.isEmpty { return nil }
+	guard isValidFloat(text), let value = Double(text) else { return .badInput }
+	let min = floatOf(minAttribute)
+	let max = floatOf(maxAttribute)
+	if let min, value < min { return .underflow(min) }
+	if let max, value > max { return .overflow(max) }
+	if stepAttribute?.lowercased() == "any" { return nil }
+	let given = floatOf(stepAttribute)
+	let step = given.map { $0 > 0 ? $0 : 1 } ?? 1
+	let base = min ?? floatOf(valueAttribute) ?? 0
+	// Whole numbers at the finest decimal any of them has, so 0.1 steps do not drift.
+	let scale = pow(10, Double(Swift.max(decimalsOf(base), decimalsOf(step), decimalsOf(value))))
+	let at = (value * scale).rounded(), from = (base * scale).rounded(), by = (step * scale).rounded()
+	if (at - from).truncatingRemainder(dividingBy: by) == 0 { return nil }
+	let lowAt = from + ((at - from) / by).rounded(.down) * by
+	let low = lowAt / scale, high = (lowAt + by) / scale
+	if let max, high > max { return .stepOne(low) }
+	return .step(low, high)
 }
 
 /// What the web says when a required field has no value, in one language.
@@ -565,12 +724,36 @@ public struct NativeCell: Equatable, Sendable {
 	public var first: NativeExpr? = nil
 	/// On a row's state: the values the row passes to the part that owns it; when one changes the row's state starts over.
 	public var rebuiltBy: [NativeExpr]? = nil
+	/// A first value the build could not know, evaluated when the screen opens, in cell order.
+	public var seed: NativeExpr? = nil
+	/// State of a component an `@if` arm shows: back to `initial` while the arm is hidden, as the web renders the arm anew.
+	public var arm: NativeArmPlace? = nil
 	/// Its first value is `undefined` on the web, which `initial` spells as null: a script reads it so until it is written.
 	public var unset = false
 	/// Written while rendering from a value that follows state: at mount, and again whenever that value changes.
 	public var follows: NativeExpr? = nil
 	/// A cell of an app-wide `shared()`: the app holds one value for every page (`NativeAppSession`).
 	public var app = false
+}
+
+/// A number a style reads while the app runs: Dragon's layout takes it, so it must be finite (and whole when `integer`).
+public struct NativeSlot: Equatable, Sendable {
+	public let id: String
+	public let value: NativeExpr
+	public let integer: Bool
+	/// Evaluated only while this style case has this value; otherwise the slot keeps its last value (0 before the first).
+	public var when: NativeStyleWhen? = nil
+}
+
+public struct NativeStyleWhen: Equatable, Sendable {
+	public let styleCase: String
+	public let value: Bool
+}
+
+/// A condition a style follows: whether its test is truthy, journalled as `state` when it changes.
+public struct NativeStyleCase: Equatable, Sendable {
+	public let id: String
+	public let value: NativeExpr
 }
 
 public struct NativeEvent: Equatable, Sendable {
@@ -601,6 +784,12 @@ public struct NativeViewPayload: Equatable, Sendable {
 	public let valueMissing: [(locale: String, messages: NativeValueMissing)]
 	/// What the web says when a text field a person edited is longer than its `maxlength`, by locale, in payload order.
 	public var tooLong: [(locale: String, message: NativeTooLong)] = []
+	/// What the web says when a number field is out of range, off its step or holds no number, by locale, in payload order.
+	public var numberMessages: [(locale: String, messages: NativeNumberMessages)] = []
+	/// The numbers element styles read, in payload order: each journalled as `slot` when it changes.
+	public var slots: [NativeSlot] = []
+	/// The conditions element styles follow, in payload order.
+	public var styleCases: [NativeStyleCase] = []
 	/// What the web says when an email field holds no email address, by locale, in payload order.
 	public var typeMismatch: [(locale: String, message: NativeEmailMismatch)] = []
 
@@ -608,11 +797,16 @@ public struct NativeViewPayload: Equatable, Sendable {
 		a.component == b.component && a.route == b.route && a.cells == b.cells && a.nodes == b.nodes && a.events == b.events
 			&& a.handlers == b.handlers && a.title == b.title && a.objects == b.objects && a.forms == b.forms && a.valueMissing.map(\.locale) == b.valueMissing.map(\.locale)
 			&& a.valueMissing.map(\.messages) == b.valueMissing.map(\.messages) && a.tooLong.map(\.locale) == b.tooLong.map(\.locale)
-			&& a.tooLong.map(\.message) == b.tooLong.map(\.message) && a.typeMismatch.map(\.locale) == b.typeMismatch.map(\.locale)
-			&& a.typeMismatch.map(\.message) == b.typeMismatch.map(\.message) && a.script == b.script
+			&& a.tooLong.map(\.message) == b.tooLong.map(\.message) && a.script == b.script && a.tapPoints == b.tapPoints && a.documentEvents == b.documentEvents && a.slots == b.slots && a.styleCases == b.styleCases
+			&& a.numberMessages.map(\.locale) == b.numberMessages.map(\.locale) && a.numberMessages.map(\.messages) == b.numberMessages.map(\.messages)
+			&& a.typeMismatch.map(\.locale) == b.typeMismatch.map(\.locale) && a.typeMismatch.map(\.message) == b.typeMismatch.map(\.message)
 	}
 	/// The JavaScript the page's script ops and computeds run; absent when every handler is data.
 	public var script: NativeScript? = nil
+	/// A click handler reads where its tap landed, so the host reports touches even with no pointer handler.
+	public var tapPoints = false
+	/// A script adds listeners to the document: the host reports every touch and its moves, which bubble to them.
+	public var documentEvents = false
 
 	public static func decode(_ data: Data) throws -> NativeViewPayload {
 		try decode(JSONValue.parse(data))
@@ -620,20 +814,41 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "typeMismatch", "script"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "title", "objects", "forms", "valueMissing", "tooLong", "numberMessages", "typeMismatch", "script", "tapPoints", "slots", "styleCases", "documentEvents"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
+		let styleCases: [NativeStyleCase] = fields.has("styleCases") ? try fields["styleCases"].array().map { styleCase in
+			let f = try styleCase.object(["id", "value"])
+			return NativeStyleCase(id: try f["id"].string(), value: try decodeExpr(try f["value"]))
+		} : []
+		let caseIds = Set(styleCases.map(\.id))
+		guard caseIds.count == styleCases.count else { throw PayloadError(path: "payload.styleCases", reason: "a style case is listed twice") }
+		let styleWhen = { (reader: Reader) throws -> NativeStyleWhen in
+			let w = try reader.object(["case", "value"])
+			let styleCase = try w["case"].string()
+			guard caseIds.contains(styleCase) else { throw PayloadError(path: reader.path, reason: "names unknown style case \(styleCase)") }
+			return NativeStyleWhen(styleCase: styleCase, value: try w["value"].bool())
+		}
+		let slots: [NativeSlot] = fields.has("slots") ? try fields["slots"].array().map { slot in
+			let f = try slot.object(required: ["id", "value"], optional: ["integer", "when"])
+			if f.has("integer"), try !f["integer"].bool() { throw PayloadError(path: try f["integer"].path, reason: "integer is only ever true") }
+			return NativeSlot(id: try f["id"].string(), value: try decodeExpr(try f["value"]), integer: f.has("integer"), when: f.has("when") ? try styleWhen(try f["when"]) : nil)
+		} : []
+		var slotIds = Set<String>()
+		for slot in slots where !slotIds.insert(slot.id).inserted {
+			throw PayloadError(path: "payload.slots", reason: "duplicate slot \(slot.id)")
+		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "domain", "device", "task", "async", "object", "row", "clock", "first", "rebuiltBy", "unset", "follows", "app"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "domain", "device", "task", "async", "object", "row", "clock", "first", "rebuiltBy", "seed", "arm", "unset", "follows", "app", "nonFinite"])
 			if field.has("clock"), try !field["clock"].bool() {
 				throw PayloadError(path: try field["clock"].path, reason: "clock is only ever true")
 			}
 			if field.has("unset"), try !field["unset"].bool() {
 				throw PayloadError(path: try field["unset"].path, reason: "unset is only ever true")
 			}
-			let initial = NativeValue(json: try field["initial"].value)
+			let initial = try NativeValue.nonFiniteJoin(try field["initial"].value, field.has("nonFinite") ? try field["nonFinite"].value : nil)
 			// The style export carries each state's domain; the payload's copy is Dragon's input, checked here and not kept.
 			if field.has("domain") { _ = try field["domain"].array().map { try $0.string() } }
 			var styled = false
@@ -659,6 +874,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 				clock: field.has("clock"),
 				first: field.has("first") ? try decodeExpr(try field["first"]) : nil,
 				rebuiltBy: field.has("rebuiltBy") ? try field["rebuiltBy"].array().map(decodeExpr) : nil,
+				seed: field.has("seed") ? try decodeExpr(try field["seed"]) : nil,
+				arm: try decodeArm(field),
 				unset: field.has("unset"),
 				follows: field.has("follows") ? try decodeExpr(try field["follows"]) : nil,
 				app: field.has("app") ? try field["app"].bool() : false)
@@ -668,12 +885,20 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let place = ["arm", "row"]
 			switch kind {
 			case "element":
-				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing", "live", "liveFollows"] + place)
+				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object", "defaultStyle", "drawing", "shape", "live", "liveFollows", "style", "styleWhen"] + place)
 				var attributes: [String: String] = [:]
 				if field.has("attributes") {
 					let reader = try field["attributes"]
 					for key in try reader.keys() { attributes[key] = try reader.field(key).string() }
 				}
+				// Dragon's style export already carries what each hole moves; the payload's copy is its input, checked here and not kept.
+				if field.has("style") {
+					for part in try field["style"].array() where !part.isString {
+						let slot = try part.object(["slot"])["slot"].string()
+						guard slotIds.contains(slot) else { throw PayloadError(path: part.path, reason: "names unknown slot \(slot)") }
+					}
+				}
+				if field.has("styleWhen") { _ = try styleWhen(try field["styleWhen"]) }
 				let bindings: [NativeBinding] = field.has("bindings") ? try field["bindings"].array().map { binding -> NativeBinding in
 					if try binding.keys().contains("property") {
 						let b = try binding.object(["property", "value"])
@@ -690,6 +915,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 					object: field.has("object") ? try field["object"].string() : nil,
 					defaultStyle: field.has("defaultStyle") ? try decodeDefaultStyle(try field["defaultStyle"]) : nil,
 					drawing: field.has("drawing") ? try decodeDrawing(try field["drawing"]) : nil,
+					shape: field.has("shape") ? try decodeShape(try field["shape"]) : nil,
 					live: field.has("live") ? try decodeLive(try field["live"]) : nil,
 					liveFollows: field.has("liveFollows") ? try decodeLiveFollows(try field["liveFollows"]) : nil)
 			case "text":
@@ -908,11 +1134,31 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let r = try fields["route"].object(["pattern", "params"])
 			return NativeRoute(pattern: try r["pattern"].string(), params: try r["params"].array().map { try $0.string() })
 		}() : nil
-		let payload = NativeViewPayload(
+		var payload = NativeViewPayload(
 			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers,
 			title: fields.has("title") ? try decodeParts(try fields["title"]) : nil,
-			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong, typeMismatch: typeMismatch,
+			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong, slots: slots, styleCases: styleCases, typeMismatch: typeMismatch,
 			script: fields.has("script") ? try decodeScript(try fields["script"]) : nil)
+		if fields.has("numberMessages") {
+			let reader = try fields["numberMessages"]
+			payload.numberMessages = try reader.keys().map { locale in
+				let m = try reader.field(locale).object(required: ["underflow", "overflow", "step", "stepOne", "badInput"], optional: ["digits", "decimal"])
+				let digits = m.has("digits") ? Array(try m["digits"].string()) : Array("0123456789")
+				guard digits.count == 10 else { throw PayloadError(path: "payload.numberMessages.\(locale).digits", reason: "not ten digits") }
+				return (locale, NativeNumberMessages(
+					underflow: try m["underflow"].string(), overflow: try m["overflow"].string(), step: try m["step"].string(),
+					stepOne: try m["stepOne"].string(), badInput: try m["badInput"].string(), digits: digits,
+					decimal: m.has("decimal") ? try m["decimal"].string() : "."))
+			}
+		}
+		if fields.has("documentEvents") {
+			guard try fields["documentEvents"].bool() else { throw PayloadError(path: "payload.documentEvents", reason: "true when present") }
+			payload.documentEvents = true
+		}
+		if fields.has("tapPoints") {
+			guard try fields["tapPoints"].bool() else { throw PayloadError(path: "payload.tapPoints", reason: "true when present") }
+			payload.tapPoints = true
+		}
 		try payload.check()
 		return payload
 	}
@@ -959,10 +1205,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		return NativeLiveFollows(politeness: try decodeExpr(try live["politeness"]), atomic: try decodeExpr(try live["atomic"]))
 	}
 
-	private static func decodeDrawing(_ reader: Reader) throws -> NativeDrawing {
-		let field = try reader.object(required: ["viewBox", "shapes"], optional: ["width", "height", "em"])
-		let viewBox = try field["viewBox"].isNull ? nil : try field["viewBox"].array().map { try $0.number() }
-		if let viewBox, viewBox.count != 4 { throw PayloadError(path: "\(reader.path).viewBox", reason: "expected four numbers") }
+	private static func decodeShape(_ shape: Reader) throws -> NativeShape {
 		func paint(_ reader: Reader) throws -> NativeShape.Paint? {
 			if reader.isNull { return nil }
 			if reader.isString {
@@ -972,21 +1215,62 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let color = try reader.object(["r", "g", "b", "alpha"])
 			return .color(RGBA(r: try color["r"].number(), g: try color["g"].number(), b: try color["b"].number(), alpha: try color["alpha"].number()))
 		}
-		let shapes = try field["shapes"].array().map { shape -> NativeShape in
-			let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform"])
-			let transform = s.has("transform") ? try s["transform"].array().map { try $0.number() } : nil
-			if let transform, transform.count != 6 { throw shape.fail("a transform has six numbers") }
-			let rule = try s["fillRule"].string()
-			guard rule == "nonzero" || rule == "evenodd" else { throw shape.fail("unknown fillRule \(rule)") }
-			return NativeShape(
-				path: try s["path"].array().map { try $0.number() }, fill: try paint(try s["fill"]), evenOdd: rule == "evenodd",
-				stroke: try paint(try s["stroke"]), width: try s["width"].number(), cap: try s["cap"].string(), join: try s["join"].string(),
-				miterLimit: try s["miterLimit"].number(), transform: transform)
+		let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "text", "clip"])
+		let transform = s.has("transform") ? try s["transform"].array().map { try $0.number() } : nil
+		if let transform, transform.count != 6 { throw shape.fail("a transform has six numbers") }
+		let rule = try s["fillRule"].string()
+		guard rule == "nonzero" || rule == "evenodd" else { throw shape.fail("unknown fillRule \(rule)") }
+		var decoded = NativeShape(
+			path: try s["path"].array().map { try $0.number() }, fill: try paint(try s["fill"]), evenOdd: rule == "evenodd",
+			stroke: try paint(try s["stroke"]), width: try s["width"].number(), cap: try s["cap"].string(), join: try s["join"].string(),
+			miterLimit: try s["miterLimit"].number(), transform: transform)
+		if s.has("clip") { decoded.clip = try s["clip"].array().map { try $0.array().map { try $0.number() } } }
+		if s.has("text") {
+			let t = try s["text"].object(["anchor", "baseline", "runs"])
+			let anchor = try t["anchor"].string()
+			guard ["start", "middle", "end"].contains(anchor) else { throw shape.fail("unknown anchor \(anchor)") }
+			let baseline = try t["baseline"].string()
+			guard ["alphabetic", "middle", "central", "hanging", "text-top", "text-bottom", "ideographic"].contains(baseline) else {
+				throw shape.fail("unknown baseline \(baseline)")
+			}
+			let runs = try t["runs"].array().map { run -> NativeDrawingText.Run in
+				let r = try run.object(required: ["text", "size", "weight", "letterSpacing", "fill"], optional: ["x", "y", "dx", "dy", "family"])
+				func optional(_ name: String) throws -> Double? { r.has(name) ? try r[name].number() : nil }
+				let family = r.has("family") ? try r["family"].string() : nil
+				if let family, !["serif", "sans-serif", "monospace"].contains(family) { throw run.fail("unknown family \(family)") }
+				return NativeDrawingText.Run(
+					text: try r["text"].string(), x: try optional("x"), y: try optional("y"), dx: try optional("dx"), dy: try optional("dy"),
+					size: try r["size"].number(), weight: try r["weight"].number(), family: family,
+					letterSpacing: try r["letterSpacing"].number(), fill: try paint(try r["fill"]))
+			}
+			decoded.text = NativeDrawingText(anchor: anchor, baseline: baseline, runs: runs)
 		}
-		return NativeDrawing(
+		return decoded
+	}
+
+	static func decodeDrawing(_ reader: Reader) throws -> NativeDrawing {
+		let field = try reader.object(required: ["viewBox", "shapes"], optional: ["width", "height", "em", "label", "aspect"])
+		let viewBox = try field["viewBox"].isNull ? nil : try field["viewBox"].array().map { try $0.number() }
+		if let viewBox, viewBox.count != 4 { throw PayloadError(path: "\(reader.path).viewBox", reason: "expected four numbers") }
+		let shapes = try field["shapes"].array().map(decodeShape)
+		var drawing = NativeDrawing(
 			viewBox: viewBox, width: field.has("width") ? try field["width"].number() : nil,
 			height: field.has("height") ? try field["height"].number() : nil, shapes: shapes,
 			em: field.has("em") ? try field["em"].bool() : false)
+		drawing.label = field.has("label") ? try field["label"].string() : nil
+		if field.has("aspect") {
+			let aspect = try field["aspect"]
+			if aspect.isString {
+				guard try aspect.string() == "none" else { throw aspect.fail("unknown aspect") }
+				drawing.aspect = NativeDrawing.Aspect.none
+			} else {
+				let a = try aspect.object(required: ["x", "y"], optional: ["slice"])
+				let x = try a["x"].string(), y = try a["y"].string()
+				guard ["min", "mid", "max"].contains(x), ["min", "mid", "max"].contains(y) else { throw aspect.fail("unknown alignment") }
+				drawing.aspect = .align(x: x, y: y, slice: a.has("slice") ? try a["slice"].bool() : false)
+			}
+		}
+		return drawing
 	}
 
 	private static func decodeScript(_ reader: Reader) throws -> NativeScript {
@@ -1077,8 +1361,18 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["captures", "pointer"]: return .captures(node: try decodeExpr(try field("captures")), pointer: try decodeExpr(try field("pointer")))
 		case ["focusOrigin"]: return .focusOrigin(try decodeExpr(try field("focusOrigin")))
 		case ["isElement"]: return .isElement(try decodeExpr(try field("isElement")))
+		case ["shown"]: return .shown(try field("shown").string())
+		case ["byId"]: return .byId(try decodeExpr(try field("byId")))
 		case ["drawn"]: return .drawn(try field("drawn").string())
 		case ["literal"]: return .literal(try field("literal").scalar())
+		case ["nonFinite"]:
+			// A JSON literal cannot hold these; in memory they are numbers like any other.
+			switch try field("nonFinite").string() {
+			case "Infinity": return .literal(.number(.infinity))
+			case "-Infinity": return .literal(.number(-.infinity))
+			case "NaN": return .literal(.number(.nan))
+			case let name: throw reader.fail("unknown nonFinite \(name)")
+			}
 		case ["unary", "value"]: return .unary(try oneOf("unary", ["!", "-", "+", "typeof"]), try decodeExpr(try field("value")))
 		case ["binary", "left", "right"]:
 			return .binary(
@@ -1111,6 +1405,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 				guard items.count == 2 else { throw PayloadError(path: pair.path, reason: "an object field is [key, expression]") }
 				return NativeObjectField(key: try items[0].string(), value: try decodeExpr(items[1]))
 			})
+		case ["merge"]: return .merge(try field("merge").array().map(decodeExpr))
 		case ["arguments", "method", "target"]:
 			let name = try field("method").string()
 			guard let method = NativeMethod(rawValue: name) else { throw PayloadError(path: reader.path + ".method", reason: "unknown method \"\(name)\"") }
@@ -1206,6 +1501,12 @@ public struct NativeViewPayload: Equatable, Sendable {
 			for case let .script(_, _, bindings, catchCell) in handler.ops where !(bindings.flatMap(\.cells) + (catchCell.map { [$0] } ?? [])).allSatisfy(cellIds.contains) {
 				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) runs a script with an unknown cell")
 			}
+		}
+		for slot in slots where !slot.value.cells.allSatisfy(cellIds.contains) {
+			throw PayloadError(path: "payload.slots", reason: "slot \(slot.id) reads an unknown cell")
+		}
+		for styleCase in styleCases where !styleCase.value.cells.allSatisfy(cellIds.contains) {
+			throw PayloadError(path: "payload.styleCases", reason: "style case \(styleCase.id) reads an unknown cell")
 		}
 		for cell in cells {
 			if let async = cell.async, !async.bindings.flatMap(\.cells).allSatisfy(cellIds.contains) {

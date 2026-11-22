@@ -45,7 +45,7 @@ abstract class MarklessActivity : Activity() {
 	/** A touch that starts outside the focused text field takes its focus and keyboard away, as a tap elsewhere does on the web. */
 	// Pointer events reach the runtime before the views, so a press is reported before the click it ends in.
 	override fun dispatchTouchEvent(e: MotionEvent): Boolean {
-		if (::host.isInitialized) host.touch(e)
+		val pressedLong = ::host.isInitialized && host.touch(e)
 		if (e.actionMasked == MotionEvent.ACTION_DOWN && ::host.isInitialized) host.focusedField()?.let { field ->
 			val at = IntArray(2).also { field.getLocationOnScreen(it) }
 			val inside = e.rawX >= at[0] && e.rawX < at[0] + field.width && e.rawY >= at[1] && e.rawY < at[1] + field.height
@@ -58,6 +58,15 @@ abstract class MarklessActivity : Activity() {
 					descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
 				}
 				(getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(field.windowToken, 0)
+			}
+		}
+		// After a long press the lift is not a tap, as in Chrome: the views see the gesture cancelled.
+		if (pressedLong && e.actionMasked == MotionEvent.ACTION_UP) {
+			val cancel = MotionEvent.obtain(e).apply { action = MotionEvent.ACTION_CANCEL }
+			try {
+				return super.dispatchTouchEvent(cancel)
+			} finally {
+				cancel.recycle()
 			}
 		}
 		return super.dispatchTouchEvent(e)
@@ -86,7 +95,7 @@ abstract class MarklessActivity : Activity() {
 	override fun onResume() {
 		super.onResume()
 		device.resumed()
-		// Shown again after Back: the app-wide cells a screen above changed reach this one.
+		// Shown again after Back: the app-wide and storage cells a screen above changed reach this one.
 		if (::host.isInitialized) host.apply(host.runtime.resume())
 	}
 

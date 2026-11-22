@@ -1,0 +1,25 @@
+{
+	"rung": 174,
+	"name": "JavaScript reads document.activeElement: the element a press focused, as an element",
+	"steps": [
+		{
+			"visible": ["Focus", "Check inside", "Check outside", "Focus is not checked"],
+			"absent": ["Focus is inside the card", "Focus is outside the card"]
+		},
+		{
+			"do": { "tap": "Check inside" },
+			"visible": ["Focus is inside the card"],
+			"absent": ["Focus is not checked", "Focus is outside the card"]
+		},
+		{
+			"do": { "tap": "Check outside" },
+			"visible": ["Focus is outside the card"],
+			"absent": ["Focus is inside the card"]
+		},
+		{
+			"do": { "tap": "Check inside" },
+			"visible": ["Focus is inside the card"],
+			"absent": ["Focus is outside the card"]
+		}
+	]
+}

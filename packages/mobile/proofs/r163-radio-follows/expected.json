@@ -1,0 +1,17 @@
+{
+	"rung": 163,
+	"name": "A radio group's input is checked from the value its root follows when the page opens, as the web renders it (the radios show in the screenshots; the vector radio-follows checks them)",
+	"steps": [
+		{ "visible": ["Photo size", "Pick small", "Pick medium", "Size: medium"] },
+		{
+			"do": { "tap": "Pick small" },
+			"visible": ["Size: small"],
+			"absent": ["Size: medium"]
+		},
+		{
+			"do": { "tap": "Pick medium" },
+			"visible": ["Size: medium"],
+			"absent": ["Size: small"]
+		}
+	]
+}

@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { allRungFolders } from '../../proofs/ladder.ts';
 import { PROOF_PLATFORMS, type ProofPlatform } from '../harness/proof-app.ts';
 import type { ProofReport } from '../harness/report.ts';
 import { affectedRungs, changedPaths, defaultBase } from './affected.ts';
-import { rungDir, writeBundle } from './bundle.ts';
+import { buildAppServer } from '../harness/app-server.ts';
+import { type BundledRung, rungDir, writeBundle } from './bundle.ts';
+import { findReused } from './reuse.ts';
 import { DEFAULT_POOL, parsePhone, phoneId, type PhoneSpec } from './pool.ts';
 import {
+	bundleRung,
 	chunkFile,
 	type Chunk,
 	daemonLog,
@@ -18,6 +21,7 @@ import {
 	phonesFile,
 	readJson,
 	resultDir,
+	reusedFile,
 	runnerHome,
 	runningDaemon,
 	rungsOn,
@@ -34,9 +38,10 @@ const USAGE = `usage: phones <command>
                          start the machine's runner and boot its phones (default: ios markless-runner, android markless_runner@5570)
   stop [--phones]        stop the runner (and shut its phones down)
   status                 the phones and every job that has not finished
-  submit [--platform ios|android] [--chunk <n>] [--wait] (--all | --affected [--base <rev>] | --failed <job> | <rung>...)
+  submit [--platform ios|android] [--chunk <n>] [--wait] [--no-reuse] (--all | --affected [--base <rev>] | --failed <job> | <rung>...)
                          compile the rungs in this checkout, queue them, print the job id; --failed reruns each rung that
-                         failed in <job> only on the phone it failed on (not a proof by itself)
+                         failed in <job> only on the phone it failed on (not a proof by itself); a rung whose bundle and
+                         host sources match a run that passed reuses that pass unless --no-reuse
   wait <job>             wait for a job; exits 0 only if it passed
   result <job> [--copy-screenshots]
                          print a finished job's results; copy its screenshots into this checkout's rung folders
@@ -140,7 +145,9 @@ async function submit(argv: string[]): Promise<number> {
 			host: { type: 'string', default: 'adapters' },
 			wait: { type: 'boolean', default: false },
 			failed: { type: 'string' },
+			reuse: { type: 'boolean', default: true },
 		},
+		allowNegative: true,
 	});
 	const platforms: ProofPlatform[] = values.platform
 		? PROOF_PLATFORMS.filter((platform) => platform === values.platform)
@@ -199,19 +206,46 @@ async function submit(argv: string[]): Promise<number> {
 			host: values.host,
 			log: (line) => console.log(`  ${line}`),
 		});
+		// An app rung that fetches its own api/ routes brings its web build, which the runner serves while the rung runs.
+		for (const dir of names.map(rungDir)) {
+			const name = basename(dir);
+			const bundled = readJson<BundledRung>(join(bundleRung(job, name), 'rung.json'));
+			if (bundled?.server !== 'app' || bundled.buildError) continue;
+			await buildAppServer(dir, join(bundleRung(job, name), 'server'));
+			console.log(`  built ${name}'s web server`);
+		}
 	} catch (error) {
 		rmSync(job, { recursive: true, force: true });
 		throw error;
 	}
 	if (onlyOn) spec = { ...spec, onlyOn };
+	// A rerun of failures always runs: the point is to see them run again.
+	const reused = values.reuse && !values.failed ? findReused(job, spec, platforms) : [];
+	if (reused.length > 0) writeJson(reusedFile(job), reused);
+	for (const pass of reused)
+		console.log(
+			`  ${pass.result.name} on ${pass.platform}: reused pass from job ${pass.result.reusedFrom}`,
+		);
 	const size = Math.max(1, Number(values.chunk));
 	for (const platform of platforms) {
-		const rungs = rungsOn(spec, platform);
-		for (let at = 0; at * size < rungs.length; at++)
+		const rungs = rungsOn(spec, platform).filter(
+			(name) =>
+				!reused.some((pass) => pass.platform === platform && pass.result.name === name),
+		);
+		// An app rung's web server holds one fixed port while its chunk runs, so each app rung runs in a chunk of its own.
+		const servesApp = (name: string) =>
+			readJson<BundledRung>(join(bundleRung(job, name), 'rung.json'))?.server === 'app';
+		const groups: string[][] = [];
+		for (const name of rungs) {
+			const last = groups.at(-1);
+			if (last && last.length < size && !servesApp(name) && !servesApp(last[0]!)) last.push(name);
+			else groups.push([name]);
+		}
+		for (const [at, group] of groups.entries())
 			writeJson(chunkFile(job, `${platform}-${String(at).padStart(3, '0')}`), {
 				state: 'queued',
 				platform,
-				rungs: rungs.slice(at * size, (at + 1) * size),
+				rungs: group,
 				attempt: 0,
 			} satisfies Chunk);
 	}
@@ -253,7 +287,11 @@ function printResult(id: string): Summary | undefined {
 		const report = readJson<ProofReport>(join(resultDir(job), `${platform}.json`))!;
 		for (const rung of report.rungs) {
 			const timing = `install ${rung.installSeconds.toFixed(1)} s, flow ${rung.flowSeconds.toFixed(1)} s`;
-			if (!rung.failure) console.log(`PASS ${rung.name} ${platform} (${timing})`);
+			if (rung.reusedFrom)
+				console.log(
+					`PASS ${rung.name} ${platform} (reused pass from job ${rung.reusedFrom})`,
+				);
+			else if (!rung.failure) console.log(`PASS ${rung.name} ${platform} (${timing})`);
 			else
 				console.log(
 					`FAIL ${rung.name} ${platform} at step ${rung.failure.step} (${rung.failure.action}) (${timing})\n  ${rung.failure.message.split('\n').slice(0, 12).join('\n  ')}`,

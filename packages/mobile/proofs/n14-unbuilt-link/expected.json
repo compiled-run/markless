@@ -1,0 +1,21 @@
+{
+	"rung": "N14",
+	"name": "A link to a page the phones did not build opens the not-found page on iOS and Android alike, and the app still launches",
+	"refusedPages": ["pages/report.tsrx"],
+	"steps": [
+		{
+			"visible": ["Home", "Open report"],
+			"absent": ["Page not found", "Report page"]
+		},
+		{
+			"do": { "tap": "Open report" },
+			"visible": ["Page not found"],
+			"absent": ["Home"],
+			"onWeb": {
+				"why": "The web builds every page, so the link opens the report; a phone build leaves out the page it could not build and treats a link to it as a link no route matches.",
+				"visible": ["Report page"],
+				"absent": ["Home"]
+			}
+		}
+	]
+}

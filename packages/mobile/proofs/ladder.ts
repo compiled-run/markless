@@ -12,6 +12,8 @@ export type LadderAction =
 				readonly text: string;
 				/** Leave the keyboard up afterwards, so the screenshot after the step shows what it covers. */
 				readonly keepKeyboard?: true;
+				/** Type after what the field holds instead of clearing it first: clearing presses Backspace, which a tag field reads. */
+				readonly append?: true;
 			};
 	  }
 	/**
@@ -76,12 +78,23 @@ export type LadderAction =
 	 * a box that scrolls that way, so the platform takes the touch for the scroll (the web's `pointercancel`); the phones and
 	 * the browser find that out for themselves, the reference ladder, which lays nothing out, is told.
 	 */
-	| { readonly drag: { readonly on: string; readonly direction: 'right' | 'up'; readonly scrolls?: true } }
+	| {
+			readonly drag: {
+				readonly on: string;
+				readonly direction: 'right' | 'up';
+				readonly scrolls?: true;
+			};
+	  }
 	/**
 	 * Moves the slider (`<input type="range">`) with this accessible name to its end, as a finger does from its thumb (a
 	 * rung starts the slider at its midpoint, where the thumb is); the web presses End or Home on it.
 	 */
-	| { readonly slide: { readonly field: string; readonly to: 'max' | 'min' } };
+	| { readonly slide: { readonly field: string; readonly to: 'max' | 'min' } }
+	/**
+	 * A finger held still on the element showing this text, then lifted: Chrome on Android raises `contextmenu` for it,
+	 * Safari on iOS does not, so a rung says what each shows with `visibleOn`.
+	 */
+	| { readonly longPress: string };
 
 /** Where a phone flow presses the backdrop: above a centred surface, below the status bar. */
 export const BACKDROP_POINT = '50%,8%';
@@ -117,6 +130,11 @@ export type LadderStep = {
 	readonly disabled?: readonly string[];
 	/** Texts that are on screen in this order, top to bottom. */
 	readonly order?: readonly string[];
+	/**
+	 * Texts on screen in this order, top to bottom, where styles rather than document order put them there (absolute
+	 * positions, flex `order`): the browser and the phones check it; the reference runtime, which has no layout, does not.
+	 */
+	readonly placed?: readonly string[];
 	/** Text fields, by accessible name, and the value each holds. */
 	readonly fields?: Readonly<Record<string, string>>;
 	/** The screen's title: the system navigation bar's on a phone, `document.title` on the web. */
@@ -200,6 +218,13 @@ export const engineStartsText = (starts: number): string => `engine starts: ${st
  * where any outgoing connection on the machine can already hold it.
  */
 export const ECHO_SERVER_PORT = 28761;
+/**
+ * The port an app rung's own web server listens on while the rung runs on phones (`server: 'app'`), so its `api/` routes
+ * answer at the origin its app.json names. Fixed and below the ephemeral ranges, as the echo server's.
+ */
+export const APP_SERVER_PORT = 28762;
+/** The port each test server listens on. */
+export const SERVER_PORTS = { echo: ECHO_SERVER_PORT, app: APP_SERVER_PORT } as const;
 export const callsText = (calls: readonly string[]): string =>
 	`calls: ${calls.length === 0 ? 'none' : calls.join(', ')}`;
 
@@ -211,6 +236,8 @@ export type LadderRung = {
 	readonly route?: string;
 	/** The path the app opens at; `/` when absent. */
 	readonly start?: string;
+	/** Pages under `pages/` the phones do not build, each refused by name: the app builds without them, and a link to one opens the not-found page. */
+	readonly refusedPages?: readonly string[];
 	/**
 	 * The text of the first element the screens and the browser leave below the first screen. The reference runtime has no
 	 * layout, so it raises `visible` only for elements before that one in document order.
@@ -232,8 +259,11 @@ export type LadderRung = {
 		/** Console errors the browser logs as part of what the rung proves (a 404 answer it loads), each once per time. */
 		readonly consoleErrors?: readonly string[];
 	};
-	/** The test runs the echo server (`ECHO_SERVER_PORT`) while the rung runs, on the web and on phones. */
-	readonly server?: 'echo';
+	/**
+	 * The test runs the echo server (`ECHO_SERVER_PORT`) while the rung runs, on the web and on phones; or, for an app rung,
+	 * the app's own web build, whose `api/` routes answer at `APP_SERVER_PORT`.
+	 */
+	readonly server?: keyof typeof SERVER_PORTS;
 	readonly steps: readonly LadderStep[];
 };
 
@@ -243,8 +273,7 @@ export const rungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
 		.filter(
 			(entry) =>
-				entry.isDirectory() &&
-				/^((\d\d|[dp]\d)[a-z]?|[fjrtuy]\d+)-/.test(entry.name),
+				entry.isDirectory() && /^((\d\d|[dp]\d)[a-z]?|[fjrtuy]\d+)-/.test(entry.name),
 		)
 		.filter((entry) => !isApp(entry.name))
 		.map((entry) => entry.name)
@@ -253,13 +282,13 @@ export const rungFolders = (): string[] =>
 /** A rung that is an app of several routes (`pages/`) rather than one screen (`App.tsrx`). */
 const isApp = (folder: string): boolean => existsSync(join(proofsDir, folder, 'pages'));
 
-/** The navigation ladder: each folder an app (`pages/`) of several routes; an `r<n>` or `j<n>` rung with `pages/` too. */
+/** The navigation ladder: each folder an app (`pages/`) of several routes; a `j<n>`, `r<n>` or `u<n>` rung with `pages/` too. */
 export const navRungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
 		.filter(
 			(entry) =>
 				entry.isDirectory() &&
-				(/^n\d+-/.test(entry.name) || (/^[jr]\d+-/.test(entry.name) && isApp(entry.name))),
+				(/^n\d+-/.test(entry.name) || (/^[jru]\d+-/.test(entry.name) && isApp(entry.name))),
 		)
 		.map((entry) => entry.name)
 		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
@@ -309,6 +338,7 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 		...(previous.hidden ?? []),
 	]);
 	const order = step.order?.join('\n') !== previous.order?.join('\n') ? step.order : undefined;
+	const placed = step.placed?.join('\n') !== previous.placed?.join('\n') ? step.placed : undefined;
 	const fields = Object.fromEntries(
 		Object.entries(step.fields ?? {}).filter(
 			([name, value]) => previous.fields?.[name] !== value,
@@ -326,6 +356,7 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 			offScreen: (step.offScreen ?? []).filter((text) => wasShown.has(text)),
 		}),
 		...(order && { order }),
+		...(placed && { placed }),
 		...(Object.keys(fields).length > 0 && { fields }),
 		...(step.title !== undefined && step.title !== previous.title && { title: step.title }),
 		...(calls && { calls }),
@@ -345,6 +376,7 @@ export const witnessCount = (witness: LadderStep): number =>
 	(witness.offScreen?.length ?? 0) +
 	(witness.hidden?.length ?? 0) +
 	(witness.order ? 1 : 0) +
+	(witness.placed ? 1 : 0) +
 	Object.keys(witness.fields ?? {}).length +
 	(witness.calls ? 1 : 0) +
 	(witness.camera ? 1 : 0) +
@@ -366,7 +398,9 @@ const assertions = (step: LadderStep): unknown[] =>
 								{
 									runFlow: {
 										when: { platform: MAESTRO_PLATFORM.android },
-										commands: step.embedded.map((text) => ({ assertVisible: selector(text) })),
+										commands: step.embedded.map((text) => ({
+											assertVisible: selector(text),
+										})),
 									},
 								},
 							]
@@ -398,9 +432,11 @@ const screenAssertions = (step: LadderStep): unknown[] => [
 	...(step.disabled ?? []).map((text) => ({
 		assertVisible: { text: selector(text), enabled: false },
 	})),
-	...(step.order ?? []).slice(1).map((text, index) => ({
-		assertVisible: { text: selector(text), below: selector(step.order![index]!) },
-	})),
+	...[step.order ?? [], step.placed ?? []].flatMap((texts) =>
+		texts.slice(1).map((text, index) => ({
+			assertVisible: { text: selector(text), below: selector(texts[index]!) },
+		})),
+	),
 	...Object.values(step.fields ?? {}).map((value) => ({ assertVisible: selector(value) })),
 	...(step.title === undefined ? [] : [{ assertVisible: selector(step.title) }]),
 	...(step.calls
@@ -436,7 +472,7 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 	if ('type' in action)
 		return [
 			{ tapOn: selector(action.type.field) },
-			'eraseText',
+			...(action.type.append ? [] : ['eraseText']),
 			{ inputText: action.type.text },
 			...(action.type.keepKeyboard ? [] : ['hideKeyboard']),
 		];
@@ -548,6 +584,7 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 				},
 			},
 		];
+	if ('longPress' in action) return [{ longPressOn: { text: selector(action.longPress) } }];
 	if ('escape' in action) return ['back'];
 	if ('pressBackdrop' in action) return [{ tapOn: { point: BACKDROP_POINT } }];
 	return [

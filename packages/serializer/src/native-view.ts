@@ -65,6 +65,8 @@ export type NativeBuiltin =
 export type NativeExpr =
 	| { readonly cell: string }
 	| { readonly literal: NativeScalar | null }
+	/** `Infinity`, `-Infinity` or `NaN` (the globals, `Number.POSITIVE_INFINITY` and the like), which a JSON literal cannot hold. */
+	| { readonly nonFinite: 'Infinity' | '-Infinity' | 'NaN' }
 	/**
 	 * `typeof` gives JavaScript's answer for a JSON value: 'string', 'number', 'boolean', or 'object' for an array, an
 	 * object and null. A native value spells `undefined` as null, so the compiler emits it only compared with 'string',
@@ -97,6 +99,8 @@ export type NativeExpr =
 	| { readonly at: NativeExpr; readonly of: NativeExpr }
 	| { readonly array: ReadonlyArray<{ readonly spread: boolean; readonly value: NativeExpr }> }
 	| { readonly object: ReadonlyArray<readonly [string, NativeExpr]> }
+	/** An object from its parts in order (`{ ...row, name }`): each part's own fields, a later key winning; a null part adds nothing. */
+	| { readonly merge: ReadonlyArray<NativeExpr> }
 	| {
 			readonly method: NativeMethod;
 			readonly target: NativeExpr;
@@ -121,7 +125,17 @@ export type NativeExpr =
 	 * handler's pasted plain text (`event.clipboardData.getData('text')`); a click handler's `event.detail`, how many presses
 	 * in a row on the element (a double tap's second press is 2).
 	 */
-	| { readonly event: 'value' | 'reason' | 'pressTarget' | 'key' | 'text' | 'detail' | NativeAnimationField | NativePointerField }
+	| {
+			readonly event:
+				| 'value'
+				| 'reason'
+				| 'pressTarget'
+				| 'key'
+				| 'text'
+				| 'detail'
+				| NativeAnimationField
+				| NativePointerField;
+	  }
 	/** Whether the element `node` has captured the pointer `pointer` (`node.hasPointerCapture(pointer)`). */
 	| { readonly captures: NativeExpr; readonly pointer: NativeExpr }
 	/**
@@ -143,6 +157,10 @@ export type NativeExpr =
 	| { readonly focusOrigin: NativeExpr }
 	/** Whether the value is an element (`value instanceof HTMLElement`). */
 	| { readonly isElement: NativeExpr }
+	/** Whether a node is shown now: every @if arm around it holds (an element a handle holds only while its arm shows). */
+	| { readonly shown: string }
+	/** `document.getElementById(value)`: the first shown element whose `id` attribute is the value now, else null. */
+	| { readonly byId: NativeExpr }
 	/**
 	 * The element `drawn` (a node id in an `@if` arm) if it was on screen when this run began, else null: a handle bound
 	 * inside an arm, which the web binds only once the arm is drawn, so a write in the same handler that opens the arm
@@ -173,8 +191,9 @@ export type NativeScriptBinding =
 	| { readonly device: NativeDeviceObject; readonly object: string }
 	/**
 	 * An element (its node id) or an array of them, which the function reads through proxies: `getAttribute`,
-	 * `hasAttribute`, `contains`, and the commands `focus` and `scrollIntoView`. The host answers each read from the
-	 * entry's `elements`: the attributes each element has now and the elements it is inside.
+	 * `hasAttribute`, `contains`, `getBoundingClientRect`, `getComputedStyle(element).direction`, and the commands
+	 * `focus` and `scrollIntoView`. The host answers each read from the entry's `elements`: the attributes each element
+	 * has now, the elements it is inside, and the box and direction its view had when the entry began.
 	 */
 	| { readonly elements: NativeExpr }
 	/** A family's shared object, member by member. */
@@ -194,7 +213,31 @@ export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>
  * `navigate` from @markless/router (through a `navigate` entry; the host passes the page's route `params`), and
  * `@markless/device` calls (through `call` entries, answered with `resume` or `reject` actions).
  */
-export type NativeScriptService = 'timers' | 'fetch' | 'console' | 'crypto' | 'navigate' | 'device';
+export type NativeScriptService =
+	| 'timers'
+	| 'fetch'
+	| 'console'
+	| 'crypto'
+	| 'navigate'
+	| 'device'
+	| 'media';
+
+/** The media features a script's `matchMedia` reads, each with the values a phone answers from its settings, first the web's default. */
+export const NATIVE_SCRIPT_MEDIA_FEATURES = {
+	'prefers-reduced-motion': ['no-preference', 'reduce'],
+	'prefers-color-scheme': ['light', 'dark'],
+} as const;
+
+/** The device's answer to each media feature now, which every script entry of a page that reads `matchMedia` carries. */
+export type NativeScriptMedia = {
+	readonly [Feature in keyof typeof NATIVE_SCRIPT_MEDIA_FEATURES]: (typeof NATIVE_SCRIPT_MEDIA_FEATURES)[Feature][number];
+};
+
+/** The web's answers with no setting changed, which a host without a value for a feature reports. */
+export const NATIVE_SCRIPT_MEDIA_DEFAULTS: NativeScriptMedia = {
+	'prefers-reduced-motion': NATIVE_SCRIPT_MEDIA_FEATURES['prefers-reduced-motion'][0],
+	'prefers-color-scheme': NATIVE_SCRIPT_MEDIA_FEATURES['prefers-color-scheme'][0],
+};
 
 /** The JavaScript a payload's `script` ops and script computeds run, in the platform's engine, started on first use. */
 export type NativeScript = {
@@ -207,6 +250,10 @@ export type NativeScript = {
 /** Every cell an expression reads. */
 export function nativeExprCells(expr: NativeExpr, into = new Set<string>()): Set<string> {
 	if ('cell' in expr) into.add(expr.cell);
+	// A script binding's `fields` names the cells of a state object the script reads.
+	if ('fields' in expr && expr.fields && typeof expr.fields === 'object')
+		for (const cell of Object.values(expr.fields as Record<string, unknown>))
+			if (typeof cell === 'string') into.add(cell);
 	for (const child of Object.values(expr)) {
 		if (Array.isArray(child)) {
 			for (const item of child)
@@ -281,6 +328,9 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	aside: {},
 	hgroup: {},
 	search: {},
+	/** A group of a form's controls, its `<legend>` the group's caption (Chrome's border is the page's to style). */
+	fieldset: {},
+	legend: {},
 	p: {},
 	h1: { bold: true, size: 2 },
 	h2: { bold: true, size: 1.5 },
@@ -355,6 +405,31 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	svg: {},
 };
 
+/** Names HTML reserves though they hold a hyphen (SVG and MathML elements), so none is a custom element. */
+const RESERVED_HYPHENATED = new Set([
+	'annotation-xml',
+	'color-profile',
+	'font-face',
+	'font-face-src',
+	'font-face-uri',
+	'font-face-format',
+	'font-face-name',
+	'missing-glyph',
+]);
+
+/**
+ * An element's default look on a phone: a listed element's, or for a custom element the app never defines (a lowercase
+ * name with a hyphen, as `<app-root>`) the browser's for an unknown element, an inline container.
+ */
+export function nativeElementStyle(element: string): NativeDefaultStyle | undefined {
+	if (Object.hasOwn(NATIVE_ELEMENTS, element)) return NATIVE_ELEMENTS[element];
+	const custom =
+		element.includes('-') &&
+		/^[a-z][a-z0-9._-]*$/.test(element) &&
+		!RESERVED_HYPHENATED.has(element);
+	return custom ? { flow: 'inline' } : undefined;
+}
+
 /**
  * Elements the web never shows in the page, so a native page shows nothing for them either: document metadata and hints
  * (`<meta>`, `<link>` but a stylesheet, `<base>`), inert markup (`<template>`), and content for browsers that run no scripts
@@ -405,18 +480,76 @@ export type NativeShape = {
 	readonly miterLimit: number;
 	/** The affine map from the shape's units to the drawing's (`[a, b, c, d, e, f]`), from `transform` on it and its groups. */
 	readonly transform?: readonly [number, number, number, number, number, number];
+	/** A `<text>` element: its `path` is empty, and the host lays out and fills these runs instead. */
+	readonly text?: NativeDrawingText;
+	/**
+	 * The `clip-path`s on it and its groups, each an outline (verb-coded, nonzero) already in the drawing's units: it is
+	 * drawn only where every one of them covers, as the browser clips it.
+	 */
+	readonly clip?: ReadonlyArray<ReadonlyArray<number>>;
+};
+
+/**
+ * An SVG `<text>`, drawn as the browser draws it: its runs (its own text and each `<tspan>`'s, in document order, with
+ * white space already collapsed or kept by `xml:space`) are laid out one after another from the pen. A run's `x` or `y`
+ * moves the pen there and starts a new chunk; `dx` and `dy` shift it. Each chunk is placed by `anchor` (start, middle or
+ * end at the pen's place) and every glyph sits on `baseline` relative to the pen's `y`.
+ */
+export type NativeDrawingText = {
+	readonly anchor: 'start' | 'middle' | 'end';
+	/** `auto` and `alphabetic` put the alphabetic baseline at `y`; the others move the em box as the browser does. */
+	readonly baseline:
+		| 'alphabetic'
+		| 'middle'
+		| 'central'
+		| 'hanging'
+		| 'text-top'
+		| 'text-bottom'
+		| 'ideographic';
+	readonly runs: ReadonlyArray<NativeDrawingTextRun>;
+};
+
+export type NativeDrawingTextRun = {
+	readonly text: string;
+	readonly x?: number;
+	readonly y?: number;
+	readonly dx?: number;
+	readonly dy?: number;
+	/** The font size in user units. */
+	readonly size: number;
+	/** 100 to 900; 400 is normal, 700 bold. */
+	readonly weight: number;
+	/** The generic family the run's `font-family` names or falls back to; the page's text font when absent. */
+	readonly family?: 'serif' | 'sans-serif' | 'monospace';
+	/** Extra advance after each glyph, in user units. */
+	readonly letterSpacing: number;
+	readonly fill: NativeColor | 'currentColor' | null;
 };
 
 /** An inline `<svg>`, compiled when the app is built: the host draws `shapes` in the element's box. */
 export type NativeDrawing = {
-	/** min-x, min-y, width and height; drawn centred and scaled to fit the box (`xMidYMid meet`), as the web does. */
+	/** min-x, min-y, width and height; placed in the box by `aspect`, as the web does. */
 	readonly viewBox: readonly [number, number, number, number] | null;
+	/**
+	 * The svg's `preserveAspectRatio`, absent for the default `xMidYMid meet` (one scale that fits, centred): `none`
+	 * stretches the viewBox to the box; otherwise one scale that fits (`meet`) or fills (`slice`, clipped to the box), the
+	 * viewBox aligned at the min, middle or max of each axis.
+	 */
+	readonly aspect?:
+		| 'none'
+		| {
+				readonly x: 'min' | 'mid' | 'max';
+				readonly y: 'min' | 'mid' | 'max';
+				readonly slice?: true;
+		  };
 	/** The `width` and `height` attributes in CSS pixels; without a size the box is the web's: full width, the viewBox's ratio. */
 	readonly width?: number;
 	readonly height?: number;
 	/** `width` and `height` are in ems of the svg's font size (`width="1em"`), not CSS pixels. */
 	readonly em?: true;
 	readonly shapes: ReadonlyArray<NativeShape>;
+	/** The text its `<text>` elements show, which a screen reader reads when the svg has no name, as the browser exposes it. */
+	readonly label?: string;
 };
 
 export type NativeNode = NativePlace &
@@ -429,18 +562,34 @@ export type NativeNode = NativePlace &
 				readonly parent: string | null;
 				/** The browser's default look of this element, when it differs from a plain box of plain text. */
 				readonly defaultStyle?: NativeDefaultStyle;
-				/** On an `<svg>`: what it draws. Its shapes are not nodes. */
+				/**
+				 * On an `<svg>`: what it draws when the app is built. Shapes from a component or its `{children}` are nodes inside
+				 * it with a `shape`, drawn after these in tree order. A `viewBox` binding gives the viewBox while the app runs, as the
+				 * engine's four numbers, space-separated (null: none).
+				 */
 				readonly drawing?: NativeDrawing;
+				/**
+				 * On a shape inside an `<svg>` (a `<path>`): its paint, read when the app is built, and its outline when that is
+				 * fixed. A `d` binding gives the outline while the app runs, as the engine's verb-coded numbers, space-separated.
+				 * The svg draws it; it has no view of its own.
+				 */
+				readonly shape?: NativeShape;
 				/**
 				 * A live region (`aria-live`, `role="status"`, `"alert"` or `"log"`, `<output>`): a change to the text inside is
 				 * announced, after the screen reader's current speech when polite; `atomic` reads the whole region, else the changed text.
 				 */
-				readonly live?: { readonly politeness: 'polite' | 'assertive'; readonly atomic: boolean };
+				readonly live?: {
+					readonly politeness: 'polite' | 'assertive';
+					readonly atomic: boolean;
+				};
 				/**
 				 * A live region whose `role`, `aria-live` or `aria-atomic` follows state: its politeness (`'polite'`,
 				 * `'assertive'` or null for none) and atomicity now, which the host evaluates each time it speaks.
 				 */
-				readonly liveFollows?: { readonly politeness: NativeExpr; readonly atomic: NativeExpr };
+				readonly liveFollows?: {
+					readonly politeness: NativeExpr;
+					readonly atomic: NativeExpr;
+				};
 				/** Attributes fixed at build time (`class` carries the component's scope class); absent when none. */
 				readonly attributes?: Readonly<Record<string, string>>;
 				/** The device object a `camera` element shows (`<base.camera el={cam} />`). */
@@ -450,6 +599,13 @@ export type NativeNode = NativePlace &
 					| { readonly attribute: string; readonly value: NativeExpr }
 					| { readonly property: NativeProperty; readonly value: NativeExpr }
 				>;
+				/**
+				 * A `style` that follows state: its text with each number the app computes as a hole naming one of the payload's
+				 * `slots`. Dragon resolves what each slot moves at build time; the host lays out again when a slot's value changes.
+				 */
+				readonly style?: ReadonlyArray<string | { readonly slot: string }>;
+				/** The `style` is `style` only while this style case (the payload's `styleCases`) has `value`, and empty text otherwise. */
+				readonly styleWhen?: { readonly case: string; readonly value: boolean };
 		  }
 		| {
 				readonly kind: 'text';
@@ -516,7 +672,11 @@ export type NativeProperty = 'value' | 'checked' | 'indeterminate' | 'selected';
  * `enter` is the keyboard's return key in a single-line text field. `submit` is a form's, raised only by a `submit` op.
  * `idle` and `visible` mean what the web runtime gives them, once for each shown instance of their element (shown again
  * after it left, it is a new one): `idle` at the first moment the host is idle after the screen's first frame (or after
- * the element appears), `visible` the first time any of the element is on the screen.
+ * the element appears), `visible` the first time any of the element is on the screen. `close` is a `<dialog>`'s, raised
+ * after the handler (or the host's back gesture) that closed it, as the browser queues it. `contextmenu` is a long press as
+ * Chrome on Android raises it: on the element pressed, then each element it is inside, innermost first, with the press's
+ * place (`NativeContextMenuField`); the tap that press would end in does not follow. Safari on iOS raises none for a long
+ * press, so the iOS host never sends it.
  */
 /**
  * `focus` and `blur` are a text field's: it took the keyboard, or gave it up. `keydown` and `paste` are a text field's too:
@@ -533,14 +693,17 @@ export type NativeEventName =
 	| 'paste'
 	| 'dismiss'
 	| 'cancel'
+	| 'close'
 	| 'enter'
 	| 'submit'
 	| 'idle'
 	| 'visible'
 	/** A range input let go after its value moved: the web's `change` on it. */
 	| 'commit'
+	| 'contextmenu'
 	| NativeAnimationEventName
-	| NativePointerEventName;
+	| NativePointerEventName
+	| NativeMouseEventName;
 
 /**
  * A CSS animation's events on a styled page, as the host's run of Dragon's animator gives them (css-animations-1 §4.2): it
@@ -570,6 +733,22 @@ export type NativePointerEventName =
 	| 'pointerleave';
 
 /**
+ * The compatibility mouse events a phone's browser fires after a tap (Chrome on Android's order), raised by the runtime
+ * once the tap's `pointerup`, `pointerout` and `pointerleave` have run and before its click: `mouseover` and
+ * `mouseenter` on the tapped element (after `mouseout` and `mouseleave` on the element tapped before, which kept the
+ * mouse until now), then `mousemove`, `mousedown` and `mouseup`. A touch the platform takes for a scroll fires none. A
+ * handler reads the pointer fields a MouseEvent has: not `pointerId`, `pointerType` or `isPrimary`.
+ */
+export type NativeMouseEventName =
+	| 'mouseover'
+	| 'mouseout'
+	| 'mouseenter'
+	| 'mouseleave'
+	| 'mousemove'
+	| 'mousedown'
+	| 'mouseup';
+
+/**
  * What a pointer handler reads off its event. `target`, `currentTarget` and `relatedTarget` are elements (`relatedTarget`
  * is null, as a touch has no element it came from); `clientX` and `clientY` are the touch's place in points (iOS) or dp
  * (Android) from the screen's top left, which a browser's CSS pixels match; `pointerType` is "touch"; `timeStamp` is in
@@ -586,6 +765,14 @@ export type NativePointerField =
 	| 'pointerId'
 	| 'pointerType'
 	| 'isPrimary'
+	| 'timeStamp';
+
+/** What a `contextmenu` handler reads off its event: the elements pressed and handling it, and the press's place and time as a pointer's. */
+export type NativeContextMenuField =
+	| 'target'
+	| 'currentTarget'
+	| 'clientX'
+	| 'clientY'
 	| 'timeStamp';
 
 /** Why the overlay behaviour reported a dismissal; the vocabulary of `OverlayGestureReason` in `@markless/web`. */
@@ -718,6 +905,59 @@ export type NativeOp =
 /** `select` selects a text field's whole text, as `field.select()` does. */
 export type NativeCommand = 'focus' | 'scrollIntoView' | 'select';
 
+/** The non-finite numbers JSON cannot hold: each with its path (object keys and array indices) inside a value. */
+export type NativeNonFinite = ReadonlyArray<
+	readonly [path: ReadonlyArray<string | number>, name: 'Infinity' | '-Infinity' | 'NaN']
+>;
+
+/**
+ * A value as JSON carries it: each Infinity, -Infinity or NaN written as null, and where each was. A value with none comes
+ * back as it is with an empty list.
+ */
+export function nativeNonFiniteSplit(value: unknown): {
+	readonly json: unknown;
+	readonly nonFinite: NativeNonFinite;
+} {
+	const found: Array<
+		readonly [ReadonlyArray<string | number>, 'Infinity' | '-Infinity' | 'NaN']
+	> = [];
+	const walk = (v: unknown, path: ReadonlyArray<string | number>): unknown => {
+		if (typeof v === 'number' && !Number.isFinite(v)) {
+			found.push([path, Number.isNaN(v) ? 'NaN' : v > 0 ? 'Infinity' : '-Infinity']);
+			return null;
+		}
+		if (Array.isArray(v)) return v.map((item, index) => walk(item, [...path, index]));
+		if (v !== null && typeof v === 'object')
+			return Object.fromEntries(
+				Object.entries(v).map(([key, item]) => [key, walk(item, [...path, key])]),
+			);
+		return v;
+	};
+	const json = walk(value, []);
+	return { json: found.length === 0 ? value : json, nonFinite: found };
+}
+
+/** A value JSON carried, with each non-finite number nativeNonFiniteSplit took out put back at its path. */
+export function nativeNonFiniteJoin(
+	json: unknown,
+	nonFinite: NativeNonFinite | undefined,
+): unknown {
+	if (!nonFinite || nonFinite.length === 0) return json;
+	const copy = structuredClone(json) as unknown;
+	const number = { Infinity: Infinity, '-Infinity': -Infinity, NaN: Number.NaN } as const;
+	let root = copy;
+	for (const [path, name] of nonFinite) {
+		if (path.length === 0) {
+			root = number[name];
+			continue;
+		}
+		let at = root as Record<string | number, unknown>;
+		for (const key of path.slice(0, -1)) at = at[key] as Record<string | number, unknown>;
+		at[path[path.length - 1]!] = number[name];
+	}
+	return root;
+}
+
 export type NativeViewPayload = {
 	readonly version: typeof NATIVE_VIEW_VERSION;
 	readonly component: string;
@@ -728,6 +968,8 @@ export type NativeViewPayload = {
 		readonly id: string;
 		readonly name: string;
 		readonly initial: NativeValue;
+		/** Where `initial` holds Infinity, -Infinity or NaN, which JSON writes as null (nativeNonFiniteSplit). */
+		readonly nonFinite?: NativeNonFinite;
 		readonly storage?: { readonly key: string };
 		/**
 		 * A cell of an app-wide `shared()`: the app holds one value for every page. A screen starts from the app's value,
@@ -783,6 +1025,16 @@ export type NativeViewPayload = {
 		 */
 		readonly clock?: true;
 		/**
+		 * A first value the build cannot know (`state(Number(id))`): the host evaluates it when the screen opens, before the
+		 * first build and in cell order, as the web runs a component's body once when it first renders; `initial` is never shown.
+		 */
+		readonly seed?: NativeExpr;
+		/**
+		 * State of a component an `@if` arm shows (its innermost arm): back to `initial` while the arm is hidden, so it starts
+		 * over each time the arm shows it, as the web renders the arm anew; a `seed` is evaluated again then, not at mount.
+		 */
+		readonly arm?: NativeArmPlace;
+		/**
 		 * Its first value is `undefined` on the web, which `initial` spells as null: a script reads it as `undefined` until
 		 * something writes it.
 		 */
@@ -819,6 +1071,22 @@ export type NativeViewPayload = {
 	}>;
 	/** The page's `<title>`, as text parts: what the system navigation bar shows for this screen. */
 	readonly title?: ReadonlyArray<NativeTextPart>;
+	/**
+	 * The numbers styles read while the app runs (an element's `style` holes): each a number expression of state, journalled
+	 * as `slot` when it changes. `integer` when it only ever gives whole numbers; another value is a runtime error.
+	 */
+	readonly slots?: ReadonlyArray<{
+		readonly id: string;
+		readonly value: NativeExpr;
+		readonly integer?: true;
+		/** Evaluated only while this style case has `value`; otherwise the slot keeps its last value (0 before the first). */
+		readonly when?: { readonly case: string; readonly value: boolean };
+	}>;
+	/**
+	 * Conditions a style follows (an element's `styleWhen`): each is whether its test is truthy now, journalled as `state`
+	 * when it changes, so the host moves to Dragon's assignment for it as it does for a styled cell.
+	 */
+	readonly styleCases?: ReadonlyArray<{ readonly id: string; readonly value: NativeExpr }>;
 	/** Forms a `submit` op can submit; absent when there are none. */
 	readonly forms?: ReadonlyArray<NativeForm>;
 	/**
@@ -828,10 +1096,16 @@ export type NativeViewPayload = {
 	readonly valueMissing?: Readonly<Record<string, NativeValueMissing>>;
 	/** What the web says when a text field a person edited is longer than its `maxlength`, by language; present when a form's text field has one. */
 	readonly tooLong?: Readonly<Record<string, NativeTooLong>>;
+	/** What the web says when a number field is out of its range, off its step or holds no number, by language; present when a form has one. */
+	readonly numberMessages?: Readonly<Record<string, NativeNumberMessages>>;
 	/** What the web says when an email field holds no email address, by language; present when a form has an email field. */
 	readonly typeMismatch?: Readonly<Record<string, NativeEmailMismatch>>;
 	/** Present only when a handler or computed runs as JavaScript; a payload without it never starts an engine. */
 	readonly script?: NativeScript;
+	/** A click handler reads where its tap landed: the host reports touches even with no pointer handler, as a browser fires them. */
+	readonly tapPoints?: true;
+	/** A script adds listeners to the document: the host reports every touch and its moves, which bubble to them. */
+	readonly documentEvents?: true;
 };
 
 export const NATIVE_APP_VERSION = 'markless.native-app/0';
@@ -857,6 +1131,101 @@ export type NativeValueMissing = {
 
 /** Chromium's message for a text field longer than its `maxlength`: `{max}` and `{length}` in `text` are written in `digits` (ASCII when absent). */
 export type NativeTooLong = { readonly text: string; readonly digits?: string };
+
+/**
+ * Chromium's messages for a number field, by language: below `min`, above `max`, off its step (the two nearest valid
+ * values, or the one when the other is past `max`), and text that is no number; with the language's digits and decimal mark.
+ */
+export type NativeNumberMessages = {
+	readonly underflow: string;
+	readonly overflow: string;
+	readonly step: string;
+	readonly stepOne: string;
+	readonly badInput: string;
+	readonly digits?: string;
+	readonly decimal?: string;
+};
+
+/** HTML's valid floating-point number: what a number field's value may be. */
+const VALID_FLOAT = /^-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/;
+
+/** A number field's value from its text, by HTML's sanitization: text that is no valid number is the empty string. */
+export const nativeNumberValue = (text: string): string => (VALID_FLOAT.test(text) ? text : '');
+
+/** What a number field's attributes give, by HTML's rules for parsing floating-point numbers; undefined when invalid. */
+const floatOf = (attribute: string | null | undefined): number | undefined =>
+	attribute != null && VALID_FLOAT.test(attribute) ? Number(attribute) : undefined;
+
+const decimalsOf = (value: number): number => {
+	const written = String(value);
+	const exponent = /e-(\d+)$/.exec(written);
+	if (exponent) return Number(exponent[1]) + (written.split('e')[0]!.split('.')[1]?.length ?? 0);
+	return written.split('.')[1]?.length ?? 0;
+};
+
+/**
+ * Why a number field holding `text` fails before a submit, in Chromium's order after a missing value: text that is no
+ * number, below `min`, above `max`, then off its step (from `min`, else the `value` attribute, else 0; 1 unless `step`
+ * says otherwise or `any`), with the two nearest valid values, or the one when the next is past `max`.
+ */
+export function nativeNumberProblem(
+	text: string,
+	attributes: {
+		readonly min: string | null;
+		readonly max: string | null;
+		readonly step: string | null;
+		readonly value: string | null;
+	},
+):
+	| { readonly message: 'badInput' }
+	| { readonly message: 'underflow'; readonly values: { readonly min: number } }
+	| { readonly message: 'overflow'; readonly values: { readonly max: number } }
+	| { readonly message: 'step'; readonly values: { readonly low: number; readonly high: number } }
+	| { readonly message: 'stepOne'; readonly values: { readonly value: number } }
+	| undefined {
+	if (text === '') return undefined;
+	if (!VALID_FLOAT.test(text)) return { message: 'badInput' };
+	const value = Number(text);
+	const min = floatOf(attributes.min);
+	const max = floatOf(attributes.max);
+	if (min !== undefined && value < min) return { message: 'underflow', values: { min } };
+	if (max !== undefined && value > max) return { message: 'overflow', values: { max } };
+	if (attributes.step?.toLowerCase() === 'any') return undefined;
+	const given = floatOf(attributes.step);
+	const step = given !== undefined && given > 0 ? given : 1;
+	const base = min ?? floatOf(attributes.value) ?? 0;
+	// Whole numbers at the finest decimal any of them has, so 0.1 steps do not drift.
+	const scale = 10 ** Math.max(decimalsOf(base), decimalsOf(step), decimalsOf(value));
+	const [at, from, by] = [value, base, step].map((one) => Math.round(one * scale)) as [
+		number,
+		number,
+		number,
+	];
+	if ((at - from) % by === 0) return undefined;
+	const lowAt = from + Math.floor((at - from) / by) * by;
+	const low = lowAt / scale;
+	const high = (lowAt + by) / scale;
+	return max !== undefined && high > max
+		? { message: 'stepOne', values: { value: low } }
+		: { message: 'step', values: { low, high } };
+}
+
+/** `message` with its `{name}`s filled in as Chromium writes numbers: no grouping, in the language's digits and decimal mark. */
+export function nativeNumberMessage(
+	message: string,
+	language: Pick<NativeNumberMessages, 'digits' | 'decimal'>,
+	values: Readonly<Record<string, number>>,
+): string {
+	const digits = language.digits ?? '0123456789';
+	const write = (value: number) =>
+		String(value).replace(/[0-9.]/g, (char) =>
+			char === '.' ? (language.decimal ?? '.') : digits[Number(char)]!,
+		);
+	return Object.entries(values).reduce(
+		(text, [name, value]) => text.replace(`{${name}}`, write(value)),
+		message,
+	);
+}
 
 /** `message` with `{max}` and `{length}` filled in as Chromium writes them: no grouping, in the language's digits. */
 export function nativeTooLongMessage(message: NativeTooLong, max: number, length: number): string {
@@ -941,7 +1310,8 @@ const rangeNumber = (text: string | null | undefined): number | undefined =>
 
 /** The decimal places a number is written with, so stepped values print as the browser writes them. */
 const decimals = (value: number): number => {
-	const [, fraction = '', exponent = '0'] = /^-?\d*(?:\.(\d+))?(?:e([-+]?\d+))?$/.exec(String(value)) ?? [];
+	const [, fraction = '', exponent = '0'] =
+		/^-?\d*(?:\.(\d+))?(?:e([-+]?\d+))?$/.exec(String(value)) ?? [];
 	return Math.max(0, fraction.length - Number(exponent));
 };
 
@@ -993,9 +1363,10 @@ export type NativeForm = {
 };
 
 /** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, a hidden input, or a `<select>`. */
-export type NativeFieldKind = 'text' | 'checkbox' | 'radio' | 'hidden' | 'select';
+export type NativeFieldKind = 'text' | 'number' | 'checkbox' | 'radio' | 'hidden' | 'select';
 
 export {
+	NATIVE_NUMBER_MESSAGES_BY_LOCALE,
 	NATIVE_EMAIL_MISMATCH_BY_LOCALE,
 	NATIVE_TOO_LONG_BY_LOCALE,
 	NATIVE_VALUE_MISSING_BY_LOCALE,
@@ -1051,7 +1422,12 @@ export type NativeJournalEntry =
 	 * An element marked `overlay` joined the overlay stack (its `hidden` binding showed it) or left it. A `modal` one (it or
 	 * an element inside it carries `aria-modal="true"`) goes in the host's top layer with the page behind inert.
 	 */
-	| { readonly op: 'overlay'; readonly node: string; readonly open: boolean; readonly modal: boolean }
+	| {
+			readonly op: 'overlay';
+			readonly node: string;
+			readonly open: boolean;
+			readonly modal: boolean;
+	  }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */
 	| {
 			readonly op: 'attribute';
@@ -1085,6 +1461,8 @@ export type NativeJournalEntry =
 	  }
 	/** A styled cell's new value: the host moves to Dragon's next style assignment (`next[a][s][v]`) and applies it. */
 	| { readonly op: 'state'; readonly cell: string; readonly value: NativeValue }
+	/** A style slot's new value: the host lays the page out again with it through Dragon's plan (`runMarklessLayout`'s `slots`). */
+	| { readonly op: 'slot'; readonly slot: string; readonly value: number }
 	/**
 	 * A list's new row order: the host removes rows whose key left, builds new rows from current values and moves the
 	 * rest into this order. Entries for nodes inside rows name the instance as `<node>@<key>`.
@@ -1150,12 +1528,16 @@ export const PLATFORM_PIECES_NAMESPACE = 'native';
 
 /**
  * Bound attributes that reach Dragon in every combination of the styled states, besides `class`: the ones a selector keys
- * state off (`[ui-open]`, `[aria-expanded]`), `hidden`, whose UA rule Dragon applies, and `disabled`, which selects `:disabled`
- * and Chrome's disabled colours in Dragon. Others (`value`) stay out of the style input, since Dragon does not model their
+ * state off (`[ui-open]`, `[aria-expanded]`), `hidden`, whose UA rule Dragon applies, `disabled`, which selects `:disabled`
+ * and Chrome's disabled colours in Dragon, and a `style` that is one of fixed texts chosen by state. Others (`value`) stay out of the style input, since Dragon does not model their
  * rendering effect.
  */
 export const isNativeStyleStateAttribute = (name: string): boolean =>
-	name === 'hidden' || name === 'disabled' || name === 'role' || /^(ui|aria|data)-/.test(name);
+	name === 'hidden' ||
+	name === 'disabled' ||
+	name === 'role' ||
+	name === 'style' ||
+	/^(ui|aria|data)-/.test(name);
 
 /** ECMAScript's own globals, which every engine a host runs has (JavaScriptCore, Hermes); `eval` is left out. */
 export const NATIVE_SCRIPT_LANGUAGE_GLOBALS: ReadonlyArray<string> = [
@@ -1214,6 +1596,75 @@ export const NATIVE_SCRIPT_LANGUAGE_GLOBALS: ReadonlyArray<string> = [
 	'globalThis',
 ];
 
+/**
+ * The DOM interface an element of each tag is an instance of, as the HTML spec assigns them; any other tag's element is an
+ * `HTMLElement`. In a phone's script an element proxy is an instance of its tag's interface, so `instanceof` answers as
+ * in the browser.
+ */
+export const NATIVE_ELEMENT_INTERFACES: Readonly<Record<string, string>> = {
+	a: 'HTMLAnchorElement',
+	audio: 'HTMLAudioElement',
+	blockquote: 'HTMLQuoteElement',
+	body: 'HTMLBodyElement',
+	br: 'HTMLBRElement',
+	button: 'HTMLButtonElement',
+	canvas: 'HTMLCanvasElement',
+	details: 'HTMLDetailsElement',
+	dialog: 'HTMLDialogElement',
+	div: 'HTMLDivElement',
+	dl: 'HTMLDListElement',
+	fieldset: 'HTMLFieldSetElement',
+	form: 'HTMLFormElement',
+	h1: 'HTMLHeadingElement',
+	h2: 'HTMLHeadingElement',
+	h3: 'HTMLHeadingElement',
+	h4: 'HTMLHeadingElement',
+	h5: 'HTMLHeadingElement',
+	h6: 'HTMLHeadingElement',
+	hr: 'HTMLHRElement',
+	iframe: 'HTMLIFrameElement',
+	img: 'HTMLImageElement',
+	input: 'HTMLInputElement',
+	label: 'HTMLLabelElement',
+	legend: 'HTMLLegendElement',
+	li: 'HTMLLIElement',
+	ol: 'HTMLOListElement',
+	option: 'HTMLOptionElement',
+	output: 'HTMLOutputElement',
+	p: 'HTMLParagraphElement',
+	pre: 'HTMLPreElement',
+	progress: 'HTMLProgressElement',
+	q: 'HTMLQuoteElement',
+	select: 'HTMLSelectElement',
+	span: 'HTMLSpanElement',
+	svg: 'SVGSVGElement',
+	table: 'HTMLTableElement',
+	tbody: 'HTMLTableSectionElement',
+	td: 'HTMLTableCellElement',
+	textarea: 'HTMLTextAreaElement',
+	tfoot: 'HTMLTableSectionElement',
+	th: 'HTMLTableCellElement',
+	thead: 'HTMLTableSectionElement',
+	time: 'HTMLTimeElement',
+	tr: 'HTMLTableRowElement',
+	ul: 'HTMLUListElement',
+	video: 'HTMLVideoElement',
+};
+
+/** The DOM interfaces a phone's script has, each with the one it extends; constructing one throws, as in the browser. */
+export const NATIVE_SCRIPT_DOM_CLASSES: Readonly<Record<string, string | null>> = {
+	Node: null,
+	Element: 'Node',
+	HTMLElement: 'Element',
+	SVGElement: 'Element',
+	...Object.fromEntries(
+		[...new Set(Object.values(NATIVE_ELEMENT_INTERFACES))].map((name) => [
+			name,
+			name.startsWith('SVG') ? 'SVGElement' : 'HTMLElement',
+		]),
+	),
+};
+
 /** Globals a host provides to scripts, by the service that backs each. */
 export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptService | 'engine'>> =
 	{
@@ -1223,9 +1674,22 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		clearInterval: 'timers',
 		queueMicrotask: 'engine',
 		structuredClone: 'engine',
+		performance: 'engine',
+		DOMException: 'engine',
+		// Answers an element's `direction` only, from the host's facts.
+		getComputedStyle: 'engine',
 		console: 'console',
 		fetch: 'fetch',
 		crypto: 'crypto',
+		matchMedia: 'media',
+		Event: 'engine',
+		CustomEvent: 'engine',
+		MouseEvent: 'engine',
+		PointerEvent: 'engine',
+		KeyboardEvent: 'engine',
+		...Object.fromEntries(
+			Object.keys(NATIVE_SCRIPT_DOM_CLASSES).map((name) => [name, 'engine' as const]),
+		),
 	};
 
 /**
@@ -1236,6 +1700,7 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> = [
 	['type'],
 	['key'],
+	['isTrusted'],
 	['isComposing'],
 	['clipboardData', 'getData'],
 	['defaultPrevented'],
@@ -1249,8 +1714,18 @@ export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> =
 	['currentTarget', 'checked'],
 ];
 
+/** What a script dismiss handler's event has beyond those: why the overlay was dismissed, and the element an outside press landed on. */
+export const NATIVE_SCRIPT_DISMISS_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> = [
+	['detail', 'reason'],
+	['detail', 'pressTarget'],
+];
 /** A submit handler's binding for its form's entries now, which its event's `target` and `currentTarget` carry for FormData. */
 export const NATIVE_SCRIPT_SUBMITTED_FORM = 'submitted form';
+
+/** Members of a page global a phone answers, read straight off it: the focused element, as a proxy. */
+export const NATIVE_SCRIPT_PAGE_MEMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
+	document: ['activeElement', 'addEventListener', 'removeEventListener'],
+};
 
 /** What a touch adds to a script pointer handler's event: its plain values. The elements it names reach only data handlers. */
 export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [
@@ -1261,6 +1736,48 @@ export const NATIVE_SCRIPT_POINTER_FIELDS: ReadonlyArray<string> = [
 	'pointerId',
 	'pointerType',
 	'isPrimary',
+	'timeStamp',
+];
+
+/**
+ * What a script pointer handler's event works out in the engine, as a phone browser's touch has it: `pressure` is 0.5
+ * while the finger is down and 0 otherwise (a screen that reports no pressure), and `getCoalescedEvents()` gives the
+ * move itself (nothing for any other type).
+ */
+export const NATIVE_SCRIPT_POINTER_ENGINE_FIELDS: ReadonlyArray<string> = [
+	'pressure',
+	'getCoalescedEvents',
+];
+
+/**
+ * What a tap's click adds to a script click handler's event, as a phone browser fills it: where the touch ended, no
+ * modifier key held (a phone has no hardware keyboard), and the press count. A click no touch made (a screen reader's, or
+ * a script's `click()`) is at 0, 0 with a count of 0.
+ */
+export const NATIVE_SCRIPT_CLICK_FIELDS: ReadonlyArray<string> = [
+	'detail',
+	'clientX',
+	'clientY',
+	'shiftKey',
+	'ctrlKey',
+	'altKey',
+	'metaKey',
+];
+
+/** What a keydown a script raised carries into a JavaScript keydown handler: its key. */
+export const NATIVE_SCRIPT_KEY_FIELDS: ReadonlyArray<string> = ['key'];
+
+/** A script pointer handler's event's elements, which reach JavaScript as proxies (`relatedTarget` null when none). */
+export const NATIVE_SCRIPT_POINTER_ELEMENT_FIELDS: ReadonlyArray<string> = [
+	'target',
+	'currentTarget',
+	'relatedTarget',
+];
+
+/** What a long press adds to a script `contextmenu` handler's event. */
+export const NATIVE_SCRIPT_CONTEXTMENU_FIELDS: ReadonlyArray<string> = [
+	'clientX',
+	'clientY',
 	'timeStamp',
 ];
 
@@ -1281,13 +1798,8 @@ export const NATIVE_SCRIPT_PAGE_GLOBALS: Readonly<Record<string, string>> = {
 	localStorage: "the browser's storage; use `storage()` from @markless/core, which a phone keeps",
 	sessionStorage:
 		"the browser's storage; use `storage()` from @markless/core, which a phone keeps",
-	matchMedia: 'a CSS media query, which a phone answers in its styles, not in a handler',
-	getComputedStyle: 'computed CSS, which a phone does not have at run time',
 	requestAnimationFrame: 'a browser frame, which a phone does not hand to handlers',
 	cancelAnimationFrame: 'a browser frame, which a phone does not hand to handlers',
-	HTMLElement: 'the DOM, which a phone does not have',
-	Element: 'the DOM, which a phone does not have',
-	Node: 'the DOM, which a phone does not have',
 	Event: 'the DOM, which a phone does not have',
 	CustomEvent: 'the DOM, which a phone does not have',
 	MutationObserver: 'the DOM, which a phone does not have',
@@ -1295,17 +1807,23 @@ export const NATIVE_SCRIPT_PAGE_GLOBALS: Readonly<Record<string, string>> = {
 	IntersectionObserver: 'the DOM, which a phone does not have',
 	customElements: 'the DOM, which a phone does not have',
 	FormData: 'an HTML form, which a phone does not have',
-	devicePixelRatio: 'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
-	innerWidth: 'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
-	innerHeight: 'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
+	devicePixelRatio:
+		'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
+	innerWidth:
+		'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
+	innerHeight:
+		'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
 	outerWidth: 'the browser window, which a phone does not have',
 	outerHeight: 'the browser window, which a phone does not have',
 	visualViewport: 'the browser window, which a phone does not have',
 	scrollX: "the page's scroll position, which a phone's views keep",
 	scrollY: "the page's scroll position, which a phone's views keep",
-	scrollTo: "the page's scroll position, which a phone's views keep; use an element's `scrollIntoView()`",
-	scrollBy: "the page's scroll position, which a phone's views keep; use an element's `scrollIntoView()`",
-	addEventListener: 'listening on the browser window, which a phone does not have; use an event attribute',
+	scrollTo:
+		"the page's scroll position, which a phone's views keep; use an element's `scrollIntoView()`",
+	scrollBy:
+		"the page's scroll position, which a phone's views keep; use an element's `scrollIntoView()`",
+	addEventListener:
+		'listening on the browser window, which a phone does not have; use an event attribute',
 	removeEventListener: 'listening on the browser window, which a phone does not have',
 	dispatchEvent: 'events on the browser window, which a phone does not have',
 	getSelection: 'a text selection in the web page, which a phone does not have',
@@ -1314,7 +1832,7 @@ export const NATIVE_SCRIPT_PAGE_GLOBALS: Readonly<Record<string, string>> = {
 	NodeFilter: 'the DOM, which a phone does not have',
 	DOMParser: 'parsing HTML into a DOM, which a phone does not have',
 	CSS: 'the CSS object model, which a phone does not have at run time',
-	XMLHttpRequest: 'the browser\'s old request API; use `fetch`, which a phone provides',
+	XMLHttpRequest: "the browser's old request API; use `fetch`, which a phone provides",
 	alert: 'a browser dialog, which a phone does not have',
 	confirm: 'a browser dialog, which a phone does not have',
 	prompt: 'a browser dialog, which a phone does not have',

@@ -82,7 +82,7 @@ export async function measureApp(app: string, styles = false): Promise<ScreenRes
 				: {}),
 			readModule: readWorkspaceModule,
 			readStylesheet: readRelativeStylesheet,
-			...readAppConfig(join(dir, 'pages')),
+			...readAppConfig(dir),
 			partial: true,
 		});
 	} catch (error) {
@@ -141,7 +141,9 @@ export async function measureApp(app: string, styles = false): Promise<ScreenRes
 			keyboardOnly: own.filter(
 				(diagnostic) => diagnostic.code === 'MARKLESS_NATIVE_KEYBOARD_ONLY',
 			).length,
-			...(styles && errors.length === 0 ? { styled: styledBy.get(route.pattern) ?? null } : {}),
+			...(styles && errors.length === 0
+				? { styled: styledBy.get(route.pattern) ?? null }
+				: {}),
 		};
 	});
 }
@@ -154,7 +156,10 @@ if (import.meta.main) {
 	for (const app of APPS) {
 		report[app] = await measureApp(app, values.styles === true);
 		const built = report[app].filter((screen) => screen.builds).length;
-		const runs = report[app].filter((screen) => screen.builds && screen.styled !== undefined && typeof screen.styled !== 'string').length;
+		const runs = report[app].filter(
+			(screen) =>
+				screen.builds && screen.styled !== undefined && typeof screen.styled !== 'string',
+		).length;
 		console.error(
 			`${app}: ${built} of ${report[app].length} screens build${values.styles ? `, ${runs} with their styles` : ''}`,
 		);

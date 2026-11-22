@@ -94,13 +94,19 @@ final class Paragraph {
 /// A `<pre>` paragraph's sideways scroller: its line is never wrapped.
 final class PreformattedScroll: UIScrollView {}
 
-/// An inline `<svg>`: draws the shapes compiled when the app was built, fitted into its box as the web fits the viewBox.
+/// An inline `<svg>`: draws the shapes compiled when the app was built, then the shapes inside it that come from components,
+/// whose outline the engine gives while the app runs, fitted into its box as the web fits the viewBox.
 final class DrawingView: UIView {
 	let drawing: NativeDrawing
 	var currentColor: UIColor = .black { didSet { setNeedsDisplay() } }
+	/// min-x, min-y, width and height: the compiled one, or what a `viewBox` that follows state gives.
+	private(set) var viewBox: [Double]?
+	/// Shapes from inside it, in tree order, each with the outline it has now.
+	private var live: [(id: String, shape: NativeShape, path: [Double])] = []
 
 	init(_ drawing: NativeDrawing) {
 		self.drawing = drawing
+		viewBox = drawing.viewBox
 		super.init(frame: .zero)
 		isOpaque = false
 		backgroundColor = .clear
@@ -112,29 +118,37 @@ final class DrawingView: UIView {
 
 	override func draw(_ rect: CGRect) {
 		guard let context = UIGraphicsGetCurrentContext() else { return }
-		if let box = drawing.viewBox?.map({ CGFloat($0) }), box[2] > 0, box[3] > 0 {
-			// SVG 2 xMidYMid meet: one scale that fits both axes, the rest centred.
-			let scale = min(bounds.width / box[2], bounds.height / box[3])
-			context.translateBy(x: -box[0] * scale + (bounds.width - box[2] * scale) / 2, y: -box[1] * scale + (bounds.height - box[3] * scale) / 2)
-			context.scaleBy(x: scale, y: scale)
-		}
-		for shape in drawing.shapes {
-			let path = CGMutablePath()
-			var i = 0
-			let p = shape.path
-			while i < p.count {
-				switch Int(p[i]) {
-				case 0: path.move(to: CGPoint(x: p[i + 1], y: p[i + 2])); i += 3
-				case 1: path.addLine(to: CGPoint(x: p[i + 1], y: p[i + 2])); i += 3
-				case 3:
-					path.addCurve(to: CGPoint(x: p[i + 5], y: p[i + 6]), control1: CGPoint(x: p[i + 1], y: p[i + 2]), control2: CGPoint(x: p[i + 3], y: p[i + 4]))
-					i += 7
-				case 4: path.closeSubpath(); i += 1
-				default: i = p.count
-				}
+		if let box = viewBox?.map({ CGFloat($0) }), box.count == 4, box[2] > 0, box[3] > 0 {
+			// SVG 2 §8.5: the viewBox placed in the box by preserveAspectRatio, xMidYMid meet when it has none.
+			switch drawing.aspect {
+			case .none?:
+				context.scaleBy(x: bounds.width / box[2], y: bounds.height / box[3])
+				context.translateBy(x: -box[0], y: -box[1])
+			default:
+				var (x, y, slice) = ("mid", "mid", false)
+				if case let .align(ax, ay, sliced)? = drawing.aspect { (x, y, slice) = (ax, ay, sliced) }
+				let fit = [bounds.width / box[2], bounds.height / box[3]]
+				let scale = slice ? fit.max()! : fit.min()!
+				let place = { (align: String, room: CGFloat) -> CGFloat in align == "min" ? 0 : align == "max" ? room : room / 2 }
+				if slice { context.clip(to: bounds) }
+				context.translateBy(
+					x: -box[0] * scale + place(x, bounds.width - box[2] * scale), y: -box[1] * scale + place(y, bounds.height - box[3] * scale))
+				context.scaleBy(x: scale, y: scale)
 			}
+		}
+		for (shape, p) in drawing.shapes.map({ ($0, $0.path) }) + live.map({ ($0.shape, $0.path) }) {
+			let path = Self.path(p)
 			context.saveGState()
+			for clip in shape.clip {
+				context.addPath(Self.path(clip))
+				context.clip(using: .winding)
+			}
 			if let t = shape.transform { context.concatenate(CGAffineTransform(a: t[0], b: t[1], c: t[2], d: t[3], tx: t[4], ty: t[5])) }
+			if let text = shape.text {
+				draw(text)
+				context.restoreGState()
+				continue
+			}
 			if let fill = shape.fill {
 				context.addPath(path)
 				context.setFillColor(color(fill).cgColor)
@@ -150,6 +164,112 @@ final class DrawingView: UIView {
 				context.strokePath()
 			}
 			context.restoreGState()
+		}
+	}
+
+	/// The engine's numbers, space-separated, as the journal carries them; nil or empty draws nothing.
+	static func numbers(_ text: String?) -> [Double] {
+		(text ?? "").split(separator: " ").compactMap { Double($0) }
+	}
+
+	func addShape(_ id: String, _ shape: NativeShape, outline: String?) {
+		live.append((id, shape, shape.path.isEmpty ? Self.numbers(outline) : shape.path))
+		setNeedsDisplay()
+	}
+
+	func setOutline(_ id: String, _ outline: String?) {
+		guard let at = live.firstIndex(where: { $0.id == id }) else { return }
+		live[at].path = Self.numbers(outline)
+		setNeedsDisplay()
+	}
+
+	func setViewBox(_ text: String?) {
+		let box = Self.numbers(text)
+		viewBox = box.count == 4 ? box : nil
+		setNeedsDisplay()
+	}
+
+	/// A verb-coded outline: 0 move x y, 1 line x y, 3 cubic x1 y1 x2 y2 x y, 4 close.
+	private static func path(_ p: [Double]) -> CGMutablePath {
+		let path = CGMutablePath()
+		var i = 0
+		while i < p.count {
+			switch Int(p[i]) {
+			case 0: path.move(to: CGPoint(x: p[i + 1], y: p[i + 2])); i += 3
+			case 1: path.addLine(to: CGPoint(x: p[i + 1], y: p[i + 2])); i += 3
+			case 3:
+				path.addCurve(to: CGPoint(x: p[i + 5], y: p[i + 6]), control1: CGPoint(x: p[i + 1], y: p[i + 2]), control2: CGPoint(x: p[i + 3], y: p[i + 4]))
+				i += 7
+			case 4: path.closeSubpath(); i += 1
+			default: i = p.count
+			}
+		}
+		return path
+	}
+
+	/// Lays out an SVG `<text>`'s runs from the pen, each chunk placed by its anchor, as the browser lays them out.
+	private func draw(_ text: NativeDrawingText) {
+		typealias Piece = (string: NSAttributedString, width: CGFloat, font: UIFont, dy: CGFloat)
+		var chunks: [(x: CGFloat, y: CGFloat, pieces: [Piece])] = []
+		var pen = CGPoint.zero
+		for run in text.runs {
+			if run.x != nil || run.y != nil || chunks.isEmpty {
+				pen = CGPoint(x: run.x.map { CGFloat($0) } ?? pen.x, y: run.y.map { CGFloat($0) } ?? pen.y)
+				chunks.append((pen.x + CGFloat(run.dx ?? 0), pen.y + CGFloat(run.dy ?? 0), []))
+				pen.x += CGFloat(run.dx ?? 0)
+				pen.y += CGFloat(run.dy ?? 0)
+			} else {
+				pen.x += CGFloat(run.dx ?? 0)
+				pen.y += CGFloat(run.dy ?? 0)
+			}
+			let font = Self.font(run)
+			var attributes: [NSAttributedString.Key: Any] = [.font: font, .kern: run.letterSpacing]
+			attributes[.foregroundColor] = run.fill.map(color) ?? UIColor.clear
+			let string = NSAttributedString(string: run.text, attributes: attributes)
+			let width = string.size().width
+			chunks[chunks.count - 1].pieces.append((string, width, font, pen.y - chunks[chunks.count - 1].y))
+			pen.x += width
+		}
+		for chunk in chunks {
+			let total = chunk.pieces.reduce(0) { $0 + $1.width }
+			var x = chunk.x - (text.anchor == "middle" ? total / 2 : text.anchor == "end" ? total : 0)
+			for piece in chunk.pieces {
+				let f = piece.font
+				// Where the alphabetic baseline sits below the pen's y for each dominant-baseline, from the font's metrics.
+				let shift: CGFloat = switch text.baseline {
+				case "middle": f.xHeight / 2
+				case "central": (f.ascender + f.descender) / 2
+				case "hanging": f.ascender * 0.8
+				case "text-top": f.ascender
+				case "text-bottom", "ideographic": f.descender
+				default: 0
+				}
+				// UIKit draws a string from the top of its line, the font's ascender above the baseline.
+				piece.string.draw(at: CGPoint(x: x, y: chunk.y + piece.dy + shift - f.ascender))
+				x += piece.width
+			}
+		}
+	}
+
+	private static func font(_ run: NativeDrawingText.Run) -> UIFont {
+		let size = CGFloat(run.size)
+		let weight: UIFont.Weight = switch run.weight {
+		case ..<150: .ultraLight
+		case ..<250: .thin
+		case ..<350: .light
+		case ..<450: .regular
+		case ..<550: .medium
+		case ..<650: .semibold
+		case ..<750: .bold
+		case ..<850: .heavy
+		default: .black
+		}
+		switch run.family {
+		case "monospace": return UIFont.monospacedSystemFont(ofSize: size, weight: weight)
+		case "serif":
+			let base = UIFont.systemFont(ofSize: size, weight: weight)
+			return base.fontDescriptor.withDesign(.serif).map { UIFont(descriptor: $0, size: size) } ?? base
+		default: return UIFont.systemFont(ofSize: size, weight: weight)
 		}
 	}
 
@@ -179,11 +299,17 @@ final class ViewTree {
 	private let ask: (NativeAction) -> Bool
 	/// The view of a device object (a camera's preview), made by the page's device.
 	private let objectView: (_ object: String, _ device: String) throws -> UIView
+	/// The images the app packaged, by the src a page writes.
+	private let images: [String: NativeImageAsset]
 	private let nodes: [String: NativeNode]
 	/// The nodes each element, root (`""`), branch arm (`branch#index`) or list row (`repeat id`) places directly.
 	private let slots: [String: [String]]
 	private let events: [String: [NativeEvent]]
 	private(set) var elements: [String: UIView] = [:]
+	/// Shapes inside an svg, by node: the drawing that draws each one.
+	private var shapeOwners: [String: DrawingView] = [:]
+	/// svgs whose viewBox follows state: the journal's `viewBox` attribute gives it.
+	private var followingViewBox: Set<String> = []
 	private(set) var labels: [String: UILabel] = [:]
 	private var contexts: [String: Context] = [:]
 	private var templates: [String: String] = [:]
@@ -247,8 +373,10 @@ final class ViewTree {
 		runtime: NativeRuntime, layout: StyleLayout?, sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:],
 		faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void,
 		ask: @escaping (NativeAction) -> Bool = { _ in false },
-		objectView: @escaping (_ object: String, _ device: String) throws -> UIView = { object, _ in throw HostError("no device to show \(object)") }
+		objectView: @escaping (_ object: String, _ device: String) throws -> UIView = { object, _ in throw HostError("no device to show \(object)") },
+		images: [String: NativeImageAsset] = [:]
 	) throws {
+		self.images = images
 		self.runtime = runtime
 		self.objectView = objectView
 		self.layout = layout
@@ -529,6 +657,16 @@ final class ViewTree {
 				guard let field = elements[node] as? UITextField else { throw HostError("journal names input \(node), which is not a shown field") }
 				field.text = value
 			case let .attribute(node, name, value):
+				if let drawn = shapeOwners[node] {
+					attributes[node, default: [:]][name] = value
+					if name == "d" { drawn.setOutline(node, value) }
+					continue
+				}
+				if followingViewBox.contains(node), name == "viewBox", let drawn = elements[node] as? DrawingView {
+					attributes[node, default: [:]][name] = value
+					drawn.setViewBox(value)
+					continue
+				}
 				if flowing.contains(node) {
 					attributes[node, default: [:]][name] = value
 					continue
@@ -539,8 +677,8 @@ final class ViewTree {
 			case let .sheet(node, open):
 				guard let sheet = sheets[node] else { throw HostError("journal names sheet \(node), which is not built") }
 				if open { sheet.open(from: presenter) } else { sheet.close() }
-			case .navigate, .title:
-				throw HostError("navigate and title entries reach the screen's controller, not its views")
+			case .navigate, .title, .slot:
+				throw HostError("navigate, title and slot entries reach the screen's controller, not its views")
 			case .call, .release, .fetch, .abort:
 				throw HostError("a \(entry.json.jsonText) entry reaches the page's device or script services, not its views")
 			case let .dialog(node, open):
@@ -742,13 +880,14 @@ final class ViewTree {
 	}
 
 	/// The text an element shows, in view order: what `aria-labelledby` and `aria-describedby` read from it.
-	private func text(within view: UIView) -> String {
+	private func text(within view: UIView, skipping skipped: UIView? = nil) -> String {
+		if view === skipped { return "" }
 		if let label = view as? UILabel { return label.text ?? "" }
-		return view.subviews.map { text(within: $0) }.filter { !$0.isEmpty }.joined(separator: " ")
+		return view.subviews.map { text(within: $0, skipping: skipped) }.filter { !$0.isEmpty }.joined(separator: " ")
 	}
 
-	/// Labels and hints taken from the elements an attribute names by id, kept current after every journal; a `<label for>`
-	/// names its control, so VoiceOver reads it there and not a second time on the label.
+	/// Labels and hints taken from the elements an attribute names by id, kept current after every journal; a `<label>` names
+	/// its control with its text, so VoiceOver reads it there and not a second time on the label.
 	private func refreshRelations() {
 		for (id, view) in elements {
 			let current = attributes[id] ?? [:]
@@ -759,7 +898,12 @@ final class ViewTree {
 			}
 			if current["aria-label"] == nil, let label = named("aria-labelledby") { view.accessibilityLabel = label }
 			if let hint = named("aria-describedby") { view.accessibilityHint = hint }
-			if current["for"].flatMap({ elements[$0] }) != nil { view.accessibilityElementsHidden = true }
+			guard let target = current["for"], let control = elements[target] else { continue }
+			let own = attributes[target] ?? [:]
+			let unnamed = own["aria-label"] == nil && own["aria-labelledby"] == nil
+			if unnamed { control.accessibilityLabel = text(within: view, skipping: control) }
+			if !control.isDescendant(of: view) { view.accessibilityElementsHidden = true }
+			else if unnamed { for sub in view.subviews where sub !== control && !control.isDescendant(of: sub) { sub.accessibilityElementsHidden = true } }
 		}
 	}
 
@@ -927,14 +1071,32 @@ final class ViewTree {
 			contexts[id] = context
 			switch node.kind {
 			case let .element(element, staticAttributes, bindings):
+				if let shape = node.shape {
+					guard let drawn = container as? DrawingView else { throw HostError("the shape \(id) is not inside a drawing") }
+					var current = staticAttributes
+					for binding in bindings where !binding.isProperty {
+						current[binding.name] = marklessAttributeValue(binding.name, try runtime.evaluate(binding.value, in: context.scope))
+					}
+					attributes[id] = current
+					shapeOwners[id] = drawn
+					drawn.addShape(id, shape, outline: current["d"])
+					continue
+				}
 				if unimplementedElements.contains(element) { throw HostError("<\(element)> \(id) has no iOS view yet") }
 				let view: UIView
 				if let drawing = node.drawing {
 					let drawn = DrawingView(drawing)
+					let boundBox = try bindings.first { !$0.isProperty && $0.name == "viewBox" }.map {
+						marklessAttributeValue("viewBox", try runtime.evaluate($0.value, in: context.scope))
+					}
+					if let boundBox {
+						followingViewBox.insert(id)
+						drawn.setViewBox(boundBox)
+					}
 					drawn.isUserInteractionEnabled = context.button == nil
 					if layout == nil {
 						leaves.insert(ObjectIdentifier(drawn))
-						let ratio = drawing.viewBox.map { $0[3] / $0[2] }
+						let ratio = drawn.viewBox.map { $0[3] / $0[2] }
 						let unit = drawing.em ? Double(TextLook.baseSize * context.look.scale) : 1
 						switch (drawing.width.map { $0 * unit }, drawing.height.map { $0 * unit }) {
 						case let (width?, height?):
@@ -995,14 +1157,9 @@ final class ViewTree {
 					}
 					view = page
 				} else if element == "img" {
-					let image = UIImageView()
-					image.contentMode = .scaleAspectFit
-					image.isAccessibilityElement = true
-					image.accessibilityTraits = .image
-					if layout == nil {
-						image.widthAnchor.constraint(equalToConstant: 120).isActive = true
-						image.heightAnchor.constraint(equalToConstant: 90).isActive = true
-					}
+					let image = ImageBox()
+					// The box lays out its picture and alt text itself; the stacking layout sizes only the box.
+					leaves.insert(ObjectIdentifier(image))
 					view = image
 				} else if element == "select" {
 					if context.button != nil { throw HostError("<select> \(id) is inside a button") }
@@ -1049,6 +1206,12 @@ final class ViewTree {
 				} else if element == "input" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					let field = TextField()
+					if staticAttributes["type"] == "password" {
+						field.isSecureTextEntry = true
+						field.textContentType = .password
+					}
+					// Safari's keyboard for a number field: digits with the punctuation a number needs.
+					if staticAttributes["type"] == "number" { field.keyboardType = .numbersAndPunctuation }
 					field.lengthLimit = LengthLimit { [weak self] in nativeMaxLength(self?.attributes[id]?["maxlength"]) }
 					// Safari gives an email field the email keyboard with no capitals or corrections.
 					if staticAttributes["type"] == "email" {
@@ -1124,11 +1287,11 @@ final class ViewTree {
 				try wire(events[template] ?? [], on: view, element: element, id: id)
 				let boundFor = try bindings.first { $0.name == "for" }.map { try runtime.evaluate($0.value, in: context.scope).text }
 				if element == "label", let target = staticAttributes["for"] ?? boundFor {
-					// A press on a label activates its control, as a browser does.
-					let forward = LabelForward(target: target, onAction: onAction)
+					let pressable = (events[String(target.split(separator: "@", maxSplits: 1)[0])] ?? []).contains { $0.event == .activate }
+					let forward = LabelForward(target: target, pressable: pressable, control: { [weak self] in self?.elements[target] }, onAction: onAction)
 					forwards.append(forward)
 					view.isUserInteractionEnabled = true
-					view.addGestureRecognizer(UITapGestureRecognizer(target: forward, action: #selector(LabelForward.press)))
+					view.addGestureRecognizer(UITapGestureRecognizer(target: forward, action: #selector(LabelForward.press(_:))))
 				}
 				var current = staticAttributes
 				for binding in bindings where !binding.isProperty {
@@ -1261,8 +1424,11 @@ final class ViewTree {
 			case (.input, _ as SelectButton):
 				// A select's change runs in the runtime when a choice is made (a `choose` action).
 				continue
-			case (.idle, _), (.visible, _), (.dismiss, _), (.animationstart, _), (.animationiteration, _), (.animationend, _), (.animationcancel, _), (_, _) where event.event.isPointer:
-				// Raised elsewhere: idle, visible and animation events by the screen's controller, dismiss and pointer events by the overlay host.
+			case (.idle, _), (.visible, _), (.dismiss, _), (.close, _), (.keydown, _), (.animationstart, _), (.animationiteration, _), (.animationend, _), (.animationcancel, _), (_, _) where event.event.isPointer:
+				// Raised elsewhere: idle, visible and animation events by the screen's controller, dismiss and pointer events by the overlay host, close and a keydown off a text field by the runtime.
+				continue
+			case (.contextmenu, _):
+				// Safari on iOS raises no contextmenu for a long press, so neither does this host.
 				continue
 			default:
 				throw HostError("\(event.event.rawValue) on <\(element)> \(id) has no iOS control event yet")
@@ -1311,13 +1477,27 @@ final class ViewTree {
 			button.isEnabled = current["disabled"] == nil
 			refreshLabel(of: button)
 		} else if let drawing = view as? DrawingView {
-			// A named svg is an image to VoiceOver; an unnamed one, or one inside a control, is decoration.
-			drawing.accessibilityLabel = current["aria-label"]
-			drawing.isAccessibilityElement = current["aria-label"] != nil && contexts[id]?.button == nil
-			drawing.accessibilityTraits = .image
-		} else if let image = view as? UIImageView {
-			image.accessibilityLabel = current["aria-label"] ?? current["alt"]
-			image.image = current["src"].flatMap { URL(string: $0) }.flatMap { $0.isFileURL ? UIImage(contentsOfFile: $0.path) : nil }
+			// A named svg is an image to VoiceOver, and one with text reads its text, as the browser exposes them; an unnamed one
+			// without text, or one inside a control, is decoration.
+			let label = current["aria-label"] ?? drawing.drawing.label
+			drawing.accessibilityLabel = label
+			drawing.isAccessibilityElement = label != nil && contexts[id]?.button == nil
+			drawing.accessibilityTraits = current["aria-label"] != nil ? .image : .staticText
+		} else if let box = view as? ImageBox {
+			let src = current["src"]
+			// A photo the device took is a `file:` URL; any other src is a file the app packaged when it was built.
+			let packaged = src.flatMap { images[$0] }
+			let image = packaged?.data.flatMap { UIImage(data: $0) }
+				?? src.flatMap { URL(string: $0) }.flatMap { $0.isFileURL ? UIImage(contentsOfFile: $0.path) : nil }
+			let natural = packaged.flatMap { p in p.width.flatMap { w in p.height.map { CGSize(width: w, height: $0) } } }
+			let length = { (name: String) in current[name].flatMap { Double($0.trimmingCharacters(in: .whitespaces)) } }
+			box.show(
+				image, drawing: packaged?.drawing, natural: natural ?? image?.size, width: length("width"), height: length("height"),
+				alt: current["alt"], sized: layout == nil)
+			if box.fillsWidth { fullWidth.insert(ObjectIdentifier(box)) } else { fullWidth.remove(ObjectIdentifier(box)) }
+			box.accessibilityLabel = current["aria-label"] ?? current["alt"]
+			// `alt=""` marks a decorative image, which a screen reader skips, as the web leaves it out of the tree.
+			box.isAccessibilityElement = current["aria-label"] != nil || current["alt"].map { !$0.isEmpty } ?? true
 		} else {
 			view.accessibilityLabel = current["aria-label"]
 		}
@@ -1930,12 +2110,25 @@ final class LengthLimit: NSObject, UITextFieldDelegate {
 @MainActor
 final class LabelForward: NSObject {
 	private let target: String
+	private let pressable: Bool
+	private let control: () -> UIView?
 	private let onAction: (NativeAction) -> Void
-	init(target: String, onAction: @escaping (NativeAction) -> Void) {
+	init(target: String, pressable: Bool, control: @escaping () -> UIView?, onAction: @escaping (NativeAction) -> Void) {
 		self.target = target
+		self.pressable = pressable
+		self.control = control
 		self.onAction = onAction
 	}
-	@objc func press() { onAction(NativeAction(event: .activate, host: target)) }
+	/// As a browser: a text field takes the keyboard; focus leaves the field that had it for any other control, which is pressed when
+	/// a press acts on it (a checkbox, a button) and only focused otherwise (a select), which a phone does not show.
+	@objc func press(_ gesture: UITapGestureRecognizer) {
+		if let field = control(), field is UITextField || field is UITextView {
+			field.becomeFirstResponder()
+			return
+		}
+		gesture.view?.window?.endEditing(true)
+		if pressable { onAction(NativeAction(event: .activate, host: target)) }
+	}
 }
 
 /// A tap or drag outside a field puts the keyboard away, as a scrolling screen does.
@@ -1977,6 +2170,7 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	if let drawing = view as? DrawingView {
 		// An svg's text colour is what its currentColor paints.
 		if let color = style.textColor { drawing.currentColor = uiColor(color) }
+		drawing.isHidden = style.hidden
 		return
 	}
 	guard let label = view as? UILabel else {
@@ -1988,6 +2182,8 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 		label.font = UIFont(descriptor: face, size: font.size)
 	}
 	if let color = style.textColor { label.textColor = uiColor(color) }
+	// Text that is not visible keeps its place but neither shows nor reads out, as the web hides it.
+	label.isHidden = style.hidden
 }
 
 /// A text node's lines drawn glyph for glyph at Dragon's positions in the platform's own font (`CTFontDrawGlyphs`).

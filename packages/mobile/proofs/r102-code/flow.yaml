@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: r102-code
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Code
 - assertVisible: Call state\(\) to keep a value
 - assertVisible: Press Ctrl \+ C to copy

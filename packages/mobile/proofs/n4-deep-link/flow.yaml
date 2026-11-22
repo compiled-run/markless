@@ -2,31 +2,31 @@ appId: ${APP_ID}
 name: n4-deep-link
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - stopApp
 - openLink: markless-proof://app/orders/42
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                text: Open
-                optional: true
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: Open
+          optional: true
 - assertVisible: Details for order 42
 - assertNotVisible: Your orders
 - assertNotVisible: Shop front
 - assertVisible: Order 42
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertVisible: Your orders
 - assertNotVisible: Details for order 42
 - assertVisible: Orders
@@ -36,9 +36,9 @@ name: n4-deep-link
 - assertNotVisible: Details for order 42
 - assertVisible: Orders
 - swipe:
-      start: 1%, 50%
-      end: 85%, 50%
-      duration: 400
+    start: 1%, 50%
+    end: 85%, 50%
+    duration: 400
 - assertNotVisible: Your orders
 - assertVisible: Shop
 - assertVisible: Shop front

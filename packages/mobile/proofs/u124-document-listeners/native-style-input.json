@@ -1,0 +1,62 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "App",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "mk-d628op"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-d628op"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Document listeners"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "pad mk-d628op"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Drag here"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-d628op"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Idle"
+		}
+	],
+	"css": ".pad.mk-d628op {\n\t\t\t\tpadding: 24px;\n\t\t\t\ttouch-action: none;\n\t\t\t}",
+	"states": []
+}

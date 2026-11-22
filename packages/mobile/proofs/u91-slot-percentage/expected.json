@@ -1,0 +1,26 @@
+{
+	"rung": 191,
+	"name": "A style value that follows state, as a percentage: the marker's top is a share of the column, laid out again on the phone by Dragon's plan",
+	"steps": [
+		{
+			"visible": ["Percentage slot", "Row one", "Row two", "Marker", "Lower", "Share 10"],
+			"placed": ["Marker", "Row one", "Row two"]
+		},
+		{
+			"do": {
+				"tap": "Lower"
+			},
+			"visible": ["Share 50"],
+			"absent": ["Share 10"],
+			"placed": ["Row one", "Marker", "Row two"]
+		},
+		{
+			"do": {
+				"tap": "Lower"
+			},
+			"visible": ["Share 90"],
+			"absent": ["Share 50"],
+			"placed": ["Row one", "Row two", "Marker"]
+		}
+	]
+}

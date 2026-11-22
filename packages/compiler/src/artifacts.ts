@@ -130,6 +130,10 @@ export type SemanticScriptGlobal = {
 	readonly typeofOnly: boolean;
 	/** `window.x`, `globalThis.x`, `self.x`: the property read off the global object. */
 	readonly property?: string;
+	/** `document.activeElement`: the member this use reads straight off the global, when it reads one by name. */
+	readonly member?: string;
+	/** A module statement's use inside a function it declares: it runs when that function is called, not as the module loads. */
+	readonly deferred?: true;
 };
 
 /** A handler's or computed's own JavaScript, as a phone's script engine runs it. Native builds only. */
@@ -147,6 +151,8 @@ export type SemanticScriptFunction = {
 		readonly span: SourceSpan;
 		/** The methods called on it (`cam.takePhoto()`), when every use is such a call; absent once any use is not. */
 		readonly calledOnly?: ReadonlyArray<string>;
+		/** The members it reads by name (`toasts.queue`), when every use is such a read; absent once any use is not. */
+		readonly membersOnly?: ReadonlyArray<string>;
 	}>;
 	/** Module-level names it reads as written, which its module's statements declare. */
 	readonly module: ReadonlyArray<string>;
@@ -166,7 +172,12 @@ export type SemanticScriptFunction = {
 	readonly unsupported: ReadonlyArray<{ readonly construct: string; readonly span: SourceSpan }>;
 };
 
-export type SemanticScriptImportUse = { readonly slot: number; readonly name: string | null };
+export type SemanticScriptImportUse = {
+	readonly slot: number;
+	readonly name: string | null;
+	/** The members read on it (`toaster.say`), when every use reads one by name: of a namespace, only those reach the script. */
+	readonly members?: ReadonlyArray<string>;
+};
 
 /** One top-level statement of a module as script code, with what it declares and reaches. */
 export type SemanticScriptStatement = {
@@ -501,6 +512,8 @@ export type SemanticGraphBinding = {
 	readonly dependencies?: ReadonlyArray<SemanticGraphDependency>;
 	/** A sync computed's body, or a state's first value that does not fold, as a tree, for native builds only (`nativeFacts`). */
 	readonly nativeExpression?: SemanticExpression;
+	/** Where a computed's function is written, for native builds only: the script engine runs it when data cannot. */
+	readonly nativeFunctionSpan?: SourceSpan;
 	readonly functionSource?: string;
 	// A synthetic computed spelling one run of text: inside @try it waits on its async inputs, not on itself.
 	readonly joinsText?: true;
@@ -1054,6 +1067,8 @@ export type SemanticKeyedRepeat = {
 	readonly collectionPath: ReadonlyArray<string>;
 	/** The collection as a tree (native builds only). */
 	readonly collectionExpression?: SemanticExpression;
+	/** Where the collection is written, which finds it when no row element does (native builds only). */
+	readonly collectionSpan?: SourceSpan;
 	readonly keySource: string;
 	// Empty means the item ITSELF is the key (`key row`), which a list of scalars
 	// is; `indexKey` is what says a row has no data identity at all.
@@ -1570,6 +1585,8 @@ export type SemanticExpression =
 			readonly kind: 'object';
 			readonly entries: ReadonlyArray<readonly [string, SemanticExpression]>;
 	  }
+	/** An object literal with spreads (`{ ...row, name }`): each part's own fields in order, a later key winning. */
+	| { readonly kind: 'merge'; readonly parts: ReadonlyArray<SemanticExpression> }
 	/** A method called on a value: an array's or string's (with JavaScript's meaning), or an element's, which a native build resolves itself. */
 	| {
 			readonly kind: 'method';

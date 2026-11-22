@@ -161,6 +161,40 @@ export default function App() @{
 		expect(texts).toEqual(['NORTH YARD']);
 	});
 
+	it('builds FormData in a page that is not the first to run its script in a shared engine, as each browser page does', async () => {
+		const first = await build("text = String(JSON.parse(text === 'none' ? '1' : '2'));", '');
+		const second = await compileNativeComponent({
+			filename: 'app/App.tsrx',
+			source: `import { state } from '@markless/core';
+import { siteFrom } from './drafts.ts';
+export default function App() @{
+	let last = state('none');
+	<main>
+		<form
+			onSubmit={(event) => {
+				event.preventDefault();
+				last = siteFrom(event.currentTarget);
+			}}
+		>
+			<input name="site" value="North yard" />
+			<button>Add</button>
+		</form>
+		<p>{last}</p>
+	</main>
+}
+`,
+			readModule,
+		});
+		expect(second.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		const engine = nodeScriptHost();
+		const press = (payload: NonNullable<typeof first.payload>) =>
+			createNativeRuntime(payload, new Map(), {}, undefined, undefined, engine)
+				.dispatch({ event: 'activate', host: payload.events.find((event) => event.event === 'activate')!.host })
+				.flatMap((entry) => (entry.op === 'text' ? [entry.value] : []));
+		expect(press(first.payload!)).toEqual(['1']);
+		expect(press(second.payload!)).toEqual(['NORTH YARD']);
+	});
+
 	it('still refuses that helper where no form is submitted, from a click', async () => {
 		const { payload, diagnostics } = await build(
 			"text = siteFrom(text as unknown as HTMLFormElement);",

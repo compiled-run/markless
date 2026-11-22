@@ -48,6 +48,13 @@ export type NativeStyleInput = {
 				/** A markup ancestor of a sheet's content: there for its selectors and inheritance, with no box of its own. */
 				readonly boxless?: true;
 				readonly arm?: NativeArmPlace;
+				/** A `style` that follows state: its text, each number the app computes as a hole naming one of `slots`. */
+				readonly styleTemplate?: ReadonlyArray<string | { readonly slot: string }>;
+				/** A `style` that is a template while a style case holds and empty text otherwise, in every combination of `states`. */
+				readonly styleByState?: ReadonlyArray<{
+					readonly when: Readonly<Record<string, NativeStyleValue>>;
+					readonly template: ReadonlyArray<string | { readonly slot: string }>;
+				}>;
 				readonly row?: string;
 		  }
 		| {
@@ -82,6 +89,8 @@ export type NativeStyleInput = {
 	}>;
 	/** A system sheet's content at one resting height: the content area's size per target, in CSS px. */
 	readonly viewports?: ReturnType<typeof sheetViewports>;
+	/** The numbers `styleTemplate`s read (the payload's `slots`), each at the value it has at mount; Dragon finds what each moves. */
+	readonly slots?: ReadonlyArray<{ readonly id: string; readonly initial: number; readonly integer?: true }>;
 	/**
 	 * Each relative `@font-face` src url of the stylesheets, as `css` spells it, and the font file it names, resolved against its
 	 * stylesheet's file. Written to disk with `file` relative to the input file (`nativeStyleInputAt`).
@@ -329,6 +338,13 @@ export function nativeStyleInput(
 	const params = Object.fromEntries((payload.route?.params ?? []).map((name) => [name, '']));
 	const mounted = createNativeRuntime(payload, new Map(), params, undefined, undefined, host);
 	const initial = new Map(mounted.texts());
+	const slotIds = new Set(
+		nodes.flatMap((node) =>
+			node.kind === 'element' ? (node.style ?? []).flatMap((part) => (typeof part === 'string' ? [] : [part.slot])) : [],
+		),
+	);
+	const slots = (payload.slots ?? []).filter((slot) => slotIds.has(slot.id));
+	const slotAtMount = new Map(slots.length > 0 ? mounted.slots() : []);
 	// A row's text is laid out once, as the row a phone copies: the first row's at mount, else one letter, so Dragon makes the text a box a phone fills per row.
 	const rowText = (id: string): string =>
 		[...initial].find(([instance]) => instance.startsWith(`${id}@`))?.[1] || 'x';
@@ -353,6 +369,11 @@ export function nativeStyleInput(
 			`${cell.name} decides a class or a ui-* attribute, but not every value it can hold is known at build time; Dragon needs a finite domain`,
 		);
 	});
+	const caseIds = new Set(nodes.flatMap((node) => (node.kind === 'element' && node.styleWhen ? [node.styleWhen.case] : [])));
+	const caseAtMount = new Map(mounted.styleCases());
+	for (const styleCase of payload.styleCases ?? [])
+		if (caseIds.has(styleCase.id))
+			states.push({ cell: styleCase.id, domain: [false, true], initial: caseAtMount.get(styleCase.id)! });
 	// A row's class or ui-* attribute its item decides: a state per row over the values it can give, by their index.
 	const rowOptions = new Map<string, { node: string; attribute: string; options: ReadonlyArray<string | null> }>();
 	for (const node of nodes) {
@@ -537,6 +558,15 @@ export function nativeStyleInput(
 					...(classByState ? { classByState } : {}),
 					...(Object.keys(attributesByState).length > 0 ? { attributesByState } : {}),
 					...(sheet?.boxless.has(node.id) ? { boxless: true as const } : {}),
+					...(node.style && !node.styleWhen ? { styleTemplate: node.style } : {}),
+					...(node.style && node.styleWhen
+						? {
+								styleByState: combinations.map((when) => ({
+									when,
+									template: when[node.styleWhen!.case] === node.styleWhen!.value ? node.style! : [],
+								})),
+							}
+						: {}),
 					...place,
 				},
 			];
@@ -544,6 +574,15 @@ export function nativeStyleInput(
 		css: [...stylesheets, ...styles].map((style) => style.cssText).join('\n'),
 		states,
 		...(fonts.length > 0 ? { fonts } : {}),
+		...(slots.length > 0
+			? {
+					slots: slots.map((slot) => ({
+						id: slot.id,
+						initial: slotAtMount.get(slot.id)!,
+						...(slot.integer ? { integer: true as const } : {}),
+					})),
+				}
+			: {}),
 		...(branches.length > 0 ? { branches } : {}),
 		...(repeats.length > 0 ? { repeats } : {}),
 	};

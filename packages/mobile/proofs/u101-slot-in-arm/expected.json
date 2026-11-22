@@ -1,0 +1,13 @@
+{
+	"rung": 201,
+	"name": "A style number that follows state on an element inside an @if arm: Dragon binds it in the arm's layout, and the phone moves it when the number changes and keeps it when the arm closes and opens",
+	"steps": [
+		{
+			"visible": ["Slot in an arm", "Middle row", "Marker", "Lower", "Toggle"],
+			"placed": ["Marker", "Middle row"]
+		},
+		{ "do": { "tap": "Lower" }, "visible": ["Marker"], "placed": ["Middle row", "Marker"] },
+		{ "do": { "tap": "Toggle" }, "visible": ["Middle row"], "absent": ["Marker"] },
+		{ "do": { "tap": "Toggle" }, "visible": ["Marker"], "placed": ["Middle row", "Marker"] }
+	]
+}

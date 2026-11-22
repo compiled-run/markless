@@ -59,12 +59,12 @@ beforeAll(async () => {
 afterAll(() => browser.close(), 60_000);
 
 /**
- * A one-screen rung that brings no route, start path, web-only steps, document, styles or components of its own shares
+ * A one-screen rung that brings no route, start path, web-only steps, document, styles, served files or components of its own shares
  * one build with the others like it, each its own page at `/<folder>`: one app per rung would repeat the same build.
  */
 const owns = (folder: string, name: string) => existsSync(join(proofsDir, folder, name));
 const SHARED = (folder: string, rung: LadderRung): boolean =>
-	!['pages', 'document.tsrx', 'styles', 'lib'].some((name) => owns(folder, name)) &&
+	!['pages', 'document.tsrx', 'styles', 'lib', 'public'].some((name) => owns(folder, name)) &&
 	rung.route === undefined &&
 	rung.start === undefined &&
 	rung.web === undefined &&
@@ -103,8 +103,8 @@ async function serveRung(
 	}
 	// Components a rung imports live in proofs/lib, which a page reaches as `../lib/...` from pages/ here too.
 	await cp(join(proofsDir, 'lib'), join(root, 'lib'), { recursive: true });
-	// An app rung may bring its own components, stylesheets and document (whose stylesheet imports reach every page).
-	for (const own of ['lib', 'styles'])
+	// An app rung may bring its own components, stylesheets, served files, API routes and document (whose stylesheet imports reach every page).
+	for (const own of ['lib', 'styles', 'public', 'api'])
 		if (existsSync(join(proofsDir, folder, own)))
 			await cp(join(proofsDir, folder, own), join(root, own), { recursive: true });
 	if (existsSync(join(proofsDir, folder, 'document.tsrx')))
@@ -119,6 +119,8 @@ async function serveRung(
 		join(root, 'node_modules/@markless/ui'),
 		'dir',
 	);
+	// The server an app rung's api/ routes run in, as the router's build imports it.
+	await symlink(join(packagesRoot, 'router/node_modules/nitro'), join(root, 'node_modules/nitro'), 'dir');
 	// The third-party package the script ladder imports (J2), as the mobile package depends on it.
 	await symlink(
 		join(packagesRoot, 'mobile/node_modules/scule'),
@@ -156,23 +158,30 @@ function recordDeviceCalls() {
 
 // A visible text or an accessible name, the two ways a Maestro selector finds a view.
 // A closed select shows its chosen option's label, as the phones draw it.
+/** The field a person types into by its name: a text field, or a number field (a spinbutton). */
+const typedField = (page: Page, name: string): Locator =>
+	page.getByRole('textbox', { name, exact: true }).or(page.getByRole('spinbutton', { name, exact: true }));
 const shown = (page: Page, text: string): Locator =>
 	page
 		.getByText(text, { exact: true })
 		.or(page.getByLabel(text, { exact: true }))
 		.or(page.getByRole('img', { name: text, exact: true }))
+		// An image is found by its alt text, its accessible name, as a phone's screen reader names it.
+		.or(page.getByAltText(text, { exact: true }))
 		.or(page.getByRole('combobox').filter({ has: page.locator('option:checked').getByText(text, { exact: true }) }));
 
 // The phone the style exports lay out for (Dragon's iOS viewport): a rung that scrolls scrolls here as on the phones.
 const PHONE = { width: 402, height: 778 };
 
-// On screen: some of it is inside the viewport and not clipped away by a scrolling box, as an IntersectionObserver reports.
+// On screen: drawn (not visibility: hidden) and some of it inside the viewport, not clipped away by a scrolling box, as an
+// IntersectionObserver reports.
 const onScreenCount = (page: Page, text: string): Promise<number> =>
 	shown(page, text).evaluateAll(async (elements) => {
 		const seen = await Promise.all(
 			elements.map(
 				(element) =>
 					new Promise<boolean>((resolve) => {
+						if (!element.checkVisibility({ visibilityProperty: true })) return resolve(false);
 						const observer = new IntersectionObserver(([entry]) => {
 							observer.disconnect();
 							resolve(
@@ -227,6 +236,35 @@ async function drag(page: Page, on: string, direction: 'right' | 'up') {
 	await cdp.detach();
 }
 
+/**
+ * A finger held on `on` past a phone's long-press time, then lifted. Chromium raises `contextmenu` for a held touch only
+ * through its touch emulator; CDP touch input ends in a click instead.
+ */
+async function longPress(page: Page, on: string) {
+	const box = await shown(page, on).first().boundingBox();
+	if (!box) throw new Error(`"${on}" is not on screen to press`);
+	const cdp = await page.context().newCDPSession(page);
+	const at = {
+		x: box.x + box.width / 2,
+		y: box.y + box.height / 2,
+		button: 'left' as const,
+		clickCount: 1,
+	};
+	await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+	await cdp.send('Emulation.setEmitTouchEventsForMouse', {
+		enabled: true,
+		configuration: 'mobile',
+	});
+	// The emulator answers a press only after its gesture ends, and a prevented contextmenu holds that answer back.
+	for (const type of ['mousePressed', 'mouseReleased'] as const) {
+		void cdp.send('Input.dispatchMouseEvent', { type, ...at }).catch(() => {});
+		await page.waitForTimeout(type === 'mousePressed' ? 1000 : 100);
+	}
+	await cdp.send('Emulation.setEmitTouchEventsForMouse', { enabled: false });
+	await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+	await cdp.detach();
+}
+
 async function act(page: Page, step: LadderStep) {
 	const action = step.do;
 	if (!action) return;
@@ -244,11 +282,11 @@ async function act(page: Page, step: LadderStep) {
 					: shown(page, tap);
 		await ('tap' in action ? target.click() : target.dblclick());
 	} else if ('type' in action) {
-		const field = page.getByRole('textbox', { name: action.type.field, exact: true });
-		await field.fill('');
+		const field = typedField(page, action.type.field);
+		if (!action.type.append) await field.fill('');
 		await field.pressSequentially(action.type.text);
 	} else if ('submit' in action)
-		await page.getByRole('textbox', { name: action.submit, exact: true }).press('Enter');
+		await typedField(page, action.submit).press('Enter');
 	else if ('erase' in action) {
 		const field = page.getByRole('textbox', { name: action.erase, exact: true });
 		await field.press('End');
@@ -273,6 +311,7 @@ async function act(page: Page, step: LadderStep) {
 		await slider.focus();
 		await slider.press(action.slide.to === 'max' ? 'End' : 'Home');
 	}
+	else if ('longPress' in action) await longPress(page, action.longPress);
 	else if ('appearance' in action) await page.emulateMedia({ colorScheme: action.appearance });
 	else if ('orientation' in action) {
 		const { width, height } = page.viewportSize()!;
@@ -333,12 +372,12 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 		if (message !== step.invalid)
 			failed.push(`the focused field's validation message is ${JSON.stringify(message)}`);
 	}
-	if (step.order) {
+	for (const order of [step.order, step.placed]) {
+		if (!order) continue;
 		const tops: number[] = [];
-		for (const text of step.order)
-			tops.push((await onScreen(text).first().boundingBox())?.y ?? NaN);
+		for (const text of order) tops.push((await onScreen(text).first().boundingBox())?.y ?? NaN);
 		if (tops.some((top, index) => !(index === 0 || top > tops[index - 1]!)))
-			failed.push(`order ${step.order.join(', ')} is not top to bottom`);
+			failed.push(`order ${order.join(', ')} is not top to bottom`);
 	}
 	return failed;
 }

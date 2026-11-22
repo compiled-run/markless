@@ -20,19 +20,19 @@ export type BuiltServer = {
 };
 
 /**
- * Starts a built Nitro server on a port the OS picks and resolves once the server says it is
+ * Starts a built Nitro server on `port`, or on a port the OS picks, and resolves once the server says it is
  * listening; a server that exits first rejects with its output instead of waiting out a clock.
  * The server exits when this process does, however this process ends.
  */
 export function startBuiltServer(
 	entry: string,
-	options: { readonly cwd?: string; readonly env?: NodeJS.ProcessEnv } = {},
+	options: { readonly cwd?: string; readonly env?: NodeJS.ProcessEnv; readonly port?: number } = {},
 ): Promise<BuiltServer> {
 	// srvx prints its listening line only while `TEST` is unset, and a test runner sets it.
 	const { TEST: _test, ...env } = options.env ?? process.env;
 	const child = spawn(process.execPath, ['--import', exitWithParent, entry], {
 		cwd: options.cwd,
-		env: { ...env, PORT: '0' },
+		env: { ...env, PORT: String(options.port ?? 0) },
 		stdio: ['pipe', 'pipe', 'pipe'],
 	});
 	live.add(child);

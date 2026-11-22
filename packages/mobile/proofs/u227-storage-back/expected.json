@@ -1,0 +1,22 @@
+{
+	"rung": 227,
+	"name": "A screen kept on the stack shows, after Back, the storage() value a page above it wrote, with what is computed from it, as the web page shown again reads the device's storage",
+	"steps": [
+		{
+			"visible": ["Home page", "Home kept 0", "Next is 1", "Nothing kept yet", "Open bump"],
+			"title": "Home"
+		},
+		{
+			"do": { "tap": "Open bump" },
+			"visible": ["Bump page", "Bump kept 0", "Bump it"],
+			"title": "Bump"
+		},
+		{ "do": { "tap": "Bump it" }, "visible": ["Bump kept 1"], "absent": ["Bump kept 0"] },
+		{
+			"do": { "back": "button" },
+			"visible": ["Home page", "Home kept 1", "Next is 2"],
+			"absent": ["Home kept 0", "Next is 1", "Nothing kept yet"],
+			"title": "Home"
+		}
+	]
+}

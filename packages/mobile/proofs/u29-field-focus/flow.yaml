@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u29-field-focus
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Sign up
 - assertVisible: Not editing
 - assertVisible: Focused 0 times

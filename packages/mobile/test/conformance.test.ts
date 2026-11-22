@@ -56,7 +56,7 @@ describe('native conformance vectors', () => {
 				readModule: entry.modules ? readWorkspaceModule : readCaseModule,
 			});
 			expect(committed(`${entry.name}.json`), entry.name).toEqual(
-				nativeConformance(payload!, entry.actions, entry.params, entry.preferredLanguages, entry.now, CONFORMANCE_SCRIPT_HOST()),
+				nativeConformance(payload!, entry.actions, entry.params, entry.preferredLanguages, entry.now, CONFORMANCE_SCRIPT_HOST(), entry.layout),
 			);
 		}
 	});
@@ -97,6 +97,41 @@ describe('native conformance vectors', () => {
 			typeof nativeAppConformance
 		>;
 		expect(deep.initial.stack).toEqual(['/', '/orders', '/orders/42']);
+	});
+
+	it('storage-back: Back shows the screen below the storage() value a screen above wrote, its texts and arm following', () => {
+		const kept = committed('storage-back.json') as ReturnType<typeof nativeAppConformance>;
+		expect(kept.steps.at(-1)!.journal).toEqual([
+			{ op: 'text', node: 'h3:text0', value: 'Home kept 1' },
+			{ op: 'text', node: 'h4:text0', value: 'Next is 2' },
+			{ op: 'arm', node: 'branch-site:0', index: 1 },
+		]);
+	});
+
+	it('contextmenu: a long press reaches the element pressed, then each element it is inside, with its place', () => {
+		const vectors = committed('contextmenu.json') as ReturnType<typeof nativeConformance>;
+		expect(vectors.steps.map((step) => step.journal)).toEqual([
+			[
+				{ op: 'text', node: 'h1:text0', value: 'Apple at 40,120' },
+				{ op: 'text', node: 'h6:text0', value: ' list:inner@900' },
+			],
+			[{ op: 'text', node: 'h6:text0', value: ' list:inner@900 list:self@1500' }],
+			[
+				{
+					op: 'text',
+					node: 'h6:text0',
+					value: ' list:inner@900 list:self@1500 pad:52.5 pad:300',
+				},
+			],
+			[
+				{ op: 'text', node: 'h1:text0', value: 'Pear at 41,160' },
+				{
+					op: 'text',
+					node: 'h6:text0',
+					value: ' list:inner@900 list:self@1500 pad:52.5 pad:300 list:inner@2600',
+				},
+			],
+		]);
 	});
 
 	it('journals only the text nodes whose string changed, in document order', () => {

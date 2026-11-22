@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u39-checklist
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Sandwich
 - assertVisible: Ticked 0
 - assertVisible: All

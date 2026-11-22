@@ -19,6 +19,12 @@ type Reference = ModuleSemantics['references'][number];
 
 const PRINT = { strip: true, format: 'pretty', indent: 1, comments: false } as const;
 const FRAMEWORK_PREFIX = '@markless/';
+/** A Markless package whose functions are plain code a phone's script can run (@markless/ui's helpers), not the framework. */
+const LIBRARY_PACKAGES: ReadonlyArray<string> = ['@markless/ui'];
+/** Whether an import is the framework's own, which a phone's script reaches only through host services. */
+const isFrameworkImport = (specifier: string): boolean =>
+	specifier.startsWith(FRAMEWORK_PREFIX) &&
+	!LIBRARY_PACKAGES.some((name) => specifier === name || specifier.startsWith(`${name}/`));
 const GLOBAL_OBJECTS = new Set(['window', 'globalThis', 'self']);
 
 const isNode = (value: unknown): value is AnyNode =>
@@ -145,6 +151,8 @@ function cloneWith(node: AnyNode, replace: (node: AnyNode) => AnyNode | undefine
 	// `{ count }` reads `count`; once `count` is spelled `__s.count`, the property says so.
 	if (copy.type === 'Property' && copy.shorthand === true && copy.value !== node.value)
 		copy.shorthand = false;
+	if ((copy.type === 'ClassDeclaration' || copy.type === 'ClassExpression') && classLowering(copy as AnyNode) === null)
+		return lowerClass(copy as AnyNode);
 	// Hermes runs async functions but not async arrows: one becomes an async function bound to the `this` around it.
 	if (copy.type === 'ArrowFunctionExpression' && copy.async === true) {
 		const body = copy.body as AnyNode;
@@ -176,6 +184,123 @@ function cloneWith(node: AnyNode, replace: (node: AnyNode) => AnyNode | undefine
 		} as unknown as AnyNode;
 	}
 	return copy as AnyNode;
+}
+
+/**
+ * Hermes runs no class syntax. A class with no `extends`, private members or static blocks is lowered to a constructor
+ * function: its fields first in the constructor, as the class runs them, its methods on the prototype, and its getters and
+ * setters defined there as the class defines them. Null when it can be lowered; else what stops it.
+ */
+function classLowering(node: AnyNode): string | null {
+	if (node.superClass) return 'a class that extends another';
+	for (const member of ((node.body as AnyNode).body as AnyNode[]) ?? []) {
+		if (member.type === 'StaticBlock') return 'a class with a `static` block';
+		if ((member.key as AnyNode | undefined)?.type === 'PrivateIdentifier') return 'a class with a private member';
+		if (member.type === 'MethodDefinition' && (member.kind === 'get' || member.kind === 'set') && member.computed === true)
+			return 'a class getter or setter with a computed name';
+		if (member.type !== 'MethodDefinition' && member.type !== 'PropertyDefinition')
+			return `a class member \`${String(member.type)}\``;
+	}
+	return null;
+}
+
+function lowerClass(node: AnyNode): AnyNode {
+	const name = (node.id as AnyNode | null)?.name as string | undefined;
+	const self = identifier(name ?? '__class');
+	const members = ((node.body as AnyNode).body as AnyNode[]) ?? [];
+	const keyed = (object: AnyNode, member: AnyNode): AnyNode => {
+		const key = member.key as AnyNode;
+		const named = member.computed !== true && key.type === 'Identifier';
+		return {
+			type: 'MemberExpression',
+			object,
+			property: named || member.computed === true ? key : { type: 'Literal', value: key.value },
+			computed: !named,
+			optional: false,
+		} as unknown as AnyNode;
+	};
+	const assign = (target: AnyNode, value: AnyNode): AnyNode =>
+		({
+			type: 'ExpressionStatement',
+			expression: { type: 'AssignmentExpression', operator: '=', left: target, right: value },
+		}) as unknown as AnyNode;
+	const undefinedValue = { type: 'UnaryExpression', operator: 'void', prefix: true, argument: { type: 'Literal', value: 0 } } as unknown as AnyNode;
+	const constructor = members.find((member) => member.type === 'MethodDefinition' && member.kind === 'constructor');
+	const fields = members
+		.filter((member) => member.type === 'PropertyDefinition' && !member.static)
+		.map((member) => assign(keyed({ type: 'ThisExpression' } as unknown as AnyNode, member), (member.value as AnyNode | null) ?? undefinedValue));
+	const ctor = (constructor?.value as AnyNode | undefined) ?? undefined;
+	const declaration = {
+		type: 'FunctionDeclaration',
+		id: self,
+		async: false,
+		generator: false,
+		params: ctor?.params ?? [],
+		body: { type: 'BlockStatement', body: [...fields, ...(((ctor?.body as AnyNode | undefined)?.body as AnyNode[]) ?? [])] },
+	} as unknown as AnyNode;
+	const prototype = { type: 'MemberExpression', object: self, property: identifier('prototype'), computed: false, optional: false } as unknown as AnyNode;
+	const accessors = new Map<string, { target: AnyNode; name: string; get?: AnyNode; set?: AnyNode }>();
+	const rest = members.flatMap((member): AnyNode[] => {
+		if (member === constructor) return [];
+		if (member.type === 'MethodDefinition' && (member.kind === 'get' || member.kind === 'set')) {
+			const key = member.key as AnyNode;
+			const keyName = String(key.type === 'Identifier' ? key.name : key.value);
+			const slot = `${member.static ? 'static' : 'prototype'}:${keyName}`;
+			const entry = accessors.get(slot) ?? { target: member.static ? self : prototype, name: keyName };
+			entry[member.kind as 'get' | 'set'] = member.value as AnyNode;
+			accessors.set(slot, entry);
+			return [];
+		}
+		if (member.type === 'MethodDefinition') return [assign(keyed(member.static ? self : prototype, member), member.value as AnyNode)];
+		return member.static ? [assign(keyed(self, member), (member.value as AnyNode | null) ?? undefinedValue)] : [];
+	});
+	const property = (name: string, value: AnyNode): AnyNode =>
+		({ type: 'Property', key: identifier(name), value, kind: 'init', computed: false, method: false, shorthand: false }) as unknown as AnyNode;
+	const literal = (value: string | boolean): AnyNode => ({ type: 'Literal', value }) as unknown as AnyNode;
+	// Class accessors are configurable and not enumerable.
+	const defined = [...accessors.values()].map(
+		({ target, name: keyName, get, set }): AnyNode =>
+			({
+				type: 'ExpressionStatement',
+				expression: {
+					type: 'CallExpression',
+					callee: member(identifier('Object'), 'defineProperty'),
+					arguments: [
+						target,
+						literal(keyName),
+						{
+							type: 'ObjectExpression',
+							properties: [
+								...(get ? [property('get', get)] : []),
+								...(set ? [property('set', set)] : []),
+								property('enumerable', literal(false)),
+								property('configurable', literal(true)),
+							],
+						},
+					],
+					optional: false,
+				},
+			}) as unknown as AnyNode,
+	);
+	const made = {
+		type: 'CallExpression',
+		callee: {
+			type: 'FunctionExpression',
+			id: null,
+			async: false,
+			generator: false,
+			params: [],
+			body: { type: 'BlockStatement', body: [declaration, ...rest, ...defined, { type: 'ReturnStatement', argument: self }] },
+		},
+		arguments: [],
+		optional: false,
+	} as unknown as AnyNode;
+	if (node.type === 'ClassExpression') return made;
+	return {
+		type: 'VariableDeclaration',
+		kind: 'var',
+		declarations: [{ type: 'VariableDeclarator', id: self, init: { type: 'ParenthesizedExpression', expression: made } }],
+	} as unknown as AnyNode;
 }
 
 /** The node of the module's own analysis at the same place as a node of another parse of the same source. */
@@ -242,6 +367,19 @@ function methodCalledOn(semantic: ModuleSemantics, node: AnyNode): string | unde
 		called.callee !== read
 	)
 		return undefined;
+	return String((read.property as AnyNode).name);
+}
+
+/** The member a reference reads by name (`toasts.queue`), or undefined when it is used otherwise. */
+function memberReadOn(semantic: ModuleSemantics, node: AnyNode): string | undefined {
+	let object: AnyNode = node;
+	let read = semantic.parentOf(node as never) as AnyNode | null;
+	// A shared accessor called with no arguments and read at once: `toasterState().dismiss(id)`.
+	if (read?.type === 'CallExpression' && read.callee === node && ((read.arguments as AnyNode[]) ?? []).length === 0) {
+		object = read;
+		read = semantic.parentOf(read as never) as AnyNode | null;
+	}
+	if (read?.type !== 'MemberExpression' || read.object !== object || read.computed) return undefined;
 	return String((read.property as AnyNode).name);
 }
 
@@ -312,7 +450,7 @@ function importSlots(semantic: ModuleSemantics) {
 		{ readonly index: number; readonly name: string | null; readonly specifier: string }
 	>();
 	for (const entry of semantic.imports) {
-		if (entry.typeOnly || !entry.local || entry.specifier.startsWith(FRAMEWORK_PREFIX))
+		if (entry.typeOnly || !entry.local || isFrameworkImport(entry.specifier))
 			continue;
 		if (entry.kind !== 'named' && entry.kind !== 'namespace') continue;
 		byBinding.set(entry.local.id, {
@@ -322,7 +460,7 @@ function importSlots(semantic: ModuleSemantics) {
 		});
 	}
 	for (const entry of semantic.exports)
-		if (!entry.typeOnly && entry.specifier && !entry.specifier.startsWith(FRAMEWORK_PREFIX))
+		if (!entry.typeOnly && entry.specifier && !isFrameworkImport(entry.specifier))
 			slot(entry.specifier, entry.node as AnyNode);
 	const record = (binding: Binding) => byBinding.get(binding.id);
 	const reach = (binding: Binding): AnyNode | undefined => {
@@ -334,6 +472,21 @@ function importSlots(semantic: ModuleSemantics) {
 	return { specifiers, spans, reach, slot, record };
 }
 
+const FUNCTIONS = new Set([
+	'FunctionDeclaration',
+	'FunctionExpression',
+	'ArrowFunctionExpression',
+]);
+
+/** Whether `node` sits inside a function within `root` (or `root` is one), so it runs only when that function is called. */
+function insideFunction(semantic: ModuleSemantics, node: AnyNode, root: AnyNode): boolean {
+	for (let at: AnyNode | null = node; at; at = semantic.parentOf(at as never) as AnyNode | null) {
+		if (FUNCTIONS.has(String(at.type))) return true;
+		if (at === root) return false;
+	}
+	return false;
+}
+
 function globalOf(
 	semantic: ModuleSemantics,
 	reference: Reference,
@@ -342,19 +495,20 @@ function globalOf(
 	const node = reference.node as unknown as AnyNode;
 	const parent = semantic.parentOf(node as never) as AnyNode | null;
 	const typeofOnly = parent?.type === 'UnaryExpression' && parent.operator === 'typeof';
-	const property =
-		GLOBAL_OBJECTS.has(reference.name) &&
+	const member =
 		parent?.type === 'MemberExpression' &&
 		parent.object === node &&
 		!parent.computed &&
 		typeof (parent.property as AnyNode | undefined)?.name === 'string'
 			? String((parent.property as AnyNode).name)
 			: undefined;
+	const property = GLOBAL_OBJECTS.has(reference.name) ? member : undefined;
 	return {
 		name: reference.name,
 		span: spanOf(node as never, filename),
 		typeofOnly,
 		...(property ? { property } : {}),
+		...(member ? { member } : {}),
 	};
 }
 
@@ -381,6 +535,10 @@ function unsupportedIn(
 	}
 	if (node.type === 'ImportExpression')
 		into.push({ construct: 'a dynamic `import()`', span: spanOf(node as never, filename) });
+	if (node.type === 'ClassDeclaration' || node.type === 'ClassExpression') {
+		const stops = classLowering(node);
+		if (stops) into.push({ construct: `${stops}, which Hermes cannot run`, span: spanOf(node as never, filename) });
+	}
 	if (node.type === 'TSEnumDeclaration' || node.type === 'TSModuleDeclaration')
 		into.push({
 			construct: node.type === 'TSEnumDeclaration' ? 'an `enum`' : 'a `namespace`',
@@ -415,7 +573,7 @@ export function scriptFunctionOf(
 	const viaState = new Map<number, Binding>();
 	const names = new Map<
 		string,
-		{ name: string; written: boolean; span: SourceSpan; calledOnly?: string[] }
+		{ name: string; written: boolean; span: SourceSpan; calledOnly?: string[]; membersOnly?: string[] }
 	>();
 	const framework: { name: string; source: string; span: SourceSpan }[] = [];
 	const navigates: SourceSpan[] = [];
@@ -424,7 +582,7 @@ export function scriptFunctionOf(
 	const replaced = new Map<AnyNode, AnyNode>();
 	const unsupported: { construct: string; span: SourceSpan }[] = [];
 	const moduleNames = new Set<string>();
-	const usedImports = new Map<string, { slot: number; name: string | null }>();
+	const usedImports = new Map<string, { slot: number; name: string | null; members?: string[] }>();
 	for (let index = 0; index < parts.length; index++) {
 		const part = parts[index]!;
 		const dead = deadIn(part);
@@ -453,7 +611,7 @@ export function scriptFunctionOf(
 				devices.push({ call: device[0], span: spanOf(node as never, filename) });
 				continue;
 			}
-			if (entry?.specifier.startsWith(FRAMEWORK_PREFIX)) {
+			if (entry && isFrameworkImport(entry.specifier)) {
 				framework.push({
 					name: reference.name,
 					source: entry.specifier,
@@ -465,9 +623,18 @@ export function scriptFunctionOf(
 			if (imported) {
 				replaced.set(node, imported);
 				const slot = imports.record(binding)!;
-				usedImports.set(`${slot.index}\0${slot.name}`, {
+				const key = `${slot.index}\0${slot.name}`;
+				// `toaster.say(...)`: only the members read reach the script, so a namespace's other exports stay out.
+				const member = memberReadOn(semantic, node);
+				const known = usedImports.get(key);
+				const members =
+					(known === undefined || known.members !== undefined) && member !== undefined
+						? [...new Set([...(known?.members ?? []), member])]
+						: undefined;
+				usedImports.set(key, {
 					slot: slot.index,
 					name: slot.name,
+					...(members ? { members } : {}),
 				});
 				continue;
 			}
@@ -508,11 +675,17 @@ export function scriptFunctionOf(
 				(known === undefined || known.calledOnly !== undefined) && method !== undefined
 					? [...new Set([...(known?.calledOnly ?? []), method])]
 					: undefined;
+			const memberRead = memberReadOn(semantic, node);
+			const membersOnly =
+				(known === undefined || known.membersOnly !== undefined) && memberRead !== undefined
+					? [...new Set([...(known?.membersOnly ?? []), memberRead])]
+					: undefined;
 			names.set(binding.name, {
 				name: binding.name,
 				written: (known?.written ?? false) || reference.isWrite,
 				span: known?.span ?? spanOf(node as never, filename),
 				...(calledOnly ? { calledOnly } : {}),
+				...(membersOnly ? { membersOnly } : {}),
 			});
 		}
 	}
@@ -621,7 +794,8 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 			if (dead.some((branch) => within(at as never, branch as never))) continue;
 			const binding = reference.binding;
 			if (!binding) {
-				globals.push(globalOf(semantic, reference, filename));
+				const global = globalOf(semantic, reference, filename);
+				globals.push(insideFunction(semantic, at, range) ? { ...global, deferred: true } : global);
 				continue;
 			}
 			const entry = importOf(semantic, binding);
@@ -637,7 +811,7 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 				devices.push({ call: device[0], span: spanOf(at as never, filename) });
 				continue;
 			}
-			if (entry?.specifier.startsWith(FRAMEWORK_PREFIX)) {
+			if (entry && isFrameworkImport(entry.specifier)) {
 				framework.push({
 					name: reference.name,
 					source: entry.specifier,
@@ -740,7 +914,7 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 		describe(declaration, declares, declares.length === 0);
 	}
 	for (const entry of semantic.exports) {
-		if (entry.typeOnly || entry.specifier?.startsWith(FRAMEWORK_PREFIX)) continue;
+		if (entry.typeOnly || (entry.specifier && isFrameworkImport(entry.specifier))) continue;
 		if (entry.kind === 'named') {
 			if (
 				!entry.local ||
@@ -806,6 +980,23 @@ function nodeOver(semantic: ModuleSemantics, span: { readonly start: number; rea
 export function scriptFactsOf(source: string, filename: string) {
 	const semantic = moduleSemantics(source, filename);
 	let module: SemanticScriptModule | undefined;
+	/** The first argument of the framework call (`computed(...)`, `state(...)`) bound to `name` in `component`. */
+	const frameworkArgument = (component: string | undefined, name: string): AnyNode | undefined => {
+		for (const binding of semantic.bindings) {
+			if (binding.name !== name) continue;
+			const declaring = declaringNode(semantic, binding);
+			if (declaring?.type !== 'VariableDeclarator' || !isFrameworkCall(semantic, declaring.init as AnyNode)) continue;
+			let owner: string | undefined;
+			for (const node of semantic.ancestors(declaring as never) as Iterable<AnyNode>)
+				if (isComponent(node)) {
+					owner = String((node.id as AnyNode | undefined)?.name);
+					break;
+				}
+			if ((owner ?? '') !== (component ?? '')) continue;
+			return ((declaring.init as AnyNode).arguments as AnyNode[] | undefined)?.[0];
+		}
+		return undefined;
+	};
 	return {
 		/** A handler written at `span`: an inline function, or the name of one. */
 		handler: (span: SourceSpan): SemanticScriptFunction | undefined => {
@@ -831,23 +1022,20 @@ export function scriptFactsOf(source: string, filename: string) {
 				if (node.type === 'JSXForExpression') return scriptFunctionOf(node.right as AnyNode, semantic, filename, true);
 			return undefined;
 		},
+		/** The function a `computed(...)` is given, written at `span` (a shared factory's returned `path: computed(...)`). */
+		computedAt: (span: SourceSpan): SemanticScriptFunction | undefined => {
+			const node = nodeOver(semantic, span);
+			return node && scriptFunctionOf(node, semantic, filename);
+		},
 		/** The function of `computed(...)` bound to `name` in `component` (module level when there is none). */
 		computed: (component: string | undefined, name: string): SemanticScriptFunction | undefined => {
-			for (const binding of semantic.bindings) {
-				if (binding.name !== name) continue;
-				const declaring = declaringNode(semantic, binding);
-				if (declaring?.type !== 'VariableDeclarator' || !isFrameworkCall(semantic, declaring.init as AnyNode)) continue;
-				let owner: string | undefined;
-				for (const node of semantic.ancestors(declaring as never) as Iterable<AnyNode>)
-					if (isComponent(node)) {
-						owner = String((node.id as AnyNode | undefined)?.name);
-						break;
-					}
-				if ((owner ?? '') !== (component ?? '')) continue;
-				const [fn] = ((declaring.init as AnyNode).arguments as AnyNode[] | undefined) ?? [];
-				return fn && scriptFunctionOf(fn, semantic, filename);
-			}
-			return undefined;
+			const fn = frameworkArgument(component, name);
+			return fn && scriptFunctionOf(fn, semantic, filename);
+		},
+		/** The first value of `state(...)` bound to `name` in `component` (module level when there is none), as a value. */
+		stateSeed: (component: string | undefined, name: string): SemanticScriptFunction | undefined => {
+			const seed = frameworkArgument(component, name);
+			return seed && scriptFunctionOf(seed, semantic, filename, true);
 		},
 		/**
 		 * A call to `name`, a function this module declares or imports from app code, with the arguments the caller passes as

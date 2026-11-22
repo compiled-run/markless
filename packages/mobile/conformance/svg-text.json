@@ -1,0 +1,336 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:quarter",
+				"name": "quarter",
+				"initial": 3
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Sales chart"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Next quarter"
+					}
+				]
+			},
+			{
+				"kind": "branch",
+				"id": "branch-site:0",
+				"parent": "h0",
+				"test": {
+					"binary": "===",
+					"left": {
+						"cell": "state:quarter"
+					},
+					"right": {
+						"literal": 3
+					}
+				},
+				"arms": 2
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "svg",
+				"parent": "h0",
+				"attributes": {
+					"viewBox": "0 0 200 80",
+					"width": "200",
+					"height": "80"
+				},
+				"drawing": {
+					"viewBox": [
+						0,
+						0,
+						200,
+						80
+					],
+					"width": 200,
+					"height": 80,
+					"shapes": [
+						{
+							"path": [
+								0,
+								0,
+								0,
+								1,
+								200,
+								0,
+								1,
+								200,
+								80,
+								1,
+								0,
+								80,
+								4
+							],
+							"fill": {
+								"r": 238,
+								"g": 238,
+								"b": 255,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						},
+						{
+							"path": [],
+							"fill": {
+								"r": 34,
+								"g": 34,
+								"b": 85,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 0,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4,
+							"text": {
+								"anchor": "middle",
+								"baseline": "middle",
+								"runs": [
+									{
+										"text": "Sales up ",
+										"x": 100,
+										"y": 45,
+										"size": 18,
+										"weight": 400,
+										"letterSpacing": 0,
+										"fill": {
+											"r": 34,
+											"g": 34,
+											"b": 85,
+											"alpha": 255
+										}
+									},
+									{
+										"text": "12%",
+										"size": 18,
+										"weight": 700,
+										"letterSpacing": 0,
+										"fill": {
+											"r": 0,
+											"g": 136,
+											"b": 0,
+											"alpha": 255
+										}
+									}
+								]
+							}
+						}
+					],
+					"label": "Sales up 12%"
+				},
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "svg",
+				"parent": "h0",
+				"attributes": {
+					"viewBox": "0 0 200 80",
+					"width": "200",
+					"height": "80"
+				},
+				"drawing": {
+					"viewBox": [
+						0,
+						0,
+						200,
+						80
+					],
+					"width": 200,
+					"height": 80,
+					"shapes": [
+						{
+							"path": [
+								0,
+								0,
+								0,
+								1,
+								200,
+								0,
+								1,
+								200,
+								80,
+								1,
+								0,
+								80,
+								4
+							],
+							"fill": {
+								"r": 255,
+								"g": 238,
+								"b": 238,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						},
+						{
+							"path": [],
+							"fill": {
+								"r": 85,
+								"g": 34,
+								"b": 34,
+								"alpha": 255
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 0,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4,
+							"text": {
+								"anchor": "start",
+								"baseline": "alphabetic",
+								"runs": [
+									{
+										"text": "Q4 forecast",
+										"x": 10,
+										"y": 50,
+										"size": 16,
+										"weight": 400,
+										"family": "serif",
+										"letterSpacing": 0,
+										"fill": {
+											"r": 85,
+											"g": 34,
+											"b": 34,
+											"alpha": 255
+										}
+									}
+								]
+							}
+						}
+					],
+					"label": "Q4 forecast"
+				},
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 1
+				}
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:quarter",
+						"value": {
+							"if": {
+								"binary": "===",
+								"left": {
+									"cell": "state:quarter"
+								},
+								"right": {
+									"literal": 3
+								}
+							},
+							"whenTrue": {
+								"literal": 4
+							},
+							"whenFalse": {
+								"literal": 3
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Sales chart"
+		],
+		[
+			"h2:text0",
+			"Next quarter"
+		]
+	],
+	"initialArms": [
+		[
+			"branch-site:0",
+			0
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 1
+				}
+			]
+		}
+	]
+}

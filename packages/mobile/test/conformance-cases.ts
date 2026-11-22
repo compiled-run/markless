@@ -1,4 +1,4 @@
-import type { NativeAction, NativeAppAction } from '../src/index.ts';
+import type { NativeAction, NativeAppAction, NativeElementBox } from '../src/index.ts';
 import type { DeviceAppConfig } from '../src/permissions.ts';
 import { nodeScriptHost } from '../src/node-engine.ts';
 
@@ -22,6 +22,8 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	readonly params?: Readonly<Record<string, string>>;
 	/** What the device's clock reads, for a component that reads it. */
 	readonly now?: number;
+	/** Each measured element's box and direction, for a script that measures. */
+	readonly layout?: Readonly<Record<string, NativeElementBox>>;
 	/** The app config's usage text, for a component that uses a device feature that asks. */
 	readonly device?: DeviceAppConfig;
 	/** The device's preferred languages, when the vector shows a message in one. */
@@ -44,6 +46,68 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [
 			{ event: 'animationstart', host: 'h1', animationName: 'close', elapsedTime: 0 },
 			{ event: 'animationend', host: 'h1', animationName: 'close', elapsedTime: 0.25 },
+		],
+	},
+	{
+		// A component's `value={prop}` that never changes leaves the typed text in the field.
+		name: 'component-input-value',
+		fixture: 'proofs/u120-component-input-value/App.tsrx',
+		actions: [
+			{ event: 'input', host: 'component-edge:0/h0', value: 'Groceries' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		// A handler's matchMedia answers from the device's settings, which a conformance run fixes at the web's defaults.
+		name: 'match-media',
+		fixture: 'proofs/u125-match-media/App.tsrx',
+		actions: [{ event: 'activate', host: 'h2' }],
+	},
+	{
+		// A class that follows state keeps the module's style scope class around it, as the web writes it.
+		name: 'class-scope',
+		fixture: 'proofs/r161-class-scope/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		// A class a helper computes in JavaScript, with the style scope around it.
+		name: 'class-script',
+		fixture: 'proofs/r154-class-script/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
+		name: 'infinite-bounds',
+		fixture: 'proofs/r159-infinite-bounds/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+		],
+	},
+	{
+		name: 'style-slots',
+		fixture: 'test/fixtures/StyleSlots.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'style-cases',
+		fixture: 'test/fixtures/StyleCases.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h3' },
 		],
 	},
 	{
@@ -362,6 +426,67 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'dialog-close',
+		fixture: 'proofs/u72-dialog-close/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'cancel', host: 'h5' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h8' },
+		],
+	},
+	{
+		name: 'tap-mouse',
+		fixture: 'proofs/u73-tap-mouse/App.tsrx',
+		actions: [
+			{ event: 'pointerdown', host: 'h3', x: 20, y: 40 },
+			{ event: 'pointerup', host: 'h3', x: 20, y: 40 },
+			{ event: 'pointerdown', host: 'h4', x: 20, y: 80 },
+			{ event: 'pointerup', host: 'h4', x: 20, y: 80 },
+			{ event: 'pointerdown', host: 'h4', x: 20, y: 80 },
+			{ event: 'pointerup', host: 'h4', x: 20, y: 80 },
+			{ event: 'pointerdown', host: 'h3', x: 20, y: 40 },
+			{ event: 'pointercancel', host: 'h3', x: 20, y: 90 },
+			{ event: 'pointerdown', host: 'h3', x: 20, y: 40 },
+			{ event: 'pointerup', host: 'h3', x: 20, y: 40 },
+		],
+	},
+	{
+		name: 'mouse-fields',
+		fixture: 'test/fixtures/MouseFields.tsrx',
+		actions: [
+			{ event: 'pointerdown', host: 'h1', x: 30, y: 12 },
+			{ event: 'pointerup', host: 'h1', x: 30, y: 12 },
+			{ event: 'pointerdown', host: 'h2', x: 44, y: 50 },
+			{ event: 'pointerup', host: 'h2', x: 44, y: 50 },
+		],
+	},
+	{
+		name: 'svg-text',
+		fixture: 'proofs/u74-svg-text/App.tsrx',
+		actions: [{ event: 'activate', host: 'h2' }],
+	},
+	{
+		name: 'svg-aspect',
+		fixture: 'proofs/u75-svg-aspect/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h2' },
+		],
+	},
+	{
+		name: 'svg-clip',
+		fixture: 'proofs/u76-svg-clip/App.tsrx',
+		actions: [{ event: 'activate', host: 'h2' }],
+	},
+	{
+		name: 'svg-markers',
+		fixture: 'proofs/u77-svg-markers/App.tsrx',
+		actions: [{ event: 'activate', host: 'h2' }],
+	},
+	{
 		name: 'types',
 		fixture: 'test/fixtures/Types.tsrx',
 		actions: [
@@ -528,6 +653,136 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'fieldset',
+		fixture: 'proofs/f12-fieldset/App.tsrx',
+		actions: [
+			{ event: 'input', host: 'h5', value: 'Ann' },
+			{ event: 'input', host: 'h8', value: 'Oslo' },
+			{ event: 'activate', host: 'h9' },
+		],
+	},
+	{
+		name: 'row-element-facts',
+		fixture: 'test/fixtures/RowElementFacts.tsrx',
+		actions: [
+			{ event: 'pointerdown', host: 'h2@b' },
+			{ event: 'pointerup', host: 'h2@b' },
+			{ event: 'pointerdown', host: 'h2@a' },
+			{ event: 'pointerup', host: 'h2@a' },
+		],
+	},
+	{
+		// A root given no value holds its default (null, not undefined), which its part then writes.
+		name: 'absent-default',
+		fixture: 'proofs/u84-absent-default/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:1/h3' },
+			{ event: 'activate', host: 'component-edge:1/h3' },
+		],
+	},
+	{
+		// Children projected into both arms of an @if: the shown arm's copy answers its tap and holds the handle.
+		name: 'projected-arms',
+		fixture: 'proofs/u85-projected-arms/App.tsrx',
+		modules: true,
+		actions: [{ event: 'activate', host: 'copy-1/component-edge:2/h6' }],
+	},
+	{
+		// A JavaScript click handler's press count: 1 for a tap, 0 for a click() a script raised.
+		name: 'click-detail',
+		fixture: 'proofs/u86-click-detail/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h1' },
+		],
+	},
+	{
+		// A KeyboardEvent a script dispatches runs the element's keydown handler with its key.
+		name: 'script-dispatch-keys',
+		fixture: 'proofs/u87-script-keys/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		// A JavaScript pointer handler's pressure (0.5 while the finger is down, 0 once it lifts) and coalesced moves.
+		name: 'pointer-pressure',
+		fixture: 'proofs/u89-pointer-pressure/App.tsrx',
+		actions: [
+			{ event: 'pointerdown', host: 'h1', x: 10, y: 10 },
+			{ event: 'pointermove', host: 'h1', x: 60, y: 10 },
+			{ event: 'pointerup', host: 'h1', x: 60, y: 10 },
+		],
+	},
+	{
+		name: 'by-id',
+		fixture: 'test/fixtures/ById.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h3@c' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+		],
+	},
+	{
+		name: 'arm-handles',
+		fixture: 'test/fixtures/ArmHandles.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
+		name: 'object-spread',
+		fixture: 'test/fixtures/ObjectSpread.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h6' },
+			{ event: 'input', host: 'h5', value: 'Di' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h8' },
+		],
+	},
+	{
+		name: 'dom-classes',
+		fixture: 'test/fixtures/DomClasses.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		name: 'roster-place',
+		fixture: 'proofs/u78-roster-place/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:3/h4' },
+			{ event: 'activate', host: 'component-edge:3/h4' },
+		],
+	},
+	{
+		name: 'custom-elements',
+		fixture: 'proofs/u70-custom-elements/App.tsrx',
+		actions: [{ event: 'activate', host: 'h6' }],
+	},
+	{
+		name: 'fieldset-disabled',
+		fixture: 'proofs/f13-fieldset-disabled/App.tsrx',
+		actions: [
+			{ event: 'input', host: 'h5', value: 'Red' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h6' },
+		],
+	},
+	{
 		name: 'form-arms',
 		fixture: 'test/fixtures/FormArms.tsrx',
 		actions: [
@@ -568,6 +823,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h7' },
 			{ event: 'activate', host: 'h6' },
 			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
+		name: 'radio-follows',
+		fixture: 'proofs/r163-radio-follows/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'component-edge:4/h5' },
+			{ event: 'activate', host: 'component-edge:7/h5' },
 		],
 	},
 	{
@@ -729,6 +993,33 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// taglist's field: its key, input and paste handlers run as JavaScript, reading the key and the pasted text, and the
+		// Enter they prevent is journalled; a tag's click reads its press count.
+		name: 'script-event-fields',
+		fixture: 'proofs/u41-taglist/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'input', host: 'component-edge:4/h3', value: 'milk' },
+			{ event: 'keydown', host: 'component-edge:4/h3', key: 'Enter' },
+			{ event: 'input', host: 'component-edge:4/h3', value: 'sugar,' },
+			{ event: 'paste', host: 'component-edge:4/h3', text: 'salt,pepper' },
+			{ event: 'keydown', host: 'component-edge:4/h3', key: 'Backspace' },
+			{ event: 'activate', host: 'component-edge:2/h4@tea', detail: 1 },
+		],
+	},
+	{
+		// A press adds document listeners: the moves bubble to them after the element's own handlers, and the lift removes them.
+		name: 'document-listeners',
+		fixture: 'test/fixtures/DocumentListeners.tsrx',
+		actions: [
+			{ event: 'pointerdown', host: 'h1', pointerId: 1, x: 20, y: 40, time: 1000 },
+			{ event: 'pointermove', host: 'h1', pointerId: 1, x: 20, y: 60, time: 1016 },
+			{ event: 'pointermove', host: 'h1', pointerId: 1, x: 20, y: 90, time: 1032 },
+			{ event: 'pointerup', host: 'h1', pointerId: 1, x: 20, y: 90, time: 1048 },
+			{ event: 'pointerdown', host: 'h1', pointerId: 2, x: 20, y: 40, time: 2000 },
+		],
+	},
+	{
 		name: 'script-keys',
 		fixture: 'test/fixtures/ScriptKeys.tsrx',
 		actions: [
@@ -851,6 +1142,154 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A tap on each child of the card, its handler reading the event's elements as proxies.
+		name: 'pointer-elements',
+		fixture: 'proofs/u62-pointer-elements/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'pointerdown', host: 'h3' },
+			{ event: 'pointerup', host: 'h3' },
+			{ event: 'pointerdown', host: 'h5' },
+			{ event: 'pointerup', host: 'h5' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'pointerdown', host: 'h4' },
+			{ event: 'pointerup', host: 'h4' },
+		],
+	},
+	{
+		// A CustomEvent, click() and a PointerEvent dispatched from JavaScript, each raised on its element after the script.
+		name: 'script-events',
+		fixture: 'proofs/u63-script-events/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h11' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h7' },
+		],
+	},
+	{
+		// A tap's click reports where the touch came up; a click a script raised is untrusted at 0, 0; one no touch made is at 0, 0.
+		name: 'click-fields',
+		fixture: 'proofs/u65-click-fields/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'pointerdown', host: 'h2', pointerId: 1, x: 40, y: 120, time: 1000 },
+			{ event: 'pointerup', host: 'h2', pointerId: 1, x: 44, y: 122, time: 1080 },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'pointerdown', host: 'h3', pointerId: 2, x: 60, y: 200, time: 2000 },
+			{ event: 'pointerup', host: 'h3', pointerId: 2, x: 60, y: 200, time: 2080 },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h2' },
+		],
+	},
+	{
+		// First values the build cannot know, taken when the screen opens: from JavaScript, from another seeded cell, and from a
+		// prop that follows state, which the child keeps after the prop moves, as its body ran once.
+		name: 'state-seeds',
+		fixture: 'proofs/u66-state-seeds/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'h7' },
+		],
+	},
+	{
+		// Each row shows its own @if arm, from its own item: a press in one row flips that row's arm alone.
+		name: 'row-arms',
+		fixture: 'proofs/u67-row-arms/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5@a' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h5@b' },
+		],
+	},
+	{
+		// A number field: below min, off its step, text that is no number (submitted empty), above max, then a valid save.
+		name: 'number-fields',
+		fixture: 'proofs/f11-number/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'input', host: 'h3', value: '3' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'input', host: 'h3', value: '15.5' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'input', host: 'h3', value: '1e' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'input', host: 'h3', value: '18' },
+			{ event: 'input', host: 'h4', value: '12' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'input', host: 'h4', value: '1.2' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'input', host: 'h4', value: '2.5' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		// A @for whose rows are a component gets its list as JavaScript when data cannot run it, once the screen opens.
+		name: 'component-rows',
+		fixture: 'proofs/u68-component-rows/App.tsrx',
+		modules: true,
+		actions: [{ event: 'activate', host: 'h4' }],
+	},
+	{
+		// A component an @if arm shows, and state written in the arm, start over each time the arm shows; one outside keeps its state.
+		name: 'arm-state',
+		fixture: 'proofs/u69-arm-state/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h0' },
+			{ event: 'activate', host: 'component-edge:1/h0' },
+			{ event: 'activate', host: 'component-edge:1/h0' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'component-edge:1/h0' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		// A component an @if arm shows takes its first value from its props each time the arm opens.
+		name: 'arm-seed',
+		fixture: 'proofs/u71-arm-seed/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'component-edge:0/h2' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h6' },
+		],
+	},
+	{
+		name: 'dismiss-detail',
+		fixture: 'proofs/u60-dismiss-detail/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'pointerdown', host: 'h5' },
+			{ event: 'pointerup', host: 'h5' },
+			{ event: 'pointerdown', host: 'h3' },
+			{ event: 'pointerup', host: 'h3' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'pointerdown', host: 'h2' },
+			{ event: 'pointerup', host: 'h2' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'dismiss', host: 'h4', reason: 'escape' },
+		],
+	},
+	{
+		name: 'active-element',
+		fixture: 'proofs/u64-active-element/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
 		name: 'shared-methods',
 		fixture: 'test/fixtures/SharedMonth.tsrx',
 		actions: [
@@ -878,6 +1317,37 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h5' },
 			{ event: 'activate', host: 'component-edge:1/h1' },
 			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		// qr-code: the svg's viewBox and its path's outline follow the code's value; the engine turns each into numbers.
+		name: 'live-drawing',
+		fixture: 'proofs/u42-qr-code/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
+		name: 'element-measure',
+		fixture: 'test/fixtures/TrackMeasure.tsrx',
+		layout: {
+			h1: { x: 20, y: 40, width: 320, height: 24, direction: 'ltr' },
+			h2: { x: 20, y: 80, width: 320, height: 24, direction: 'rtl' },
+		},
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		name: 'script-clock-errors',
+		fixture: 'test/fixtures/ClockAndErrors.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
 		],
 	},
 	{
@@ -1386,6 +1856,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h3' },
 		],
 	},
+	{
+		// Long presses as Chrome on Android raises `contextmenu`: on a row's inner element, it reaches the row then the list;
+		// on the list itself; on an element whose handler runs as JavaScript.
+		name: 'contextmenu',
+		fixture: 'test/fixtures/ContextMenu.tsrx',
+		actions: [
+			{ event: 'contextmenu', host: 'h4@Apple', x: 40, y: 120, time: 900 },
+			{ event: 'contextmenu', host: 'h2', x: 10, y: 5, time: 1500 },
+			{ event: 'contextmenu', host: 'h5', x: 52.5, y: 300, time: 2000 },
+			{ event: 'contextmenu', host: 'h4@Pear', x: 41, y: 160, time: 2600 },
+		],
+	},
 ];
 
 /** Each committed navigation vector file: a navigation rung's app, the path it opens at and the actions it records. */
@@ -1418,6 +1900,18 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// Each screen has its own runtime over the device's one store: Back shows the screen below the storage() value a
+		// screen above wrote, with its texts and arms following.
+		name: 'storage-back',
+		app: 'proofs/u227-storage-back',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'back' },
+		],
+	},
+	{
 		name: 'navigation-replace',
 		app: 'proofs/n3-navigate',
 		open: '/',
@@ -1435,6 +1929,34 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'back' },
 			{ event: 'back' },
 			{ event: 'activate', host: 'component-edge:0' },
+		],
+	},
+	{
+		// An app-scoped shared() is one copy for every screen: the second screen reads what the first wrote, and Back shows
+		// the first screen the copy as the second left it.
+		name: 'app-shared-player',
+		app: 'proofs/n7-app-shared',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h2' },
+			{ event: 'activate', host: 'component-edge:1' },
+			{ event: 'activate', host: 'component-edge:0/h2' },
+			{ event: 'back' },
+		],
+	},
+	{
+		// A plain <a href> to one of the app's pages opens it in place with its params, as a <Link> does.
+		name: 'plain-links',
+		app: 'proofs/n6-plain-links',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'back' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'back' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'back' },
 		],
 	},
 	{

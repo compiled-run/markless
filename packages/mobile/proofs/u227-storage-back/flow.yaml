@@ -1,0 +1,40 @@
+appId: ${APP_ID}
+name: u227-storage-back
+---
+- launchApp:
+      clearState: true
+- assertVisible: Home page
+- assertVisible: Home kept 0
+- assertVisible: Next is 1
+- assertVisible: Nothing kept yet
+- assertVisible: Open bump
+- assertVisible: Home
+- tapOn: Open bump
+- assertVisible: Bump
+- assertVisible: Bump page
+- assertVisible: Bump kept 0
+- assertVisible: Bump it
+- assertVisible: Bump
+- tapOn: Bump it
+- assertNotVisible: Bump kept 0
+- assertVisible: Bump kept 1
+- assertNotVisible: Bump kept 0
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertVisible: Home
+- assertVisible: Home page
+- assertVisible: Home kept 1
+- assertVisible: Next is 2
+- assertNotVisible: Home kept 0
+- assertNotVisible: Next is 1
+- assertNotVisible: Nothing kept yet
+- assertVisible: Home

@@ -133,10 +133,22 @@
 		]
 	},
 	"initial": [
-		["h1:text0", "Panel"],
-		["h2:text0", "none"]
+		[
+			"h1:text0",
+			"Panel"
+		],
+		[
+			"h2:text0",
+			"none"
+		]
 	],
-	"initialAttributes": [["h1", "hidden", null]],
+	"initialAttributes": [
+		[
+			"h1",
+			"hidden",
+			null
+		]
+	],
 	"steps": [
 		{
 			"action": {
