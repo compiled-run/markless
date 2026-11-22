@@ -3975,6 +3975,26 @@ export function Note() @{
 	]);
 });
 
+it('reads a default import of an asset as the URL the build gives it, in markup and in phone JavaScript', async () => {
+	const asked: string[] = [];
+	const { payload, diagnostics } = await nativeView(
+		`import logo from './logo.png';
+export function Header() @{
+	<main>
+		<img src={logo} alt="Logo" />
+		<button onClick={() => console.log(logo)}>Log</button>
+	</main>
+}`,
+		{ assetImport: (specifier) => (asked.push(specifier), `/@markless-asset/${specifier.slice(2)}`) },
+	);
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	expect(asked).toContain('./logo.png');
+	const img = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'img');
+	if (img?.kind !== 'element') throw new Error('no img');
+	expect(img.bindings).toEqual([{ attribute: 'src', value: { literal: '/@markless-asset/logo.png' } }]);
+	expect(payload!.script?.source).toContain('{ "default": "/@markless-asset/logo.png" }');
+});
+
 describe('linked stylesheets', () => {
 	const source = `export function Page() @{
 	<main>
@@ -4057,6 +4077,24 @@ export function App() @{
 		expect(code).not.toMatch(/\bclass\s+Bits/);
 		expect(code).toContain('Bits.prototype.add = function');
 		expect(code).toContain('this.bits = []');
+	});
+
+	it("lowers a class's getters and setters to definitions on its prototype and on itself", async () => {
+		const { payload, diagnostics } = await nativeView(
+			source('class Bits {\n\tget size() { return this.bits.length; }\n\tset size(n: number) { this.bits.length = n; }\n\tstatic get kind() { return 1; }'),
+		);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		const code = payload!.script!.source;
+		expect(code).not.toMatch(/\bclass\s+Bits/);
+		expect(code).toContain('Object["defineProperty"](Bits.prototype, "size", { get: function');
+		expect(code).toContain('}, enumerable: false, configurable: true });\n Object["defineProperty"](Bits, "kind", { get: function');
+	});
+
+	it('refuses a getter or setter with a computed name', async () => {
+		const { diagnostics } = await nativeView(source("class Bits {\n\tget ['size']() { return this.bits.length; }"));
+		expect(diagnostics.map((diagnostic) => diagnostic.message).join('\n')).toContain(
+			'a class getter or setter with a computed name, which Hermes cannot run',
+		);
 	});
 
 	it('refuses a class it cannot lower, naming why', async () => {

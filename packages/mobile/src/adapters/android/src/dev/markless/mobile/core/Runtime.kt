@@ -254,6 +254,9 @@ data class Row(val key: String, val item: JsValue)
 /** Each screen's async values run under their own number in an engine the app's screens share. */
 private var screens = 0
 
+/** A pointer run that is the document's, not an element handler's. */
+private const val DOCUMENT_RUN = "\u0000document:"
+
 class Runtime(
 	val payload: Payload,
 	private val store: Store = MemoryStore(),
@@ -499,6 +502,8 @@ class Runtime(
 
 	/** The screen's views: the box of an element (its node id, `<node>@<key>` in a row) a script reads, measured as an entry begins; null when it has no view. */
 	var measure: ((id: String) -> ElementBox?)? = null
+	/** The device's answers to the media features a script's `matchMedia` reads, read as each entry begins; the web's defaults when the host gives none. */
+	var media: () -> List<Pair<String, String>> = { listOf("prefers-reduced-motion" to "no-preference", "prefers-color-scheme" to "light") }
 
 	/** Called with each engine entry's duration in nanoseconds, including starting the engine when the entry had to. */
 	var onScriptEntry: ((nanos: Long) -> Unit)? = null
@@ -631,7 +636,7 @@ class Runtime(
 		return facts.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value}" }
 	}
 
-	/** Every current value by slot, the seed `crypto` draws from when the script uses it, and the route params for `navigate`. */
+	/** Every current value by slot, the seed `crypto` draws from when the script uses it, the route params for `navigate`, and the device's media answers for `media`. */
 	private fun entryCells(): String = buildString {
 		append(",\"cells\":")
 		append(values.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonValue(it.value)}" })
@@ -642,12 +647,25 @@ class Runtime(
 		if (payload.script?.services?.contains("crypto") == true) scriptHost?.seed()?.let { append(",\"seed\":${jsonString(it)}") }
 		if (payload.script?.services?.contains("navigate") == true)
 			append(",\"params\":" + params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" })
+		if (payload.script?.services?.contains("media") == true)
+			append(",\"media\":" + media().joinToString(",", "{", "}") { "${jsonString(it.first)}:${jsonString(it.second)}" })
 	}
 
 	/** Submissions held by a script promise not settled yet, by the engine's run number. */
 	private val scriptRuns = HashMap<Int, Submission>()
 
 	/** One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries, in that order. */
+	/** A pointer event bubbled to the document's listeners: its plain fields, and the elements it names as proxies. */
+	private fun document(type: String, fields: Map<String, JsValue>): List<JournalEntry> {
+		val plain = listOf("button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp")
+			.mapNotNull { f -> fields[f]?.let { ",${jsonString(f)}:${jsonValue(it)}" } }.joinToString("")
+		val target = (fields["target"] as? JsValue.Str)?.value
+		val related = (fields["relatedTarget"] as? JsValue.Str)?.value
+		val nodes = ",\"nodes\":{\"target\":${target?.let(::jsonString) ?: "null"},\"currentTarget\":null,\"relatedTarget\":${related?.let(::jsonString) ?: "null"}}"
+		val watched = documentElements.sorted() + listOfNotNull(target)
+		return enter("\"kind\":\"document\",\"event\":{\"type\":${jsonString(type)}$plain$nodes},\"elements\":${elementFacts(emptyMap(), Scope.EMPTY, watched)}")
+	}
+
 	private fun enter(fields: String, submission: Submission? = null): List<JournalEntry> {
 		// A handler may read the focused element; a computed, which renders, never does, so only entries carry it.
 		val focus = focused?.takeIf { it != NATIVE_DOCUMENT_BODY }?.let { ",\"focused\":${jsonString(it)},\"focusElements\":${elementFacts(emptyMap(), Scope.EMPTY, listOf(it))}" } ?: ""
@@ -668,6 +686,8 @@ class Runtime(
 			unset.remove(slot)
 			storageKeys[cell]?.let { store.set(it, v) }
 		}
+		result["listening"]?.let { l -> documentListening.clear(); l.arr("leave().listening").forEach { documentListening.add(it.str("leave().listening[]")) } }
+		result["watch"]?.arr("leave().watch")?.forEach { documentElements.add(it.str("leave().watch[]")) }
 		for (l in list("logs")) {
 			val pair = l.arr("leave().logs[]")
 			val level = pair[0].str("leave().logs[][0]")
@@ -732,6 +752,8 @@ class Runtime(
 			} +
 			// A key or paste handler called preventDefault() before it first awaited.
 			(if ((result["prevented"] as? Json.Bool)?.value == true) listOf(JournalEntry.PreventDefault) else emptyList()) +
+			// An input handler that set its field's value (`event.target.value = …`) writes the field, as the DOM's setter does.
+			listOfNotNull(typing?.let { field -> result["value"]?.str("leave().value")?.let { text -> edited[field] = text; JournalEntry.Property(field, "value", text) } }) +
 			raised +
 			listOfNotNull(result["navigate"]?.let { n ->
 				val o = n.obj("leave().navigate")
@@ -746,6 +768,11 @@ class Runtime(
 
 	/** How deep events raised from JavaScript nest now. */
 	private var raising = 0
+	/** The text field whose input event is running, which a handler's `event.target.value` write lands on. */
+	private var typing: String? = null
+	/** The event types the page's document has listeners for, and the elements those listeners may read. */
+	private val documentListening = HashSet<String>()
+	private val documentElements = HashSet<String>()
 
 	/**
 	 * An event a script dispatched on an element (or its `click()`), raised once the script returned: `click` as a press on
@@ -823,14 +850,16 @@ class Runtime(
 	}
 
 	/** Starts the async values the script computes, once the screen is built; the host applies its journal as an action's. */
-	/** The screen shows again (Back): app-scoped shared fields take the values the app holds now; the journal of what moved. */
 	fun start(): List<JournalEntry> = if (asyncCells.isEmpty()) emptyList() else change(null, null) { emptyList() }
 
-	/** The screen shows again after Back: it takes the app's values of its app-wide cells that a page above it changed. */
+	/** The screen shows again after Back: it takes the app's values of its app-wide cells and the device's of its storage cells, which a page above it may have changed. */
 	fun resume(): List<JournalEntry> {
-		val moved = payload.cells.filter { c -> c.app && session.values[c.id]?.let { it != values[c.id] } == true }
+		val moved = payload.cells.mapNotNull { c ->
+			val kept = if (c.app) session.values[c.id] else c.storageKey?.let(store::get)
+			if (kept == null || kept == values[c.id]) null else c.id to kept
+		}
 		if (moved.isEmpty()) return emptyList()
-		return change(null, null) { for (c in moved) values[c.id] = session.values.getValue(c.id); emptyList() }
+		return change(null, null) { for ((cell, value) in moved) { values[cell] = value; unset.remove(cell) }; emptyList() }
 	}
 
 	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
@@ -1430,6 +1459,8 @@ class Runtime(
 			val runs = ArrayList<Triple<String, Map<String, JsValue>, Scope?>>()
 			fun raise(type: EventName, target: String, related: String? = null) {
 				for (node in chain(target)) handlerFor(node.substringBefore('@'), type)?.let { runs.add(Triple(it, fieldsOf(type, target, node, related), null)) }
+				// The event bubbles on to the document's listeners after the element's own handlers.
+				if (type.wire in documentListening) runs.add(Triple(DOCUMENT_RUN + type.wire, fieldsOf(type, target, target, related), null))
 			}
 			/** `pointerenter` on each element [target] is in that [from] is not, outermost first; `pointerleave` the other way. */
 			fun crossing(type: EventName, target: String, from: String?, related: String?) {
@@ -1442,6 +1473,7 @@ class Runtime(
 				val taken = runs.toList()
 				runs.clear()
 				for ((id, f, at) in taken) {
+					if (id.startsWith(DOCUMENT_RUN)) { calls.addAll(document(id.removePrefix(DOCUMENT_RUN), f)); continue }
 					val handler = handlers[id] ?: throw MarklessRuntimeError("unknown handler \"$id\"")
 					val out = withFields(f) { run(handler.ops, at ?: scope) }
 					if (out.firstOrNull() is JournalEntry.Navigate) return out
@@ -1753,6 +1785,7 @@ class Runtime(
 		val bindingsBefore = ticked.associate { it.id to checkedBinding(it.id) }
 		val beforeProperties = properties().associate { (n, a, v) -> (n to a) to v }
 		if (value != null && host != null) edited[host] = value
+		typing = if (value != null) host else null
 		val beforeArms = arms().toMap()
 		val beforeRows = rows().toMap()
 		val beforeTitle = title()

@@ -299,6 +299,8 @@ final class ViewTree {
 	private let ask: (NativeAction) -> Bool
 	/// The view of a device object (a camera's preview), made by the page's device.
 	private let objectView: (_ object: String, _ device: String) throws -> UIView
+	/// The images the app packaged, by the src a page writes.
+	private let images: [String: NativeImageAsset]
 	private let nodes: [String: NativeNode]
 	/// The nodes each element, root (`""`), branch arm (`branch#index`) or list row (`repeat id`) places directly.
 	private let slots: [String: [String]]
@@ -366,13 +368,17 @@ final class ViewTree {
 	/// Each drawn checkbox (false) or radio button (true) and whether it is checked.
 	private var ticks: [String: (radio: Bool, checked: Bool)] = [:]
 	private(set) var overlays: OverlayHost!
+	/// Each box moved into its stacking parent's view, by instance id: the view it was built in and the view that followed it there.
+	private var restacked: [String: Restacked] = [:]
 
 	init(
 		runtime: NativeRuntime, layout: StyleLayout?, sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:],
 		faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void,
 		ask: @escaping (NativeAction) -> Bool = { _ in false },
-		objectView: @escaping (_ object: String, _ device: String) throws -> UIView = { object, _ in throw HostError("no device to show \(object)") }
+		objectView: @escaping (_ object: String, _ device: String) throws -> UIView = { object, _ in throw HostError("no device to show \(object)") },
+		images: [String: NativeImageAsset] = [:]
 	) throws {
+		self.images = images
 		self.runtime = runtime
 		self.objectView = objectView
 		self.layout = layout
@@ -905,6 +911,7 @@ final class ViewTree {
 
 	/// Paints a view and puts it at its frame; inside a scroll container, frames count from the scroll view's padding box.
 	private func place(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws {
+		try restack(id, view, style)
 		try paint(view, style, faces: faces)
 		if let label = view as? UILabel { drawLines(label, style) }
 		if let host = view.superview as? ContainerScrollView { view.frame.origin = CGPoint(x: view.frame.minX - host.inset.left, y: view.frame.minY - host.inset.top) }
@@ -914,6 +921,32 @@ final class ViewTree {
 		}
 		guard let s = style.scroll else { throw HostError("\(id) stopped being a scroll container after it was built") }
 		scroll.configure(s, in: view.bounds.size, cornerRadius: style.cornerRadius)
+	}
+
+	/// Moves a box whose stacking context paints it past ancestors with later siblings into the view of its `stackingParent`, where
+	/// its zPosition orders it among that context's boxes, and back to the view it was built in when it no longer is.
+	private func restack(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws {
+		guard style.frame != nil else { return }
+		if let parent = style.stackingParent {
+			guard let target = scrollViews[parent] ?? elements[parent] else { throw HostError("\(id) paints in the order of \(parent), which has no view") }
+			if view.superview === target { return }
+			if restacked[id] == nil, let home = view.superview, let at = home.subviews.firstIndex(of: view) {
+				restacked[id] = Restacked(home: home, next: at + 1 < home.subviews.count ? home.subviews[at + 1] : nil)
+			}
+			view.removeFromSuperview()
+			// After the boxes moved there that paint below it, so hit testing, which walks subviews from the last, meets the topmost first.
+			let z = style.paintOrder.map { CGFloat($0.bucket) * 100_000 + CGFloat($0.rank) + 1 } ?? 0
+			let moved = Set(restacked.keys.compactMap { elements[$0].map(ObjectIdentifier.init) })
+			if let above = target.subviews.firstIndex(where: { moved.contains(ObjectIdentifier($0)) && $0.layer.zPosition > z }) {
+				target.insertSubview(view, at: above)
+			} else {
+				target.addSubview(view)
+			}
+		} else if let place = restacked.removeValue(forKey: id) {
+			guard let home = place.home else { return }
+			view.removeFromSuperview()
+			if let next = place.next, next.superview === home { home.insertSubview(view, belowSubview: next) } else { home.addSubview(view) }
+		}
 	}
 
 	/// Draws Dragon's lines over a label in a system face while its text is the one Dragon laid out; otherwise the label draws its own.
@@ -1153,14 +1186,9 @@ final class ViewTree {
 					}
 					view = page
 				} else if element == "img" {
-					let image = UIImageView()
-					image.contentMode = .scaleAspectFit
-					image.isAccessibilityElement = true
-					image.accessibilityTraits = .image
-					if layout == nil {
-						image.widthAnchor.constraint(equalToConstant: 120).isActive = true
-						image.heightAnchor.constraint(equalToConstant: 90).isActive = true
-					}
+					let image = ImageBox()
+					// The box lays out its picture and alt text itself; the stacking layout sizes only the box.
+					leaves.insert(ObjectIdentifier(image))
 					view = image
 				} else if element == "select" {
 					if context.button != nil { throw HostError("<select> \(id) is inside a button") }
@@ -1461,6 +1489,7 @@ final class ViewTree {
 			view.removeFromSuperview()
 		}
 		contexts.removeValue(forKey: id)
+		restacked.removeValue(forKey: id)
 		templates.removeValue(forKey: id)
 		attributes.removeValue(forKey: id)
 	}
@@ -1484,9 +1513,21 @@ final class ViewTree {
 			drawing.accessibilityLabel = label
 			drawing.isAccessibilityElement = label != nil && contexts[id]?.button == nil
 			drawing.accessibilityTraits = current["aria-label"] != nil ? .image : .staticText
-		} else if let image = view as? UIImageView {
-			image.accessibilityLabel = current["aria-label"] ?? current["alt"]
-			image.image = current["src"].flatMap { URL(string: $0) }.flatMap { $0.isFileURL ? UIImage(contentsOfFile: $0.path) : nil }
+		} else if let box = view as? ImageBox {
+			let src = current["src"]
+			// A photo the device took is a `file:` URL; any other src is a file the app packaged when it was built.
+			let packaged = src.flatMap { images[$0] }
+			let image = packaged?.data.flatMap { UIImage(data: $0) }
+				?? src.flatMap { URL(string: $0) }.flatMap { $0.isFileURL ? UIImage(contentsOfFile: $0.path) : nil }
+			let natural = packaged.flatMap { p in p.width.flatMap { w in p.height.map { CGSize(width: w, height: $0) } } }
+			let length = { (name: String) in current[name].flatMap { Double($0.trimmingCharacters(in: .whitespaces)) } }
+			box.show(
+				image, drawing: packaged?.drawing, natural: natural ?? image?.size, width: length("width"), height: length("height"),
+				alt: current["alt"], sized: layout == nil)
+			if box.fillsWidth { fullWidth.insert(ObjectIdentifier(box)) } else { fullWidth.remove(ObjectIdentifier(box)) }
+			box.accessibilityLabel = current["aria-label"] ?? current["alt"]
+			// `alt=""` marks a decorative image, which a screen reader skips, as the web leaves it out of the tree.
+			box.isAccessibilityElement = current["aria-label"] != nil || current["alt"].map { !$0.isEmpty } ?? true
 		} else {
 			view.accessibilityLabel = current["aria-label"]
 		}
@@ -1858,6 +1899,16 @@ final class ViewTree {
 
 /// `<audio controls>`: a button reading "Play", or "Pause" while its file plays.
 @MainActor
+/// Where a box moved into its stacking parent's view was built: its home view and the view after it there.
+final class Restacked {
+	weak var home: UIView?
+	weak var next: UIView?
+	init(home: UIView, next: UIView?) {
+		self.home = home
+		self.next = next
+	}
+}
+
 final class AudioButton: UIButton, AVAudioPlayerDelegate {
 	private var player: AVAudioPlayer?
 	private var source: String?

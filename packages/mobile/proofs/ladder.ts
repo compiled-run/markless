@@ -12,6 +12,8 @@ export type LadderAction =
 				readonly text: string;
 				/** Leave the keyboard up afterwards, so the screenshot after the step shows what it covers. */
 				readonly keepKeyboard?: true;
+				/** Type after what the field holds instead of clearing it first: clearing presses Backspace, which a tag field reads. */
+				readonly append?: true;
 			};
 	  }
 	/**
@@ -216,6 +218,13 @@ export const engineStartsText = (starts: number): string => `engine starts: ${st
  * where any outgoing connection on the machine can already hold it.
  */
 export const ECHO_SERVER_PORT = 28761;
+/**
+ * The port an app rung's own web server listens on while the rung runs on phones (`server: 'app'`), so its `api/` routes
+ * answer at the origin its app.json names. Fixed and below the ephemeral ranges, as the echo server's.
+ */
+export const APP_SERVER_PORT = 28762;
+/** The port each test server listens on. */
+export const SERVER_PORTS = { echo: ECHO_SERVER_PORT, app: APP_SERVER_PORT } as const;
 export const callsText = (calls: readonly string[]): string =>
 	`calls: ${calls.length === 0 ? 'none' : calls.join(', ')}`;
 
@@ -250,8 +259,11 @@ export type LadderRung = {
 		/** Console errors the browser logs as part of what the rung proves (a 404 answer it loads), each once per time. */
 		readonly consoleErrors?: readonly string[];
 	};
-	/** The test runs the echo server (`ECHO_SERVER_PORT`) while the rung runs, on the web and on phones. */
-	readonly server?: 'echo';
+	/**
+	 * The test runs the echo server (`ECHO_SERVER_PORT`) while the rung runs, on the web and on phones; or, for an app rung,
+	 * the app's own web build, whose `api/` routes answer at `APP_SERVER_PORT`.
+	 */
+	readonly server?: keyof typeof SERVER_PORTS;
 	readonly steps: readonly LadderStep[];
 };
 
@@ -270,13 +282,13 @@ export const rungFolders = (): string[] =>
 /** A rung that is an app of several routes (`pages/`) rather than one screen (`App.tsrx`). */
 const isApp = (folder: string): boolean => existsSync(join(proofsDir, folder, 'pages'));
 
-/** The navigation ladder: each folder an app (`pages/`) of several routes; an `r<n>` or `j<n>` rung with `pages/` too. */
+/** The navigation ladder: each folder an app (`pages/`) of several routes; a `j<n>`, `r<n>` or `u<n>` rung with `pages/` too. */
 export const navRungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
 		.filter(
 			(entry) =>
 				entry.isDirectory() &&
-				(/^n\d+-/.test(entry.name) || (/^[jr]\d+-/.test(entry.name) && isApp(entry.name))),
+				(/^n\d+-/.test(entry.name) || (/^[jru]\d+-/.test(entry.name) && isApp(entry.name))),
 		)
 		.map((entry) => entry.name)
 		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
@@ -460,7 +472,7 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 	if ('type' in action)
 		return [
 			{ tapOn: selector(action.type.field) },
-			'eraseText',
+			...(action.type.append ? [] : ['eraseText']),
 			{ inputText: action.type.text },
 			...(action.type.keepKeyboard ? [] : ['hideKeyboard']),
 		];

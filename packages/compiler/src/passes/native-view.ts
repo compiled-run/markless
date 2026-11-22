@@ -1184,6 +1184,11 @@ export type NativeViewOptions = {
 	 * the page as the browser's load does; else the link is refused.
 	 */
 	readonly linkStylesheet?: (href: string) => boolean;
+	/**
+	 * A default import of a file the build reads as an asset (`import logo from './logo.png'`): the URL the app shows it
+	 * by, as Vite gives the web its URL; undefined when the build does not read that file.
+	 */
+	readonly assetImport?: (specifier: string, importer: string) => string | undefined;
 	/** The page's route when the module is a page: the router's pattern and its param names. */
 	readonly route?: { readonly pattern: string; readonly params: ReadonlyArray<string> };
 	/**
@@ -2776,6 +2781,8 @@ export function createNativeViewPayload(
 		{ readonly id: string; readonly module: ModuleFacts; readonly fact: SemanticScriptFunction }
 	>();
 	const scriptServices = new Set<NativeScriptService>();
+	/** A script adds listeners to the document, so the hosts report every touch for them. */
+	let documentEvents = false;
 	scriptsMakeKeys = () =>
 		[...scriptFunctions.values()].some(({ fact }) =>
 			fact.globals.some(
@@ -2872,7 +2879,8 @@ export function createNativeViewPayload(
 				Object.hasOwn(NATIVE_SCRIPT_PAGE_MEMBERS, name) &&
 				NATIVE_SCRIPT_PAGE_MEMBERS[name]!.includes(global.member)
 			) {
-				if (!rendering) continue;
+				if (name === 'document' && global.member !== 'activeElement') documentEvents = true;
+				if (!rendering || global.deferred) continue;
 				ok = false;
 				refuseScript(
 					`${what} reads \`${name}.${global.member}\` while rendering; a phone answers it only in a handler`,
@@ -2883,6 +2891,14 @@ export function createNativeViewPayload(
 			const service = Object.hasOwn(NATIVE_SCRIPT_HOST_GLOBALS, name)
 				? NATIVE_SCRIPT_HOST_GLOBALS[name]
 				: undefined;
+			if (service === 'media' && rendering) {
+				ok = false;
+				refuseScript(
+					`${what} reads \`${name}\` while rendering; a phone answers a media query only in a handler`,
+					global.span,
+				);
+				continue;
+			}
 			if (service) {
 				if (service !== 'engine') scriptServices.add(service);
 				if (Object.hasOwn(NATIVE_SCRIPT_DOM_CLASSES, name)) scriptNamesDomClasses = true;
@@ -3314,6 +3330,8 @@ export function createNativeViewPayload(
 			readonly statements: Set<number>;
 			readonly exports: Map<string, string>;
 			readonly slots: Map<number, number | null>;
+			/** Slots that import an asset (`import logo from './logo.png'`), with the URL the app shows it by. */
+			readonly assets: Map<number, string>;
 		};
 		const included = new Map<ModuleFacts, Included>();
 		const order: Included[] = [];
@@ -3335,6 +3353,7 @@ export function createNativeViewPayload(
 				statements: new Set(),
 				exports: new Map(),
 				slots: new Map(),
+				assets: new Map(),
 			};
 			included.set(module, entry);
 			order.push(entry);
@@ -3354,6 +3373,12 @@ export function createNativeViewPayload(
 			}
 			const { specifier, span } = factsOf(entry.module)!.imports[slot]!;
 			const module = moduleAt(entry.module, specifier);
+			const asset = module ? undefined : options.assetImport?.(specifier, entry.module.graph.filename);
+			if (asset !== undefined) {
+				entry.assets.set(slot, asset);
+				entry.slots.set(slot, null);
+				return undefined;
+			}
 			if (!module && missingModules.size === 0)
 				refuseScript(
 					`${where(entry.module)} imports \`${specifier}\`, which the build could not read for the phone's script`,
@@ -3495,7 +3520,10 @@ export function createNativeViewPayload(
 						entry.statements.has(index) ? [statement.code] : [],
 					),
 				].join('\n'),
-				imports: facts.imports.map((_, slot) => entry.slots.get(slot) ?? null),
+				imports: facts.imports.map((_, slot) => {
+					const asset = entry.assets.get(slot);
+					return asset !== undefined ? { asset } : (entry.slots.get(slot) ?? null);
+				}),
 				functions: [...scriptFunctions.values()]
 					.filter((fn) => fn.module === entry.module)
 					.map((fn) => ({ id: fn.id, code: fn.fact.code })),
@@ -4389,6 +4417,11 @@ export function createNativeViewPayload(
 				const constant = constantAt(scope.module, expression.name);
 				if (constant) return moduleConstant(constant, what, scope);
 				const imported = scope.module.imports.get(expression.name);
+				const asset =
+					imported?.kind === 'default'
+						? options.assetImport?.(imported.source, scope.module.graph.filename)
+						: undefined;
+				if (asset !== undefined) return { literal: asset };
 				if (imported)
 					return refuse(
 						`${what} reads \`${expression.name}\` from \`${imported.source}\`, which this build cannot read as data`,
@@ -9249,6 +9282,7 @@ export function createNativeViewPayload(
 		...(emailChecked ? { typeMismatch: NATIVE_EMAIL_MISMATCH_BY_LOCALE } : {}),
 		...(script ? { script } : {}),
 		...(tapPoints ? { tapPoints: true as const } : {}),
+		...(documentEvents ? { documentEvents: true as const } : {}),
 	});
 
 	/**

@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { allRungFolders } from '../../proofs/ladder.ts';
 import { PROOF_PLATFORMS, type ProofPlatform } from '../harness/proof-app.ts';
 import type { ProofReport } from '../harness/report.ts';
 import { affectedRungs, changedPaths, defaultBase } from './affected.ts';
-import { rungDir, writeBundle } from './bundle.ts';
+import { buildAppServer } from '../harness/app-server.ts';
+import { type BundledRung, rungDir, writeBundle } from './bundle.ts';
 import { findReused } from './reuse.ts';
 import { DEFAULT_POOL, parsePhone, phoneId, type PhoneSpec } from './pool.ts';
 import {
+	bundleRung,
 	chunkFile,
 	type Chunk,
 	daemonLog,
@@ -204,6 +206,14 @@ async function submit(argv: string[]): Promise<number> {
 			host: values.host,
 			log: (line) => console.log(`  ${line}`),
 		});
+		// An app rung that fetches its own api/ routes brings its web build, which the runner serves while the rung runs.
+		for (const dir of names.map(rungDir)) {
+			const name = basename(dir);
+			const bundled = readJson<BundledRung>(join(bundleRung(job, name), 'rung.json'));
+			if (bundled?.server !== 'app' || bundled.buildError) continue;
+			await buildAppServer(dir, join(bundleRung(job, name), 'server'));
+			console.log(`  built ${name}'s web server`);
+		}
 	} catch (error) {
 		rmSync(job, { recursive: true, force: true });
 		throw error;
@@ -222,11 +232,20 @@ async function submit(argv: string[]): Promise<number> {
 			(name) =>
 				!reused.some((pass) => pass.platform === platform && pass.result.name === name),
 		);
-		for (let at = 0; at * size < rungs.length; at++)
+		// An app rung's web server holds one fixed port while its chunk runs, so each app rung runs in a chunk of its own.
+		const servesApp = (name: string) =>
+			readJson<BundledRung>(join(bundleRung(job, name), 'rung.json'))?.server === 'app';
+		const groups: string[][] = [];
+		for (const name of rungs) {
+			const last = groups.at(-1);
+			if (last && last.length < size && !servesApp(name) && !servesApp(last[0]!)) last.push(name);
+			else groups.push([name]);
+		}
+		for (const [at, group] of groups.entries())
 			writeJson(chunkFile(job, `${platform}-${String(at).padStart(3, '0')}`), {
 				state: 'queued',
 				platform,
-				rungs: rungs.slice(at * size, (at + 1) * size),
+				rungs: group,
 				attempt: 0,
 			} satisfies Chunk);
 	}

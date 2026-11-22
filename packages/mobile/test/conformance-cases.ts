@@ -50,6 +50,12 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A handler's matchMedia answers from the device's settings, which a conformance run fixes at the web's defaults.
+		name: 'match-media',
+		fixture: 'proofs/u125-match-media/App.tsrx',
+		actions: [{ event: 'activate', host: 'h2' }],
+	},
+	{
 		// A class that follows state keeps the module's style scope class around it, as the web writes it.
 		name: 'class-scope',
 		fixture: 'proofs/r161-class-scope/App.tsrx',
@@ -979,6 +985,43 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// taglist's field: its key, input and paste handlers run as JavaScript, reading the key and the pasted text, and the
+		// Enter they prevent is journalled; a tag's click reads its press count.
+		name: 'script-event-fields',
+		fixture: 'proofs/u41-taglist/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'input', host: 'component-edge:4/h3', value: 'milk' },
+			{ event: 'keydown', host: 'component-edge:4/h3', key: 'Enter' },
+			{ event: 'input', host: 'component-edge:4/h3', value: 'sugar,' },
+			{ event: 'paste', host: 'component-edge:4/h3', text: 'salt,pepper' },
+			{ event: 'keydown', host: 'component-edge:4/h3', key: 'Backspace' },
+			{ event: 'activate', host: 'component-edge:2/h4@tea', detail: 1 },
+		],
+	},
+	{
+		// A press adds document listeners: the moves bubble to them after the element's own handlers, and the lift removes them.
+		name: 'document-listeners',
+		fixture: 'test/fixtures/DocumentListeners.tsrx',
+		actions: [
+			{ event: 'pointerdown', host: 'h1', pointerId: 1, x: 20, y: 40, time: 1000 },
+			{ event: 'pointermove', host: 'h1', pointerId: 1, x: 20, y: 60, time: 1016 },
+			{ event: 'pointermove', host: 'h1', pointerId: 1, x: 20, y: 90, time: 1032 },
+			{ event: 'pointerup', host: 'h1', pointerId: 1, x: 20, y: 90, time: 1048 },
+			{ event: 'pointerdown', host: 'h1', pointerId: 2, x: 20, y: 40, time: 2000 },
+		],
+	},
+	{
+		// A DataTransfer built in a handler and kept in a WeakMap keyed by an element, across two presses.
+		name: 'file-store',
+		fixture: 'test/fixtures/FileStore.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h2' },
+		],
+	},
+	{
 		name: 'script-keys',
 		fixture: 'test/fixtures/ScriptKeys.tsrx',
 		actions: [
@@ -1855,6 +1898,18 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'component-edge:1/h1' },
 			{ event: 'activate', host: 'component-edge:2' },
 			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'back' },
+		],
+	},
+	{
+		// Each screen has its own runtime over the device's one store: Back shows the screen below the storage() value a
+		// screen above wrote, with its texts and arms following.
+		name: 'storage-back',
+		app: 'proofs/u227-storage-back',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0' },
+			{ event: 'activate', host: 'h4' },
 			{ event: 'back' },
 		],
 	},

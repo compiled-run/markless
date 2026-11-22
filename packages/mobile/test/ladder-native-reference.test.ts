@@ -24,7 +24,14 @@ import {
 	type NativeRuntime,
 	type NativeScreen,
 } from '../src/index.ts';
-import { compileRungApp, readAppConfig, readWorkspaceModule, servedReader } from '../src/harness/rung.ts';
+import {
+	assetReader,
+	compileRungApp,
+	readAppConfig,
+	readWorkspaceModule,
+	servedFileReader,
+	servedReader,
+} from '../src/harness/rung.ts';
 import { echoText } from '../src/harness/echo-server.ts';
 import { nativeMaxLength, nativeRangeValue } from '@markless/serializer/native-view';
 import { nodeScriptHost } from '../src/node-engine.ts';
@@ -422,12 +429,14 @@ function walkApp(
 		if (action && 'back' in action) {
 			const journal = appRuntime.dispatch({ event: 'back' });
 			stack.pop();
-			// The screen shown again takes what a page above it changed in the app-wide cells; nothing else changes.
+			// The screen shown again takes what a page above it changed in the app-wide and storage cells; nothing else changes.
 			const resumed = appRuntime.screens().at(-1)!.runtime.resume();
 			expect(resumed, `step ${index}: the screen shown again had resumed already`).toEqual([]);
 			const shownAgain = journal.filter((entry) => entry.op !== 'abort' && entry.op !== 'clearTimer');
-			const appWide = pageOf(appRuntime.screens().at(-1)!.route).cells.some((cell) => cell.app);
-			if (!appWide) expect(shownAgain, `step ${index}: Back journals only what it cancels`).toEqual([]);
+			const kept = pageOf(appRuntime.screens().at(-1)!.route).cells.some(
+				(cell) => cell.app || cell.storage,
+			);
+			if (!kept) expect(shownAgain, `step ${index}: Back journals only what it cancels`).toEqual([]);
 			for (const entry of shownAgain) stack.at(-1)!.apply(entry, -1);
 		} else if (
 			looksOnly(action) ||
@@ -458,21 +467,26 @@ function walkApp(
 								value: top.typed(host, action.type.text),
 							})
 						: [];
-			const answered: NativeAction[] = [];
-			for (const entry of journal) {
-				const answer = services.answer(entry);
-				if (answer) answered.push(answer);
-				if (entry.op !== 'navigate') {
-					top.apply(entry, index);
-					continue;
+			// What a journal shows goes to the top screen; a navigation opens the next one, as the hosts push it.
+			const show = (entries: ReadonlyArray<NativeJournalEntry>) => {
+				const answered: NativeAction[] = [];
+				for (const entry of entries) {
+					const answer = services.answer(entry);
+					if (answer) answered.push(answer);
+					if (entry.op !== 'navigate') {
+						stack.at(-1)!.apply(entry, index);
+						continue;
+					}
+					const opened = appRuntime.screens().at(-1)!;
+					expect(opened.route, `step ${index}: the screen opened`).toBe(entry.route);
+					if (entry.replace) stack.pop();
+					stack.push(open(opened));
 				}
-				const opened = appRuntime.screens().at(-1)!;
-				expect(opened.route, `step ${index}: the screen opened`).toBe(entry.route);
-				if (entry.replace) stack.pop();
-				stack.push(open(opened));
-			}
-			for (const next of answered)
-				for (const entry of appRuntime.dispatch(next)) stack.at(-1)!.apply(entry, index);
+				for (const next of answered) show(appRuntime.dispatch(next));
+			};
+			show(journal);
+			// A timer already due fires at once, as on a phone: a handler's `await` of a zero-delay timer resumes.
+			services.advance(0, (fire) => show(appRuntime.dispatch(fire)));
 		}
 		expect(stack.length, `step ${index}: the stack`).toBe(appRuntime.screens().length);
 		stack.at(-1)!.check(step, index);
@@ -560,6 +574,8 @@ function walk(
 	let clock = Date.now();
 	/** The text field that has the keyboard, if any. */
 	let focused: string | undefined;
+	// The device's appearance, as an `appearance` step sets it; a script's matchMedia reads it.
+	let scheme: 'light' | 'dark' = 'light';
 	const start = () => {
 		const r = createNativeRuntime(
 			payload,
@@ -570,6 +586,7 @@ function walk(
 			services.host,
 			undefined,
 			stacked,
+			() => ({ 'prefers-reduced-motion': 'no-preference', 'prefers-color-scheme': scheme }),
 		);
 		for (const cell of payload.cells)
 			if (cell.device)
@@ -1096,7 +1113,8 @@ function walk(
 				],
 				index,
 			);
-		} else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
+		} else if (action && 'appearance' in action) scheme = action.appearance;
+		else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
 			const sheet = openSheet(index);
@@ -1126,7 +1144,7 @@ function walk(
 			// Typing shows the text in the field at once; the input event then runs the handler.
 			const text =
 				'type' in action
-					? typedInto(action.type.text, attributeNow(host, 'maxlength'))
+					? typedInto((action.type.append ? fieldText(host) : '') + action.type.text, attributeNow(host, 'maxlength'))
 					: undefined;
 			if (text !== undefined) {
 				if (properties.has(host)) properties.set(host, text);
@@ -1390,6 +1408,8 @@ test.each(
 			...(page ? { page } : {}),
 			readModule: readWorkspaceModule,
 			readServedStylesheet: servedReader(join(proofsDir, folder)),
+			readServedFile: servedFileReader(join(proofsDir, folder)),
+			readAsset: assetReader,
 			...readAppConfig(join(proofsDir, folder)),
 			target,
 		});

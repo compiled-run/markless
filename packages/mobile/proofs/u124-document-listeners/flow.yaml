@@ -1,0 +1,17 @@
+appId: ${APP_ID}
+name: u124-document-listeners
+---
+- launchApp:
+    clearState: true
+- assertVisible: Document listeners
+- assertVisible: Drag here
+- assertVisible: Idle
+- swipe:
+    from:
+      text: Drag here
+    direction: RIGHT
+    duration: 800
+- assertNotVisible: Idle
+- assertVisible: Released after moving
+- assertNotVisible: Idle
+- assertNotVisible: Moving

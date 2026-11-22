@@ -12,7 +12,7 @@ import { simctl, SimulatorStuck } from '../harness/simctl.ts';
 import { runFlow } from '../harness/maestro.ts';
 import type { ProofPlatform } from '../harness/proof-app.ts';
 import { androidTools, cacheRoot } from '../harness/tools.ts';
-import { ECHO_SERVER_PORT } from '../../proofs/ladder.ts';
+import { SERVER_PORTS } from '../../proofs/ladder.ts';
 import { dragonDir } from '../style-export.ts';
 import { type BundledRung, readAssets } from './bundle.ts';
 import {
@@ -133,14 +133,14 @@ try {
 				else
 					await exec(tools!.adb, ['-s', device, 'shell', 'cmd', 'uimode', 'night', 'no']);
 				await install(rung, dir);
-				// The emulator's 127.0.0.1 is its own: the runner's echo server port is forwarded to it.
-				if (rung.server === 'echo' && platform === 'android')
+				// The emulator's 127.0.0.1 is its own: the port of the runner's test server is forwarded to it.
+				if (rung.server && platform === 'android')
 					await exec(tools!.adb, [
 						'-s',
 						device,
 						'reverse',
-						`tcp:${ECHO_SERVER_PORT}`,
-						`tcp:${ECHO_SERVER_PORT}`,
+						`tcp:${SERVER_PORTS[rung.server]}`,
+						`tcp:${SERVER_PORTS[rung.server]}`,
 					]);
 			} catch (error) {
 				// A stuck simulator fails every rung left, so the queue moves on and the runner restarts it.
