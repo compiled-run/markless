@@ -1,5 +1,6 @@
 {
 	"rung": "Y-shop",
+	"server": "app",
 	"name": "Yardstick shop as one app: product list, product detail, pick an option in a sheet, add to cart, back, cart total, change quantity",
 	"steps": [
 		{ "visible": ["New this week", "Refresh", "Desk lamp", "Copper kettle"], "title": "Shop" },
