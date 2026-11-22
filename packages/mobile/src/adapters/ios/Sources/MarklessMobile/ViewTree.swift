@@ -1546,7 +1546,7 @@ final class ViewTree {
 			let src = current["src"]
 			// A photo the device took is a `file:` URL; any other src is a file the app packaged when it was built.
 			let packaged = src.flatMap { images[$0] }
-			let image = packaged?.data.flatMap { UIImage(data: $0) }
+			let image = packaged?.picture
 				?? src.flatMap { URL(string: $0) }.flatMap { $0.isFileURL ? UIImage(contentsOfFile: $0.path) : nil }
 			let natural = packaged.flatMap { p in p.width.flatMap { w in p.height.map { CGSize(width: w, height: $0) } } }
 			let length = { (name: String) in current[name].flatMap { Double($0.trimmingCharacters(in: .whitespaces)) } }
