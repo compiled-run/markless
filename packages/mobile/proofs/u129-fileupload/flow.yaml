@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: u129-fileupload
+---
+- launchApp:
+      clearState: true
+      arguments:
+          pick: '[{"name":"note.txt","text":"hello","type":"text/plain"}]'
+- assertVisible: Upload
+- assertVisible: Attachments
+- assertVisible: Browse
+- assertVisible: 0 chosen
+- tapOn: Browse
+- assertNotVisible: 0 chosen
+- assertVisible: 1 chosen
+- assertVisible: note\.txt
+- assertVisible: Remove
+- assertNotVisible: 0 chosen
+- tapOn: Remove
+- assertVisible: 0 chosen
+- assertNotVisible: 1 chosen
+- assertNotVisible: note\.txt
+- assertVisible: 0 chosen
+- assertNotVisible: 1 chosen
+- assertNotVisible: note\.txt

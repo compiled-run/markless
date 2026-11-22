@@ -1039,6 +1039,23 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A file input's picker opened from a button, the files it chose read in its change handler, then cleared.
+		name: 'file-input',
+		fixture: 'test/fixtures/FileInput.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{
+				event: 'pick',
+				host: 'h1',
+				files: [
+					{ name: 'note.txt', size: 5, type: 'text/plain', lastModified: 1700000000000 },
+					{ name: 'photo.png', size: 2048, type: 'image/png', lastModified: 1700000001000 },
+				],
+			},
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
 		name: 'script-keys',
 		fixture: 'test/fixtures/ScriptKeys.tsrx',
 		actions: [

@@ -1,0 +1,14 @@
+appId: ${APP_ID}
+name: u128-file-input
+---
+- launchApp:
+      clearState: true
+      arguments:
+          pick: '[{"name":"note.txt","text":"hello","type":"text/plain"},{"name":"list.txt","text":"a,b","type":"text/plain"}]'
+- assertVisible: Pick
+- assertVisible: Choose
+- assertVisible: none
+- tapOn: Choose
+- assertNotVisible: none
+- assertVisible: note\.txt 5 text/plain, list\.txt 3 text/plain
+- assertNotVisible: none

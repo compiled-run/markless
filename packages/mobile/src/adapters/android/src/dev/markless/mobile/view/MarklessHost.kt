@@ -579,7 +579,7 @@ class MarklessHost(
 					// A phrase element's attributes (`datetime`, `title`) change nothing its paragraph shows.
 					attrs.getOrPut(entry.node) { HashMap() }.let { if (entry.value == null) it.remove(entry.name) else it[entry.name] = entry.value }
 				} else attribute(entry.node, entry.name, entry.value)
-				is JournalEntry.Property -> if (entry.node !in inert) {
+				is JournalEntry.Property -> if (entry.name == "files") (view(entry.node) as? FileInputView ?: throw MarklessHostError("journal sets the files of \"${entry.node}\", which is not a file input")).show(entry.value) else if (entry.node !in inert) {
 					val field = view(entry.node) as? EditText ?: throw MarklessHostError("journal sets the value of \"${entry.node}\", which is not an input")
 					if (field.text.toString() != entry.value) { field.setAppText(entry.value); field.setSelection(entry.value.length) }
 				}
@@ -1044,7 +1044,10 @@ class MarklessHost(
 			}
 			// The select's list shows its options; their views only keep their text current.
 			"option" -> MarklessBox(context).apply { visibility = View.GONE }
-			"input", "textarea" -> if (node.attributes["type"] == "range") RangeBar(context).also { named(it, inst.id) } else MarklessField(context).apply {
+			"input", "textarea" -> if (node.attributes["type"] == "file") FileInputView(context, node.attributes["aria-hidden"] == "true").apply {
+				accept = node.attributes["accept"].orEmpty()
+				multiple = node.attributes["multiple"] != null
+			} else if (node.attributes["type"] == "range") RangeBar(context).also { named(it, inst.id) } else MarklessField(context).apply {
 				filters = arrayOf(LengthLimit { nativeMaxLength(attrs[inst.id]?.get("maxlength")) })
 				val focusEvents = events[node.id].orEmpty().map { it.event }
 				setOnFocusChangeListener { v, focused ->
@@ -1120,7 +1123,7 @@ class MarklessHost(
 			}
 			EventName.Commit -> (view as? RangeBar ?: throw MarklessHostError("commit event on \"${node.id}\", which is not a range")).onCommit = { value -> apply(runtime.dispatch(inst.id, EventName.Commit, value)) }
 			// A select's input handler runs when a choice lands, from the runtime's choose.
-			EventName.Input -> if (node.element == "select") Unit else if (view is RangeBar) view.onInput = { value -> apply(runtime.dispatch(inst.id, EventName.Input, value)) } else (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
+			EventName.Input -> if (node.element == "select") Unit else if (view is FileInputView) view.onPick = { files -> apply(runtime.pick(inst.id, files)) } else if (view is RangeBar) view.onInput = { value -> apply(runtime.dispatch(inst.id, EventName.Input, value)) } else (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
 				override fun afterTextChanged(s: Editable) {
@@ -1319,6 +1322,7 @@ class MarklessHost(
 	private fun command(view: View, command: String, preventScroll: Boolean) {
 		// As on the web: scrollIntoView aligns the element to the start; focus brings it into view unless told not to.
 		if (command == "scrollIntoView") return bringIntoView(view, dev.markless.mobile.core.SCROLL_INTO_VIEW)
+		if (command == "showPicker") return (view as? FileInputView ?: throw MarklessHostError("showPicker() on a view that is not a file input")).open()
 		// `select()` selects a field's whole text; it does not move focus, as on the web.
 		if (command == "select") return (view as? EditText ?: throw MarklessHostError("select() on a view that is not a text field")).selectAll()
 		if (!preventScroll) bringIntoView(view, dev.markless.mobile.core.FOCUS_INTO_VIEW)

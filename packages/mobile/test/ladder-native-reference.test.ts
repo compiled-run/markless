@@ -490,6 +490,7 @@ function walk(
 	target: 'ios' | 'android',
 	styled = false,
 	belowFold?: string,
+	pick?: LadderRung['pick'],
 ) {
 	const store = new Map<string, NativeValue>();
 	let calls: string[] = [];
@@ -865,6 +866,8 @@ function walk(
 				checks.set(entry.node, entry.value);
 			else if (entry.op === 'property' && entry.name === 'selected')
 				selected.set(entry.node, entry.value);
+			// A file input's shown names are the host's to draw; the runtime keeps no field text for them.
+			else if (entry.op === 'property' && entry.name === 'files') continue;
 			else if (entry.op === 'property') {
 				const node = nodeOf.get(entry.node.split('@')[0]!);
 				const followsDefault = node?.kind === 'element' && node.element === 'textarea' && !bindsValue(nodeOf, entry.node);
@@ -1264,6 +1267,22 @@ function walk(
 					focused = entry.node;
 					if (handles(entry.node, 'focus')) apply(runtime.dispatch({ event: 'focus', host: entry.node }), index);
 				}
+			// A picker a handler opens answers with the rung's files, as the hosts' launch argument does.
+			for (const entry of dispatched)
+				if (entry.op === 'command' && entry.command === 'showPicker' && pick && handles(entry.node, 'input'))
+					apply(
+						runtime.dispatch({
+							event: 'pick',
+							host: entry.node,
+							files: pick.map((file) => ({
+								name: file.name,
+								size: new TextEncoder().encode(file.text).length,
+								type: file.type,
+								lastModified: clock,
+							})),
+						}),
+						index,
+					);
 			if ('erase' in action) keyedUp('Backspace');
 			else if ('submit' in action) keyedUp('Enter');
 		}
@@ -1446,6 +1465,7 @@ test.each(
 			target,
 			build.styles.length > 0 || build.stylesheets.length > 0,
 			rung.belowFold,
+			rung.pick,
 		);
 	},
 );

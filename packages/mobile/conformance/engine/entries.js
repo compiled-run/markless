@@ -99,6 +99,8 @@ var elementOf = function (id) {
 	};
 	var own = function (name) { return Object.prototype.hasOwnProperty.call(facts().attributes, String(name).toLowerCase()); };
 	var command = function (name, preventScroll) { host.out.commands.push([id, name, preventScroll]); };
+	var isFileInput = function () { return !!elementFacts[id] && String(elementFacts[id].attributes.type || '').toLowerCase() === 'file'; };
+	var chosen = [];
 	var proxy = {
 		getAttribute: function (name) { return own(name) ? facts().attributes[String(name).toLowerCase()] : null; },
 		hasAttribute: own,
@@ -108,7 +110,14 @@ var elementOf = function (id) {
 			return node === id || (!!elementFacts[node] && elementFacts[node].ancestors.indexOf(id) >= 0);
 		},
 		focus: function (options) { command('focus', !!(options && options.preventScroll)); },
-		click: function () { host.out.raises.push({ node: id, type: 'click', bubbles: true }); },
+		click: function () {
+			host.out.raises.push({ node: id, type: 'click', bubbles: true });
+			if (isFileInput()) command('showPicker', false);
+		},
+		showPicker: function () {
+			if (!isFileInput()) throw new g.DOMException('showPicker() is not supported for this element', 'NotSupportedError');
+			command('showPicker', false);
+		},
 		dispatchEvent: function (event) {
 			var raised = { node: id, type: String(event.type), bubbles: event.bubbles === true };
 			if (event.detail !== null && typeof event.detail === 'object' && typeof event.detail.reason === 'string')
@@ -140,6 +149,25 @@ var elementOf = function (id) {
 	var tag = (typeof classes === 'object' && classes[id.split('@')[0]]) || 'HTMLElement';
 	if (g[tag] && g[tag].__dom) Object.setPrototypeOf(proxy, g[tag].prototype);
 	Object.defineProperty(proxy, '__node', { value: id });
+	// A file input's files are the picker's last choice until a handler assigns a FileList, as the DOM's are.
+	Object.defineProperty(proxy, 'files', {
+		get: function () { return isFileInput() ? host.fileListOf(chosen) : null; },
+		set: function (list) {
+			if (!isFileInput() || !list) return;
+			chosen = Array.prototype.slice.call(list);
+			// The input shows what it now holds, as the browser's does.
+			host.out.commands.push([id, 'files', JSON.stringify(chosen.map(function (file) { return file.name; }))]);
+		},
+	});
+	Object.defineProperty(proxy, '__choose', {
+		value: function (files) {
+			chosen = files.map(function (file) {
+				var made = new g.File([], file.name, { type: file.type, lastModified: file.lastModified });
+				Object.defineProperty(made, 'size', { value: file.size });
+				return made;
+			});
+		},
+	});
 	Object.defineProperty(proxy, '__style', {
 		value: function () {
 			var direction = facts().direction || 'ltr';
@@ -322,6 +350,7 @@ g.__markless[id] = {
 			var event = null;
 			try {
 				var frame = frameOf(entry.frame);
+				if (entry.event.files && entry.event.nodes && entry.event.nodes.target) elementOf(entry.event.nodes.target).__choose(entry.event.files);
 				event = eventOf(entry.event, frame);
 				var result = fn(entry.fn)(frame)(event);
 				if (result && typeof result.then === 'function') {

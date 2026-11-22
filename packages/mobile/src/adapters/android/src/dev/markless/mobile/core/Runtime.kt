@@ -750,6 +750,8 @@ class Runtime(
 					setDialog(node, command == "showModal")
 					return@mapNotNull null
 				}
+				// A file input shows the names of the files a handler gave it.
+				if (command == "files") return@mapNotNull JournalEntry.Property(node, "files", parts[2].str("leave().commands[][2]"))
 				if (command == "focus") focused = node
 				JournalEntry.Command(node, command, (parts[2] as? Json.Bool)?.value == true)
 			} +
@@ -1365,6 +1367,18 @@ class Runtime(
 		}
 	}
 
+	/** The files a person chose in the picker the file input [host] opened: its `input` and `change` handlers run with them. */
+	fun pick(host: String, files: List<PickedFile>): List<JournalEntry> {
+		val template = host.substringBefore('@')
+		val handlerId = handlerFor(template, EventName.Input) ?: throw MarklessRuntimeError("no input handler on \"$host\"")
+		val scope = (instances(node(template)).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")).scope
+		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
+		val chosen = JsValue.Arr(files.mapTo(ArrayList()) { it.value })
+		return change(host, null) {
+			withFields(mapOf("files" to chosen, "target" to JsValue.Str(host), "currentTarget" to JsValue.Str(host))) { run(handler.ops, scope) }
+		}
+	}
+
 	/**
 	 * A press on [pressed], as a browser's click: its own handler, then the handler of each element around it, innermost first,
 	 * until one stops propagation. An element around it whose handler reads where the press landed runs its copy for the
@@ -1726,7 +1740,8 @@ class Runtime(
 					",\"detail\":{\"reason\":${jsonString(it.value)},\"pressTarget\":${pressed?.let(::jsonString) ?: "null"}}"
 				} ?: ""
 				val touch = TOUCH_FIELDS.mapNotNull { f -> fields?.get(f)?.let { ",${jsonString(f)}:${jsonValue(it)}" } }.joinToString("")
-				val typed = listOf("key", "text").mapNotNull { f -> (fields?.get(f) as? JsValue.Str)?.let { ",${jsonString(f)}:${jsonString(it.value)}" } }.joinToString("")
+				val typed = listOf("key", "text").mapNotNull { f -> (fields?.get(f) as? JsValue.Str)?.let { ",${jsonString(f)}:${jsonString(it.value)}" } }.joinToString("") +
+					(fields?.get("files")?.let { ",\"files\":${jsonValue(it)}" } ?: "")
 				val named = if (fields?.get("currentTarget") is JsValue.Str) listOf("target", "currentTarget", "relatedTarget").associateWith { (fields?.get(it) as? JsValue.Str)?.value } else null
 				val nodes = named?.let { n -> ",\"nodes\":" + n.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value?.let(::jsonString) ?: "null"}" } } ?: ""
 				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$typed$touch$nodes$detail}"
@@ -1961,4 +1976,10 @@ class Runtime(
 		settled(submission)
 		return taken
 	}
+}
+
+/** A file a picker chose, as a page's `File` describes it. */
+data class PickedFile(val name: String, val size: Double, val type: String, val lastModified: Double) {
+	internal val value: JsValue
+		get() = JsValue.Obj(linkedMapOf("name" to JsValue.Str(name), "size" to JsValue.Num(size), "type" to JsValue.Str(type), "lastModified" to JsValue.Num(lastModified)))
 }
