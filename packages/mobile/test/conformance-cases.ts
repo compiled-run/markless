@@ -1279,6 +1279,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// qr-code: the svg's viewBox and its path's outline follow the code's value; the engine turns each into numbers.
+		name: 'live-drawing',
+		fixture: 'proofs/u42-qr-code/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
 		name: 'element-measure',
 		fixture: 'test/fixtures/TrackMeasure.tsrx',
 		layout: {

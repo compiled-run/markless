@@ -144,7 +144,7 @@ sealed interface Node {
 	val row: String?
 
 	/** [obj]: the device object a `camera` element shows. */
-	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null, val obj: String? = null, val defaultStyle: DefaultStyle? = null, val drawing: Drawing? = null, val live: Live? = null, val liveFollows: LiveFollows? = null, val style: List<StylePiece>? = null, val styleWhen: StyleWhen? = null) : Node
+	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null, val obj: String? = null, val defaultStyle: DefaultStyle? = null, val drawing: Drawing? = null, val live: Live? = null, val liveFollows: LiveFollows? = null, val style: List<StylePiece>? = null, val styleWhen: StyleWhen? = null, val shape: Shape? = null) : Node
 	/** [parent] is null for text at the top of the page. */
 	data class Text(override val id: String, override val parent: String?, val parts: List<TextPart>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
 	/** An `@if` with [test] (arm 0 while truthy, arm 1 otherwise), or a chain with [tests]: the first truthy arm, else the `null` arm. */
@@ -913,40 +913,7 @@ data class Payload(
 			val em = o["em"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.em must be true when present"); true } ?: false
 			val viewBox = o.field("viewBox", what).let { if (it == Json.Null) null else it.arr("$what.viewBox").map { n -> n.num("$what.viewBox[]") } }
 			if (viewBox != null && viewBox.size != 4) throw MarklessDecodeError("$what.viewBox must hold four numbers")
-			val shapes = o.field("shapes", what).arr("$what.shapes").mapIndexed { n, sv ->
-				val w = "$what.shapes[$n]"
-				val so = sv.obj(w)
-				so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "text", "clip"), w)
-				val path = so.field("path", w).arr("$w.path").map { it.num("$w.path[]") }
-				val transform = so["transform"]?.arr("$w.transform")?.map { it.num("$w.transform[]") }
-				if (transform != null && transform.size != 6) throw MarklessDecodeError("$w.transform must hold six numbers")
-				Shape(
-					path, paint(so.field("fill", w), "$w.fill"), oneOf(so, "fillRule", setOf("nonzero", "evenodd"), w) == "evenodd",
-					paint(so.field("stroke", w), "$w.stroke"), so.field("width", w).num("$w.width"),
-					oneOf(so, "cap", setOf("butt", "round", "square"), w), oneOf(so, "join", setOf("miter", "round", "bevel"), w),
-					so.field("miterLimit", w).num("$w.miterLimit"), transform,
-					so["text"]?.let { tv ->
-						val t = tv.obj("$w.text")
-						t.only(setOf("anchor", "baseline", "runs"), "$w.text")
-						DrawingText(
-							oneOf(t, "anchor", setOf("start", "middle", "end"), "$w.text"),
-							oneOf(t, "baseline", setOf("alphabetic", "middle", "central", "hanging", "text-top", "text-bottom", "ideographic"), "$w.text"),
-							t.field("runs", "$w.text").arr("$w.text.runs").mapIndexed { r, rv ->
-								val rw = "$w.text.runs[$r]"
-								val ro = rv.obj(rw)
-								ro.only(setOf("text", "x", "y", "dx", "dy", "size", "weight", "family", "letterSpacing", "fill"), rw)
-								TextRun(
-									ro.field("text", rw).str("$rw.text"), ro["x"]?.num("$rw.x"), ro["y"]?.num("$rw.y"), ro["dx"]?.num("$rw.dx"), ro["dy"]?.num("$rw.dy"),
-									ro.field("size", rw).num("$rw.size"), ro.field("weight", rw).num("$rw.weight"),
-									ro["family"]?.let { oneOf(ro, "family", setOf("serif", "sans-serif", "monospace"), rw) },
-									ro.field("letterSpacing", rw).num("$rw.letterSpacing"), paint(ro.field("fill", rw), "$rw.fill"),
-								)
-							},
-						)
-					},
-					so["clip"]?.arr("$w.clip")?.map { c -> c.arr("$w.clip[]").map { it.num("$w.clip[][]") } } ?: emptyList(),
-				)
-			}
+			val shapes = o.field("shapes", what).arr("$what.shapes").mapIndexed { n, sv -> shape(sv, "$what.shapes[$n]") }
 			val aspect = o["aspect"]?.let { av ->
 				if (av is Json.Str) { if (av.value != "none") throw MarklessDecodeError("$what.aspect must be none or an alignment"); Aspect.None }
 				else {
@@ -977,12 +944,46 @@ data class Payload(
 			}
 		}
 
+		private fun shape(sv: Json, w: String): Shape {
+			val so = sv.obj(w)
+			so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "text", "clip"), w)
+			val path = so.field("path", w).arr("$w.path").map { it.num("$w.path[]") }
+			val transform = so["transform"]?.arr("$w.transform")?.map { it.num("$w.transform[]") }
+			if (transform != null && transform.size != 6) throw MarklessDecodeError("$w.transform must hold six numbers")
+			return Shape(
+				path, paint(so.field("fill", w), "$w.fill"), oneOf(so, "fillRule", setOf("nonzero", "evenodd"), w) == "evenodd",
+				paint(so.field("stroke", w), "$w.stroke"), so.field("width", w).num("$w.width"),
+				oneOf(so, "cap", setOf("butt", "round", "square"), w), oneOf(so, "join", setOf("miter", "round", "bevel"), w),
+				so.field("miterLimit", w).num("$w.miterLimit"), transform,
+				so["text"]?.let { tv ->
+					val t = tv.obj("$w.text")
+					t.only(setOf("anchor", "baseline", "runs"), "$w.text")
+					DrawingText(
+						oneOf(t, "anchor", setOf("start", "middle", "end"), "$w.text"),
+						oneOf(t, "baseline", setOf("alphabetic", "middle", "central", "hanging", "text-top", "text-bottom", "ideographic"), "$w.text"),
+						t.field("runs", "$w.text").arr("$w.text.runs").mapIndexed { r, rv ->
+							val rw = "$w.text.runs[$r]"
+							val ro = rv.obj(rw)
+							ro.only(setOf("text", "x", "y", "dx", "dy", "size", "weight", "family", "letterSpacing", "fill"), rw)
+							TextRun(
+								ro.field("text", rw).str("$rw.text"), ro["x"]?.num("$rw.x"), ro["y"]?.num("$rw.y"), ro["dx"]?.num("$rw.dx"), ro["dy"]?.num("$rw.dy"),
+								ro.field("size", rw).num("$rw.size"), ro.field("weight", rw).num("$rw.weight"),
+								ro["family"]?.let { oneOf(ro, "family", setOf("serif", "sans-serif", "monospace"), rw) },
+								ro.field("letterSpacing", rw).num("$rw.letterSpacing"), paint(ro.field("fill", rw), "$rw.fill"),
+							)
+						},
+					)
+				},
+				so["clip"]?.arr("$w.clip")?.map { c -> c.arr("$w.clip[]").map { it.num("$w.clip[][]") } } ?: emptyList(),
+			)
+		}
+
 		private fun node(v: Json, what: String): Node {
 			val o = v.obj(what)
 			val id = o.field("id", what).str("$what.id")
 			return when (val kind = o.field("kind", what).str("$what.kind")) {
 				"element" -> {
-					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm", "row", "object", "defaultStyle", "drawing", "live", "liveFollows", "style", "styleWhen"), what)
+					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm", "row", "object", "defaultStyle", "drawing", "live", "liveFollows", "style", "styleWhen", "shape"), what)
 					val parent = o.field("parent", what)
 					val attributes = o["attributes"]?.obj("$what.attributes")?.mapValues { (k, v) -> v.str("$what.attributes.$k") } ?: emptyMap()
 					val bindings = o["bindings"]?.arr("$what.bindings")?.mapIndexed { n, b ->
@@ -996,7 +997,7 @@ data class Payload(
 							Binding(bo.field("attribute", what).str("$what.bindings[$n].attribute"), value)
 						}
 					} ?: emptyList()
-					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what), rowPlace(o, what), o["object"]?.str("$what.object"), o["defaultStyle"]?.let { defaultStyle(it, "$what.defaultStyle") }, o["drawing"]?.let { drawing(it, "$what.drawing") }, o["live"]?.let { live(it, "$what.live") }, o["liveFollows"]?.let { liveFollows(it, "$what.liveFollows") }, o["style"]?.let { stylePieces(it, "$what.style") }, o["styleWhen"]?.let { styleWhen(it, "$what.styleWhen", null) })
+					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what), rowPlace(o, what), o["object"]?.str("$what.object"), o["defaultStyle"]?.let { defaultStyle(it, "$what.defaultStyle") }, o["drawing"]?.let { drawing(it, "$what.drawing") }, o["live"]?.let { live(it, "$what.live") }, o["liveFollows"]?.let { liveFollows(it, "$what.liveFollows") }, o["style"]?.let { stylePieces(it, "$what.style") }, o["styleWhen"]?.let { styleWhen(it, "$what.styleWhen", null) }, o["shape"]?.let { shape(it, "$what.shape") })
 				}
 				"text" -> {
 					o.only(setOf("kind", "id", "parent", "parts", "arm", "row"), what)
