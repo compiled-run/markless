@@ -4,8 +4,15 @@ export default function App() @{
 	let seen = state('Idle');
 	let moves = state(0);
 	<main>
+		<style>
+			.pad {
+				padding: 24px;
+				touch-action: none;
+			}
+		</style>
 		<h1>Document listeners</h1>
 		<div
+			class="pad"
 			onPointerdown={() => {
 				const onMove = () => {
 					moves = moves + 1;
