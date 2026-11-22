@@ -830,6 +830,8 @@ export type NativeOp =
 	  }
 	/** `event.preventDefault()` in a text field's `keydown` or `paste` handler: the host leaves out what the key or paste does. */
 	| { readonly op: 'preventDefault' }
+	/** `event.stopPropagation()` in a click handler: the press runs no handler of the elements around this one. */
+	| { readonly op: 'stopPropagation' }
 	/**
 	 * `field.value = text` on a text field: its text becomes `value` (as a string), as if typed but with no input event; the
 	 * journal's `property` entry carries it to the field. `node` is a fixed id or an expression giving one (null: nothing).
