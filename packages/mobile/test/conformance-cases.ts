@@ -1892,6 +1892,18 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// Each screen has its own runtime over the device's one store: Back shows the screen below the storage() value a
+		// screen above wrote, with its texts and arms following.
+		name: 'storage-back',
+		app: 'proofs/u227-storage-back',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'back' },
+		],
+	},
+	{
 		name: 'navigation-replace',
 		app: 'proofs/n3-navigate',
 		open: '/',

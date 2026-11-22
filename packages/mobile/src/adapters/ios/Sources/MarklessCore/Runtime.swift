@@ -1019,12 +1019,19 @@ public final class NativeRuntime {
 		asyncCells.isEmpty ? [] : try change(host: nil) { [] }
 	}
 
-	/// The screen shows again after Back: it takes the app's values of its app-wide cells that a page above it changed.
+	/// The screen shows again after Back: it takes the app's values of its app-wide cells and the device's of its storage
+	/// cells, which a page above it may have changed.
 	public func resume() throws -> [NativeJournalEntry] {
-		let moved = payload.cells.filter { cell in cell.app && session.values[cell.id] != nil && session.values[cell.id] != values[cell.id] }
+		let moved = payload.cells.compactMap { cell -> (String, NativeValue)? in
+			guard let kept = cell.app ? session.values[cell.id] : cell.storageKey.flatMap(store.read), kept != values[cell.id] else { return nil }
+			return (cell.id, kept)
+		}
 		guard !moved.isEmpty else { return [] }
 		return try change(host: nil) {
-			for cell in moved { values[cell.id] = session.values[cell.id] }
+			for (cell, value) in moved {
+				values[cell] = value
+				unset.remove(cell)
+			}
 			return []
 		}
 	}
