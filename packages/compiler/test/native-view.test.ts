@@ -4161,6 +4161,27 @@ export function Code() @{
 		);
 	});
 
+	it('draws a <path> written in the svg whose d follows state while the app runs, over the shapes before it; refuses a shape after it', async () => {
+		const source = (after: string) => `import { state } from '@markless/core';
+export function Mark() @{
+	let turned = state(false);
+	<main>
+		<svg viewBox="0 0 16 16"><rect width="16" height="16" fill="#eee" /><path d={turned ? 'M0 0H16V16Z' : 'M0 0H16L0 16Z'} fill="#264653" />${after}</svg>
+		<button onClick={() => (turned = !turned)}>Turn</button>
+	</main>
+}`;
+		const { payload, diagnostics } = await nativeView(source(''));
+		expect(diagnostics).toEqual([]);
+		const svg = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'svg');
+		const path = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'path');
+		expect(svg?.kind === 'element' ? svg.drawing?.shapes : undefined).toHaveLength(1);
+		expect(path).toMatchObject({ parent: svg!.id, shape: { path: [], fill: { r: 38, g: 70, b: 83, alpha: 255 } } });
+		expect(path?.kind === 'element' ? path.bindings.map((binding) => 'attribute' in binding && binding.attribute) : []).toEqual(['d']);
+		expect((await nativeView(source('<circle r="2" />'))).diagnostics.map((d) => d.message)).toContain(
+			'a shape after a component or `{children}` inside an <svg>, which a native drawing would paint under them',
+		);
+	});
+
 	it("compiles an svg's shapes into a drawing, with its <title> as its name", async () => {
 		const { payload, diagnostics } = await nativeView(`export function Icon() @{
 	<svg viewBox="0 0 20 10" width="40" height="20" fill="currentColor">

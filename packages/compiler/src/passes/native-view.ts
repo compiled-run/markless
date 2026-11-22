@@ -2893,10 +2893,10 @@ export function createNativeViewPayload(
 			const service = Object.hasOwn(NATIVE_SCRIPT_HOST_GLOBALS, name)
 				? NATIVE_SCRIPT_HOST_GLOBALS[name]
 				: undefined;
-			if (service === 'media' && rendering) {
+			if ((service === 'media' || service === 'screen') && rendering) {
 				ok = false;
 				refuseScript(
-					`${what} reads \`${name}\` while rendering; a phone answers a media query only in a handler`,
+					`${what} reads \`${name}\` while rendering; a phone answers ${service === 'media' ? 'a media query' : 'it'} only in a handler`,
 					global.span,
 				);
 				continue;
@@ -5930,6 +5930,16 @@ export function createNativeViewPayload(
 					const texts: { path: ReadonlyArray<number>; text: string }[] = [];
 					for (const other of inside) {
 						if (drawnLive.some((path) => isPrefix(path, other.path))) continue;
+						// A <path> written in the <svg> whose `d` follows state is drawn while the app runs, as a component's is.
+						if (
+							other.kind === 'host' &&
+							other.path.length === item.path.length + 1 &&
+							scope.module.tagOf.get(other.id) === 'path' &&
+							boundAt(other.path).includes('d')
+						) {
+							drawnLive.push(other.path);
+							continue;
+						}
 						if (other.kind === 'host' && drawnLive.length > 0)
 							refuseAs(
 								'svg',

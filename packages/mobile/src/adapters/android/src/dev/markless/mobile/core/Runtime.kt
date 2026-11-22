@@ -507,6 +507,8 @@ class Runtime(
 	var measure: ((id: String) -> ElementBox?)? = null
 	/** The device's answers to the media features a script's `matchMedia` reads, read as each entry begins; the web's defaults when the host gives none. */
 	var media: () -> List<Pair<String, String>> = { listOf("prefers-reduced-motion" to "no-preference", "prefers-color-scheme" to "light") }
+	/** The screen's device pixels per CSS px, which a script's `devicePixelRatio` reads as each entry begins. */
+	var devicePixelRatio: () -> Double = { 1.0 }
 
 	/** Called with each engine entry's duration in nanoseconds, including starting the engine when the entry had to. */
 	var onScriptEntry: ((nanos: Long) -> Unit)? = null
@@ -652,6 +654,8 @@ class Runtime(
 			append(",\"params\":" + params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" })
 		if (payload.script?.services?.contains("media") == true)
 			append(",\"media\":" + media().joinToString(",", "{", "}") { "${jsonString(it.first)}:${jsonString(it.second)}" })
+		if (payload.script?.services?.contains("screen") == true)
+			append(",\"screen\":{\"devicePixelRatio\":${jsonValue(JsValue.Num(devicePixelRatio()))}}")
 	}
 
 	/** Submissions held by a script promise not settled yet, by the engine's run number. */

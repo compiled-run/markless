@@ -174,6 +174,8 @@ class MarklessHost(
 		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
 		onScriptEntry = AppScriptEngine::entryRan
 		measure = this@MarklessHost::measureBox
+		// Chrome on Android reports the display density as devicePixelRatio.
+		devicePixelRatio = { context.resources.displayMetrics.density.toDouble() }
 		// "Remove animations" sets the animator duration scale to 0, as Chrome on Android reads prefers-reduced-motion.
 		media = {
 			val scale = android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f)

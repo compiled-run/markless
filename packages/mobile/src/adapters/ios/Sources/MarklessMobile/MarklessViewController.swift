@@ -154,6 +154,8 @@ public final class MarklessViewController: UIViewController {
 	/// Fills the device cells from the device, then builds the views and starts the page's async device calls.
 	private func buildPage() throws {
 		runtime.measure = { [weak self] id in self?.measureBox(id) }
+		// Safari reports the screen's scale as devicePixelRatio.
+		runtime.devicePixelRatio = { [weak self] in Double(self?.traitCollection.displayScale ?? 1) }
 		runtime.media = { [weak self] in
 			[
 				("prefers-reduced-motion", UIAccessibility.isReduceMotionEnabled ? "reduce" : "no-preference"),

@@ -33,6 +33,7 @@ import {
 	nativeTooLongMessage,
 	NATIVE_SCRIPT_MEDIA_DEFAULTS,
 	type NativeScriptMedia,
+	type NativeScriptScreen,
 } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeScriptEngine } from './script-engine.ts';
@@ -722,6 +723,8 @@ export function createNativeRuntime(
 	measure?: (id: string) => NativeElementBox | null,
 	/** The device's answers to the media features a script's `matchMedia` reads, read as each entry begins. */
 	media: () => NativeScriptMedia = () => NATIVE_SCRIPT_MEDIA_DEFAULTS,
+	/** The screen's device pixels per CSS px that a script's `devicePixelRatio` reads, read as each entry begins. */
+	screenFacts: () => NativeScriptScreen = () => ({ devicePixelRatio: 1 }),
 ): NativeRuntime {
 	const base: NativeScope = {
 		...EMPTY_SCOPE,
@@ -987,6 +990,7 @@ export function createNativeRuntime(
 			: {}),
 		...(script?.services.includes('navigate') ? { params } : {}),
 		...(script?.services.includes('media') ? { media: media() } : {}),
+		...(script?.services.includes('screen') ? { screen: screenFacts() } : {}),
 	});
 	/** One engine entry, then what it asked for: its writes land in cells; timers, clears and requests become entries. */
 	/** Submissions held by a script promise not settled yet, by the engine's run number. */

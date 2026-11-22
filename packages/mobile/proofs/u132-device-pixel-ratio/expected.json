@@ -1,0 +1,8 @@
+{
+	"rung": 234,
+	"name": "A handler's window.devicePixelRatio is the screen's device pixels per CSS px, as the phone's browser reports it",
+	"steps": [
+		{ "visible": ["Screen check", "Check screen", "Ratio unknown"] },
+		{ "do": { "tap": "Check screen" }, "visible": ["Ratio read"], "absent": ["Ratio unknown", "No ratio"] }
+	]
+}

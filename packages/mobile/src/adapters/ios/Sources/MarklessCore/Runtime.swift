@@ -315,6 +315,8 @@ public final class NativeRuntime {
 	/// The device's answers to the media features a script's `matchMedia` reads (`prefers-reduced-motion`, `prefers-color-scheme`),
 	/// read as each entry begins; the web's defaults when the host gives none.
 	public var media: () -> [(String, String)] = { [("prefers-reduced-motion", "no-preference"), ("prefers-color-scheme", "light")] }
+	/// The screen's device pixels per CSS px, which a script's `devicePixelRatio` reads as each entry begins.
+	public var devicePixelRatio: () -> Double = { 1 }
 
 	/// The device's clock, in milliseconds since 1970 (UTC).
 	private let now: () -> Double
@@ -759,12 +761,14 @@ public final class NativeRuntime {
 		let crypto = payload.script?.services.contains(.crypto) == true
 		let navigate = payload.script?.services.contains(.navigate) == true
 		let media = payload.script?.services.contains(.media) == true
+		let screen = payload.script?.services.contains(.screen) == true
 		let nonFinite: [(String, JSONValue)] = if case let .array(found) = split.nonFinite, !found.isEmpty { [("nonFinite", split.nonFinite)] } else { [] }
 		return [("cells", split.json)] + nonFinite
 			+ (unset.isEmpty ? [] : [("unset", .array(unset.sorted().map { .string($0) }))])
 			+ (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
 			+ (navigate ? [("params", .object(params.map { ($0.name, .string($0.value)) }))] : [])
 			+ (media ? [("media", .object(self.media().map { ($0.0, .string($0.1)) }))] : [])
+			+ (screen ? [("screen", .object([("devicePixelRatio", .number(devicePixelRatio()))]))] : [])
 	}
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
