@@ -154,6 +154,8 @@ function mirror(
 	let title: string | null = null;
 	// What the platform's sheets show: changed only by `sheet` entries.
 	const sheetOpen = new Map<string, boolean>();
+	// Each option's selectedness as the journal reported it; an option a new row adds starts unselected.
+	const selected = new Map<string, boolean>();
 	const mount = (next: NativeRuntime) => {
 		runtime = next;
 		texts.clear();
@@ -168,6 +170,8 @@ function mirror(
 		title = runtime.title();
 		sheetOpen.clear();
 		for (const [node, open] of runtime.sheets()) sheetOpen.set(node, open);
+		selected.clear();
+		for (const [node, value] of runtime.selections()) selected.set(node, value);
 	};
 	mount(opened);
 	const nodeOf = new Map(payload.nodes.map((node) => [node.id, node]));
@@ -210,6 +214,8 @@ function mirror(
 		const node = nodeOf.get(baseOf(id));
 		if (!node) return false;
 		if (node.kind === 'element') {
+			// An option shows only in its select's list, which is closed between steps.
+			if (node.element === 'option') return true;
 			const bound = attributes.get(`${id}\0hidden`);
 			if ((bound !== undefined ? bound : (node.attributes?.['hidden'] ?? null)) !== null)
 				return true;
@@ -219,6 +225,13 @@ function mirror(
 			hiddenWithin(`${node.parent}${nodeOf.get(node.parent)?.row ? suffix : ''}`)
 		);
 	};
+	// A closed select shows its chosen option's label.
+	const chosenLabels = () =>
+		payload.nodes.flatMap((node) =>
+			node.kind === 'element' && node.element === 'select' && shownNode(node.id) && !hiddenWithin(node.id)
+				? runtime.choices(node.id).flatMap((choice) => (selected.get(choice.option) ? [choice.label] : []))
+				: [],
+		);
 	// What a flow can see or tap: shown text, and each shown element's accessible name (aria-label, bound or static).
 	const labels = () =>
 		payload.nodes.flatMap((node) => {
@@ -245,6 +258,7 @@ function mirror(
 		else if (entry.op === 'title') title = entry.value;
 		else if (entry.op === 'attribute')
 			attributes.set(`${entry.node}\0${entry.name}`, entry.value);
+		else if (entry.op === 'property' && entry.name === 'selected') selected.set(entry.node, entry.value);
 		else if (entry.op === 'property') {
 			// A textarea's default value reaches its text, which this column does not compare.
 			if (bindsValue(nodeOf, entry.node)) properties.set(entry.node, entry.value);
@@ -320,7 +334,7 @@ function mirror(
 				[...texts].filter(([id]) => !inClosedSheet(id) && !hiddenWithin(id)),
 			);
 			const read = styled ? [...open.values()] : nativeShownTexts(payload, open);
-			const shown = [...read, ...labels().map(([, label]) => label)];
+			const shown = [...read, ...labels().map(([, label]) => label), ...chosenLabels()];
 			expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 			for (const text of step.absent ?? [])
 				expect(shown, `step ${index}`).not.toContain(text);
@@ -353,6 +367,8 @@ function mirror(
 				`step ${index}: the journal left a field stale`,
 			).toEqual(properties);
 			expect(runtime.title(), `step ${index}: the journal left the title stale`).toBe(title);
+			for (const [node, value] of runtime.selections())
+				expect(selected.get(node) ?? false, `step ${index}: the journal left ${node}'s selectedness stale`).toBe(value);
 		},
 	};
 }
@@ -427,6 +443,14 @@ function walkApp(
 			(action && ('swipe' in action || 'scrollTo' in action || 'orientation' in action))
 		) {
 			// Neither the appearance, a rotation, nor a sheet's resting height or scroll changes state: the hosts restyle and lay out.
+		} else if (action && 'choose' in action) {
+			const top = stack.at(-1)!;
+			const select = top.elementReading(action.choose.field);
+			if (!select) throw new Error(`step ${index}: no select reads "${action.choose.field}"`);
+			const choice = top.runtime.choices(select).find((one) => one.label === action.choose.option);
+			if (!choice || choice.disabled)
+				throw new Error(`step ${index}: "${action.choose.field}" has no option "${action.choose.option}" to pick`);
+			for (const entry of appRuntime.dispatch({ event: 'choose', host: choice.option })) top.apply(entry, index);
 		} else if (action) {
 			const top = stack.at(-1)!;
 			const host = top.elementReading(

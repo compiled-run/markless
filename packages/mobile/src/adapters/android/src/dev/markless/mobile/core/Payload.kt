@@ -1259,6 +1259,19 @@ data class AppPayload(val routes: List<AppRoute>) {
 	}
 }
 
+/** Each node inside a `<select>`: its options and their text, which show only in the select's picker. */
+val Payload.pickerContent: Set<String>
+	get() {
+		val selects = HashSet<String>()
+		val inside = HashSet<String>()
+		for (node in nodes) {
+			if (node is Node.Element && node.element == "select") selects.add(node.id)
+			val parent = node.parent ?: continue
+			if (parent in selects || parent in inside) inside.add(node.id)
+		}
+		return inside
+	}
+
 /** A live region: an assertive one interrupts the screen reader; an atomic one is read whole. */
 data class Live(val assertive: Boolean, val atomic: Boolean)
 

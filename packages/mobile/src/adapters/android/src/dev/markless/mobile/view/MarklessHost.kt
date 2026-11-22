@@ -11,7 +11,9 @@ import android.window.OnBackInvokedDispatcher
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.os.Build
 import android.os.Handler
 import android.os.LocaleList
@@ -61,6 +63,7 @@ import dev.markless.mobile.style.Assignment
 import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.StyleExport
 import dev.markless.mobile.style.shownRows
+import dev.markless.mobile.core.pickerContent
 import dev.markless.mobile.style.rowStates
 import dev.markless.mobile.style.StyleWrite
 import dev.markless.mobile.style.StyledNode
@@ -158,6 +161,8 @@ class MarklessHost(
 		private set
 	/** The export as built, which Dragon's plan lays out again at each size. */
 	private val planned = style
+	private val picker = payload.pickerContent
+	private val payloadIds = payload.nodes.mapTo(HashSet()) { it.id }
 	/** Dragon's HarfBuzz over this phone's system fonts, made when a page first lays its rows out. */
 	private var rowShaper: RowShaper? = null
 	/** The page size in device px and the slot values (export order) the page was last laid out at. */
@@ -1443,6 +1448,8 @@ class MarklessHost(
 		val node = inst.node
 		val layout = layoutOf(node) ?: return
 		val styled = layout.export.assignments[layout.assignment]
+		// Dragon lays out no box for what shows only in a select's picker.
+		if (node.id in picker && styled.byId[inst.id] == null) return
 		val s = styled.byId[inst.id] ?: if (node.row != null && layout.export.planRepeats.isNotEmpty()) {
 			// A row not laid out yet (at mount, or just added): the page is laid out again with its rows, which places it.
 			view.visibility = View.GONE
@@ -1500,6 +1507,7 @@ class MarklessHost(
 			if (view is MarklessBox) sizeScroller(inst.id, view, s, rect)
 		}
 		paint(view, s, styled)
+		if (view is SelectBox) selectLabel(view, s, styled, absolute)
 		if (view is TextView && node is Node.Text) {
 			lineSources[view] = s to inView
 			drawLines(view)
@@ -1561,7 +1569,7 @@ class MarklessHost(
 		var worst = 0.0
 		for (inst in built.values.sortedBy { order.getValue(it.node.id) }) {
 			val node = inst.node
-			if (sheetOf[node.id] != null) continue
+			if (sheetOf[node.id] != null || (node.id in picker && styled.byId[inst.id] == null)) continue
 			val view = views.getValue(inst.id)
 			if (view.visibility == View.GONE) continue
 			val frame = styled.byId.getValue(inst.id).frame!!
@@ -1629,6 +1637,7 @@ class MarklessHost(
 			StyleWrite.ClipText -> {}
 			is StyleWrite.PaintOrder -> {}
 			is StyleWrite.Visibility -> {}
+			is StyleWrite.SelectArrow -> if (view !is SelectBox) throw MarklessHostError("\"${s.id}\" draws a drop-down arrow but is not a select")
 		}
 		if (s.kind != "text") {
 			val edges = s.borderWidths
@@ -1650,27 +1659,58 @@ class MarklessHost(
 			return
 		}
 		val bw = s.borderWidths ?: throw MarklessHostError("element \"${s.id}\" has no border widths")
+		val arrow = s.selectArrow?.let { MenuListArrow(it, s.writes.filterIsInstance<StyleWrite.SelectArrow>().last().color.argb) }
+		// Chrome paints a menulist-button's arrow over its background and under its border.
+		fun withArrow(box: (Int) -> Drawable): Drawable = if (arrow == null) box(fill ?: 0) else LayerDrawable(arrayOf(
+			GradientDrawable().apply { setColor(fill ?: 0); radii?.let { r -> cornerRadii = r.map { it.toFloat() }.toFloatArray() } }, arrow, box(0),
+		))
 		s.borderOps?.let { ops ->
 			if (radii?.any { it != 0.0 } == true) throw MarklessHostError("\"${s.id}\" has a dashed or dotted border with rounded corners; Dragon draws none")
-			view.background = DashedBorder(fill ?: 0, ops, colors?.takeIf { it.size == 4 } ?: throw MarklessHostError("\"${s.id}\" has border operations but not four side colours"))
+			val sides = colors?.takeIf { it.size == 4 } ?: throw MarklessHostError("\"${s.id}\" has border operations but not four side colours")
+			view.background = withArrow { DashedBorder(it, ops, sides) }
 			return
 		}
 		val st = styles ?: listOf("none", "none", "none", "none")
 		for (x in st) if (x != "none" && x != "hidden" && x != "solid") throw MarklessHostError("\"${s.id}\" has border style \"$x\"; Android draws solid borders only")
 		val widths = listOf(bw.top, bw.right, bw.bottom, bw.left).mapIndexed { i, w -> if (st[i] == "solid") w else 0.0 }
 		val anyBorder = widths.any { it > 0 }
-		if ((fill == null || (fill ushr 24) == 0) && !anyBorder) { view.background = null; return }
+		if ((fill == null || (fill ushr 24) == 0) && !anyBorder) { view.background = arrow; return }
 		if (anyBorder && (widths.distinct().size != 1 || colors?.distinct()?.size != 1)) {
 			if (radii?.any { it != 0.0 } == true) throw MarklessHostError("\"${s.id}\" has unequal border sides with rounded corners; not implemented on Android")
-			view.background = SideBorders(fill ?: 0, widths.map { it.toFloat() }, colors ?: throw MarklessHostError("\"${s.id}\" has border sides but no colours"))
+			val sides = colors ?: throw MarklessHostError("\"${s.id}\" has border sides but no colours")
+			view.background = withArrow { SideBorders(it, widths.map { w -> w.toFloat() }, sides) }
 			return
 		}
-		view.background = GradientDrawable().apply {
-			setColor(fill ?: 0)
-			if (anyBorder) setStroke(widths[0].roundToInt(), colors!![0])
-			radii?.let { r -> cornerRadii = r.map { it.toFloat() }.toFloatArray() }
+		view.background = withArrow { f ->
+			GradientDrawable().apply {
+				setColor(f)
+				if (anyBorder) setStroke(widths[0].roundToInt(), colors!![0])
+				radii?.let { r -> cornerRadii = r.map { it.toFloat() }.toFloatArray() }
+			}
 		}
 	}
+
+	/** A styled select's label: in the box Dragon lays out inside it for its text, in that text's font and colour. */
+	private fun selectLabel(view: SelectBox, s: StyledNode, styled: Assignment, absolute: Map<String, Pair<Double, Double>>) {
+		// A select that is not visible shows neither its label nor its arrow, as the web hides them with it.
+		if (s.writes.any { it is StyleWrite.Visibility && it.value != "visible" }) return view.label(null, null, 0.0, null)
+		val inner = styled.nodes.filter { it.parent == s.id && !isView(it.id) }
+		if (inner.size != 1 || inner[0].kind != "element") throw MarklessHostError("\"${s.id}\": a select's style export holds one box for its label, not ${inner.size}")
+		val box = inner[0].frame
+		val at = absolute[inner[0].id]
+		val origin = absolute.getValue(s.id)
+		val text = styled.nodes.firstOrNull { it.parent == inner[0].id && it.kind == "text" }
+		if (box == null || at == null || text == null) return view.label(null, null, 0.0, null)
+		val font = text.writes.filterIsInstance<StyleWrite.Font>().lastOrNull() ?: throw MarklessHostError("\"${s.id}\": its label's text has no font")
+		val (ox, oy) = origin.first.roundToInt() to origin.second.roundToInt()
+		view.label(
+			Rect(at.first.roundToInt() - ox, at.second.roundToInt() - oy, (at.first + box.width).roundToInt() - ox, (at.second + box.height).roundToInt() - oy),
+			fonts.typeface(font.family), font.size * dpr, text.writes.filterIsInstance<StyleWrite.TextColor>().lastOrNull()?.color?.argb,
+		)
+	}
+
+	/** Whether a style node is a payload node's, or a row's copy of one. */
+	private fun isView(id: String): Boolean = payloadIds.contains(id.substringBefore('@'))
 
 	companion object {
 		const val TAG = "MarklessHost"

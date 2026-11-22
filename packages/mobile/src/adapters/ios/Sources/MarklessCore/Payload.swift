@@ -1730,3 +1730,16 @@ func decodeKeyParts(_ reader: Reader) throws -> [NativeKeyPart] {
 		return .path(try part.array().map { try $0.string() })
 	}
 }
+
+extension NativeViewPayload {
+	/// Each node inside a `<select>`: its options and their text, which show only in the select's picker.
+	public var pickerContent: Set<String> {
+		var selects = Set<String>()
+		var inside = Set<String>()
+		for node in nodes {
+			if case .element("select", _, _) = node.kind { selects.insert(node.id) }
+			if let parent = node.parent, selects.contains(parent) || inside.contains(parent) { inside.insert(node.id) }
+		}
+		return inside
+	}
+}

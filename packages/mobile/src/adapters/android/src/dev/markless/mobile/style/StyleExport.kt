@@ -57,7 +57,15 @@ sealed interface StyleWrite {
 	data class PaintOrder(val host: String, val bucket: Int, val rank: Int) : StyleWrite
 	/** `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own. */
 	data class Visibility(val value: String) : StyleWrite
+	/** A select whose appearance devolves to menulist-button: its drop-down arrow is stroked in [color], along [StyledNode.selectArrow]. */
+	data class SelectArrow(val color: Rgba) : StyleWrite
 }
+
+/**
+ * A select's drop-down arrow as Dragon's plan layout gives it: an open path of [points] (x, y pairs, the first moved to), stroked
+ * [strokeWidth] wide with butt caps and miter joins (limit 4), all in device px from the select's snapped border box.
+ */
+data class SelectArrow(val strokeWidth: Double, val points: List<Double>)
 
 /** One drawing operation of a dashed or dotted border, in device px; [side] names the side whose colour it takes (-1: none). */
 data class BorderOp(val op: String, val side: Int, val alpha: Double, val antialias: Boolean, val points: List<Double>)
@@ -72,7 +80,9 @@ data class GlyphRun(val face: String, val size: Double, val glyphs: List<Int>, v
 data class TextLine(val top: Double, val baseline: Double, val runs: List<GlyphRun>)
 
 /** [scrollRange], device px, only on a scroll container; [lines], only on a framed text node, the glyphs Dragon draws for its [text]. */
-data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val scrollRange: ScrollRange? = null, val borderOps: BorderOps? = null, val lines: List<TextLine>? = null, val text: String? = null)
+data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val scrollRange: ScrollRange? = null, val borderOps: BorderOps? = null, val lines: List<TextLine>? = null, val text: String? = null, val selectArrow: SelectArrow? = null) {
+	val drawsSelectArrow: Boolean get() = writes.any { it is StyleWrite.SelectArrow }
+}
 
 /**
  * One reachable combination of style states: every node's frame and writes, complete, the canvas behind the page (null: white),
@@ -270,7 +280,32 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			if (lists != null && rowsLayout == null) throw MarklessDecodeError("a page with rows needs Dragon's rows layout")
 			val result = Json.parse(if (lists == null) layout(line) else rowsLayout!!(line))
 			val parts = result.arr("plan layout")
-			if (parts.size != (if (slots.isEmpty()) 3 else 4) || parts[0] != Json.Str("ok")) throw MarklessDecodeError("Dragon's layout at $width x $height dp and ${scale}x failed: ${result.text()}")
+			val slotted = slots.isNotEmpty()
+			val tagged = parts.size > (if (slotted) 4 else 3)
+			if (parts.size != (if (slotted) 4 else 3) + (if (tagged) 1 else 0) || parts[0] != Json.Str("ok")) throw MarklessDecodeError("Dragon's layout at $width x $height dp and ${scale}x failed: ${result.text()}")
+			// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
+			fun exportId(id: String): String {
+				val at = id.indexOf('@')
+				return if (at < 0) names[id] ?: id else (names[id.substring(0, at)] ?: id.substring(0, at)) + id.substring(at)
+			}
+			val arrows = HashMap<String, SelectArrow>()
+			if (tagged) {
+				val suffix = parts.last().arr("plan layout arrows")
+				if (suffix.size != 2 || suffix[0] != Json.Str("menulist-arrows")) throw MarklessDecodeError("plan layout: expected [\"menulist-arrows\", arrows], found ${parts.last().text()}")
+				for (a in suffix[1].arr("plan layout arrows")) {
+					val f = a.arr("plan layout arrow")
+					if (f.size != 3) throw MarklessDecodeError("plan layout arrow: expected id, stroke width and path")
+					val id = exportId(f[0].str("plan layout arrow id"))
+					if (id in arrows) throw MarklessDecodeError("plan layout: $id has two arrows")
+					val points = f[2].arr("plan layout arrow of $id").flatMapIndexed { k, g ->
+						val segment = g.arr("plan layout arrow of $id")
+						if (segment.size != 3 || segment[0] != Json.Str(if (k == 0) "move" else "line")) throw MarklessDecodeError("plan layout arrow of $id: its path is a move and then lines")
+						listOf(planNumber(segment[1]), planNumber(segment[2]))
+					}
+					if (points.size < 4) throw MarklessDecodeError("plan layout arrow of $id: its path needs a move and a line")
+					arrows[id] = SelectArrow(planNumber(f[1]), points)
+				}
+			}
 			val page = parts[1].arr("plan layout page scroll")
 			// Dragon's ["undecided", node, reason] when it could not decide the page's range at this size.
 			if (page.size == 3) undecided = "${page[1].str("plan layout page scroll node")}: ${page[2].str("plan layout page scroll reason")}"
@@ -278,10 +313,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val geometry = HashMap<String, List<Json>>()
 			for (g in parts[2].arr("plan layout nodes")) {
 				val f = g.arr("plan layout node")
-				val id = f.firstOrNull()?.str("plan layout node id") ?: throw MarklessDecodeError("plan layout node has no id")
-				// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
-				val at = id.indexOf('@')
-				if (at < 0) geometry[names[id] ?: id] = f else geometry[(names[id.substring(0, at)] ?: id.substring(0, at)) + id.substring(at)] = f
+				geometry[exportId(f.firstOrNull()?.str("plan layout node id") ?: throw MarklessDecodeError("plan layout node has no id"))] = f
 			}
 			val assignment = assignments[k]
 			val moved = HashMap<String, MutableList<List<Json>>>()
@@ -333,11 +365,14 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				}), "$what.lines")
 				val ops = if (f[4] == Json.Null) null else borderOps(planBorderOps(f[4], what), "$what.borderOps")
 				val scroll = if (f[5] == Json.Null) null else range(rangeJson(f[5].arr(what), what), what)
+				val arrow = arrows.remove(node.id)
+				if (arrow != null && !node.drawsSelectArrow) throw MarklessDecodeError("Dragon's layout gives ${node.id} an arrow, but it draws none")
+				if (arrow == null && node.drawsSelectArrow) throw MarklessDecodeError("\"${node.id}\" draws a drop-down arrow, but Dragon's layout gives it no arrow geometry")
 				node.copy(
 					frame = Frame(frame[0], frame[1], frame[2], frame[3]), borderWidths = widths?.let { Edges(it[0], it[1], it[2], it[3]) },
-					borderOps = ops, scrollRange = scroll, lines = if (node.kind == "text") lines else null,
+					borderOps = ops, scrollRange = scroll, lines = if (node.kind == "text") lines else null, selectArrow = arrow,
 				)
-			})
+			}).also { if (arrows.isNotEmpty()) throw MarklessDecodeError("Dragon's layout gives an arrow for ${arrows.keys.sorted().first()}, which it shows no box for") }
 		}
 		return copy(dpr = scale, viewportWidth = width, viewportHeight = height, assignments = laid, pageScrollUndecided = undecided ?: pageScrollUndecided)
 	}
@@ -442,6 +477,9 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				if (template.isEmpty()) throw MarklessDecodeError("$what.planRepeats[$i]: a row has at least one box")
 				PlanRepeat(o.field("id", "$what.planRepeats[$i]").str("id"), o.field("parent", "$what.planRepeats[$i]").str("parent"), template)
 			} ?: emptyList()
+			if (plan == null) style.assignments.firstNotNullOfOrNull { a -> a.nodes.firstOrNull { it.drawsSelectArrow } }?.let {
+				throw MarklessDecodeError("$what: \"${it.id}\" draws a drop-down arrow, whose geometry only Dragon's plan layout gives, and the export has no plan")
+			}
 			return style.copy(plan = plan, planNames = names, planRepeats = repeats)
 		}
 
@@ -605,7 +643,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 						ho.only(setOf("snapPoint", "viewport", "readiness", "states", "initial", "next", "bands", "assignments"), at)
 						val hp = ho.field("viewport", at).obj("$at.viewport")
 						hp.only(setOf("width", "height"), "$at.viewport")
-						SheetHeight(ho.field("snapPoint", at).num("$at.snapPoint"), program(ho, at, dpr, hp.field("width", at).num("width"), hp.field("height", at).num("height"), null, listed))
+						SheetHeight(ho.field("snapPoint", at).num("$at.snapPoint"), withPlan(program(ho, at, dpr, hp.field("width", at).num("width"), hp.field("height", at).num("height"), null, listed), ho, at))
 					}.also { if (it.isEmpty() || it.map { h -> h.snapPoint }.distinct().size != it.size) throw MarklessDecodeError("$where needs one layout per resting height") }
 				}
 				val planned = withPlan(program(o, "routes[$n] ($pattern)", dpr, width, height, null, listed).copy(sheets = sheets, systemFaces = faces), o, "routes[$n]")
@@ -740,6 +778,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					if (o.field("canvas", what) !is Json.Bool) throw MarklessDecodeError("$what.canvas must be a boolean")
 					StyleWrite.Visibility(value)
 				}
+				"select-arrow" -> StyleWrite.SelectArrow(color(o.field("color", what), "$what.color"))
 				else -> throw MarklessDecodeError("$what has unknown style write kind \"$kind\"")
 			}
 		}
