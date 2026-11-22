@@ -4605,6 +4605,33 @@ export function Page() @{
 		]);
 	});
 
+	it('runs URL and URLSearchParams in the script, adding their code only to a script that reads them', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function nextPage(query: string): string {
+	const params = new URLSearchParams(query);
+	params.set('page', String(Number(params.get('page')) + 1));
+	return new URL('?' + params, 'https://shop.example/list').href;
+}
+export function Page() @{
+	let query = state('page=1');
+	let link = state('');
+	<button onClick={() => (link = nextPage(query))}>{link}</button>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.script!.services).toEqual([]);
+		expect(payload!.script!.source).toContain('g.URLSearchParams = URLSearchParams');
+		const timers = await nativeView(`import { state } from '@markless/core';
+function later(fn: () => void): void {
+	for (const ms of [1]) setTimeout(fn, ms);
+}
+export function Page() @{
+	let count = state(0);
+	<button onClick={() => later(() => (count += 1))}>{count}</button>
+}`);
+		expect(timers.diagnostics).toEqual([]);
+		expect(timers.payload!.script!.source).not.toContain('g.URLSearchParams');
+	});
+
 	it('passes a component a prop that calls app code through the script', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function total(text: string): number {
