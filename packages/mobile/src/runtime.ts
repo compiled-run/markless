@@ -31,6 +31,8 @@ import {
 	type NativeNonFinite,
 	nativeEmailValue,
 	nativeTooLongMessage,
+	NATIVE_SCRIPT_MEDIA_DEFAULTS,
+	type NativeScriptMedia,
 } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeScriptEngine } from './script-engine.ts';
@@ -718,6 +720,8 @@ export function createNativeRuntime(
 	session: Map<string, Value> = new Map(),
 	/** The screen's views: the box of an element (its node id, `<node>@<key>` in a row) a script reads, measured as an entry begins; null when it has no view. */
 	measure?: (id: string) => NativeElementBox | null,
+	/** The device's answers to the media features a script's `matchMedia` reads, read as each entry begins. */
+	media: () => NativeScriptMedia = () => NATIVE_SCRIPT_MEDIA_DEFAULTS,
 ): NativeRuntime {
 	const base: NativeScope = {
 		...EMPTY_SCOPE,
@@ -982,6 +986,7 @@ export function createNativeRuntime(
 			? { seed: scriptHost.seed() }
 			: {}),
 		...(script?.services.includes('navigate') ? { params } : {}),
+		...(script?.services.includes('media') ? { media: media() } : {}),
 	});
 	/** One engine entry, then what it asked for: its writes land in cells; timers, clears and requests become entries. */
 	/** Submissions held by a script promise not settled yet, by the engine's run number. */

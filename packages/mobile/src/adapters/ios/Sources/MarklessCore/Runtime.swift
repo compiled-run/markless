@@ -310,6 +310,9 @@ public final class NativeRuntime {
 	/// The screen's views: the box of an element (its node id, `<node>@<key>` in a row) a script reads, measured as an
 	/// entry begins; nil when it has no view.
 	public var measure: ((String) -> NativeElementBox?)?
+	/// The device's answers to the media features a script's `matchMedia` reads (`prefers-reduced-motion`, `prefers-color-scheme`),
+	/// read as each entry begins; the web's defaults when the host gives none.
+	public var media: () -> [(String, String)] = { [("prefers-reduced-motion", "no-preference"), ("prefers-color-scheme", "light")] }
 
 	/// The device's clock, in milliseconds since 1970 (UTC).
 	private let now: () -> Double
@@ -743,8 +746,8 @@ public final class NativeRuntime {
 		return .object(facts)
 	}
 
-	/// Every current value by slot (the page's cells in payload order, then row slots), a seed when `crypto` is used, and
-	/// the route params when `navigate` is.
+	/// Every current value by slot (the page's cells in payload order, then row slots), a seed when `crypto` is used, the
+	/// route params when `navigate` is, and the device's media answers when `media` is.
 	private func entryCells() -> [(String, JSONValue)] {
 		let ids = Set(payload.cells.map(\.id))
 		let slots = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0) } }
@@ -753,11 +756,13 @@ public final class NativeRuntime {
 		let split = NativeValue.object(slots.map { (key: $0.0, value: $0.1) }).nonFiniteSplit
 		let crypto = payload.script?.services.contains(.crypto) == true
 		let navigate = payload.script?.services.contains(.navigate) == true
+		let media = payload.script?.services.contains(.media) == true
 		let nonFinite: [(String, JSONValue)] = if case let .array(found) = split.nonFinite, !found.isEmpty { [("nonFinite", split.nonFinite)] } else { [] }
 		return [("cells", split.json)] + nonFinite
 			+ (unset.isEmpty ? [] : [("unset", .array(unset.sorted().map { .string($0) }))])
 			+ (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
 			+ (navigate ? [("params", .object(params.map { ($0.name, .string($0.value)) }))] : [])
+			+ (media ? [("media", .object(self.media().map { ($0.0, .string($0.1)) }))] : [])
 	}
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.

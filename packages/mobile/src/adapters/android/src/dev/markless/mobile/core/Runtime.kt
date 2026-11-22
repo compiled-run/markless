@@ -502,6 +502,8 @@ class Runtime(
 
 	/** The screen's views: the box of an element (its node id, `<node>@<key>` in a row) a script reads, measured as an entry begins; null when it has no view. */
 	var measure: ((id: String) -> ElementBox?)? = null
+	/** The device's answers to the media features a script's `matchMedia` reads, read as each entry begins; the web's defaults when the host gives none. */
+	var media: () -> List<Pair<String, String>> = { listOf("prefers-reduced-motion" to "no-preference", "prefers-color-scheme" to "light") }
 
 	/** Called with each engine entry's duration in nanoseconds, including starting the engine when the entry had to. */
 	var onScriptEntry: ((nanos: Long) -> Unit)? = null
@@ -634,7 +636,7 @@ class Runtime(
 		return facts.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value}" }
 	}
 
-	/** Every current value by slot, the seed `crypto` draws from when the script uses it, and the route params for `navigate`. */
+	/** Every current value by slot, the seed `crypto` draws from when the script uses it, the route params for `navigate`, and the device's media answers for `media`. */
 	private fun entryCells(): String = buildString {
 		append(",\"cells\":")
 		append(values.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonValue(it.value)}" })
@@ -645,6 +647,8 @@ class Runtime(
 		if (payload.script?.services?.contains("crypto") == true) scriptHost?.seed()?.let { append(",\"seed\":${jsonString(it)}") }
 		if (payload.script?.services?.contains("navigate") == true)
 			append(",\"params\":" + params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" })
+		if (payload.script?.services?.contains("media") == true)
+			append(",\"media\":" + media().joinToString(",", "{", "}") { "${jsonString(it.first)}:${jsonString(it.second)}" })
 	}
 
 	/** Submissions held by a script promise not settled yet, by the engine's run number. */
