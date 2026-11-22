@@ -1,0 +1,8 @@
+{
+	"rung": 171,
+	"name": "<center>: its blocks in the middle of the line and its text centred, as the web's default stylesheet has it",
+	"steps": [
+		{ "visible": ["Poll", "Votes: 0"] },
+		{ "do": { "tap": "Vote" }, "visible": ["Votes: 1"], "absent": ["Votes: 0"] }
+	]
+}

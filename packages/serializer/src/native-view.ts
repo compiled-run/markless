@@ -311,6 +311,8 @@ export type NativeDefaultStyle = {
 	readonly marker?: 'disc' | 'decimal';
 	/** On `<summary>`: a triangle before its content, not read aloud: ▸ while its `aria-expanded` is false, ▾ while true. */
 	readonly disclosure?: true;
+	/** On `<center>`: its blocks in the middle of the line and its text centred (`text-align: -webkit-center`), inherited. */
+	readonly center?: true;
 	/** Table structure: `<td>` and `<th>` cells line up in columns across the rows of their `<table>`. */
 	readonly table?: 'table' | 'row' | 'cell';
 };
@@ -406,6 +408,7 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	dialog: {},
 	details: {},
 	summary: { disclosure: true },
+	center: { center: true },
 	form: {},
 	select: {},
 	option: {},

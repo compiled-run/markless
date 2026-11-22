@@ -207,6 +207,8 @@ public struct NativeDefaultStyle: Equatable, Sendable {
 	public var marker: String?
 	/// On a summary: a ▸ (collapsed) or ▾ (expanded) before its content, by its `aria-expanded`.
 	public var disclosure = false
+	/// On a center: its blocks in the middle of the line and its text centred, which what is inside inherits.
+	public var center = false
 	/// `table`, `row` or `cell`.
 	public var table: String?
 	public init() {}
@@ -1201,7 +1203,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 	private static func decodeDefaultStyle(_ reader: Reader) throws -> NativeDefaultStyle {
 		let field = try reader.object(required: [], optional: [
 			"flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "rule",
-			"marker", "disclosure", "table",
+			"marker", "disclosure", "center", "table",
 		])
 		func oneOf(_ key: String, _ allowed: [String]) throws -> String? {
 			guard field.has(key) else { return nil }
@@ -1225,6 +1227,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		style.rule = try flag("rule")
 		style.marker = try oneOf("marker", ["disc", "decimal"])
 		style.disclosure = try flag("disclosure")
+		style.center = try flag("center")
 		style.table = try oneOf("table", ["table", "row", "cell"])
 		return style
 	}

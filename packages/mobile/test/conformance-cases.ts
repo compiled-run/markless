@@ -1774,6 +1774,12 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'center',
+		fixture: 'proofs/r171-center/App.tsrx',
+		modules: true,
+		actions: [{ event: 'activate', host: 'h4' }],
+	},
+	{
 		name: 'details',
 		fixture: 'proofs/r145-details/App.tsrx',
 		modules: true,

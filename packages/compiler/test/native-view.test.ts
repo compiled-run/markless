@@ -4770,6 +4770,18 @@ export function Page() @{
 		expect(timers.payload!.script!.source).not.toContain('g.URLSearchParams');
 	});
 
+	it('draws <center> with its default look: its blocks in the middle of the line, its text centred', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Page() @{
+	<center><h1>Poll</h1><p>Once</p></center>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.nodes.flatMap((node) => (node.kind === 'element' ? [[node.element, node.defaultStyle]] : []))).toEqual([
+			['center', { center: true }],
+			['h1', { bold: true, size: 2 }],
+			['p', undefined],
+		]);
+	});
+
 	it('passes a component a prop that calls app code through the script', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function total(text: string): number {
