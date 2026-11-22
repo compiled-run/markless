@@ -1033,7 +1033,16 @@ export function createNativeRuntime(
 			readonly prevented?: true;
 			/** The text an input handler set on its field (`event.target.value = …`). */
 			readonly value?: string;
+			/** The event types the page's document listens for now, when an entry changed them. */
+			readonly listening?: ReadonlyArray<string>;
+			/** The elements the entry that changed them held, which the document's listeners may read later. */
+			readonly watch?: ReadonlyArray<string>;
 		};
+		if (result.listening) {
+			documentListening.clear();
+			for (const type of result.listening) documentListening.add(type);
+		}
+		for (const id of result.watch ?? []) documentElements.add(id);
 		if (result.value !== undefined && typing !== undefined) {
 			edited.set(typing, result.value);
 			written.add(typing);
@@ -1625,6 +1634,9 @@ export function createNativeRuntime(
 	const edited = new Map<string, string>();
 	/** The text field whose input event is running, which a handler's `event.target.value` write lands on. */
 	let typing: string | undefined;
+	/** The event types the page's document has listeners for, and the elements those listeners may read. */
+	const documentListening = new Set<string>();
+	const documentElements = new Set<string>();
 	type Submission = {
 		readonly sent: string;
 		readonly submitter: string | null;
@@ -2343,6 +2355,8 @@ export function createNativeRuntime(
 						readonly handler: string;
 						readonly fields: NativeEventFields;
 						readonly scope?: NativeScope;
+						/** The event bubbled on to the document's listeners, after the element's own handlers. */
+						readonly document?: NativePointerEventName;
 					}[] = [];
 					const raise = (
 						type: NativePointerEventName,
@@ -2357,6 +2371,8 @@ export function createNativeRuntime(
 									fields: fieldsOf(type, target, node, related),
 								});
 						}
+						if (documentListening.has(type))
+							runs.push({ handler: '', fields: fieldsOf(type, target, target, related), document: type });
 					};
 					/** `pointerenter` on each element `target` is in that `from` is not, outermost first; `pointerleave` the other way. */
 					const crossing = (
@@ -2378,6 +2394,24 @@ export function createNativeRuntime(
 					};
 					const flush = (): NativeJournalEntry[] | undefined => {
 						for (const step of runs.splice(0)) {
+							if (step.document) {
+								const { target: from, relatedTarget, currentTarget: _, ...fields } = step.fields;
+								calls.push(
+									...enter({
+										kind: 'document',
+										event: {
+											type: step.document,
+											...fields,
+											nodes: { target: from ?? null, currentTarget: null, relatedTarget: relatedTarget ?? null },
+										},
+										elements: elementFacts({}, [
+											...documentElements,
+											...(typeof from === 'string' ? [from] : []),
+										]),
+									}),
+								);
+								continue;
+							}
 							const out = run(
 								handlers.get(step.handler) ?? [],
 								step.fields,
