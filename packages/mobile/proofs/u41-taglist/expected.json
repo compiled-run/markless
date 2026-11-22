@@ -1,0 +1,27 @@
+{
+	"rung": 205,
+	"name": "taglist: the return key commits what was typed as a tag, and typing the delimiter commits the word before it, each from the field's own JavaScript handlers",
+	"steps": [
+		{
+			"visible": ["Pantry", "Tags: tea"],
+			"fields": { "Topics": "" }
+		},
+		{
+			"do": { "type": { "field": "Topics", "text": "milk", "append": true } },
+			"visible": ["Tags: tea"],
+			"fields": { "Topics": "milk" }
+		},
+		{
+			"do": { "submit": "Topics" },
+			"visible": ["Tags: tea, milk"],
+			"absent": ["Tags: tea"],
+			"fields": { "Topics": "" }
+		},
+		{
+			"do": { "type": { "field": "Topics", "text": "sugar,", "append": true } },
+			"visible": ["Tags: tea, milk, sugar"],
+			"absent": ["Tags: tea, milk"],
+			"fields": { "Topics": "" }
+		}
+	]
+}

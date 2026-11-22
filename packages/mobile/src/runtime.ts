@@ -1031,7 +1031,13 @@ export function createNativeRuntime(
 			readonly raises?: ReadonlyArray<Raised>;
 			/** A key or paste handler called `preventDefault()` before it first awaited. */
 			readonly prevented?: true;
+			/** The text an input handler set on its field (`event.target.value = …`). */
+			readonly value?: string;
 		};
+		if (result.value !== undefined && typing !== undefined) {
+			edited.set(typing, result.value);
+			written.add(typing);
+		}
 		for (const [slot, json, nonFinite] of result.writes) {
 			const value = nativeNonFiniteJoin(json, nonFinite) as Value;
 			const at = slot.indexOf('@');
@@ -1115,6 +1121,9 @@ export function createNativeRuntime(
 				},
 			),
 			...(result.prevented ? [{ op: 'preventDefault' } as NativeJournalEntry] : []),
+			...(result.value !== undefined && typing !== undefined
+				? [{ op: 'property', node: typing, name: 'value', value: result.value } as NativeJournalEntry]
+				: []),
 			...raised,
 			...(result.navigate
 				? [
@@ -1614,6 +1623,8 @@ export function createNativeRuntime(
 	const forms = new Map((payload.forms ?? []).map((form) => [form.node, form]));
 	/** A field's text a person typed since its `value` binding last changed it. */
 	const edited = new Map<string, string>();
+	/** The text field whose input event is running, which a handler's `event.target.value` write lands on. */
+	let typing: string | undefined;
 	type Submission = {
 		readonly sent: string;
 		readonly submitter: string | null;
@@ -2846,6 +2857,7 @@ export function createNativeRuntime(
 			const beforeProperties = keyed(properties());
 			const typedKey = eventValue !== undefined && host !== undefined ? `${host}\0value` : undefined;
 			if (eventValue !== undefined && host !== undefined) edited.set(host, eventValue);
+			typing = typeof eventValue === 'string' ? host : undefined;
 			const beforeArms = new Map(arms());
 			drawnArms = beforeArms;
 			const beforeRows = new Map(rows());
