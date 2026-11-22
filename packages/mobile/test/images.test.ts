@@ -13,6 +13,12 @@ test("an image's natural size comes from its header: PNG, JPEG and GIF", () => {
 	expect(imageHeader(gif)).toEqual({ format: 'gif', width: 18, height: 18 });
 });
 
+test("a WebP's natural size comes from its first chunk: lossy, lossless and extended, its EXIF orientation left unapplied as Chrome does", () => {
+	expect(imageHeader(readFileSync(join(proofs, 'r170-webp-images/public/static/photo.webp')))).toEqual({ format: 'webp', width: 200, height: 120 });
+	expect(imageHeader(readFileSync(join(proofs, 'lib/square.webp')))).toEqual({ format: 'webp', width: 64, height: 64 });
+	expect(imageHeader(readFileSync(join(proofs, 'r170-webp-images/public/static/turned.webp')))).toEqual({ format: 'webp', width: 96, height: 48 });
+});
+
 test('bytes that are not an image the build reads have no header, so the phone shows the alt text', () => {
 	expect(imageHeader(readFileSync(join(proofs, 'r155-images/public/static/broken.png')))).toBeNull();
 	expect(imageHeader(new Uint8Array())).toBeNull();
