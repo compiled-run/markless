@@ -64,13 +64,8 @@ internal class ShadowRaster private constructor() {
 		val w = whole(r - l)
 		val h = whole(b - t)
 		if (w <= 0 || h <= 0) return null
-		val rgba = layerRgba.invoke(layer) as List<Double>
-		if (rgba.size != w * h * 4) throw MarklessHostError("a shadow layer of ${rgba.size} values is not ${w}x$h RGBA")
-		val bytes = ByteArray(rgba.size) { i ->
-			val c = rgba[i]
-			if (!(c >= 0.0 && c <= 255.0) || c != Math.floor(c)) throw MarklessHostError("shadow channel $c is not a byte")
-			c.toInt().toByte()
-		}
+		val bytes = layerRgba.invoke(layer) as ByteArray
+		if (bytes.size != w * h * 4) throw MarklessHostError("a shadow layer of ${bytes.size} bytes is not ${w}x$h RGBA")
 		val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
 		bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(bytes))
 		return Triple(bitmap, whole(l - box[0]), whole(t - box[1]))

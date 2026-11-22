@@ -1512,9 +1512,8 @@ class MarklessHost(
 			}
 			if (view is MarklessBox) sizeScroller(inst.id, view, s, rect)
 		}
-		paint(view, s)
-		paintShadow(view, s, styled)
 		paint(view, s, styled)
+		paintShadow(view, s, styled)
 		if (view is TextView && node is Node.Text) {
 			lineSources[view] = s to inView
 			drawLines(view)

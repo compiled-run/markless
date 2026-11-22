@@ -136,7 +136,10 @@
 	"states": [
 		{
 			"cell": "state:tall",
-			"domain": [false, true],
+			"domain": [
+				false,
+				true
+			],
 			"initial": false
 		}
 	]

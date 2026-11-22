@@ -111,12 +111,8 @@ private func bitmap(_ layer: ShadowLayer, _ s: BoxShadow) throws -> (image: CGIm
 		x: (layer.left - s.originX) / s.dpr, y: (layer.top - s.originY) / s.dpr, width: Double(w) / s.dpr, height: Double(h) / s.dpr)
 	let rgba = layer.rgba.items
 	if w <= 0 || h <= 0 { return (nil, rect) }
-	guard rgba.count == w * h * 4 else { throw HostError("a shadow layer of \(rgba.count) values is not \(w)x\(h) RGBA") }
-	let bytes = try rgba.map { c -> UInt8 in
-		guard c >= 0, c <= 255, c.rounded(.towardZero) == c else { throw HostError("shadow channel \(c) is not a byte") }
-		return UInt8(c)
-	}
-	guard let space = CGColorSpace(name: CGColorSpace.sRGB), let provider = CGDataProvider(data: Data(bytes) as CFData),
+	guard rgba.count == w * h * 4 else { throw HostError("a shadow layer of \(rgba.count) bytes is not \(w)x\(h) RGBA") }
+	guard let space = CGColorSpace(name: CGColorSpace.sRGB), let provider = CGDataProvider(data: Data(rgba) as CFData),
 		let image = CGImage(
 			width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: w * 4, space: space,
 			bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue), provider: provider, decode: nil,
