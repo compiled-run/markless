@@ -703,12 +703,18 @@ class MarklessHost(
 			val shaper = rowShaper ?: RowShaper(planned.systemFaces).also { rowShaper = it }
 			(RowShaper.rowsLayout(shaper) ?: throw MarklessHostError("a page with styled rows or texts that follow state needs Dragon's live layout in the app"))(line)
 		}
-		val next = planned.laidOut(
-			Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout, at.third.first,
-			rows = if (withRows) planned.shownRows(payload, runtime) else null,
-			rowsLayout = live,
-			texts = texts,
-		)
+		val rows = if (withRows) planned.shownRows(payload, runtime) else null
+		val lay = { shown: Map<String, String> ->
+			planned.laidOut(Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout, at.third.first, rows = rows, rowsLayout = live, texts = shown)
+		}
+		// Page texts in a face this host cannot shape keep the boxes the build laid them out in, as before they followed state.
+		rowShaper?.unshapedFace = false
+		val next = try {
+			lay(texts)
+		} catch (e: Exception) {
+			if (texts.isEmpty() || rowShaper?.unshapedFace != true) throw e
+			lay(emptyMap())
+		}
 		style = next
 		p.relaid(next)
 		laidOutFor = at

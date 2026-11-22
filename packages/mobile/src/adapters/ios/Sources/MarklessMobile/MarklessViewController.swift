@@ -362,11 +362,21 @@ public final class MarklessViewController: UIViewController {
 			let texts = Dictionary(try runtime.texts().filter { pageRows[$0.node] != nil && pageRows[$0.node]! == nil }.map { ($0.node, $0.text) }, uniquingKeysWith: { a, _ in a })
 			guard size.width > 0, size.height > 0, rowsMoved || size != laidOutFor?.size || slots.map(\.bitPattern) != laidOutFor?.slots.map(\.bitPattern) || texts != laidOutFor?.texts else { return }
 			let scale = Double(traitCollection.displayScale)
-			let shape = coreTextRowShaper(faces: style.systemFaces, dpr: scale)
-			let relaid = try style.laidOut(
-				width: Double(size.width), height: Double(size.height), scale: scale, slots: slots, layout: DragonPlan.layout,
-				rows: style.planRepeats.isEmpty ? nil : try style.shownRows(payload, runtime: runtime),
-				rowsLayout: { DragonPlan.rowsLayout($0, shape: shape) }, texts: texts)
+			let shaper = coreTextRowShaper(faces: style.systemFaces, dpr: scale)
+			var unshaped = false
+			let shape: (String, Double, String, Int, Int, String, [Double]) throws -> [Double] = { face, size, text, start, end, language, features in
+				if style.systemFaces[face] == nil { unshaped = true }
+				return try shaper(face, size, text, start, end, language, features)
+			}
+			let rows = style.planRepeats.isEmpty ? nil : try style.shownRows(payload, runtime: runtime)
+			let lay = { (texts: [String: String]) in
+				try style.laidOut(
+					width: Double(size.width), height: Double(size.height), scale: scale, slots: slots, layout: DragonPlan.layout,
+					rows: rows, rowsLayout: { DragonPlan.rowsLayout($0, shape: shape) }, texts: texts)
+			}
+			// Page texts in a face this host cannot shape keep the boxes the build laid them out in, as before they followed state.
+			let relaid: StyleExport
+			do { relaid = try lay(texts) } catch where unshaped && !texts.isEmpty { relaid = try lay([:]) }
 			let now = try relaid.resolve(
 				for: payload, initialTexts: mountTexts, value: runtime.value(of:), dark: traitCollection.userInterfaceStyle == .dark)
 			try tree.relayout(now)
