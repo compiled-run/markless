@@ -110,7 +110,20 @@ class SizedImage(context: Context, private val packaged: Map<String, PackagedIma
 		addView(altText, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
 	}
 
+	/** On a styled page, an img whose src the app sets as it runs: Dragon places the image it loads; null otherwise. */
+	var loaded: LoadedImageView? = null
+		private set
+
+	/** Makes this box draw the images its app loads, as Dragon places them, instead of a picture at the web's size. */
+	fun loadsImages() {
+		if (loaded != null) return
+		loaded = LoadedImageView(context, packaged).also { addView(it, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)) }
+		image.visibility = View.GONE
+		altText.visibility = View.GONE
+	}
+
 	fun src(value: String?) {
+		loaded?.let { return it.show(value) }
 		src = value
 		natural = value?.let { packaged[it] }
 		drawn?.let(::removeView)
@@ -136,6 +149,7 @@ class SizedImage(context: Context, private val packaged: Map<String, PackagedIma
 	}
 
 	private fun refresh() {
+		if (loaded != null) return
 		altText.text = if (shown) null else alt
 		altText.visibility = if (shown || alt.isNullOrEmpty()) View.GONE else View.VISIBLE
 		requestLayout()

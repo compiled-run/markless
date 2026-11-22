@@ -57,6 +57,54 @@ sealed interface StyleWrite {
 	data class PaintOrder(val host: String, val bucket: Int, val rank: Int) : StyleWrite
 	/** `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own. */
 	data class Visibility(val value: String) : StyleWrite
+	/** An `<img>` whose src the app sets as it runs: the host draws whatever image loads into its content box, as Chrome does. */
+	data class RuntimeImage(val image: LoadedImageSpec) : StyleWrite
+}
+
+/** Dragon's layout unit, which the runtime-image write's content box counts in: 1/64 px, as Blink's LayoutUnit. */
+const val DRAGON_LAYOUT_UNITS_PER_PX = 64.0
+
+/**
+ * An `<img>` whose src the app sets as it runs: its object-fit, object-position (x then y: a percent, or CSS px), whether
+ * image-rendering is pixelated, the no-image outline's colour when its src can be absent (null: it always has one), and its content
+ * box at the export's layout, absolute, in Dragon's layout units.
+ */
+data class LoadedImageSpec(val fit: String, val position: List<Pair<Boolean, Double>>, val pixelated: Boolean, val outline: Rgba?, val content: Frame?)
+
+/** Where a runtime image is painted from, in absolute device px: its content box, and the origin of its node's frame. */
+data class RuntimeImagePlace(val content: Frame, val originX: Double, val originY: Double)
+
+/**
+ * Dragon's translated paint of an img whose src the app sets as it runs (layout paint.ts runtimeImagePaint), when the app is built
+ * with Dragon's engine: from object-fit, object-position, the content box in absolute layout units, the image's size in CSS px and
+ * the zoom, the destination rect, the snapped content box and the drawn part (null: none), each in absolute device px.
+ */
+object RuntimeImagePaint {
+	var engine: ((fit: String, position: List<Pair<Boolean, Double>>, content: Frame, width: Double, height: Double, zoom: Double) -> Triple<Frame, Frame, Frame?>)? = try {
+		val run = Class.forName("dev.dragon.layout.MarklessPaintKt").getMethod(
+			"marklessRuntimeImagePaint", String::class.java, BooleanArray::class.java, DoubleArray::class.java, DoubleArray::class.java,
+			Double::class.javaPrimitiveType, Double::class.javaPrimitiveType, Double::class.javaPrimitiveType,
+		)
+		({ fit, position, content, width, height, zoom ->
+			val r = try {
+				run.invoke(null, fit, position.map { it.first }.toBooleanArray(), position.map { it.second }.toDoubleArray(), doubleArrayOf(content.x, content.y, content.width, content.height), width, height, zoom) as DoubleArray
+			} catch (e: java.lang.reflect.InvocationTargetException) {
+				throw e.cause ?: e
+			}
+			fun frame(at: Int) = Frame(r[at], r[at + 1], r[at + 2], r[at + 3])
+			Triple(frame(0), frame(4), if (r[8].isNaN()) null else frame(8))
+		})
+	} catch (_: ClassNotFoundException) {
+		null
+	}
+
+	/** Where an image [width] x [height] CSS px is drawn in [place], at [scale] device px per CSS px. */
+	fun paint(image: LoadedImageSpec, place: RuntimeImagePlace, width: Double, height: Double, scale: Double): Triple<Frame, Frame, Frame?> {
+		val run = engine ?: throw MarklessDecodeError("an image the app loads is placed by Dragon's paint, which this host does not link")
+		val u = DRAGON_LAYOUT_UNITS_PER_PX
+		val c = place.content
+		return run(image.fit, image.position, Frame(Math.rint(c.x * u), Math.rint(c.y * u), Math.rint(c.width * u), Math.rint(c.height * u)), width, height, scale)
+	}
 }
 
 /** One drawing operation of a dashed or dotted border, in device px; [side] names the side whose colour it takes (-1: none). */
@@ -72,7 +120,52 @@ data class GlyphRun(val face: String, val size: Double, val glyphs: List<Int>, v
 data class TextLine(val top: Double, val baseline: Double, val runs: List<GlyphRun>)
 
 /** [scrollRange], device px, only on a scroll container; [lines], only on a framed text node, the glyphs Dragon draws for its [text]. */
-data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val scrollRange: ScrollRange? = null, val borderOps: BorderOps? = null, val lines: List<TextLine>? = null, val text: String? = null)
+data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val scrollRange: ScrollRange? = null, val borderOps: BorderOps? = null, val lines: List<TextLine>? = null, val text: String? = null, val runtimeImagePlace: RuntimeImagePlace? = null) {
+	val runtimeImage: LoadedImageSpec? get() = writes.firstNotNullOfOrNull { (it as? StyleWrite.RuntimeImage)?.image }
+}
+
+/**
+ * Each runtime image's padding at the export's layout, in CSS px (top, right, bottom, left): its content box less its frame and
+ * borders. A phone lays the page out at its own size and keeps these, as px padding does not follow the layout.
+ */
+fun runtimeImagePadding(nodes: List<StyledNode>, dpr: Double): Map<String, List<Double>> =
+	placingRuntimeImages(nodes, exported = true).mapNotNull { node ->
+		val place = node.runtimeImagePlace ?: return@mapNotNull null
+		val frame = node.frame ?: return@mapNotNull null
+		val w = node.borderWidths ?: Edges(0.0, 0.0, 0.0, 0.0)
+		val left = place.content.x - place.originX - w.left
+		val top = place.content.y - place.originY - w.top
+		val right = frame.width - w.left - w.right - left - place.content.width
+		val bottom = frame.height - w.top - w.bottom - top - place.content.height
+		node.id to listOf(top, right, bottom, left).map { it / dpr }
+	}.toMap()
+
+/**
+ * [nodes] with each framed runtime image placed: at the export's layout ([exported]), its write's content box; at a phone's, its
+ * frame less its borders and the export's [padding] for it (device px, top, right, bottom, left).
+ */
+fun placingRuntimeImages(nodes: List<StyledNode>, exported: Boolean, padding: (String) -> List<Double>? = { null }): List<StyledNode> {
+	val absolute = HashMap<String, Pair<Double, Double>>()
+	return nodes.map { node ->
+		val frame = node.frame ?: return@map node
+		val parent = if (node.parent == null) 0.0 to 0.0 else absolute[node.parent] ?: return@map node
+		val at = parent.first + frame.x to parent.second + frame.y
+		absolute[node.id] = at
+		val image = node.runtimeImage ?: return@map node
+		val content = if (exported) {
+			val lu = image.content ?: throw MarklessDecodeError("\"${node.id}\" draws an image its app loads, but the export gives it no content box")
+			val u = DRAGON_LAYOUT_UNITS_PER_PX
+			Frame(lu.x / u, lu.y / u, lu.width / u, lu.height / u)
+		} else {
+			val p = padding(node.id) ?: throw MarklessDecodeError("\"${node.id}\" draws an image its app loads, but the export has no content box for it")
+			val w = node.borderWidths ?: Edges(0.0, 0.0, 0.0, 0.0)
+			val left = w.left + p[3]
+			val top = w.top + p[0]
+			Frame(at.first + left, at.second + top, maxOf(0.0, frame.width - left - w.right - p[1]), maxOf(0.0, frame.height - top - w.bottom - p[2]))
+		}
+		node.copy(runtimeImagePlace = RuntimeImagePlace(content, at.first, at.second))
+	}
+}
 
 /**
  * One reachable combination of style states: every node's frame and writes, complete, the canvas behind the page (null: white),
@@ -315,7 +408,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					withRows.add(own.copy(id = "${node.id}@${row.key}", parent = if (place.second) node.parent else node.parent?.let { "$it@${row.key}" }, text = if (own.kind == "text") (row.texts[node.id] ?: own.text) else own.text))
 				}
 			}
-			assignment.copy(pageScroll = pageScroll, nodes = withRows.map { slotted ->
+			val padding = runtimeImagePadding(assignment.nodes, dpr)
+			assignment.copy(pageScroll = pageScroll, nodes = placingRuntimeImages(withRows.map { slotted ->
 				val node = moved[slotted.id]?.let { slotted.copy(writes = slotWrites(slotted, it)) } ?: slotted
 				if (node.frame == null) return@map node
 				val f = geometry[node.id] ?: throw MarklessDecodeError("Dragon's layout has no box for ${node.id}")
@@ -337,7 +431,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					frame = Frame(frame[0], frame[1], frame[2], frame[3]), borderWidths = widths?.let { Edges(it[0], it[1], it[2], it[3]) },
 					borderOps = ops, scrollRange = scroll, lines = if (node.kind == "text") lines else null,
 				)
-			})
+			}, exported = false) { id -> padding[id.substringBefore('@')]?.map { it * scale } })
 		}
 		return copy(dpr = scale, viewportWidth = width, viewportHeight = height, assignments = laid, pageScrollUndecided = undecided ?: pageScrollUndecided)
 	}
@@ -525,7 +619,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				if (canvas != null && canvas.alpha != 255) throw MarklessDecodeError("assignments[$a].canvas is not opaque")
 				val body = o["bodyBackground"]?.takeIf { it != Json.Null }?.let { color(it, "assignments[$a].bodyBackground") }
 				if (body != null && body.alpha != 255) throw MarklessDecodeError("assignments[$a].bodyBackground is not opaque")
-				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> node(x, "assignments[$a].nodes[$n]", writesOf) }, canvas, body, o["pageScroll"]?.let { range(it, "assignments[$a].pageScroll") })
+				Assignment(values, placingRuntimeImages(o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> node(x, "assignments[$a].nodes[$n]", writesOf) }, exported = true), canvas, body, o["pageScroll"]?.let { range(it, "assignments[$a].pageScroll") })
 			}
 			val initial = t.field("initial", target).num("initial").toInt()
 			val next = t.field("next", target).arr("next").map { row -> row.arr("next[]").map { col -> col.arr("next[][]").map { it.num("next[][][]").toInt() } } }
@@ -739,6 +833,32 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					if (value != "visible" && value != "hidden" && value != "collapse") throw MarklessDecodeError("$what: visibility $value is not visible, hidden or collapse")
 					if (o.field("canvas", what) !is Json.Bool) throw MarklessDecodeError("$what.canvas must be a boolean")
 					StyleWrite.Visibility(value)
+				}
+				"runtime-image" -> {
+					o.only(setOf("kind", "fit", "position", "layer", "pixelated", "absent", "key", "content"), what)
+					if (o.field("key", what).str("$what.key") != "dragonRuntimeImage") throw MarklessDecodeError("$what: a runtime-image write's key is dragonRuntimeImage")
+					val fit = o.field("fit", what).str("$what.fit")
+					if (fit !in setOf("fill", "contain", "cover", "none", "scale-down")) throw MarklessDecodeError("$what: object-fit $fit is not a keyword Chrome has")
+					val position = o.field("position", what).arr("$what.position").map {
+						val p = it.obj("$what.position[]")
+						p.only(setOf("kind", "value"), "$what.position[]")
+						val unit = p.field("kind", what).str("$what.position[].kind")
+						if (unit != "px" && unit != "percent") throw MarklessDecodeError("$what: object-position $unit is not px or percent")
+						(unit == "percent") to p.field("value", what).num("$what.position[].value")
+					}
+					if (position.size != 2) throw MarklessDecodeError("$what: object-position is x and y")
+					if (o.field("layer", what) !is Json.Bool) throw MarklessDecodeError("$what.layer must be a boolean")
+					val pixelated = (o.field("pixelated", what) as? Json.Bool ?: throw MarklessDecodeError("$what.pixelated must be a boolean")).value
+					val outline = o.field("absent", what).takeIf { it != Json.Null }?.obj("$what.absent")?.let { a ->
+						a.only(setOf("color", "width"), "$what.absent")
+						if (a.field("width", what).num("$what.absent.width") != 1.0) throw MarklessDecodeError("$what: only a 1 device px no-image outline is drawn")
+						color(a.field("color", what), "$what.absent.color")
+					}
+					val content = o.field("content", what).takeIf { it != Json.Null }?.obj("$what.content")?.let { c ->
+						c.only(setOf("x", "y", "width", "height"), "$what.content")
+						Frame(c.field("x", what).num("x"), c.field("y", what).num("y"), c.field("width", what).num("width"), c.field("height", what).num("height"))
+					}
+					StyleWrite.RuntimeImage(LoadedImageSpec(fit, position, pixelated, outline, content))
 				}
 				else -> throw MarklessDecodeError("$what has unknown style write kind \"$kind\"")
 			}

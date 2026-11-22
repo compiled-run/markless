@@ -1018,7 +1018,10 @@ class MarklessHost(
 				val device = payload.objects.firstOrNull { it.id == obj }?.device ?: throw MarklessHostError("<camera> \"${node.id}\" names unknown object \"$obj\"")
 				needDevice().view(obj, device).also { named(it, inst.id) }
 			}
-			"img" -> SizedImage(context, packaged, sized = style == null).also { named(it, inst.id) }
+			"img" -> SizedImage(context, packaged, sized = style == null).also {
+				named(it, inst.id)
+				if (style != null && node.bindings.any { b -> !b.property && b.name == "src" }) it.loadsImages()
+			}
 			"iframe" -> EmbeddedPage(
 				context,
 				node.attributes["src"] ?: throw MarklessHostError("<iframe> ${inst.id} has no src"),
@@ -1614,6 +1617,7 @@ class MarklessHost(
 			StyleWrite.ClipText -> {}
 			is StyleWrite.PaintOrder -> {}
 			is StyleWrite.Visibility -> {}
+			is StyleWrite.RuntimeImage -> {}
 		}
 		if (s.kind != "text") {
 			val edges = s.borderWidths
@@ -1635,6 +1639,12 @@ class MarklessHost(
 			return
 		}
 		val bw = s.borderWidths ?: throw MarklessHostError("element \"${s.id}\" has no border widths")
+		(view as? SizedImage)?.loaded?.let { loaded ->
+			val image = s.runtimeImage ?: throw MarklessHostError("\"${s.id}\" draws the images its app loads, but the style export gives it no runtime-image write")
+			val place = s.runtimeImagePlace ?: throw MarklessHostError("\"${s.id}\" draws an image its app loads, but has no content box")
+			loaded.spec = Triple(image, place, dpr)
+			loaded.edge = radii to listOf(bw.top, bw.right, bw.bottom, bw.left)
+		}
 		s.borderOps?.let { ops ->
 			if (radii?.any { it != 0.0 } == true) throw MarklessHostError("\"${s.id}\" has a dashed or dotted border with rounded corners; Dragon draws none")
 			view.background = DashedBorder(fill ?: 0, ops, colors?.takeIf { it.size == 4 } ?: throw MarklessHostError("\"${s.id}\" has border operations but not four side colours"))

@@ -1158,6 +1158,7 @@ final class ViewTree {
 					view = page
 				} else if element == "img" {
 					let image = ImageBox()
+					if layout != nil, bindings.contains(where: { !$0.isProperty && $0.name == "src" }) { image.loadsImages() }
 					// The box lays out its picture and alt text itself; the stacking layout sizes only the box.
 					leaves.insert(ObjectIdentifier(image))
 					view = image
@@ -1483,6 +1484,10 @@ final class ViewTree {
 			drawing.accessibilityLabel = label
 			drawing.isAccessibilityElement = label != nil && contexts[id]?.button == nil
 			drawing.accessibilityTraits = current["aria-label"] != nil ? .image : .staticText
+		} else if let box = view as? ImageBox, let loaded = box.loaded {
+			loaded.show(current["src"], packaged: images)
+			box.accessibilityLabel = current["aria-label"] ?? current["alt"]
+			box.isAccessibilityElement = current["aria-label"] != nil || current["alt"].map { !$0.isEmpty } ?? true
 		} else if let box = view as? ImageBox {
 			let src = current["src"]
 			// A photo the device took is a `file:` URL; any other src is a file the app packaged when it was built.
@@ -2167,6 +2172,10 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	}
 	paintSides(view, style.sides)
 	paintDashed(view, style.dashedBorder)
+	if let loaded = (view as? ImageBox)?.loaded {
+		loaded.style = style.runtimeImage
+		loaded.edge = (style.cornerRadius, style.borderWidth)
+	}
 	if let drawing = view as? DrawingView {
 		// An svg's text colour is what its currentColor paints.
 		if let color = style.textColor { drawing.currentColor = uiColor(color) }

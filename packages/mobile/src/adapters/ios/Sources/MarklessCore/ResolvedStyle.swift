@@ -25,6 +25,8 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var scroll: ResolvedScroll?
 	/// `visibility` other than visible (a text takes its element's): the view keeps its place, but paints nothing of its own.
 	public var hidden = false
+	/// An `<img>` whose src the app sets as it runs: how and where the image it loads is drawn, at `scale` device px per point.
+	public var runtimeImage: (image: RuntimeImage, place: RuntimeImagePlace, scale: Double)?
 
 	public static func == (a: ResolvedStyle, b: ResolvedStyle) -> Bool {
 		a.frame == b.frame && a.background == b.background && a.borderWidth == b.borderWidth && a.borderColor == b.borderColor
@@ -32,6 +34,7 @@ public struct ResolvedStyle: Equatable, Sendable {
 			&& a.textColor == b.textColor && a.lines == b.lines && a.linesText == b.linesText && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll && a.hidden == b.hidden
 			&& a.clipsChildren == b.clipsChildren && a.clipRect == b.clipRect
 			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank
+			&& a.runtimeImage?.image == b.runtimeImage?.image && a.runtimeImage?.place == b.runtimeImage?.place && a.runtimeImage?.scale == b.runtimeImage?.scale
 	}
 
 	public struct DashedBorder: Equatable, Sendable {
@@ -352,6 +355,10 @@ extension StyleExport {
 			case .clipText: break
 			case let .paintOrder(_, bucket, rank): style.paintOrder = (bucket, rank)
 			case let .visibility(value): style.hidden = value != "visible"
+			case let .runtimeImage(image):
+				guard node.frame != nil else { break }
+				guard let place = node.runtimeImagePlace else { throw styleError("\(node.id) draws an image its app loads, but has no content box") }
+				style.runtimeImage = (image, place, dpr)
 			}
 		}
 		// A scroll view clips its own content; any other box clips its children.

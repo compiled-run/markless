@@ -1,4 +1,5 @@
 #if canImport(UIKit)
+import ImageIO
 import MarklessCore
 import UIKit
 
@@ -73,6 +74,21 @@ final class ImageBox: UIView {
 	@available(*, unavailable)
 	required init?(coder: NSCoder) { fatalError("ImageBox is made in code") }
 
+	/// On a styled page, an img whose src the app sets as it runs: Dragon places the image it loads; nil otherwise.
+	private(set) var loaded: LoadedImageView?
+
+	/// Makes this box draw the images its app loads, as Dragon places them, instead of a picture at the web's size.
+	func loadsImages() {
+		guard loaded == nil else { return }
+		let view = LoadedImageView()
+		view.frame = bounds
+		view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+		addSubview(view)
+		loaded = view
+		picture.isHidden = true
+		alt.isHidden = true
+	}
+
 	/// `sized`: the stacking layout gives the box the image's size (its `width` and `height` attributes, else its natural
 	/// size, keeping its ratio when only one is given), as the web's unstyled `<img>` takes. With only a ratio (an SVG file
 	/// with only a viewBox) and no attributes, the stacking layout gives the box its width and the box keeps the ratio.
@@ -117,4 +133,144 @@ final class ImageBox: UIView {
 	}
 
 }
+/// What an img whose src the app sets as it runs draws: nothing while its first image loads, the last image that loaded (kept while
+/// the next one loads), or Chrome's no-image outline when it has no src or its image did not load.
+enum LoadedImageState {
+	case waiting
+	case picture(LoadedPicture)
+	case missing
+}
+
+/// A loaded image and its natural size in CSS px: a decoded bitmap (its pixel size), or an SVG file's drawing, rasterized where drawn.
+enum LoadedPicture {
+	case bitmap(CGImage)
+	case drawing(NativeDrawing, width: Double, height: Double)
+
+	var size: (width: Double, height: Double) {
+		switch self {
+		case let .bitmap(image): (Double(image.width), Double(image.height))
+		case let .drawing(_, width, height): (width, height)
+		}
+	}
+
+	/// The image at `src`: a file the app packaged, or a photo the device took (a `file:` URL); nil when there is none or it does not decode.
+	static func load(_ src: String, packaged: [String: NativeImageAsset]) -> LoadedPicture? {
+		if let asset = packaged[src] {
+			if let drawing = asset.drawing {
+				let box = drawing.viewBox ?? []
+				// An SVG file with only a viewBox has a ratio and no size; its viewBox gives that ratio.
+				guard let width = asset.width ?? (box.count == 4 ? box[2] : nil), let height = asset.height ?? (box.count == 4 ? box[3] : nil) else { return nil }
+				return .drawing(drawing, width: width, height: height)
+			}
+			return asset.data.flatMap(decoded).map(LoadedPicture.bitmap)
+		}
+		guard let url = URL(string: src), url.isFileURL, let data = try? Data(contentsOf: url) else { return nil }
+		return decoded(data).map(LoadedPicture.bitmap)
+	}
+
+	/// The bytes decoded into 8-bit sRGB with their EXIF orientation applied, as the browser draws them.
+	private static func decoded(_ data: Data) -> CGImage? {
+		guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+			let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+			let w = properties[kCGImagePropertyPixelWidth] as? Int, let h = properties[kCGImagePropertyPixelHeight] as? Int,
+			let oriented = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+				kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true,
+				kCGImageSourceThumbnailMaxPixelSize: max(w, h), kCGImageSourceShouldCacheImmediately: true,
+			] as CFDictionary),
+			let space = CGColorSpace(name: CGColorSpace.sRGB),
+			let context = CGContext(
+				data: nil, width: oriented.width, height: oriented.height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+				bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+		else { return nil }
+		context.draw(oriented, in: CGRect(x: 0, y: 0, width: oriented.width, height: oriented.height))
+		return context.makeImage()
+	}
+}
+
+/// Draws an img's loaded image into the rect Dragon's paint gives for its size, clipped to the drawn part of the content box and its
+/// rounded edge; with no image, the no-image outline.
+final class LoadedImageView: UIView {
+	private(set) var state = LoadedImageState.waiting
+	/// The src last asked for: a load that finishes for another src is dropped.
+	private var wanted: String?
+	var style: (image: RuntimeImage, place: RuntimeImagePlace, scale: Double)? { didSet { setNeedsDisplay() } }
+	/// The img's corner radius and border width in points, for the rounded edge of its content box.
+	var edge: (radius: CGFloat, border: CGFloat) = (0, 0) { didSet { setNeedsDisplay() } }
+
+	init() {
+		super.init(frame: .zero)
+		isOpaque = false
+		backgroundColor = .clear
+		isUserInteractionEnabled = false
+		contentMode = .redraw
+	}
+
+	@available(*, unavailable)
+	required init?(coder: NSCoder) { fatalError("LoadedImageView is made in code") }
+
+	/// The runtime's src for the img now; a new src loads off the main thread.
+	func show(_ src: String?, packaged: [String: NativeImageAsset]) {
+		guard src != wanted || src == nil else { return }
+		wanted = src
+		guard let src else { return move(to: .missing) }
+		DispatchQueue.global(qos: .userInitiated).async {
+			let picture = LoadedPicture.load(src, packaged: packaged)
+			DispatchQueue.main.async { [weak self] in
+				guard let self, self.wanted == src else { return }
+				self.move(to: picture.map(LoadedImageState.picture) ?? .missing)
+			}
+		}
+	}
+
+	private func move(to next: LoadedImageState) {
+		state = next
+		setNeedsDisplay()
+	}
+
+	override func draw(_ rect: CGRect) {
+		guard let style, let context = UIGraphicsGetCurrentContext() else { return }
+		let s = style.scale
+		let local = { (r: Frame) in
+			CGRect(x: (r.x - style.place.originX) / s, y: (r.y - style.place.originY) / s, width: r.width / s, height: r.height / s)
+		}
+		switch state {
+		case .waiting: return
+		case .missing:
+			let color = style.image.outline.map { (r: $0.r, g: $0.g, b: $0.b, alpha: $0.alpha) } ?? noImageOutline
+			guard let paint = try? RuntimeImagePaint.paint(style.image, at: style.place, width: 0, height: 0, scale: s),
+				paint.content.width > 2, paint.content.height > 2
+			else { return }
+			let c = paint.content
+			context.setShouldAntialias(false)
+			context.setFillColor(UIColor(red: color.r / 255, green: color.g / 255, blue: color.b / 255, alpha: color.alpha / 255).cgColor)
+			for band in [
+				Frame(x: c.x, y: c.y, width: c.width, height: 1), Frame(x: c.x, y: c.y + c.height - 1, width: c.width, height: 1),
+				Frame(x: c.x, y: c.y + 1, width: 1, height: c.height - 2), Frame(x: c.x + c.width - 1, y: c.y + 1, width: 1, height: c.height - 2),
+			] { context.fill(local(band)) }
+		case let .picture(picture):
+			let size = picture.size
+			guard let paint = try? RuntimeImagePaint.paint(style.image, at: style.place, width: size.width, height: size.height, scale: s),
+				let drawn = paint.drawn
+			else { return }
+			let dest = local(paint.dest)
+			context.saveGState()
+			context.clip(to: local(drawn))
+			UIBezierPath(roundedRect: local(paint.content), cornerRadius: max(0, edge.radius - edge.border)).addClip()
+			context.interpolationQuality = style.image.pixelated ? .none : .high
+			switch picture {
+			case let .bitmap(image): UIImage(cgImage: image).draw(in: dest)
+			case let .drawing(drawing, _, _):
+				let view = DrawingView(drawing)
+				view.frame = CGRect(origin: .zero, size: dest.size)
+				context.translateBy(x: dest.minX, y: dest.minY)
+				view.draw(view.bounds)
+			}
+			context.restoreGState()
+		}
+	}
+}
+
+/// Blink's no-image outline colour, Color::kLightGray, for an img whose image did not load.
+private let noImageOutline = (r: 192.0, g: 192.0, b: 192.0, alpha: 255.0)
 #endif
+

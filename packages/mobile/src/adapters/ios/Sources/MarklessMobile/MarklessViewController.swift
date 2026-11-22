@@ -83,6 +83,13 @@ public final class MarklessViewController: UIViewController {
 	private static func linkDragon() {
 		#if canImport(DragonPlan)
 		StyleBands.library = DragonPlan.library
+		RuntimeImagePaint.engine = { fit, position, content, width, height, zoom in
+			let r = try DragonPlan.runtimeImagePaint(
+				fit: fit, position: position.map { ($0.percent, $0.value) }, content: [content.x, content.y, content.width, content.height],
+				width: width, height: height, zoom: zoom)
+			let frame = { (at: Int) in Frame(x: r[at], y: r[at + 1], width: r[at + 2], height: r[at + 3]) }
+			return (frame(0), frame(4), r[8].isNaN ? nil : frame(8))
+		}
 		#endif
 	}
 
