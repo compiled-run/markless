@@ -2893,10 +2893,10 @@ export function createNativeViewPayload(
 			const service = Object.hasOwn(NATIVE_SCRIPT_HOST_GLOBALS, name)
 				? NATIVE_SCRIPT_HOST_GLOBALS[name]
 				: undefined;
-			if (service === 'media' && rendering) {
+			if ((service === 'media' || service === 'screen') && rendering) {
 				ok = false;
 				refuseScript(
-					`${what} reads \`${name}\` while rendering; a phone answers a media query only in a handler`,
+					`${what} reads \`${name}\` while rendering; a phone answers ${service === 'media' ? 'a media query' : 'it'} only in a handler`,
 					global.span,
 				);
 				continue;

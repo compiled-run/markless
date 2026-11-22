@@ -61,6 +61,27 @@ describe('modules a JavaScript handler imports', () => {
 		]);
 	});
 
+	it("reads the screen's devicePixelRatio in a handler, through window too, from the value the host gives each entry", async () => {
+		const { payload, diagnostics } = await build('text = `${Math.ceil(101.3 * window.devicePixelRatio) / devicePixelRatio}`;', '');
+		expect(diagnostics).toEqual([]);
+		expect(payload!.script!.services).toContain('screen');
+		const runtime = createNativeRuntime(
+			payload!,
+			new Map(),
+			{},
+			undefined,
+			undefined,
+			nodeScriptHost(),
+			undefined,
+			undefined,
+			undefined,
+			() => ({ devicePixelRatio: 3 }),
+		);
+		expect(runtime.dispatch({ event: 'activate', host: payload!.events[0]!.host })).toEqual([
+			{ op: 'text', node: 'h0:text0', value: String(Math.ceil(101.3 * 3) / 3) },
+		]);
+	});
+
 	it('refuses the helper that touches document once the handler reaches it, at its own line', async () => {
 		const { payload, diagnostics } = await build(
 			"retitle('x');",
