@@ -218,6 +218,13 @@ export const engineStartsText = (starts: number): string => `engine starts: ${st
  * where any outgoing connection on the machine can already hold it.
  */
 export const ECHO_SERVER_PORT = 28761;
+/**
+ * The port an app rung's own web server listens on while the rung runs on phones (`server: 'app'`), so its `api/` routes
+ * answer at the origin its app.json names. Fixed and below the ephemeral ranges, as the echo server's.
+ */
+export const APP_SERVER_PORT = 28762;
+/** The port each test server listens on. */
+export const SERVER_PORTS = { echo: ECHO_SERVER_PORT, app: APP_SERVER_PORT } as const;
 export const callsText = (calls: readonly string[]): string =>
 	`calls: ${calls.length === 0 ? 'none' : calls.join(', ')}`;
 
@@ -252,8 +259,11 @@ export type LadderRung = {
 		/** Console errors the browser logs as part of what the rung proves (a 404 answer it loads), each once per time. */
 		readonly consoleErrors?: readonly string[];
 	};
-	/** The test runs the echo server (`ECHO_SERVER_PORT`) while the rung runs, on the web and on phones. */
-	readonly server?: 'echo';
+	/**
+	 * The test runs the echo server (`ECHO_SERVER_PORT`) while the rung runs, on the web and on phones; or, for an app rung,
+	 * the app's own web build, whose `api/` routes answer at `APP_SERVER_PORT`.
+	 */
+	readonly server?: keyof typeof SERVER_PORTS;
 	readonly steps: readonly LadderStep[];
 };
 

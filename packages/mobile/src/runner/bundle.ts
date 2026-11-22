@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
+import type { LadderRung } from '../../proofs/ladder.ts';
 import { instrumentFlow, type InstrumentedFlow } from '../harness/flow.ts';
 import { PROOF_PLATFORMS, type ProofPlatform } from '../harness/proof-app.ts';
 import { loadRung, type ProofAssets } from '../harness/rung.ts';
@@ -41,8 +42,11 @@ export type BundledRung = {
 	readonly name: string;
 	readonly flow: InstrumentedFlow;
 	readonly manifest: DeviceManifest;
-	/** The rung fetches from the test's echo server, which the runner serves for as long as it runs. */
-	readonly server?: 'echo';
+	/**
+	 * The rung fetches from the test's echo server, or from its app's own web build (bundled beside it as `server/`), which
+	 * the runner serves for as long as it runs.
+	 */
+	readonly server?: LadderRung['server'];
 	/** Set when the rung did not build: it fails at `build` on every platform without reaching a phone. */
 	readonly buildError?: string;
 };

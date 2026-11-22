@@ -110,6 +110,7 @@
 		"packages/bundler/test/template-dynamic-import.test.ts",
 		"packages/bundler/test/transform-memos-released.test.ts",
 		"packages/cli/test/starter-build.test.ts",
+		"packages/mobile/test/app-server.test.ts",
 		"packages/router/test/navigate-promise.test.ts",
 		"packages/router/test/vite/api-pages.test.ts",
 		"packages/router/test/vite/arm-close-async-run.test.ts",
