@@ -366,6 +366,38 @@ if (!host) {
 		if (!element || typeof element.__style !== 'function') throw new TypeError('getComputedStyle() takes an element');
 		return element.__style();
 	};
+	// A media query, answered from the device's settings in the entry it is read in; a feature a phone has no value for throws.
+	var mediaFeature = function (text, query) {
+		var colon = text.indexOf(':');
+		var name = (colon < 0 ? text : text.slice(0, colon)).trim();
+		if (!host.media || !Object.prototype.hasOwnProperty.call(host.media, name))
+			throw new TypeError('matchMedia on a phone answers prefers-reduced-motion and prefers-color-scheme, not "' + query + '"');
+		return colon < 0 ? host.media[name] !== 'no-preference' : text.slice(colon + 1).trim() === host.media[name];
+	};
+	var mediaQuery = function (one, query) {
+		var words = one.trim().toLowerCase(), negate = false;
+		if (words.indexOf('not ') === 0) { negate = true; words = words.slice(4); }
+		else if (words.indexOf('only ') === 0) words = words.slice(5);
+		var result = true;
+		words.split(/\s+and\s+/).forEach(function (part, index) {
+			part = part.trim();
+			if (part.charAt(0) === '(' && part.charAt(part.length - 1) === ')') result = mediaFeature(part.slice(1, -1), query) && result;
+			else if (index === 0 && part === 'print') result = false;
+			else if (!(index === 0 && (part === 'all' || part === 'screen')))
+				throw new TypeError('matchMedia on a phone does not read "' + query + '"');
+		});
+		return negate ? !result : result;
+	};
+	g.matchMedia = function (query) {
+		var text = String(query);
+		var changes = function () { throw new TypeError('a phone does not tell a script when a media query changes yet'); };
+		return {
+			media: text,
+			matches: text.split(',').some(function (one) { return mediaQuery(one, text); }),
+			addEventListener: changes,
+			addListener: changes,
+		};
+	};
 	g.window = g.self = g;
 	// The page's one member a phone answers: the focused element (the body when none is), which the build allows alone.
 	// A page whose <html> has no lang, as code guarded by typeof document read it before the page had a document.
@@ -685,6 +717,7 @@ var begin = function (entry) {
 	host.place = navigation && entry.kind !== 'compute' ? { routes: navigation.routes, path: pathOf(navigation.here, entry.params || {}) } : null;
 	host.seed = entry.seed || null;
 	host.focused = entry.focused || null;
+	host.media = entry.media || null;
 	for (var known in entry.focusElements || {}) if (!elementFacts[known]) elementFacts[known] = entry.focusElements[known];
 	host.focus = function () { return elementOf(host.focused || BODY); };
 	host.counter = 0;
