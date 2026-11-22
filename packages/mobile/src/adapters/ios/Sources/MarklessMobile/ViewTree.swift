@@ -97,6 +97,11 @@ final class Paragraph {
 /// A `<pre>` paragraph's sideways scroller: its line is never wrapped.
 final class PreformattedScroll: UIScrollView {}
 
+/// The page's scroll view: a drag that starts on a button or field scrolls the page, as it does in Safari; a tap still presses it.
+final class PageScroll: UIScrollView {
+	override func touchesShouldCancel(in view: UIView) -> Bool { true }
+}
+
 /// An inline `<svg>`: draws the shapes compiled when the app was built, then the shapes inside it that come from components,
 /// whose outline the engine gives while the app runs, fitted into its box as the web fits the viewBox.
 final class DrawingView: UIView {
@@ -338,7 +343,7 @@ final class ViewTree {
 	let root = UIView()
 	/// The page's own scroll view, as a browser's viewport: it fills the screen, insets its content by the safe areas and
 	/// scrolls it under the bars.
-	let page = UIScrollView()
+	let page = PageScroll()
 	let keyboard: KeyboardDismisser
 	private let runtime: NativeRuntime
 	private var layout: StyleLayout?

@@ -383,9 +383,14 @@ public final class MarklessViewController: UIViewController {
 			}
 			// Page texts in a face this host cannot shape keep the boxes the build laid them out in, as before they followed state.
 			let relaid: StyleExport
-			do { relaid = try lay(texts) } catch where unshaped && !texts.isEmpty { relaid = try lay([:]) }
+			// The layout holds the texts the page shows now, unless it kept the build's boxes.
+			var laidTexts = try runtime.texts()
+			do { relaid = try lay(texts) } catch where unshaped && !texts.isEmpty {
+				relaid = try lay([:])
+				laidTexts = mountTexts
+			}
 			let now = try relaid.resolve(
-				for: payload, initialTexts: mountTexts, value: runtime.value(of:), dark: traitCollection.userInterfaceStyle == .dark)
+				for: payload, initialTexts: laidTexts, value: runtime.value(of:), dark: traitCollection.userInterfaceStyle == .dark)
 			try tree.relayout(now)
 			layout = now
 			laidOutFor = (size, slots, texts)
@@ -407,8 +412,9 @@ public final class MarklessViewController: UIViewController {
 			moved = true
 			if slot.contains("@") { rowMoved = true }
 		}
-		// A page text that changes may change its box: the layout compares the texts it last laid out with.
+		// A page text that changes, or one an arm shows, may change its box: the layout compares the texts it last laid out with.
 		for case let .text(node, _) in journal where !node.contains("@") { moved = true }
+		for case let .arm(node, _) in journal where !node.contains("@") { moved = true }
 		if moved, isViewLoaded { layOutAtScreenSize(rowsMoved: rowMoved) }
 	}
 

@@ -665,8 +665,8 @@ class MarklessHost(
 			}
 			Log.i(TAG, "journal ${entry.toJson()}")
 		}
-		// A page text that changes may change its box: the layout compares the texts it last laid out with.
-		if (slotMoved || journal.any { it is JournalEntry.Text && '@' !in it.node }) laidOutFor?.let { layOutAt(it.first, it.second, rowsMoved = rowSlotMoved) }
+		// A page text that changes, or one an arm shows, may change its box: the layout compares the texts it last laid out with.
+		if (slotMoved || journal.any { (it is JournalEntry.Text || it is JournalEntry.Arm) && '@' !in it.node }) laidOutFor?.let { layOutAt(it.first, it.second, rowsMoved = rowSlotMoved) }
 		syncSheets()
 		refreshRelations()
 		refreshSelects()

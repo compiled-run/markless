@@ -1,0 +1,17 @@
+{
+	"rung": "S40",
+	"name": "A styled @if arm whose heading's text is only known at run time, and a text that follows a style state: both lay out on the phone as the web lays them out",
+	"steps": [
+		{
+			"visible": ["No note open", "Open note", "Resting", "Lift"],
+			"absent": ["Trip to Oslo", "Lifted"]
+		},
+		{
+			"do": { "tap": "Open note" },
+			"visible": ["Trip to Oslo", "Resting"],
+			"absent": ["No note open"]
+		},
+		{ "do": { "tap": "Lift" }, "visible": ["Trip to Oslo", "Lifted"], "absent": ["Resting"] },
+		{ "do": { "tap": "Lift" }, "visible": ["Resting"], "absent": ["Lifted"] }
+	]
+}

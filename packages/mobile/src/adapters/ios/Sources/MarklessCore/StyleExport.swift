@@ -692,9 +692,12 @@ public struct StyleExport: Sendable {
 				}
 				line += ",\"rows\":\(JSONValue.array(lists).jsonText)"
 			}
-			// The page's own texts whose current string is not the one this assignment was laid out with, by Dragon id.
-			let nodeText = Dictionary(assignments[k].nodes.compactMap { node in node.text.map { (node.id, $0) } }, uniquingKeysWith: { a, _ in a })
+			// The page's own texts whose current string is not the one this assignment was laid out with, by Dragon id; a text an arm
+			// hides there has no box to lay out.
+			let nodeText = Dictionary(assignments[k].nodes.compactMap { node in node.frame == nil ? nil : node.text.map { (node.id, $0) } }, uniquingKeysWith: { a, _ in a })
 			let changed = texts.filter { id, text in nodeText[id].map { $0 != text } ?? false }.sorted { $0.key < $1.key }
+			// The page's texts as this layout lays them out: the changed ones with their current string.
+			let relaidTexts = Dictionary(changed.map { ($0.key, $0.value) }, uniquingKeysWith: { a, _ in a })
 			let live = shown != nil || !changed.isEmpty
 			if !changed.isEmpty {
 				if shown == nil { line += ",\"rows\":[]" }
@@ -841,7 +844,8 @@ public struct StyleExport: Sendable {
 				let ops = f[4].isNull ? nil : try StyleExport.decodeBorderOps(Reader(try planBorderOps(f[4]), at: f[4].path))
 				let range = f[5].isNull ? nil : try StyleExport.decodeRange(Reader(.object(zip(["minX", "maxX", "minY", "maxY"], try f[5].array().map { try bits($0) }).map { ($0, $1) }), at: f[5].path))
 				return StyleNode(
-					id: node.id, parent: node.parent, isText: node.isText, isAnonymous: node.isAnonymous, text: node.text,
+					id: node.id, parent: node.parent, isText: node.isText, isAnonymous: node.isAnonymous,
+					text: node.isText ? (relaidTexts[node.id] ?? node.text) : node.text,
 					frame: Frame(x: frame[0], y: frame[1], width: frame[2], height: frame[3]),
 					borderWidths: widths.map { ($0[0], $0[1], $0[2], $0[3]) }, writes: node.writes, borderOps: ops,
 					scrollRange: range, lines: node.isText ? lines : nil)
