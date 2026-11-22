@@ -315,6 +315,8 @@ public final class NativeRuntime {
 	/// The device's answers to the media features a script's `matchMedia` reads (`prefers-reduced-motion`, `prefers-color-scheme`),
 	/// read as each entry begins; the web's defaults when the host gives none.
 	public var media: () -> [(String, String)] = { [("prefers-reduced-motion", "no-preference"), ("prefers-color-scheme", "light")] }
+	/// The screen's device pixels per CSS px, which a script's `devicePixelRatio` reads as each entry begins.
+	public var devicePixelRatio: () -> Double = { 1 }
 
 	/// The device's clock, in milliseconds since 1970 (UTC).
 	private let now: () -> Double
@@ -759,12 +761,14 @@ public final class NativeRuntime {
 		let crypto = payload.script?.services.contains(.crypto) == true
 		let navigate = payload.script?.services.contains(.navigate) == true
 		let media = payload.script?.services.contains(.media) == true
+		let screen = payload.script?.services.contains(.screen) == true
 		let nonFinite: [(String, JSONValue)] = if case let .array(found) = split.nonFinite, !found.isEmpty { [("nonFinite", split.nonFinite)] } else { [] }
 		return [("cells", split.json)] + nonFinite
 			+ (unset.isEmpty ? [] : [("unset", .array(unset.sorted().map { .string($0) }))])
 			+ (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
 			+ (navigate ? [("params", .object(params.map { ($0.name, .string($0.value)) }))] : [])
 			+ (media ? [("media", .object(self.media().map { ($0.0, .string($0.1)) }))] : [])
+			+ (screen ? [("screen", .object([("devicePixelRatio", .number(devicePixelRatio()))]))] : [])
 	}
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
@@ -1468,18 +1472,24 @@ public final class NativeRuntime {
 	/// Each style slot's number now, in the payload's order: what the host lays the page out with.
 	public func slots() throws -> [(slot: String, value: Double)] {
 		let cases = Dictionary(uniqueKeysWithValues: try styleCases().map { ($0.styleCase, $0.value) })
-		return try payload.slots.map { slot in
+		return try payload.slots.flatMap { slot -> [(slot: String, value: Double)] in
 			// Its expression may not hold while its style case hides the text (`point.x`), so it keeps its last value.
-			if let when = slot.when, cases[when.styleCase] != when.value { return (slot.id, keptSlots[slot.id] ?? 0) }
-			let evaluated = try evaluate(slot.value)
-			guard case let .number(value) = evaluated, value.isFinite else {
-				throw RuntimeError(reason: "style slot \(slot.id) is \(evaluated.json.jsonText), not a finite number")
+			if let when = slot.when, cases[when.styleCase] != when.value { return [(slot.id, keptSlots[slot.id] ?? 0)] }
+			var copies: [(id: String, scope: NativeScope)] = [(slot.id, .empty)]
+			if slot.row != nil, let owner = payload.slotOwners[slot.id].flatMap({ nodesById[$0] }) {
+				copies = try instances(of: owner).map { ("\(slot.id)\($0.id.dropFirst(owner.id.count))", $0.scope) }
 			}
-			if slot.integer, value.rounded(.towardZero) != value {
-				throw RuntimeError(reason: "style slot \(slot.id) is \(JSONValue.number(value).jsonText), not a whole number")
+			return try copies.map { copy in
+				let evaluated = try evaluate(slot.value, in: copy.scope)
+				guard case let .number(value) = evaluated, value.isFinite else {
+					throw RuntimeError(reason: "style slot \(copy.id) is \(evaluated.json.jsonText), not a finite number")
+				}
+				if slot.integer, value.rounded(.towardZero) != value {
+					throw RuntimeError(reason: "style slot \(copy.id) is \(JSONValue.number(value).jsonText), not a whole number")
+				}
+				keptSlots[copy.id] = value
+				return (copy.id, value)
 			}
-			keptSlots[slot.id] = value
-			return (slot.id, value)
 		}
 	}
 

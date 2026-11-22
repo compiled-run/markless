@@ -93,7 +93,7 @@ import type {
 } from '../artifacts.ts';
 import { isEventAttribute, normalizeEventName } from '../ast/events.ts';
 import { compileDrawing, compileLiveShape, SHAPES, type DrawingElement } from './native-drawing.ts';
-import { nativeScriptOf, type NativeScriptModuleInput } from './native-script.ts';
+import { nativeScriptOf, type NativeScriptEngine, type NativeScriptModuleInput } from './native-script.ts';
 import { scriptFactsOf, type ScriptFacts } from './semantic-graph/script-facts.ts';
 import { sharedDefinitionId } from './semantic-graph/collect-shared.ts';
 
@@ -1223,6 +1223,8 @@ export type NativeViewOptions = {
 	 * `never`: data only.
 	 */
 	readonly scriptHandlers?: 'fallback' | 'all' | 'never';
+	/** The engine text the payload's script carries; conformance vectors write markers in its place. */
+	readonly scriptEngine?: NativeScriptEngine;
 	/** Keep elements' keydown handlers, which a script's `KeyboardEvent` can raise though a phone has no hardware keyboard. */
 	readonly keyHandlers?: boolean;
 	/** A module's source as the build read it, by filename: where a native build finds a value's own JavaScript. */
@@ -2891,10 +2893,10 @@ export function createNativeViewPayload(
 			const service = Object.hasOwn(NATIVE_SCRIPT_HOST_GLOBALS, name)
 				? NATIVE_SCRIPT_HOST_GLOBALS[name]
 				: undefined;
-			if (service === 'media' && rendering) {
+			if ((service === 'media' || service === 'screen') && rendering) {
 				ok = false;
 				refuseScript(
-					`${what} reads \`${name}\` while rendering; a phone answers a media query only in a handler`,
+					`${what} reads \`${name}\` while rendering; a phone answers ${service === 'media' ? 'a media query' : 'it'} only in a handler`,
 					global.span,
 				);
 				continue;
@@ -3569,6 +3571,7 @@ export function createNativeViewPayload(
 				: undefined,
 			svgGeometry,
 			options.origin,
+			options.scriptEngine,
 		);
 	}
 
@@ -5220,6 +5223,7 @@ export function createNativeViewPayload(
 		readonly value: NativeExpr;
 		readonly integer?: true;
 		readonly when?: { readonly case: string; readonly value: boolean };
+		readonly row?: string;
 	}[] = [];
 	const bindingsOf = (
 		host: string,
@@ -5926,6 +5930,16 @@ export function createNativeViewPayload(
 					const texts: { path: ReadonlyArray<number>; text: string }[] = [];
 					for (const other of inside) {
 						if (drawnLive.some((path) => isPrefix(path, other.path))) continue;
+						// A <path> written in the <svg> whose `d` follows state is drawn while the app runs, as a component's is.
+						if (
+							other.kind === 'host' &&
+							other.path.length === item.path.length + 1 &&
+							scope.module.tagOf.get(other.id) === 'path' &&
+							boundAt(other.path).includes('d')
+						) {
+							drawnLive.push(other.path);
+							continue;
+						}
 						if (other.kind === 'host' && drawnLive.length > 0)
 							refuseAs(
 								'svg',
@@ -6050,16 +6064,16 @@ export function createNativeViewPayload(
 					bindings,
 				);
 				const parts = styleParts.get(id);
-				if (parts && place.row !== undefined)
+				if (parts && place.row !== undefined && caseOf.has(id))
 					refuse(
-						'a `style` that follows state inside a @for row, which Dragon lays out once for every row',
+						'a `style` inside a @for row that is a template or empty text by a condition; Dragon lays each row out from one template',
 					);
 				const styleCase = place.row === undefined ? caseOf.get(id) : undefined;
 				const styleWhen = styleCase && { case: `case:${id}`, value: styleCase.value };
 				if (styleCase && styleWhen)
 					styleCases.push({ id: styleWhen.case, value: styleCase.test });
 				const style =
-					parts && place.row === undefined
+					parts && !(place.row !== undefined && caseOf.has(id))
 						? parts.map((part) => {
 								if (typeof part === 'string') return part;
 								const slot = `slot:${id}#${slots.length}`;
@@ -6068,6 +6082,7 @@ export function createNativeViewPayload(
 									value: part.hole,
 									...(part.integer ? { integer: true as const } : {}),
 									...(styleWhen ? { when: styleWhen } : {}),
+									...(place.row !== undefined ? { row: place.row } : {}),
 								});
 								return { slot };
 							})

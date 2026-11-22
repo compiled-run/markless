@@ -122,7 +122,7 @@ data class ArmPlace(val branch: String, val index: Int)
 data class Binding(val name: String, val value: Expr, val property: Boolean = false)
 
 /** A number styles read while the app runs, journalled as `slot` when it changes; [integer] when only whole numbers are allowed. */
-data class StyleSlot(val id: String, val value: Expr, val integer: Boolean = false, val whenCase: StyleWhen? = null)
+data class StyleSlot(val id: String, val value: Expr, val integer: Boolean = false, val whenCase: StyleWhen? = null, val row: String? = null)
 
 /** A slot evaluated, or a style shown, only while style case [case] has [value]; a hidden slot keeps its last value (0 before the first). */
 data class StyleWhen(val case: String, val value: Boolean)
@@ -195,7 +195,9 @@ sealed interface ShapePaint {
 }
 
 /** One shape: verb-coded path (0 move, 1 line, 3 cubic, 4 close), its paint and stroke, and an optional affine map [a,b,c,d,e,f]. */
-data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val text: DrawingText? = null, val clip: List<List<Double>> = emptyList())
+data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val text: DrawingText? = null, val clip: List<List<Double>> = emptyList(), val blur: Blur? = null, val clipEvenOdd: List<Boolean> = emptyList()) {
+	data class Blur(val deviation: Double, val region: List<Double>)
+}
 
 /** An SVG `<text>`: runs laid out from the pen, each chunk placed by [anchor], glyphs on [baseline] relative to the pen. */
 data class DrawingText(val anchor: String, val baseline: String, val runs: List<TextRun>)
@@ -578,9 +580,9 @@ data class Payload(
 			val slots = root["slots"]?.arr("payload.slots")?.mapIndexed { n, v ->
 				val what = "payload.slots[$n]"
 				val o = v.obj(what)
-				o.only(setOf("id", "value", "integer", "when"), what)
+				o.only(setOf("id", "value", "integer", "when", "row"), what)
 				val integer = o["integer"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.integer must be true") else true } ?: false
-				StyleSlot(o.field("id", what).str("$what.id"), expr(o.field("value", what), "$what.value"), integer, o["when"]?.let { styleWhen(it, "$what.when", caseIds) })
+				StyleSlot(o.field("id", what).str("$what.id"), expr(o.field("value", what), "$what.value"), integer, o["when"]?.let { styleWhen(it, "$what.when", caseIds) }, o["row"]?.str("$what.row"))
 			} ?: emptyList()
 			val slotIds = HashSet<String>()
 			for (s in slots) {
@@ -700,7 +702,7 @@ data class Payload(
 			}
 		}
 
-		private val SERVICES = setOf("timers", "fetch", "console", "crypto", "navigate", "device", "media")
+		private val SERVICES = setOf("timers", "fetch", "console", "crypto", "navigate", "device", "media", "screen")
 
 		private fun scriptBindings(v: Json, what: String): Map<String, ScriptBinding> = v.obj(what).entries.associateTo(LinkedHashMap()) { (name, b) ->
 			val bo = b.obj("$what.$name")
@@ -954,7 +956,7 @@ data class Payload(
 
 		private fun shape(sv: Json, w: String): Shape {
 			val so = sv.obj(w)
-			so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "text", "clip"), w)
+			so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "text", "clip", "clipRule", "blur"), w)
 			val path = so.field("path", w).arr("$w.path").map { it.num("$w.path[]") }
 			val transform = so["transform"]?.arr("$w.transform")?.map { it.num("$w.transform[]") }
 			if (transform != null && transform.size != 6) throw MarklessDecodeError("$w.transform must hold six numbers")
@@ -983,7 +985,15 @@ data class Payload(
 					)
 				},
 				so["clip"]?.arr("$w.clip")?.map { c -> c.arr("$w.clip[]").map { it.num("$w.clip[][]") } } ?: emptyList(),
-			)
+				so["blur"]?.let { b ->
+					val bo = b.obj("$w.blur")
+					bo.only(setOf("deviation", "region"), "$w.blur")
+					Shape.Blur(bo.field("deviation", "$w.blur").num("$w.blur.deviation"), bo.field("region", "$w.blur").arr("$w.blur.region").map { it.num("$w.blur.region[]") })
+				},
+				so["clipRule"]?.arr("$w.clipRule")?.map {
+					when (val rule = it.str("$w.clipRule[]")) { "evenodd" -> true; "nonzero" -> false; else -> throw MarklessDecodeError("$w has unknown clipRule \"$rule\"") }
+				} ?: emptyList(),
+			).also { if (it.clipEvenOdd.isNotEmpty() && it.clipEvenOdd.size != it.clip.size) throw MarklessDecodeError("$w.clipRule must hold a rule for each clip") }
 		}
 
 		private fun node(v: Json, what: String): Node {
@@ -1267,6 +1277,19 @@ data class AppPayload(val routes: List<AppRoute>) {
 		}
 	}
 }
+
+/** Each node inside a `<select>`: its options and their text, which show only in the select's picker. */
+val Payload.pickerContent: Set<String>
+	get() {
+		val selects = HashSet<String>()
+		val inside = HashSet<String>()
+		for (node in nodes) {
+			if (node is Node.Element && node.element == "select") selects.add(node.id)
+			val parent = node.parent ?: continue
+			if (parent in selects || parent in inside) inside.add(node.id)
+		}
+		return inside
+	}
 
 /** A live region: an assertive one interrupts the screen reader; an atomic one is read whole. */
 data class Live(val assertive: Boolean, val atomic: Boolean)

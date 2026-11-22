@@ -2,7 +2,7 @@ import Foundation
 
 /// A host service a payload's script uses; a host provides only those it names.
 public enum NativeScriptService: String, Sendable {
-	case timers, fetch, console, crypto, navigate, device, media
+	case timers, fetch, console, crypto, navigate, device, media, screen
 }
 
 /// The JavaScript a payload's `script` ops and script computeds run, in the platform's engine, started on first use.

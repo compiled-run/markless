@@ -28,15 +28,24 @@ import dev.markless.mobile.core.ScrollRange
 import dev.markless.mobile.core.ScrollRect
 import dev.markless.mobile.core.scrollIntoView
 import dev.markless.mobile.core.jsonString
+import dev.markless.mobile.core.ConformanceEngine
 import dev.markless.mobile.core.jsonValue
 import dev.markless.mobile.core.num
 import dev.markless.mobile.core.obj
 import dev.markless.mobile.core.str
+import dev.markless.mobile.core.text
 import dev.markless.mobile.style.BAND_KEY
+import dev.markless.mobile.style.Edges
+import dev.markless.mobile.style.PaddingBox
+import dev.markless.mobile.style.paddingBox
 import dev.markless.mobile.style.BandAtom
 import dev.markless.mobile.style.BandComparison
 import dev.markless.mobile.style.Bands
 import dev.markless.mobile.style.Rgba
+import dev.markless.mobile.style.Shadow
+import dev.markless.mobile.style.ShadowPaint
+import dev.markless.mobile.style.CheckboxColors
+import dev.markless.mobile.style.CheckboxMarks
 import dev.markless.mobile.style.GlyphRun
 import dev.markless.mobile.style.StyleExport
 import dev.markless.mobile.style.shownRows
@@ -45,6 +54,7 @@ import dev.markless.mobile.style.SystemFace
 import dev.markless.mobile.style.TextLine
 import dev.markless.mobile.style.StyleWrite
 import dev.markless.mobile.style.stackingParent
+import dev.markless.mobile.style.SelectArrow
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -115,9 +125,13 @@ private fun touchOf(action: Map<String, Json>): TouchPoint? {
 	return TouchPoint(n("pointerId", 1.0), n("x", 0.0), n("y", 0.0), n("time", 0.0))
 }
 
+/** A vector's JSON with the engine text put back from conformance/engine, beside the vector. */
+private fun vectorBytes(file: File): ByteArray =
+	ConformanceEngine.put(file.readText()) { name -> File(File(file.parentFile, "engine"), name).readText() }.toByteArray()
+
 /** One `markless.native-conformance/0` vector: the mounted texts must read `initial`, then each action's journal must match, byte for byte. */
 private fun runVector(file: File) {
-	val vector = Json.parse(file.readBytes()).obj(file.name)
+	val vector = Json.parse(vectorBytes(file)).obj(file.name)
 	val version = field(vector, "version", file.name).str("version")
 	if (version == APP_CONFORMANCE_VERSION) return runAppVector(file, vector)
 	check("${file.name} version", version == CONFORMANCE_VERSION) { "vector version is $version, this test reads $CONFORMANCE_VERSION" }
@@ -369,7 +383,7 @@ private fun styleExport(fixtures: File) {
 		val err = try { StyleExport.decode(changed.toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
 		check("style export refuses $name", err != null && err.contains(fragment)) { "error was: $err" }
 	}
-	refusesStyle("an unknown write kind", text.replace("\"kind\": \"text-color\"", "\"kind\": \"box-shadow\""), "unknown style write kind \"box-shadow\"")
+	refusesStyle("an unknown write kind", text.replace("\"kind\": \"text-color\"", "\"kind\": \"text-shadow\""), "unknown style write kind \"text-shadow\"")
 	refusesStyle("an unknown schema", text.replace("native-style-export/0", "native-style-export/9"), "unknown style export schema")
 	fun withVisibility(value: String) = text.replace("\"writes\": [\n      {", "\"writes\": [\n      { \"kind\": \"visibility\", \"value\": \"$value\", \"canvas\": false, \"key\": \"visibility\" },\n      {")
 	check("the fixture gains visibility writes", withVisibility("hidden") != text) { "" }
@@ -390,6 +404,43 @@ private fun dashedBorders(fixtures: File) {
 	}
 	val err = try { StyleExport.decode(text.replace("\"op\": \"dot\"", "\"op\": \"arc\"").toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
 	check("style export refuses an unknown border operation", err?.contains("unknown border operation \"arc\"") == true) { "error was: $err" }
+}
+
+// The u122 rung's export (proofs/u122-box-shadow): an outer, an inset and a rounded spread shadow.
+private fun boxShadows(fixtures: File) {
+	val text = File(fixtures, "u122-box-shadow.native-style.json").readText()
+	val export = runCatching { StyleExport.decode(text.toByteArray()) }
+	check("decodes the u122 export's box-shadow writes", export.isSuccess) { export.exceptionOrNull().toString() }
+	export.getOrNull()?.let { e ->
+		val short = e.assignments[0]
+		val outer = ShadowPaint.of(short.byId.getValue("h2"), short, e.dpr)
+		check("an outer shadow keeps its computed values", outer?.shadows == listOf(Shadow(false, 0.0, 2.0, 6.0, 0.0, Rgba(0, 0, 0, 51)))) { "$outer" }
+		check("an outer shadow is only outer", outer?.hasOuter == true && outer.hasInset == false) { "$outer" }
+		// 52.5 and 222.03125 device px from the page, 974 by 125.5: the snapped border box.
+		check("the box is snapped in page device px", outer?.box?.edges == listOf(53.0, 222.0, 1027.0, 348.0)) { "${outer?.box}" }
+		// The white canvas, then main's background; html's and body's transparent writes paint nothing.
+		check("the backdrop is the canvas and main", outer?.backdrop?.map { it.background } == listOf(Rgba(255, 255, 255, 255), Rgba(244, 241, 234, 255))) { "${outer?.backdrop}" }
+		val inset = ShadowPaint.of(short.byId.getValue("h3"), short, e.dpr)
+		check("an inset shadow is only inset", inset?.hasInset == true && inset.hasOuter == false) { "$inset" }
+		val rounded = ShadowPaint.of(short.byId.getValue("h4"), short, e.dpr)
+		check("a rounded shadow has its radii and spread", rounded?.box?.radii == List(8) { 14.0 } && rounded.shadows.single().spread == 3.0) { "$rounded" }
+		check("a box without box-shadow has none", ShadowPaint.of(short.byId.getValue("h5"), short, e.dpr) == null) { "" }
+		val tall = e.assignments[1]
+		check("the shadow follows the box into another assignment", ShadowPaint.of(tall.byId.getValue("h4"), tall, e.dpr) != rounded) { "" }
+	}
+	val err = try { StyleExport.decode(text.replace("\"dragonShadow.shadows\"", "\"dragonShadow.list\"").toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
+	check("style export refuses a box-shadow write with another key", err?.contains("dragonShadow.shadows") == true) { "error was: $err" }
+}
+
+private fun paddingBoxes() {
+	val even = paddingBox(Edges(6.0, 6.0, 6.0, 6.0), List(8) { 16.0 })
+	check("an even border insets the padding box and rounds it by the radius less the border", even == PaddingBox(6.0, 6.0, 6.0, 6.0, List(8) { 10.0 })) { "$even" }
+	val uneven = paddingBox(Edges(2.0, 10.0, 2.0, 10.0), List(8) { 16.0 })
+	check("an uneven border shapes each corner per axis", uneven.radii == listOf(6.0, 14.0, 6.0, 14.0, 6.0, 14.0, 6.0, 14.0)) { "${uneven.radii}" }
+	val thick = paddingBox(Edges(4.0, 20.0, 30.0, 1.0), listOf(8.0, 8.0, 12.0, 12.0, 16.0, 16.0, 0.0, 0.0))
+	check("an inner radius never goes below 0", thick.radii == listOf(7.0, 4.0, 0.0, 8.0, 0.0, 0.0, 0.0, 0.0) && thick.rounded) { "${thick.radii}" }
+	val square = paddingBox(Edges(3.0, 3.0, 3.0, 3.0), null)
+	check("a square box's padding box is square", !square.rounded && square.left == 3.0) { "$square" }
 }
 
 private fun textLines(fixtures: File) {
@@ -784,6 +835,104 @@ private fun rehostedStacking(fixtures: File) {
 	check("a box painted past an ancestor that clips is refused by name", err == "\"h5\" paints in html's stacking order past h4, which clips or scrolls; not implemented on Android") { "$err" }
 }
 
+/** The S24 rung's: a styled select's arrow write, and the arrow geometry Dragon's plan layout gives as a 4th element. */
+private fun selectArrows(fixtures: File) {
+	val bytes = File(fixtures, "s24-styled-select.native-app-style.json").readBytes()
+	val style = StyleExport.decodeApp(bytes).getValue("/")
+	val laid = File(fixtures, "s24-styled-select.layout.json").readText()
+	val select = style.assignments[0].byId.getValue("h3")
+	check("decodes a select's arrow write", select.writes.filterIsInstance<StyleWrite.SelectArrow>().map { it.color } == listOf(Rgba(29, 42, 36, 255))) { "${select.writes}" }
+	check("a select with appearance: none draws no arrow", !style.assignments[0].byId.getValue("h5").drawsSelectArrow) { "" }
+	check("the export plans no rows for a select's options", style.planRepeats.isEmpty()) { "${style.planRepeats}" }
+	val out = runCatching { style.laidOut(412.0, 870.0, 2.625, { laid }) }
+	check("reads the plan layout's menulist arrows", out.isSuccess) { out.exceptionOrNull().toString() }
+	out.getOrNull()?.let { e ->
+		check("the select takes Dragon's arrow", e.assignments[0].byId.getValue("h3").selectArrow == SelectArrow(2.0, listOf(923.0, 55.0, 933.0, 65.0, 944.0, 55.0))) { "${e.assignments[0].byId.getValue("h3").selectArrow}" }
+		check("only the select that draws one has an arrow", e.assignments[0].nodes.count { it.selectArrow != null } == 1) { "" }
+	}
+	val parts = (Json.parse(laid) as Json.Arr).items
+	fun layoutFails(name: String, result: String, fragment: String) {
+		val err = runCatching { style.laidOut(412.0, 870.0, 2.625, { result }) }.exceptionOrNull()?.message
+		check(name, err != null && err.contains(fragment)) { "error was: $err" }
+	}
+	layoutFails("a select-arrow write with no arrow geometry names the node", Json.Arr(parts.take(3)).text(), "\"h3\" draws a drop-down arrow, but Dragon's layout gives it no arrow geometry")
+	layoutFails("a 4th element other than menulist-arrows is refused", Json.Arr(parts.take(3) + Json.Arr(listOf(Json.Str("other"), Json.Arr(emptyList())))).text(), "unknown tag other")
+	val root = Json.parse(bytes) as Json.Obj
+	val target = (root.fields.getValue("targets") as Json.Obj).fields.getValue("android") as Json.Obj
+	val route = ((target.fields.getValue("routes") as Json.Arr).items[0] as Json.Obj).fields
+	route.remove("plan")
+	route.remove("planNames")
+	route.remove("planRepeats")
+	val err = runCatching { StyleExport.decodeApp(root.text().toByteArray()) }.exceptionOrNull()?.message
+	check("a select-arrow write in an export with no plan names the node", err?.contains("\"h3\" draws a drop-down arrow, whose geometry only Dragon's plan layout gives, and the export has no plan") == true) { "error was: $err" }
+}
+
+/** The S27 rung's: a themed checkbox's colours, and the marks Dragon's plan layout gives in its tagged checkbox-marks suffix. */
+private fun checkboxMarks(fixtures: File) {
+	val bytes = File(fixtures, "s27-styled-checkbox.native-app-style.json").readBytes()
+	val style = StyleExport.decodeApp(bytes).getValue("/")
+	val laid = File(fixtures, "s27-styled-checkbox.layout.json").readText()
+	val box = style.assignments[0].byId.getValue("h3")
+	val white = Rgba(255, 255, 255, 255)
+	check("decodes a themed checkbox's colours", box.writes.filterIsInstance<StyleWrite.Checkbox>().map { it.colors } == listOf(CheckboxColors(white, Rgba(118, 118, 118, 255), white, Rgba(194, 65, 12, 255), white))) { "${box.writes}" }
+	val out = runCatching { style.laidOut(412.0, 870.0, 2.625, { laid }) }
+	check("reads the plan layout's checkbox marks", out.isSuccess) { out.exceptionOrNull().toString() }
+	fun bits(hex: String) = java.lang.Double.longBitsToDouble(java.lang.Long.parseUnsignedLong(hex, 16))
+	val expected = CheckboxMarks(0.0, bits("3ff5000000000000"), bits("404b900000000000"), false, bits("4015000000000000"), bits("3fe0cccccccccccd"), bits("3ff5000000000000"), bits("4005000000000000"),
+		listOf("40260ccccccccccd", "403ce00000000000", "40360ccccccccccd", "4043f33333333333", "40460ccccccccccd", "4028accccccccccd").map(::bits), bits("4021a3d70a3d70a4"))
+	out.getOrNull()?.let { e ->
+		for ((k, a) in e.assignments.withIndex()) {
+			check("assignment $k's checkbox takes Dragon's marks", a.byId.getValue("h3").checkboxMarks == expected) { "${a.byId.getValue("h3").checkboxMarks}" }
+			check("assignment $k: only the checkbox has marks", a.nodes.count { it.checkboxMarks != null } == 1) { "" }
+		}
+	}
+	val parts = (Json.parse(laid) as Json.Arr).items
+	fun layoutFails(name: String, result: String, fragment: String) {
+		val err = runCatching { style.laidOut(412.0, 870.0, 2.625, { result }) }.exceptionOrNull()?.message
+		check(name, err != null && err.contains(fragment)) { "error was: $err" }
+	}
+	layoutFails("a checkbox write with no marks names the node", Json.Arr(parts.take(3)).text(), "\"h3\" draws a themed checkbox, but Dragon's layout gives it no marks")
+	layoutFails("a tag given twice is refused", Json.Arr(parts + parts[3]).text(), "checkbox-marks is given twice")
+	val suffix = (parts[3] as Json.Arr).items
+	val entry = ((suffix[1] as Json.Arr).items[0] as Json.Arr).items
+	val stray = Json.Arr(listOf(Json.Str("h9")) + entry.drop(1))
+	layoutFails("marks for a node with no box are refused", Json.Arr(parts.take(3) + Json.Arr(listOf(suffix[0], Json.Arr((suffix[1] as Json.Arr).items + stray)))).text(), "gives checkbox marks for h9")
+	val arrows = Json.Arr(listOf(Json.Str("menulist-arrows"), Json.Arr(emptyList())))
+	for ((name, order) in listOf("before" to parts.take(3) + arrows + parts[3], "after" to parts + arrows)) {
+		val r = runCatching { style.laidOut(412.0, 870.0, 2.625, { Json.Arr(order).text() }) }
+		check("the tagged suffixes are read by tag, the arrows $name the marks", r.getOrNull()?.assignments?.get(0)?.byId?.getValue("h3")?.checkboxMarks == expected) { r.exceptionOrNull().toString() }
+	}
+	val root = Json.parse(bytes) as Json.Obj
+	val target = (root.fields.getValue("targets") as Json.Obj).fields.getValue("android") as Json.Obj
+	val route = ((target.fields.getValue("routes") as Json.Arr).items[0] as Json.Obj).fields
+	route.remove("plan")
+	route.remove("planNames")
+	route.remove("planRepeats")
+	val err = runCatching { StyleExport.decodeApp(root.text().toByteArray()) }.exceptionOrNull()?.message
+	check("a checkbox write in an export with no plan names the node", err?.contains("\"h3\" draws a themed checkbox, whose marks only Dragon's plan layout gives, and the export has no plan") == true) { "error was: $err" }
+}
+
+/** A slotted page with a menulist-button select (Dragon's slots example and a select): the plan layout gives the slot writes, then the arrows, tagged and last. */
+private fun slottedSelectArrows(fixtures: File) {
+	val style = StyleExport.decodeApp(File(fixtures, "slotted-select.native-app-style.json").readBytes()).getValue("/")
+	val laid = File(fixtures, "slotted-select.android.layout.json").readText()
+	val values = style.slots.map { it.initial }
+	val out = runCatching { style.laidOut(411.0, 818.0, 2.625, { laid }, values) }
+	check("a slotted layout with arrows decodes", out.isSuccess) { out.exceptionOrNull().toString() }
+	out.getOrNull()?.let { e ->
+		check("the slotted page's select takes its arrow", e.assignments[0].byId.getValue("h20").selectArrow == SelectArrow(2.0, listOf(1004.0, 34.0, 1014.0, 44.0, 1025.0, 34.0))) { "${e.assignments[0].byId.getValue("h20").selectArrow}" }
+		check("the slot writes still patch their writes", e.assignments[0].byId.getValue("h8").writes.filterIsInstance<StyleWrite.BackgroundColor>().single().color.r == 200) { "${e.assignments[0].byId.getValue("h8").writes}" }
+	}
+	val parts = (Json.parse(laid) as Json.Arr).items
+	fun fails(name: String, result: List<Json>, fragment: String) {
+		val err = runCatching { style.laidOut(411.0, 818.0, 2.625, { Json.Arr(result).text() }, values) }.exceptionOrNull()?.message
+		check(name, err != null && fragment in err) { "error was: $err" }
+	}
+	fails("a slotted layout's arrows must be tagged", parts.take(4) + Json.Arr(listOf(Json.Str("other"), Json.Arr(emptyList()))), "unknown tag other")
+	fails("a slotted layout without its slot writes is refused", parts.take(3) + parts[4], "plan layout")
+	fails("a slotted layout with no arrows leaves its select without one", parts.take(4), "\"h20\" draws a drop-down arrow, but Dragon's layout gives it no arrow geometry")
+}
+
 fun main(args: Array<String>) {
 	routes()
 	arrays()
@@ -796,11 +945,16 @@ fun main(args: Array<String>) {
 	appStyle(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	appCanvas(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	dashedBorders(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	boxShadows(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	paddingBoxes()
 	textLines(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	systemFonts(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	sheetStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	rowStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	rowPressedStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	selectArrows(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	slottedSelectArrows(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	checkboxMarks(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	styleSlots()
 	rehostedStacking(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))

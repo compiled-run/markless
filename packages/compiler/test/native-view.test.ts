@@ -4161,6 +4161,27 @@ export function Code() @{
 		);
 	});
 
+	it('draws a <path> written in the svg whose d follows state while the app runs, over the shapes before it; refuses a shape after it', async () => {
+		const source = (after: string) => `import { state } from '@markless/core';
+export function Mark() @{
+	let turned = state(false);
+	<main>
+		<svg viewBox="0 0 16 16"><rect width="16" height="16" fill="#eee" /><path d={turned ? 'M0 0H16V16Z' : 'M0 0H16L0 16Z'} fill="#264653" />${after}</svg>
+		<button onClick={() => (turned = !turned)}>Turn</button>
+	</main>
+}`;
+		const { payload, diagnostics } = await nativeView(source(''));
+		expect(diagnostics).toEqual([]);
+		const svg = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'svg');
+		const path = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'path');
+		expect(svg?.kind === 'element' ? svg.drawing?.shapes : undefined).toHaveLength(1);
+		expect(path).toMatchObject({ parent: svg!.id, shape: { path: [], fill: { r: 38, g: 70, b: 83, alpha: 255 } } });
+		expect(path?.kind === 'element' ? path.bindings.map((binding) => 'attribute' in binding && binding.attribute) : []).toEqual(['d']);
+		expect((await nativeView(source('<circle r="2" />'))).diagnostics.map((d) => d.message)).toContain(
+			'a shape after a component or `{children}` inside an <svg>, which a native drawing would paint under them',
+		);
+	});
+
 	it("compiles an svg's shapes into a drawing, with its <title> as its name", async () => {
 		const { payload, diagnostics } = await nativeView(`export function Icon() @{
 	<svg viewBox="0 0 20 10" width="40" height="20" fill="currentColor">
@@ -4352,6 +4373,69 @@ export function Chart() @{
 		expect(
 			(await shapesOf('<mask id="m" maskUnits="userSpaceOnUse"><rect width="5" height="10" fill="white" /></mask>')).messages,
 		).toContain('<mask> without `x`, `y`, `width` and `height`: its default region depends on the box of what it masks');
+	});
+
+	it('cuts the black shapes over a white region out of a luminance <mask> as even-odd clips; refuses a crossing nonzero cut', async () => {
+		const shapesOf = async (cut: string) => {
+			const { payload, diagnostics } = await nativeView(`export function Card() @{
+	<svg viewBox="0 0 10 10"><defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="10" height="10" fill="black"><rect fill="white" width="10" height="10" />${cut}</mask></defs><rect width="10" height="10" mask="url(#m)" /></svg>
+}`);
+			const svg = payload?.nodes.find((node) => node.kind === 'element' && node.drawing);
+			return {
+				shape: svg?.kind === 'element' ? svg.drawing?.shapes[0] : undefined,
+				messages: diagnostics.map((d) => d.message),
+			};
+		};
+		const region = [0, 0, 0, 1, 10, 0, 1, 10, 10, 1, 0, 10, 4];
+		const simple = await shapesOf('<path d="M2 2L8 2L8 8Z" />');
+		expect(simple.messages).toEqual([]);
+		expect(simple.shape?.clip).toEqual([region, region, [...region, 0, 2, 2, 1, 8, 2, 1, 8, 8, 4]]);
+		expect(simple.shape?.clipRule).toEqual(['nonzero', 'nonzero', 'evenodd']);
+		expect((await shapesOf('<path fill-rule="evenodd" d="M2 2L8 8L8 2L2 8Z" />')).messages).toEqual([]);
+		expect((await shapesOf('<path d="M2 2L8 8L8 2L2 8Z" />')).messages).toContain(
+			'a black <path> filled nonzero that crosses itself or has several parts, inside a luminance <mask>: only an even-odd fill or one simple outline cuts a mask natively yet',
+		);
+		expect((await shapesOf('<path d="M1 1H3V3ZM5 5H7V7Z" />')).messages).toHaveLength(1);
+		expect((await shapesOf('<rect x="2" y="2" width="2" height="2" /><rect fill="white" width="5" height="5" />')).messages).toContain(
+			'a white <rect> after a black shape inside a luminance <mask>, which would show through the cut again',
+		);
+	});
+
+	it('blurs the one shape under a <filter> of one feGaussianBlur inside its region, after a flood and blend; refuses other filters', async () => {
+		const shapesOf = async (filter: string, inside = '<rect width="4" height="4" />') => {
+			const { payload, diagnostics } = await nativeView(`export function Glow() @{
+	<svg viewBox="0 0 10 10"><defs>${filter}</defs><g filter="url(#f)" transform="translate(2 0) scale(2)">${inside}</g></svg>
+}`);
+			const svg = payload?.nodes.find((node) => node.kind === 'element' && node.drawing);
+			return {
+				shapes: svg?.kind === 'element' ? svg.drawing?.shapes : undefined,
+				messages: diagnostics.map((d) => d.message),
+			};
+		};
+		const region = 'filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB" x="0" y="0" width="4" height="5"';
+		const flooded = await shapesOf(
+			`<filter id="f" ${region}><feFlood flood-opacity="0" result="bg" /><feBlend mode="normal" in="SourceGraphic" in2="bg" result="shape" /><feGaussianBlur stdDeviation="1.5" /></filter>`,
+		);
+		expect(flooded.messages).toEqual([]);
+		expect(flooded.shapes?.[0]?.blur).toEqual({ deviation: 3, region: [0, 2, 0, 1, 10, 0, 1, 10, 10, 1, 2, 10, 4] });
+		expect((await shapesOf(`<filter id="f" ${region}><feGaussianBlur stdDeviation="1.5" /></filter>`)).shapes?.[0]?.blur).toEqual(
+			flooded.shapes?.[0]?.blur,
+		);
+		const refused = 'a native drawing draws a filter that only blurs its source graphic';
+		expect((await shapesOf(`<filter id="f" ${region}><feOffset dx="1" /></filter>`)).messages).toContain(
+			`a <filter> that does not end in one <feGaussianBlur>: ${refused}`,
+		);
+		expect((await shapesOf(`<filter id="f" ${region}><feGaussianBlur stdDeviation="1 2" /></filter>`)).messages).toContain(
+			`an <feGaussianBlur> whose deviation is not one non-negative number: ${refused}`,
+		);
+		expect(
+			(await shapesOf('<filter id="f" filterUnits="userSpaceOnUse" x="0" y="0" width="4" height="5"><feGaussianBlur stdDeviation="1" /></filter>'))
+				.messages,
+		).toContain(`a <filter> that blurs in linearRGB (no \`color-interpolation-filters="sRGB"\`): ${refused}`);
+		expect(
+			(await shapesOf(`<filter id="f" ${region}><feGaussianBlur stdDeviation="1" /></filter>`, '<rect width="1" height="1" /><rect width="2" height="2" />'))
+				.messages,
+		).toContain('a `filter` over more than one shape: a native drawing blurs one shape at a time');
 	});
 
 	it('clips a group by the <clipPath> its clip-path names, mapped into the drawing; refuses one in bounding-box units', async () => {

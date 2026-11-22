@@ -1,0 +1,9 @@
+{
+	"rung": 168,
+	"name": "an svg group under a <filter> that blurs its source graphic is drawn blurred inside the filter region, as the browser filters it",
+	"steps": [
+		{ "visible": ["Glowing mark", "Soft glow", "Toggle glow"] },
+		{ "do": { "tap": "Toggle glow" }, "visible": ["Glowing mark"], "absent": ["Soft glow"] },
+		{ "do": { "tap": "Toggle glow" }, "visible": ["Soft glow"] }
+	]
+}

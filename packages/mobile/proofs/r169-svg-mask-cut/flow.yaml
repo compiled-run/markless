@@ -1,0 +1,15 @@
+appId: ${APP_ID}
+name: r169-svg-mask-cut
+---
+- launchApp:
+    clearState: true
+- assertVisible: Outlined card
+- assertVisible: Card outline
+- assertVisible: Toggle card
+- tapOn: Toggle card
+- assertNotVisible: Card outline
+- assertVisible: Outlined card
+- assertNotVisible: Card outline
+- tapOn: Toggle card
+- assertVisible: Card outline
+- assertVisible: Card outline

@@ -219,7 +219,8 @@ export type NativeScriptService =
 	| 'crypto'
 	| 'navigate'
 	| 'device'
-	| 'media';
+	| 'media'
+	| 'screen';
 
 /** The media features a script's `matchMedia` reads, each with the values a phone answers from its settings, first the web's default. */
 export const NATIVE_SCRIPT_MEDIA_FEATURES = {
@@ -231,6 +232,9 @@ export const NATIVE_SCRIPT_MEDIA_FEATURES = {
 export type NativeScriptMedia = {
 	readonly [Feature in keyof typeof NATIVE_SCRIPT_MEDIA_FEATURES]: (typeof NATIVE_SCRIPT_MEDIA_FEATURES)[Feature][number];
 };
+
+/** The screen a script's `devicePixelRatio` reads as each entry begins: device pixels per CSS px, as the phone's browser reports it. */
+export type NativeScriptScreen = { readonly devicePixelRatio: number };
 
 /** The web's answers with no setting changed, which a host without a value for a feature reports. */
 export const NATIVE_SCRIPT_MEDIA_DEFAULTS: NativeScriptMedia = {
@@ -490,6 +494,14 @@ export type NativeShape = {
 	 * drawn only where every one of them covers, as the browser clips it.
 	 */
 	readonly clip?: ReadonlyArray<ReadonlyArray<number>>;
+	/** The rule that fills each `clip` outline, present only when one is `evenodd` (a luminance mask with black shapes cut out). */
+	readonly clipRule?: ReadonlyArray<'nonzero' | 'evenodd'>;
+	/**
+	 * An SVG `filter` that blurs the shape alone (`feGaussianBlur` of its source graphic, in sRGB): the blur's standard
+	 * deviation in the drawing's units, and the filter region the blurred shape is drawn inside (verb-coded, in the drawing's
+	 * units). Its `clip`s apply to the blurred result, as they do on the web.
+	 */
+	readonly blur?: { readonly deviation: number; readonly region: ReadonlyArray<number> };
 };
 
 /**
@@ -1076,6 +1088,8 @@ export type NativeViewPayload = {
 		readonly integer?: true;
 		/** Evaluated only while this style case has `value`; otherwise the slot keeps its last value (0 before the first). */
 		readonly when?: { readonly case: string; readonly value: boolean };
+		/** Inside a @for row: one value per row, `<slot>@<row key>`, evaluated with that row's item. */
+		readonly row?: string;
 	}>;
 	/**
 	 * Conditions a style follows (an element's `styleWhen`): each is whether its test is truthy now, journalled as `state`
@@ -1679,6 +1693,7 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		fetch: 'fetch',
 		crypto: 'crypto',
 		matchMedia: 'media',
+		devicePixelRatio: 'screen',
 		Event: 'engine',
 		CustomEvent: 'engine',
 		MouseEvent: 'engine',
@@ -1804,8 +1819,6 @@ export const NATIVE_SCRIPT_PAGE_GLOBALS: Readonly<Record<string, string>> = {
 	IntersectionObserver: 'the DOM, which a phone does not have',
 	customElements: 'the DOM, which a phone does not have',
 	FormData: 'an HTML form, which a phone does not have',
-	devicePixelRatio:
-		'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
 	innerWidth:
 		'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
 	innerHeight:
