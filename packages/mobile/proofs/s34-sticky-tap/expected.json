@@ -1,0 +1,45 @@
+{
+	"rung": "S34",
+	"name": "a tap on a sticky header over rows scrolled beneath it reaches the header, and a row tapped below it reaches the row, as the web routes both taps",
+	"steps": [
+		{
+			"visible": ["Sticky header", "Header taps 0", "Button taps 0", "Picked none", "Row 1"],
+			"title": "Sticky tap"
+		},
+		{
+			"do": {
+				"swipe": {
+					"from": [50, 80],
+					"to": [50, 25],
+					"until": "Row 30"
+				}
+			},
+			"visible": ["Sticky header", "Header taps 0", "Button taps 0", "Picked none", "Row 30"],
+			"offScreen": ["Row 1"]
+		},
+		{
+			"do": {
+				"tap": "Header button"
+			},
+			"visible": ["Header taps 1", "Button taps 1", "Picked none"],
+			"absent": ["Header taps 0", "Button taps 0"]
+		},
+		{
+			"do": {
+				"tapAt": {
+					"point": [80, 10],
+					"on": "Sticky header"
+				}
+			},
+			"visible": ["Header taps 2", "Button taps 1", "Picked none"],
+			"absent": ["Header taps 1"]
+		},
+		{
+			"do": {
+				"tap": "Row 30"
+			},
+			"visible": ["Header taps 2", "Button taps 1", "Picked Row 30"],
+			"absent": ["Picked none"]
+		}
+	]
+}
