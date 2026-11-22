@@ -38,20 +38,48 @@
 		},
 		{
 			"kind": "element",
-			"id": "h4",
+			"id": "h4@0",
 			"element": "option",
 			"parent": "h3",
 			"attributes": {
 				"class": "mk-z7ocsw"
-			},
-			"row": "repeat:0"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h4@1",
+			"element": "option",
+			"parent": "h3",
+			"attributes": {
+				"class": "mk-z7ocsw"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h4@2",
+			"element": "option",
+			"parent": "h3",
+			"attributes": {
+				"class": "mk-z7ocsw"
+			}
 		},
 		{
 			"kind": "text",
-			"id": "h4:text0",
-			"parent": "h4",
-			"text": "Work",
-			"row": "repeat:0"
+			"id": "h4:text0@0",
+			"parent": "h4@0",
+			"text": "Work"
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0@1",
+			"parent": "h4@1",
+			"text": "Home"
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0@2",
+			"parent": "h4@2",
+			"text": "Ideas"
 		},
 		{
 			"kind": "element",
@@ -117,12 +145,6 @@
 		{
 			"url": "./fonts/Lato-Regular.woff2",
 			"file": "../styles/fonts/Lato-Regular.woff2"
-		}
-	],
-	"repeats": [
-		{
-			"id": "repeat:0",
-			"parent": "h3"
 		}
 	]
 }
