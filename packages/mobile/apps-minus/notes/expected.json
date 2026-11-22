@@ -1,0 +1,89 @@
+{
+	"rung": "Y-notes-minus-refused",
+	"name": "Test aid, not the checkpoint: notes with only the styles Dragon refuses removed, one seeded note, no form pages; list, open the note, back, tags, a tag, the note",
+	"steps": [
+		{
+			"visible": [
+				"All notes",
+				{
+					"startsWith": "Groceries"
+				}
+			],
+			"title": "All notes"
+		},
+		{
+			"do": {
+				"tap": {
+					"startsWith": "Groceries"
+				}
+			},
+			"visible": [
+				"Edit",
+				"Milk and eggs"
+			],
+			"absent": [
+				"All notes"
+			]
+		},
+		{
+			"do": {
+				"back": "button"
+			},
+			"visible": [
+				"All notes",
+				{
+					"startsWith": "Groceries"
+				}
+			],
+			"absent": [
+				"Edit"
+			]
+		},
+		{
+			"do": {
+				"tap": "Tags"
+			},
+			"visible": [
+				"Tags",
+				{
+					"startsWith": "Personal"
+				},
+				{
+					"startsWith": "Work"
+				}
+			],
+			"absent": [
+				"All notes"
+			]
+		},
+		{
+			"do": {
+				"tap": {
+					"startsWith": "Personal"
+				}
+			},
+			"visible": [
+				"Personal",
+				{
+					"startsWith": "Groceries"
+				}
+			],
+			"absent": [
+				{
+					"startsWith": "Work"
+				}
+			]
+		},
+		{
+			"do": {
+				"tap": {
+					"startsWith": "Groceries"
+				}
+			},
+			"visible": [
+				"Edit",
+				"Milk and eggs"
+			]
+		}
+	]
+}

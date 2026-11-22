@@ -1,0 +1,43 @@
+appId: ${APP_ID}
+name: notes
+---
+- launchApp:
+    clearState: true
+- assertVisible: All notes
+- assertVisible: ^Groceries.*
+- assertVisible: All notes
+- tapOn: ^Groceries.*
+- assertNotVisible: All notes
+- assertVisible: Edit
+- assertVisible: Milk and eggs
+- assertNotVisible: All notes
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
+- assertVisible: All notes
+- assertNotVisible: Edit
+- assertVisible: All notes
+- assertVisible: ^Groceries.*
+- assertNotVisible: Edit
+- tapOn: Tags
+- assertNotVisible: All notes
+- assertVisible: Tags
+- assertVisible: ^Personal.*
+- assertVisible: ^Work.*
+- assertNotVisible: All notes
+- tapOn: ^Personal.*
+- assertNotVisible: ^Work.*
+- assertVisible: Personal
+- assertVisible: ^Groceries.*
+- assertNotVisible: ^Work.*
+- tapOn: ^Groceries.*
+- assertVisible: Edit
+- assertVisible: Milk and eggs
