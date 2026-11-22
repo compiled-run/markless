@@ -236,6 +236,18 @@ const cellsOf = (expr: unknown, into: Set<string>): Set<string> => {
 	return into;
 };
 
+/** Each payload node's system sheet: the nearest sheet among its ancestors, or null for the page's own content. */
+export function sheetsOf(payload: NativeViewPayload): ReadonlyMap<string, string | null> {
+	const byId = new Map(payload.nodes.map((node) => [node.id, node]));
+	return new Map(
+		payload.nodes.map((node): [string, string | null] => {
+			for (let at = node.parent; at !== null; at = byId.get(at)?.parent ?? null)
+				if (byId.get(at)?.kind === 'sheet') return [node.id, at];
+			return [node.id, null];
+		}),
+	);
+}
+
 /**
  * A page's style inputs: the page without its system sheets, then each sheet's content once per resting height. Each
  * sheet's content is laid out as a document of its own, the size of the sheet's content area, with the page's CSS: the
@@ -254,12 +266,7 @@ export function nativeStyleInputs(
 	}>;
 } {
 	const byId = new Map(payload.nodes.map((node) => [node.id, node]));
-	const sheetOf = (node: PayloadNode): string | null => {
-		for (let at = node.parent; at !== null; at = byId.get(at)?.parent ?? null)
-			if (byId.get(at)?.kind === 'sheet') return at;
-		return null;
-	};
-	const rootOf = new Map(payload.nodes.map((node) => [node.id, sheetOf(node)]));
+	const rootOf = sheetsOf(payload);
 	const page = nativeStyleInput(
 		payload,
 		styles,

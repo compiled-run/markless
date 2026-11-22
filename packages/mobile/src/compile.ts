@@ -30,6 +30,7 @@ import {
 	nativeStyleRowAttribute,
 	readsRow,
 	rowAttributeOptions,
+	sheetsOf,
 	type NativeStyleInput,
 } from './style-input.ts';
 import { imageHeader, svgImage, type NativeImage } from './images.ts';
@@ -440,7 +441,7 @@ export async function compileNativeComponent(input: {
 	};
 }
 
-/** Elements a native host draws only on a page Dragon does not lay out: Dragon has no box for a pop-up list yet. */
+/** Elements a native host cannot draw on a styled page from what Dragon exports for it. */
 function unstyledOnly(
 	payload: NativeViewPayload,
 	sources: NativeViewArtifact['elementSources'],
@@ -448,13 +449,15 @@ function unstyledOnly(
 ): CompilerDiagnostic[] {
 	if (!css.some((text) => text.length > 0)) return [];
 	const tested = new Set(css.flatMap((text) => [...selectorAttributes(text)]));
+	const sheetOf = sheetsOf(payload);
 	return payload.nodes.flatMap((node) => {
 		if (node.kind !== 'element') return [];
 		const span = sources.get(node.id)?.span;
-		if (node.element === 'select')
+		const sheet = sheetOf.get(node.id);
+		if (node.element === 'select' && sheet)
 			return [
 				nativeUnsupported(
-					`the <select> ${node.id} on a styled page, which Dragon does not lay out yet`,
+					`the <select> ${node.id} inside the system sheet ${sheet} on a styled page: a sheet's content is exported without Dragon's plan layout, so no geometry for its drop-down arrow reaches the phone`,
 					span,
 				),
 			];

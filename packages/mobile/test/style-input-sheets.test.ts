@@ -242,3 +242,38 @@ export default function Sites() @{
 	const rowState = build.styleInputs[0]!.input.states.find((state) => state.row !== undefined)!;
 	expect(rowState.domain).toEqual(['0', '1']);
 });
+
+test('a styled page builds its <select>, and refuses one inside a system sheet, whose content has no plan layout to give its arrow', async () => {
+	const build = (where: 'page' | 'sheet') =>
+		compileNativeComponent({
+			filename: 'packages/mobile/test/fixtures/StyledSelect.tsrx',
+			source: `import { state } from '@markless/core';
+import { native, platform } from '@markless/device';
+
+export default function App() @{
+	let open = state(false);
+	<main>
+		<style>
+			select { padding: 8px; border-radius: 6px; }
+		</style>
+		${where === 'page' ? '<select aria-label="Size"><option>Small</option></select>' : ''}
+		@if (!platform.web) {
+			<native.sheet open={open} onChange={(next) => (open = next)} snapPoints={[0.5]}>
+				${where === 'sheet' ? '<select aria-label="Size"><option>Small</option></select>' : '<p>Inside</p>'}
+			</native.sheet>
+		}
+	</main>
+}`,
+			target: 'ios',
+		});
+	const page = await build('page');
+	expect(page.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	expect(page.payload).not.toBeNull();
+	const sheet = await build('sheet');
+	expect(sheet.payload).toBeNull();
+	expect(sheet.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+		expect.stringMatching(
+			/^the <select> \S+ inside the system sheet \S+ on a styled page: a sheet's content is exported without Dragon's plan layout, so no geometry for its drop-down arrow reaches the phone$/,
+		),
+	]);
+});
