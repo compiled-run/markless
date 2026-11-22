@@ -50,6 +50,12 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A handler's matchMedia answers from the device's settings, which a conformance run fixes at the web's defaults.
+		name: 'match-media',
+		fixture: 'proofs/u125-match-media/App.tsrx',
+		actions: [{ event: 'activate', host: 'h2' }],
+	},
+	{
 		// A class that follows state keeps the module's style scope class around it, as the web writes it.
 		name: 'class-scope',
 		fixture: 'proofs/r161-class-scope/App.tsrx',
@@ -976,6 +982,21 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'keydown', host: 'h2', key: 'Enter' },
 			{ event: 'keydown', host: 'h2', key: 'Enter' },
 			{ event: 'input', host: 'h2', value: '\n' },
+		],
+	},
+	{
+		// taglist's field: its key, input and paste handlers run as JavaScript, reading the key and the pasted text, and the
+		// Enter they prevent is journalled; a tag's click reads its press count.
+		name: 'script-event-fields',
+		fixture: 'proofs/u41-taglist/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'input', host: 'component-edge:4/h3', value: 'milk' },
+			{ event: 'keydown', host: 'component-edge:4/h3', key: 'Enter' },
+			{ event: 'input', host: 'component-edge:4/h3', value: 'sugar,' },
+			{ event: 'paste', host: 'component-edge:4/h3', text: 'salt,pepper' },
+			{ event: 'keydown', host: 'component-edge:4/h3', key: 'Backspace' },
+			{ event: 'activate', host: 'component-edge:2/h4@tea', detail: 1 },
 		],
 	},
 	{

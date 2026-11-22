@@ -310,6 +310,9 @@ public final class NativeRuntime {
 	/// The screen's views: the box of an element (its node id, `<node>@<key>` in a row) a script reads, measured as an
 	/// entry begins; nil when it has no view.
 	public var measure: ((String) -> NativeElementBox?)?
+	/// The device's answers to the media features a script's `matchMedia` reads (`prefers-reduced-motion`, `prefers-color-scheme`),
+	/// read as each entry begins; the web's defaults when the host gives none.
+	public var media: () -> [(String, String)] = { [("prefers-reduced-motion", "no-preference"), ("prefers-color-scheme", "light")] }
 
 	/// The device's clock, in milliseconds since 1970 (UTC).
 	private let now: () -> Double
@@ -743,8 +746,8 @@ public final class NativeRuntime {
 		return .object(facts)
 	}
 
-	/// Every current value by slot (the page's cells in payload order, then row slots), a seed when `crypto` is used, and
-	/// the route params when `navigate` is.
+	/// Every current value by slot (the page's cells in payload order, then row slots), a seed when `crypto` is used, the
+	/// route params when `navigate` is, and the device's media answers when `media` is.
 	private func entryCells() -> [(String, JSONValue)] {
 		let ids = Set(payload.cells.map(\.id))
 		let slots = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0) } }
@@ -753,11 +756,13 @@ public final class NativeRuntime {
 		let split = NativeValue.object(slots.map { (key: $0.0, value: $0.1) }).nonFiniteSplit
 		let crypto = payload.script?.services.contains(.crypto) == true
 		let navigate = payload.script?.services.contains(.navigate) == true
+		let media = payload.script?.services.contains(.media) == true
 		let nonFinite: [(String, JSONValue)] = if case let .array(found) = split.nonFinite, !found.isEmpty { [("nonFinite", split.nonFinite)] } else { [] }
 		return [("cells", split.json)] + nonFinite
 			+ (unset.isEmpty ? [] : [("unset", .array(unset.sorted().map { .string($0) }))])
 			+ (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
 			+ (navigate ? [("params", .object(params.map { ($0.name, .string($0.value)) }))] : [])
+			+ (media ? [("media", .object(self.media().map { ($0.0, .string($0.1)) }))] : [])
 	}
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
@@ -772,7 +777,7 @@ public final class NativeRuntime {
 			return try callScript("leave")
 		}
 		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave")
-			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["calls", "commands", "navigate", "prevented", "raises"])
+			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["calls", "commands", "navigate", "prevented", "raises", "value"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
 			guard pair.count == 2 || pair.count == 3 else { throw write.fail("a write is [slot, value] or [slot, value, nonFinite]") }
@@ -848,11 +853,18 @@ public final class NativeRuntime {
 		}
 		// A key or paste handler called preventDefault() before it first awaited.
 		let prevented: [NativeJournalEntry] = try result.has("prevented") && result["prevented"].bool() ? [.preventDefault] : []
+		// An input handler that set its field's value (`event.target.value = …`) writes the field, as the DOM's setter does.
+		var typed: [NativeJournalEntry] = []
+		if result.has("value"), let field = typing {
+			let text = try result["value"].string()
+			edited[field] = text
+			typed = [.property(node: field, name: "value", value: text)]
+		}
 		let entries: [NativeJournalEntry] = aborts + clears + timers + requests
-		guard result.has("navigate") else { return entries + calls + commands + prevented + raised }
+		guard result.has("navigate") else { return entries + calls + commands + prevented + typed + raised }
 		let opened = try result["navigate"].object(["route", "params", "replace"])
 		let params = try opened["params"].keys().map { NativeRouteParam(name: $0, value: try opened["params"].field($0).string()) }
-		return entries + calls + commands + prevented + raised + [.navigate(route: try opened["route"].string(), params: params, replace: try opened["replace"].bool())]
+		return entries + calls + commands + prevented + typed + raised + [.navigate(route: try opened["route"].string(), params: params, replace: try opened["replace"].bool())]
 	}
 
 	/// How deep events raised from JavaScript may nest.
@@ -864,6 +876,8 @@ public final class NativeRuntime {
 		dialogs[node] = open
 	}
 	private var raising = 0
+	/// The text field whose input event is running, which a handler's `event.target.value` write lands on.
+	private var typing: String?
 
 	/// An event a script dispatched on an element (or its `click()`), raised once the script returned: `click` as a press on
 	/// the innermost element from it outwards that has one; any other type on the element, then its ancestors when it
@@ -1970,6 +1984,7 @@ public final class NativeRuntime {
 		let bindingsBefore = Dictionary(uniqueKeysWithValues: try ticked.map { ($0.id, try checkedBinding($0.id)) })
 		let beforeProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
 		if let edit, let host { edited[host] = edit }
+		typing = edit != nil ? host : nil
 		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let beforeRows = Dictionary(uniqueKeysWithValues: try rows().map { ($0.node, $0.keys) })
 		let beforeTitle = try title()

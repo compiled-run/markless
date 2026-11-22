@@ -499,6 +499,8 @@ class Runtime(
 
 	/** The screen's views: the box of an element (its node id, `<node>@<key>` in a row) a script reads, measured as an entry begins; null when it has no view. */
 	var measure: ((id: String) -> ElementBox?)? = null
+	/** The device's answers to the media features a script's `matchMedia` reads, read as each entry begins; the web's defaults when the host gives none. */
+	var media: () -> List<Pair<String, String>> = { listOf("prefers-reduced-motion" to "no-preference", "prefers-color-scheme" to "light") }
 
 	/** Called with each engine entry's duration in nanoseconds, including starting the engine when the entry had to. */
 	var onScriptEntry: ((nanos: Long) -> Unit)? = null
@@ -631,7 +633,7 @@ class Runtime(
 		return facts.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value}" }
 	}
 
-	/** Every current value by slot, the seed `crypto` draws from when the script uses it, and the route params for `navigate`. */
+	/** Every current value by slot, the seed `crypto` draws from when the script uses it, the route params for `navigate`, and the device's media answers for `media`. */
 	private fun entryCells(): String = buildString {
 		append(",\"cells\":")
 		append(values.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonValue(it.value)}" })
@@ -642,6 +644,8 @@ class Runtime(
 		if (payload.script?.services?.contains("crypto") == true) scriptHost?.seed()?.let { append(",\"seed\":${jsonString(it)}") }
 		if (payload.script?.services?.contains("navigate") == true)
 			append(",\"params\":" + params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" })
+		if (payload.script?.services?.contains("media") == true)
+			append(",\"media\":" + media().joinToString(",", "{", "}") { "${jsonString(it.first)}:${jsonString(it.second)}" })
 	}
 
 	/** Submissions held by a script promise not settled yet, by the engine's run number. */
@@ -732,6 +736,8 @@ class Runtime(
 			} +
 			// A key or paste handler called preventDefault() before it first awaited.
 			(if ((result["prevented"] as? Json.Bool)?.value == true) listOf(JournalEntry.PreventDefault) else emptyList()) +
+			// An input handler that set its field's value (`event.target.value = …`) writes the field, as the DOM's setter does.
+			listOfNotNull(typing?.let { field -> result["value"]?.str("leave().value")?.let { text -> edited[field] = text; JournalEntry.Property(field, "value", text) } }) +
 			raised +
 			listOfNotNull(result["navigate"]?.let { n ->
 				val o = n.obj("leave().navigate")
@@ -746,6 +752,8 @@ class Runtime(
 
 	/** How deep events raised from JavaScript nest now. */
 	private var raising = 0
+	/** The text field whose input event is running, which a handler's `event.target.value` write lands on. */
+	private var typing: String? = null
 
 	/**
 	 * An event a script dispatched on an element (or its `click()`), raised once the script returned: `click` as a press on
@@ -1753,6 +1761,7 @@ class Runtime(
 		val bindingsBefore = ticked.associate { it.id to checkedBinding(it.id) }
 		val beforeProperties = properties().associate { (n, a, v) -> (n to a) to v }
 		if (value != null && host != null) edited[host] = value
+		typing = if (value != null) host else null
 		val beforeArms = arms().toMap()
 		val beforeRows = rows().toMap()
 		val beforeTitle = title()

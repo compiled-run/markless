@@ -24,7 +24,14 @@ import {
 	type NativeRuntime,
 	type NativeScreen,
 } from '../src/index.ts';
-import { compileRungApp, readAppConfig, readWorkspaceModule, servedReader } from '../src/harness/rung.ts';
+import {
+	assetReader,
+	compileRungApp,
+	readAppConfig,
+	readWorkspaceModule,
+	servedFileReader,
+	servedReader,
+} from '../src/harness/rung.ts';
 import { echoText } from '../src/harness/echo-server.ts';
 import { nativeMaxLength, nativeRangeValue } from '@markless/serializer/native-view';
 import { nodeScriptHost } from '../src/node-engine.ts';
@@ -541,6 +548,8 @@ function walk(
 	let clock = Date.now();
 	/** The text field that has the keyboard, if any. */
 	let focused: string | undefined;
+	// The device's appearance, as an `appearance` step sets it; a script's matchMedia reads it.
+	let scheme: 'light' | 'dark' = 'light';
 	const start = () => {
 		const r = createNativeRuntime(
 			payload,
@@ -551,6 +560,7 @@ function walk(
 			services.host,
 			undefined,
 			stacked,
+			() => ({ 'prefers-reduced-motion': 'no-preference', 'prefers-color-scheme': scheme }),
 		);
 		for (const cell of payload.cells)
 			if (cell.device)
@@ -1077,7 +1087,8 @@ function walk(
 				],
 				index,
 			);
-		} else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
+		} else if (action && 'appearance' in action) scheme = action.appearance;
+		else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
 			const sheet = openSheet(index);
@@ -1107,7 +1118,7 @@ function walk(
 			// Typing shows the text in the field at once; the input event then runs the handler.
 			const text =
 				'type' in action
-					? typedInto(action.type.text, attributeNow(host, 'maxlength'))
+					? typedInto((action.type.append ? fieldText(host) : '') + action.type.text, attributeNow(host, 'maxlength'))
 					: undefined;
 			if (text !== undefined) {
 				if (properties.has(host)) properties.set(host, text);
@@ -1371,6 +1382,8 @@ test.each(
 			...(page ? { page } : {}),
 			readModule: readWorkspaceModule,
 			readServedStylesheet: servedReader(join(proofsDir, folder)),
+			readServedFile: servedFileReader(join(proofsDir, folder)),
+			readAsset: assetReader,
 			...readAppConfig(join(proofsDir, folder)),
 			target,
 		});

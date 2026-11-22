@@ -15,8 +15,11 @@ import { SVG_GEOMETRY_SOURCE } from './native-svg-geometry.ts';
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
 export type NativeScriptModuleInput = {
 	readonly code: string;
-	/** The module each `__i` slot loads, or null for a slot nothing the script keeps reads. */
-	readonly imports: ReadonlyArray<number | null>;
+	/**
+	 * The module each `__i` slot loads, or null for a slot nothing the script keeps reads; `{ asset }` for an asset import,
+	 * a module whose default export is the asset's URL.
+	 */
+	readonly imports: ReadonlyArray<number | null | { readonly asset: string }>;
 	readonly functions: ReadonlyArray<{ readonly id: string; readonly code: string }>;
 };
 
@@ -363,6 +366,38 @@ if (!host) {
 		if (!element || typeof element.__style !== 'function') throw new TypeError('getComputedStyle() takes an element');
 		return element.__style();
 	};
+	// A media query, answered from the device's settings in the entry it is read in; a feature a phone has no value for throws.
+	var mediaFeature = function (text, query) {
+		var colon = text.indexOf(':');
+		var name = (colon < 0 ? text : text.slice(0, colon)).trim();
+		if (!host.media || !Object.prototype.hasOwnProperty.call(host.media, name))
+			throw new TypeError('matchMedia on a phone answers prefers-reduced-motion and prefers-color-scheme, not "' + query + '"');
+		return colon < 0 ? host.media[name] !== 'no-preference' : text.slice(colon + 1).trim() === host.media[name];
+	};
+	var mediaQuery = function (one, query) {
+		var words = one.trim().toLowerCase(), negate = false;
+		if (words.indexOf('not ') === 0) { negate = true; words = words.slice(4); }
+		else if (words.indexOf('only ') === 0) words = words.slice(5);
+		var result = true;
+		words.split(/\s+and\s+/).forEach(function (part, index) {
+			part = part.trim();
+			if (part.charAt(0) === '(' && part.charAt(part.length - 1) === ')') result = mediaFeature(part.slice(1, -1), query) && result;
+			else if (index === 0 && part === 'print') result = false;
+			else if (!(index === 0 && (part === 'all' || part === 'screen')))
+				throw new TypeError('matchMedia on a phone does not read "' + query + '"');
+		});
+		return negate ? !result : result;
+	};
+	g.matchMedia = function (query) {
+		var text = String(query);
+		var changes = function () { throw new TypeError('a phone does not tell a script when a media query changes yet'); };
+		return {
+			media: text,
+			matches: text.split(',').some(function (one) { return mediaQuery(one, text); }),
+			addEventListener: changes,
+			addListener: changes,
+		};
+	};
 	g.window = g.self = g;
 	// The page's one member a phone answers: the focused element (the body when none is), which the build allows alone.
 	g.document = { get activeElement() { return host.focus(); } };
@@ -681,6 +716,7 @@ var begin = function (entry) {
 	host.place = navigation && entry.kind !== 'compute' ? { routes: navigation.routes, path: pathOf(navigation.here, entry.params || {}) } : null;
 	host.seed = entry.seed || null;
 	host.focused = entry.focused || null;
+	host.media = entry.media || null;
 	for (var known in entry.focusElements || {}) if (!elementFacts[known]) elementFacts[known] = entry.focusElements[known];
 	host.focus = function () { return elementOf(host.focused || BODY); };
 	host.counter = 0;
@@ -811,6 +847,8 @@ g.__markless[id] = {
 			}
 			// A key's or paste's cancel reaches the host, as a browser reads defaultPrevented before the handler first awaits.
 			if (event && event.defaultPrevented && (entry.event.type === 'keydown' || entry.event.type === 'paste')) host.out.prevented = true;
+			// A handler that sets its text field's value writes the field, as the DOM's value setter does.
+			if (event && typeof entry.event.value === 'string' && event.target && !(event.target instanceof host.Form) && typeof event.target.value === 'string' && event.target.value !== entry.event.value) host.out.value = event.target.value;
 		} else if (entry.kind === 'timer') {
 			var timer = host.timers[entry.timer];
 			if (timer) {
@@ -864,6 +902,7 @@ g.__markless[id] = {
 		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands, pending: out.pending, settled: out.settled, raises: out.raises };
 		if (out.calls.length > 0) left.calls = out.calls;
 		if (out.prevented) left.prevented = true;
+		if (out.value !== undefined) left.value = out.value;
 		if (out.navigate) left.navigate = out.navigate;
 		return JSON.stringify(left);
 	},
@@ -903,7 +942,15 @@ export function nativeScriptOf(
 		return [
 			`modules[${index}] = function (exports) {`,
 			'"use strict";',
-			`var __i = [${module.imports.map((target) => (target === null ? 'null' : `load(${target})`)).join(', ')}];`,
+			`var __i = [${module.imports
+				.map((target) =>
+					target === null
+						? 'null'
+						: typeof target === 'object'
+							? `{ "default": ${JSON.stringify(target.asset)} }`
+							: `load(${target})`,
+				)
+				.join(', ')}];`,
 			module.code,
 			...module.functions.map(
 				(fn) => `functions[${JSON.stringify(fn.id)}] = function (__s) {\n${fn.code}\n};`,

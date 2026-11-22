@@ -166,6 +166,8 @@ const shown = (page: Page, text: string): Locator =>
 		.getByText(text, { exact: true })
 		.or(page.getByLabel(text, { exact: true }))
 		.or(page.getByRole('img', { name: text, exact: true }))
+		// An image is found by its alt text, its accessible name, as a phone's screen reader names it.
+		.or(page.getByAltText(text, { exact: true }))
 		.or(page.getByRole('combobox').filter({ has: page.locator('option:checked').getByText(text, { exact: true }) }));
 
 // The phone the style exports lay out for (Dragon's iOS viewport): a rung that scrolls scrolls here as on the phones.
@@ -281,7 +283,7 @@ async function act(page: Page, step: LadderStep) {
 		await ('tap' in action ? target.click() : target.dblclick());
 	} else if ('type' in action) {
 		const field = typedField(page, action.type.field);
-		await field.fill('');
+		if (!action.type.append) await field.fill('');
 		await field.pressSequentially(action.type.text);
 	} else if ('submit' in action)
 		await typedField(page, action.submit).press('Enter');
