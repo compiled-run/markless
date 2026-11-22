@@ -28,6 +28,7 @@ import dev.markless.mobile.core.ScrollRange
 import dev.markless.mobile.core.ScrollRect
 import dev.markless.mobile.core.scrollIntoView
 import dev.markless.mobile.core.jsonString
+import dev.markless.mobile.core.ConformanceEngine
 import dev.markless.mobile.core.jsonValue
 import dev.markless.mobile.core.num
 import dev.markless.mobile.core.obj
@@ -119,9 +120,13 @@ private fun touchOf(action: Map<String, Json>): TouchPoint? {
 	return TouchPoint(n("pointerId", 1.0), n("x", 0.0), n("y", 0.0), n("time", 0.0))
 }
 
+/** A vector's JSON with the engine text put back from conformance/engine, beside the vector. */
+private fun vectorBytes(file: File): ByteArray =
+	ConformanceEngine.put(file.readText()) { name -> File(File(file.parentFile, "engine"), name).readText() }.toByteArray()
+
 /** One `markless.native-conformance/0` vector: the mounted texts must read `initial`, then each action's journal must match, byte for byte. */
 private fun runVector(file: File) {
-	val vector = Json.parse(file.readBytes()).obj(file.name)
+	val vector = Json.parse(vectorBytes(file)).obj(file.name)
 	val version = field(vector, "version", file.name).str("version")
 	if (version == APP_CONFORMANCE_VERSION) return runAppVector(file, vector)
 	check("${file.name} version", version == CONFORMANCE_VERSION) { "vector version is $version, this test reads $CONFORMANCE_VERSION" }

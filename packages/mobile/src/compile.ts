@@ -13,6 +13,7 @@ import {
 	nativeRefusal,
 	nativeUnsupported,
 	selectorAttributes,
+	type NativeScriptEngine,
 	type NativeViewArtifact,
 } from '@markless/compiler/native';
 import {
@@ -178,6 +179,8 @@ export async function compileNativeComponent(input: {
 	readonly unbuilt?: ReadonlySet<string>;
 	/** The app config's `origin`: where the app's site is served, which a URL from the root fetched on a phone reaches. */
 	readonly origin?: string;
+	/** The engine text a payload's script carries (`NativeViewOptions['scriptEngine']`). */
+	readonly scriptEngine?: NativeScriptEngine;
 }): Promise<NativeBuild> {
 	if (input.origin !== undefined) checkOrigin(input.origin);
 	const manifest =
@@ -353,6 +356,7 @@ export async function compileNativeComponent(input: {
 				file === input.filename ? own.source : read.get(file)?.source,
 			...(input.scriptHandlers ? { scriptHandlers: input.scriptHandlers } : {}),
 			...(input.origin !== undefined ? { origin: input.origin } : {}),
+			...(input.scriptEngine ? { scriptEngine: input.scriptEngine } : {}),
 			...(input.manifest
 				? {
 						routes: input.manifest.routes.map((entry) => ({
@@ -530,6 +534,7 @@ export async function compileNativeApp(input: {
 	readonly target?: 'ios' | 'android';
 	/** Keep the routes whose page builds when others refuse (their diagnostics are still returned). */
 	readonly partial?: boolean;
+	readonly scriptEngine?: NativeScriptEngine;
 	/** The `icons` option of the app's `ui()` plugin, as `compileNativeComponent` takes it. */
 	readonly icons?: false | IconsOptions;
 	/** The app config's `origin`, for every page (see `compileNativeComponent`). */
@@ -591,6 +596,7 @@ export async function compileNativeApp(input: {
 			...(input.readAsset ? { readAsset: input.readAsset } : {}),
 			...(input.device ? { device: input.device } : {}),
 			...(input.target ? { target: input.target } : {}),
+			...(input.scriptEngine ? { scriptEngine: input.scriptEngine } : {}),
 			...(unbuilt ? { unbuilt } : {}),
 			icons,
 			...(input.origin !== undefined ? { origin: input.origin } : {}),
