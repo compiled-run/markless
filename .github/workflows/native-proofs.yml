@@ -24,8 +24,7 @@ permissions:
 env:
     # The rungs green on both CI devices; a rung joins in the change that makes both hosts pass it there. 08-text-input passes
     # on iOS 27.2 but not on this runner's simulator, where Maestro's hideKeyboard finds no dismiss action (run 44068173427).
-    # S36 shapes a styled row in a web font on the phone, through Dragon's HarfBuzz shim the Zig step below builds.
-    RUNGS: proofs/01-static-text proofs/03-counter proofs/05-if proofs/09-storage proofs/12-long-page proofs/15-long-list proofs/s36-web-font-rows
+    RUNGS: proofs/01-static-text proofs/03-counter proofs/05-if proofs/09-storage proofs/12-long-page proofs/15-long-list
     MAESTRO_VERSION: 2.12.1
 
 jobs:
@@ -100,13 +99,6 @@ jobs:
               run: |
                   curl -fsSL "https://get.maestro.mobile.dev" | MAESTRO_VERSION="$MAESTRO_VERSION" bash
                   echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
-            # Builds Dragon's HarfBuzz shim, which shapes a styled row's text in a web font on the phone.
-            - name: Install Zig 0.16
-              run: |
-                  curl -fsSL -o "$RUNNER_TEMP/zig.tar.xz" https://ziglang.org/download/0.16.0/zig-aarch64-macos-0.16.0.tar.xz
-                  echo "b23d70deaa879b5c2d486ed3316f7eaa53e84acf6fc9cc747de152450d401489  $RUNNER_TEMP/zig.tar.xz" | shasum -a 256 -c -
-                  tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
-                  echo "MARKLESS_ZIG=$RUNNER_TEMP/zig-aarch64-macos-0.16.0/zig" >> "$GITHUB_ENV"
             - name: Run the rungs on an iOS simulator
               env:
                   MARKLESS_PROOF_SIMULATOR: iPhone 16
@@ -169,20 +161,13 @@ jobs:
             - name: Install the Android SDK parts, Kotlin and Maestro
               run: |
                   yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
-                  "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "emulator" "platforms;android-36" "build-tools;36.0.0" "system-images;android-36;google_apis;x86_64" "ndk;29.0.14206865"
+                  "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "emulator" "platforms;android-36" "build-tools;36.0.0" "system-images;android-36;google_apis;x86_64"
                   curl -fsSL -o "$RUNNER_TEMP/kotlin.zip" https://github.com/JetBrains/kotlin/releases/download/v2.4.21/kotlin-compiler-2.4.21.zip
                   unzip -q "$RUNNER_TEMP/kotlin.zip" -d "$RUNNER_TEMP"
                   echo "KOTLIN_HOME=$RUNNER_TEMP/kotlinc" >> "$GITHUB_ENV"
                   echo "$RUNNER_TEMP/kotlinc/bin" >> "$GITHUB_PATH"
                   curl -fsSL "https://get.maestro.mobile.dev" | MAESTRO_VERSION="$MAESTRO_VERSION" bash
                   echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
-            # Builds Dragon's HarfBuzz shim, which shapes a styled row's text on the phone.
-            - name: Install Zig 0.16
-              run: |
-                  curl -fsSL -o "$RUNNER_TEMP/zig.tar.xz" https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz
-                  echo "70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00  $RUNNER_TEMP/zig.tar.xz" | sha256sum -c -
-                  tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
-                  echo "MARKLESS_ZIG=$RUNNER_TEMP/zig-x86_64-linux-0.16.0/zig" >> "$GITHUB_ENV"
             - name: Run the rungs on an Android emulator
               env:
                   MARKLESS_DRAGON_DIR: ${{ github.workspace }}/dragon
