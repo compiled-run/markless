@@ -1031,6 +1031,8 @@ export function createNativeRuntime(
 			readonly raises?: ReadonlyArray<Raised>;
 			/** A key or paste handler called `preventDefault()` before it first awaited. */
 			readonly prevented?: true;
+			/** A click handler called `stopPropagation()` before it first awaited. */
+			readonly stopped?: true;
 			/** The text an input handler set on its field (`event.target.value = …`). */
 			readonly value?: string;
 			/** The event types the page's document listens for now, when an entry changed them. */
@@ -1038,6 +1040,7 @@ export function createNativeRuntime(
 			/** The elements the entry that changed them held, which the document's listeners may read later. */
 			readonly watch?: ReadonlyArray<string>;
 		};
+		if (result.stopped) propagationStopped = true;
 		if (result.listening) {
 			documentListening.clear();
 			for (const type of result.listening) documentListening.add(type);
@@ -1148,6 +1151,8 @@ export function createNativeRuntime(
 	};
 	/** How deep events raised from JavaScript may nest (a handler that raises one that raises another...). */
 	let raising = 0;
+	/** A click handler called stopPropagation(): the press goes no further out. */
+	let propagationStopped = false;
 	/**
 	 * An event a script dispatched on an element (or its `click()`), raised once the script returned: `click` as a press
 	 * on the innermost element from it outwards that has one; any other type on the element, then its ancestors when it
@@ -1168,14 +1173,7 @@ export function createNativeRuntime(
 			const calls: NativeJournalEntry[] = [];
 			if (event.type === 'click') {
 				const pressed = chain.find((node) => handlerOf(nodeOf(node), 'activate'));
-				const scope = pressed && scopeOf(pressed);
-				return pressed && scope
-					? run(
-							handlers.get(handlerOf(nodeOf(pressed), 'activate')!.handler) ?? [],
-							clickFields(false),
-							scope,
-						)
-					: [];
+				return pressed ? press(pressed, clickFields(false)) : [];
 			}
 			for (const node of event.bubbles ? chain : chain.slice(0, 1)) {
 				const own = handlerOf(nodeOf(node), event.type as NativePointerEventName);
@@ -2085,6 +2083,31 @@ export function createNativeRuntime(
 			);
 		return out;
 	};
+	/**
+	 * A press on `pressed`, as a browser's click: its own handler, then the handler of each element around it, innermost
+	 * first, until one stops propagation. An element around it whose handler reads where the press landed runs its copy for
+	 * the pressed element (`<handler>@<node>`), which a pressed element with no handler of its own holds as its own.
+	 */
+	const press = (pressed: string, fields: NativeEventFields): NativeJournalEntry[] => {
+		propagationStopped = false;
+		const own = nodeOf(pressed);
+		const ownHandler = handlerOf(own, 'activate')?.handler;
+		const journal: NativeJournalEntry[] = [];
+		for (const id of chainOf(pressed)) {
+			const node = nodeOf(id);
+			const bound = handlerOf(node, 'activate');
+			const scope = bound && scopeOf(id);
+			if (!bound || !scope) continue;
+			// A copy (`<handler>@<node>`) stands for the handler around it, and runs only as the pressed element's own.
+			if (node !== own && bound.handler.includes('@')) continue;
+			const copy = node === own ? undefined : `${bound.handler}@${own}`;
+			if (copy && ownHandler === copy) continue;
+			journal.push(...run(handlers.get(copy && handlers.has(copy) ? copy : bound.handler) ?? [], fields, scope));
+			if (propagationStopped || journal.some((entry) => entry.op === 'navigate')) break;
+		}
+		propagationStopped = false;
+		return journal;
+	};
 	/** `idle` and `visible` handlers that ran, by `<event>\0<instance>`; an instance that leaves the screen is forgotten. */
 	const fired = new Set<string>();
 	const due = (event: 'idle' | 'visible'): string[] =>
@@ -2598,7 +2621,9 @@ export function createNativeRuntime(
 						? nativeNumberValue(eventValue)
 						: eventValue;
 			return change(action.host, edit, () =>
-				run(handlers.get(event.handler) ?? [], fields, scope),
+				action.event === 'activate'
+					? press(action.host, fields as NativeEventFields)
+					: run(handlers.get(event.handler) ?? [], fields, scope),
 			);
 		},
 		due,
@@ -2719,6 +2744,10 @@ export function createNativeRuntime(
 			}
 			if (op.op === 'preventDefault') {
 				calls.push({ op: 'preventDefault' });
+				continue;
+			}
+			if (op.op === 'stopPropagation') {
+				propagationStopped = true;
 				continue;
 			}
 			if (op.op === 'fieldText') {

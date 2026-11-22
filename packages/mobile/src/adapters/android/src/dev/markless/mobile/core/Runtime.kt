@@ -279,6 +279,9 @@ class Runtime(
 	private val fired = HashSet<String>()
 	private val storageKeys = payload.cells.mapNotNull { c -> c.storageKey?.let { c.id to it } }.toMap()
 	private val handlers = payload.handlers.associateBy { it.id }
+
+	/** A click handler called stopPropagation(): the press goes no further out. */
+	private var propagationStopped = false
 	private val continuations = HashMap<String, Continuation>().also { found ->
 		fun collect(ops: List<Op>) {
 			for (op in ops) if (op is Op.Call && op.after != null) {
@@ -750,6 +753,8 @@ class Runtime(
 				if (command == "focus") focused = node
 				JournalEntry.Command(node, command, (parts[2] as? Json.Bool)?.value == true)
 			} +
+			// A click handler called stopPropagation() before it first awaited.
+			(if ((result["stopped"] as? Json.Bool)?.value == true) { propagationStopped = true; emptyList() } else emptyList<JournalEntry>()) +
 			// A key or paste handler called preventDefault() before it first awaited.
 			(if ((result["prevented"] as? Json.Bool)?.value == true) listOf(JournalEntry.PreventDefault) else emptyList()) +
 			// An input handler that set its field's value (`event.target.value = …`) writes the field, as the DOM's setter does.
@@ -789,8 +794,7 @@ class Runtime(
 			fun scopeOf(id: String): Scope? = byId[id.substringBefore('@')]?.let { node -> instances(node).firstOrNull { it.id == id }?.scope }
 			if (type == "click") {
 				val pressed = chain.firstOrNull { handlerFor(it.substringBefore('@'), EventName.Activate) != null } ?: return emptyList()
-				val scope = scopeOf(pressed) ?: return emptyList()
-				return withFields(clickFields(trusted = false)) { run(handlers[handlerFor(pressed.substringBefore('@'), EventName.Activate)]?.ops.orEmpty(), scope) }
+				return withFields(clickFields(trusted = false)) { press(pressed) }
 			}
 			val name = EventName.entries.firstOrNull { it.wire == type } ?: return emptyList()
 			fun optional(key: String, fallback: JsValue): JsValue = event[key]?.let { JsValue.fromJson(it) } ?: fallback
@@ -1357,7 +1361,36 @@ class Runtime(
 			else -> null
 		}
 		return change(host, if (event == EventName.Input || event == EventName.Commit) value else null) {
-			withFields(carried) { run(handler.ops, scope) }
+			withFields(carried) { if (event == EventName.Activate) press(host) else run(handler.ops, scope) }
+		}
+	}
+
+	/**
+	 * A press on [pressed], as a browser's click: its own handler, then the handler of each element around it, innermost first,
+	 * until one stops propagation. An element around it whose handler reads where the press landed runs its copy for the
+	 * pressed element (`<handler>@<node>`), which a pressed element with no handler of its own holds as its own.
+	 */
+	private fun press(pressed: String): List<JournalEntry> {
+		propagationStopped = false
+		try {
+			val own = pressed.substringBefore('@')
+			val ownHandler = handlerFor(own, EventName.Activate)
+			val journal = ArrayList<JournalEntry>()
+			for (id in chain(pressed)) {
+				val node = id.substringBefore('@')
+				val bound = handlerFor(node, EventName.Activate) ?: continue
+				val scope = byId[node]?.let { element -> instances(element).firstOrNull { it.id == id }?.scope } ?: continue
+				// A copy stands for the handler around it, and runs only as the pressed element's own.
+				if (node != own && '@' in bound) continue
+				val copy = if (node == own) null else "$bound@$own"
+				if (copy != null && ownHandler == copy) continue
+				val chosen = copy?.takeIf { it in handlers } ?: bound
+				journal.addAll(run(handlers[chosen]?.ops.orEmpty(), scope))
+				if (propagationStopped || journal.any { it is JournalEntry.Navigate }) break
+			}
+			return journal
+		} finally {
+			propagationStopped = false
 		}
 	}
 
@@ -1701,6 +1734,7 @@ class Runtime(
 				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope, named?.values?.filterNotNull().orEmpty() + listOfNotNull(pressed))},\"event\":$event$catch", submission))
 			}
 			Op.PreventDefault -> calls.add(JournalEntry.PreventDefault)
+			Op.StopPropagation -> propagationStopped = true
 			is Op.FieldText -> {
 				val node = evaluate(op.node, scope)
 				if (node == JsValue.Null) continue

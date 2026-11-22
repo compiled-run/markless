@@ -249,6 +249,8 @@ public final class NativeRuntime {
 	private var edit: String?
 	/// What a dismiss or pointer event carries while its handlers run.
 	private var eventFields: [NativeEventField: NativeValue]?
+	/// A click handler called stopPropagation(): the press goes no further out.
+	private var propagationStopped = false
 	/// The arms on screen when the running action began; nil between actions, when what shows is what the cells say.
 	private var drawnArms: [String: Int?]?
 	/// A text field's key or paste event: the field's text then, a script handler's `event.target.value`.
@@ -795,7 +797,7 @@ public final class NativeRuntime {
 			return try callScript("leave")
 		}
 		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave")
-			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["calls", "commands", "navigate", "prevented", "raises", "value", "listening", "watch"])
+			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["calls", "commands", "navigate", "prevented", "stopped", "raises", "value", "listening", "watch"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
 			guard pair.count == 2 || pair.count == 3 else { throw write.fail("a write is [slot, value] or [slot, value, nonFinite]") }
@@ -871,6 +873,8 @@ public final class NativeRuntime {
 			if case .navigate? = taken.first { return taken }
 			raised += taken
 		}
+		// A click handler called stopPropagation() before it first awaited.
+		if result.has("stopped"), try result["stopped"].bool() { propagationStopped = true }
 		// A key or paste handler called preventDefault() before it first awaited.
 		let prevented: [NativeJournalEntry] = try result.has("prevented") && result["prevented"].bool() ? [.preventDefault] : []
 		// An input handler that set its field's value (`event.target.value = …`) writes the field, as the DOM's setter does.
@@ -930,9 +934,9 @@ public final class NativeRuntime {
 		}
 		let handlerOf = { (id: String, name: NativeEventName) in self.payload.events.first { $0.host == self.nodeOf(id) && $0.event == name } }
 		if type == "click" {
-			guard let pressed = chain.first(where: { handlerOf($0, .activate) != nil }), let scope = try scopeOf(pressed) else { return [] }
+			guard let pressed = chain.first(where: { handlerOf($0, .activate) != nil }) else { return [] }
 			eventFields = clickFields(trusted: false)
-			return try run(handlers[handlerOf(pressed, .activate)!.handler] ?? [], in: scope)
+			return try press(pressed)
 		}
 		guard let name = NativeEventName(rawValue: type) else { return [] }
 		let optional = { (key: String, fallback: NativeValue) throws -> NativeValue in event.has(key) ? try event[key].scalar() : fallback }
@@ -1592,8 +1596,35 @@ public final class NativeRuntime {
 		let numeric = action.event == .input && { if case let .element(_, attributes, _) = node.kind { attributes["type"] == "number" } else { false } }()
 		return try change(host: action.host) {
 			if numeric, let typed = self.eventValue { self.eventValue = nativeNumberValue(typed) }
-			return try self.run(self.handlers[bound.handler] ?? [], in: scope)
+			return action.event == .activate ? try self.press(action.host) : try self.run(self.handlers[bound.handler] ?? [], in: scope)
 		}
+	}
+
+	/// A press on `pressed`, as a browser's click: its own handler, then the handler of each element around it, innermost first,
+	/// until one stops propagation. An element around it whose handler reads where the press landed runs its copy for the
+	/// pressed element (`<handler>@<node>`), which a pressed element with no handler of its own holds as its own.
+	private func press(_ pressed: String) throws -> [NativeJournalEntry] {
+		propagationStopped = false
+		defer { propagationStopped = false }
+		let own = nodeOf(pressed)
+		let key = pressed.firstIndex(of: "@").map { String(pressed[$0...]) } ?? ""
+		let ownHandler = payload.events.first { $0.host == own && $0.event == .activate }?.handler
+		var journal: [NativeJournalEntry] = []
+		var at: String? = own
+		while let node = at {
+			at = nodesById[node]?.parent
+			let id = node == own ? pressed : !key.isEmpty && nodesById[node]?.row != nil ? node + key : node
+			guard let bound = payload.events.first(where: { $0.host == node && $0.event == .activate }), let element = nodesById[node],
+				let scope = try instances(of: element).first(where: { $0.id == id })?.scope else { continue }
+			// A copy stands for the handler around it, and runs only as the pressed element's own.
+			if node != own && bound.handler.contains("@") { continue }
+			let copy = node == own ? nil : "\(bound.handler)@\(own)"
+			if let copy, ownHandler == copy { continue }
+			let chosen = copy.flatMap { handlers[$0] != nil ? $0 : nil } ?? bound.handler
+			journal += try run(handlers[chosen] ?? [], in: scope)
+			if propagationStopped || journal.contains(where: { if case .navigate = $0 { true } else { false } }) { break }
+		}
+		return journal
 	}
 
 	/// A long press on the action's host: its `contextmenu` handler, then each one of the elements it is inside, innermost first.
@@ -1899,6 +1930,8 @@ public final class NativeRuntime {
 				calls.append(.command(node: node, command: command, preventScroll: preventScroll))
 			case .preventDefault:
 				calls.append(.preventDefault)
+			case .stopPropagation:
+				propagationStopped = true
 			case let .fieldText(target, value):
 				let id = try evaluate(target, in: scope)
 				if id == .null { continue }

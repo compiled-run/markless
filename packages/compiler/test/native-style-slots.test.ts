@@ -77,6 +77,120 @@ export function offsetStyle(value: number, min: number, max: number): string {
 		expect(payload?.slots?.length).toBe(1);
 	});
 
+	describe('through a helper that returns one template', () => {
+		const app = `import { computed, state } from '@markless/core';
+import { offsetText } from './swipe.ts';
+export default function App() @{
+	let hidden = state(0.25);
+	const offset = computed(() => {
+		const now = hidden;
+		return offsetText(now);
+	});
+	<main><div style={offset}>Sheet</div><button onClick={() => (hidden = hidden + 0.5)}>Move</button></main>
+}`;
+		const clamp = `function clampFraction(value: number): number {
+	if (!Number.isFinite(value)) return 0;
+	if (value < 0) return 0;
+	if (value > 1) return 1;
+	return value;
+}
+`;
+		const refusal =
+			'a `style` that follows state whose text is not known when the app is built (only numbers in it may follow state)';
+
+		it('has the slots the template written inline has, its parameter bound to the argument', async () => {
+			const inline = await build(`import { computed, state } from '@markless/core';
+export default function App() @{
+	let hidden = state(0.25);
+	const offset = computed(() => \`--offset: \${Math.round(hidden * 10000) / 10000}\`);
+	<main><div style={offset}>Sheet</div><button onClick={() => (hidden = hidden + 0.5)}>Move</button></main>
+}`);
+			const helped = await build(app, {
+				'swipe.ts': `export function offsetText(hidden: number): string {
+	return \`--offset: \${Math.round(hidden * 10000) / 10000}\`;
+}
+`,
+			});
+			expect(helped.diagnostics).toEqual([]);
+			expect(styled(helped.payload)).toEqual(styled(inline.payload));
+			expect(helped.payload?.slots).toEqual(inline.payload?.slots);
+		});
+
+		it('keeps its text when a call in a hole runs as JavaScript, the hole still a number slot', async () => {
+			const { payload, diagnostics } = await build(app, {
+				'swipe.ts': `${clamp}export function offsetText(hidden: number): string {
+	return \`--offset: \${Math.round(clampFraction(hidden) * 10000) / 10000}\`;
+}
+`,
+			});
+			expect(diagnostics).toEqual([]);
+			expect(styled(payload)).toEqual([['h1', ['--offset: ', { slot: 'slot:h1#0' }]]]);
+			const [slot, ...more] = payload?.slots ?? [];
+			expect(more).toEqual([]);
+			expect(slot).toMatchObject({
+				id: 'slot:h1#0',
+				value: {
+					binary: '/',
+					left: {
+						call: 'Math.round',
+						arguments: [
+							{
+								binary: '*',
+								left: {
+									script: expect.any(String),
+									bindings: {
+										args: { value: { array: [{ spread: false, value: { cell: 'state:hidden' } }] } },
+									},
+								},
+								right: { literal: 10000 },
+							},
+						],
+					},
+					right: { literal: 10000 },
+				},
+			});
+		});
+
+		it.each([
+			[
+				'more than one return',
+				`${clamp}export function offsetText(hidden: number): string {
+	if (hidden > 1) return '--offset: 1';
+	return \`--offset: \${Math.round(clampFraction(hidden) * 10000) / 10000}\`;
+}
+`,
+			],
+			[
+				'a return that is not a template',
+				`${clamp}export function offsetText(hidden: number): string {
+	return '--offset: ' + Math.round(clampFraction(hidden) * 10000) / 10000;
+}
+`,
+			],
+			[
+				'an array joined',
+				`${clamp}export function offsetText(hidden: number): string {
+	return [\`--offset: \${clampFraction(hidden)}\`, 'opacity: 1'].join('; ');
+}
+`,
+			],
+			[
+				'a hole that is not a number',
+				`function spelled(value: number): string {
+	return Number.isFinite(value) ? 'near' : 'far';
+}
+export function offsetText(hidden: number): string {
+	return \`--offset: \${spelled(hidden)}\`;
+}
+`,
+			],
+		])('stays refused by name for %s', async (_, helper) => {
+			const { payload, diagnostics } = await build(app, { 'swipe.ts': helper });
+			expect(payload).toBeNull();
+			expect(diagnostics.map((d) => d.message)).toContain(refusal);
+		});
+	});
+
 	it('is a style attribute that follows a styled state when it is one of fixed texts', async () => {
 		const { payload, diagnostics } =
 			await build(`import { computed, state } from '@markless/core';

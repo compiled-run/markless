@@ -21,6 +21,9 @@ public struct ResolvedStyle: Equatable, Sendable {
 	/// Painted in a stacking context's layer order (a positioned or z-index box): its bucket (-1 below the flow, 1 auto or 0, 2 above)
 	/// and its rank there; the host orders it among its view's siblings, after (or, for -1, before) the boxes in flow.
 	public var paintOrder: (bucket: Int, rank: Int)?
+	/// Set on a box whose stacking context paints it past ancestors with later siblings: the payload node whose view it is placed
+	/// in, among that view's children in `paintOrder`, with `frame` relative to that node's box.
+	public var stackingParent: String?
 	/// Set on a scroll container: the axes CSS lets scroll, its offset range in points, and its scroll view's look.
 	public var scroll: ResolvedScroll?
 	/// `visibility` other than visible (a text takes its element's): the view keeps its place, but paints nothing of its own.
@@ -31,7 +34,7 @@ public struct ResolvedStyle: Equatable, Sendable {
 			&& a.cornerRadius == b.cornerRadius && a.font?.family == b.font?.family && a.font?.size == b.font?.size
 			&& a.textColor == b.textColor && a.lines == b.lines && a.linesText == b.linesText && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll && a.hidden == b.hidden
 			&& a.clipsChildren == b.clipsChildren && a.clipRect == b.clipRect
-			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank
+			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank && a.stackingParent == b.stackingParent
 	}
 
 	public struct DashedBorder: Equatable, Sendable {
@@ -253,7 +256,12 @@ extension StyleExport {
 			if styled.isText, let parent = styled.parent, hiddenBoxes.contains(parent) { style.hidden = true }
 			// A box that paints nothing (an empty clip) has no order to keep.
 			if style.clipRect.map({ $0.width == 0 || $0.height == 0 }) ?? false { style.paintOrder = nil }
-			if style.paintOrder != nil, let host = reHostOf(styled.writes) { try checkSiblingOrderSuffices(styled, host: host, byId: byId, nodes: nodes) }
+			if style.paintOrder != nil, let host = reHostOf(styled.writes),
+				let lifted = try stackingParent(styled, host: host, payloadParent: cursor, byId: byId, payloadIds: payloadIds)
+			{
+				style.stackingParent = lifted.parent
+				offset = lifted.offset
+			}
 			if let frame = style.frame {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
 			}
@@ -288,22 +296,39 @@ extension StyleExport {
 		return nil
 	}
 
-	/// Ordering a box among its own siblings paints it where its stacking context does when the context is its parent, or when every
-	/// box between them is the last painting child of its parent and clips nothing: then nothing of the context paints after it
-	/// outside the parent. Anything else is refused by name.
-	private func checkSiblingOrderSuffices(_ node: StyleNode, host: String, byId: [String: StyleNode], nodes: [StyleNode]) throws {
+	/// Where a box Dragon paints in its stacking context's order (`host`) is placed so its view's siblings are that order: the host
+	/// when it is a payload node, else the page's top node; nil when that is its parent already. Its frame there adds every box
+	/// in between (device px). A box in between that clips, scrolls or keeps an order of its own would have to carry the box
+	/// with it, and is refused by name, as is a box below the flow (a negative z-index) placed past its parent.
+	private func stackingParent(
+		_ node: StyleNode, host: String, payloadParent: String?, byId: [String: StyleNode], payloadIds: Set<String>
+	) throws -> (parent: String, offset: (x: Double, y: Double))? {
+		guard case let .paintOrder(_, bucket, _)? = node.writes.first(where: { if case .paintOrder = $0 { return true } else { return false } }) else { return nil }
+		var chain: [StyleNode] = []
 		var cursor = node.parent
-		guard case let .paintOrder(_, bucket, _)? = node.writes.first(where: { if case .paintOrder = $0 { return true } else { return false } }) else { return }
 		while let id = cursor, id != host {
 			guard let between = byId[id] else { throw styleError("\(node.id)'s stacking context \(host) is not an ancestor") }
-			let painting = nodes.filter { $0.parent == between.parent && $0.frame != nil }
-			let clips = between.writes.contains { if case .paddingBoxClip = $0 { return true }; if case .clipPathInset = $0 { return true }; return false }
-			guard bucket >= 0, painting.last?.id == between.id, !clips else {
-				throw styleError("\(node.id): painting in \(host)'s stacking order past \(between.id), which has later siblings or clips, is not implemented on iOS")
-			}
+			chain.append(between)
 			cursor = between.parent
 		}
 		if cursor == nil { throw styleError("\(node.id)'s stacking context \(host) is not an ancestor") }
+		let target = payloadIds.contains(host) ? host : chain.last(where: { payloadIds.contains($0.id) })?.id
+		let between = chain.prefix { $0.id != target }
+		for box in between {
+			let clips = box.writes.contains {
+				switch $0 {
+				case .paddingBoxClip, .clipPathInset, .scrollContainer: return true
+				default: return false
+				}
+			}
+			if clips { throw styleError("\(node.id): painting in \(host)'s stacking order past \(box.id), which clips or scrolls, is not implemented on iOS") }
+			if box.writes.contains(where: { if case .paintOrder = $0 { return true } else { return false } }) {
+				throw styleError("\(node.id): painting in \(host)'s stacking order past \(box.id), which keeps an order of its own, is not implemented on iOS")
+			}
+		}
+		guard let target, target != payloadParent else { return nil }
+		guard bucket >= 0 else { throw styleError("\(node.id): painting below the flow of \(host) past \(payloadParent ?? "the page") is not implemented on iOS") }
+		return (target, between.reduce((x: 0.0, y: 0.0)) { ($0.x + ($1.frame?.x ?? 0), $0.y + ($1.frame?.y ?? 0)) })
 	}
 
 	/// A device px range in points; a range that starts before 0 (right to left, a reversed flex box) is not implemented.

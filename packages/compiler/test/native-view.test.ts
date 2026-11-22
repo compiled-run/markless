@@ -1228,7 +1228,7 @@ export function Page() @{
 		);
 	});
 
-	it('makes a live region whose aria-live or role follows state, outside a row, with its politeness as an expression', async () => {
+	it('makes a live region whose aria-live or role follows state, with its politeness as an expression, in a @for row as outside one', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Page() @{
 	let paused = state(false);
@@ -1254,9 +1254,12 @@ export function Page() @{
 		}
 	</ul>
 }`);
-		expect(rows.diagnostics.map((d) => d.message).join('\n')).toContain(
-			'in a @for row whose `role`, `aria-live` or `aria-atomic` follows state',
-		);
+		expect(rows.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		const row = rows.payload!.nodes.find((node) => node.kind === 'element' && node.element === 'li');
+		expect(row).toMatchObject({
+			row: expect.any(String),
+			liveFollows: { politeness: expect.any(Object), atomic: expect.any(Object) },
+		});
 	});
 
 	it("folds a shared state's first value that reads module constants", async () => {
@@ -4315,6 +4318,40 @@ export function Chart() @{
 		expect(tip).toEqual([10, 60]);
 		expect(corner).toEqual([15, 50]);
 		expect(shapes[1]!.clip).toHaveLength(1);
+	});
+
+	it('masks a group by a <mask> of opaque fills as a clip by them inside its region; refuses partial coverage and the default units', async () => {
+		const shapesOf = async (mask: string) => {
+			const { payload, diagnostics } = await nativeView(`export function Mark() @{
+	<svg viewBox="0 0 10 10"><defs>${mask}</defs><g mask="url(#m)" transform="translate(2 0)"><rect width="10" height="10" /></g></svg>
+}`);
+			const svg = payload?.nodes.find((node) => node.kind === 'element' && node.drawing);
+			return {
+				shapes: svg?.kind === 'element' ? svg.drawing?.shapes : undefined,
+				messages: diagnostics.map((d) => d.message),
+			};
+		};
+		const alpha = await shapesOf(
+			'<mask id="m" mask-type="alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="8" height="10"><rect width="5" height="10" fill="black" /></mask>',
+		);
+		expect(alpha.messages).toEqual([]);
+		expect(alpha.shapes?.[0]?.clip).toEqual([
+			[0, 2, 0, 1, 10, 0, 1, 10, 10, 1, 2, 10, 4],
+			[0, 2, 0, 1, 7, 0, 1, 7, 10, 1, 2, 10, 4],
+		]);
+		const luminance = await shapesOf(
+			'<mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="8" height="10"><rect width="5" height="10" fill="white" /></mask>',
+		);
+		expect(luminance.shapes?.[0]?.clip).toEqual(alpha.shapes?.[0]?.clip);
+		expect(
+			(await shapesOf('<mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="8" height="10"><rect width="5" height="10" fill="grey" /></mask>')).messages,
+		).toContain('a <rect> inside a luminance <mask> that is not one opaque white fill with no stroke: a mask of partial coverage is not drawn natively yet');
+		expect((await shapesOf('<mask id="m"><rect width="5" height="10" fill="white" /></mask>')).messages).toContain(
+			'`maskUnits="objectBoundingBox"` on <mask>: a mask\'s region is drawn in user space only',
+		);
+		expect(
+			(await shapesOf('<mask id="m" maskUnits="userSpaceOnUse"><rect width="5" height="10" fill="white" /></mask>')).messages,
+		).toContain('<mask> without `x`, `y`, `width` and `height`: its default region depends on the box of what it masks');
 	});
 
 	it('clips a group by the <clipPath> its clip-path names, mapped into the drawing; refuses one in bounding-box units', async () => {
