@@ -374,6 +374,11 @@ private fun styleExport(fixtures: File) {
 	}
 	refusesStyle("an unknown write kind", text.replace("\"kind\": \"text-color\"", "\"kind\": \"box-shadow\""), "unknown style write kind \"box-shadow\"")
 	refusesStyle("an unknown schema", text.replace("native-style-export/0", "native-style-export/9"), "unknown style export schema")
+	fun withVisibility(value: String) = text.replace("\"writes\": [\n      {", "\"writes\": [\n      { \"kind\": \"visibility\", \"value\": \"$value\", \"canvas\": false, \"key\": \"visibility\" },\n      {")
+	check("the fixture gains visibility writes", withVisibility("hidden") != text) { "" }
+	val hidden = runCatching { StyleExport.decode(withVisibility("hidden").toByteArray()) }
+	check("decodes a visibility write", hidden.getOrNull()?.assignments?.get(0)?.byId?.get("h2")?.writes?.contains(StyleWrite.Visibility("hidden")) == true) { "${hidden.exceptionOrNull() ?: hidden.getOrNull()?.assignments?.get(0)?.byId?.get("h2")}" }
+	refusesStyle("a visibility it does not know", withVisibility("gone"), "visibility")
 }
 
 private fun dashedBorders(fixtures: File) {

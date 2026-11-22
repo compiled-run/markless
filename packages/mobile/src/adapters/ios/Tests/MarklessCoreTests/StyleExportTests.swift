@@ -44,6 +44,24 @@ private func exportText(_ edit: (String) -> String = { $0 }) -> Data { Data(edit
 	#expect(layout.styles["h1:text0"]?.frame == Frame(x: 0, y: 0, width: 284.953125 / 3, height: 29))
 }
 
+@Test func visibilityHiddenHidesTheBoxAndTheTextInsideIt() throws {
+	let (decoded, texts) = try payload()
+	let red = "\"writes\": [\n      {\n       \"kind\": \"background-color\",\n       \"color\": {\n        \"r\": 37,"
+	let hidden = "\"writes\": [\n      { \"kind\": \"visibility\", \"value\": \"hidden\", \"canvas\": false, \"key\": \"visibility\" },\n      {\n       \"kind\": \"background-color\",\n       \"color\": {\n        \"r\": 37,"
+	let edited = exportText { $0.replacingOccurrences(of: red, with: hidden) }
+	#expect(edited != counterExport)
+	let layout = try StyleExport.decode(edited).resolve(for: decoded, initialTexts: texts, value: noCells)
+	let button = try #require(layout.styles["h2"])
+	#expect(button.hidden)
+	#expect(button.background == nil)
+	#expect(button.borderWidth == 0)
+	#expect(layout.styles["h2:text0"]?.hidden == true)
+	#expect(layout.styles["h1"]?.hidden == false)
+	#expect(layout.styles["h1:text0"]?.hidden == false)
+	let gone = exportText { $0.replacingOccurrences(of: red, with: hidden.replacingOccurrences(of: "\"hidden\"", with: "\"gone\"")) }
+	#expect(throws: PayloadError.self) { try StyleExport.decode(gone).resolve(for: decoded, initialTexts: texts, value: noCells) }
+}
+
 @Test(arguments: [
 	("\"kind\": \"font\"", "\"kind\": \"letter-spacing\"", "unknown style write kind \"letter-spacing\""),
 	("dragon.native-style-export/0", "dragon.native-style-export/2", "unsupported schema"),

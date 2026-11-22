@@ -434,21 +434,26 @@ function walkApp(
 								value: top.typed(host, action.type.text),
 							})
 						: [];
-			const answered: NativeAction[] = [];
-			for (const entry of journal) {
-				const answer = services.answer(entry);
-				if (answer) answered.push(answer);
-				if (entry.op !== 'navigate') {
-					top.apply(entry, index);
-					continue;
+			// What a journal shows goes to the top screen; a navigation opens the next one, as the hosts push it.
+			const show = (entries: ReadonlyArray<NativeJournalEntry>) => {
+				const answered: NativeAction[] = [];
+				for (const entry of entries) {
+					const answer = services.answer(entry);
+					if (answer) answered.push(answer);
+					if (entry.op !== 'navigate') {
+						stack.at(-1)!.apply(entry, index);
+						continue;
+					}
+					const opened = appRuntime.screens().at(-1)!;
+					expect(opened.route, `step ${index}: the screen opened`).toBe(entry.route);
+					if (entry.replace) stack.pop();
+					stack.push(open(opened));
 				}
-				const opened = appRuntime.screens().at(-1)!;
-				expect(opened.route, `step ${index}: the screen opened`).toBe(entry.route);
-				if (entry.replace) stack.pop();
-				stack.push(open(opened));
-			}
-			for (const next of answered)
-				for (const entry of appRuntime.dispatch(next)) stack.at(-1)!.apply(entry, index);
+				for (const next of answered) show(appRuntime.dispatch(next));
+			};
+			show(journal);
+			// A timer already due fires at once, as on a phone: a handler's `await` of a zero-delay timer resumes.
+			services.advance(0, (fire) => show(appRuntime.dispatch(fire)));
 		}
 		expect(stack.length, `step ${index}: the stack`).toBe(appRuntime.screens().length);
 		stack.at(-1)!.check(step, index);
@@ -1144,7 +1149,8 @@ function walk(
 				const control = named ? nodeOf.get(named.split('@')[0]!) : undefined;
 				if (named && control?.kind === 'element') {
 					const type = control.attributes?.['type'] ?? 'text';
-					if (control.element === 'textarea' || (control.element === 'input' && !PRESSED_INPUT_TYPES.has(type)))
+					const pressable = payload.events.some((event) => event.host === control.id && event.event === 'activate');
+					if (control.element === 'textarea' || (control.element === 'input' && !PRESSED_INPUT_TYPES.has(type)) || !pressable)
 						focusing = named;
 					else pressed = named;
 				}
