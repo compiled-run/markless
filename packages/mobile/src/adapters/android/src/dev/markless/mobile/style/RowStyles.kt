@@ -55,6 +55,7 @@ fun StyleExport.shownRows(payload: Payload, runtime: Runtime): (Int) -> Map<Stri
 	val texts = runtime.texts().toMap()
 	val attributes = runtime.attributes().associate { (node, name, value) -> "$node\u0000$name" to value }
 	val lists = runtime.rows().toMap()
+	val slotValues = runtime.slots().toMap()
 	data class RowState(val state: Int, val node: String, val attribute: String, val options: List<String?>, val list: String)
 	val rowStates = states.mapIndexedNotNull { index, state ->
 		val hash = state.key.lastIndexOf('#')
@@ -78,7 +79,8 @@ fun StyleExport.shownRows(payload: Payload, runtime: Runtime): (Int) -> Map<Stri
 					if (option < 0) throw MarklessDecodeError("${row.node}@$key has ${row.attribute} ${value ?: "absent"}, which its style lists no state for")
 					reached = next(reached, row.state, JsValue.Str(option.toString()))
 				}
-				LaidOutRow(key, reached, rowTexts.filter { it.row == list.id }.associate { it.id to (texts["${it.id}@$key"] ?: "") })
+				val ownSlots = payload.slots.filter { it.row == list.id }.mapNotNull { s -> slotValues["${s.id}@$key"]?.let { s.id to it } }.toMap()
+				LaidOutRow(key, reached, rowTexts.filter { it.row == list.id }.associate { it.id to (texts["${it.id}@$key"] ?: "") }, ownSlots)
 			}
 		}
 	}

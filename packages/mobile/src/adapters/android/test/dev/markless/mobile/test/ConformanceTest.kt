@@ -35,6 +35,9 @@ import dev.markless.mobile.core.obj
 import dev.markless.mobile.core.str
 import dev.markless.mobile.core.text
 import dev.markless.mobile.style.BAND_KEY
+import dev.markless.mobile.style.Edges
+import dev.markless.mobile.style.PaddingBox
+import dev.markless.mobile.style.paddingBox
 import dev.markless.mobile.style.BandAtom
 import dev.markless.mobile.style.BandComparison
 import dev.markless.mobile.style.Bands
@@ -399,6 +402,17 @@ private fun dashedBorders(fixtures: File) {
 	}
 	val err = try { StyleExport.decode(text.replace("\"op\": \"dot\"", "\"op\": \"arc\"").toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
 	check("style export refuses an unknown border operation", err?.contains("unknown border operation \"arc\"") == true) { "error was: $err" }
+}
+
+private fun paddingBoxes() {
+	val even = paddingBox(Edges(6.0, 6.0, 6.0, 6.0), List(8) { 16.0 })
+	check("an even border insets the padding box and rounds it by the radius less the border", even == PaddingBox(6.0, 6.0, 6.0, 6.0, List(8) { 10.0 })) { "$even" }
+	val uneven = paddingBox(Edges(2.0, 10.0, 2.0, 10.0), List(8) { 16.0 })
+	check("an uneven border shapes each corner per axis", uneven.radii == listOf(6.0, 14.0, 6.0, 14.0, 6.0, 14.0, 6.0, 14.0)) { "${uneven.radii}" }
+	val thick = paddingBox(Edges(4.0, 20.0, 30.0, 1.0), listOf(8.0, 8.0, 12.0, 12.0, 16.0, 16.0, 0.0, 0.0))
+	check("an inner radius never goes below 0", thick.radii == listOf(7.0, 4.0, 0.0, 8.0, 0.0, 0.0, 0.0, 0.0) && thick.rounded) { "${thick.radii}" }
+	val square = paddingBox(Edges(3.0, 3.0, 3.0, 3.0), null)
+	check("a square box's padding box is square", !square.rounded && square.left == 3.0) { "$square" }
 }
 
 private fun textLines(fixtures: File) {
@@ -903,6 +917,7 @@ fun main(args: Array<String>) {
 	appStyle(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	appCanvas(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	dashedBorders(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	paddingBoxes()
 	textLines(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	systemFonts(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	sheetStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
