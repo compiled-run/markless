@@ -8,7 +8,7 @@
 			"element": "main",
 			"parent": null,
 			"attributes": {
-				"class": "page mk-17ddx0t"
+				"class": "page mk-13nrcdm"
 			}
 		},
 		{
@@ -17,7 +17,7 @@
 			"element": "h1",
 			"parent": "h0",
 			"attributes": {
-				"class": "heading mk-17ddx0t"
+				"class": "heading mk-13nrcdm"
 			}
 		},
 		{
@@ -32,7 +32,7 @@
 			"element": "div",
 			"parent": "h0",
 			"attributes": {
-				"class": "notice mk-17ddx0t"
+				"class": "notice mk-13nrcdm"
 			},
 			"attributesByState": {
 				"ui-closing": [
@@ -71,7 +71,7 @@
 			"element": "button",
 			"parent": "h0",
 			"attributes": {
-				"class": "action mk-17ddx0t"
+				"class": "action mk-13nrcdm"
 			}
 		},
 		{
@@ -86,7 +86,7 @@
 			"element": "p",
 			"parent": "h0",
 			"attributes": {
-				"class": "status mk-17ddx0t"
+				"class": "status mk-13nrcdm"
 			}
 		},
 		{
@@ -96,7 +96,7 @@
 			"text": "Notice open"
 		}
 	],
-	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n/* Global, so the keyframes keep their name: an animation event reports it. */\n.notice[ui-closing] {\n\tanimation: fold 400ms ease-in forwards;\n}\n@keyframes fold {\n\tfrom {\n\t\tbackground-color: #fff3cd;\n\t}\n\tto {\n\t\tbackground-color: #f8f9fa;\n\t}\n}\n\n.page.mk-17ddx0t {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #f8f9fa;\n\t\t\t}\n\t\t\t.heading.mk-17ddx0t {\n\t\t\t\tfont-size: 26px;\n\t\t\t\tfont-weight: 700;\n\t\t\t\tcolor: #212529;\n\t\t\t}\n\t\t\t.notice.mk-17ddx0t {\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 16px;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #fff3cd;\n\t\t\t\tcolor: #664d03;\n\t\t\t\tfont-size: 17px;\n\t\t\t}\n\t\t\t.action.mk-17ddx0t {\n\t\t\t\tdisplay: block;\n\t\t\t\twidth: 100%;\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tpadding: 10px 16px;\n\t\t\t\tborder: 2px solid #264653;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #264653;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 17px;\n\t\t\t\ttext-align: left;\n\t\t\t}\n\t\t\t.status.mk-17ddx0t {\n\t\t\t\tmargin-top: 24px;\n\t\t\t\tcolor: #495057;\n\t\t\t\tfont-size: 15px;\n\t\t\t}",
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n/* Global, so the keyframes keep their name: an animation event reports it. */\n.notice[ui-closing] {\n\tanimation: fold 400ms ease-in forwards;\n}\n@keyframes fold {\n\tfrom {\n\t\tbackground-color: #fff3cd;\n\t}\n\tto {\n\t\tbackground-color: #f8f9fa;\n\t}\n}\n\n.page.mk-13nrcdm {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #f8f9fa;\n\t\t\t}\n\t\t\t.heading.mk-13nrcdm {\n\t\t\t\tfont-size: 26px;\n\t\t\t\tfont-weight: 700;\n\t\t\t\tcolor: #212529;\n\t\t\t}\n\t\t\t.notice.mk-13nrcdm {\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 16px;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #fff3cd;\n\t\t\t\tcolor: #664d03;\n\t\t\t\tfont-size: 17px;\n\t\t\t}\n\t\t\t.action.mk-13nrcdm {\n\t\t\t\tdisplay: block;\n\t\t\t\twidth: 100%;\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tpadding: 10px 16px;\n\t\t\t\tborder: 2px solid #264653;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #264653;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 17px;\n\t\t\t\ttext-align: left;\n\t\t\t}\n\t\t\t.status.mk-13nrcdm {\n\t\t\t\tmargin-top: 24px;\n\t\t\t\tcolor: #495057;\n\t\t\t\tfont-size: 15px;\n\t\t\t}",
 	"states": [
 		{
 			"cell": "state:closing",
