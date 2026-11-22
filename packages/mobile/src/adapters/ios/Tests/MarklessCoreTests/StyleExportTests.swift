@@ -167,3 +167,51 @@ private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) 
 	let other = text.replacingOccurrences(of: "\"values\": {},", with: "\"values\": {}, \"colorScheme\": \"sepia\",")
 	#expect(throws: PayloadError.self) { try StyleExport.decode(Data(other.utf8)) }
 }
+
+private let pressedWrites = #"""
+	{ "kind": "transform", "ops": [{ "fn": "scale", "x": { "kind": "px", "px": 0, "percent": 0 }, "y": { "kind": "px", "px": 0, "percent": 0 }, "angle": 0, "sx": 0.97, "sy": 0.97 }], "origin": { "x": { "kind": "percent", "px": 0, "percent": 50 }, "y": { "kind": "calc", "px": 2, "percent": 50 } }, "key": "dragonTransform" },
+	{ "kind": "opacity-group", "opacity": 0.85, "backdrop": null, "painters": ["h1"], "after": "h0", "key": "dragonGroup" },
+	"""#
+
+private func pressed(_ edit: (String) -> String = { $0 }) -> Data {
+	let red = "\"writes\": [\n      {\n       \"kind\": \"background-color\",\n       \"color\": {\n        \"r\": 37,"
+	return exportText { $0.replacingOccurrences(of: red, with: red.replacingOccurrences(of: "\"writes\": [\n", with: "\"writes\": [\n\(edit(pressedWrites))\n")) }
+}
+
+@Test func aPressedButtonsTransformAndOpacityGroupResolve() throws {
+	let (decoded, texts) = try payload()
+	#expect(pressed() != counterExport)
+	let button = try #require(try StyleExport.decode(pressed()).resolve(for: decoded, initialTexts: texts, value: noCells).styles["h2"])
+	let zero = TransformLength(kind: "px", px: 0, percent: 0)
+	#expect(button.transform == StyleTransform(
+		functions: [TransformFunction(fn: "scale", x: zero, y: zero, angle: 0, sx: 0.97, sy: 0.97)],
+		originX: TransformLength(kind: "percent", px: 0, percent: 50), originY: TransformLength(kind: "calc", px: 2, percent: 50)))
+	#expect(button.group == OpacityGroup(opacity: 0.85, backdrop: nil, painters: ["h1"], after: "h0"))
+	#expect(button.background == RGBA(r: 37, g: 99, b: 235, alpha: 255))
+	let plain = try StyleExport.decode(counterExport).resolve(for: decoded, initialTexts: texts, value: noCells)
+	#expect(plain.styles["h2"]?.transform == nil)
+	#expect(plain.styles["h2"]?.group == nil)
+	#expect(plain.styles["h2"] != button)
+	let backdrop = try StyleExport.decode(pressed { $0.replacingOccurrences(of: "\"backdrop\": null", with: "\"backdrop\": \"h0\"").replacingOccurrences(of: ", \"after\": \"h0\"", with: "") })
+	#expect(try backdrop.resolve(for: decoded, initialTexts: texts, value: noCells).styles["h2"]?.group == OpacityGroup(opacity: 0.85, backdrop: "h0", painters: ["h1"], after: nil))
+}
+
+@Test(arguments: [
+	("\"fn\": \"scale\"", "\"fn\": \"skewX\"", "transform function \"skewX\""),
+	("\"kind\": \"calc\"", "\"kind\": \"em\"", "transform length kind \"em\""),
+	("\"key\": \"dragonTransform\"", "\"key\": \"transform\"", "expected dragonTransform"),
+	("\"opacity\": 0.85", "\"opacity\": 1", "opacity-group opacity 1.0 is not in (0, 1)"),
+	("\"painters\": [\"h1\"]", "\"painters\": [1]", "painters"),
+	("\"kind\": \"opacity-group\"", "\"kind\": \"filter-group\"", "unknown style write kind \"filter-group\""),
+])
+func refusesTransformsAndGroupsItCannotDraw(find: String, replace: String, reason: String) throws {
+	let (decoded, texts) = try payload()
+	let edited = pressed { $0.replacingOccurrences(of: find, with: replace) }
+	#expect(edited != pressed())
+	do {
+		_ = try StyleExport.decode(edited).resolve(for: decoded, initialTexts: texts, value: noCells)
+		Issue.record("accepted a write with \(replace)")
+	} catch {
+		#expect("\(error)".contains(reason), "\(error)")
+	}
+}

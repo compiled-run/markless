@@ -11,7 +11,7 @@ import android.widget.FrameLayout
 import android.widget.TextView
 
 /** The element view: children stack vertically until a style export assigns frames, then each child sits at its frame. */
-open class MarklessBox(context: Context) : FrameLayout(context) {
+open class MarklessBox(context: Context) : FrameLayout(context), SkipsBackdrop {
 	internal val frames = HashMap<View, Rect>()
 	/** Each child's place in paint order: 0 in flow, below 0 under it, above 0 a positioned box in its stacking context's order. */
 	private val orderKeys = HashMap<View, Int>()
@@ -29,6 +29,15 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 	// Stable: children with equal keys keep tree order; touch dispatch follows the same order.
 	override fun getChildDrawingOrder(childCount: Int, drawingPosition: Int): Int =
 		(0 until childCount).sortedBy { orderKeys[getChildAt(it)] ?: 0 }[drawingPosition]
+
+	/** The children drawn after [child], in drawing order. */
+	internal fun drawnAfter(child: View): List<View> {
+		val order = (0 until childCount).sortedBy { orderKeys[getChildAt(it)] ?: 0 }.map(::getChildAt)
+		return order.drop(order.indexOf(child) + 1)
+	}
+
+	override fun drawChild(canvas: Canvas, child: View, drawingTime: Long): Boolean =
+		if (child in Backdrop.skip) false else super.drawChild(canvas, child, drawingTime)
 	/** clip-path: inset(): the rect in px, relative to the box, it and its children draw inside; empty draws nothing. Accessibility is untouched. */
 	internal var clip: Rect? = null
 		set(value) {

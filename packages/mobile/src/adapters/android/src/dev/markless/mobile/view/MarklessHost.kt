@@ -315,6 +315,9 @@ class MarklessHost(
 	/** Inputs with no visible view (a checkbox or hidden input): GONE and outside the accessibility tree. */
 	private val inert = HashSet<String>()
 
+	/** Each shown pre-composited opacity group's overlay, by instance id. */
+	private val groups = HashMap<String, GroupOverlay>()
+
 	/** The layer showing an `invalid` entry's message until the next action. */
 	private var message: View? = null
 
@@ -639,6 +642,7 @@ class MarklessHost(
 		if (planned?.planRepeats?.isNotEmpty() == true && journal.any { it is JournalEntry.Rows || it is JournalEntry.Arm || ((it is JournalEntry.Text || it is JournalEntry.Attribute) && '@' in it.node) }) {
 			laidOutFor?.let { (w, h) -> layOutAt(w, h, rowsMoved = true) }
 		}
+		markGroupsDirty()
 		onJournal?.invoke(journal)
 		scheduleLoadEvents()
 	}
@@ -1368,7 +1372,7 @@ class MarklessHost(
 			val parent = view.parent as ViewGroup
 			val index = parent.indexOfChild(view)
 			parent.removeView(view)
-			val layer = FrameLayout(context).apply {
+			val layer = TopLayer(context).apply {
 				// Chrome's ::backdrop default, rgba(0, 0, 0, 0.1); a press on it is the page's, so it is consumed here.
 				setBackgroundColor(0x1A000000)
 				isClickable = true
@@ -1494,9 +1498,81 @@ class MarklessHost(
 			lineSources[view] = s to inView
 			drawLines(view)
 		}
+		// A button's text is the button's own view: only the element's writes transform it or group it.
+		if (s.kind != "text") {
+			applyTransform(inst.id, view, s.writes.filterIsInstance<StyleWrite.Transform>().lastOrNull(), frame.width, frame.height, dpr)
+			paintGroup(inst.id, view, s.writes.filterIsInstance<StyleWrite.OpacityGroup>().lastOrNull())
+		}
+		markGroupsDirty()
 		// A box that paints nothing (an empty clip) has no order to keep.
 		val paintsNothing = (view as? MarklessBox)?.clip?.isEmpty == true
 		(view.parent as? MarklessBox)?.order(view, s.writes.filterIsInstance<StyleWrite.PaintOrder>().firstOrNull()?.takeIf { !paintsNothing }?.let { checkSiblingOrderSuffices(s, it, styled); it.bucket * 100_000 + it.rank + 1 } ?: 0)
+	}
+
+	/** Shows a pre-composited opacity group's composite over its view, or takes it away. */
+	private fun paintGroup(id: String, view: View, group: StyleWrite.OpacityGroup?) {
+		val shown = groups[id]
+		if (group == null) {
+			shown?.remove()
+			groups.remove(id)
+			return
+		}
+		val composite = DragonComposite.linked ?: throw MarklessHostError("\"$id\": an opacity group needs Dragon's composite, which this app does not link")
+		val alpha8 = composite.alpha8(group.opacity)
+		if (shown != null && shown.view === view && shown.group == group && shown.alpha8 == alpha8) return
+		shown?.remove()
+		groups[id] = GroupOverlay(id, view, group, alpha8, composite, groupContext)
+	}
+
+	/** A box or text changed its layout or paint: every group's composite is stale and recomputes in the next pre-draw pass. */
+	private fun markGroupsDirty() {
+		val gone = groups.filter { (id, g) -> views[id] !== g.view }
+		for ((id, g) in gone) { g.remove(); groups.remove(id) }
+		for (g in groups.values) g.markDirty()
+	}
+
+	/** The view a group's backdrop is drawn from, and what shows under it: the page's root over the canvas and body, a top layer over the page, or a sheet's content. */
+	private fun backdropRoot(group: View): Pair<View, (android.graphics.Canvas) -> Unit> {
+		val canvas = canvasColor ?: Color.WHITE
+		val pageUnder: (android.graphics.Canvas) -> Unit = { c ->
+			c.drawColor(canvas)
+			val f = rootFrame
+			bodyBox?.let { (r, color) -> c.drawRect(Rect(r).apply { if (f != null) offset(-f.left, -f.top) }, Paint().apply { this.color = color }) }
+		}
+		if (group === root) return root to pageUnder
+		var at: View = group
+		while (true) {
+			val p = at.parent as? View ?: break
+			if (p === root) return root to pageUnder
+			if (p is TopLayer) return p to { c ->
+				c.drawColor(canvas)
+				val parent = p.parent as? ViewGroup
+				if (parent != null) for (i in 0 until parent.indexOfChild(p)) {
+					val sibling = parent.getChildAt(i)
+					if (sibling.visibility != View.VISIBLE) continue
+					val saved = c.save()
+					c.translate((sibling.left - p.left - sibling.scrollX).toFloat(), (sibling.top - p.top - sibling.scrollY).toFloat())
+					sibling.draw(c)
+					c.restoreToCount(saved)
+				}
+			}
+			if (sheets.keys.any { views[it] === p }) return p to { c -> c.drawColor(Color.WHITE) }
+			at = p
+		}
+		throw MarklessHostError("an opacity group outside the page, a sheet and a top layer has no backdrop to draw from")
+	}
+
+	private val groupContext by lazy {
+		GroupContext(
+			backdropRoot = ::backdropRoot,
+			rootOverflows = { page?.let { p -> p.export.assignments[p.assignment].pageScroll?.let { it.maxX > 0 || it.maxY > 0 } } ?: false },
+			overlay = { painter, from ->
+				// A painter in the same list row as the group is that row's copy.
+				val suffix = from.indexOf('@').let { if (it < 0) "" else from.substring(it) }
+				(groups[painter + suffix] ?: groups[painter])?.takeIf { views[it.id] === it.view }
+			},
+			overlays = { groups.values.toList() },
+		)
 	}
 
 	/** Draws Dragon's lines over a text view whose text is still the one Dragon laid out; otherwise the view draws its own text. */
@@ -1614,6 +1690,8 @@ class MarklessHost(
 			StyleWrite.ClipText -> {}
 			is StyleWrite.PaintOrder -> {}
 			is StyleWrite.Visibility -> {}
+			// Applied once the view is placed: at its frame's size, and over what it paints.
+			is StyleWrite.Transform, is StyleWrite.OpacityGroup -> if (s.kind == "text") throw MarklessHostError("\"${s.id}\" is text with a ${w.javaClass.simpleName} write")
 		}
 		if (s.kind != "text") {
 			val edges = s.borderWidths

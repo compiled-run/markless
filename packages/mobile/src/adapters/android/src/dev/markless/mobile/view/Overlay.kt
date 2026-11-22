@@ -92,7 +92,7 @@ internal class Overlays(private val host: MarklessHost, private val context: Con
 		val view = host.view(id)
 		val content = activity.findViewById<ViewGroup>(android.R.id.content)
 		val parent = view.parent as? ViewGroup ?: throw MarklessHostError("overlay \"$id\" has no place in the page")
-		val place = Lifted(id, view, FrameLayout(context), parent, parent.indexOfChild(view), view.layoutParams, view.background, intArrayOf(view.paddingLeft, view.paddingTop, view.paddingRight, view.paddingBottom))
+		val place = Lifted(id, view, TopLayer(context), parent, parent.indexOfChild(view), view.layoutParams, view.background, intArrayOf(view.paddingLeft, view.paddingTop, view.paddingRight, view.paddingBottom))
 		parent.removeView(view)
 		place.layer.apply {
 			// The same backdrop as the dialog layer; a press on it is the overlay's, so it is consumed here.

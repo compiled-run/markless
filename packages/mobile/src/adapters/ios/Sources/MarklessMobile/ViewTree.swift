@@ -368,6 +368,8 @@ final class ViewTree {
 	/// Each drawn checkbox (false) or radio button (true) and whether it is checked.
 	private var ticks: [String: (radio: Bool, checked: Bool)] = [:]
 	private(set) var overlays: OverlayHost!
+	/// Each shown pre-composited opacity group's overlay, by instance id.
+	private var groups: [String: GroupOverlayView] = [:]
 
 	init(
 		runtime: NativeRuntime, layout: StyleLayout?, sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:],
@@ -782,6 +784,7 @@ final class ViewTree {
 		refreshRelations()
 		refreshSelects()
 		if layout == nil { alignTables() }
+		markGroupsDirty()
 		overlays.flush()
 		announce(liveChanges)
 	}
@@ -909,9 +912,15 @@ final class ViewTree {
 
 	/// Paints a view and puts it at its frame; inside a scroll container, frames count from the scroll view's padding box.
 	private func place(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws {
+		// UIKit leaves frame undefined under a transform: the box is placed untransformed, then transformed at its new size.
+		if !CATransform3DIsIdentity(view.layer.transform) { view.layer.setAffineTransform(.identity) }
 		try paint(view, style, faces: faces)
 		if let label = view as? UILabel { drawLines(label, style) }
 		if let host = view.superview as? ContainerScrollView { view.frame.origin = CGPoint(x: view.frame.minX - host.inset.left, y: view.frame.minY - host.inset.top) }
+		let shown = style.frame != nil && !(view is AbsentField)
+		try applyTransform(id, view, shown ? style.transform : nil)
+		try paintGroup(id, view, shown ? style.group : nil)
+		markGroupsDirty()
 		guard let scroll = scrollViews[id] else {
 			if style.scroll != nil { throw HostError("\(id) became a scroll container after it was built") }
 			return
@@ -919,6 +928,47 @@ final class ViewTree {
 		guard let s = style.scroll else { throw HostError("\(id) stopped being a scroll container after it was built") }
 		scroll.configure(s, in: view.bounds.size, cornerRadius: style.cornerRadius)
 	}
+
+	/// Shows a pre-composited opacity group's composite over its view, or takes it away.
+	private func paintGroup(_ id: String, _ view: UIView, _ group: OpacityGroup?) throws {
+		let shown = view.subviews.lazy.compactMap { $0 as? GroupOverlayView }.first
+		guard let group else {
+			shown?.removeFromSuperview()
+			groups[id] = nil
+			return
+		}
+		guard let alpha8 = DragonPaint.opacityAlpha8, DragonPaint.groupComposite != nil, DragonPaint.groupCompositeLayered != nil else {
+			throw HostError("\(id): an opacity group needs Dragon's composite, which this host does not link")
+		}
+		let a8 = try alpha8(group.opacity)
+		if let shown, shown.group == group, shown.alpha8 == a8 { return }
+		shown?.removeFromSuperview()
+		let overlay = GroupOverlayView(id: id, group: group, alpha8: a8, context: groupContext)
+		view.addSubview(overlay)
+		groups[id] = overlay
+	}
+
+	/// A box or text changed its layout or paint: every group's composite is stale and recomputes in the next layout pass.
+	private func markGroupsDirty() {
+		for (id, overlay) in groups {
+			if overlay.superview == nil { groups[id] = nil } else { overlay.markDirty() }
+		}
+	}
+
+	private lazy var groupContext = GroupContext(
+		pageRoot: root,
+		canvas: { [unowned self] in self.canvas ?? .white },
+		scale: { [unowned self] in self.layout?.dpr ?? Double(self.root.traitCollection.displayScale) },
+		rootOverflows: { [unowned self] in
+			guard let layout = self.layout, let range = layout.pageScrolls[self.assignment] else { return false }
+			return range.maxX > 0 || range.maxY > 0
+		},
+		overlay: { [unowned self] painter, from in
+			// A painter in the same list row as the group is that row's copy.
+			let suffix = from.firstIndex(of: "@").map { String(from[$0...]) } ?? ""
+			return (self.groups[painter + suffix] ?? self.groups[painter]).flatMap { $0.superview == nil ? nil : $0 }
+		},
+		overlays: { [unowned self] in Array(self.groups.values) })
 
 	/// Draws Dragon's lines over a label in a system face while its text is the one Dragon laid out; otherwise the label draws its own.
 	private func drawLines(_ label: UILabel, _ given: ResolvedStyle? = nil) {

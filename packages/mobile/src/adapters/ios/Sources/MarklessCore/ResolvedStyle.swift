@@ -25,6 +25,10 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var scroll: ResolvedScroll?
 	/// `visibility` other than visible (a text takes its element's): the view keeps its place, but paints nothing of its own.
 	public var hidden = false
+	/// The box's `transform`, resolved at its size when the host applies it.
+	public var transform: StyleTransform?
+	/// Set when Dragon pre-composites the box's opacity: the host draws the composite over the box.
+	public var group: OpacityGroup?
 
 	public static func == (a: ResolvedStyle, b: ResolvedStyle) -> Bool {
 		a.frame == b.frame && a.background == b.background && a.borderWidth == b.borderWidth && a.borderColor == b.borderColor
@@ -32,6 +36,7 @@ public struct ResolvedStyle: Equatable, Sendable {
 			&& a.textColor == b.textColor && a.lines == b.lines && a.linesText == b.linesText && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll && a.hidden == b.hidden
 			&& a.clipsChildren == b.clipsChildren && a.clipRect == b.clipRect
 			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank
+			&& a.transform == b.transform && a.group == b.group
 	}
 
 	public struct DashedBorder: Equatable, Sendable {
@@ -352,6 +357,8 @@ extension StyleExport {
 			case .clipText: break
 			case let .paintOrder(_, bucket, rank): style.paintOrder = (bucket, rank)
 			case let .visibility(value): style.hidden = value != "visible"
+			case let .transform(transform): style.transform = transform
+			case let .opacityGroup(group): style.group = group
 			}
 		}
 		// A scroll view clips its own content; any other box clips its children.
