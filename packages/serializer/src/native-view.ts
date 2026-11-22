@@ -1730,9 +1730,10 @@ export const NATIVE_SCRIPT_DISMISS_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<st
 /** A submit handler's binding for its form's entries now, which its event's `target` and `currentTarget` carry for FormData. */
 export const NATIVE_SCRIPT_SUBMITTED_FORM = 'submitted form';
 
-/** Members of a page global a phone answers, read straight off it: the focused element, as a proxy. */
+/** Members of a page global a phone answers, read straight off it: the focused element, as a proxy, and the screen's history state. */
 export const NATIVE_SCRIPT_PAGE_MEMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
 	document: ['activeElement', 'addEventListener', 'removeEventListener'],
+	history: ['state', 'replaceState'],
 };
 
 /** What a touch adds to a script pointer handler's event: its plain values. The elements it names reach only data handlers. */

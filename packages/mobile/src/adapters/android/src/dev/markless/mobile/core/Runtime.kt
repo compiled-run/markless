@@ -672,7 +672,7 @@ class Runtime(
 	private fun enter(fields: String, submission: Submission? = null): List<JournalEntry> {
 		// A handler may read the focused element; a computed, which renders, never does, so only entries carry it.
 		val focus = focused?.takeIf { it != NATIVE_DOCUMENT_BODY }?.let { ",\"focused\":${jsonString(it)},\"focusElements\":${elementFacts(emptyMap(), Scope.EMPTY, listOf(it))}" } ?: ""
-		val entry = "{$fields$focus${entryCells()}}"
+		val entry = "{$fields,\"screen\":$screen$focus${entryCells()}}"
 		val started = System.nanoTime()
 		scriptCall("enter", entry)
 		val result = Json.parse(scriptCall("leave", null)).obj("leave()")
@@ -848,7 +848,7 @@ class Runtime(
 			asyncSent = sent
 			val again = if (retry.isEmpty()) "" else retry.joinToString(",", ",\"retry\":[", "]", transform = ::jsonString)
 			retry.clear()
-			out.addAll(enter("\"kind\":\"tasks\",\"screen\":$screen,\"tasks\":$tasks$again"))
+			out.addAll(enter("\"kind\":\"tasks\",\"tasks\":$tasks$again"))
 		}
 		throw MarklessRuntimeError("async values that keep starting each other")
 	}
@@ -869,7 +869,7 @@ class Runtime(
 	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
 	fun leave(): List<JournalEntry> =
 		if (asyncSent == null) emptyList()
-		else enter("\"kind\":\"tasks\",\"screen\":$screen,\"tasks\":[],\"leave\":true").filter { it is JournalEntry.Abort }
+		else enter("\"kind\":\"tasks\",\"tasks\":[],\"leave\":true").filter { it is JournalEntry.Abort }
 
 	/** The host's answer to a `fetch` entry: `{ status, statusText, headers, body }`, or `{ error }` for a network failure. */
 	fun response(id: Int, response: JsValue): List<JournalEntry> =

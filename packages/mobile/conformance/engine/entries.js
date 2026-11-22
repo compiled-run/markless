@@ -312,6 +312,7 @@ g.__markless[id] = {
 	enter: function (text) {
 		var entry = JSON.parse(text);
 		begin(entry);
+		host.enterScreen(entry.screen, entry.kind === 'tasks' && entry.leave);
 		if (entry.kind === 'compute') {
 			var value = fn(entry.fn)(frameOf(entry.frame))();
 			host.out = null;
