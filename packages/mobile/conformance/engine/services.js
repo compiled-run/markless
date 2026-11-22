@@ -413,6 +413,8 @@ if (!host) {
 	host.listeners = {};
 	g.document = {
 		get activeElement() { return host.focus(); },
+		// A page whose <html> has no lang, as code guarded by typeof document read it before the page had a document.
+		documentElement: { lang: '' },
 		addEventListener: function (type, listener) {
 			var list = host.listeners[String(type)] || (host.listeners[String(type)] = []);
 			if (typeof listener === 'function' && list.indexOf(listener) < 0) { list.push(listener); host.listened = true; }

@@ -5294,6 +5294,72 @@ export function Track() @{
 	});
 });
 
+it('compares `x ?? null` with null as data, whatever x first held', async () => {
+	const { diagnostics } = await nativeView(
+		`import { state } from '@markless/core';
+export function App() @{
+	const s = state({ low: undefined as number | undefined, out: '' });
+	<button onClick={() => { if ((s.low ?? null) === null) s.out = 'none'; }}>{s.out}</button>
+}`,
+		dataOnly,
+	);
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+});
+
+describe('a field steppers press', () => {
+	const source = `import { shared, state } from '@markless/core';
+function pageLanguage(): string | undefined {
+	if (typeof document === 'undefined') return undefined;
+	return document.documentElement.lang || undefined;
+}
+function shown(value: number | null): string {
+	if (value === null) return '';
+	return value.toLocaleString(pageLanguage());
+}
+const stepperState = shared(
+	() => {
+		const stepper = state({ value: 1, low: undefined as number | undefined, text: '1' });
+		return {
+			...stepper,
+			settle(next: number | null) {
+				stepper.value = next ?? 0;
+				stepper.text = shown(next);
+			},
+		};
+	},
+	{ scope: 'subtree' },
+);
+export function Stepper() @{
+	const stepper = stepperState();
+	<main>
+		<p>{stepper.text}</p>
+		<input
+			type="text"
+			value={stepper.text}
+			onKeydown={(event) => {
+				if (event.key === 'Home') event.preventDefault();
+				if (event.key === 'Home') stepper.settle(stepper.low ?? null);
+			}}
+		/>
+	</main>
+}`;
+
+	it('runs a key handler its data cannot spell as JavaScript, with the method reading a page global only past a typeof test', async () => {
+		const { payload, diagnostics } = await nativeView(source);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		const keydown = payload!.events.find((event) => event.event === 'keydown');
+		const ops = payload!.handlers.find((handler) => handler.id === keydown?.handler)?.ops;
+		expect(ops).toMatchObject([{ op: 'script', type: 'keydown' }]);
+		expect(JSON.stringify(ops)).toMatch(/"settle":\{"method":"fn:/);
+	});
+
+	it('still refuses the method without the typeof test, as its JavaScript would read a page global', async () => {
+		const { payload, diagnostics } = await nativeView(source.replace("if (typeof document === 'undefined') return undefined;\n", ''));
+		expect(payload).toBeNull();
+		expect(diagnostics.some((diagnostic) => diagnostic.severity === 'error')).toBe(true);
+	});
+});
+
 describe('overlays', () => {
 	it("lets a handler's JavaScript read document.activeElement alone of the page, never while rendering", async () => {
 		const { payload, diagnostics } =

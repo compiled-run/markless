@@ -235,6 +235,8 @@ var eventOf = function (given, frame) {
 		key: given.key,
 		isTrusted: given.isTrusted !== false,
 		isComposing: false,
+		// A phone's browser reports a finger as a touch pointer.
+		pointerType: String(given.type).indexOf('pointer') === 0 ? 'touch' : undefined,
 		defaultPrevented: false,
 		preventDefault: function () { this.defaultPrevented = true; },
 		propagationStopped: false,
