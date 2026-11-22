@@ -2511,6 +2511,50 @@ export function Entries() @{
 		]);
 	});
 
+	it('names the first labelable element inside a <label> with no `for`, as the web resolves its control', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Form() @{
+	<form onSubmit={(event) => event.preventDefault()}>
+		<label>Title <input name="title" /></label>
+		<label><input type="hidden" name="id" /><input type="checkbox" name="pinned" /> Pinned</label>
+	</form>
+}`);
+		expect(diagnostics).toEqual([]);
+		const elements = (payload?.nodes ?? []).filter((node) => node.kind === 'element');
+		const labels = elements.filter((node) => node.element === 'label');
+		const [title, , pinned] = elements.filter((node) => node.element === 'input');
+		expect(labels.map((label) => label.bindings)).toEqual([
+			[{ attribute: 'for', value: { literal: title?.id } }],
+			[{ attribute: 'for', value: { literal: pinned?.id } }],
+		]);
+	});
+
+	it("names the same row's control for a <label> inside a keyed @for row", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Tasks() @{
+	let tasks = state([{ slug: 'a', title: 'A' }]);
+	<ul>
+		@for (const task of tasks; key task.slug) {
+			<li><label><input type="checkbox" /> {task.title}</label></li>
+		}
+	</ul>
+}`);
+		expect(diagnostics).toEqual([]);
+		const label = payload?.nodes.find(
+			(node) => node.kind === 'element' && node.element === 'label',
+		);
+		const box = payload?.nodes.find(
+			(node) => node.kind === 'element' && node.element === 'input',
+		);
+		expect(label?.kind === 'element' && label.bindings).toEqual([
+			{
+				attribute: 'for',
+				value: {
+					template: [`${box?.id}@`, { member: { item: 'repeat:0' }, property: 'slug' }],
+				},
+			},
+		]);
+	});
+
 	it('refuses an id reference from outside a row to an element inside one', async () => {
 		const { payload, diagnostics } =
 			await nativeView(`import { element, shared, state } from '@markless/core';
@@ -3992,7 +4036,90 @@ export function Notes() @{
 	});
 });
 
+describe('classes in phone JavaScript', () => {
+	const source = (head: string) => `import { state } from '@markless/core';
+${head}
+	bits = [] as number[];
+	constructor(first: number) { this.bits.push(first); }
+	add(bit: number) { this.bits.push(bit); return this; }
+	static of(first: number) { return new Bits(first); }
+}
+function count(): number { return Bits.of(1).add(0).add(1).bits.length; }
+export function App() @{
+	const shown = state({ n: 0 });
+	<button onClick={() => (shown.n = count())}>{shown.n}</button>
+}`;
+
+	it('lowers a plain class to a constructor function, as Hermes runs no class syntax', async () => {
+		const { payload, diagnostics } = await nativeView(source('class Bits {'));
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		const code = payload!.script!.source;
+		expect(code).not.toMatch(/\bclass\s+Bits/);
+		expect(code).toContain('Bits.prototype.add = function');
+		expect(code).toContain('this.bits = []');
+	});
+
+	it('refuses a class it cannot lower, naming why', async () => {
+		const { diagnostics } = await nativeView(source('class Base {}\nclass Bits extends Base {'));
+		expect(diagnostics.map((diagnostic) => diagnostic.message).join('\n')).toContain(
+			'a class that extends another, which Hermes cannot run',
+		);
+	});
+});
+
 describe('inline svg', () => {
+	const live = `import { state } from '@markless/core';
+function Mark({ d, ...rest }: { d: string; fill?: string }) @{
+	<path {...rest} d={d} />
+}
+export function Code() @{
+	const code = state({ d: 'M0 0h1v1h-1z', box: '0 0 1 1' });
+	<main>
+		<svg viewBox={code.box} width="10" height="10" fill="red">
+			<Mark d={code.d} fill="currentColor" />
+		</svg>
+		<button onClick={() => { code.d = 'M0 0h2v2h-2z'; code.box = '0 0 2 2'; }}>Grow</button>
+	</main>
+}`;
+
+	it("draws a component's path inside an svg while the app runs: paint read at build time, outline and viewBox from the engine", async () => {
+		const { payload, diagnostics } = await nativeView(live);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		const svg = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'svg')!;
+		const path = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'path')!;
+		if (svg.kind !== 'element' || path.kind !== 'element') throw new Error('not elements');
+		expect(svg.drawing).toMatchObject({ viewBox: null, width: 10, height: 10, shapes: [] });
+		expect(svg.bindings).toMatchObject([{ attribute: 'viewBox', value: { script: expect.any(String) } }]);
+		expect(path.parent).toBe(svg.id);
+		expect(path.shape).toEqual({
+			path: [],
+			fill: 'currentColor',
+			fillRule: 'nonzero',
+			stroke: null,
+			width: 1,
+			cap: 'butt',
+			join: 'miter',
+			miterLimit: 4,
+		});
+		expect(path.bindings).toMatchObject([{ attribute: 'd', value: { script: expect.any(String) } }]);
+		expect(path.attributes?.d).toBeUndefined();
+		expect(payload!.script?.source).toContain('var __svgPath');
+	});
+
+	it('refuses a paint that follows state on a shape drawn while the app runs, and a shape after one', async () => {
+		const { diagnostics } = await nativeView(
+			live
+				.replace('<path {...rest} d={d} />', '<path {...rest} d={d} stroke={d} />')
+				.replace('</svg>', '<rect width="1" height="1" /></svg>'),
+		);
+		expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+			expect.arrayContaining([
+				'a shape after a component or `{children}` inside an <svg>, which a native drawing would paint under them',
+				'`stroke` on <path> follows state; a native drawing is compiled when the app is built',
+			]),
+		);
+	});
+
 	it("compiles an svg's shapes into a drawing, with its <title> as its name", async () => {
 		const { payload, diagnostics } = await nativeView(`export function Icon() @{
 	<svg viewBox="0 0 20 10" width="40" height="20" fill="currentColor">

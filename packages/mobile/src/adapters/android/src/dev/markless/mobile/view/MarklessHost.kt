@@ -187,6 +187,10 @@ class MarklessHost(
 	private val events = payload.events.groupBy { it.host }
 	private val views = HashMap<String, View>()
 	private val built = HashMap<String, Instance>()
+	/** Shapes inside an svg, by instance: the drawing that draws each one. */
+	private val shapeOwners = HashMap<String, DrawingView>()
+	/** svgs whose viewBox follows state: the journal's `viewBox` attribute gives it. */
+	private val followingViewBox = HashSet<String>()
 	private val textViews = HashMap<String, TextView>()
 	/** Each text view that draws Dragon's glyph lines over itself instead of its own text. */
 	private val glyphLines = HashMap<TextView, GlyphLines>()
@@ -810,6 +814,10 @@ class MarklessHost(
 		heldTexts.keys.removeAll { it !in live && inScope(it, only) }
 		for (inst in built.values.sortedByDescending { order.getValue(it.node.id) }) {
 			if (inst.id in live || (only != null && !only(inst))) continue
+			if (shapeOwners.remove(inst.id) != null) {
+				built.remove(inst.id)
+				continue
+			}
 			val view = views.remove(inst.id)!!
 			built.remove(inst.id)
 			scrollers.remove(inst.id)
@@ -837,7 +845,17 @@ class MarklessHost(
 				val lead = flow.leadOf[node.id]
 				if (lead != null && lead != node.id) { members.add(inst.id); continue }
 			}
-			if (inst.id in views) continue
+			if (inst.id in views || inst.id in shapeOwners) continue
+			val shape = (node as? Node.Element)?.shape
+			if (shape != null) {
+				// A shape inside an svg is drawn by the svg's view; it has no view of its own.
+				val drawn = parentOf(inst)?.let { views[it] } as? DrawingView ?: throw MarklessHostError("the shape \"${inst.id}\" is not inside a drawing")
+				val outline = (node as Node.Element).bindings.firstOrNull { !it.property && it.name == "d" }?.let { runtime.attribute(it, inst.scope) }
+				shapeOwners[inst.id] = drawn
+				drawn.addShape(inst.id, shape, outline)
+				built[inst.id] = inst
+				continue
+			}
 			val view = when {
 				flow != null && flow.leadOf[node.id] == node.id -> paragraph(inst).also { fresh.add(inst.id) }
 				node is Node.Element -> element(node, inst)
@@ -1108,6 +1126,7 @@ class MarklessHost(
 		// A dialog shows nothing until showModal() puts it in the top layer (the UA's dialog:not([open]) { display: none }).
 		if (node.element == "dialog") view.visibility = View.GONE
 		for ((name, value) in node.attributes) if (name != "class") attribute(inst.id, name, value)
+		if (drawing != null && node.bindings.any { !it.property && it.name == "viewBox" }) followingViewBox.add(inst.id)
 		for (b in node.bindings) if (!b.property) attribute(inst.id, b.name, runtime.attribute(b, inst.scope))
 		if (unseen) {
 			view.visibility = View.GONE
@@ -1230,17 +1249,29 @@ class MarklessHost(
 
 	/** Attributes per the contract's Android mapping; `class` reaches views only through Dragon's style states, and any other attribute is ignored. */
 	private fun attribute(id: String, name: String, value: String?) {
+		shapeOwners[id]?.let { drawn ->
+			if (name == "d") drawn.setOutline(id, value)
+			return
+		}
 		val view = view(id)
+		if (name == "viewBox" && id in followingViewBox) {
+			(view as DrawingView).setViewBox(value)
+			return
+		}
 		val current = attrs.getOrPut(id) { HashMap() }
 		if (value == null) current.remove(name) else current[name] = value
 		if (id in inert && (name == "aria-hidden" || name == "hidden")) return
 		if (view is RangeBar && name in RangeBar.SHAPE) view.show(current)
 		if (name == "role" || name == "aria-live") (payload.nodes.firstOrNull { it.id == id.substringBefore('@') } as? Node.Element)?.takeIf { it.liveFollows != null }?.let { liveRegion(it, view) }
 		when (name) {
-			// A label names its control, so TalkBack reads it there and not a second time on the label; a press on it activates the control.
-			"for" -> if (value != null) {
-				view.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
-				view.setOnClickListener { views[value]?.performClick() }
+			// A press on a label acts on its control, as the web does: a text field takes the keyboard, any other is pressed.
+			"for" -> if (value != null) view.setOnClickListener {
+				when (val control = views[value]) {
+					is EditText -> command(control, "focus", false)
+					// A select is only focused, as a browser does; its picker opens from a press on the select itself.
+					is SelectBox -> Unit
+					else -> control?.performClick()
+				}
 			}
 			"aria-label" -> if (view is AudioButton) view.label(value) else {
 				view.contentDescription = value ?: (view as? DrawingView)?.label
@@ -1363,22 +1394,35 @@ class MarklessHost(
 	/** The text the elements named by a space-separated id list show, in view order. */
 	private fun textOf(ids: String): String = ids.split(' ').mapNotNull { views[it] }.joinToString(" ") { textWithin(it) }
 
-	private fun textWithin(view: View): String = when (view) {
-		is TextView -> view.text.toString()
-		is ViewGroup -> (0 until view.childCount).map { textWithin(view.getChildAt(it)) }.filter { it.isNotEmpty() }.joinToString(" ")
+	private fun textWithin(view: View, skipped: View? = null): String = when {
+		view === skipped -> ""
+		view is TextView -> view.text.toString()
+		view is ViewGroup -> (0 until view.childCount).map { textWithin(view.getChildAt(it), skipped) }.filter { it.isNotEmpty() }.joinToString(" ")
 		else -> ""
 	}
 
-	/** `aria-labelledby` as the content description, kept current after every journal. */
 	/** Each select shows its chosen option's label, as the web's closed `<select>` does. */
 	private fun refreshSelects() {
 		for ((id, view) in views) if (view is SelectBox) view.show(runtime.choices(id).firstOrNull { it.selected }?.label ?: "")
 	}
 
+	/** `aria-labelledby` as the content description, kept current after every journal; a `<label>` names its control with its
+	 * text, so TalkBack reads it there and not a second time on the label. */
 	private fun refreshRelations() {
 		for ((id, current) in attrs) {
 			val view = views[id] ?: continue
 			if (current["aria-label"] == null) current["aria-labelledby"]?.let { view.contentDescription = textOf(it) }
+			val target = current["for"] ?: continue
+			val control = views[target] ?: continue
+			val own = attrs[target].orEmpty()
+			val unnamed = own["aria-label"] == null && own["aria-labelledby"] == null
+			if (unnamed) control.contentDescription = textWithin(view, control)
+			val inside = generateSequence(control.parent) { it.parent }.any { it === view }
+			if (!inside) view.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+			else if (unnamed && view is ViewGroup)
+				for (child in (0 until view.childCount).map { view.getChildAt(it) })
+					if (child !== control && !(child is ViewGroup && generateSequence(control.parent) { it.parent }.any { it === child }))
+						child.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
 		}
 	}
 
@@ -1436,7 +1480,7 @@ class MarklessHost(
 			if (parentId == null) rootFrame = rect else (scrollers[parentId]?.second ?: views.getValue(parentId) as MarklessBox).frames[view] = rect
 			if (view is MarklessBox) sizeScroller(inst.id, view, s, rect)
 		}
-		paint(view, s)
+		paint(view, s, styled)
 		if (view is SelectBox) selectLabel(view, s, styled, absolute)
 		if (view is TextView && node is Node.Text) {
 			lineSources[view] = s to inView
@@ -1526,7 +1570,10 @@ class MarklessHost(
 		if (cursor == null) throw MarklessHostError("\"${s.id}\"'s stacking context ${order.host} is not an ancestor")
 	}
 
-	private fun paint(view: View, s: StyledNode) {
+	private fun paint(view: View, s: StyledNode, styled: Assignment) {
+		fun notVisible(n: StyledNode?) = n?.writes?.any { it is StyleWrite.Visibility && it.value != "visible" } == true
+		// A text takes its element's visibility, which Dragon writes on the element only.
+		val hidden = notVisible(s) || (s.kind == "text" && notVisible(s.parent?.let { styled.byId[it] }))
 		var fill: Int? = null
 		var styles: List<String>? = null
 		var colors: List<Int>? = null
@@ -1558,6 +1605,7 @@ class MarklessHost(
 			}
 			StyleWrite.ClipText -> {}
 			is StyleWrite.PaintOrder -> {}
+			is StyleWrite.Visibility -> {}
 			is StyleWrite.SelectArrow -> if (view !is SelectBox) throw MarklessHostError("\"${s.id}\" draws a drop-down arrow but is not a select")
 		}
 		if (s.kind != "text") {
@@ -1568,6 +1616,15 @@ class MarklessHost(
 		}
 		if (s.kind == "text") {
 			if (view !is Button) view.background = null
+			// Text that is not visible keeps its place but neither shows nor reads out, as the web hides it.
+			// Only between shown and invisible: a view an arm or `hidden` took out (GONE) stays out.
+			if (hidden && view.visibility == View.VISIBLE) view.visibility = View.INVISIBLE
+			else if (!hidden && view.visibility == View.INVISIBLE) view.visibility = View.VISIBLE
+			return
+		}
+		// A box that is not visible paints none of its own decorations; its children paint as their own visibility says.
+		if (hidden) {
+			view.background = null
 			return
 		}
 		val bw = s.borderWidths ?: throw MarklessHostError("element \"${s.id}\" has no border widths")
@@ -1604,6 +1661,8 @@ class MarklessHost(
 
 	/** A styled select's label: in the box Dragon lays out inside it for its text, in that text's font and colour. */
 	private fun selectLabel(view: SelectBox, s: StyledNode, styled: Assignment, absolute: Map<String, Pair<Double, Double>>) {
+		// A select that is not visible shows neither its label nor its arrow, as the web hides them with it.
+		if (s.writes.any { it is StyleWrite.Visibility && it.value != "visible" }) return view.label(null, null, 0.0, null)
 		val inner = styled.nodes.filter { it.parent == s.id && !isView(it.id) }
 		if (inner.size != 1 || inner[0].kind != "element") throw MarklessHostError("\"${s.id}\": a select's style export holds one box for its label, not ${inner.size}")
 		val box = inner[0].frame

@@ -119,3 +119,31 @@ private func writesArrow(_ node: StyleNode?) -> RGBA? {
 		#expect(throws: PayloadError.self) { try style.laidOut(width: 402, height: 778, scale: 3, slots: values, layout: { _ in text }) }
 	}
 }
+
+@Test func aSelectThatIsNotVisibleDrawsNeitherItsArrowNorItsLabel() throws {
+	var root = try #require(try JSONSerialization.jsonObject(with: try fixture("s24-styled-select.native-app-style")) as? [String: Any])
+	var targets = try #require(root["targets"] as? [String: Any])
+	var ios = try #require(targets["ios"] as? [String: Any])
+	var routes = try #require(ios["routes"] as? [[String: Any]])
+	var assignments = try #require(routes[0]["assignments"] as? [[String: Any]])
+	var nodes = try #require(assignments[0]["nodes"] as? [[String: Any]])
+	let at = try #require(nodes.firstIndex { $0["id"] as? String == "h3" })
+	var writes = try #require(ios["writes"] as? [[[String: Any]]])
+	writes.append(try #require(writes[try #require(nodes[at]["writes"] as? Int)]) + [["kind": "visibility", "value": "hidden", "canvas": false, "key": "visibility"]])
+	nodes[at]["writes"] = writes.count - 1
+	assignments[0]["nodes"] = nodes
+	routes[0]["assignments"] = assignments
+	ios["routes"] = routes
+	ios["writes"] = writes
+	targets["ios"] = ios
+	root["targets"] = targets
+	let style = try #require(try StyleExport.decodeApp(try JSONSerialization.data(withJSONObject: root))["/"])
+	let (_, page, layout) = try tagging()
+	let runtime = NativeRuntime(payload: page)
+	let laid = try style.laidOut(width: 402, height: 778, scale: 3, layout: { _ in layout })
+	let select = try #require(try laid.resolve(for: page, initialTexts: try runtime.texts(), value: runtime.value(of:), arm: runtime.styleArm(of:)).styles["h3"])
+	#expect(select.hidden)
+	#expect(select.selectArrow == nil)
+	#expect(select.selectLabel == nil)
+	#expect(select.background == nil)
+}

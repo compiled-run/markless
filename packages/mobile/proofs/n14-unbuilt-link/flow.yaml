@@ -1,0 +1,14 @@
+appId: ${APP_ID}
+name: n14-unbuilt-link
+---
+- launchApp:
+    clearState: true
+- assertVisible: Home
+- assertVisible: Open report
+- assertNotVisible: Page not found
+- assertNotVisible: Report page
+- tapOn: Open report
+- assertVisible: Page not found
+- assertNotVisible: Home
+- assertVisible: Page not found
+- assertNotVisible: Home
