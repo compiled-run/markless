@@ -827,6 +827,14 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'row-live',
+		fixture: 'proofs/r166-row-live/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
 		name: 'radio-follows',
 		fixture: 'proofs/r163-radio-follows/App.tsrx',
 		modules: true,
