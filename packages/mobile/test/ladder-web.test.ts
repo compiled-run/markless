@@ -103,8 +103,8 @@ async function serveRung(
 	}
 	// Components a rung imports live in proofs/lib, which a page reaches as `../lib/...` from pages/ here too.
 	await cp(join(proofsDir, 'lib'), join(root, 'lib'), { recursive: true });
-	// An app rung may bring its own components, stylesheets, served files and document (whose stylesheet imports reach every page).
-	for (const own of ['lib', 'styles', 'public'])
+	// An app rung may bring its own components, stylesheets, served files, API routes and document (whose stylesheet imports reach every page).
+	for (const own of ['lib', 'styles', 'public', 'api'])
 		if (existsSync(join(proofsDir, folder, own)))
 			await cp(join(proofsDir, folder, own), join(root, own), { recursive: true });
 	if (existsSync(join(proofsDir, folder, 'document.tsrx')))
@@ -119,6 +119,8 @@ async function serveRung(
 		join(root, 'node_modules/@markless/ui'),
 		'dir',
 	);
+	// The server an app rung's api/ routes run in, as the router's build imports it.
+	await symlink(join(packagesRoot, 'router/node_modules/nitro'), join(root, 'node_modules/nitro'), 'dir');
 	// The third-party package the script ladder imports (J2), as the mobile package depends on it.
 	await symlink(
 		join(packagesRoot, 'mobile/node_modules/scule'),
@@ -169,13 +171,15 @@ const shown = (page: Page, text: string): Locator =>
 // The phone the style exports lay out for (Dragon's iOS viewport): a rung that scrolls scrolls here as on the phones.
 const PHONE = { width: 402, height: 778 };
 
-// On screen: some of it is inside the viewport and not clipped away by a scrolling box, as an IntersectionObserver reports.
+// On screen: drawn (not visibility: hidden) and some of it inside the viewport, not clipped away by a scrolling box, as an
+// IntersectionObserver reports.
 const onScreenCount = (page: Page, text: string): Promise<number> =>
 	shown(page, text).evaluateAll(async (elements) => {
 		const seen = await Promise.all(
 			elements.map(
 				(element) =>
 					new Promise<boolean>((resolve) => {
+						if (!element.checkVisibility({ visibilityProperty: true })) return resolve(false);
 						const observer = new IntersectionObserver(([entry]) => {
 							observer.disconnect();
 							resolve(

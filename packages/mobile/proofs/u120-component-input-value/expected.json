@@ -1,0 +1,18 @@
+{
+	"rung": 220,
+	"name": "Text typed into a component's <input value={prop}> stays, as the web keeps it: the prop sets the field's default value only",
+	"steps": [
+		{ "visible": ["New note", "Bumped 0"], "fields": { "Title": "" } },
+		{
+			"do": { "type": { "field": "Title", "text": "Groceries" } },
+			"visible": ["Bumped 0"],
+			"fields": { "Title": "Groceries" }
+		},
+		{
+			"do": { "tap": "Bumped 0" },
+			"visible": ["Bumped 1"],
+			"absent": ["Bumped 0"],
+			"fields": { "Title": "Groceries" }
+		}
+	]
+}

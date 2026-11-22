@@ -1,0 +1,19 @@
+{
+	"rung": 151,
+	"name": "qr-code: the pattern is drawn from path data the code's value gives while the app runs, and a new value redraws it",
+	"steps": [
+		{
+			"visible": ["Pair a device", "Showing alpha", "New code"]
+		},
+		{
+			"do": { "tap": "New code" },
+			"visible": ["Showing bravo"],
+			"absent": ["Showing alpha"]
+		},
+		{
+			"do": { "tap": "New code" },
+			"visible": ["Showing alpha"],
+			"absent": ["Showing bravo"]
+		}
+	]
+}

@@ -1,0 +1,59 @@
+appId: ${APP_ID}
+name: shop
+---
+- launchApp:
+      clearState: true
+- assertVisible: New this week
+- assertVisible: Refresh
+- assertVisible: Desk lamp
+- assertVisible: Copper kettle
+- assertVisible: Shop
+- tapOn: Copper kettle
+- assertNotVisible: New this week
+- assertVisible: Whistles when it is ready\. Works on every hob\.
+- assertVisible: Choose option
+- assertVisible: Add to cart
+- assertNotVisible: New this week
+- assertVisible:
+      text: Add to cart
+      enabled: false
+- tapOn: Choose option
+- assertVisible: Choose an option
+- assertVisible: 1 litre
+- assertVisible: 2 litres
+- tapOn: 2 litres
+- assertNotVisible: Choose an option
+- assertVisible: 2 litres
+- assertVisible: Add to cart
+- assertNotVisible: Choose an option
+- assertNotVisible: Choose option
+- tapOn: Add to cart
+- assertVisible: Added to your cart
+- assertVisible: 1 in cart
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertNotVisible: Added to your cart
+- assertVisible: New this week
+- assertVisible: Copper kettle
+- assertVisible: 1 in cart
+- assertNotVisible: Added to your cart
+- tapOn: Cart
+- assertNotVisible: New this week
+- assertVisible: Copper kettle
+- assertVisible: 2 litres · £64\.00
+- assertVisible: £64\.00
+- assertVisible: Place order
+- assertNotVisible: New this week
+- tapOn: One more Copper kettle
+- assertVisible: £128\.00
+- assertVisible: 2 in cart
+- assertNotVisible: 1 in cart

@@ -1,0 +1,66 @@
+{
+	"rung": "Y-checkin",
+	"name": "Yardstick checkin as one app: empty list, settings (switch, select), back, setting kept, access, new check-in with a note",
+	"steps": [
+		{
+			"visible": [
+				"Check-ins",
+				"New check-in",
+				"No check-ins yet. Start one when you reach a site."
+			],
+			"title": "Check-ins"
+		},
+		{
+			"do": { "tap": "Settings" },
+			"visible": [
+				"Capture",
+				"Attach my location",
+				"End-of-day reminder",
+				"Photo size",
+				"Default site",
+				"North yard"
+			],
+			"absent": ["No check-ins yet. Start one when you reach a site."],
+			"title": "Settings"
+		},
+		{
+			"do": { "tap": "Change▾" },
+			"visible": ["Pump house", "East fence", "Loading dock"]
+		},
+		{
+			"do": { "tap": "East fence" },
+			"visible": ["East fence"],
+			"absent": ["North yard", "Loading dock"]
+		},
+		{
+			"do": { "back": "button" },
+			"visible": ["No check-ins yet. Start one when you reach a site."],
+			"absent": ["Capture"],
+			"title": "Check-ins"
+		},
+		{
+			"do": { "tap": "Settings" },
+			"visible": ["Default site", "East fence"],
+			"absent": ["North yard"]
+		},
+		{
+			"do": { "tap": "Access" },
+			"visible": ["What Field notes may use on this device.", "Camera", "Location"],
+			"absent": ["Default site"]
+		},
+		{
+			"do": { "tap": "Field notes" },
+			"visible": ["New check-in", "No check-ins yet. Start one when you reach a site."]
+		},
+		{
+			"do": { "tap": "New check-in" },
+			"visible": ["Save check-in", "Use my location"],
+			"absent": ["No check-ins yet. Start one when you reach a site."]
+		},
+		{
+			"do": { "type": { "field": "Note", "text": "Gauge reads 4 bar" } },
+			"fields": { "Note": "Gauge reads 4 bar" },
+			"visible": ["Save check-in"]
+		}
+	]
+}

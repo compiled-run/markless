@@ -54,14 +54,22 @@ export type ProofRung = {
 	readonly manifest: DeviceManifest;
 };
 
-/** The app config, one per app, beside the app's rung folders: `{ "device": { "usage": { "<feature>": "<text>" } } }`. */
+/** The app config, one per app, in an app rung folder or beside the rung folders of a ladder: `{ "device": { "usage": { "<feature>": "<text>" } } }`. */
 const APP_CONFIG = 'app.json';
 
-/** The config of the app a rung folder belongs to; empty when the app has none. */
-export function readAppConfig(rungDir: string): { readonly device?: DeviceAppConfig } {
-	const file = join(dirname(rungDir), APP_CONFIG);
-	return existsSync(file)
-		? (JSON.parse(readFileSync(file, 'utf8')) as { readonly device?: DeviceAppConfig })
+/** The config of the app a rung folder is (its own app.json) or belongs to (one beside it); empty when the app has none. */
+export function readAppConfig(rungDir: string): {
+	readonly device?: DeviceAppConfig;
+	readonly origin?: string;
+} {
+	const file = [join(rungDir, APP_CONFIG), join(dirname(rungDir), APP_CONFIG)].find((path) =>
+		existsSync(path),
+	);
+	return file
+		? (JSON.parse(readFileSync(file, 'utf8')) as {
+				readonly device?: DeviceAppConfig;
+				readonly origin?: string;
+			})
 		: {};
 }
 
@@ -112,7 +120,13 @@ const APP_DOCUMENT = 'document.tsrx';
 /** Compiles a navigation rung's app: every page under `pages/`, with repo-relative filenames as for one-screen rungs. */
 export function compileRungApp(
 	dir: string,
-	options: { readonly target?: ProofPlatform; readonly device?: DeviceAppConfig } = {},
+	options: {
+		readonly target?: ProofPlatform;
+		readonly device?: DeviceAppConfig;
+		/** Keep the pages that build when others refuse (a rung's `refusedPages`). */
+		readonly partial?: boolean;
+		readonly origin?: string;
+	} = {},
 ) {
 	const document = join(dir, APP_DOCUMENT);
 	return compileNativeApp({
@@ -130,7 +144,7 @@ export function compileRungApp(
 					},
 				}
 			: {}),
-		readModule: readRelativeModule,
+		readModule: readWorkspaceModule,
 		readStylesheet: readRelativeStylesheet,
 		readServedStylesheet: servedReader(dir),
 	});
@@ -362,6 +376,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				readModule: readWorkspaceModule,
 				readServedStylesheet: servedReader(dir),
 				...(appConfig.device ? { device: appConfig.device } : {}),
+				...(appConfig.origin !== undefined ? { origin: appConfig.origin } : {}),
 				target: platform,
 			});
 			if (!build.payload) {
@@ -378,7 +393,10 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				PROOF_PAYLOAD_PATH,
 				new TextEncoder().encode(payloads[platform]),
 			]);
-			if (build.styles.some((style) => style.cssText.length > 0) || build.stylesheets.length > 0) {
+			if (
+				build.styles.some((style) => style.cssText.length > 0) ||
+				build.stylesheets.length > 0
+			) {
 				// Dragon lays out one input for both phones, so both must build the same views.
 				if (
 					payloads.ios !== undefined &&
@@ -415,6 +433,8 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 			const build = await compileRungApp(dir, {
 				target: platform,
 				...(appConfig.device ? { device: appConfig.device } : {}),
+				...(expected.refusedPages ? { partial: true } : {}),
+				...(appConfig.origin !== undefined ? { origin: appConfig.origin } : {}),
 			});
 			if (!build.payload) {
 				const lines = build.diagnostics.map(

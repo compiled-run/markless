@@ -2,6 +2,7 @@ import type {
 	NativeCommand,
 	NativeDefaultStyle,
 	NativeDrawing,
+	NativeShape,
 	NativeArmPlace,
 	NativePlace,
 	NativeBuiltin,
@@ -91,7 +92,7 @@ import type {
 	SourceSpan,
 } from '../artifacts.ts';
 import { isEventAttribute, normalizeEventName } from '../ast/events.ts';
-import { compileDrawing, type DrawingElement } from './native-drawing.ts';
+import { compileDrawing, compileLiveShape, SHAPES, type DrawingElement } from './native-drawing.ts';
 import { nativeScriptOf, type NativeScriptModuleInput } from './native-script.ts';
 import { scriptFactsOf, type ScriptFacts } from './semantic-graph/script-facts.ts';
 import { sharedDefinitionId } from './semantic-graph/collect-shared.ts';
@@ -450,6 +451,16 @@ function returningInto(
 
 /** `<input>` types a person ticks: a press checks them before their handlers run. */
 const TICKED_TYPES = new Set(['checkbox', 'radio']);
+/** The elements a <label> names (HTML's labelable elements), the first inside it when it has no `for`. */
+const LABELABLE_ELEMENTS = new Set([
+	'button',
+	'input',
+	'meter',
+	'output',
+	'progress',
+	'select',
+	'textarea',
+]);
 
 /** `<input>` types a host draws as a single-line text field (a password masked); each blocks the return key's submit when a form has two. */
 const TEXT_TYPES = new Set(['text', 'search', 'tel', 'password', 'email']);
@@ -725,6 +736,8 @@ type Field =
 			readonly expression: SemanticExpression | undefined;
 			/** The factory's `computed(...)` it reads, by name, which can run as a script computed. */
 			readonly computed?: string;
+			/** Where that computed's function is written, for one the factory returns without naming it. */
+			readonly functionSpan?: SourceSpan;
 	  };
 
 /** A name whose members are what a native build reads: a state object split into one cell per field, or a shared instance. */
@@ -1191,6 +1204,8 @@ export type NativeViewOptions = {
 	 * as the web's router answers that path with the app's `pages/404.tsrx`.
 	 */
 	readonly notFound?: string;
+	/** Routes of the app whose page did not build: a link to one opens the not-found page when there is one, else does nothing. */
+	readonly unbuilt?: ReadonlySet<string>;
 	/** Matches a path written in `navigate()` against the app's routes, as the router matches a URL. */
 	readonly resolvePath?: (
 		path: string,
@@ -1207,6 +1222,11 @@ export type NativeViewOptions = {
 	readonly keyHandlers?: boolean;
 	/** A module's source as the build read it, by filename: where a native build finds a value's own JavaScript. */
 	readonly readSource?: (filename: string) => string | undefined;
+	/**
+	 * Where the app's site is served (`https://shop.example`): a URL from the root (`/api/products`) that the phone's
+	 * JavaScript fetches resolves against it, as the web resolves one against the page's origin.
+	 */
+	readonly origin?: string;
 };
 
 /** One module's facts, indexed for lowering its templates. */
@@ -1874,12 +1894,18 @@ export function createNativeViewPayload(
 		prefix: string,
 		row: string | undefined,
 	): SharedInstance => {
+		// The module that defines the factory owns its state and methods; another that links it may list its state too.
+		const holds = (facts: ModuleFacts) =>
+			facts.graph.graphBindings.some((binding) => binding.sharedDefinitionId === definition.id);
+		const candidates = [module, ...moduleFactsByFile.values()];
 		const owner =
-			[module, ...moduleFactsByFile.values()].find((facts) =>
-				facts.graph.graphBindings.some(
-					(binding) => binding.sharedDefinitionId === definition.id,
-				),
-			) ?? module;
+			candidates.find(
+				(facts) =>
+					sharedDefinitionId(facts.graph.moduleId, definition.exportedName) === definition.id &&
+					holds(facts),
+			) ??
+			candidates.find(holds) ??
+			module;
 		const byName = new Map<string, string>();
 		const byBinding = new Map<string, string>();
 		const objects = new Map<string, ObjectRef>();
@@ -1994,6 +2020,9 @@ export function createNativeViewPayload(
 						kind: 'expr',
 						expression: binding.nativeExpression,
 						computed: binding.name,
+						...(binding.nativeFunctionSpan
+							? { functionSpan: binding.nativeFunctionSpan }
+							: {}),
 					});
 			}
 		}
@@ -2380,7 +2409,13 @@ export function createNativeViewPayload(
 					field.computed === binding.name &&
 					prop.path.length === 0
 				)
-					return sharedExpr(instance, name, field.expression, field.computed);
+					return sharedExpr(
+						instance,
+						name,
+						field.expression,
+						field.computed,
+						field.functionSpan,
+					);
 				if (
 					binding?.kind === 'state' &&
 					field.kind === 'cell' &&
@@ -2442,6 +2477,8 @@ export function createNativeViewPayload(
 		}
 		return Object.fromEntries(entries);
 	};
+	/** A link to a page that did not build when the app has no not-found page: the tap leads nowhere. */
+	const NO_ROUTE: { route: string; params: Record<string, string | NativeExpr> } = { route: '', params: {} };
 	/** A link or `navigate()` target as a route pattern and params, checked against the app's routes when they are known. */
 	/** A path inside the app (`/logout`), not another site (`//cdn.example`, `https://…`): only it falls to the not-found page. */
 	const inApp = (start: string | NativeExpr | undefined) =>
@@ -2451,6 +2488,8 @@ export function createNativeViewPayload(
 		params: Record<string, string | NativeExpr>,
 		span: SourceSpan | undefined,
 	): { route: string; params: Record<string, string | NativeExpr> } | null => {
+		if (options.unbuilt?.has(pattern))
+			return options.notFound ? linkRoute(options.notFound, {}, span) : NO_ROUTE;
 		const known =
 			options.routes?.find((route) => route.pattern === pattern) ??
 			(pattern === options.notFound ? { pattern, params: [] } : undefined);
@@ -2752,6 +2791,41 @@ export function createNativeViewPayload(
 	let scriptNamesDomClasses = false;
 	/** Forms whose submit handler runs as JavaScript: their script may build FormData from the form it is given. */
 	const scriptSubmits = new Set<string>();
+	/** A drawing's geometry follows state, so the engine carries the svg grammars. */
+	let svgGeometry = false;
+	/**
+	 * A `d` or `viewBox` that follows state, as the engine turns it into numbers: the outline as Dragon's verb-coded numbers
+	 * (or the viewBox's four), space-separated, so no phone parses SVG.
+	 */
+	const geometryOf = (
+		kind: 'path' | 'viewBox',
+		value: NativeExpr,
+		module: ModuleFacts,
+	): NativeExpr => {
+		svgGeometry = true;
+		const key = `${module.graph.filename}\0svg:${kind}`;
+		let id = scriptFunctions.get(key)?.id;
+		if (!id) {
+			id = `fn:${scriptFunctions.size}`;
+			scriptFunctions.set(key, {
+				id,
+				module,
+				fact: {
+					code: `return function () { return ${kind === 'path' ? '__svgPath' : '__svgViewBox'}(__s.v); };`,
+					names: [],
+					module: [],
+					imports: [],
+					globals: [],
+					framework: [],
+					unsupported: [],
+					navigates: [],
+					devices: [],
+					span: { filename: module.graph.filename, start: 0, end: 0 },
+				},
+			});
+		}
+		return { script: id, bindings: { v: { value } } };
+	};
 	const refuseScript = (message: string, span?: SourceSpan): null => {
 		diagnostics.push(nativeRefusal('javascript', message, span));
 		return null;
@@ -2887,6 +2961,7 @@ export function createNativeViewPayload(
 		name: string,
 		reading: boolean,
 		span: SourceSpan | undefined,
+		used?: ReadonlyArray<string>,
 	): Record<string, NativeScriptBinding> | null {
 		const members: Record<string, NativeScriptBinding> = {};
 		for (const [field, member] of instance.fields) {
@@ -2894,6 +2969,8 @@ export function createNativeViewPayload(
 			if (member.kind === 'cell') members[field] = { cell: member.cell };
 			else if (member.kind === 'method') {
 				if (reading) continue;
+				// A method the script never names is not bound, so a method the build cannot read does not refuse it.
+				if (used && !used.includes(field)) continue;
 				if (!member.span)
 					return refuseScript(
 						`${label} has no source the build read, so it cannot run as JavaScript`,
@@ -2909,7 +2986,13 @@ export function createNativeViewPayload(
 				if (!value) return null;
 				members[field] = { elements: value };
 			} else if (member.kind === 'expr' && member.expression) {
-				const value = sharedExpr(instance, field, member.expression, member.computed);
+				const value = sharedExpr(
+					instance,
+					field,
+					member.expression,
+					member.computed,
+					member.functionSpan,
+				);
 				if (!value) return null;
 				members[field] = mentionsElement(value) ? { elements: value } : { value };
 			}
@@ -2942,7 +3025,7 @@ export function createNativeViewPayload(
 	): Record<string, NativeScriptBinding> | null {
 		const bindings: Record<string, NativeScriptBinding> = {};
 		let ok = true;
-		for (const { name, written, span, calledOnly } of fact.names) {
+		for (const { name, written, span, calledOnly, membersOnly } of fact.names) {
 			const prop = propOf(name, scope);
 			if (prop?.kind === 'callback') {
 				const callback = written
@@ -2984,7 +3067,7 @@ export function createNativeViewPayload(
 								candidate.instance.definition.name === name,
 						)?.instance;
 			if (owned && !scope.locals.has(name)) {
-				const members = sharedMembers(owned, name, reading, span);
+				const members = sharedMembers(owned, name, reading, span, membersOnly);
 				if (!members) {
 					ok = false;
 					continue;
@@ -3091,12 +3174,16 @@ export function createNativeViewPayload(
 		field: string,
 		expression: SemanticExpression | undefined,
 		computed: string | undefined,
+		functionSpan?: SourceSpan,
 	): NativeExpr | null {
 		const label = `${instance.definition.name}.${field}`;
 		const scope = { ...instance.scope, live: true };
 		const data = attempt(() => exprOf(expression, label, scope));
 		if (!data.failed || scriptMode === 'never' || computed === undefined) return data.value;
-		const fact = scriptFacts(instance.module)?.computed(undefined, computed);
+		const facts = scriptFacts(instance.module);
+		const fact =
+			facts?.computed(undefined, computed) ??
+			(functionSpan && facts?.computedAt(functionSpan));
 		if (!fact) return data.value;
 		data.rollBack();
 		const script = attempt(() => {
@@ -3314,11 +3401,18 @@ export function createNativeViewPayload(
 			factsOf(entry.module)!.statements.forEach((statement, index) => {
 				if (statement.declares.includes(name)) include(entry, index);
 			});
-		const imported = (entry: Included, slot: number, name: string | null): void => {
+		const imported = (
+			entry: Included,
+			slot: number,
+			name: string | null,
+			members?: ReadonlyArray<string>,
+		): void => {
 			const reached = target(entry, slot);
 			if (!reached) return;
-			if (name === null) everything(reached);
-			else exported(reached, name);
+			if (name === null) {
+				if (members) for (const member of members) exported(reached, member);
+				else everything(reached);
+			} else exported(reached, name, members);
 		};
 		/** Whether a module exports `name`, itself or through `export *`. */
 		const exports = (
@@ -3338,12 +3432,18 @@ export function createNativeViewPayload(
 				return entry.name === name;
 			});
 		};
-		const exported = (entry: Included, name: string): void => {
-			if (entry.exports.has(name)) return;
+		const exported = (entry: Included, name: string, members?: ReadonlyArray<string>): void => {
 			const facts = factsOf(entry.module)!;
 			const direct = facts.exports.find(
 				(candidate) => !('star' in candidate) && candidate.name === name,
 			);
+			// `export * as toaster`, read only as `toaster.say`: the namespace carries just the members read.
+			if (members && direct && 'slot' in direct && direct.from === null) {
+				entry.exports.set(name, `__i[${direct.slot}]`);
+				imported(entry, direct.slot, null, members);
+				return;
+			}
+			if (entry.exports.has(name)) return;
 			if (direct && 'local' in direct) {
 				entry.exports.set(name, direct.local);
 				local(entry, direct.local);
@@ -3380,7 +3480,7 @@ export function createNativeViewPayload(
 			const entry = enter(module);
 			if (!entry) continue;
 			for (const name of fact.module) local(entry, name);
-			for (const use of fact.imports) imported(entry, use.slot, use.name);
+			for (const use of fact.imports) imported(entry, use.slot, use.name, use.members);
 		}
 		if (only) return undefined;
 		const inputs: NativeScriptModuleInput[] = order.map((entry) => {
@@ -3432,6 +3532,8 @@ export function createNativeViewPayload(
 						routes: options.routes.map((route) => route.pattern),
 					}
 				: undefined,
+			svgGeometry,
+			options.origin,
 		);
 	}
 
@@ -4428,6 +4530,7 @@ export function createNativeViewPayload(
 							expression.property,
 							field.expression,
 							field.computed,
+							field.functionSpan,
 						);
 					if (field?.kind === 'handle')
 						return handleValue(
@@ -5417,8 +5520,14 @@ export function createNativeViewPayload(
 			attributesAt(path)['aria-hidden'] === 'true' && !boundAt(path).includes('aria-hidden');
 		/** Subtrees lowered whole (an `<svg>`) or never shown (`<template>`): their items are not lowered one by one. */
 		const consumed: ReadonlyArray<number>[] = [];
+		/** Inside a consumed `<svg>`, components and `{children}` whose shapes it draws while the app runs. */
+		const drawnLive: ReadonlyArray<number>[] = [];
 		for (const item of items) {
-			if (consumed.some((path) => isPrefix(path, item.path))) continue;
+			if (
+				consumed.some((path) => isPrefix(path, item.path)) &&
+				!drawnLive.some((path) => path === item.path || isPrefix(path, item.path))
+			)
+				continue;
 			const parent = parentOf(item.path);
 			if (item.kind === 'dynamic') {
 				close();
@@ -5520,9 +5629,17 @@ export function createNativeViewPayload(
 				close();
 				const element = scope.tags?.get(item.id) ?? scope.module.tagOf.get(item.id);
 				const span = scope.module.hostSpans.get(item.id);
+				const around = parent === null ? undefined : nodeById().get(parent);
+				const drawnIn =
+					element !== undefined &&
+					SHAPES.has(element) &&
+					around?.kind === 'element' &&
+					around.drawing
+						? around
+						: undefined;
 				if (!element || element === '*') refuse(`host ${item.id} has no static tag`, span);
 				else if (
-					(!nativeElementStyle(element) && element !== 'title') ||
+					(!nativeElementStyle(element) && element !== 'title' && !drawnIn) ||
 					(element === 'select' && hiddenFormValue(item.path))
 				) {
 					const written = attributesAt(item.path);
@@ -5753,6 +5870,13 @@ export function createNativeViewPayload(
 					const drawn: DrawingElement[] = [];
 					const texts: { path: ReadonlyArray<number>; text: string }[] = [];
 					for (const other of inside) {
+						if (drawnLive.some((path) => isPrefix(path, other.path))) continue;
+						if (other.kind === 'host' && drawnLive.length > 0)
+							refuseAs(
+								'svg',
+								'a shape after a component or `{children}` inside an <svg>, which a native drawing would paint under them',
+								scope.module.hostSpans.get(other.id) ?? span,
+							);
 						if (other.kind === 'host') {
 							const tag = scope.module.tagOf.get(other.id) ?? '*';
 							drawn.push({
@@ -5772,6 +5896,11 @@ export function createNativeViewPayload(
 							}
 						} else if (other.kind === 'part' && 'text' in other.part)
 							texts.push({ path: relative(other.path), text: other.part.text });
+						else if (
+							(other.kind === 'child' || other.kind === 'children') &&
+							other.path.length === item.path.length + 1
+						)
+							drawnLive.push(other.path);
 						else
 							refuseAs(
 								'svg',
@@ -5789,6 +5918,42 @@ export function createNativeViewPayload(
 					drawing = result.drawing;
 					if (result.title !== undefined && !('aria-label' in attributes))
 						attributes['aria-label'] = result.title;
+					const viewBox = bindings.findIndex(
+						(binding) => 'attribute' in binding && binding.attribute === 'viewBox',
+					);
+					if (viewBox >= 0)
+						bindings[viewBox] = {
+							attribute: 'viewBox',
+							value: geometryOf('viewBox', bindings[viewBox]!.value, scope.module),
+						};
+				}
+				let shape: NativeShape | undefined;
+				if (drawnIn && element) {
+					const bound = bindings.flatMap((binding) =>
+						'attribute' in binding ? [binding.attribute] : [],
+					);
+					const result = compileLiveShape(
+						drawnIn.attributes ?? {},
+						{ id: item.id, tag: element, path: [0], attributes, bound },
+						drawnIn.id,
+					);
+					for (const refusal of result.refusals) refuseAs('svg', refusal.message, span);
+					shape = result.shape;
+					for (const event of scope.module.eventsByHost.get(item.id) ?? [])
+						refuseAs(
+							'svg',
+							`the ${event.eventName} handler on <${element}> inside an <svg>: its shapes are drawn, not views`,
+							event.handlerSpan,
+						);
+					const d = bindings.findIndex(
+						(binding) => 'attribute' in binding && binding.attribute === 'd',
+					);
+					if (d >= 0)
+						bindings[d] = {
+							attribute: 'd',
+							value: geometryOf('path', bindings[d]!.value, scope.module),
+						};
+					delete attributes.d;
 				}
 				// An <input> phones draw: a text or number field, a checkbox or radio button, a hidden, range or submit input.
 				const drawnType =
@@ -5869,6 +6034,7 @@ export function createNativeViewPayload(
 					...(styleWhen ? { styleWhen } : {}),
 					...(defaultStyle ? { defaultStyle } : {}),
 					...(drawing ? { drawing } : {}),
+					...(shape ? { shape } : {}),
 					...live,
 					...place,
 				});
@@ -6176,6 +6342,7 @@ export function createNativeViewPayload(
 						...place,
 					});
 					if (projection) lowerChunk(projection, id, place, scope);
+					if (route === NO_ROUTE) continue;
 					const handler = `handler:${id}`;
 					events.push({ host: id, event: 'activate', handler });
 					handlers.push({
@@ -7128,13 +7295,16 @@ export function createNativeViewPayload(
 		span: SourceSpan,
 		what: string,
 	): NativeScriptBinding | null {
-		const fact = scriptFacts(instance.module)?.method(span);
+		// An app-wide definition's state may be listed in the module that uses it; its methods are in the module that defines them.
+		const own = scriptFacts(instance.module)?.method(span);
+		const definer = own ? instance.module : (moduleFactsByFile.get(span.filename) ?? instance.module);
+		const fact = own ?? scriptFacts(definer)?.method(span);
 		if (!fact)
 			return refuseScript(
 				`${what} has no source the build read, so it cannot run as JavaScript`,
 				span,
 			);
-		const fn = scriptFunctionId(fact, instance.module, what);
+		const fn = scriptFunctionId(fact, definer, what);
 		const bindings = scriptBindings(fact, instance.scope, what);
 		if (fn === null || bindings === null) return null;
 		// `calendar.onChange?.(iso)`: a callback the root filled a slot with runs as JavaScript where it was written, reached
@@ -8691,7 +8861,7 @@ export function createNativeViewPayload(
 			return [];
 		}
 		const route = linkRoute(matched.pattern, matched.params, span);
-		return route
+		return route && route !== NO_ROUTE
 			? [{ op: 'navigate', ...route, ...(replace ? { replace: true as const } : {}) }]
 			: [];
 	}
@@ -8815,6 +8985,44 @@ export function createNativeViewPayload(
 			...node,
 			bindings: [...(node.bindings ?? []), { attribute: reference.attribute, value }],
 		};
+	}
+
+	// A <label> with no `for` names the first labelable element inside it, as the web resolves the control it activates.
+	{
+		const byId = nodeById();
+		const inside = (id: string, ancestor: string) => {
+			for (let at = byId.get(id)?.parent; at; at = byId.get(at)?.parent)
+				if (at === ancestor) return true;
+			return false;
+		};
+		for (const [index, label] of nodes.entries()) {
+			if (
+				label.kind !== 'element' ||
+				label.element !== 'label' ||
+				label.attributes?.['for'] !== undefined ||
+				label.bindings?.some(
+					(binding) => 'attribute' in binding && binding.attribute === 'for',
+				)
+			)
+				continue;
+			const control = nodes.find(
+				(node) =>
+					node.kind === 'element' &&
+					LABELABLE_ELEMENTS.has(node.element) &&
+					!(node.element === 'input' && node.attributes?.['type'] === 'hidden') &&
+					inside(node.id, label.id),
+			);
+			if (control === undefined || control.row !== label.row) continue;
+			const rowKey = control.row && rowKeys.get(control.row);
+			if (control.row && !rowKey) continue;
+			const value: NativeExpr = rowKey
+				? { template: [`${control.id}@`, ...rowKey] }
+				: { literal: control.id };
+			nodes[index] = {
+				...label,
+				bindings: [...(label.bindings ?? []), { attribute: 'for', value }],
+			};
+		}
 	}
 
 	// A tap lands on the innermost element that handles it, so a handler that reads `event.target` runs once per element a
@@ -9168,8 +9376,15 @@ export function createNativeViewPayload(
 			if (node.kind !== 'element' || node.element !== 'a') continue;
 			if (events.some((event) => event.host === node.id && event.event === 'activate'))
 				continue;
-			const route = linkedRoute(node);
-			if (!route) continue;
+			const linked = linkedRoute(node);
+			// A page that did not build: its links open the not-found page, or nothing, as a <Link>'s do.
+			const route =
+				linked && options.unbuilt?.has(linked.route)
+					? options.notFound
+						? { route: options.notFound, params: {} }
+						: NO_ROUTE
+					: linked;
+			if (!route || route === NO_ROUTE) continue;
 			const handler = `handler:${node.id}/link`;
 			events.push({ host: node.id, event: 'activate', handler });
 			handlers.push({ id: handler, ops: [{ op: 'navigate', ...route }] });

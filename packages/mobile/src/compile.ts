@@ -82,8 +82,7 @@ type ReadModule = (
 ) => { readonly filename: string; readonly source: string } | undefined;
 
 /** A JSON file imports as a module whose default export is its value, as the web build loads it. */
-const withJsonModules =
-	(read: ReadModule | undefined): ReadModule | undefined =>
+const withJsonModules = (read: ReadModule | undefined): ReadModule | undefined =>
 	read &&
 	((specifier, importer) => {
 		const module = read(specifier, importer);
@@ -93,7 +92,10 @@ const withJsonModules =
 		} catch {
 			return undefined;
 		}
-		return { filename: module.filename, source: `const json = ${module.source};\nexport default json;\n` };
+		return {
+			filename: module.filename,
+			source: `const json = ${module.source};\nexport default json;\n`,
+		};
 	});
 
 /** Compiles one `.tsrx` module through the real compiler, then lowers its analysis to the native view payload. */
@@ -144,7 +146,12 @@ export async function compileNativeComponent(input: {
 	readonly target?: 'ios' | 'android';
 	/** Where handlers run (`NativeViewOptions['scriptHandlers']`); the default runs each as data where it lowers. */
 	readonly scriptHandlers?: 'fallback' | 'all' | 'never';
+	/** Routes of the app whose page did not build: a link to one opens the not-found page, or does nothing. */
+	readonly unbuilt?: ReadonlySet<string>;
+	/** The app config's `origin`: where the app's site is served, which a URL from the root fetched on a phone reaches. */
+	readonly origin?: string;
 }): Promise<NativeBuild> {
+	if (input.origin !== undefined) checkOrigin(input.origin);
 	const manifest =
 		input.manifest ?? (input.page ? buildRouteManifestFromFileIds([input.page]) : undefined);
 	const route = input.page
@@ -274,13 +281,17 @@ export async function compileNativeComponent(input: {
 			modules: { graphs, resolve },
 			readSource: (file: string) => (file === input.filename ? own.source : read.get(file)?.source),
 			...(input.scriptHandlers ? { scriptHandlers: input.scriptHandlers } : {}),
+			...(input.origin !== undefined ? { origin: input.origin } : {}),
 			...(input.manifest
 				? {
 						routes: input.manifest.routes.map((entry) => ({
 							pattern: entry.pattern,
 							params: entry.params.map((param) => param.name),
 						})),
-						...(input.manifest.statusPages.notFound ? { notFound: NATIVE_NOT_FOUND_ROUTE } : {}),
+						...(input.manifest.statusPages.notFound && !input.unbuilt?.has(NATIVE_NOT_FOUND_ROUTE)
+							? { notFound: NATIVE_NOT_FOUND_ROUTE }
+							: {}),
+						...(input.unbuilt ? { unbuilt: input.unbuilt } : {}),
 						resolvePath: (path: string) => {
 							const matched = matchRouteManifest(path, input.manifest!);
 							return matched
@@ -334,7 +345,8 @@ export async function compileNativeComponent(input: {
 			)
 		: [];
 	return {
-		payload: errors.length > 0 || usage.length > 0 || unstyled.length > 0 ? null : native.payload,
+		payload:
+			errors.length > 0 || usage.length > 0 || unstyled.length > 0 ? null : native.payload,
 		styles,
 		stylesheets: sheets,
 		features: native.features,
@@ -422,6 +434,8 @@ export async function compileNativeApp(input: {
 	readonly partial?: boolean;
 	/** The `icons` option of the app's `ui()` plugin, as `compileNativeComponent` takes it. */
 	readonly icons?: false | IconsOptions;
+	/** The app config's `origin`, for every page (see `compileNativeComponent`). */
+	readonly origin?: string;
 }): Promise<NativeAppBuild> {
 	const icons = sourceTransformOf(input.icons) ?? (false as const);
 	const manifest = buildRouteManifestFromFileIds(input.pages.map((page) => page.page));
@@ -454,7 +468,8 @@ export async function compileNativeApp(input: {
 			? [{ file: manifest.statusPages.notFound, pattern: NATIVE_NOT_FOUND_ROUTE, params: [], routed: false }]
 			: []),
 	];
-	for (const route of entries) {
+	type Entry = (typeof entries)[number];
+	const buildPage = async (route: Entry, unbuilt?: ReadonlySet<string>) => {
 		const page = input.pages.find((candidate) => candidate.page === route.file)!;
 		const build = await compileNativeComponent({
 			filename: page.filename,
@@ -466,13 +481,12 @@ export async function compileNativeApp(input: {
 			...(input.readServedStylesheet ? { readServedStylesheet: input.readServedStylesheet } : {}),
 			...(input.device ? { device: input.device } : {}),
 			...(input.target ? { target: input.target } : {}),
+			...(unbuilt ? { unbuilt } : {}),
 			icons,
+			...(input.origin !== undefined ? { origin: input.origin } : {}),
 		});
-		for (const feature of build.features) features.add(feature);
-		diagnostics.push(
-			...build.diagnostics.map((diagnostic) => ({ ...diagnostic, page: page.page })),
-		);
-		if (!build.payload) continue;
+		const pageDiagnostics = build.diagnostics.map((diagnostic) => ({ ...diagnostic, page: page.page }));
+		if (!build.payload) return { route, features: build.features, diagnostics: pageDiagnostics };
 		const sheets = [...documentSheets, ...build.stylesheets].filter(
 			(sheet, index, all) => all.findIndex((other) => other.file === sheet.file) === index,
 		);
@@ -482,25 +496,38 @@ export async function compileNativeApp(input: {
 			build.elementSources,
 			[...sheets, ...build.styles].map((style) => style.cssText),
 		);
-		if (unstyled.length > 0) {
-			diagnostics.push(...unstyled.map((diagnostic) => ({ ...diagnostic, page: page.page })));
-			continue;
-		}
-		routes.push({
-			pattern: route.pattern,
-			params: route.params,
-			// Each route's page names its route, as hosts check; the 404 page is routed here, not by the router.
-			page: route.routed ? build.payload : { ...build.payload, route: { pattern: route.pattern, params: [] } },
-		});
-		if (styled) {
-			const inputs = nativeStyleInputs(build.payload, build.styles, sheets);
-			styleInputs.push({
+		if (unstyled.length > 0)
+			return {
+				route,
+				features: build.features,
+				diagnostics: [...pageDiagnostics, ...unstyled.map((diagnostic) => ({ ...diagnostic, page: page.page }))],
+			};
+		const inputs = styled ? nativeStyleInputs(build.payload, build.styles, sheets) : undefined;
+		return {
+			route,
+			features: build.features,
+			diagnostics: pageDiagnostics,
+			built: {
 				pattern: route.pattern,
-				page: page.page,
-				input: inputs.page,
-				sheets: inputs.sheets,
-			});
-		}
+				params: route.params,
+				// Each route's page names its route, as hosts check; the 404 page is routed here, not by the router.
+				page: route.routed ? build.payload : { ...build.payload, route: { pattern: route.pattern, params: [] } },
+			},
+			...(inputs ? { styleInput: { pattern: route.pattern, page: page.page, input: inputs.page, sheets: inputs.sheets } } : {}),
+		};
+	};
+	let pages: Awaited<ReturnType<typeof buildPage>>[] = [];
+	for (const route of entries) pages.push(await buildPage(route));
+	// A page that did not build leaves the app: the others are built again knowing it, so a link to it opens the not-found
+	// page, or does nothing, rather than naming a route the app does not have.
+	const unbuilt = new Set(pages.filter((one) => !('built' in one)).map((one) => one.route.pattern));
+	if (input.partial && unbuilt.size > 0 && unbuilt.size < pages.length)
+		for (const [index, one] of pages.entries()) if ('built' in one) pages[index] = await buildPage(one.route, unbuilt);
+	for (const one of pages) {
+		for (const feature of one.features) features.add(feature);
+		diagnostics.push(...one.diagnostics);
+		if ('built' in one) routes.push(one.built);
+		if ('styleInput' in one && one.styleInput) styleInputs.push(one.styleInput);
 	}
 	return {
 		payload:
@@ -511,4 +538,20 @@ export async function compileNativeApp(input: {
 		manifest: deviceManifest([...features], input.device).manifest,
 		diagnostics,
 	};
+}
+
+/** An app's `origin` is a site's origin as the web writes it: `http` or `https`, a host, maybe a port, and no path. */
+function checkOrigin(origin: string): void {
+	let parsed: URL | undefined;
+	try {
+		parsed = new URL(origin);
+	} catch {}
+	if (
+		!parsed ||
+		(parsed.protocol !== 'https:' && parsed.protocol !== 'http:') ||
+		parsed.origin !== origin
+	)
+		throw new Error(
+			`app.json "origin" is ${JSON.stringify(origin)}; write the site's origin, as in "https://shop.example" (http or https, no path or trailing slash)`,
+		);
 }
