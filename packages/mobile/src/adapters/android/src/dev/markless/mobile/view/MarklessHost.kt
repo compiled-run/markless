@@ -317,6 +317,17 @@ class MarklessHost(
 
 	/** Each shown pre-composited opacity group's overlay, by instance id. */
 	private val groups = HashMap<String, GroupOverlay>()
+	/** Declared before the init block that builds the page, whose first place reads it. */
+	private val groupContext = GroupContext(
+		backdropRoot = ::backdropRoot,
+		rootOverflows = { page?.let { p -> p.export.assignments[p.assignment].pageScroll?.let { it.maxX > 0 || it.maxY > 0 } } ?: false },
+		overlay = { painter, from ->
+			// A painter in the same list row as the group is that row's copy.
+			val suffix = from.indexOf('@').let { if (it < 0) "" else from.substring(it) }
+			(groups[painter + suffix] ?: groups[painter])?.takeIf { views[it.id] === it.view }
+		},
+		overlays = { groups.values.toList() },
+	)
 
 	/** The layer showing an `invalid` entry's message until the next action. */
 	private var message: View? = null
@@ -1562,18 +1573,6 @@ class MarklessHost(
 		throw MarklessHostError("an opacity group outside the page, a sheet and a top layer has no backdrop to draw from")
 	}
 
-	private val groupContext by lazy {
-		GroupContext(
-			backdropRoot = ::backdropRoot,
-			rootOverflows = { page?.let { p -> p.export.assignments[p.assignment].pageScroll?.let { it.maxX > 0 || it.maxY > 0 } } ?: false },
-			overlay = { painter, from ->
-				// A painter in the same list row as the group is that row's copy.
-				val suffix = from.indexOf('@').let { if (it < 0) "" else from.substring(it) }
-				(groups[painter + suffix] ?: groups[painter])?.takeIf { views[it.id] === it.view }
-			},
-			overlays = { groups.values.toList() },
-		)
-	}
 
 	/** Draws Dragon's lines over a text view whose text is still the one Dragon laid out; otherwise the view draws its own text. */
 	private fun drawLines(view: TextView) {

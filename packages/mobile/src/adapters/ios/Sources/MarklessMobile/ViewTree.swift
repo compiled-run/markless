@@ -911,7 +911,9 @@ final class ViewTree {
 	}
 
 	/// Paints a view and puts it at its frame; inside a scroll container, frames count from the scroll view's padding box.
-	private func place(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws {
+	private func place(_ id: String, _ view: UIView, _ given: ResolvedStyle) throws {
+		var style = given
+		style.cornerRadius = try fittedRadius(id, given)
 		// UIKit leaves frame undefined under a transform: the box is placed untransformed, then transformed at its new size.
 		if !CATransform3DIsIdentity(view.layer.transform) { view.layer.setAffineTransform(.identity) }
 		try paint(view, style, faces: faces)
@@ -929,6 +931,15 @@ final class ViewTree {
 		scroll.configure(s, in: view.bounds.size, cornerRadius: style.cornerRadius)
 	}
 
+	/// The box's corner radius in points as Chrome draws it: scaled down where adjacent corners would overlap (a 999px pill is
+	/// half its height). Core Animation draws a radius past half a side as nothing on screen and as a square in render(in:).
+	private func fittedRadius(_ id: String, _ style: ResolvedStyle) throws -> Double {
+		guard style.cornerRadius > 0, let frame = style.frame, let fit = DragonPaint.cornerRadii, let dpr = layout?.dpr else { return style.cornerRadius }
+		let radii = try fit(Array(repeating: (percent: false, value: style.cornerRadius), count: 8), frame.width * dpr, frame.height * dpr, dpr)
+		guard radii.count == 8, radii.allSatisfy({ $0 == radii[0] }) else { throw HostError("\(id): Dragon's corner radii \(radii) are not one uniform radius") }
+		return radii[0] / dpr
+	}
+
 	/// Shows a pre-composited opacity group's composite over its view, or takes it away.
 	private func paintGroup(_ id: String, _ view: UIView, _ group: OpacityGroup?) throws {
 		let shown = view.subviews.lazy.compactMap { $0 as? GroupOverlayView }.first
@@ -941,9 +952,13 @@ final class ViewTree {
 			throw HostError("\(id): an opacity group needs Dragon's composite, which this host does not link")
 		}
 		let a8 = try alpha8(group.opacity)
-		if let shown, shown.group == group, shown.alpha8 == a8 { return }
+		if let shown, shown.group == group, shown.alpha8 == a8 {
+			shown.takeBorder(from: view)
+			return
+		}
 		shown?.removeFromSuperview()
 		let overlay = GroupOverlayView(id: id, group: group, alpha8: a8, context: groupContext)
+		overlay.takeBorder(from: view)
 		view.addSubview(overlay)
 		groups[id] = overlay
 	}

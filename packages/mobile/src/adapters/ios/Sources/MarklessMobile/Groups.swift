@@ -7,6 +7,8 @@ public enum DragonPaint {
 	/// A transform at a border box of width x height points, as [a, b, c, d, tx, ty] about the box's centre.
 	nonisolated(unsafe) public static var transformMatrix: ((StyleTransform, Double, Double) throws -> [Double])?
 	nonisolated(unsafe) public static var opacityAlpha8: ((Double) throws -> Double)?
+	/// The eight corner radii in device px of a border box (width, height in device px) at a device scale, from its authored radii.
+	nonisolated(unsafe) public static var cornerRadii: (([(percent: Bool, value: Double)], Double, Double, Double) throws -> [Double])?
 	/// A group's layer pixel over its backdrop pixel (premultiplied RGBA bytes) at an alpha byte, packed r | g << 8 | b << 16 | a << 24.
 	nonisolated(unsafe) public static var groupComposite: ((Double, Double, Double, Double, Double, Double, Double, Double, Double) throws -> Double)?
 	/// The same, when Chrome composites the group in a layer of its own.
@@ -52,6 +54,8 @@ final class GroupOverlayView: UIView {
 	private let context: GroupContext
 	private let bitmap = CALayer()
 	private var dirty = true
+	/// The box's own border: Core Animation draws a layer's border above its sublayers, so it stays off screen and is drawn into L.
+	private var boxBorder: (width: CGFloat, color: CGColor?) = (0, nil)
 	/// How deep a composite is running: a composite's own hiding and restoring marks nothing stale.
 	private static var computing = 0
 
@@ -67,8 +71,6 @@ final class GroupOverlayView: UIView {
 		isUserInteractionEnabled = false
 		isAccessibilityElement = false
 		accessibilityElementsHidden = true
-		// Above every sibling's paint-order zPosition.
-		layer.zPosition = 1e9
 		bitmap.magnificationFilter = .nearest
 		bitmap.minificationFilter = .nearest
 		bitmap.actions = ["bounds": NSNull(), "position": NSNull(), "frame": NSNull(), "contents": NSNull()]
@@ -77,6 +79,12 @@ final class GroupOverlayView: UIView {
 
 	@available(*, unavailable)
 	required init?(coder: NSCoder) { fatalError("built in code") }
+
+	/// Takes the border the box was just painted with off screen.
+	func takeBorder(from g: UIView) {
+		boxBorder = (g.layer.borderWidth, g.layer.borderColor)
+		g.layer.borderWidth = 0
+	}
 
 	func markDirty() {
 		if Self.computing > 0 { return }
@@ -106,6 +114,8 @@ final class GroupOverlayView: UIView {
 
 	private func compute(_ g: UIView) throws {
 		if g.subviews.last !== self { g.bringSubviewToFront(self) }
+		// Just above every sibling's paint-order zPosition: a far larger depth is clipped by the compositor.
+		layer.zPosition = (g.layer.sublayers ?? []).filter { $0 !== layer }.map(\.zPosition).max().map { max($0 + 1, 0) } ?? 0
 		frame = g.bounds
 		let s = context.scale()
 		let root = backdropRoot(of: g)
@@ -135,14 +145,39 @@ final class GroupOverlayView: UIView {
 		}
 		guard let space = CGColorSpace(name: CGColorSpace.sRGB) else { throw HostError("no sRGB colour space") }
 		// L: the platform's rendering of the group's view and everything in it at the device scale, this overlay hidden.
+		// The group's layer is its untransformed drawing. render(in:) draws a rounded layer's own background and border with stray
+		// edge columns on iOS, so those two are filled here as the screen shapes them: background, children, then border.
 		isHidden = true
+		let transform = g.layer.transform
+		let background = g.layer.backgroundColor
+		g.layer.transform = CATransform3DIdentity
+		g.layer.backgroundColor = nil
 		displayTree(g.layer)
 		var lp = [UInt8](repeating: 0, count: w * h * 4)
 		try renderPixels(into: &lp, w, h, space) { ctx in
 			ctx.scaleBy(x: CGFloat(s), y: CGFloat(s))
 			ctx.translateBy(x: gr.minX - CGFloat(Double(ext[0]) / s), y: gr.minY - CGFloat(Double(ext[1]) / s))
+			let box = g.layer.bounds
+			let radius = min(g.layer.cornerRadius, box.width / 2, box.height / 2)
+			if let background {
+				ctx.addPath(CGPath(roundedRect: box, cornerWidth: radius, cornerHeight: radius, transform: nil))
+				ctx.setFillColor(background)
+				ctx.fillPath()
+			}
 			g.layer.render(in: ctx)
+			if boxBorder.width > 0, let color = boxBorder.color {
+				let inner = box.insetBy(dx: boxBorder.width, dy: boxBorder.width)
+				ctx.addPath(CGPath(roundedRect: box, cornerWidth: radius, cornerHeight: radius, transform: nil))
+				if inner.width > 0, inner.height > 0 {
+					let r = min(max(radius - boxBorder.width, 0), inner.width / 2, inner.height / 2)
+					ctx.addPath(CGPath(roundedRect: inner, cornerWidth: r, cornerHeight: r, transform: nil))
+				}
+				ctx.setFillColor(color)
+				ctx.fillPath(using: .evenOdd)
+			}
 		}
+		g.layer.backgroundColor = background
+		g.layer.transform = transform
 		isHidden = false
 		for painter in group.painters { context.overlay(painter, id)?.computeIfNeeded() }
 		// The group's transform to the root, from the platform: the root point of each local layout point.

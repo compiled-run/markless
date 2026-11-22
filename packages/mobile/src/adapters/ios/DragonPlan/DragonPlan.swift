@@ -71,6 +71,13 @@ extension DragonPlan {
 		return [about.a, about.b, about.c, about.d, about.e, about.f]
 	}
 
+	/// The eight corner radii in device px of a border box `width` x `height` device px, from its authored radii (percent, value
+	/// in CSS px): paint-radius.ts resolveCornerRadii, then constrainCornerRadii's one scale factor where adjacent radii overlap.
+	public static func cornerRadii(_ lengths: [(percent: Bool, value: Double)], width: Double, height: Double, dpr: Double) throws -> [Double] {
+		let resolved = try paintRadius_resolveCornerRadii(JsArray(lengths.map { RadiusLength($0.percent, $0.value) }), width, height, dpr)
+		return try paintRadius_constrainCornerRadii(resolved, width, height, RadiusFaults(false, false)).items
+	}
+
 	/// Chrome's paint alpha byte of an opacity (paint.ts).
 	public static func opacityAlpha8(_ opacity: Double) throws -> Double { try paint_opacityAlpha8(opacity) }
 

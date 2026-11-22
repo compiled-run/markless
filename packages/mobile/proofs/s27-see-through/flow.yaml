@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: s27-see-through
+---
+- launchApp:
+    clearState: true
+- assertVisible: New note
+- assertVisible: Edit note
+- assertVisible: Release
+- assertNotVisible: Press
+- assertVisible: See-through
+- tapOn: Release
+- assertVisible: Press
+- assertNotVisible: Release
+- assertVisible: New note
+- assertVisible: Edit note
+- assertVisible: Press
+- assertNotVisible: Release
+- tapOn: Press
+- assertVisible: Release
+- assertNotVisible: Press
+- assertVisible: New note
+- assertVisible: Edit note
+- assertVisible: Release
+- assertNotVisible: Press

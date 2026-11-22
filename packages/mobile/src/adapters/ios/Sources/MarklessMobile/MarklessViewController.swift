@@ -90,6 +90,7 @@ public final class MarklessViewController: UIViewController {
 				originX: length(transform.originX), originY: length(transform.originY), width: width, height: height)
 		}
 		DragonPaint.opacityAlpha8 = DragonPlan.opacityAlpha8
+		DragonPaint.cornerRadii = { try DragonPlan.cornerRadii($0, width: $1, height: $2, dpr: $3) }
 		DragonPaint.groupComposite = { try DragonPlan.groupComposite($0, $1, $2, $3, $4, $5, $6, $7, $8, fold: false) }
 		DragonPaint.groupCompositeLayered = DragonPlan.groupCompositeLayered
 		#endif
