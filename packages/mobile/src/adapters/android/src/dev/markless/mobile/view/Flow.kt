@@ -3,6 +3,7 @@ package dev.markless.mobile.view
 import android.content.Context
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
+import android.graphics.DashPathEffect
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Matrix
@@ -277,6 +278,7 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double, 
 				paint.strokeCap = when (shape.cap) { "round" -> Paint.Cap.ROUND; "square" -> Paint.Cap.SQUARE; else -> Paint.Cap.BUTT }
 				paint.strokeJoin = when (shape.join) { "round" -> Paint.Join.ROUND; "bevel" -> Paint.Join.BEVEL; else -> Paint.Join.MITER }
 				paint.strokeMiter = shape.miterLimit.toFloat()
+				shape.dash?.let { paint.pathEffect = DashPathEffect(it.map(Double::toFloat).toFloatArray(), shape.dashOffset.toFloat()) }
 				paint.maskFilter = mask
 				canvas.drawPath(drawn, paint)
 			}
