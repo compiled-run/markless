@@ -4770,6 +4770,22 @@ export function Page() @{
 		expect(timers.payload!.script!.source).not.toContain('g.URLSearchParams');
 	});
 
+	it('runs history.replaceState and reads history.state in a handler, and still refuses pushState', async () => {
+		const kept = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let shown = state('');
+	<button onClick={() => { history.replaceState({ n: 1 }, '', '/elsewhere'); shown = JSON.stringify(history.state); }}>{shown}</button>
+}`);
+		expect(kept.diagnostics).toEqual([]);
+		expect(kept.payload!.script!.source).toContain('g.history = {');
+		const pushed = await nativeView(`export function Page() @{
+	<button onClick={() => history.pushState(null, '', '/next')}>Next</button>
+}`);
+		expect(pushed.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			expect.stringContaining("uses `history`: the browser's history"),
+		]);
+	});
+
 	it('draws <center> with its default look: its blocks in the middle of the line, its text centred', async () => {
 		const { payload, diagnostics } = await nativeView(`export function Page() @{
 	<center><h1>Poll</h1><p>Once</p></center>

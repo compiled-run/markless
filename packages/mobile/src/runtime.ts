@@ -1004,7 +1004,7 @@ export function createNativeRuntime(
 			focused !== null && focused !== NATIVE_DOCUMENT_BODY
 				? { focused, focusElements: elementFacts({}, [focused]) }
 				: {};
-		call('enter', { ...entry, ...focus, ...entryCells() });
+		call('enter', { ...entry, screen, ...focus, ...entryCells() });
 		const result = JSON.parse(call('leave')) as {
 			readonly pending: ReadonlyArray<number>;
 			readonly settled: ReadonlyArray<number>;
@@ -1255,7 +1255,6 @@ export function createNativeRuntime(
 			out.push(
 				...enter({
 					kind: 'tasks',
-					screen,
 					tasks,
 					...(again.length > 0 ? { retry: again } : {}),
 				}),
@@ -2201,7 +2200,7 @@ export function createNativeRuntime(
 		leave: () =>
 			asyncSent === null
 				? []
-				: enter({ kind: 'tasks', screen, tasks: [], leave: true }).filter(
+				: enter({ kind: 'tasks', tasks: [], leave: true }).filter(
 						(entry) => entry.op === 'abort',
 					),
 		dispatch(action) {
