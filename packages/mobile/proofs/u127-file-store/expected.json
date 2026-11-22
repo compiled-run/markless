@@ -1,0 +1,36 @@
+{
+	"rung": 232,
+	"name": "A handler builds a DataTransfer of Files and keeps it in a WeakMap keyed by an element, which is the same object in every handler, as on the web",
+	"steps": [
+		{
+			"visible": [
+				"Files",
+				"Box",
+				"Add",
+				"none"
+			]
+		},
+		{
+			"do": {
+				"tap": "Add"
+			},
+			"visible": [
+				"note-1.txt 5 text/plain"
+			],
+			"absent": [
+				"none"
+			]
+		},
+		{
+			"do": {
+				"tap": "Add"
+			},
+			"visible": [
+				"note-1.txt 5 text/plain, note-2.txt 5 text/plain"
+			],
+			"absent": [
+				"note-1.txt 5 text/plain"
+			]
+		}
+	]
+}

@@ -1665,6 +1665,8 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		structuredClone: 'engine',
 		performance: 'engine',
 		DOMException: 'engine',
+		File: 'engine',
+		DataTransfer: 'engine',
 		// Answers an element's `direction` only, from the host's facts.
 		getComputedStyle: 'engine',
 		console: 'console',
