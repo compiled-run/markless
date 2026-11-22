@@ -1000,6 +1000,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A press adds document listeners: the moves bubble to them after the element's own handlers, and the lift removes them.
+		name: 'document-listeners',
+		fixture: 'test/fixtures/DocumentListeners.tsrx',
+		actions: [
+			{ event: 'pointerdown', host: 'h1', pointerId: 1, x: 20, y: 40, time: 1000 },
+			{ event: 'pointermove', host: 'h1', pointerId: 1, x: 20, y: 60, time: 1016 },
+			{ event: 'pointermove', host: 'h1', pointerId: 1, x: 20, y: 90, time: 1032 },
+			{ event: 'pointerup', host: 'h1', pointerId: 1, x: 20, y: 90, time: 1048 },
+			{ event: 'pointerdown', host: 'h1', pointerId: 2, x: 20, y: 40, time: 2000 },
+		],
+	},
+	{
 		name: 'script-keys',
 		fixture: 'test/fixtures/ScriptKeys.tsrx',
 		actions: [
@@ -1876,6 +1888,18 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'component-edge:1/h1' },
 			{ event: 'activate', host: 'component-edge:2' },
 			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'back' },
+		],
+	},
+	{
+		// Each screen has its own runtime over the device's one store: Back shows the screen below the storage() value a
+		// screen above wrote, with its texts and arms following.
+		name: 'storage-back',
+		app: 'proofs/u227-storage-back',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0' },
+			{ event: 'activate', host: 'h4' },
 			{ event: 'back' },
 		],
 	},

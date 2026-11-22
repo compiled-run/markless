@@ -480,13 +480,15 @@ data class Payload(
 	val slots: List<StyleSlot> = emptyList(),
 	/** The conditions element styles follow, in payload order. */
 	val styleCases: List<StyleCase> = emptyList(),
+	/** A script adds listeners to the document: the host reports every touch and its moves, which bubble to them. */
+	val documentEvents: Boolean = false,
 ) {
 	companion object {
 		fun decode(bytes: ByteArray): Payload = decode(Json.parse(bytes))
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "numberMessages", "typeMismatch", "script", "tapPoints", "slots", "styleCases"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "numberMessages", "typeMismatch", "script", "tapPoints", "slots", "styleCases", "documentEvents"), "payload")
 			val route = root["route"]?.obj("payload.route")?.let { r ->
 				r.only(setOf("pattern", "params"), "payload.route")
 				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
@@ -601,7 +603,8 @@ data class Payload(
 			}
 			for (node in nodes) if (node is Node.Element) node.styleWhen?.let { if (it.case !in caseIds) throw MarklessDecodeError("node \"${node.id}\"'s style names unknown style case \"${it.case}\"") }
 			val tapPoints = root["tapPoints"]?.let { it == Json.Bool(true) || throw MarklessDecodeError("payload.tapPoints is true when present") } ?: false
-			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, numberMessages, typeMismatch, script, tapPoints, slots, styleCases)
+			val documentEvents = root["documentEvents"]?.let { it == Json.Bool(true) || throw MarklessDecodeError("payload.documentEvents is true when present") } ?: false
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, numberMessages, typeMismatch, script, tapPoints, slots, styleCases, documentEvents)
 		}
 
 		private fun readsOf(node: Node): List<Expr> = when (node) {
