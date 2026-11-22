@@ -50,7 +50,6 @@ export default function AllNotes() @{
 				border: 1px solid var(--line);
 				border-radius: var(--radius);
 				background: var(--card);
-				box-shadow: var(--shadow);
 				text-decoration: none;
 			}
 			.card strong {
