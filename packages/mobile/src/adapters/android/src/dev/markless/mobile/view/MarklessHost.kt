@@ -1633,7 +1633,10 @@ class MarklessHost(
 		if (s.kind != "text") {
 			val edges = s.borderWidths
 			if (clipsChildren && edges != null && listOf(edges.top, edges.right, edges.bottom, edges.left).any { it != 0.0 }) throw MarklessHostError("\"${s.id}\" clips overflow to its padding box past borders, which is not implemented on Android")
-			if (view is MarklessBox) view.clip = clip
+			if (view is MarklessBox) {
+				view.clip = clip
+				view.childClipRadii = if (clipsChildren) radii?.takeIf { r -> r.any { it != 0.0 } }?.map { it.toFloat() }?.toFloatArray() else null
+			}
 			else if (clip != null) throw MarklessHostError("\"${s.id}\" has a clip-path on a ${view.javaClass.simpleName}, which is not implemented on Android")
 		}
 		if (s.kind == "text") {
