@@ -250,6 +250,8 @@ public final class NativeRuntime {
 	private var edit: String?
 	/// What a dismiss or pointer event carries while its handlers run.
 	private var eventFields: [NativeEventField: NativeValue]?
+	/// A click handler called stopPropagation(): the press goes no further out.
+	private var propagationStopped = false
 	/// The arms on screen when the running action began; nil between actions, when what shows is what the cells say.
 	private var drawnArms: [String: Int?]?
 	/// A text field's key or paste event: the field's text then, a script handler's `event.target.value`.
@@ -314,6 +316,8 @@ public final class NativeRuntime {
 	/// The device's answers to the media features a script's `matchMedia` reads (`prefers-reduced-motion`, `prefers-color-scheme`),
 	/// read as each entry begins; the web's defaults when the host gives none.
 	public var media: () -> [(String, String)] = { [("prefers-reduced-motion", "no-preference"), ("prefers-color-scheme", "light")] }
+	/// The screen's device pixels per CSS px, which a script's `devicePixelRatio` reads as each entry begins.
+	public var devicePixelRatio: () -> Double = { 1 }
 
 	/// The device's clock, in milliseconds since 1970 (UTC).
 	private let now: () -> Double
@@ -758,12 +762,14 @@ public final class NativeRuntime {
 		let crypto = payload.script?.services.contains(.crypto) == true
 		let navigate = payload.script?.services.contains(.navigate) == true
 		let media = payload.script?.services.contains(.media) == true
+		let screen = payload.script?.services.contains(.screen) == true
 		let nonFinite: [(String, JSONValue)] = if case let .array(found) = split.nonFinite, !found.isEmpty { [("nonFinite", split.nonFinite)] } else { [] }
 		return [("cells", split.json)] + nonFinite
 			+ (unset.isEmpty ? [] : [("unset", .array(unset.sorted().map { .string($0) }))])
 			+ (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
 			+ (navigate ? [("params", .object(params.map { ($0.name, .string($0.value)) }))] : [])
 			+ (media ? [("media", .object(self.media().map { ($0.0, .string($0.1)) }))] : [])
+			+ (screen ? [("screen", .object([("devicePixelRatio", .number(devicePixelRatio()))]))] : [])
 	}
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
@@ -796,7 +802,7 @@ public final class NativeRuntime {
 			return try callScript("leave")
 		}
 		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave")
-			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["calls", "commands", "navigate", "prevented", "raises", "value", "listening", "watch"])
+			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["calls", "commands", "navigate", "prevented", "stopped", "raises", "value", "listening", "watch"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
 			guard pair.count == 2 || pair.count == 3 else { throw write.fail("a write is [slot, value] or [slot, value, nonFinite]") }
@@ -872,6 +878,8 @@ public final class NativeRuntime {
 			if case .navigate? = taken.first { return taken }
 			raised += taken
 		}
+		// A click handler called stopPropagation() before it first awaited.
+		if result.has("stopped"), try result["stopped"].bool() { propagationStopped = true }
 		// A key or paste handler called preventDefault() before it first awaited.
 		let prevented: [NativeJournalEntry] = try result.has("prevented") && result["prevented"].bool() ? [.preventDefault] : []
 		// An input handler that set its field's value (`event.target.value = …`) writes the field, as the DOM's setter does.
@@ -931,9 +939,9 @@ public final class NativeRuntime {
 		}
 		let handlerOf = { (id: String, name: NativeEventName) in self.payload.events.first { $0.host == self.nodeOf(id) && $0.event == name } }
 		if type == "click" {
-			guard let pressed = chain.first(where: { handlerOf($0, .activate) != nil }), let scope = try scopeOf(pressed) else { return [] }
+			guard let pressed = chain.first(where: { handlerOf($0, .activate) != nil }) else { return [] }
 			eventFields = clickFields(trusted: false)
-			return try run(handlers[handlerOf(pressed, .activate)!.handler] ?? [], in: scope)
+			return try press(pressed)
 		}
 		guard let name = NativeEventName(rawValue: type) else { return [] }
 		let optional = { (key: String, fallback: NativeValue) throws -> NativeValue in event.has(key) ? try event[key].scalar() : fallback }
@@ -1465,18 +1473,24 @@ public final class NativeRuntime {
 	/// Each style slot's number now, in the payload's order: what the host lays the page out with.
 	public func slots() throws -> [(slot: String, value: Double)] {
 		let cases = Dictionary(uniqueKeysWithValues: try styleCases().map { ($0.styleCase, $0.value) })
-		return try payload.slots.map { slot in
+		return try payload.slots.flatMap { slot -> [(slot: String, value: Double)] in
 			// Its expression may not hold while its style case hides the text (`point.x`), so it keeps its last value.
-			if let when = slot.when, cases[when.styleCase] != when.value { return (slot.id, keptSlots[slot.id] ?? 0) }
-			let evaluated = try evaluate(slot.value)
-			guard case let .number(value) = evaluated, value.isFinite else {
-				throw RuntimeError(reason: "style slot \(slot.id) is \(evaluated.json.jsonText), not a finite number")
+			if let when = slot.when, cases[when.styleCase] != when.value { return [(slot.id, keptSlots[slot.id] ?? 0)] }
+			var copies: [(id: String, scope: NativeScope)] = [(slot.id, .empty)]
+			if slot.row != nil, let owner = payload.slotOwners[slot.id].flatMap({ nodesById[$0] }) {
+				copies = try instances(of: owner).map { ("\(slot.id)\($0.id.dropFirst(owner.id.count))", $0.scope) }
 			}
-			if slot.integer, value.rounded(.towardZero) != value {
-				throw RuntimeError(reason: "style slot \(slot.id) is \(JSONValue.number(value).jsonText), not a whole number")
+			return try copies.map { copy in
+				let evaluated = try evaluate(slot.value, in: copy.scope)
+				guard case let .number(value) = evaluated, value.isFinite else {
+					throw RuntimeError(reason: "style slot \(copy.id) is \(evaluated.json.jsonText), not a finite number")
+				}
+				if slot.integer, value.rounded(.towardZero) != value {
+					throw RuntimeError(reason: "style slot \(copy.id) is \(JSONValue.number(value).jsonText), not a whole number")
+				}
+				keptSlots[copy.id] = value
+				return (copy.id, value)
 			}
-			keptSlots[slot.id] = value
-			return (slot.id, value)
 		}
 	}
 
@@ -1589,8 +1603,35 @@ public final class NativeRuntime {
 		let numeric = action.event == .input && { if case let .element(_, attributes, _) = node.kind { attributes["type"] == "number" } else { false } }()
 		return try change(host: action.host) {
 			if numeric, let typed = self.eventValue { self.eventValue = nativeNumberValue(typed) }
-			return try self.run(self.handlers[bound.handler] ?? [], in: scope)
+			return action.event == .activate ? try self.press(action.host) : try self.run(self.handlers[bound.handler] ?? [], in: scope)
 		}
+	}
+
+	/// A press on `pressed`, as a browser's click: its own handler, then the handler of each element around it, innermost first,
+	/// until one stops propagation. An element around it whose handler reads where the press landed runs its copy for the
+	/// pressed element (`<handler>@<node>`), which a pressed element with no handler of its own holds as its own.
+	private func press(_ pressed: String) throws -> [NativeJournalEntry] {
+		propagationStopped = false
+		defer { propagationStopped = false }
+		let own = nodeOf(pressed)
+		let key = pressed.firstIndex(of: "@").map { String(pressed[$0...]) } ?? ""
+		let ownHandler = payload.events.first { $0.host == own && $0.event == .activate }?.handler
+		var journal: [NativeJournalEntry] = []
+		var at: String? = own
+		while let node = at {
+			at = nodesById[node]?.parent
+			let id = node == own ? pressed : !key.isEmpty && nodesById[node]?.row != nil ? node + key : node
+			guard let bound = payload.events.first(where: { $0.host == node && $0.event == .activate }), let element = nodesById[node],
+				let scope = try instances(of: element).first(where: { $0.id == id })?.scope else { continue }
+			// A copy stands for the handler around it, and runs only as the pressed element's own.
+			if node != own && bound.handler.contains("@") { continue }
+			let copy = node == own ? nil : "\(bound.handler)@\(own)"
+			if let copy, ownHandler == copy { continue }
+			let chosen = copy.flatMap { handlers[$0] != nil ? $0 : nil } ?? bound.handler
+			journal += try run(handlers[chosen] ?? [], in: scope)
+			if propagationStopped || journal.contains(where: { if case .navigate = $0 { true } else { false } }) { break }
+		}
+		return journal
 	}
 
 	/// A long press on the action's host: its `contextmenu` handler, then each one of the elements it is inside, innermost first.
@@ -1896,6 +1937,8 @@ public final class NativeRuntime {
 				calls.append(.command(node: node, command: command, preventScroll: preventScroll))
 			case .preventDefault:
 				calls.append(.preventDefault)
+			case .stopPropagation:
+				propagationStopped = true
 			case let .fieldText(target, value):
 				let id = try evaluate(target, in: scope)
 				if id == .null { continue }

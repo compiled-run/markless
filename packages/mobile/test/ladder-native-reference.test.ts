@@ -36,16 +36,24 @@ import { echoText } from '../src/harness/echo-server.ts';
 import { nativeMaxLength, nativeRangeValue } from '@markless/serializer/native-view';
 import { nodeScriptHost } from '../src/node-engine.ts';
 import {
+	describeText,
 	looksOnly,
 	navRungFolders,
 	sheetStyleRungFolders,
 	styleRungFolders,
 	proofsDir,
 	readRung,
+	readsAs,
 	rungFolders,
+	selector,
 	type LadderRung,
 	type LadderStep,
+	type LadderText,
 } from '../proofs/ladder.ts';
+
+// A text named by how it starts is on screen when some shown text starts with it, as Maestro's anchored selector matches.
+const reading = (text: LadderText) =>
+	typeof text === 'string' ? text : expect.stringMatching(new RegExp(selector(text), 's'));
 
 /**
  * The key, at a `rows` entry's list, of the row an instance id sits in, when it sits in that copy of the list: an inner
@@ -83,10 +91,10 @@ const bindsValue = (nodeOf: ReadonlyMap<string, NativeViewPayload['nodes'][numbe
 	return node?.kind === 'element' && (node.bindings ?? []).some((binding) => 'property' in binding && binding.property === 'value');
 };
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
-const REFUSED_RUNGS = new Set(['y4-sheet-beside-drawer', 'j7-page-refused']);
+const REFUSED_RUNGS = new Set(['j7-page-refused']);
 // Rungs whose later steps wait on CSS animation events, which only Dragon's animator on the phones (and the browser) runs: this
 // walk checks their launch screen, and the phones and the web column check every step.
-const ANIMATED_RUNGS = new Set(['s24-animation-end']);
+const ANIMATED_RUNGS = new Set(['s34-animation-end']);
 // The <input> types a host draws as a control a press acts on; every other type is a text field that takes the keyboard.
 const PRESSED_INPUT_TYPES = new Set(['checkbox', 'radio', 'range', 'hidden']);
 
@@ -157,6 +165,8 @@ function mirror(
 	let title: string | null = null;
 	// What the platform's sheets show: changed only by `sheet` entries.
 	const sheetOpen = new Map<string, boolean>();
+	// Each option's selectedness as the journal reported it; an option a new row adds starts unselected.
+	const selected = new Map<string, boolean>();
 	const mount = (next: NativeRuntime) => {
 		runtime = next;
 		texts.clear();
@@ -171,6 +181,8 @@ function mirror(
 		title = runtime.title();
 		sheetOpen.clear();
 		for (const [node, open] of runtime.sheets()) sheetOpen.set(node, open);
+		selected.clear();
+		for (const [node, value] of runtime.selections()) selected.set(node, value);
 	};
 	mount(opened);
 	const nodeOf = new Map(payload.nodes.map((node) => [node.id, node]));
@@ -213,6 +225,8 @@ function mirror(
 		const node = nodeOf.get(baseOf(id));
 		if (!node) return false;
 		if (node.kind === 'element') {
+			// An option shows only in its select's list, which is closed between steps.
+			if (node.element === 'option') return true;
 			const bound = attributes.get(`${id}\0hidden`);
 			if ((bound !== undefined ? bound : (node.attributes?.['hidden'] ?? null)) !== null)
 				return true;
@@ -222,6 +236,13 @@ function mirror(
 			hiddenWithin(`${node.parent}${nodeOf.get(node.parent)?.row ? suffix : ''}`)
 		);
 	};
+	// A closed select shows its chosen option's label.
+	const chosenLabels = () =>
+		payload.nodes.flatMap((node) =>
+			node.kind === 'element' && node.element === 'select' && shownNode(node.id) && !hiddenWithin(node.id)
+				? runtime.choices(node.id).flatMap((choice) => (selected.get(choice.option) ? [choice.label] : []))
+				: [],
+		);
 	// What a flow can see or tap: shown text, and each shown element's accessible name (aria-label, bound or static).
 	const labels = () =>
 		payload.nodes.flatMap((node) => {
@@ -232,10 +253,10 @@ function mirror(
 			return label !== null && shownNode(node.id) ? [[node.id, label] as const] : [];
 		});
 	// The element a text names: a labelled element, or the element holding that text (a row instance keeps its key).
-	const elementReading = (text: string) => {
-		const labelled = labels().find(([, label]) => label === text)?.[0];
+	const elementReading = (text: LadderText) => {
+		const labelled = labels().find(([, label]) => readsAs(label, text))?.[0];
 		if (labelled) return labelled;
-		const node = [...texts].find(([id, shown]) => shown === text && !inClosedSheet(id))?.[0];
+		const node = [...texts].find(([id, shown]) => readsAs(shown, text) && !inClosedSheet(id))?.[0];
 		if (!node) return undefined;
 		const parent = nodeOf.get(baseOf(node))?.parent ?? undefined;
 		return parent && node.includes('@') && nodeOf.get(parent)?.row
@@ -248,6 +269,7 @@ function mirror(
 		else if (entry.op === 'title') title = entry.value;
 		else if (entry.op === 'attribute')
 			attributes.set(`${entry.node}\0${entry.name}`, entry.value);
+		else if (entry.op === 'property' && entry.name === 'selected') selected.set(entry.node, entry.value);
 		else if (entry.op === 'property') {
 			// A textarea's default value reaches its text, which this column does not compare.
 			if (bindsValue(nodeOf, entry.node)) properties.set(entry.node, entry.value);
@@ -296,6 +318,8 @@ function mirror(
 		mount,
 		apply,
 		elementReading,
+		// A press on a <label> acts on the control its `for` names, as both hosts pass it on.
+		pressed: (host: string) => (nodeOf.get(baseOf(host))?.element === 'label' ? (attributes.get(`${host}\0for`) ?? host) : host),
 		disabled: (host: string) => attributes.get(`${host}\0disabled`) != null,
 		/** Types into the emptied field and returns what it holds. */
 		typed: (host: string, text: string) => {
@@ -323,10 +347,10 @@ function mirror(
 				[...texts].filter(([id]) => !inClosedSheet(id) && !hiddenWithin(id)),
 			);
 			const read = styled ? [...open.values()] : nativeShownTexts(payload, open);
-			const shown = [...read, ...labels().map(([, label]) => label)];
-			expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
+			const shown = [...read, ...labels().map(([, label]) => label), ...chosenLabels()];
+			expect(shown, `step ${index}`).toEqual(expect.arrayContaining(step.visible.map(reading)));
 			for (const text of step.absent ?? [])
-				expect(shown, `step ${index}`).not.toContain(text);
+				expect(shown, `step ${index}`).not.toEqual(expect.arrayContaining([reading(text)]));
 			// Which texts a page's styles hide is Dragon's layout; the payload must still hold them.
 			for (const text of step.hidden ?? [])
 				expect([...open.values()], `step ${index}`).toContain(text);
@@ -356,6 +380,8 @@ function mirror(
 				`step ${index}: the journal left a field stale`,
 			).toEqual(properties);
 			expect(runtime.title(), `step ${index}: the journal left the title stale`).toBe(title);
+			for (const [node, value] of runtime.selections())
+				expect(selected.get(node) ?? false, `step ${index}: the journal left ${node}'s selectedness stale`).toBe(value);
 		},
 	};
 }
@@ -430,6 +456,14 @@ function walkApp(
 			(action && ('swipe' in action || 'scrollTo' in action || 'orientation' in action))
 		) {
 			// Neither the appearance, a rotation, nor a sheet's resting height or scroll changes state: the hosts restyle and lay out.
+		} else if (action && 'choose' in action) {
+			const top = stack.at(-1)!;
+			const select = top.elementReading(action.choose.field);
+			if (!select) throw new Error(`step ${index}: no select reads "${action.choose.field}"`);
+			const choice = top.runtime.choices(select).find((one) => one.label === action.choose.option);
+			if (!choice || choice.disabled)
+				throw new Error(`step ${index}: "${action.choose.field}" has no option "${action.choose.option}" to pick`);
+			for (const entry of appRuntime.dispatch({ event: 'choose', host: choice.option })) top.apply(entry, index);
 		} else if (action) {
 			const top = stack.at(-1)!;
 			const host = top.elementReading(
@@ -438,7 +472,7 @@ function walkApp(
 			if (!host) throw new Error(`step ${index}: nothing on the top screen to act on`);
 			const journal =
 				'tap' in action
-					? appRuntime.dispatch({ event: 'activate', host })
+					? appRuntime.dispatch({ event: 'activate', host: top.pressed(host) })
 					: 'type' in action
 						? appRuntime.dispatch({
 								event: 'input',
@@ -722,15 +756,15 @@ function walk(
 		return label !== null && shownNode(node.id) ? [[id, label] as const] : [];
 	};
 	// A text field by its accessible name, as the web finds a textbox: a control named the same (a preview button) is not one.
-	const fieldReading = (text: string) =>
+	const fieldReading = (text: LadderText) =>
 		labels().find(([id, label]) => {
 			const element = nodeOf.get(id.split('@')[0]!);
-			return label === text && element?.kind === 'element' && (element.element === 'input' || element.element === 'textarea');
+			return readsAs(label, text) && element?.kind === 'element' && (element.element === 'input' || element.element === 'textarea');
 		})?.[0] ?? elementReading(text);
-	const elementReading = (text: string) => {
-		const labelled = labels().find(([, label]) => label === text)?.[0];
+	const elementReading = (text: LadderText) => {
+		const labelled = labels().find(([, label]) => readsAs(label, text))?.[0];
 		if (labelled) return labelled;
-		const node = shownTexts().find(([id, shown]) => shown === text && !hiddenWithin(id))?.[0];
+		const node = shownTexts().find(([id, shown]) => readsAs(shown, text) && !hiddenWithin(id))?.[0];
 		return node ? parentOf(node) : undefined;
 	};
 	// A field's text: what its `value` binding or attribute gave it, then what was typed or the journal wrote.
@@ -1116,10 +1150,10 @@ function walk(
 			const host = 'tap' in action || 'doubleTap' in action ? elementReading(name) : fieldReading(name);
 			if (!host)
 				throw new Error(
-					`step ${index}: nothing reads "${name}" to ${'tap' in action ? 'tap' : 'type into'}`,
+					`step ${index}: nothing reads ${describeText(name)} to ${'tap' in action ? 'tap' : 'type into'}`,
 				);
 			if (attributeNow(host, 'disabled') != null)
-				throw new Error(`step ${index}: "${name}" is disabled`);
+				throw new Error(`step ${index}: ${describeText(name)} is disabled`);
 			// Typing shows the text in the field at once; the input event then runs the handler.
 			const text =
 				'type' in action
@@ -1330,8 +1364,9 @@ function walk(
 				.map(([, label]) => label),
 			...chosenLabels(),
 		];
-		expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
-		for (const text of step.absent ?? []) expect(shown, `step ${index}`).not.toContain(text);
+		expect(shown, `step ${index}`).toEqual(expect.arrayContaining(step.visible.map(reading)));
+		for (const text of step.absent ?? [])
+			expect(shown, `step ${index}`).not.toEqual(expect.arrayContaining([reading(text)]));
 		for (const [node, value] of runtime.selections())
 			expect(selected.get(node) ?? false, `step ${index}: the journal left ${node}'s selectedness stale`).toBe(value);
 		expect(shown, `step ${index}: scrolled out of sight, still held`).toEqual(

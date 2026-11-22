@@ -1,0 +1,24 @@
+{
+	"rung": "J52",
+	"name": "URL and URLSearchParams in JavaScript on the phone, as the browser has them",
+	"steps": [
+		{
+			"visible": ["Shop links", "Query: q=shoes&page=1", "Page 1", "Opened: nothing yet"]
+		},
+		{
+			"do": { "tap": "Next page" },
+			"visible": ["Query: q=shoes&page=2", "Page 2"],
+			"absent": ["Page 1"]
+		},
+		{
+			"do": { "tap": "Search hats" },
+			"visible": ["Query: q=hats+%26+caps&page=2", "Page 2", "Opened: nothing yet"],
+			"absent": ["Query: q=shoes&page=2"]
+		},
+		{
+			"do": { "tap": "Open order" },
+			"visible": ["Opened: shop.example/account/orders/7?tab=items&from=%C3%A4"],
+			"absent": ["Opened: nothing yet"]
+		}
+	]
+}

@@ -1,0 +1,13 @@
+{
+	"rung": 235,
+	"name": "A <path> written in an <svg> whose d follows state or comes from a prop is drawn from its current value, as the browser draws it",
+	"steps": [
+		{ "visible": ["Live paths", "Icon octicon-heart", "Corner mark", "Turn mark"] },
+		{
+			"do": { "tap": "Turn mark" },
+			"visible": ["Corner mark", "Turn back"],
+			"absent": ["Turn mark"]
+		},
+		{ "do": { "tap": "Turn back" }, "visible": ["Turn mark"], "absent": ["Turn back"] }
+	]
+}

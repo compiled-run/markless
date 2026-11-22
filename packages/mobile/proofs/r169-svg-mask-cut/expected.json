@@ -1,0 +1,9 @@
+{
+	"rung": 169,
+	"name": "an svg luminance <mask> of a white region with black shapes over it hides those shapes, as the browser composites it",
+	"steps": [
+		{ "visible": ["Outlined card", "Card outline", "Toggle card"] },
+		{ "do": { "tap": "Toggle card" }, "visible": ["Outlined card"], "absent": ["Card outline"] },
+		{ "do": { "tap": "Toggle card" }, "visible": ["Card outline"] }
+	]
+}

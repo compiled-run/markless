@@ -5,6 +5,7 @@ import { chromium, type Browser, type BrowserContext, type Page } from '@playwri
 import { afterAll, beforeAll, describe, test } from 'vitest';
 import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 import { startBuiltServer, type BuiltServer } from '../../../scripts/test-utils/built-server.ts';
+import { takeBuildSlot } from '../../router/test/support/build-slots.ts';
 import { buildAppServer } from '../src/harness/app-server.ts';
 import { APPS, appsDir } from '../apps/measure.ts';
 import { walks, type Walk } from '../apps/walks.ts';
@@ -29,7 +30,12 @@ afterAll(async () => {
 async function serveApp(app: string): Promise<BuiltServer> {
 	const out = await mkdtemp(join(tmpdir(), `markless-yardstick-${app}-`));
 	cleanups.push(() => rm(out, { recursive: true, force: true }));
-	await buildAppServer(join(appsDir, app), out);
+	const release = await takeBuildSlot();
+	try {
+		await buildAppServer(join(appsDir, app), out);
+	} finally {
+		await release();
+	}
 	const server = await startBuiltServer(join(out, 'server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});

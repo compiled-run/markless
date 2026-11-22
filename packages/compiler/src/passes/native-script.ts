@@ -10,6 +10,7 @@ import {
 	NATIVE_SCRIPT_SUBMITTED_FORM,
 	NATIVE_UNBOUND_HANDLE,
 } from '@markless/serializer/native-view';
+import { NATIVE_SCRIPT_URL } from './native-script-url.ts';
 import { SVG_GEOMETRY_SOURCE } from './native-svg-geometry.ts';
 
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
@@ -133,6 +134,35 @@ if (!host) {
 			this.name = name === undefined ? 'Error' : String(name);
 		};
 		g.DOMException.prototype = Object.create(Error.prototype, { constructor: { value: g.DOMException, writable: true, configurable: true } });
+	}
+	// Files as a page holds them: a File's name, size, type and lastModified, a FileList, and a DataTransfer to build one.
+	var utf8Length = function (text) { return unescape(encodeURIComponent(text)).length; };
+	if (typeof g.File !== 'function') {
+		g.File = function File(bits, name, options) {
+			this.name = String(name);
+			this.type = options && options.type !== undefined ? String(options.type).toLowerCase() : '';
+			this.lastModified = options && options.lastModified !== undefined ? Number(options.lastModified) : Date.now();
+			var size = 0;
+			(bits || []).forEach(function (part) { size += typeof part === 'string' ? utf8Length(part) : part && typeof part.size === 'number' ? part.size : 0; });
+			this.size = size;
+		};
+	}
+	host.fileListOf = function (files) {
+		var list = files.slice();
+		list.item = function (index) { return list[index] || null; };
+		return list;
+	};
+	if (typeof g.DataTransfer !== 'function') {
+		g.DataTransfer = function DataTransfer() {
+			var held = [];
+			this.items = {
+				add: function (file) { held.push(file); return { kind: 'file', type: file.type }; },
+				remove: function (index) { held.splice(index, 1); },
+				clear: function () { held.length = 0; },
+			};
+			Object.defineProperty(this.items, 'length', { get: function () { return held.length; } });
+			Object.defineProperty(this, 'files', { get: function () { return host.fileListOf(held); } });
+		};
 	}
 	var Headers = function (pairs) {
 		this.get = function (name) {
@@ -398,6 +428,12 @@ if (!host) {
 			addListener: changes,
 		};
 	};
+	Object.defineProperty(g, 'devicePixelRatio', {
+		get: function () {
+			if (!host.screen) throw new TypeError('devicePixelRatio is read in a handler on a phone');
+			return host.screen.devicePixelRatio;
+		},
+	});
 	g.window = g.self = g;
 	// The page answers its focused element (the body when none is) and keeps listeners a handler adds; the host passes each
 	// pointer event to them after the element's own handlers, as the browser bubbles it to the document.
@@ -717,7 +753,6 @@ var stable = function (value) {
 var begin = function (entry) {
 	host.origin = origin;
 	elementFacts = entry.elements || {};
-	proxies = {};
 	captured = {};
 	cells = join(entry.cells, entry.nonFinite);
 	unset = {};
@@ -730,6 +765,7 @@ var begin = function (entry) {
 	host.seed = entry.seed || null;
 	host.focused = entry.focused || null;
 	host.media = entry.media || null;
+	host.screen = entry.screen || null;
 	for (var known in entry.focusElements || {}) if (!elementFacts[known]) elementFacts[known] = entry.focusElements[known];
 	host.focus = function () { return elementOf(host.focused || BODY); };
 	host.counter = 0;
@@ -761,7 +797,8 @@ var eventOf = function (given, frame) {
 		isComposing: false,
 		defaultPrevented: false,
 		preventDefault: function () { this.defaultPrevented = true; },
-		stopPropagation: function () {},
+		propagationStopped: false,
+		stopPropagation: function () { this.propagationStopped = true; },
 	};
 	${JSON.stringify([...new Set([...NATIVE_SCRIPT_POINTER_FIELDS, ...NATIVE_SCRIPT_CLICK_FIELDS, ...NATIVE_SCRIPT_KEY_FIELDS])])}.forEach(function (field) { if (field in given) event[field] = given[field]; });
 	// A dismiss's detail is an object whose pressTarget is an element; a click's detail is its press count.
@@ -860,6 +897,8 @@ g.__markless[id] = {
 			}
 			// A key's or paste's cancel reaches the host, as a browser reads defaultPrevented before the handler first awaits.
 			if (event && event.defaultPrevented && (entry.event.type === 'keydown' || entry.event.type === 'paste')) host.out.prevented = true;
+			// A click's stopPropagation() before it first awaits keeps the press from the handlers around it, as a browser's.
+			if (event && event.propagationStopped && entry.event.type === 'click') host.out.stopped = true;
 			// A handler that sets its text field's value writes the field, as the DOM's value setter does.
 			if (event && typeof entry.event.value === 'string' && event.target && !(event.target instanceof host.Form) && typeof event.target.value === 'string' && event.target.value !== entry.event.value) host.out.value = event.target.value;
 		} else if (entry.kind === 'document') {
@@ -919,6 +958,7 @@ g.__markless[id] = {
 		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands, pending: out.pending, settled: out.settled, raises: out.raises };
 		if (out.calls.length > 0) left.calls = out.calls;
 		if (out.prevented) left.prevented = true;
+		if (out.stopped) left.stopped = true;
 		if (out.value !== undefined) left.value = out.value;
 		if (out.navigate) left.navigate = out.navigate;
 		// The document's listener types now, and the elements the entry that changed them held, whose facts later entries need.
@@ -943,6 +983,10 @@ function contentId(text: string): string {
 	return a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0');
 }
 
+/** The engine text every payload's script carries around its own modules: the host services, then the entry points. */
+export type NativeScriptEngine = { readonly services: string; readonly entries: string };
+export const NATIVE_SCRIPT_ENGINE: NativeScriptEngine = { services: HOST_SERVICES, entries: ENTRIES };
+
 /**
  * The script a payload's `script` ops and computeds run. Every module is a function run once on first use, imports first,
  * as ES modules evaluate; each script function is defined inside its module, so the module's own names reach it.
@@ -958,6 +1002,9 @@ export function nativeScriptOf(
 	svg = false,
 	/** The app's origin (app.json `origin`), which a URL from the root resolves against. */
 	origin?: string,
+	engine: NativeScriptEngine = NATIVE_SCRIPT_ENGINE,
+	/** The script reads `URL` or `URLSearchParams`: the engine carries the URL Standard's code for engines without them. */
+	url = false,
 ): NativeScript {
 	const owners: Record<string, number> = {};
 	const definitions = modules.map((module, index) => {
@@ -989,9 +1036,9 @@ export function nativeScriptOf(
 		`var navigation = ${JSON.stringify(navigation ?? null)};`,
 		...definitions,
 		...(svg ? [SVG_GEOMETRY_SOURCE] : []),
-		ENTRIES,
+		engine.entries,
 	].join('\n');
 	const id = contentId(body);
-	const source = `(function (g, id) {\n${HOST_SERVICES}\ng.__markless = g.__markless || {};\n${body}\n})(globalThis, ${JSON.stringify(id)});\n`;
+	const source = `(function (g, id) {\n${engine.services}\n${url ? `${NATIVE_SCRIPT_URL}\n` : ''}g.__markless = g.__markless || {};\n${body}\n})(globalThis, ${JSON.stringify(id)});\n`;
 	return { id, source, services };
 }

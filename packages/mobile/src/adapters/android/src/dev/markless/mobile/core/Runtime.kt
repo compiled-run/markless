@@ -280,6 +280,9 @@ class Runtime(
 	private val fired = HashSet<String>()
 	private val storageKeys = payload.cells.mapNotNull { c -> c.storageKey?.let { c.id to it } }.toMap()
 	private val handlers = payload.handlers.associateBy { it.id }
+
+	/** A click handler called stopPropagation(): the press goes no further out. */
+	private var propagationStopped = false
 	private val continuations = HashMap<String, Continuation>().also { found ->
 		fun collect(ops: List<Op>) {
 			for (op in ops) if (op is Op.Call && op.after != null) {
@@ -505,6 +508,8 @@ class Runtime(
 	var measure: ((id: String) -> ElementBox?)? = null
 	/** The device's answers to the media features a script's `matchMedia` reads, read as each entry begins; the web's defaults when the host gives none. */
 	var media: () -> List<Pair<String, String>> = { listOf("prefers-reduced-motion" to "no-preference", "prefers-color-scheme" to "light") }
+	/** The screen's device pixels per CSS px, which a script's `devicePixelRatio` reads as each entry begins. */
+	var devicePixelRatio: () -> Double = { 1.0 }
 
 	/** Called with each engine entry's duration in nanoseconds, including starting the engine when the entry had to. */
 	var onScriptEntry: ((nanos: Long) -> Unit)? = null
@@ -650,6 +655,8 @@ class Runtime(
 			append(",\"params\":" + params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" })
 		if (payload.script?.services?.contains("media") == true)
 			append(",\"media\":" + media().joinToString(",", "{", "}") { "${jsonString(it.first)}:${jsonString(it.second)}" })
+		if (payload.script?.services?.contains("screen") == true)
+			append(",\"screen\":{\"devicePixelRatio\":${jsonValue(JsValue.Num(devicePixelRatio()))}}")
 	}
 
 	/** Submissions held by a script promise not settled yet, by the engine's run number. */
@@ -751,6 +758,8 @@ class Runtime(
 				if (command == "focus") focused = node
 				JournalEntry.Command(node, command, (parts[2] as? Json.Bool)?.value == true)
 			} +
+			// A click handler called stopPropagation() before it first awaited.
+			(if ((result["stopped"] as? Json.Bool)?.value == true) { propagationStopped = true; emptyList() } else emptyList<JournalEntry>()) +
 			// A key or paste handler called preventDefault() before it first awaited.
 			(if ((result["prevented"] as? Json.Bool)?.value == true) listOf(JournalEntry.PreventDefault) else emptyList()) +
 			// An input handler that set its field's value (`event.target.value = …`) writes the field, as the DOM's setter does.
@@ -790,8 +799,7 @@ class Runtime(
 			fun scopeOf(id: String): Scope? = byId[id.substringBefore('@')]?.let { node -> instances(node).firstOrNull { it.id == id }?.scope }
 			if (type == "click") {
 				val pressed = chain.firstOrNull { handlerFor(it.substringBefore('@'), EventName.Activate) != null } ?: return emptyList()
-				val scope = scopeOf(pressed) ?: return emptyList()
-				return withFields(clickFields(trusted = false)) { run(handlers[handlerFor(pressed.substringBefore('@'), EventName.Activate)]?.ops.orEmpty(), scope) }
+				return withFields(clickFields(trusted = false)) { press(pressed) }
 			}
 			val name = EventName.entries.firstOrNull { it.wire == type } ?: return emptyList()
 			fun optional(key: String, fallback: JsValue): JsValue = event[key]?.let { JsValue.fromJson(it) } ?: fallback
@@ -1362,7 +1370,36 @@ class Runtime(
 			else -> null
 		}
 		return change(host, if (event == EventName.Input || event == EventName.Commit) value else null) {
-			withFields(carried) { run(handler.ops, scope) }
+			withFields(carried) { if (event == EventName.Activate) press(host) else run(handler.ops, scope) }
+		}
+	}
+
+	/**
+	 * A press on [pressed], as a browser's click: its own handler, then the handler of each element around it, innermost first,
+	 * until one stops propagation. An element around it whose handler reads where the press landed runs its copy for the
+	 * pressed element (`<handler>@<node>`), which a pressed element with no handler of its own holds as its own.
+	 */
+	private fun press(pressed: String): List<JournalEntry> {
+		propagationStopped = false
+		try {
+			val own = pressed.substringBefore('@')
+			val ownHandler = handlerFor(own, EventName.Activate)
+			val journal = ArrayList<JournalEntry>()
+			for (id in chain(pressed)) {
+				val node = id.substringBefore('@')
+				val bound = handlerFor(node, EventName.Activate) ?: continue
+				val scope = byId[node]?.let { element -> instances(element).firstOrNull { it.id == id }?.scope } ?: continue
+				// A copy stands for the handler around it, and runs only as the pressed element's own.
+				if (node != own && '@' in bound) continue
+				val copy = if (node == own) null else "$bound@$own"
+				if (copy != null && ownHandler == copy) continue
+				val chosen = copy?.takeIf { it in handlers } ?: bound
+				journal.addAll(run(handlers[chosen]?.ops.orEmpty(), scope))
+				if (propagationStopped || journal.any { it is JournalEntry.Navigate }) break
+			}
+			return journal
+		} finally {
+			propagationStopped = false
 		}
 	}
 
@@ -1706,6 +1743,7 @@ class Runtime(
 				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope, named?.values?.filterNotNull().orEmpty() + listOfNotNull(pressed))},\"event\":$event$catch", submission))
 			}
 			Op.PreventDefault -> calls.add(JournalEntry.PreventDefault)
+			Op.StopPropagation -> propagationStopped = true
 			is Op.FieldText -> {
 				val node = evaluate(op.node, scope)
 				if (node == JsValue.Null) continue
@@ -1757,16 +1795,25 @@ class Runtime(
 	/** Each style slot's current value, in payload order; a slot that is not a finite number (or not whole when integer) is an error, as no layout of it was proven. */
 	fun slots(): List<Pair<String, Double>> {
 		val cases = styleCases().toMap()
-		return payload.slots.map { slot ->
+		return payload.slots.flatMap { slot ->
 			// Its expression may not hold while its style case hides the text (`point.x`), so it keeps its last value.
 			val w = slot.whenCase
-			if (w != null && cases[w.case] != w.value) return@map slot.id to (keptSlots[slot.id] ?: 0.0)
-			val v = evaluate(slot.value)
-			if (v !is JsValue.Num || !v.value.isFinite()) throw MarklessRuntimeError("style slot ${slot.id} is ${jsonValue(v)}, not a finite number")
-			if (slot.integer && v.value != Math.rint(v.value)) throw MarklessRuntimeError("style slot ${slot.id} is ${JsString.number(v.value)}, not a whole number")
-			keptSlots[slot.id] = v.value
-			slot.id to v.value
+			if (w != null && cases[w.case] != w.value) return@flatMap listOf(slot.id to (keptSlots[slot.id] ?: 0.0))
+			val owner = if (slot.row == null) null else slotOwners[slot.id]
+			val copies = owner?.let { o -> instances(o).map { "${slot.id}${it.id.substring(o.id.length)}" to it.scope } } ?: listOf(slot.id to Scope.EMPTY)
+			copies.map { (id, scope) ->
+				val v = evaluate(slot.value, scope)
+				if (v !is JsValue.Num || !v.value.isFinite()) throw MarklessRuntimeError("style slot $id is ${jsonValue(v)}, not a finite number")
+				if (slot.integer && v.value != Math.rint(v.value)) throw MarklessRuntimeError("style slot $id is ${JsString.number(v.value)}, not a whole number")
+				keptSlots[id] = v.value
+				id to v.value
+			}
 		}
+	}
+
+	/** The element whose style holds each slot: a slot inside a row has one value per row copy, `<slot>@<key>`. */
+	private val slotOwners: Map<String, Node.Element> by lazy {
+		payload.nodes.filterIsInstance<Node.Element>().flatMap { n -> n.style.orEmpty().filterIsInstance<StylePiece.Hole>().map { it.slot to n } }.toMap()
 	}
 
 	/** Whether each style case's test holds now, in payload order: which of Dragon's assignments the style is in. */

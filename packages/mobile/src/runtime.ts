@@ -33,6 +33,7 @@ import {
 	nativeTooLongMessage,
 	NATIVE_SCRIPT_MEDIA_DEFAULTS,
 	type NativeScriptMedia,
+	type NativeScriptScreen,
 } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeScriptEngine } from './script-engine.ts';
@@ -732,6 +733,8 @@ export function createNativeRuntime(
 	measure?: (id: string) => NativeElementBox | null,
 	/** The device's answers to the media features a script's `matchMedia` reads, read as each entry begins. */
 	media: () => NativeScriptMedia = () => NATIVE_SCRIPT_MEDIA_DEFAULTS,
+	/** The screen's device pixels per CSS px that a script's `devicePixelRatio` reads, read as each entry begins. */
+	screenFacts: () => NativeScriptScreen = () => ({ devicePixelRatio: 1 }),
 ): NativeRuntime {
 	const base: NativeScope = {
 		...EMPTY_SCOPE,
@@ -997,6 +1000,7 @@ export function createNativeRuntime(
 			: {}),
 		...(script?.services.includes('navigate') ? { params } : {}),
 		...(script?.services.includes('media') ? { media: media() } : {}),
+		...(script?.services.includes('screen') ? { screen: screenFacts() } : {}),
 	});
 	/** One engine entry, then what it asked for: its writes land in cells; timers, clears and requests become entries. */
 	/** Submissions held by a script promise not settled yet, by the engine's run number. */
@@ -1041,6 +1045,8 @@ export function createNativeRuntime(
 			readonly raises?: ReadonlyArray<Raised>;
 			/** A key or paste handler called `preventDefault()` before it first awaited. */
 			readonly prevented?: true;
+			/** A click handler called `stopPropagation()` before it first awaited. */
+			readonly stopped?: true;
 			/** The text an input handler set on its field (`event.target.value = …`). */
 			readonly value?: string;
 			/** The event types the page's document listens for now, when an entry changed them. */
@@ -1048,6 +1054,7 @@ export function createNativeRuntime(
 			/** The elements the entry that changed them held, which the document's listeners may read later. */
 			readonly watch?: ReadonlyArray<string>;
 		};
+		if (result.stopped) propagationStopped = true;
 		if (result.listening) {
 			documentListening.clear();
 			for (const type of result.listening) documentListening.add(type);
@@ -1158,6 +1165,8 @@ export function createNativeRuntime(
 	};
 	/** How deep events raised from JavaScript may nest (a handler that raises one that raises another...). */
 	let raising = 0;
+	/** A click handler called stopPropagation(): the press goes no further out. */
+	let propagationStopped = false;
 	/**
 	 * An event a script dispatched on an element (or its `click()`), raised once the script returned: `click` as a press
 	 * on the innermost element from it outwards that has one; any other type on the element, then its ancestors when it
@@ -1178,14 +1187,7 @@ export function createNativeRuntime(
 			const calls: NativeJournalEntry[] = [];
 			if (event.type === 'click') {
 				const pressed = chain.find((node) => handlerOf(nodeOf(node), 'activate'));
-				const scope = pressed && scopeOf(pressed);
-				return pressed && scope
-					? run(
-							handlers.get(handlerOf(nodeOf(pressed), 'activate')!.handler) ?? [],
-							clickFields(false),
-							scope,
-						)
-					: [];
+				return pressed ? press(pressed, clickFields(false)) : [];
 			}
 			for (const node of event.bubbles ? chain : chain.slice(0, 1)) {
 				const own = handlerOf(nodeOf(node), event.type as NativePointerEventName);
@@ -1607,20 +1609,40 @@ export function createNativeRuntime(
 		);
 	// A slot whose style case does not show its text keeps its last value: its expression may not hold then (`point.x`).
 	const keptSlots = new Map<string, number>();
+	// The element whose style holds each slot: a slot inside a row has one value per row copy, `<slot>@<key>`.
+	const slotOwner = new Map(
+		payload.nodes.flatMap((node) =>
+			node.kind === 'element'
+				? (node.style ?? []).flatMap((part) =>
+						typeof part === 'string' ? [] : [[part.slot, node] as const],
+					)
+				: [],
+		),
+	);
 	const slotValues = () => {
 		const cases = new Map(caseValues());
-		return (payload.slots ?? []).map((slot) => {
+		return (payload.slots ?? []).flatMap((slot): (readonly [string, number])[] => {
 			if (slot.when && cases.get(slot.when.case) !== slot.when.value)
-				return [slot.id, keptSlots.get(slot.id) ?? 0] as const;
-			const value = evaluate(slot.value);
-			if (typeof value !== 'number' || !Number.isFinite(value))
-				throw new Error(
-					`style slot ${slot.id} is ${JSON.stringify(value)}, not a finite number`,
-				);
-			if (slot.integer && !Number.isInteger(value))
-				throw new Error(`style slot ${slot.id} is ${value}, not a whole number`);
-			keptSlots.set(slot.id, value);
-			return [slot.id, value] as const;
+				return [[slot.id, keptSlots.get(slot.id) ?? 0]];
+			const owner = slotOwner.get(slot.id);
+			const copies =
+				slot.row && owner
+					? instances(owner).map(
+							({ id, scope }) =>
+								[`${slot.id}${id.slice(owner.id.length)}`, scope] as const,
+						)
+					: [[slot.id, base] as const];
+			return copies.map(([id, scope]) => {
+				const value = evaluate(slot.value, undefined, scope);
+				if (typeof value !== 'number' || !Number.isFinite(value))
+					throw new Error(
+						`style slot ${id} is ${JSON.stringify(value)}, not a finite number`,
+					);
+				if (slot.integer && !Number.isInteger(value))
+					throw new Error(`style slot ${id} is ${value}, not a whole number`);
+				keptSlots.set(id, value);
+				return [id, value] as const;
+			});
 		});
 	};
 	/** Text fields with no `value` binding whose text a handler wrote (`field.value = text`): their text is journalled too. */
@@ -2070,8 +2092,35 @@ export function createNativeRuntime(
 			node;
 			node = nodesById.get(node)?.parent
 		)
-			out.push(node === nodeOf(id) ? id : key && nodesById.get(node)?.row ? `${node}${key}` : node);
+			out.push(
+				node === nodeOf(id) ? id : key && nodesById.get(node)?.row ? `${node}${key}` : node,
+			);
 		return out;
+	};
+	/**
+	 * A press on `pressed`, as a browser's click: its own handler, then the handler of each element around it, innermost
+	 * first, until one stops propagation. An element around it whose handler reads where the press landed runs its copy for
+	 * the pressed element (`<handler>@<node>`), which a pressed element with no handler of its own holds as its own.
+	 */
+	const press = (pressed: string, fields: NativeEventFields): NativeJournalEntry[] => {
+		propagationStopped = false;
+		const own = nodeOf(pressed);
+		const ownHandler = handlerOf(own, 'activate')?.handler;
+		const journal: NativeJournalEntry[] = [];
+		for (const id of chainOf(pressed)) {
+			const node = nodeOf(id);
+			const bound = handlerOf(node, 'activate');
+			const scope = bound && scopeOf(id);
+			if (!bound || !scope) continue;
+			// A copy (`<handler>@<node>`) stands for the handler around it, and runs only as the pressed element's own.
+			if (node !== own && bound.handler.includes('@')) continue;
+			const copy = node === own ? undefined : `${bound.handler}@${own}`;
+			if (copy && ownHandler === copy) continue;
+			journal.push(...run(handlers.get(copy && handlers.has(copy) ? copy : bound.handler) ?? [], fields, scope));
+			if (propagationStopped || journal.some((entry) => entry.op === 'navigate')) break;
+		}
+		propagationStopped = false;
+		return journal;
 	};
 	/** `idle` and `visible` handlers that ran, by `<event>\0<instance>`; an instance that leaves the screen is forgotten. */
 	const fired = new Set<string>();
@@ -2588,7 +2637,9 @@ export function createNativeRuntime(
 						? nativeNumberValue(eventValue)
 						: eventValue;
 			return change(action.host, edit, () =>
-				run(handlers.get(event.handler) ?? [], fields, scope),
+				action.event === 'activate'
+					? press(action.host, fields as NativeEventFields)
+					: run(handlers.get(event.handler) ?? [], fields, scope),
 			);
 		},
 		due,
@@ -2709,6 +2760,10 @@ export function createNativeRuntime(
 			}
 			if (op.op === 'preventDefault') {
 				calls.push({ op: 'preventDefault' });
+				continue;
+			}
+			if (op.op === 'stopPropagation') {
+				propagationStopped = true;
 				continue;
 			}
 			if (op.op === 'fieldText') {
@@ -2909,7 +2964,8 @@ export function createNativeRuntime(
 			);
 			// A `value` binding writes the field only when its own value changes, as on the web: typing alone never resets it.
 			const beforeProperties = keyed(properties());
-			const typedKey = eventValue !== undefined && host !== undefined ? `${host}\0value` : undefined;
+			const typedKey =
+				eventValue !== undefined && host !== undefined ? `${host}\0value` : undefined;
 			if (eventValue !== undefined && host !== undefined) edited.set(host, eventValue);
 			typing = typeof eventValue === 'string' ? host : undefined;
 			const beforeArms = new Map(arms());
@@ -3072,7 +3128,9 @@ export function createNativeRuntime(
 								!before.has(key) ||
 								!after.has(key) ||
 								before.get(key) === after.get(key) ||
-								(!('attribute' in binding) && key === typedKey && after.get(key) === eventValue)
+								(!('attribute' in binding) &&
+									key === typedKey &&
+									after.get(key) === eventValue)
 							)
 								return [];
 							return 'attribute' in binding

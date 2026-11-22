@@ -13,6 +13,12 @@ test("an image's natural size comes from its header: PNG, JPEG and GIF", () => {
 	expect(imageHeader(gif)).toEqual({ format: 'gif', width: 18, height: 18 });
 });
 
+test("a WebP's natural size comes from its first chunk: lossy, lossless and extended, its EXIF orientation left unapplied as Chrome does", () => {
+	expect(imageHeader(readFileSync(join(proofs, 'r170-webp-images/public/static/photo.webp')))).toEqual({ format: 'webp', width: 200, height: 120 });
+	expect(imageHeader(readFileSync(join(proofs, 'lib/square.webp')))).toEqual({ format: 'webp', width: 64, height: 64 });
+	expect(imageHeader(readFileSync(join(proofs, 'r170-webp-images/public/static/turned.webp')))).toEqual({ format: 'webp', width: 96, height: 48 });
+});
+
 test('bytes that are not an image the build reads have no header, so the phone shows the alt text', () => {
 	expect(imageHeader(readFileSync(join(proofs, 'r155-images/public/static/broken.png')))).toBeNull();
 	expect(imageHeader(new Uint8Array())).toBeNull();
@@ -90,4 +96,17 @@ test('an SVG file a native drawing cannot draw is refused, naming why; bytes tha
 	expect(svg('<svg><rect></svg>')).toBeNull();
 	expect(svg('<html xmlns="http://www.w3.org/1999/xhtml"/>')).toBeNull();
 	expect(svg('not markup')).toBeNull();
+});
+
+test("an SVG file's style that only sets mask-type is read as that attribute; any other style is still refused", () => {
+	const svg = (style: string) =>
+		new TextEncoder().encode(
+			`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><mask id="m" style="${style}" maskUnits="userSpaceOnUse" x="0" y="0" width="10" height="10"><rect width="5" height="10" fill="black" /></mask><g mask="url(#m)"><rect width="10" height="10" /></g></svg>`,
+		);
+	const alpha = svgImage(svg('mask-type:alpha'))!;
+	expect(alpha.refusals).toEqual([]);
+	expect(alpha.image.drawing.shapes[0]?.clip).toHaveLength(2);
+	expect(svgImage(svg('mask-type:alpha; opacity: 0.5'))!.refusals).toContain(
+		'`style="mask-type:alpha; opacity: 0.5"` on <mask> in an SVG file: its CSS is not read for a native drawing yet',
+	);
 });

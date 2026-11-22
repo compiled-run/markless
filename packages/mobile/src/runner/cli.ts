@@ -32,6 +32,8 @@ import {
 import { checkoutFacts, commitsBehind, describeCheckout } from './refresh.ts';
 import { spawnRunner } from './spawn-runner.ts';
 
+/** Rungs the ladder lists that no phone build exists for yet: Dragon refuses the drawer's styles (`:dir(rtl)`, `overlay`). */
+const REFUSED = new Set(['y4-sheet-beside-drawer', 'u102-drawer-swipe']);
 const USAGE = `usage: phones <command>
 
   start [--ios <simulator>]... [--android <avd>@<port>]...
@@ -48,10 +50,7 @@ const USAGE = `usage: phones <command>
   affected [--base <rev> | --files <repo path>...]
                          the rungs a change since <rev> (default origin/cw/native-integration) can affect, and why
 
-Runner files: ${runnerHome()} (MARKLESS_PHONES_HOME). Ladder rungs refused by name never run: ${'y4-sheet-beside-drawer'}.`;
-
-/** Rungs the ladder lists that no phone build exists for yet (named in the conformance report). */
-const REFUSED = new Set(['y4-sheet-beside-drawer']);
+Runner files: ${runnerHome()} (MARKLESS_PHONES_HOME). Ladder rungs refused by name never run: ${[...REFUSED].join(', ')}.`;
 const ladder = () => allRungFolders().filter((name) => !REFUSED.has(name));
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

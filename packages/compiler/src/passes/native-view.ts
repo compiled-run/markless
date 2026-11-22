@@ -93,7 +93,7 @@ import type {
 } from '../artifacts.ts';
 import { isEventAttribute, normalizeEventName } from '../ast/events.ts';
 import { compileDrawing, compileLiveShape, SHAPES, type DrawingElement } from './native-drawing.ts';
-import { nativeScriptOf, type NativeScriptModuleInput } from './native-script.ts';
+import { nativeScriptOf, type NativeScriptEngine, type NativeScriptModuleInput } from './native-script.ts';
 import { scriptFactsOf, type ScriptFacts } from './semantic-graph/script-facts.ts';
 import { sharedDefinitionId } from './semantic-graph/collect-shared.ts';
 
@@ -1229,6 +1229,8 @@ export type NativeViewOptions = {
 	 * `never`: data only.
 	 */
 	readonly scriptHandlers?: 'fallback' | 'all' | 'never';
+	/** The engine text the payload's script carries; conformance vectors write markers in its place. */
+	readonly scriptEngine?: NativeScriptEngine;
 	/** Keep elements' keydown handlers, which a script's `KeyboardEvent` can raise though a phone has no hardware keyboard. */
 	readonly keyHandlers?: boolean;
 	/** A module's source as the build read it, by filename: where a native build finds a value's own JavaScript. */
@@ -2787,6 +2789,7 @@ export function createNativeViewPayload(
 		{ readonly id: string; readonly module: ModuleFacts; readonly fact: SemanticScriptFunction }
 	>();
 	const scriptServices = new Set<NativeScriptService>();
+	let scriptReadsUrl = false;
 	/** A script adds listeners to the document, so the hosts report every touch for them. */
 	let documentEvents = false;
 	scriptsMakeKeys = () =>
@@ -2897,16 +2900,17 @@ export function createNativeViewPayload(
 			const service = Object.hasOwn(NATIVE_SCRIPT_HOST_GLOBALS, name)
 				? NATIVE_SCRIPT_HOST_GLOBALS[name]
 				: undefined;
-			if (service === 'media' && rendering) {
+			if ((service === 'media' || service === 'screen') && rendering) {
 				ok = false;
 				refuseScript(
-					`${what} reads \`${name}\` while rendering; a phone answers a media query only in a handler`,
+					`${what} reads \`${name}\` while rendering; a phone answers ${service === 'media' ? 'a media query' : 'it'} only in a handler`,
 					global.span,
 				);
 				continue;
 			}
 			if (service) {
-				if (service !== 'engine') scriptServices.add(service);
+				if (service === 'url') scriptReadsUrl = true;
+				else if (service !== 'engine') scriptServices.add(service);
 				if (Object.hasOwn(NATIVE_SCRIPT_DOM_CLASSES, name)) scriptNamesDomClasses = true;
 				continue;
 			}
@@ -3217,6 +3221,19 @@ export function createNativeViewPayload(
 		return value;
 	}
 
+	/** Whether a `style` value is being lowered, where a helper returning one template keeps its text around number holes. */
+	let readingStyle = false;
+	/** Whether the call's own source is one `return` of a template literal, as the analyzer read the function. */
+	const returnsTemplate = (found: ModuleFunction | undefined): boolean => {
+		const [only, ...more] = found?.fn.native.statements ?? [];
+		return more.length === 0 && only?.kind === 'return' && only.value.kind === 'template';
+	};
+	/** A template whose holes are each a number the build can see, not a script value that may be text. */
+	const numberHoles = (value: NativeExpr): boolean =>
+		'template' in value &&
+		value.template.every(
+			(part) => typeof part === 'string' || (!('script' in part) && mayBeNumber(part)),
+		);
 	/** Whether a call to an app function the data path cannot evaluate runs in the script instead: in a submit or change handler. */
 	let handlerCallsScript = false;
 	/** The script functions that call an app function for a handler: each such value runs once where it is written. */
@@ -3562,6 +3579,8 @@ export function createNativeViewPayload(
 				: undefined,
 			svgGeometry,
 			options.origin,
+			options.scriptEngine,
+			scriptReadsUrl,
 		);
 	}
 
@@ -3770,8 +3789,6 @@ export function createNativeViewPayload(
 		element: string,
 		attributes: Readonly<Record<string, string>>,
 		bindings: ReadonlyArray<{ readonly attribute: string } | { readonly property: string }>,
-		span: SourceSpan | undefined,
-		row: string | undefined,
 	): Pick<Extract<NativeNode, { kind: 'element' }>, 'live' | 'liveFollows'> => {
 		const LIVE_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
 			role: new Set(['status', 'alert', 'log']),
@@ -3789,14 +3806,8 @@ export function createNativeViewPayload(
 			const values = writtenValuesOf(bound.value);
 			return !values || [...values].some((value) => live.has(value));
 		});
+		// In a @for row each copy is its own live region, its rule read in that row.
 		if (follows) {
-			if (row !== undefined) {
-				refuse(
-					`a <${element}> in a @for row whose \`role\`, \`aria-live\` or \`aria-atomic\` follows state; a native host makes such a live region only outside a row`,
-					span,
-				);
-				return {};
-			}
 			return {
 				liveFollows: liveRuleOf(element, (name) => {
 					const bound = boundTo(name);
@@ -4849,7 +4860,24 @@ export function createNativeViewPayload(
 						inlining.delete(key);
 					}
 				};
-				if (!handlerCallsScript) return evaluate();
+				if (!handlerCallsScript) {
+					if (!readingStyle || !returnsTemplate(found)) return evaluate();
+					const data = attempt(evaluate);
+					if (!data.failed) return data.value;
+					data.rollBack();
+					// A style helper's one returned template keeps its text; a call in a hole that data cannot spell runs as JavaScript.
+					handlerCallsScript = true;
+					const holed = attempt(() => {
+						try {
+							return evaluate();
+						} finally {
+							handlerCallsScript = false;
+						}
+					});
+					if (!holed.failed && holed.value && numberHoles(holed.value)) return holed.value;
+					holed.rollBack();
+					return evaluate();
+				}
 				// The outermost call runs whole in the script, so a value its body uses twice is computed once.
 				const asData = <T>(run: () => T): T => {
 					handlerCallsScript = false;
@@ -5208,6 +5236,7 @@ export function createNativeViewPayload(
 		readonly value: NativeExpr;
 		readonly integer?: true;
 		readonly when?: { readonly case: string; readonly value: boolean };
+		readonly row?: string;
 	}[] = [];
 	const bindingsOf = (
 		host: string,
@@ -5220,7 +5249,13 @@ export function createNativeViewPayload(
 			const target = read.target;
 			if (target.kind === 'text') return [];
 			if (target.kind === 'style') {
-				const value = exprOf(read.expression, 'the `style` attribute', scope);
+				readingStyle = true;
+				let value: NativeExpr | null;
+				try {
+					value = exprOf(read.expression, 'the `style` attribute', scope);
+				} finally {
+					readingStyle = false;
+				}
 				if (!value) return [];
 				const given = joinedStyle(stylePartsOf(value));
 				// A style that is one hole and no text is text the build cannot see (a helper's return), never a bare number.
@@ -5908,6 +5943,16 @@ export function createNativeViewPayload(
 					const texts: { path: ReadonlyArray<number>; text: string }[] = [];
 					for (const other of inside) {
 						if (drawnLive.some((path) => isPrefix(path, other.path))) continue;
+						// A <path> written in the <svg> whose `d` follows state is drawn while the app runs, as a component's is.
+						if (
+							other.kind === 'host' &&
+							other.path.length === item.path.length + 1 &&
+							scope.module.tagOf.get(other.id) === 'path' &&
+							boundAt(other.path).includes('d')
+						) {
+							drawnLive.push(other.path);
+							continue;
+						}
 						if (other.kind === 'host' && drawnLive.length > 0)
 							refuseAs(
 								'svg',
@@ -6030,20 +6075,18 @@ export function createNativeViewPayload(
 					element ?? '*',
 					attributes,
 					bindings,
-					item.span,
-					place.row,
 				);
 				const parts = styleParts.get(id);
-				if (parts && place.row !== undefined)
+				if (parts && place.row !== undefined && caseOf.has(id))
 					refuse(
-						'a `style` that follows state inside a @for row, which Dragon lays out once for every row',
+						'a `style` inside a @for row that is a template or empty text by a condition; Dragon lays each row out from one template',
 					);
 				const styleCase = place.row === undefined ? caseOf.get(id) : undefined;
 				const styleWhen = styleCase && { case: `case:${id}`, value: styleCase.value };
 				if (styleCase && styleWhen)
 					styleCases.push({ id: styleWhen.case, value: styleCase.test });
 				const style =
-					parts && place.row === undefined
+					parts && !(place.row !== undefined && caseOf.has(id))
 						? parts.map((part) => {
 								if (typeof part === 'string') return part;
 								const slot = `slot:${id}#${slots.length}`;
@@ -6052,6 +6095,7 @@ export function createNativeViewPayload(
 									value: part.hole,
 									...(part.integer ? { integer: true as const } : {}),
 									...(styleWhen ? { when: styleWhen } : {}),
+									...(place.row !== undefined ? { row: place.row } : {}),
 								});
 								return { slot };
 							})
@@ -7339,8 +7383,14 @@ export function createNativeViewPayload(
 		return { method: fn, bindings };
 	}
 
+	/** Script ops whose handler may call `event.preventDefault()`: it reads it, or hands the whole event on. */
+	const mayPreventDefault = new WeakSet<NativeOp>();
 	function scriptOp(event: SemanticEvent, scope: Scope, form?: string): NativeOp | null {
-		return keepingFunctions(() => scriptOpOf(event, scope, form));
+		const op = keepingFunctions(() => scriptOpOf(event, scope, form));
+		const fact = event.handlerSpan && scriptFacts(scope.module)?.handler(event.handlerSpan);
+		if (op && fact && (fact.event ?? []).some((read) => read.path.length === 0 || read.path[0] === 'preventDefault'))
+			mayPreventDefault.add(op);
+		return op;
 	}
 
 	function scriptOpOf(event: SemanticEvent, scope: Scope, form?: string): NativeOp | null {
@@ -8427,6 +8477,16 @@ export function createNativeViewPayload(
 			return resetOps(scope.resets.get(statement.name)!, scope, what, span);
 		if (statement.kind === 'invoke') {
 			const callee = [statement.name, ...(statement.path ?? [])].join('.');
+			// A click's stopPropagation(): the press reaches no handler of the elements around this one, as in a browser.
+			if (
+				scope.clicking &&
+				statement.name === scope.opaque &&
+				!scope.args.has(statement.name) &&
+				statement.path?.length === 1 &&
+				statement.path[0] === 'stopPropagation' &&
+				(statement.arguments ?? []).length === 0
+			)
+				return [{ op: 'stopPropagation' }];
 			if (
 				scope.submitting &&
 				statement.name === scope.opaque &&
@@ -9054,13 +9114,8 @@ export function createNativeViewPayload(
 				!isWithin(node.id, host)
 			)
 				continue;
-			if (events.some((other) => other.host === node.id && other.event === 'activate')) {
-				refuse(
-					`a press on ${node.id} is handled by its own click handler and by the one on ${host}, which reads where it landed`,
-					event.handlerSpan,
-				);
-				continue;
-			}
+			// An element with a click handler of its own runs it first; the press then reaches this copy, as it bubbles.
+			const ownPress = events.some((other) => other.host === node.id && other.event === 'activate');
 			const pressed = { target: node.id, currentTarget: host };
 			const marks = { diagnostics: diagnostics.length, cells: cells.length };
 			const rollBack = () => {
@@ -9069,7 +9124,7 @@ export function createNativeViewPayload(
 			};
 			// Lowered as the run it would reach, kept values and all: the same ops mean it needs no handler of its own.
 			pressedRow = node.row;
-			const around = reached(node.id);
+			const around = ownPress ? undefined : reached(node.id);
 			if (around) {
 				const same =
 					JSON.stringify(handlerOps(event, scope, around.id, pressed)) === around.spelled;
@@ -9093,9 +9148,10 @@ export function createNativeViewPayload(
 					.slice(marks.diagnostics)
 					.filter((diagnostic) => !seen.has(diagnostic.message)),
 			);
+			handlers.push({ id, ops });
+			if (ownPress) continue;
 			runs.set(node.id, { id, spelled: JSON.stringify(ops) });
 			events.push({ host: node.id, event: 'activate', handler: id });
-			handlers.push({ id, ops });
 		}
 		// The host's own run does nothing once the elements in it have theirs: it is not a control then.
 		if (handler.ops.length === 0 && runs.size > 1) {
@@ -9112,6 +9168,7 @@ export function createNativeViewPayload(
 	wireFieldsets();
 	wireLinks();
 	checkSelects();
+	wireDetails();
 	let lengthLimited = false;
 	let numbered = false;
 	let emailChecked = false;
@@ -9304,6 +9361,96 @@ export function createNativeViewPayload(
 	 * A checkbox or radio button is pressed as on the web: the press ticks it, then its click handlers run, then (when the
 	 * tick changed it) its input and change handlers. A radio button already checked only runs its click handlers.
 	 */
+	/**
+	 * A `<details>` shows its first `<summary>` child, and its other children only while open: a cell holds whether it is
+	 * open (its `open` attribute first), a press on the summary flips it after the summary's own click handler, and the
+	 * summary reads it as expanded or collapsed. What a native build cannot keep per element yet is refused by name.
+	 */
+	function wireDetails() {
+		for (const [index, node] of nodes.entries()) {
+			if (node.kind !== 'element' || node.element !== 'details') continue;
+			const span = nodeSpans.get(node.id);
+			const where = `the <details> ${node.id}`;
+			if (node.row) {
+				refuse(`${where} sits inside a @for row, which keeps no open state per row yet`, span);
+				continue;
+			}
+			const bound = (name: string, of: typeof node) =>
+				of.attributes?.[name] !== undefined ||
+				(of.bindings ?? []).some((binding) => 'attribute' in binding && binding.attribute === name);
+			if (node.bindings?.some((binding) => 'attribute' in binding && binding.attribute === 'open')) {
+				refuse(`${where} binds \`open\`; a native build opens it from a press on its <summary>`, span);
+				continue;
+			}
+			if (bound('name', node)) {
+				refuse(`${where} has \`name\`, an exclusive group a native build does not keep yet`, span);
+				continue;
+			}
+			const children = nodes.filter((child) => child.parent === node.id);
+			const summaryAt = children.findIndex(
+				(child) => child.kind === 'element' && child.element === 'summary',
+			);
+			if (summaryAt < 0) {
+				refuse(`${where} has no <summary>, so the browser writes its label, which a native build does not yet`, span);
+				continue;
+			}
+			const summary = children[summaryAt] as Extract<NativeNode, { kind: 'element' }>;
+			const cell = `details:${node.id}`;
+			const open: NativeExpr = { cell };
+			let ok = true;
+			for (const child of children) {
+				if (child === summary) continue;
+				if (child.kind === 'element') {
+					if (bound('hidden', child)) {
+						refuse(`the <${child.element}> ${child.id} in ${where} has \`hidden\` of its own, which a native build does not combine with the details' yet`, nodeSpans.get(child.id));
+						ok = false;
+					}
+					continue;
+				}
+				if (child.kind === 'text' && child.parts.every((part) => 'text' in part && part.text.trim() === '')) continue;
+				refuse(`${child.kind === 'text' ? 'text' : `a ${child.kind}`} directly inside ${where}, outside an element a native build can hide while it is closed`, span);
+				ok = false;
+			}
+			const handler = events.find((entry) => entry.host === summary.id && entry.event === 'activate');
+			const ops = handler ? handlers.find((entry) => entry.id === handler.handler)?.ops : undefined;
+			if (ops?.some((op) => mayPreventDefault.has(op))) {
+				refuse(`the click handler on the <summary> ${summary.id} may call \`event.preventDefault()\` in JavaScript, which a phone cannot report before the toggle yet`, nodeSpans.get(summary.id));
+				ok = false;
+			}
+			if (!ok) continue;
+			cells.push({ id: cell, name: 'open', initial: node.attributes?.['open'] !== undefined });
+			const toggle: NativeOp = { op: 'assign', cell, value: { unary: '!', value: open } };
+			if (ops) ops.push(toggle);
+			else {
+				const id = `toggle:${node.id}`;
+				handlers.push({ id, ops: [toggle] });
+				events.push({ host: summary.id, event: 'activate', handler: id });
+			}
+			const { attributes: written, ...rest } = node;
+			const { open: _open, ...attributes } = written ?? {};
+			nodes[index] = {
+				...rest,
+				...(Object.keys(attributes).length > 0 ? { attributes } : {}),
+				bindings: [...(node.bindings ?? []), { attribute: 'open', value: open }],
+			};
+			for (const [at, child] of nodes.entries()) {
+				if (child.kind !== 'element' || child.parent !== node.id) continue;
+				nodes[at] = {
+					...child,
+					bindings: [
+						...(child.bindings ?? []),
+						child.id === summary.id
+							? {
+									attribute: 'aria-expanded',
+									value: { if: open, whenTrue: { literal: 'true' }, whenFalse: { literal: 'false' } },
+								}
+							: { attribute: 'hidden', value: { unary: '!', value: open } },
+					],
+				};
+			}
+		}
+	}
+
 	/**
 	 * A `<select>` is a pop-up list of its `<option>`s, one chosen. What a native build does not draw or run yet is refused
 	 * by name: a list box (`multiple`, `size`), a select whose choice a binding sets, handlers on either element other

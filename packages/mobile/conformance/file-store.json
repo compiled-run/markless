@@ -1,0 +1,146 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "Files",
+		"cells": [
+			{
+				"id": "state:shown",
+				"name": "shown",
+				"initial": "none"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "div",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Box"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Add"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"cell": "state:shown"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"box": {
+								"elements": {
+									"literal": "h1"
+								}
+							},
+							"shown": {
+								"cell": "state:shown"
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "5fe2e36e7308bc92",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [load(1)];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => {\n if (__s.box) __s.shown = __i[0][\"addNote\"](__s.box);\n});\n};\n};\nmodules[1] = function (exports) {\n\"use strict\";\nvar __i = [];\n__export(exports, {\n\"addNote\": function () { return addNote; }\n});\nconst stores = new WeakMap();\nfunction addNote(field) {\n let held = stores.get(field);\n if (!held) {\n  held = new DataTransfer();\n  stores.set(field, held);\n }\n held.items.add(new File(['hello'], `note-${held.items.length + 1}.txt`, { type: 'Text/Plain' }));\n return [...held.files].map((file) => `${file.name} ${file.size} ${file.type}`).join(', ');\n}\n};\n/*markless-engine:entries*/\n})(globalThis, \"5fe2e36e7308bc92\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Box"
+		],
+		[
+			"h2:text0",
+			"Add"
+		],
+		[
+			"h3:text0",
+			"none"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "note-1.txt 5 text/plain"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "note-1.txt 5 text/plain, note-2.txt 5 text/plain"
+				}
+			]
+		}
+	]
+}

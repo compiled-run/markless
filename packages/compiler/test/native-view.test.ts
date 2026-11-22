@@ -1243,7 +1243,7 @@ export function Page() @{
 		);
 	});
 
-	it('makes a live region whose aria-live or role follows state, outside a row, with its politeness as an expression', async () => {
+	it('makes a live region whose aria-live or role follows state, with its politeness as an expression, in a @for row as outside one', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Page() @{
 	let paused = state(false);
@@ -1269,9 +1269,12 @@ export function Page() @{
 		}
 	</ul>
 }`);
-		expect(rows.diagnostics.map((d) => d.message).join('\n')).toContain(
-			'in a @for row whose `role`, `aria-live` or `aria-atomic` follows state',
-		);
+		expect(rows.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		const row = rows.payload!.nodes.find((node) => node.kind === 'element' && node.element === 'li');
+		expect(row).toMatchObject({
+			row: expect.any(String),
+			liveFollows: { politeness: expect.any(Object), atomic: expect.any(Object) },
+		});
 	});
 
 	it("folds a shared state's first value that reads module constants", async () => {
@@ -4173,6 +4176,27 @@ export function Code() @{
 		);
 	});
 
+	it('draws a <path> written in the svg whose d follows state while the app runs, over the shapes before it; refuses a shape after it', async () => {
+		const source = (after: string) => `import { state } from '@markless/core';
+export function Mark() @{
+	let turned = state(false);
+	<main>
+		<svg viewBox="0 0 16 16"><rect width="16" height="16" fill="#eee" /><path d={turned ? 'M0 0H16V16Z' : 'M0 0H16L0 16Z'} fill="#264653" />${after}</svg>
+		<button onClick={() => (turned = !turned)}>Turn</button>
+	</main>
+}`;
+		const { payload, diagnostics } = await nativeView(source(''));
+		expect(diagnostics).toEqual([]);
+		const svg = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'svg');
+		const path = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'path');
+		expect(svg?.kind === 'element' ? svg.drawing?.shapes : undefined).toHaveLength(1);
+		expect(path).toMatchObject({ parent: svg!.id, shape: { path: [], fill: { r: 38, g: 70, b: 83, alpha: 255 } } });
+		expect(path?.kind === 'element' ? path.bindings.map((binding) => 'attribute' in binding && binding.attribute) : []).toEqual(['d']);
+		expect((await nativeView(source('<circle r="2" />'))).diagnostics.map((d) => d.message)).toContain(
+			'a shape after a component or `{children}` inside an <svg>, which a native drawing would paint under them',
+		);
+	});
+
 	it("compiles an svg's shapes into a drawing, with its <title> as its name", async () => {
 		const { payload, diagnostics } = await nativeView(`export function Icon() @{
 	<svg viewBox="0 0 20 10" width="40" height="20" fill="currentColor">
@@ -4332,6 +4356,103 @@ export function Chart() @{
 		expect(shapes[1]!.clip).toHaveLength(1);
 	});
 
+	it('masks a group by a <mask> of opaque fills as a clip by them inside its region; refuses partial coverage and the default units', async () => {
+		const shapesOf = async (mask: string) => {
+			const { payload, diagnostics } = await nativeView(`export function Mark() @{
+	<svg viewBox="0 0 10 10"><defs>${mask}</defs><g mask="url(#m)" transform="translate(2 0)"><rect width="10" height="10" /></g></svg>
+}`);
+			const svg = payload?.nodes.find((node) => node.kind === 'element' && node.drawing);
+			return {
+				shapes: svg?.kind === 'element' ? svg.drawing?.shapes : undefined,
+				messages: diagnostics.map((d) => d.message),
+			};
+		};
+		const alpha = await shapesOf(
+			'<mask id="m" mask-type="alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="8" height="10"><rect width="5" height="10" fill="black" /></mask>',
+		);
+		expect(alpha.messages).toEqual([]);
+		expect(alpha.shapes?.[0]?.clip).toEqual([
+			[0, 2, 0, 1, 10, 0, 1, 10, 10, 1, 2, 10, 4],
+			[0, 2, 0, 1, 7, 0, 1, 7, 10, 1, 2, 10, 4],
+		]);
+		const luminance = await shapesOf(
+			'<mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="8" height="10"><rect width="5" height="10" fill="white" /></mask>',
+		);
+		expect(luminance.shapes?.[0]?.clip).toEqual(alpha.shapes?.[0]?.clip);
+		expect(
+			(await shapesOf('<mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="8" height="10"><rect width="5" height="10" fill="grey" /></mask>')).messages,
+		).toContain('a <rect> inside a luminance <mask> that is not one opaque white fill with no stroke: a mask of partial coverage is not drawn natively yet');
+		expect((await shapesOf('<mask id="m"><rect width="5" height="10" fill="white" /></mask>')).messages).toContain(
+			'`maskUnits="objectBoundingBox"` on <mask>: a mask\'s region is drawn in user space only',
+		);
+		expect(
+			(await shapesOf('<mask id="m" maskUnits="userSpaceOnUse"><rect width="5" height="10" fill="white" /></mask>')).messages,
+		).toContain('<mask> without `x`, `y`, `width` and `height`: its default region depends on the box of what it masks');
+	});
+
+	it('cuts the black shapes over a white region out of a luminance <mask> as even-odd clips; refuses a crossing nonzero cut', async () => {
+		const shapesOf = async (cut: string) => {
+			const { payload, diagnostics } = await nativeView(`export function Card() @{
+	<svg viewBox="0 0 10 10"><defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="10" height="10" fill="black"><rect fill="white" width="10" height="10" />${cut}</mask></defs><rect width="10" height="10" mask="url(#m)" /></svg>
+}`);
+			const svg = payload?.nodes.find((node) => node.kind === 'element' && node.drawing);
+			return {
+				shape: svg?.kind === 'element' ? svg.drawing?.shapes[0] : undefined,
+				messages: diagnostics.map((d) => d.message),
+			};
+		};
+		const region = [0, 0, 0, 1, 10, 0, 1, 10, 10, 1, 0, 10, 4];
+		const simple = await shapesOf('<path d="M2 2L8 2L8 8Z" />');
+		expect(simple.messages).toEqual([]);
+		expect(simple.shape?.clip).toEqual([region, region, [...region, 0, 2, 2, 1, 8, 2, 1, 8, 8, 4]]);
+		expect(simple.shape?.clipRule).toEqual(['nonzero', 'nonzero', 'evenodd']);
+		expect((await shapesOf('<path fill-rule="evenodd" d="M2 2L8 8L8 2L2 8Z" />')).messages).toEqual([]);
+		expect((await shapesOf('<path d="M2 2L8 8L8 2L2 8Z" />')).messages).toContain(
+			'a black <path> filled nonzero that crosses itself or has several parts, inside a luminance <mask>: only an even-odd fill or one simple outline cuts a mask natively yet',
+		);
+		expect((await shapesOf('<path d="M1 1H3V3ZM5 5H7V7Z" />')).messages).toHaveLength(1);
+		expect((await shapesOf('<rect x="2" y="2" width="2" height="2" /><rect fill="white" width="5" height="5" />')).messages).toContain(
+			'a white <rect> after a black shape inside a luminance <mask>, which would show through the cut again',
+		);
+	});
+
+	it('blurs the one shape under a <filter> of one feGaussianBlur inside its region, after a flood and blend; refuses other filters', async () => {
+		const shapesOf = async (filter: string, inside = '<rect width="4" height="4" />') => {
+			const { payload, diagnostics } = await nativeView(`export function Glow() @{
+	<svg viewBox="0 0 10 10"><defs>${filter}</defs><g filter="url(#f)" transform="translate(2 0) scale(2)">${inside}</g></svg>
+}`);
+			const svg = payload?.nodes.find((node) => node.kind === 'element' && node.drawing);
+			return {
+				shapes: svg?.kind === 'element' ? svg.drawing?.shapes : undefined,
+				messages: diagnostics.map((d) => d.message),
+			};
+		};
+		const region = 'filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB" x="0" y="0" width="4" height="5"';
+		const flooded = await shapesOf(
+			`<filter id="f" ${region}><feFlood flood-opacity="0" result="bg" /><feBlend mode="normal" in="SourceGraphic" in2="bg" result="shape" /><feGaussianBlur stdDeviation="1.5" /></filter>`,
+		);
+		expect(flooded.messages).toEqual([]);
+		expect(flooded.shapes?.[0]?.blur).toEqual({ deviation: 3, region: [0, 2, 0, 1, 10, 0, 1, 10, 10, 1, 2, 10, 4] });
+		expect((await shapesOf(`<filter id="f" ${region}><feGaussianBlur stdDeviation="1.5" /></filter>`)).shapes?.[0]?.blur).toEqual(
+			flooded.shapes?.[0]?.blur,
+		);
+		const refused = 'a native drawing draws a filter that only blurs its source graphic';
+		expect((await shapesOf(`<filter id="f" ${region}><feOffset dx="1" /></filter>`)).messages).toContain(
+			`a <filter> that does not end in one <feGaussianBlur>: ${refused}`,
+		);
+		expect((await shapesOf(`<filter id="f" ${region}><feGaussianBlur stdDeviation="1 2" /></filter>`)).messages).toContain(
+			`an <feGaussianBlur> whose deviation is not one non-negative number: ${refused}`,
+		);
+		expect(
+			(await shapesOf('<filter id="f" filterUnits="userSpaceOnUse" x="0" y="0" width="4" height="5"><feGaussianBlur stdDeviation="1" /></filter>'))
+				.messages,
+		).toContain(`a <filter> that blurs in linearRGB (no \`color-interpolation-filters="sRGB"\`): ${refused}`);
+		expect(
+			(await shapesOf(`<filter id="f" ${region}><feGaussianBlur stdDeviation="1" /></filter>`, '<rect width="1" height="1" /><rect width="2" height="2" />'))
+				.messages,
+		).toContain('a `filter` over more than one shape: a native drawing blurs one shape at a time');
+	});
+
 	it('clips a group by the <clipPath> its clip-path names, mapped into the drawing; refuses one in bounding-box units', async () => {
 		const shapesOf = async (clipPath: string) => {
 			const { payload, diagnostics } = await nativeView(`export function Moon() @{
@@ -4457,6 +4578,73 @@ export function Page() @{
 	<p aria-label={name.toUpperCase()}>{name.toUpperCase()}</p>
 }`);
 		expect(plain.payload!.script).toBeUndefined();
+	});
+
+	it('opens a <details> from a press on its <summary>, after the summary\'s own handler; refuses what it cannot keep', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let peeks = state(0);
+	<details open>
+		<summary onClick={() => peeks++}>More {peeks}</summary>
+		<p>Body</p>
+	</details>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.cells).toContainEqual({ id: 'details:h0', name: 'open', initial: true });
+		const toggle = { op: 'assign', cell: 'details:h0', value: { unary: '!', value: { cell: 'details:h0' } } };
+		expect(payload!.handlers[0]!.ops.at(-1)).toEqual(toggle);
+		const node = (id: string) => payload!.nodes.find((one) => one.id === id) as { attributes?: object; bindings?: unknown[] };
+		expect(node('h0').attributes).toBeUndefined();
+		expect(node('h2').bindings).toEqual([{ attribute: 'hidden', value: { unary: '!', value: { cell: 'details:h0' } } }]);
+		const refused = async (source: string) =>
+			(await nativeView(`import { state } from '@markless/core';\n${source}`)).diagnostics.map((diagnostic) => diagnostic.message);
+		expect(await refused(`export function Page() @{ <details><p>No legend</p></details> }`)).toEqual([
+			'the <details> h0 has no <summary>, so the browser writes its label, which a native build does not yet',
+		]);
+		expect(
+			await refused(`export function Page() @{
+	let shown = state(false);
+	<details open={shown}><summary>S</summary><p>B</p></details>
+}`),
+		).toEqual(['the <details> h0 binds `open`; a native build opens it from a press on its <summary>']);
+		expect(await refused(`export function Page() @{ <details name="faq"><summary>S</summary><p>B</p></details> }`)).toEqual([
+			'the <details> h0 has `name`, an exclusive group a native build does not keep yet',
+		]);
+		expect(
+			await refused(`export function Page() @{
+	let n = state(0);
+	<details><summary onClick={(event) => { n++; if (n > 1) event.preventDefault(); }}>S</summary><p>B</p></details>
+}`),
+		).toEqual([
+			'the click handler on the <summary> h1 may call `event.preventDefault()` in JavaScript, which a phone cannot report before the toggle yet',
+		]);
+	});
+
+	it('runs URL and URLSearchParams in the script, adding their code only to a script that reads them', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function nextPage(query: string): string {
+	const params = new URLSearchParams(query);
+	params.set('page', String(Number(params.get('page')) + 1));
+	return new URL('?' + params, 'https://shop.example/list').href;
+}
+export function Page() @{
+	let query = state('page=1');
+	let link = state('');
+	<button onClick={() => (link = nextPage(query))}>{link}</button>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.script!.services).toEqual([]);
+		expect(payload!.script!.source).toContain('g.URLSearchParams = URLSearchParams');
+		const timers = await nativeView(`import { state } from '@markless/core';
+function later(fn: () => void): void {
+	for (const ms of [1]) setTimeout(fn, ms);
+}
+export function Page() @{
+	let count = state(0);
+	<button onClick={() => later(() => (count += 1))}>{count}</button>
+}`);
+		expect(timers.diagnostics).toEqual([]);
+		expect(timers.payload!.script!.source).not.toContain('g.URLSearchParams');
 	});
 
 	it('passes a component a prop that calls app code through the script', async () => {

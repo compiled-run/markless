@@ -207,6 +207,8 @@ public struct NativeDefaultStyle: Equatable, Sendable {
 	public var rule = false
 	/// `disc` or `decimal`, on a list.
 	public var marker: String?
+	/// On a summary: a ▸ (collapsed) or ▾ (expanded) before its content, by its `aria-expanded`.
+	public var disclosure = false
 	/// `table`, `row` or `cell`.
 	public var table: String?
 	public init() {}
@@ -233,6 +235,14 @@ public struct NativeShape: Equatable, Sendable {
 	public var text: NativeDrawingText?
 	/// Clip outlines in the drawing's units (nonzero); the shape shows only where all of them cover.
 	public var clip: [[Double]] = []
+	/// Whether each `clip` outline is filled even-odd (a luminance mask's black shapes cut out) rather than nonzero.
+	public var clipEvenOdd: [Bool] = []
+	/// An SVG `feGaussianBlur` of the shape alone: its standard deviation and the filter region (verb-coded), in the drawing's units.
+	public var blur: Blur?
+	public struct Blur: Equatable, Sendable {
+		public let deviation: Double
+		public let region: [Double]
+	}
 }
 
 /// An SVG `<text>`: runs laid out from the pen, each chunk placed by `anchor`, glyphs on `baseline` relative to the pen.
@@ -381,6 +391,8 @@ public enum NativeOp: Equatable, Sendable {
 	case script(fn: String, type: String, bindings: [NativeScriptBinding], catch: String?)
 	/// `event.preventDefault()` in a text field's `keydown` or `paste` handler.
 	case preventDefault
+	/// `event.stopPropagation()` in a click handler: the press runs no handler of the elements around this one.
+	case stopPropagation
 	/// `field.value = text` on a text field: its text becomes the value, with no input event; `node` evaluates to its id.
 	case fieldText(node: NativeExpr, value: NativeExpr)
 	/// `reset` of `@catch (error, reset)`: clears `catch` and runs again each of `cells` (read where the handler runs) that holds an error.
@@ -743,6 +755,8 @@ public struct NativeSlot: Equatable, Sendable {
 	public let integer: Bool
 	/// Evaluated only while this style case has this value; otherwise the slot keeps its last value (0 before the first).
 	public var when: NativeStyleWhen? = nil
+	/// Inside a @for row: one value per row, `<slot>@<row key>`, evaluated with that row's item.
+	public var row: String? = nil
 }
 
 public struct NativeStyleWhen: Equatable, Sendable {
@@ -790,6 +804,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 	public var slots: [NativeSlot] = []
 	/// The conditions element styles follow, in payload order.
 	public var styleCases: [NativeStyleCase] = []
+	/// The element whose style holds each slot: a slot inside a row has one value per row copy.
+	public var slotOwners: [String: String] = [:]
 	/// What the web says when an email field holds no email address, by locale, in payload order.
 	public var typeMismatch: [(locale: String, message: NativeEmailMismatch)] = []
 
@@ -831,10 +847,13 @@ public struct NativeViewPayload: Equatable, Sendable {
 			guard caseIds.contains(styleCase) else { throw PayloadError(path: reader.path, reason: "names unknown style case \(styleCase)") }
 			return NativeStyleWhen(styleCase: styleCase, value: try w["value"].bool())
 		}
+		var slotOwners: [String: String] = [:]
 		let slots: [NativeSlot] = fields.has("slots") ? try fields["slots"].array().map { slot in
-			let f = try slot.object(required: ["id", "value"], optional: ["integer", "when"])
+			let f = try slot.object(required: ["id", "value"], optional: ["integer", "when", "row"])
 			if f.has("integer"), try !f["integer"].bool() { throw PayloadError(path: try f["integer"].path, reason: "integer is only ever true") }
-			return NativeSlot(id: try f["id"].string(), value: try decodeExpr(try f["value"]), integer: f.has("integer"), when: f.has("when") ? try styleWhen(try f["when"]) : nil)
+			return NativeSlot(
+				id: try f["id"].string(), value: try decodeExpr(try f["value"]), integer: f.has("integer"), when: f.has("when") ? try styleWhen(try f["when"]) : nil,
+				row: f.has("row") ? try f["row"].string() : nil)
 		} : []
 		var slotIds = Set<String>()
 		for slot in slots where !slotIds.insert(slot.id).inserted {
@@ -896,6 +915,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 					for part in try field["style"].array() where !part.isString {
 						let slot = try part.object(["slot"])["slot"].string()
 						guard slotIds.contains(slot) else { throw PayloadError(path: part.path, reason: "names unknown slot \(slot)") }
+						slotOwners[slot] = try field["id"].string()
 					}
 				}
 				if field.has("styleWhen") { _ = try styleWhen(try field["styleWhen"]) }
@@ -1030,6 +1050,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 				case "preventDefault":
 					_ = try op.object(["op"])
 					return .preventDefault
+				case "stopPropagation":
+					_ = try op.object(["op"])
+					return .stopPropagation
 				case "command":
 					let keys = Set(try op.keys())
 					let opField = try op.object(required: ["op", "node", "command"], optional: ["preventScroll"])
@@ -1137,7 +1160,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		var payload = NativeViewPayload(
 			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers,
 			title: fields.has("title") ? try decodeParts(try fields["title"]) : nil,
-			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong, slots: slots, styleCases: styleCases, typeMismatch: typeMismatch,
+			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong, slots: slots, styleCases: styleCases, slotOwners: slotOwners, typeMismatch: typeMismatch,
 			script: fields.has("script") ? try decodeScript(try fields["script"]) : nil)
 		if fields.has("numberMessages") {
 			let reader = try fields["numberMessages"]
@@ -1166,7 +1189,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 	private static func decodeDefaultStyle(_ reader: Reader) throws -> NativeDefaultStyle {
 		let field = try reader.object(required: [], optional: [
 			"flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "rule",
-			"marker", "table",
+			"marker", "disclosure", "table",
 		])
 		func oneOf(_ key: String, _ allowed: [String]) throws -> String? {
 			guard field.has(key) else { return nil }
@@ -1189,6 +1212,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		style.indent = field.has("indent") ? try field["indent"].number() : nil
 		style.rule = try flag("rule")
 		style.marker = try oneOf("marker", ["disc", "decimal"])
+		style.disclosure = try flag("disclosure")
 		style.table = try oneOf("table", ["table", "row", "cell"])
 		return style
 	}
@@ -1215,7 +1239,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let color = try reader.object(["r", "g", "b", "alpha"])
 			return .color(RGBA(r: try color["r"].number(), g: try color["g"].number(), b: try color["b"].number(), alpha: try color["alpha"].number()))
 		}
-		let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "text", "clip"])
+		let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "text", "clip", "clipRule", "blur"])
 		let transform = s.has("transform") ? try s["transform"].array().map { try $0.number() } : nil
 		if let transform, transform.count != 6 { throw shape.fail("a transform has six numbers") }
 		let rule = try s["fillRule"].string()
@@ -1225,6 +1249,18 @@ public struct NativeViewPayload: Equatable, Sendable {
 			stroke: try paint(try s["stroke"]), width: try s["width"].number(), cap: try s["cap"].string(), join: try s["join"].string(),
 			miterLimit: try s["miterLimit"].number(), transform: transform)
 		if s.has("clip") { decoded.clip = try s["clip"].array().map { try $0.array().map { try $0.number() } } }
+		if s.has("clipRule") {
+			decoded.clipEvenOdd = try s["clipRule"].array().map { rule in
+				let name = try rule.string()
+				guard name == "nonzero" || name == "evenodd" else { throw shape.fail("unknown clipRule \(name)") }
+				return name == "evenodd"
+			}
+			guard decoded.clipEvenOdd.count == decoded.clip.count else { throw shape.fail("a clipRule for each clip") }
+		}
+		if s.has("blur") {
+			let b = try s["blur"].object(["deviation", "region"])
+			decoded.blur = NativeShape.Blur(deviation: try b["deviation"].number(), region: try b["region"].array().map { try $0.number() })
+		}
 		if s.has("text") {
 			let t = try s["text"].object(["anchor", "baseline", "runs"])
 			let anchor = try t["anchor"].string()
@@ -1732,5 +1768,18 @@ func decodeKeyParts(_ reader: Reader) throws -> [NativeKeyPart] {
 	try reader.array().map { part in
 		if case .string = part.value { return .text(try part.string()) }
 		return .path(try part.array().map { try $0.string() })
+	}
+}
+
+extension NativeViewPayload {
+	/// Each node inside a `<select>`: its options and their text, which show only in the select's picker.
+	public var pickerContent: Set<String> {
+		var selects = Set<String>()
+		var inside = Set<String>()
+		for node in nodes {
+			if case .element("select", _, _) = node.kind { selects.insert(node.id) }
+			if let parent = node.parent, selects.contains(parent) || inside.contains(parent) { inside.insert(node.id) }
+		}
+		return inside
 	}
 }

@@ -1,0 +1,314 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "RowSlots",
+		"cells": [
+			{
+				"id": "state:rows",
+				"name": "rows",
+				"initial": [
+					{
+						"id": "a",
+						"share": 25
+					},
+					{
+						"id": "b",
+						"share": 50
+					}
+				]
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "ul",
+				"parent": "h0",
+				"defaultStyle": {
+					"indent": 40,
+					"marker": "disc"
+				}
+			},
+			{
+				"kind": "repeat",
+				"id": "repeat:0",
+				"parent": "h1",
+				"list": {
+					"cell": "state:rows"
+				},
+				"key": ["id"]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "li",
+				"parent": "h1",
+				"style": [
+					"width: ",
+					{
+						"slot": "slot:h2#0"
+					},
+					"%"
+				],
+				"row": "repeat:0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"expr": {
+							"member": {
+								"item": "repeat:0"
+							},
+							"property": "id"
+						}
+					}
+				],
+				"row": "repeat:0"
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Widen"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Add"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Drop"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h5",
+				"event": "activate",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:rows",
+						"value": {
+							"array": [
+								{
+									"spread": false,
+									"value": {
+										"member": {
+											"cell": "state:rows"
+										},
+										"property": "0"
+									}
+								},
+								{
+									"spread": false,
+									"value": {
+										"object": [
+											[
+												"id",
+												{
+													"literal": "b"
+												}
+											],
+											[
+												"share",
+												{
+													"literal": 75
+												}
+											]
+										]
+									}
+								}
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:rows",
+						"value": {
+							"array": [
+								{
+									"spread": true,
+									"value": {
+										"cell": "state:rows"
+									}
+								},
+								{
+									"spread": false,
+									"value": {
+										"object": [
+											[
+												"id",
+												{
+													"literal": "c"
+												}
+											],
+											[
+												"share",
+												{
+													"literal": 10
+												}
+											]
+										]
+									}
+								}
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:rows",
+						"value": {
+							"array": [
+								{
+									"spread": false,
+									"value": {
+										"member": {
+											"cell": "state:rows"
+										},
+										"property": "1"
+									}
+								}
+							]
+						}
+					}
+				]
+			}
+		],
+		"slots": [
+			{
+				"id": "slot:h2#0",
+				"value": {
+					"member": {
+						"item": "repeat:0"
+					},
+					"property": "share"
+				},
+				"row": "repeat:0"
+			}
+		]
+	},
+	"initial": [
+		["h2:text0@a", "a"],
+		["h2:text0@b", "b"],
+		["h3:text0", "Widen"],
+		["h4:text0", "Add"],
+		["h5:text0", "Drop"]
+	],
+	"initialRows": [["repeat:0", ["a", "b"]]],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "slot",
+					"slot": "slot:h2#0@b",
+					"value": 75
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "slot",
+					"slot": "slot:h2#0@c",
+					"value": 10
+				},
+				{
+					"op": "rows",
+					"node": "repeat:0",
+					"keys": ["a", "b", "c"]
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "rows",
+					"node": "repeat:0",
+					"keys": ["b"]
+				}
+			]
+		}
+	]
+}

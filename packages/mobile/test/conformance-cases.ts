@@ -64,6 +64,12 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h2' }],
 	},
 	{
+		// A handler's devicePixelRatio reads the screen, which a conformance run fixes at 1.
+		name: 'device-pixel-ratio',
+		fixture: 'proofs/u132-device-pixel-ratio/App.tsrx',
+		actions: [{ event: 'activate', host: 'h2' }],
+	},
+	{
 		// A class that follows state keeps the module's style scope class around it, as the web writes it.
 		name: 'class-scope',
 		fixture: 'proofs/r161-class-scope/App.tsrx',
@@ -98,6 +104,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h2' },
 			{ event: 'activate', host: 'h3' },
 			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'row-slots',
+		fixture: 'test/fixtures/RowSlots.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
 		],
 	},
 	{
@@ -826,6 +841,23 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'press-bubbles',
+		fixture: 'proofs/r165-press-bubbles/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h2' },
+		],
+	},
+	{
+		name: 'row-live',
+		fixture: 'proofs/r166-row-live/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
 		name: 'radio-follows',
 		fixture: 'proofs/r163-radio-follows/App.tsrx',
 		modules: true,
@@ -1017,6 +1049,16 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'pointermove', host: 'h1', pointerId: 1, x: 20, y: 90, time: 1032 },
 			{ event: 'pointerup', host: 'h1', pointerId: 1, x: 20, y: 90, time: 1048 },
 			{ event: 'pointerdown', host: 'h1', pointerId: 2, x: 20, y: 40, time: 2000 },
+		],
+	},
+	{
+		// A DataTransfer built in a handler and kept in a WeakMap keyed by an element, across two presses.
+		name: 'file-store',
+		fixture: 'test/fixtures/FileStore.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h2' },
 		],
 	},
 	{
@@ -1720,6 +1762,27 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		fixture: 'proofs/j9-render-list/App.tsrx',
 		modules: true,
 		actions: [{ event: 'activate', host: 'h4' }],
+	},
+	{
+		name: 'script-url',
+		fixture: 'proofs/j52-url/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h7' },
+		],
+	},
+	{
+		name: 'details',
+		fixture: 'proofs/r145-details/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h3' },
+		],
 	},
 	{
 		// The real modal family: trigger, a press inside the dialog, a press on its backdrop, an alert that refuses one, Escape.

@@ -1,5 +1,5 @@
 {
-	"rung": "S24",
+	"rung": "S34",
 	"name": "A styled element's animationend handler runs when its CSS animation ends, as the web runs it",
 	"steps": [
 		{

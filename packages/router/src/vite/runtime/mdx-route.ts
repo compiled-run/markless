@@ -1,4 +1,5 @@
 import {
+	installMarklessComposedArmRecords,
 	marklessInstanceScopedLoadSymbol,
 	marklessIslandSpacedSymbol,
 	marklessPrefixedRepeatId,
@@ -85,6 +86,8 @@ export function mdxSymbolLoader(prefix: string, importModule: () => Promise<MdxI
 	let module: Promise<MdxIslandModule> | undefined;
 	const loadModule = () => {
 		if (module) return module;
+		// An island composes under its own segment, so the arms it renders re-spell their records into page space.
+		installMarklessComposedArmRecords();
 		const loading = (module = importModule());
 		// An island in its own chunk loads without the pack's marker; once it has run, later symbols answer in the caller's task.
 		loading.then(
@@ -908,6 +911,7 @@ const MDX_INSTANCE_PATH_KEYS = ['instancePath', 'composedInstancePath'] as const
 const MDX_NESTED_RECORD_KEYS = [
 	'testReads',
 	'contentReads',
+	'armSeeds',
 	'asyncReads',
 	'inputGraphReads',
 	'composedGraphProps',
