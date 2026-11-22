@@ -46,6 +46,27 @@ public enum StyleWrite: Sendable {
 	/// A themed checkbox (`appearance: auto`): drawn in these colours over the marks Dragon's plan layout gives
 	/// (`StyleNode.checkboxMarks`), checked or not as the input's live checkedness says.
 	case checkbox(CheckboxColors)
+	/// `outline`: drawn after its stacking context's flow content, in the view of its paint layer (`Outline.layer`).
+	case outline(Outline)
+}
+
+/// An outline as Dragon lowers it: its style, width and offset in CSS px, its colour, a 3D style's lighter and darker colours,
+/// the box's corner radius lengths (nil: square), and the node whose paint layer paints it.
+public struct Outline: Equatable, Sendable {
+	public static let styles = ["solid", "double", "dotted", "dashed", "groove", "ridge", "inset", "outset"]
+	public let style: String
+	public let width: Double
+	public let offset: Double
+	public let color: RGBA
+	public let tones: (light: RGBA, dark: RGBA)?
+	public let radii: [(percent: Bool, value: Double)]?
+	public let layer: String
+
+	public static func == (a: Outline, b: Outline) -> Bool {
+		a.style == b.style && a.width == b.width && a.offset == b.offset && a.color == b.color && a.layer == b.layer
+			&& a.tones?.light == b.tones?.light && a.tones?.dark == b.tones?.dark
+			&& a.radii?.map(\.percent) == b.radii?.map(\.percent) && a.radii?.map(\.value) == b.radii?.map(\.value)
+	}
 }
 
 /// A themed checkbox's colours, as Chrome's theme gives them for its accent-color.
@@ -95,6 +116,14 @@ public struct BorderOps: Equatable, Sendable {
 		public let alpha: Double
 		public let antialias: Bool
 		public let points: [Double]
+
+		public init(op: String, side: Int, alpha: Double, antialias: Bool, points: [Double]) {
+			self.op = op
+			self.side = side
+			self.alpha = alpha
+			self.antialias = antialias
+			self.points = points
+		}
 	}
 	public let originX: Double
 	public let originY: Double
@@ -1041,6 +1070,33 @@ public struct StyleExport: Sendable {
 			let f = try write.object(["kind", "color", "key"])
 			try expectKey(f, "dragonSelectArrow")
 			return .selectArrow(try decodeColor(try f["color"]))
+		case "outline":
+			let f = try write.object(["kind", "style", "width", "offset", "color", "tones", "radii", "layer", "key"])
+			try expectKey(f, "dragonOutline.rings")
+			let style = try f["style"].string()
+			guard Outline.styles.contains(style) else { throw PayloadError(path: write.path + ".style", reason: "outline style \(style) has no native paint") }
+			let width = try f["width"].number(), offset = try f["offset"].number()
+			guard width > 0, width.isFinite, offset.isFinite else { throw PayloadError(path: write.path, reason: "outline width \(width) or offset \(offset) is out of range") }
+			let threeD = ["groove", "ridge", "inset", "outset"].contains(style)
+			var tones: (light: RGBA, dark: RGBA)?
+			if try !f["tones"].isNull {
+				let pair = try f["tones"].array()
+				guard pair.count == 2 else { throw PayloadError(path: write.path + ".tones", reason: "expected a lighter and a darker colour") }
+				tones = (try decodeColor(pair[0]), try decodeColor(pair[1]))
+			}
+			guard (tones != nil) == threeD else { throw PayloadError(path: write.path + ".tones", reason: "a \(style) outline \(threeD ? "needs" : "has no") lighter and darker colours") }
+			var radii: [(percent: Bool, value: Double)]?
+			if try !f["radii"].isNull {
+				let lengths = try f["radii"].array()
+				guard lengths.count == 8 else { throw PayloadError(path: write.path + ".radii", reason: "an outline's radii are 8 lengths") }
+				radii = try lengths.map { length in
+					let l = try length.object(["percent", "value"])
+					return (percent: try l["percent"].bool(), value: try l["value"].number())
+				}
+			}
+			return .outline(Outline(
+				style: style, width: width, offset: offset, color: try decodeColor(try f["color"]), tones: tones, radii: radii,
+				layer: try f["layer"].string()))
 		default:
 			throw PayloadError(path: write.path + ".kind", reason: "unknown style write kind \"\(kind)\"")
 		}

@@ -41,6 +41,9 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 			field = value
 		}
 
+	/** Overflow other than visible: the children are clipped to this box. */
+	internal var clipsOverflow = false
+
 	override fun draw(canvas: Canvas) {
 		val c = clip ?: return super.draw(canvas)
 		if (c.isEmpty) return
