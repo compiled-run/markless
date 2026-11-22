@@ -1,0 +1,8 @@
+{
+	"rung": 226,
+	"name": "A carousel builds on phones, as @markless/ui's carousel runs on the web: its forward trigger shows the next slide and reports it",
+	"steps": [
+		{ "visible": ["Cities", "Paris", "Next", "Showing paris"] },
+		{ "do": { "tap": "Next" }, "visible": ["Showing oslo"], "absent": ["Showing paris"] }
+	]
+}
