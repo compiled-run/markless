@@ -693,7 +693,7 @@ data class Payload(
 			}
 		}
 
-		private val SERVICES = setOf("timers", "fetch", "console", "crypto", "navigate", "device")
+		private val SERVICES = setOf("timers", "fetch", "console", "crypto", "navigate", "device", "media")
 
 		private fun scriptBindings(v: Json, what: String): Map<String, ScriptBinding> = v.obj(what).entries.associateTo(LinkedHashMap()) { (name, b) ->
 			val bo = b.obj("$what.$name")

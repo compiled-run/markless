@@ -2888,6 +2888,14 @@ export function createNativeViewPayload(
 			const service = Object.hasOwn(NATIVE_SCRIPT_HOST_GLOBALS, name)
 				? NATIVE_SCRIPT_HOST_GLOBALS[name]
 				: undefined;
+			if (service === 'media' && rendering) {
+				ok = false;
+				refuseScript(
+					`${what} reads \`${name}\` while rendering; a phone answers a media query only in a handler`,
+					global.span,
+				);
+				continue;
+			}
 			if (service) {
 				if (service !== 'engine') scriptServices.add(service);
 				if (Object.hasOwn(NATIVE_SCRIPT_DOM_CLASSES, name)) scriptNamesDomClasses = true;
