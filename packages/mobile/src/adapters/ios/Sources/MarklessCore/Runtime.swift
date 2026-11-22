@@ -448,7 +448,7 @@ public final class NativeRuntime {
 
 	/// What the host tells a script about the elements its frame passes as proxies: each one's attributes now and the
 	/// elements it is inside, nearest first.
-	private func elementFacts(_ frame: JSONValue) throws -> JSONValue {
+	private func elementFacts(_ frame: JSONValue, also: [String] = []) throws -> JSONValue {
 		var facts: [(String, JSONValue)] = []
 		var seen = Set<String>()
 		func add(_ value: JSONValue) throws {
@@ -478,6 +478,7 @@ public final class NativeRuntime {
 			}
 		}
 		try visit(frame)
+		for id in also { try add(.string(id)) }
 		return .object(facts)
 	}
 
@@ -949,10 +950,17 @@ public final class NativeRuntime {
 			case let .call(call, object, arguments, result, then):
 				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
 			case let .script(fn, type, bindings, catchCell):
-				let event: JSONValue = .object([("type", .string(type))] + (eventValue.map { [("value", JSONValue.string($0))] } ?? []))
+				var fields: [(String, JSONValue)] = [("type", .string(type))] + (eventValue.map { [("value", JSONValue.string($0))] } ?? [])
+				var pressed: [String] = []
+				if case let .string(reason)? = eventFields?[.reason] {
+					var press: JSONValue = .null
+					if case let .string(node)? = eventFields?[.pressTarget] { press = .string(node); pressed = [node] }
+					fields.append(("detail", .object([("reason", .string(reason)), ("pressTarget", press)])))
+				}
+				let event: JSONValue = .object(fields)
 				let frame = try frame(of: bindings, in: scope)
 				calls.append(contentsOf: try enter(
-					[("kind", .string("dispatch")), ("fn", .string(fn)), ("frame", frame), ("elements", try elementFacts(frame)), ("event", event)]
+					[("kind", .string("dispatch")), ("fn", .string(fn)), ("frame", frame), ("elements", try elementFacts(frame, also: pressed)), ("event", event)]
 						+ (try catchCell.map { [("catch", JSONValue.string(try slot(of: $0, in: scope)))] } ?? [])))
 			}
 		}

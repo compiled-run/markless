@@ -900,6 +900,12 @@ export const NATIVE_SCRIPT_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> =
 	['currentTarget', 'checked'],
 ];
 
+/** What a script dismiss handler's event has beyond those: why the overlay was dismissed, and the element an outside press landed on. */
+export const NATIVE_SCRIPT_DISMISS_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<string>> = [
+	['detail', 'reason'],
+	['detail', 'pressTarget'],
+];
+
 /** Names for the global object itself: `window.setTimeout` reads a provided global, `window.document` does not. */
 export const NATIVE_SCRIPT_GLOBAL_OBJECTS: ReadonlyArray<string> = ['window', 'self', 'globalThis'];
 

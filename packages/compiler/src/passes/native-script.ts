@@ -247,8 +247,15 @@ var fail = function (slot, error) {
 };
 var eventOf = function (given) {
 	var target = { value: given.value === undefined ? '' : given.value, checked: given.checked === true };
+	var detail;
+	if (given.detail) {
+		detail = { reason: given.detail.reason };
+		// Escape has no press: the key is absent, as on the web.
+		if (given.detail.pressTarget != null) detail.pressTarget = elementOf(given.detail.pressTarget);
+	}
 	return {
 		type: given.type,
+		detail: detail,
 		target: target,
 		currentTarget: target,
 		key: given.key,

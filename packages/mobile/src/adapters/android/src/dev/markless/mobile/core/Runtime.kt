@@ -337,7 +337,7 @@ class Runtime(
 	}
 
 	/** What the host tells a script about the elements its frame passes as proxies: each one's attributes now and the elements it is inside, nearest first. */
-	private fun elementFacts(bindings: Map<String, ScriptBinding>, scope: Scope): String {
+	private fun elementFacts(bindings: Map<String, ScriptBinding>, scope: Scope, also: List<String> = emptyList()): String {
 		val facts = LinkedHashMap<String, String>()
 		fun add(value: JsValue) {
 			if (value !is JsValue.Str) return
@@ -367,6 +367,7 @@ class Runtime(
 			}
 		}
 		visit(bindings)
+		also.forEach { add(JsValue.Str(it)) }
 		return facts.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value}" }
 	}
 
@@ -842,9 +843,13 @@ class Runtime(
 				calls.add(JournalEntry.Command(node.value, op.command, op.preventScroll))
 			}
 			is Op.Script -> {
-				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}}"
+				val pressed = (fields?.get("pressTarget") as? JsValue.Str)?.value
+				val detail = (fields?.get("reason") as? JsValue.Str)?.let {
+					",\"detail\":{\"reason\":${jsonString(it.value)},\"pressTarget\":${pressed?.let(::jsonString) ?: "null"}}"
+				} ?: ""
+				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$detail}"
 				val catch = op.catch?.let { ",\"catch\":${jsonString(slot(it, scope))}" } ?: ""
-				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope)},\"event\":$event$catch"))
+				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope, listOfNotNull(pressed))},\"event\":$event$catch"))
 			}
 			is Op.Assign -> {
 				val v = evaluate(op.value, scope)

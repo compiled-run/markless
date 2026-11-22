@@ -1974,6 +1974,58 @@ export function Picker() @{
 });
 
 describe('overlays', () => {
+	it("runs a dismiss handler that keeps the event's detail as JavaScript, reading why and where the press landed", async () => {
+		const { payload, diagnostics } = await nativeView(`import { element, state } from '@markless/core';
+export function Card() @{
+	let open = state(false);
+	let last = state('none');
+	const opener = element<HTMLButtonElement>();
+	<main>
+		<button el={opener} onClick={() => (open = !open)}>Open</button>
+		<div
+			overlay
+			hidden={open !== true}
+			onDismiss={(event) => {
+				const detail = event.detail;
+				const pressed = detail.pressTarget;
+				const onOpener = pressed !== undefined && opener !== undefined && opener.contains(pressed);
+				last = onOpener ? detail.reason + ' on the opener' : detail.reason;
+				if (!onOpener) open = false;
+			}}
+		><p>Body</p></div>
+		<p>{last}</p>
+	</main>
+}`);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		expect(payload!.handlers[1]?.ops).toEqual([
+			{
+				op: 'script',
+				fn: expect.any(String),
+				type: 'dismiss',
+				bindings: expect.objectContaining({ opener: { elements: { literal: 'h1' } } }),
+			},
+		]);
+	});
+
+	it('refuses a member of a dismiss event a phone does not report, and detail in a click handler', async () => {
+		const { diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Card() @{
+	let open = state(false);
+	let last = state('none');
+	<main>
+		<button onClick={(event) => { const detail = event.detail; last = String(detail); }}>Open</button>
+		<div overlay hidden={open !== true} onDismiss={(event) => { const detail = event.detail; last = String(event.timeStamp) + detail.reason; }}><p>Body</p></div>
+		<p>{last}</p>
+	</main>
+}`);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error').map((d) => d.message)).toEqual(
+			expect.arrayContaining([
+				'the click handler reads `event.detail`, which a tap on a phone does not have',
+				'the dismiss handler reads `event.timeStamp`, which a tap on a phone does not have',
+			]),
+		);
+	});
+
 	it('lowers an overlay sheet: its mark, dismiss and pointer events, element values, focus and a module set its helpers keep', async () => {
 		const { payload, diagnostics } =
 			await nativeView(`import { element, state } from '@markless/core';
