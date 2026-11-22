@@ -55,8 +55,12 @@ sealed interface StyleWrite {
 	data object ClipText : StyleWrite
 	/** The box paints in another stacking context's order (Dragon's re-hosting); [host] is that context's node. */
 	data class PaintOrder(val host: String, val bucket: Int, val rank: Int) : StyleWrite
+	/** A themed checkbox (`appearance: auto`): drawn in [colors] over [StyledNode.checkboxMarks], checked or not as the input's live checkedness says. */
+	data class Checkbox(val colors: CheckboxColors) : StyleWrite
 	/** `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own. */
 	data class Visibility(val value: String) : StyleWrite
+	/** A select whose appearance devolves to menulist-button: its drop-down arrow is stroked in [color], along [StyledNode.selectArrow]. */
+	data class SelectArrow(val color: Rgba) : StyleWrite
 	/** An `<img>` whose src the app sets as it runs: the host draws whatever image loads into its content box, as Chrome does. */
 	data class RuntimeImage(val image: LoadedImageSpec) : StyleWrite
 }
@@ -107,6 +111,23 @@ object RuntimeImagePaint {
 	}
 }
 
+/**
+ * A select's drop-down arrow as Dragon's plan layout gives it: an open path of [points] (x, y pairs, the first moved to), stroked
+ * [strokeWidth] wide with butt caps and miter joins (limit 4), all in device px from the select's snapped border box.
+ */
+data class SelectArrow(val strokeWidth: Double, val points: List<Double>)
+
+/** A themed checkbox's colours, as Chrome's theme gives them for its accent-color. */
+data class CheckboxColors(val uncheckedBackground: Rgba, val uncheckedBorder: Rgba, val checkedBackground: Rgba, val fill: Rgba, val check: Rgba)
+
+/**
+ * A themed checkbox's marks as Dragon's plan layout gives them, in device px from the snapped border box: the square ([x], [y],
+ * [side]), one fill when [plain]; otherwise its background inset by [backgroundInset] and, unchecked, its border stroked [borderWidth]
+ * wide inset by [borderInset], both rounded by [radius]; checked, the square filled and the open path [check] (three x, y pairs)
+ * stroked [checkWidth] wide.
+ */
+data class CheckboxMarks(val x: Double, val y: Double, val side: Double, val plain: Boolean, val radius: Double, val backgroundInset: Double, val borderInset: Double, val borderWidth: Double, val check: List<Double>, val checkWidth: Double)
+
 /** One drawing operation of a dashed or dotted border, in device px; [side] names the side whose colour it takes (-1: none). */
 data class BorderOp(val op: String, val side: Int, val alpha: Double, val antialias: Boolean, val points: List<Double>)
 
@@ -120,7 +141,9 @@ data class GlyphRun(val face: String, val size: Double, val glyphs: List<Int>, v
 data class TextLine(val top: Double, val baseline: Double, val runs: List<GlyphRun>)
 
 /** [scrollRange], device px, only on a scroll container; [lines], only on a framed text node, the glyphs Dragon draws for its [text]. */
-data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val scrollRange: ScrollRange? = null, val borderOps: BorderOps? = null, val lines: List<TextLine>? = null, val text: String? = null, val runtimeImagePlace: RuntimeImagePlace? = null) {
+data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val scrollRange: ScrollRange? = null, val borderOps: BorderOps? = null, val lines: List<TextLine>? = null, val text: String? = null, val selectArrow: SelectArrow? = null, val checkboxMarks: CheckboxMarks? = null, val runtimeImagePlace: RuntimeImagePlace? = null) {
+	val drawsSelectArrow: Boolean get() = writes.any { it is StyleWrite.SelectArrow }
+	val drawsCheckbox: Boolean get() = writes.any { it is StyleWrite.Checkbox }
 	val runtimeImage: LoadedImageSpec? get() = writes.firstNotNullOfOrNull { (it as? StyleWrite.RuntimeImage)?.image }
 }
 
@@ -363,7 +386,50 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			if (lists != null && rowsLayout == null) throw MarklessDecodeError("a page with rows needs Dragon's rows layout")
 			val result = Json.parse(if (lists == null) layout(line) else rowsLayout!!(line))
 			val parts = result.arr("plan layout")
-			if (parts.size != (if (slots.isEmpty()) 3 else 4) || parts[0] != Json.Str("ok")) throw MarklessDecodeError("Dragon's layout at $width x $height dp and ${scale}x failed: ${result.text()}")
+			val slotted = slots.isNotEmpty()
+			val fixed = if (slotted) 4 else 3
+			if (parts.size < fixed || parts.size > fixed + 2 || parts[0] != Json.Str("ok")) throw MarklessDecodeError("Dragon's layout at $width x $height dp and ${scale}x failed: ${result.text()}")
+			// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
+			fun exportId(id: String): String {
+				val at = id.indexOf('@')
+				return if (at < 0) names[id] ?: id else (names[id.substring(0, at)] ?: id.substring(0, at)) + id.substring(at)
+			}
+			val arrows = HashMap<String, SelectArrow>()
+			val marks = HashMap<String, CheckboxMarks>()
+			val tags = HashSet<String>()
+			for (tagged in parts.drop(fixed)) {
+				val suffix = tagged.arr("plan layout suffix")
+				if (suffix.size != 2) throw MarklessDecodeError("plan layout: expected [tag, entries], found ${tagged.text()}")
+				val tag = suffix[0].str("plan layout suffix tag")
+				if (!tags.add(tag)) throw MarklessDecodeError("plan layout: $tag is given twice")
+				if (tag == "checkbox-marks") {
+					for (e in suffix[1].arr("plan layout checkbox marks")) {
+						val m = e.arr("plan layout checkbox marks")
+						if (m.size != 11) throw MarklessDecodeError("plan layout checkbox marks: expected id, square, plain, radius, insets, border width, check and check width")
+						val id = exportId(m[0].str("plan layout checkbox marks id"))
+						if (id in marks) throw MarklessDecodeError("plan layout: $id has two checkbox marks")
+						val check = m[9].arr("plan layout checkbox check of $id").map { planNumber(it) }
+						if (check.size != 6) throw MarklessDecodeError("plan layout checkbox check of $id: a check is three points")
+						val plain = (m[4] as? Json.Bool ?: throw MarklessDecodeError("plan layout checkbox marks of $id: plain must be a boolean")).value
+						marks[id] = CheckboxMarks(planNumber(m[1]), planNumber(m[2]), planNumber(m[3]), plain, planNumber(m[5]), planNumber(m[6]), planNumber(m[7]), planNumber(m[8]), check, planNumber(m[10]))
+					}
+					continue
+				}
+				if (tag != "menulist-arrows") throw MarklessDecodeError("plan layout: unknown tag $tag")
+				for (a in suffix[1].arr("plan layout arrows")) {
+					val f = a.arr("plan layout arrow")
+					if (f.size != 3) throw MarklessDecodeError("plan layout arrow: expected id, stroke width and path")
+					val id = exportId(f[0].str("plan layout arrow id"))
+					if (id in arrows) throw MarklessDecodeError("plan layout: $id has two arrows")
+					val points = f[2].arr("plan layout arrow of $id").flatMapIndexed { k, g ->
+						val segment = g.arr("plan layout arrow of $id")
+						if (segment.size != 3 || segment[0] != Json.Str(if (k == 0) "move" else "line")) throw MarklessDecodeError("plan layout arrow of $id: its path is a move and then lines")
+						listOf(planNumber(segment[1]), planNumber(segment[2]))
+					}
+					if (points.size < 4) throw MarklessDecodeError("plan layout arrow of $id: its path needs a move and a line")
+					arrows[id] = SelectArrow(planNumber(f[1]), points)
+				}
+			}
 			val page = parts[1].arr("plan layout page scroll")
 			// Dragon's ["undecided", node, reason] when it could not decide the page's range at this size.
 			if (page.size == 3) undecided = "${page[1].str("plan layout page scroll node")}: ${page[2].str("plan layout page scroll reason")}"
@@ -371,10 +437,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val geometry = HashMap<String, List<Json>>()
 			for (g in parts[2].arr("plan layout nodes")) {
 				val f = g.arr("plan layout node")
-				val id = f.firstOrNull()?.str("plan layout node id") ?: throw MarklessDecodeError("plan layout node has no id")
-				// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
-				val at = id.indexOf('@')
-				if (at < 0) geometry[names[id] ?: id] = f else geometry[(names[id.substring(0, at)] ?: id.substring(0, at)) + id.substring(at)] = f
+				geometry[exportId(f.firstOrNull()?.str("plan layout node id") ?: throw MarklessDecodeError("plan layout node has no id"))] = f
 			}
 			val assignment = assignments[k]
 			val moved = HashMap<String, MutableList<List<Json>>>()
@@ -427,11 +490,20 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				}), "$what.lines")
 				val ops = if (f[4] == Json.Null) null else borderOps(planBorderOps(f[4], what), "$what.borderOps")
 				val scroll = if (f[5] == Json.Null) null else range(rangeJson(f[5].arr(what), what), what)
+				val arrow = arrows.remove(node.id)
+				if (arrow != null && !node.drawsSelectArrow) throw MarklessDecodeError("Dragon's layout gives ${node.id} an arrow, but it draws none")
+				if (arrow == null && node.drawsSelectArrow) throw MarklessDecodeError("\"${node.id}\" draws a drop-down arrow, but Dragon's layout gives it no arrow geometry")
+				val mark = marks.remove(node.id)
+				if (mark != null && !node.drawsCheckbox) throw MarklessDecodeError("Dragon's layout gives ${node.id} checkbox marks, but it draws no checkbox")
+				if (mark == null && node.drawsCheckbox) throw MarklessDecodeError("\"${node.id}\" draws a themed checkbox, but Dragon's layout gives it no marks")
 				node.copy(
 					frame = Frame(frame[0], frame[1], frame[2], frame[3]), borderWidths = widths?.let { Edges(it[0], it[1], it[2], it[3]) },
-					borderOps = ops, scrollRange = scroll, lines = if (node.kind == "text") lines else null,
+					borderOps = ops, scrollRange = scroll, lines = if (node.kind == "text") lines else null, selectArrow = arrow, checkboxMarks = mark,
 				)
-			}, exported = false) { id -> padding[id.substringBefore('@')]?.map { it * scale } })
+			}, exported = false) { id -> padding[id.substringBefore('@')]?.map { it * scale } }).also {
+				if (arrows.isNotEmpty()) throw MarklessDecodeError("Dragon's layout gives an arrow for ${arrows.keys.sorted().first()}, which it shows no box for")
+				if (marks.isNotEmpty()) throw MarklessDecodeError("Dragon's layout gives checkbox marks for ${marks.keys.sorted().first()}, which it shows no box for")
+			}
 		}
 		return copy(dpr = scale, viewportWidth = width, viewportHeight = height, assignments = laid, pageScrollUndecided = undecided ?: pageScrollUndecided)
 	}
@@ -536,6 +608,12 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				if (template.isEmpty()) throw MarklessDecodeError("$what.planRepeats[$i]: a row has at least one box")
 				PlanRepeat(o.field("id", "$what.planRepeats[$i]").str("id"), o.field("parent", "$what.planRepeats[$i]").str("parent"), template)
 			} ?: emptyList()
+			if (plan == null) style.assignments.firstNotNullOfOrNull { a -> a.nodes.firstOrNull { it.drawsSelectArrow } }?.let {
+				throw MarklessDecodeError("$what: \"${it.id}\" draws a drop-down arrow, whose geometry only Dragon's plan layout gives, and the export has no plan")
+			}
+			if (plan == null) style.assignments.firstNotNullOfOrNull { a -> a.nodes.firstOrNull { it.drawsCheckbox } }?.let {
+				throw MarklessDecodeError("$what: \"${it.id}\" draws a themed checkbox, whose marks only Dragon's plan layout gives, and the export has no plan")
+			}
 			return style.copy(plan = plan, planNames = names, planRepeats = repeats)
 		}
 
@@ -699,7 +777,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 						ho.only(setOf("snapPoint", "viewport", "readiness", "states", "initial", "next", "bands", "assignments"), at)
 						val hp = ho.field("viewport", at).obj("$at.viewport")
 						hp.only(setOf("width", "height"), "$at.viewport")
-						SheetHeight(ho.field("snapPoint", at).num("$at.snapPoint"), program(ho, at, dpr, hp.field("width", at).num("width"), hp.field("height", at).num("height"), null, listed))
+						SheetHeight(ho.field("snapPoint", at).num("$at.snapPoint"), withPlan(program(ho, at, dpr, hp.field("width", at).num("width"), hp.field("height", at).num("height"), null, listed), ho, at))
 					}.also { if (it.isEmpty() || it.map { h -> h.snapPoint }.distinct().size != it.size) throw MarklessDecodeError("$where needs one layout per resting height") }
 				}
 				val planned = withPlan(program(o, "routes[$n] ($pattern)", dpr, width, height, null, listed).copy(sheets = sheets, systemFaces = faces), o, "routes[$n]")
@@ -828,12 +906,24 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				}.also { if (it.size != 4) throw MarklessDecodeError("$what has ${it.size} inset edges, not 4") })
 				"clip-text" -> StyleWrite.ClipText.also { o.field("texts", what).arr("texts").forEach { t -> t.str("$what.texts[]") } }
 				"paint-order" -> StyleWrite.PaintOrder(o.field("host", what).str("host"), o.field("bucket", what).num("bucket").toInt(), o.field("rank", what).num("rank").toInt())
+				"checkbox" -> {
+					// The initial checkedness; the runtime keeps the live one, which a tap changes and a re-render does not reset.
+					if (o.field("checked", what) !is Json.Bool) throw MarklessDecodeError("$what.checked must be a boolean")
+					val colors = o.field("colors", what).obj("$what.colors")
+					val off = colors.field("unchecked", what).obj("$what.colors.unchecked")
+					val on = colors.field("checked", what).obj("$what.colors.checked")
+					StyleWrite.Checkbox(CheckboxColors(
+						color(off.field("background", what), "$what.colors.unchecked.background"), color(off.field("border", what), "$what.colors.unchecked.border"),
+						color(on.field("background", what), "$what.colors.checked.background"), color(on.field("fill", what), "$what.colors.checked.fill"), color(on.field("check", what), "$what.colors.checked.check"),
+					))
+				}
 				"visibility" -> {
 					val value = o.field("value", what).str("$what.value")
 					if (value != "visible" && value != "hidden" && value != "collapse") throw MarklessDecodeError("$what: visibility $value is not visible, hidden or collapse")
 					if (o.field("canvas", what) !is Json.Bool) throw MarklessDecodeError("$what.canvas must be a boolean")
 					StyleWrite.Visibility(value)
 				}
+				"select-arrow" -> StyleWrite.SelectArrow(color(o.field("color", what), "$what.color"))
 				"runtime-image" -> {
 					o.only(setOf("kind", "fit", "position", "layer", "pixelated", "absent", "key", "content"), what)
 					if (o.field("key", what).str("$what.key") != "dragonRuntimeImage") throw MarklessDecodeError("$what: a runtime-image write's key is dragonRuntimeImage")

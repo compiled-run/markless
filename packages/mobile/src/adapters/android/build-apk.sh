@@ -15,7 +15,7 @@ w=${MARKLESS_ANDROID_OUT:-$here/.build}/apk
 rm -rf "$w"; mkdir -p "$w/assets/markless" "$w/assets/markless-fonts" "$w/dex"
 cp "$payload" "$w/assets/markless/payload.json"
 if [ $# -ge 1 ]; then cp "$1" "$w/assets/markless/style.json"; shift; fi
-if [ -n "${MARKLESS_CONFORMANCE_DIR:-}" ]; then mkdir -p "$w/assets/markless/conformance"; cp "$MARKLESS_CONFORMANCE_DIR"/*.json "$w/assets/markless/conformance/"; fi
+if [ -n "${MARKLESS_CONFORMANCE_DIR:-}" ]; then mkdir -p "$w/assets/markless/conformance"; cp "$MARKLESS_CONFORMANCE_DIR"/*.json "$w/assets/markless/conformance/"; if [ -d "$MARKLESS_CONFORMANCE_DIR/engine" ]; then mkdir -p "$w/assets/markless/conformance/engine"; cp "$MARKLESS_CONFORMANCE_DIR"/engine/*.js "$w/assets/markless/conformance/engine/"; fi; fi
 for font in "$@"; do cp "$font" "$w/assets/markless-fonts/$(shasum -a 256 "$font" | cut -d' ' -f1).ttf"; done
 node "$here/../../harness/android-libraries.ts" "$w/libraries"
 set --

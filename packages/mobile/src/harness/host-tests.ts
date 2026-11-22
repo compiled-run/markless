@@ -61,6 +61,7 @@ const iosHostTestSources = (iosPackage: string) => [
 	...filesUnder(iosPackage, '.swift'),
 	...filesUnder(join(iosPackage, 'Tests'), '.json'),
 	...filesUnder(conformance(iosPackage), '.json'),
+	...filesUnder(conformance(iosPackage), '.js'),
 ];
 
 /**
@@ -125,6 +126,7 @@ export function androidHostTests(androidSources: string): Promise<HostTestOutcom
 		...filesUnder(hostDir, '.kt'),
 		...filesUnder(join(hostDir, 'test'), '.json'),
 		...filesUnder(conformance(hostDir), '.json'),
+		...filesUnder(conformance(hostDir), '.js'),
 		script,
 	];
 	return remembered('android', contentKey(hostDir, sources), async () => {

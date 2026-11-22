@@ -341,6 +341,8 @@ export default defineConfig({
 			'packages/typescript-plugin/test/fixtures/**',
 			'demos/chained-async-comparison/**/routeTree.gen.ts',
 			'packages/typescript-plugin/src/element-attribute-names.generated.d.ts',
+			// Written by packages/mobile/test/write-conformance.ts: the phone engine's text, which native-script.ts holds as strings.
+			'packages/mobile/conformance/engine/**',
 		],
 		rules: {
 			'no-restricted-imports': [
@@ -386,6 +388,7 @@ export default defineConfig({
 			'demos/chained-async-comparison/**/routeTree.gen.ts',
 			'demos/benchmarks/baselines/**/*.json',
 			'demos/chained-async-comparison/results/**',
+			'packages/mobile/conformance/engine/**',
 		],
 	},
 });
