@@ -47,6 +47,8 @@ export type NativeStyleInput = {
 				>;
 				/** A markup ancestor of a sheet's content: there for its selectors and inheritance, with no box of its own. */
 				readonly boxless?: true;
+				/** An `<img>` whose `src` the app sets as it runs; `absent`: the binding can give no src (null or undefined). */
+				readonly runtimeSrc?: { readonly absent: boolean };
 				readonly arm?: NativeArmPlace;
 				/** A `style` that follows state: its text, each number the app computes as a hole naming one of `slots`. */
 				readonly styleTemplate?: ReadonlyArray<string | { readonly slot: string }>;
@@ -146,6 +148,47 @@ function givesBoolean(expr: NativeExpr, booleanCells: ReadonlySet<string>): bool
 	if ('if' in expr)
 		return givesBoolean(expr.whenTrue, booleanCells) && givesBoolean(expr.whenFalse, booleanCells);
 	return false;
+}
+
+/**
+ * Whether a bound value can be null or undefined (a native value spells both as null): a null literal, an optional chain,
+ * an element read by index, a value a script or a lookup gives, a cell whose first value or any write is one of those, or a
+ * conditional, `&&`, `||` or `??` that can choose one. A field read off an object or a row's item takes its declared value.
+ */
+export function givesAbsent(payload: NativeViewPayload, expr: NativeExpr): boolean {
+	const nullableCells = new Set(
+		payload.cells.flatMap((cell) => (cell.initial === null ? [cell.id] : [])),
+	);
+	const writes = new Map<string, NativeExpr[]>();
+	const collect = (at: unknown): void => {
+		if (Array.isArray(at)) for (const item of at) collect(item);
+		else if (at !== null && typeof at === 'object') {
+			const op = at as { op?: unknown; cell?: unknown; value?: unknown };
+			if (op.op === 'assign' && typeof op.cell === 'string' && op.value)
+				writes.set(op.cell, [...(writes.get(op.cell) ?? []), op.value as NativeExpr]);
+			for (const value of Object.values(at)) collect(value);
+		}
+	};
+	collect(payload);
+	const seen = new Set<string>();
+	const absent = (at: NativeExpr): boolean => {
+		if ('literal' in at) return at.literal === null;
+		if ('cell' in at) {
+			if (nullableCells.has(at.cell)) return true;
+			if (seen.has(at.cell)) return false;
+			seen.add(at.cell);
+			return (writes.get(at.cell) ?? []).some(absent);
+		}
+		if ('if' in at) return absent(at.whenTrue) || absent(at.whenFalse);
+		if ('logical' in at)
+			return at.logical === '&&' ? absent(at.left) || absent(at.right) : absent(at.right);
+		if ('member' in at)
+			return at.optional === true || (at.property !== '' && Number.isInteger(Number(at.property)));
+		return (
+			'at' in at || 'script' in at || 'byId' in at || 'focusOrigin' in at || 'drawn' in at
+		);
+	};
+	return absent(expr);
 }
 
 /** The payload's cells whose first value is true or false. */
@@ -548,6 +591,11 @@ export function nativeStyleInput(
 						attributes[binding.attribute] = byState[0]!.value;
 				} else attributesByState[binding.attribute] = byState;
 			}
+			const runtimeSrc =
+				node.element === 'img'
+					? (node.bindings ?? []).find((binding) => 'attribute' in binding && binding.attribute === 'src')
+					: undefined;
+			if (runtimeSrc) delete attributes['src'];
 			return [
 				{
 					kind: 'element',
@@ -558,6 +606,7 @@ export function nativeStyleInput(
 					...(classByState ? { classByState } : {}),
 					...(Object.keys(attributesByState).length > 0 ? { attributesByState } : {}),
 					...(sheet?.boxless.has(node.id) ? { boxless: true as const } : {}),
+					...(runtimeSrc ? { runtimeSrc: { absent: givesAbsent(payload, runtimeSrc.value) } } : {}),
 					...(node.style && !node.styleWhen ? { styleTemplate: node.style } : {}),
 					...(node.style && node.styleWhen
 						? {

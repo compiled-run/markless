@@ -64,6 +64,8 @@ export type ReadStylesheet = (specifier: string, importer: string) => NativeStyl
 export type NativeFile = { readonly file: string; readonly bytes: Uint8Array };
 /** A file the app serves at `href` (`/static/y18.gif`, from its public folder), as the browser loads it. */
 export type ReadServedFile = (href: string) => NativeFile | undefined;
+/** The path of every file the app serves from its public folder (`/images/lamp.svg`). */
+export type ListServedFiles = () => ReadonlyArray<string>;
 /** A file a module imports as an asset (`import logo from './logo.png'`), resolved as Vite resolves it; else undefined. */
 export type ReadAsset = (specifier: string, importer: string) => NativeFile | undefined;
 /** The prefix of the URL an imported asset is shown by in a native app: the packaged file's path follows it. */
@@ -166,6 +168,7 @@ export async function compileNativeComponent(input: {
 	readonly readStylesheet?: ReadStylesheet;
 	readonly readServedStylesheet?: ReadServedStylesheet;
 	readonly readServedFile?: ReadServedFile;
+	readonly listServedFiles?: ListServedFiles;
 	readonly readAsset?: ReadAsset;
 	/** The app config's `device` section (usage text per feature). */
 	readonly device?: DeviceAppConfig;
@@ -303,14 +306,17 @@ export async function compileNativeComponent(input: {
 	const images = new Map<string, NativeImage>();
 	const imageRefusals: CompilerDiagnostic[] = [];
 	// What the browser takes the file for comes from its type, which the server gives by its extension.
+	// `refuse`: a file the page names is refused when a phone cannot draw it; one it may name is left out.
 	const imageAt = (
 		src: string,
 		read: NativeFile | undefined,
 		span?: CompilerDiagnostic['primarySpan'],
+		refuse = true,
 	): boolean => {
 		if (!read) return false;
 		if (read.file.toLowerCase().endsWith('.svg')) {
 			const svg = svgImage(read.bytes);
+			if (!refuse && svg && svg.refusals.length > 0) return false;
 			for (const refusal of svg?.refusals ?? [])
 				imageRefusals.push(
 					nativeRefusal('svg', `${read.file}, the image ${src}: ${refusal}`, span),
@@ -425,6 +431,16 @@ export async function compileNativeComponent(input: {
 		if (src && src.startsWith('/') && !src.startsWith('//') && !images.has(src))
 			imageAt(src, input.readServedFile?.(src), native.elementSources.get(node.id)?.span);
 	}
+	// An `<img>` whose src follows state can show any image the app serves, so the app packages each one a phone can draw.
+	const runtimeSrc = (native.payload?.nodes ?? []).some(
+		(node) =>
+			node.kind === 'element' &&
+			node.element === 'img' &&
+			(node.bindings ?? []).some((binding) => 'attribute' in binding && binding.attribute === 'src'),
+	);
+	if (runtimeSrc)
+		for (const href of input.listServedFiles?.() ?? [])
+			if (!images.has(href)) imageAt(href, input.readServedFile?.(href), undefined, false);
 	return {
 		payload:
 			errors.length > 0 || usage.length > 0 || unstyled.length > 0 || imageRefusals.length > 0
@@ -513,6 +529,7 @@ export async function compileNativeApp(input: {
 	readonly readStylesheet?: ReadStylesheet;
 	readonly readServedStylesheet?: ReadServedStylesheet;
 	readonly readServedFile?: ReadServedFile;
+	readonly listServedFiles?: ListServedFiles;
 	readonly readAsset?: ReadAsset;
 	/** The app config's `device` section (usage text per feature), for every page. */
 	readonly device?: DeviceAppConfig;
@@ -578,6 +595,7 @@ export async function compileNativeApp(input: {
 				? { readServedStylesheet: input.readServedStylesheet }
 				: {}),
 			...(input.readServedFile ? { readServedFile: input.readServedFile } : {}),
+			...(input.listServedFiles ? { listServedFiles: input.listServedFiles } : {}),
 			...(input.readAsset ? { readAsset: input.readAsset } : {}),
 			...(input.device ? { device: input.device } : {}),
 			...(input.target ? { target: input.target } : {}),
