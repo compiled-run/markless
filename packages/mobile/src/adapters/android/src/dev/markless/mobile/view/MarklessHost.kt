@@ -23,6 +23,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewParent
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -63,6 +64,7 @@ import dev.markless.mobile.style.Assignment
 import dev.markless.mobile.style.Edges
 import dev.markless.mobile.style.paddingBox
 import dev.markless.mobile.style.BAND_KEY
+import dev.markless.mobile.style.ShadowPaint
 import dev.markless.mobile.style.StyleExport
 import dev.markless.mobile.style.shownRows
 import dev.markless.mobile.core.pickerContent
@@ -215,6 +217,8 @@ class MarklessHost(
 	private val glyphLines = HashMap<TextView, GlyphLines>()
 	/** Each styled text view's node and its frame origin inside the view, for drawing its lines again when its text changes. */
 	private val lineSources = HashMap<TextView, Pair<StyledNode, Pair<Double, Double>>>()
+	/** The shadow each box's bitmaps were rastered for. */
+	private val shadowsDrawn = HashMap<View, ShadowPaint>()
 	/** Without a style export, text flows in paragraphs (one text view each); with one, Dragon lays out every text node. */
 	private val flow: TextFlow? = if (style == null) TextFlow(payload) else null
 	/** Each shown text instance's current string, which its paragraph view is rendered from. */
@@ -1526,6 +1530,7 @@ class MarklessHost(
 			if (view is MarklessBox) sizeScroller(inst.id, view, s, rect)
 		}
 		paint(view, s, styled)
+		paintShadow(view, s, styled)
 		if (view is SelectBox) selectLabel(view, s, styled, absolute)
 		if (view is TextView && node is Node.Text) {
 			lineSources[view] = s to inView
@@ -1555,6 +1560,34 @@ class MarklessHost(
 		} else {
 			view.accessibilityTraversalAfter = View.NO_ID
 			reorder(box)
+		}
+	}
+
+	/** box-shadow: rastered by Dragon's translated painter after a layout that moves or changes the box or what is beneath it. */
+	private fun paintShadow(view: View, s: StyledNode, styled: Assignment) {
+		val shadow = ShadowPaint.of(s, styled, dpr)
+		val parent = view.parent as? MarklessBox
+		if (shadow == null) {
+			shadowsDrawn.remove(view)
+			parent?.childShadow(view, null)
+			(view as? MarklessBox)?.insetShadow = null
+			return
+		}
+		if (shadowsDrawn[view] == shadow) return
+		if (shadow.hasOuter && parent == null) throw MarklessHostError("\"${s.id}\" has an outer box-shadow outside any box; not implemented on Android")
+		if (shadow.hasInset && view !is MarklessBox) throw MarklessHostError("\"${s.id}\" has an inset box-shadow on a ${view.javaClass.simpleName}; not implemented on Android")
+		if (shadow.hasOuter && (view as? MarklessBox)?.clip != null) throw MarklessHostError("\"${s.id}\" has a box-shadow and a clip-path; not implemented on Android")
+		val raster = ShadowRaster.dragon ?: throw MarklessHostError("box-shadow is rastered by Dragon's translated painter, which this build does not link")
+		val (outer, inset) = raster.raster(shadow)
+		parent?.childShadow(view, outer)
+		(view as? MarklessBox)?.insetShadow = inset
+		shadowsDrawn[view] = shadow
+		// The shadow reaches past its box: each box around it up to one that clips its overflow lets its children draw outside them.
+		var at: ViewParent? = parent
+		while (outer != null && at is MarklessBox && at.childClip == null) {
+			val around = at.parent as? MarklessBox ?: break
+			around.clipChildren = false
+			at = around
 		}
 	}
 
@@ -1655,6 +1688,7 @@ class MarklessHost(
 			}
 			StyleWrite.ClipText -> {}
 			is StyleWrite.PaintOrder -> {}
+			is StyleWrite.BoxShadow -> {}
 			is StyleWrite.Checkbox -> if (view !is CheckBox) throw MarklessHostError("\"${s.id}\" draws a themed checkbox but is not a checkbox")
 			is StyleWrite.Visibility -> {}
 			is StyleWrite.SelectArrow -> if (view !is SelectBox) throw MarklessHostError("\"${s.id}\" draws a drop-down arrow but is not a select")
@@ -1665,7 +1699,8 @@ class MarklessHost(
 			if (clipsChildren && bordered && s.borderOps != null) throw MarklessHostError("\"${s.id}\" clips overflow to its padding box inside a dashed or dotted border, which is not implemented on Android")
 			if (view is MarklessBox) {
 				view.clip = clip
-				view.childClip = if (clipsChildren) paddingBox(edges, radii).takeIf { bordered || it.rounded } else null
+				// Always its own clip: a shadow elsewhere may have turned off its parent's clipChildren.
+				view.childClip = if (clipsChildren) paddingBox(edges, radii) else null
 			}
 			else if (clip != null) throw MarklessHostError("\"${s.id}\" has a clip-path on a ${view.javaClass.simpleName}, which is not implemented on Android")
 		}

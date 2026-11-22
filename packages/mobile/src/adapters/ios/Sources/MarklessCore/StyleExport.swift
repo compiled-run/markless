@@ -38,6 +38,8 @@ public enum StyleWrite: Sendable {
 	case clipText
 	/// The box paints in another stacking context's order (Dragon's re-hosting); `host` is that context's node.
 	case paintOrder(host: String, bucket: Int, rank: Int)
+	/// box-shadow: the computed shadows in list order.
+	case boxShadow([BoxShadow.Shadow])
 	/// `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own.
 	case visibility(String)
 	/// A select whose appearance devolves to menulist-button: its drop-down arrow is stroked in this colour, along the path
@@ -1035,6 +1037,15 @@ public struct StyleExport: Sendable {
 			try expectKey(f, "dragonStacking.order")
 			_ = try f["index"].number()
 			return .paintOrder(host: try f["host"].string(), bucket: Int(try f["bucket"].number()), rank: Int(try f["rank"].number()))
+		case "box-shadow":
+			let f = try write.object(["kind", "shadows", "key"])
+			try expectKey(f, "dragonShadow.shadows")
+			return .boxShadow(try f["shadows"].array().map { shadow in
+				let s = try shadow.object(["inset", "x", "y", "blur", "spread", "color"])
+				return BoxShadow.Shadow(
+					inset: try s["inset"].bool(), x: try s["x"].number(), y: try s["y"].number(), blur: try s["blur"].number(),
+					spread: try s["spread"].number(), color: try decodeColor(try s["color"]))
+			})
 		case "checkbox":
 			let f = try write.object(["kind", "checked", "colors", "key"])
 			try expectKey(f, "dragonCheckbox")

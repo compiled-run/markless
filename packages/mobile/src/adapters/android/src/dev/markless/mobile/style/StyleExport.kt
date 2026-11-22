@@ -55,6 +55,8 @@ sealed interface StyleWrite {
 	data object ClipText : StyleWrite
 	/** The box paints in another stacking context's order (Dragon's re-hosting); [host] is that context's node. */
 	data class PaintOrder(val host: String, val bucket: Int, val rank: Int) : StyleWrite
+	/** box-shadow: the computed shadows in list order. */
+	data class BoxShadow(val shadows: List<Shadow>) : StyleWrite
 	/** A themed checkbox (`appearance: auto`): drawn in [colors] over [StyledNode.checkboxMarks], checked or not as the input's live checkedness says. */
 	data class Checkbox(val colors: CheckboxColors) : StyleWrite
 	/** `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own. */
@@ -829,6 +831,15 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				}.also { if (it.size != 4) throw MarklessDecodeError("$what has ${it.size} inset edges, not 4") })
 				"clip-text" -> StyleWrite.ClipText.also { o.field("texts", what).arr("texts").forEach { t -> t.str("$what.texts[]") } }
 				"paint-order" -> StyleWrite.PaintOrder(o.field("host", what).str("host"), o.field("bucket", what).num("bucket").toInt(), o.field("rank", what).num("rank").toInt())
+				"box-shadow" -> {
+					if (o.field("key", what) != Json.Str("dragonShadow.shadows")) throw MarklessDecodeError("$what: a box-shadow write's key is dragonShadow.shadows")
+					StyleWrite.BoxShadow(o.field("shadows", what).arr("$what.shadows").mapIndexed { n, x ->
+						val at = "$what.shadows[$n]"
+						val sh = x.obj(at)
+						fun length(k: String) = sh.field(k, at).num("$at.$k")
+						Shadow((sh.field("inset", at) as? Json.Bool ?: throw MarklessDecodeError("$at.inset must be a boolean")).value, length("x"), length("y"), length("blur"), length("spread"), color(sh.field("color", at), "$at.color"))
+					})
+				}
 				"checkbox" -> {
 					// The initial checkedness; the runtime keeps the live one, which a tap changes and a re-render does not reset.
 					if (o.field("checked", what) !is Json.Bool) throw MarklessDecodeError("$what.checked must be a boolean")

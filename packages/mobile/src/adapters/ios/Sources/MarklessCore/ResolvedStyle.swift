@@ -28,6 +28,8 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var stackingParent: String?
 	/// Set on a scroll container: the axes CSS lets scroll, its offset range in points, and its scroll view's look.
 	public var scroll: ResolvedScroll?
+	/// box-shadow, rastered by Dragon's translated painter after every layout.
+	public var shadow: BoxShadow?
 	/// `visibility` other than visible (a text takes its element's): the view keeps its place, but paints nothing of its own.
 	public var hidden = false
 	/// A select's drop-down arrow, once Dragon's plan has laid the page out.
@@ -42,7 +44,7 @@ public struct ResolvedStyle: Equatable, Sendable {
 			&& a.cornerRadius == b.cornerRadius && a.font?.family == b.font?.family && a.font?.size == b.font?.size
 			&& a.textColor == b.textColor && a.lines == b.lines && a.linesText == b.linesText && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll && a.hidden == b.hidden
 			&& a.clipsChildren == b.clipsChildren && a.childClip == b.childClip && a.clipRect == b.clipRect
-			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank && a.stackingParent == b.stackingParent
+			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank && a.stackingParent == b.stackingParent && a.shadow == b.shadow
 			&& a.selectArrow == b.selectArrow && a.selectLabel == b.selectLabel && a.checkbox == b.checkbox
 	}
 
@@ -249,7 +251,9 @@ extension StyleExport {
 		let picker = payload.pickerContent
 		return StyleLayout(
 			assignments: try assignments.indices.map { index in
-				try resolveNodes(assignments[index].nodes, for: nodes, picker: picker, root: root, initialTexts: index == start ? initialTexts : nil)
+				try resolveNodes(
+					assignments[index].nodes, for: nodes, picker: picker, root: root, initialTexts: index == start ? initialTexts : nil,
+					canvas: assignments[index].canvas, body: assignments[index].body)
 			},
 			canvases: assignments.map(\.canvas),
 			bodies: try assignments.map { assignment in
@@ -275,7 +279,8 @@ extension StyleExport {
 	}
 
 	private func resolveNodes(
-		_ nodes: [StyleNode], for payloadNodes: [NativeNode], picker: Set<String>, root: String?, initialTexts: [(node: String, text: String)]?
+		_ nodes: [StyleNode], for payloadNodes: [NativeNode], picker: Set<String>, root: String?, initialTexts: [(node: String, text: String)]?,
+		canvas: RGBA?, body: RGBA?
 	) throws -> [String: ResolvedStyle] {
 		let byId = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
 		// Boxes whose visibility is not visible: their text, which Dragon writes no visibility for, is hidden with them.
@@ -320,6 +325,7 @@ extension StyleExport {
 				throw styleError("\(node.id)'s parent is \(node.parent ?? "none") in the payload, \(cursor ?? "none") in the style export")
 			}
 			var style = try resolve(styled, styled.writes)
+			style.shadow = try BoxShadow.of(styled, byId: byId, canvas: canvas, body: body, dpr: dpr)
 			if styled.isText, let parent = styled.parent, hiddenBoxes.contains(parent) { style.hidden = true }
 			// A box that paints nothing (an empty clip) has no order to keep.
 			if style.clipRect.map({ $0.width == 0 || $0.height == 0 }) ?? false { style.paintOrder = nil }
@@ -348,6 +354,7 @@ extension StyleExport {
 				cursor = skipped.parent
 			}
 			var style = try resolve(styled, styled.writes)
+			style.shadow = try BoxShadow.of(styled, byId: byId, canvas: canvas, body: body, dpr: dpr)
 			if styled.isText, let parent = styled.parent, hiddenBoxes.contains(parent) { style.hidden = true }
 			if let frame = style.frame {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
@@ -466,6 +473,7 @@ extension StyleExport {
 				style.clipRect = r <= l || b <= t ? Frame(x: 0, y: 0, width: 0, height: 0) : Frame(x: l, y: t, width: r - l, height: b - t)
 			case .clipText: break
 			case let .paintOrder(_, bucket, rank): style.paintOrder = (bucket, rank)
+			case .boxShadow: break
 			case let .visibility(value): style.hidden = value != "visible"
 			case let .selectArrow(color):
 				if let arrow = node.selectArrow { style.selectArrow = ResolvedStyle.SelectArrowPaint(arrow: arrow, color: color, scale: dpr) }
