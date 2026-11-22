@@ -18,6 +18,7 @@ export {
 } from './passes/native-view.ts';
 export {
 	compileDrawing,
+	svgStyleAttributes,
 	type DrawingElement,
 	type DrawingResult,
 } from './passes/native-drawing.ts';
