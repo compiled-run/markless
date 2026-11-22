@@ -33,7 +33,7 @@ import kotlin.math.roundToInt
  */
 internal class Overlays(private val host: MarklessHost, private val context: Context, private val dpr: Double) {
 	private val reportsTouches = host.payload.nodes.any { it is Node.Element && OVERLAY_ATTRIBUTE in it.attributes } ||
-		host.payload.events.any { it.event.pointer } || host.payload.tapPoints
+		host.payload.events.any { it.event.pointer } || host.payload.tapPoints || host.payload.documentEvents
 
 	private val pressesLong = host.payload.events.any { it.event == EventName.ContextMenu }
 	private val longPress = Handler(Looper.getMainLooper())

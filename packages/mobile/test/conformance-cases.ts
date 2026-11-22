@@ -994,6 +994,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A press adds document listeners: the moves bubble to them after the element's own handlers, and the lift removes them.
+		name: 'document-listeners',
+		fixture: 'test/fixtures/DocumentListeners.tsrx',
+		actions: [
+			{ event: 'pointerdown', host: 'h1', pointerId: 1, x: 20, y: 40, time: 1000 },
+			{ event: 'pointermove', host: 'h1', pointerId: 1, x: 20, y: 60, time: 1016 },
+			{ event: 'pointermove', host: 'h1', pointerId: 1, x: 20, y: 90, time: 1032 },
+			{ event: 'pointerup', host: 'h1', pointerId: 1, x: 20, y: 90, time: 1048 },
+			{ event: 'pointerdown', host: 'h1', pointerId: 2, x: 20, y: 40, time: 2000 },
+		],
+	},
+	{
 		name: 'script-keys',
 		fixture: 'test/fixtures/ScriptKeys.tsrx',
 		actions: [

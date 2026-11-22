@@ -761,6 +761,24 @@ public final class NativeRuntime {
 	}
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
+	/// A pointer run that is the document's, not an element handler's.
+	private static let documentRun = "\u{0}document:"
+
+	/// A pointer event bubbled to the document's listeners: its plain fields, and the elements it names as proxies.
+	private func document(_ type: String, _ fields: [NativeEventField: NativeValue]) throws -> [NativeJournalEntry] {
+		var event: [(String, JSONValue)] = [("type", .string(type))]
+		for field in [NativeEventField.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp] {
+			if let value = fields[field] { event.append((field.rawValue, value.json)) }
+		}
+		var target: String?
+		if case let .string(node)? = fields[.target] { target = node }
+		var related: JSONValue = .null
+		if case let .string(node)? = fields[.relatedTarget] { related = .string(node) }
+		event.append(("nodes", .object([("target", target.map(JSONValue.string) ?? .null), ("currentTarget", .null), ("relatedTarget", related)])))
+		let watched = documentElements.sorted() + (target.map { [$0] } ?? [])
+		return try enter([("kind", .string("document")), ("event", .object(event)), ("elements", try elementFacts(.object([]), also: watched))])
+	}
+
 	private func enter(_ entry: [(String, JSONValue)], submission: Submission? = nil) throws -> [NativeJournalEntry] {
 		// A handler may read the focused element; a computed, which renders, never does, so only entries carry it.
 		var focus: [(String, JSONValue)] = []
@@ -772,7 +790,7 @@ public final class NativeRuntime {
 			return try callScript("leave")
 		}
 		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave")
-			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["calls", "commands", "navigate", "prevented", "raises", "value"])
+			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["calls", "commands", "navigate", "prevented", "raises", "value", "listening", "watch"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
 			guard pair.count == 2 || pair.count == 3 else { throw write.fail("a write is [slot, value] or [slot, value, nonFinite]") }
@@ -784,6 +802,8 @@ public final class NativeRuntime {
 			unset.remove(slot)
 			if let key = storageKeys[cell] { store.write(key, value) }
 		}
+		if result.has("listening") { documentListening = Set(try result["listening"].array().map { try $0.string() }) }
+		if result.has("watch") { for id in try result["watch"].array() { documentElements.insert(try id.string()) } }
 		for line in try result["logs"].array() {
 			let pair = try line.array()
 			guard pair.count == 2 else { throw line.fail("a log line is [level, text]") }
@@ -873,6 +893,9 @@ public final class NativeRuntime {
 	private var raising = 0
 	/// The text field whose input event is running, which a handler's `event.target.value` write lands on.
 	private var typing: String?
+	/// The event types the page's document has listeners for, and the elements those listeners may read.
+	private var documentListening: Set<String> = []
+	private var documentElements: Set<String> = []
 
 	/// An event a script dispatched on an element (or its `click()`), raised once the script returned: `click` as a press on
 	/// the innermost element from it outwards that has one; any other type on the element, then its ancestors when it
@@ -1627,6 +1650,8 @@ public final class NativeRuntime {
 				for node in chain(target) {
 					if let own = handlerOf(self.nodeOf(node), type) { runs.append((own.handler, fieldsOf(type, target, node, related), nil)) }
 				}
+				// The event bubbles on to the document's listeners after the element's own handlers.
+				if self.documentListening.contains(type.rawValue) { runs.append((Self.documentRun + type.rawValue, fieldsOf(type, target, target, related), nil)) }
 			}
 			/// `pointerenter` on each element `target` is in that `from` is not, outermost first; `pointerleave` the other way.
 			let crossing = { (type: NativeEventName, target: String, from: String?, related: String?) in
@@ -1641,6 +1666,10 @@ public final class NativeRuntime {
 				let steps = runs
 				runs = []
 				for step in steps {
+					if step.handler.hasPrefix(Self.documentRun) {
+						calls.append(contentsOf: try self.document(String(step.handler.dropFirst(Self.documentRun.count)), step.fields))
+						continue
+					}
 					self.eventFields = step.fields
 					let taken = try self.run(self.handlers[step.handler] ?? [], in: step.scope ?? instance.scope)
 					if case .navigate? = taken.first { return taken }
