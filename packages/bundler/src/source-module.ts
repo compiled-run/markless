@@ -1140,7 +1140,7 @@ export function emitQueuedResumeContainerEvent(
 // child's own id space, so the gate that emits its symbol routes also emits
 // this install. The call is explicit because `@markless/web` declares
 // `sideEffects: false`, which would drop a bare side-effect import.
-function emitComposedArmRecordsInstall(): string {
+export function emitComposedArmRecordsInstall(): string {
 	return [
 		"import { installMarklessComposedArmRecords } from '@markless/web/fns/instance-scope';",
 		'installMarklessComposedArmRecords();',
