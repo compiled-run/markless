@@ -134,6 +134,35 @@ if (!host) {
 		};
 		g.DOMException.prototype = Object.create(Error.prototype, { constructor: { value: g.DOMException, writable: true, configurable: true } });
 	}
+	// Files as a page holds them: a File's name, size, type and lastModified, a FileList, and a DataTransfer to build one.
+	var utf8Length = function (text) { return unescape(encodeURIComponent(text)).length; };
+	if (typeof g.File !== 'function') {
+		g.File = function File(bits, name, options) {
+			this.name = String(name);
+			this.type = options && options.type !== undefined ? String(options.type).toLowerCase() : '';
+			this.lastModified = options && options.lastModified !== undefined ? Number(options.lastModified) : Date.now();
+			var size = 0;
+			(bits || []).forEach(function (part) { size += typeof part === 'string' ? utf8Length(part) : part && typeof part.size === 'number' ? part.size : 0; });
+			this.size = size;
+		};
+	}
+	host.fileListOf = function (files) {
+		var list = files.slice();
+		list.item = function (index) { return list[index] || null; };
+		return list;
+	};
+	if (typeof g.DataTransfer !== 'function') {
+		g.DataTransfer = function DataTransfer() {
+			var held = [];
+			this.items = {
+				add: function (file) { held.push(file); return { kind: 'file', type: file.type }; },
+				remove: function (index) { held.splice(index, 1); },
+				clear: function () { held.length = 0; },
+			};
+			Object.defineProperty(this.items, 'length', { get: function () { return held.length; } });
+			Object.defineProperty(this, 'files', { get: function () { return host.fileListOf(held); } });
+		};
+	}
 	var Headers = function (pairs) {
 		this.get = function (name) {
 			var key = String(name).toLowerCase(), found = [];
@@ -719,7 +748,6 @@ var stable = function (value) {
 var begin = function (entry) {
 	host.origin = origin;
 	elementFacts = entry.elements || {};
-	proxies = {};
 	captured = {};
 	cells = join(entry.cells, entry.nonFinite);
 	unset = {};

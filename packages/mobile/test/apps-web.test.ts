@@ -1,17 +1,16 @@
-import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { afterAll, beforeAll, describe, test } from 'vitest';
 import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 import { startBuiltServer, type BuiltServer } from '../../../scripts/test-utils/built-server.ts';
-import { buildFixture } from '../../router/test/support/fixture-build.ts';
+import { buildAppServer } from '../src/harness/app-server.ts';
 import { APPS, appsDir } from '../apps/measure.ts';
 import { walks, type Walk } from '../apps/walks.ts';
 
 // The yardstick apps' web reference: each app built as the router builds it, served by its production server and walked
 // through in Chromium at a phone's size.
-const packagesRoot = resolve(import.meta.dirname, '../..');
 const PHONE = { width: 402, height: 778 };
 const screenshots = process.env.MARKLESS_YARDSTICK_SCREENSHOTS;
 
@@ -28,33 +27,10 @@ afterAll(async () => {
 }, 60_000);
 
 async function serveApp(app: string): Promise<BuiltServer> {
-	const root = await mkdtemp(join(tmpdir(), `markless-yardstick-${app}-`));
-	cleanups.push(() => rm(root, { recursive: true, force: true }));
-	await cp(join(appsDir, app), root, { recursive: true });
-	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
-	for (const pkg of ['core', 'router', 'device'])
-		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
-	await symlink(
-		join(packagesRoot, 'headless/components'),
-		join(root, 'node_modules/@markless/ui'),
-		'dir',
-	);
-	// API routes import the server runtime the router builds on.
-	await symlink(
-		join(packagesRoot, 'router/node_modules/nitro'),
-		join(root, 'node_modules/nitro'),
-		'dir',
-	);
-	const nodeEnv = process.env.NODE_ENV;
-	// Vitest's NODE_ENV=test leaves import.meta.env.DEV true in a build.
-	process.env.NODE_ENV = 'production';
-	try {
-		await buildFixture({ root, configFile: join(root, 'vite.config.ts') });
-	} finally {
-		if (nodeEnv === undefined) delete process.env.NODE_ENV;
-		else process.env.NODE_ENV = nodeEnv;
-	}
-	const server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
+	const out = await mkdtemp(join(tmpdir(), `markless-yardstick-${app}-`));
+	cleanups.push(() => rm(out, { recursive: true, force: true }));
+	await buildAppServer(join(appsDir, app), out);
+	const server = await startBuiltServer(join(out, 'server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
 	cleanups.push(() => server.close());

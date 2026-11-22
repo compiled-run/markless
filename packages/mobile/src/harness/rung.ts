@@ -12,7 +12,7 @@ import {
 import { createRequire, findPackageJSON } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { basename, dirname, join, relative, resolve } from 'node:path';
-import type { LadderRung } from '../../proofs/ladder.ts';
+import { APP_SERVER_PORT, type LadderRung } from '../../proofs/ladder.ts';
 import {
 	appStyleFonts,
 	nativeAppStyle,
@@ -416,6 +416,11 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 	const assets: Record<ProofPlatform, Array<[string, Uint8Array]>> = { ios: [], android: [] };
 	let manifest: DeviceManifest = { ios: [], android: [] };
 	const appConfig = readAppConfig(dir);
+	const served = `http://127.0.0.1:${APP_SERVER_PORT}`;
+	if (expected.server === 'app' && appConfig.origin !== served)
+		throw new Error(
+			`${basename(dir)}: the runner serves this app's api/ routes at ${served}, and its app.json names ${appConfig.origin ?? 'no origin'}`,
+		);
 	if (existsSync(component)) {
 		const payloads: Partial<Record<ProofPlatform, string>> = {};
 		for (const platform of PROOF_PLATFORMS) {
