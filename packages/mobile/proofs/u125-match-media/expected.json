@@ -1,0 +1,18 @@
+{
+	"rung": 225,
+	"name": "A handler's matchMedia answers from the device's settings, as the browser does: motion not reduced, then the light and the dark scheme",
+	"steps": [
+		{ "visible": ["Settings check", "Checked 0", "Motion unknown", "Scheme unknown"] },
+		{
+			"do": { "tap": "Checked 0" },
+			"visible": ["Checked 1", "Motion full", "Scheme light"],
+			"absent": ["Motion unknown", "Scheme unknown"]
+		},
+		{ "do": { "appearance": "dark" }, "visible": ["Checked 1", "Scheme light"] },
+		{
+			"do": { "tap": "Checked 1" },
+			"visible": ["Checked 2", "Motion full", "Scheme dark"],
+			"absent": ["Scheme light"]
+		}
+	]
+}

@@ -24,21 +24,36 @@ import {
 	type NativeRuntime,
 	type NativeScreen,
 } from '../src/index.ts';
-import { compileRungApp, readAppConfig, readWorkspaceModule, servedReader } from '../src/harness/rung.ts';
+import {
+	assetReader,
+	compileRungApp,
+	readAppConfig,
+	readWorkspaceModule,
+	servedFileReader,
+	servedReader,
+} from '../src/harness/rung.ts';
 import { echoText } from '../src/harness/echo-server.ts';
 import { nativeMaxLength, nativeRangeValue } from '@markless/serializer/native-view';
 import { nodeScriptHost } from '../src/node-engine.ts';
 import {
+	describeText,
 	looksOnly,
 	navRungFolders,
 	sheetStyleRungFolders,
 	styleRungFolders,
 	proofsDir,
 	readRung,
+	readsAs,
 	rungFolders,
+	selector,
 	type LadderRung,
 	type LadderStep,
+	type LadderText,
 } from '../proofs/ladder.ts';
+
+// A text named by how it starts is on screen when some shown text starts with it, as Maestro's anchored selector matches.
+const reading = (text: LadderText) =>
+	typeof text === 'string' ? text : expect.stringMatching(new RegExp(selector(text), 's'));
 
 /**
  * The key, at a `rows` entry's list, of the row an instance id sits in, when it sits in that copy of the list: an inner
@@ -76,7 +91,7 @@ const bindsValue = (nodeOf: ReadonlyMap<string, NativeViewPayload['nodes'][numbe
 	return node?.kind === 'element' && (node.bindings ?? []).some((binding) => 'property' in binding && binding.property === 'value');
 };
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
-const REFUSED_RUNGS = new Set(['y4-sheet-beside-drawer', 'j7-page-refused']);
+const REFUSED_RUNGS = new Set(['j7-page-refused']);
 // The <input> types a host draws as a control a press acts on; every other type is a text field that takes the keyboard.
 const PRESSED_INPUT_TYPES = new Set(['checkbox', 'radio', 'range', 'hidden']);
 
@@ -222,10 +237,10 @@ function mirror(
 			return label !== null && shownNode(node.id) ? [[node.id, label] as const] : [];
 		});
 	// The element a text names: a labelled element, or the element holding that text (a row instance keeps its key).
-	const elementReading = (text: string) => {
-		const labelled = labels().find(([, label]) => label === text)?.[0];
+	const elementReading = (text: LadderText) => {
+		const labelled = labels().find(([, label]) => readsAs(label, text))?.[0];
 		if (labelled) return labelled;
-		const node = [...texts].find(([id, shown]) => shown === text && !inClosedSheet(id))?.[0];
+		const node = [...texts].find(([id, shown]) => readsAs(shown, text) && !inClosedSheet(id))?.[0];
 		if (!node) return undefined;
 		const parent = nodeOf.get(baseOf(node))?.parent ?? undefined;
 		return parent && node.includes('@') && nodeOf.get(parent)?.row
@@ -314,9 +329,9 @@ function mirror(
 			);
 			const read = styled ? [...open.values()] : nativeShownTexts(payload, open);
 			const shown = [...read, ...labels().map(([, label]) => label)];
-			expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
+			expect(shown, `step ${index}`).toEqual(expect.arrayContaining(step.visible.map(reading)));
 			for (const text of step.absent ?? [])
-				expect(shown, `step ${index}`).not.toContain(text);
+				expect(shown, `step ${index}`).not.toEqual(expect.arrayContaining([reading(text)]));
 			// Which texts a page's styles hide is Dragon's layout; the payload must still hold them.
 			for (const text of step.hidden ?? [])
 				expect([...open.values()], `step ${index}`).toContain(text);
@@ -406,12 +421,14 @@ function walkApp(
 		if (action && 'back' in action) {
 			const journal = appRuntime.dispatch({ event: 'back' });
 			stack.pop();
-			// The screen shown again takes what a page above it changed in the app-wide cells; nothing else changes.
+			// The screen shown again takes what a page above it changed in the app-wide and storage cells; nothing else changes.
 			const resumed = appRuntime.screens().at(-1)!.runtime.resume();
 			expect(resumed, `step ${index}: the screen shown again had resumed already`).toEqual([]);
 			const shownAgain = journal.filter((entry) => entry.op !== 'abort' && entry.op !== 'clearTimer');
-			const appWide = pageOf(appRuntime.screens().at(-1)!.route).cells.some((cell) => cell.app);
-			if (!appWide) expect(shownAgain, `step ${index}: Back journals only what it cancels`).toEqual([]);
+			const kept = pageOf(appRuntime.screens().at(-1)!.route).cells.some(
+				(cell) => cell.app || cell.storage,
+			);
+			if (!kept) expect(shownAgain, `step ${index}: Back journals only what it cancels`).toEqual([]);
 			for (const entry of shownAgain) stack.at(-1)!.apply(entry, -1);
 		} else if (
 			looksOnly(action) ||
@@ -541,6 +558,8 @@ function walk(
 	let clock = Date.now();
 	/** The text field that has the keyboard, if any. */
 	let focused: string | undefined;
+	// The device's appearance, as an `appearance` step sets it; a script's matchMedia reads it.
+	let scheme: 'light' | 'dark' = 'light';
 	const start = () => {
 		const r = createNativeRuntime(
 			payload,
@@ -551,6 +570,7 @@ function walk(
 			services.host,
 			undefined,
 			stacked,
+			() => ({ 'prefers-reduced-motion': 'no-preference', 'prefers-color-scheme': scheme }),
 		);
 		for (const cell of payload.cells)
 			if (cell.device)
@@ -707,15 +727,15 @@ function walk(
 		return label !== null && shownNode(node.id) ? [[id, label] as const] : [];
 	};
 	// A text field by its accessible name, as the web finds a textbox: a control named the same (a preview button) is not one.
-	const fieldReading = (text: string) =>
+	const fieldReading = (text: LadderText) =>
 		labels().find(([id, label]) => {
 			const element = nodeOf.get(id.split('@')[0]!);
-			return label === text && element?.kind === 'element' && (element.element === 'input' || element.element === 'textarea');
+			return readsAs(label, text) && element?.kind === 'element' && (element.element === 'input' || element.element === 'textarea');
 		})?.[0] ?? elementReading(text);
-	const elementReading = (text: string) => {
-		const labelled = labels().find(([, label]) => label === text)?.[0];
+	const elementReading = (text: LadderText) => {
+		const labelled = labels().find(([, label]) => readsAs(label, text))?.[0];
 		if (labelled) return labelled;
-		const node = shownTexts().find(([id, shown]) => shown === text && !hiddenWithin(id))?.[0];
+		const node = shownTexts().find(([id, shown]) => readsAs(shown, text) && !hiddenWithin(id))?.[0];
 		return node ? parentOf(node) : undefined;
 	};
 	// A field's text: what its `value` binding or attribute gave it, then what was typed or the journal wrote.
@@ -1077,7 +1097,8 @@ function walk(
 				],
 				index,
 			);
-		} else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
+		} else if (action && 'appearance' in action) scheme = action.appearance;
+		else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
 			const sheet = openSheet(index);
@@ -1100,10 +1121,10 @@ function walk(
 			const host = 'tap' in action || 'doubleTap' in action ? elementReading(name) : fieldReading(name);
 			if (!host)
 				throw new Error(
-					`step ${index}: nothing reads "${name}" to ${'tap' in action ? 'tap' : 'type into'}`,
+					`step ${index}: nothing reads ${describeText(name)} to ${'tap' in action ? 'tap' : 'type into'}`,
 				);
 			if (attributeNow(host, 'disabled') != null)
-				throw new Error(`step ${index}: "${name}" is disabled`);
+				throw new Error(`step ${index}: ${describeText(name)} is disabled`);
 			// Typing shows the text in the field at once; the input event then runs the handler.
 			const text =
 				'type' in action
@@ -1314,8 +1335,9 @@ function walk(
 				.map(([, label]) => label),
 			...chosenLabels(),
 		];
-		expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
-		for (const text of step.absent ?? []) expect(shown, `step ${index}`).not.toContain(text);
+		expect(shown, `step ${index}`).toEqual(expect.arrayContaining(step.visible.map(reading)));
+		for (const text of step.absent ?? [])
+			expect(shown, `step ${index}`).not.toEqual(expect.arrayContaining([reading(text)]));
 		for (const [node, value] of runtime.selections())
 			expect(selected.get(node) ?? false, `step ${index}: the journal left ${node}'s selectedness stale`).toBe(value);
 		expect(shown, `step ${index}: scrolled out of sight, still held`).toEqual(
@@ -1371,6 +1393,8 @@ test.each(
 			...(page ? { page } : {}),
 			readModule: readWorkspaceModule,
 			readServedStylesheet: servedReader(join(proofsDir, folder)),
+			readServedFile: servedFileReader(join(proofsDir, folder)),
+			readAsset: assetReader,
 			...readAppConfig(join(proofsDir, folder)),
 			target,
 		});

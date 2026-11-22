@@ -31,6 +31,8 @@ import {
 	type NativeNonFinite,
 	nativeEmailValue,
 	nativeTooLongMessage,
+	NATIVE_SCRIPT_MEDIA_DEFAULTS,
+	type NativeScriptMedia,
 } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeScriptEngine } from './script-engine.ts';
@@ -340,7 +342,7 @@ export type NativeRuntime = {
 	readonly start: () => ReadonlyArray<NativeJournalEntry>;
 	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
 	readonly leave: () => ReadonlyArray<NativeJournalEntry>;
-	/** The screen shows again after Back: it takes the app's values of its app-wide cells that a page above it changed. */
+	/** The screen shows again after Back: it takes the app's values of its app-wide cells and the device's of its storage cells, which a page above it may have changed. */
 	readonly resume: () => ReadonlyArray<NativeJournalEntry>;
 };
 
@@ -718,6 +720,8 @@ export function createNativeRuntime(
 	session: Map<string, Value> = new Map(),
 	/** The screen's views: the box of an element (its node id, `<node>@<key>` in a row) a script reads, measured as an entry begins; null when it has no view. */
 	measure?: (id: string) => NativeElementBox | null,
+	/** The device's answers to the media features a script's `matchMedia` reads, read as each entry begins. */
+	media: () => NativeScriptMedia = () => NATIVE_SCRIPT_MEDIA_DEFAULTS,
 ): NativeRuntime {
 	const base: NativeScope = {
 		...EMPTY_SCOPE,
@@ -982,6 +986,7 @@ export function createNativeRuntime(
 			? { seed: scriptHost.seed() }
 			: {}),
 		...(script?.services.includes('navigate') ? { params } : {}),
+		...(script?.services.includes('media') ? { media: media() } : {}),
 	});
 	/** One engine entry, then what it asked for: its writes land in cells; timers, clears and requests become entries. */
 	/** Submissions held by a script promise not settled yet, by the engine's run number. */
@@ -1026,9 +1031,21 @@ export function createNativeRuntime(
 			readonly raises?: ReadonlyArray<Raised>;
 			/** A key or paste handler called `preventDefault()` before it first awaited. */
 			readonly prevented?: true;
+			/** A click handler called `stopPropagation()` before it first awaited. */
+			readonly stopped?: true;
 			/** The text an input handler set on its field (`event.target.value = …`). */
 			readonly value?: string;
+			/** The event types the page's document listens for now, when an entry changed them. */
+			readonly listening?: ReadonlyArray<string>;
+			/** The elements the entry that changed them held, which the document's listeners may read later. */
+			readonly watch?: ReadonlyArray<string>;
 		};
+		if (result.stopped) propagationStopped = true;
+		if (result.listening) {
+			documentListening.clear();
+			for (const type of result.listening) documentListening.add(type);
+		}
+		for (const id of result.watch ?? []) documentElements.add(id);
 		if (result.value !== undefined && typing !== undefined) {
 			edited.set(typing, result.value);
 			written.add(typing);
@@ -1134,6 +1151,8 @@ export function createNativeRuntime(
 	};
 	/** How deep events raised from JavaScript may nest (a handler that raises one that raises another...). */
 	let raising = 0;
+	/** A click handler called stopPropagation(): the press goes no further out. */
+	let propagationStopped = false;
 	/**
 	 * An event a script dispatched on an element (or its `click()`), raised once the script returned: `click` as a press
 	 * on the innermost element from it outwards that has one; any other type on the element, then its ancestors when it
@@ -1154,14 +1173,7 @@ export function createNativeRuntime(
 			const calls: NativeJournalEntry[] = [];
 			if (event.type === 'click') {
 				const pressed = chain.find((node) => handlerOf(nodeOf(node), 'activate'));
-				const scope = pressed && scopeOf(pressed);
-				return pressed && scope
-					? run(
-							handlers.get(handlerOf(nodeOf(pressed), 'activate')!.handler) ?? [],
-							clickFields(false),
-							scope,
-						)
-					: [];
+				return pressed ? press(pressed, clickFields(false)) : [];
 			}
 			for (const node of event.bubbles ? chain : chain.slice(0, 1)) {
 				const own = handlerOf(nodeOf(node), event.type as NativePointerEventName);
@@ -1620,6 +1632,9 @@ export function createNativeRuntime(
 	const edited = new Map<string, string>();
 	/** The text field whose input event is running, which a handler's `event.target.value` write lands on. */
 	let typing: string | undefined;
+	/** The event types the page's document has listeners for, and the elements those listeners may read. */
+	const documentListening = new Set<string>();
+	const documentElements = new Set<string>();
 	type Submission = {
 		readonly sent: string;
 		readonly submitter: string | null;
@@ -2046,6 +2061,31 @@ export function createNativeRuntime(
 			out.push(node === nodeOf(id) ? id : key && nodesById.get(node)?.row ? `${node}${key}` : node);
 		return out;
 	};
+	/**
+	 * A press on `pressed`, as a browser's click: its own handler, then the handler of each element around it, innermost
+	 * first, until one stops propagation. An element around it whose handler reads where the press landed runs its copy for
+	 * the pressed element (`<handler>@<node>`), which a pressed element with no handler of its own holds as its own.
+	 */
+	const press = (pressed: string, fields: NativeEventFields): NativeJournalEntry[] => {
+		propagationStopped = false;
+		const own = nodeOf(pressed);
+		const ownHandler = handlerOf(own, 'activate')?.handler;
+		const journal: NativeJournalEntry[] = [];
+		for (const id of chainOf(pressed)) {
+			const node = nodeOf(id);
+			const bound = handlerOf(node, 'activate');
+			const scope = bound && scopeOf(id);
+			if (!bound || !scope) continue;
+			// A copy (`<handler>@<node>`) stands for the handler around it, and runs only as the pressed element's own.
+			if (node !== own && bound.handler.includes('@')) continue;
+			const copy = node === own ? undefined : `${bound.handler}@${own}`;
+			if (copy && ownHandler === copy) continue;
+			journal.push(...run(handlers.get(copy && handlers.has(copy) ? copy : bound.handler) ?? [], fields, scope));
+			if (propagationStopped || journal.some((entry) => entry.op === 'navigate')) break;
+		}
+		propagationStopped = false;
+		return journal;
+	};
 	/** `idle` and `visible` handlers that ran, by `<event>\0<instance>`; an instance that leaves the screen is forgotten. */
 	const fired = new Set<string>();
 	const due = (event: 'idle' | 'visible'): string[] =>
@@ -2114,16 +2154,24 @@ export function createNativeRuntime(
 		slots: slotValues,
 		styleCases: caseValues,
 		start: () => (asyncCells.length === 0 ? [] : change(undefined, undefined, () => [])),
-		resume: () =>
-			appCells.some(
-				(cell) => session.has(cell) && !Object.is(session.get(cell), values.get(cell)),
-			)
-				? change(undefined, undefined, () => {
-						for (const cell of appCells)
-							if (session.has(cell)) values.set(cell, session.get(cell)!);
+		resume: () => {
+			const moved = payload.cells.flatMap((cell): Array<readonly [string, Value]> => {
+				const [keeper, key] = cell.app
+					? [session, cell.id]
+					: cell.storage
+						? [store, cell.storage.key]
+						: [undefined, ''];
+				if (!keeper?.has(key)) return [];
+				const kept = keeper.get(key)!;
+				return Object.is(kept, values.get(cell.id)) ? [] : [[cell.id, kept]];
+			});
+			return moved.length === 0
+				? []
+				: change(undefined, undefined, () => {
+						for (const [cell, value] of moved) values.set(cell, value);
 						return [];
-					})
-				: [],
+					});
+		},
 		leave: () =>
 			asyncSent === null
 				? []
@@ -2338,6 +2386,8 @@ export function createNativeRuntime(
 						readonly handler: string;
 						readonly fields: NativeEventFields;
 						readonly scope?: NativeScope;
+						/** The event bubbled on to the document's listeners, after the element's own handlers. */
+						readonly document?: NativePointerEventName;
 					}[] = [];
 					const raise = (
 						type: NativePointerEventName,
@@ -2352,6 +2402,8 @@ export function createNativeRuntime(
 									fields: fieldsOf(type, target, node, related),
 								});
 						}
+						if (documentListening.has(type))
+							runs.push({ handler: '', fields: fieldsOf(type, target, target, related), document: type });
 					};
 					/** `pointerenter` on each element `target` is in that `from` is not, outermost first; `pointerleave` the other way. */
 					const crossing = (
@@ -2373,6 +2425,24 @@ export function createNativeRuntime(
 					};
 					const flush = (): NativeJournalEntry[] | undefined => {
 						for (const step of runs.splice(0)) {
+							if (step.document) {
+								const { target: from, relatedTarget, currentTarget: _, ...fields } = step.fields;
+								calls.push(
+									...enter({
+										kind: 'document',
+										event: {
+											type: step.document,
+											...fields,
+											nodes: { target: from ?? null, currentTarget: null, relatedTarget: relatedTarget ?? null },
+										},
+										elements: elementFacts({}, [
+											...documentElements,
+											...(typeof from === 'string' ? [from] : []),
+										]),
+									}),
+								);
+								continue;
+							}
 							const out = run(
 								handlers.get(step.handler) ?? [],
 								step.fields,
@@ -2529,7 +2599,9 @@ export function createNativeRuntime(
 						? nativeNumberValue(eventValue)
 						: eventValue;
 			return change(action.host, edit, () =>
-				run(handlers.get(event.handler) ?? [], fields, scope),
+				action.event === 'activate'
+					? press(action.host, fields as NativeEventFields)
+					: run(handlers.get(event.handler) ?? [], fields, scope),
 			);
 		},
 		due,
@@ -2650,6 +2722,10 @@ export function createNativeRuntime(
 			}
 			if (op.op === 'preventDefault') {
 				calls.push({ op: 'preventDefault' });
+				continue;
+			}
+			if (op.op === 'stopPropagation') {
+				propagationStopped = true;
 				continue;
 			}
 			if (op.op === 'fieldText') {

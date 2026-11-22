@@ -12,6 +12,10 @@ export const PROOF_URL_SCHEME = 'markless-proof';
 /** Where both shells read the build's bytes: inside the iOS bundle, inside the APK's assets. */
 export const PROOF_PAYLOAD_PATH = 'markless/payload.json';
 export const PROOF_STYLE_PATH = 'markless/style.json';
+/** The packaged images' manifest: each `<img src>` the app shows, its file and its natural size. */
+export const PROOF_IMAGES_PATH = 'markless/images.json';
+/** Where the packaged images' files are, each named by its SHA-256 and format. */
+export const PROOF_IMAGES_FOLDER = 'markless-images';
 export const PROOF_FONTS_FOLDER = 'markless-fonts';
 
 export const ANDROID_SHELL_ACTIVITY = 'dev.markless.proof.ShellActivity';

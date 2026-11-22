@@ -472,6 +472,21 @@ function importSlots(semantic: ModuleSemantics) {
 	return { specifiers, spans, reach, slot, record };
 }
 
+const FUNCTIONS = new Set([
+	'FunctionDeclaration',
+	'FunctionExpression',
+	'ArrowFunctionExpression',
+]);
+
+/** Whether `node` sits inside a function within `root` (or `root` is one), so it runs only when that function is called. */
+function insideFunction(semantic: ModuleSemantics, node: AnyNode, root: AnyNode): boolean {
+	for (let at: AnyNode | null = node; at; at = semantic.parentOf(at as never) as AnyNode | null) {
+		if (FUNCTIONS.has(String(at.type))) return true;
+		if (at === root) return false;
+	}
+	return false;
+}
+
 function globalOf(
 	semantic: ModuleSemantics,
 	reference: Reference,
@@ -779,7 +794,8 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 			if (dead.some((branch) => within(at as never, branch as never))) continue;
 			const binding = reference.binding;
 			if (!binding) {
-				globals.push(globalOf(semantic, reference, filename));
+				const global = globalOf(semantic, reference, filename);
+				globals.push(insideFunction(semantic, at, range) ? { ...global, deferred: true } : global);
 				continue;
 			}
 			const entry = importOf(semantic, binding);

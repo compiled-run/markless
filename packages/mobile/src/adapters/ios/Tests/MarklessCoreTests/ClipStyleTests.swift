@@ -24,8 +24,11 @@ private func resolved(_ edit: (String) -> String = { $0 }) throws -> StyleLayout
 	#expect(!card.clipsChildren)
 }
 
-@Test func aBoxThatPaintsInAnotherStackingOrderIsRefusedUnlessItPaintsNothing() throws {
-	// inset(0) leaves the whole box, so its re-hosted paint order would matter.
+@Test func aBoxThatPaintsInAnotherStackingOrderIsPlacedInItsStackingParentUnlessItPaintsNothing() throws {
+	#expect(try resolved().styles["component-edge:0/h0"]?.stackingParent == nil)
+	// inset(0) leaves the whole box, so its re-hosted paint order matters: it is placed in the page's top box, in that order.
 	let edited = { (s: String) in s.replacingOccurrences(of: "\"value\": 50", with: "\"value\": 0") }
-	#expect(throws: PayloadError.self) { try resolved(edited) }
+	let span = try #require(try resolved(edited).styles["component-edge:0/h0"])
+	#expect(span.stackingParent == "h0")
+	#expect(span.paintOrder?.bucket == 1)
 }

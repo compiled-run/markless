@@ -1,0 +1,9 @@
+{
+	"rung": 166,
+	"name": "a @for row whose role follows its item is a live region of its own, which updates as its row does",
+	"steps": [
+		{ "visible": ["Uploads", "Photo saved", "Report saved"], "absent": ["Report failed"] },
+		{ "do": { "tap": "Fail report" }, "visible": ["Photo saved", "Report failed"], "absent": ["Report saved"] },
+		{ "do": { "tap": "Fail report" }, "visible": ["Photo saved", "Report saved"], "absent": ["Report failed"] }
+	]
+}

@@ -23,13 +23,37 @@ name: notes
 - assertVisible: Groceries
 - assertVisible: Edit
 - assertNotVisible: Save note
-- tapOn: Notes
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertVisible: Save note
 - assertNotVisible: Edit
+- assertVisible: Save note
+- assertNotVisible: Edit
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertNotVisible: Save note
 - assertVisible: All notes
-- assertVisible: Groceries
-- assertNotVisible: Edit
-- tapOn: Groceries
-- assertVisible: Edit
+- assertVisible: ^Groceries.*
+- assertNotVisible: Save note
+- tapOn: ^Groceries.*
 - assertVisible: Edit
 - assertNotVisible: Search notes
 - runFlow:
@@ -45,12 +69,12 @@ name: notes
           - pressKey: back
 - assertNotVisible: Edit
 - assertVisible: All notes
-- assertVisible: Groceries
+- assertVisible: ^Groceries.*
 - assertNotVisible: Edit
 - tapOn: Search notes
 - eraseText
 - inputText: zzz
 - hideKeyboard
-- assertNotVisible: Groceries
+- assertNotVisible: ^Groceries.*
 - assertVisible: No notes match “zzz”
-- assertNotVisible: Groceries
+- assertNotVisible: ^Groceries.*

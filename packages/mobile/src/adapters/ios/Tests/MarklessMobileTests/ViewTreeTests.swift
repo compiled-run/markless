@@ -536,4 +536,19 @@ private func scrollingCounterExport() throws -> Data {
 	#expect(spoken.map(\.text) == ["Upload failed"])
 	#expect(spoken.first?.assertive == true)
 }
+@MainActor @Test func aRowsLiveRegionSpeaksByItsOwnRowsRule() throws {
+	var spoken: [(text: String, assertive: Bool)] = []
+	let controller = try MarklessViewController(payload: vectorPayload("row-live"), store: MemoryStore())
+	let views = try tree(controller)
+	views.announce = { spoken.append(($0, $1)) }
+	// The report's row turns role="alert": its own change is read at once.
+	controller.perform(NativeAction(event: .activate, host: "h4"))
+	#expect(spoken.map(\.text) == ["Report failed"], "\(spoken)")
+	#expect(spoken.first?.assertive == true)
+	// Back to role="status": read politely; the photo's row, unchanged, says nothing.
+	spoken = []
+	controller.perform(NativeAction(event: .activate, host: "h4"))
+	#expect(spoken.map(\.text) == ["Report saved"], "\(spoken)")
+	#expect(spoken.first?.assertive == false)
+}
 #endif

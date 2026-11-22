@@ -1184,6 +1184,11 @@ export type NativeViewOptions = {
 	 * the page as the browser's load does; else the link is refused.
 	 */
 	readonly linkStylesheet?: (href: string) => boolean;
+	/**
+	 * A default import of a file the build reads as an asset (`import logo from './logo.png'`): the URL the app shows it
+	 * by, as Vite gives the web its URL; undefined when the build does not read that file.
+	 */
+	readonly assetImport?: (specifier: string, importer: string) => string | undefined;
 	/** The page's route when the module is a page: the router's pattern and its param names. */
 	readonly route?: { readonly pattern: string; readonly params: ReadonlyArray<string> };
 	/**
@@ -2778,6 +2783,8 @@ export function createNativeViewPayload(
 		{ readonly id: string; readonly module: ModuleFacts; readonly fact: SemanticScriptFunction }
 	>();
 	const scriptServices = new Set<NativeScriptService>();
+	/** A script adds listeners to the document, so the hosts report every touch for them. */
+	let documentEvents = false;
 	scriptsMakeKeys = () =>
 		[...scriptFunctions.values()].some(({ fact }) =>
 			fact.globals.some(
@@ -2874,7 +2881,8 @@ export function createNativeViewPayload(
 				Object.hasOwn(NATIVE_SCRIPT_PAGE_MEMBERS, name) &&
 				NATIVE_SCRIPT_PAGE_MEMBERS[name]!.includes(global.member)
 			) {
-				if (!rendering) continue;
+				if (name === 'document' && global.member !== 'activeElement') documentEvents = true;
+				if (!rendering || global.deferred) continue;
 				ok = false;
 				refuseScript(
 					`${what} reads \`${name}.${global.member}\` while rendering; a phone answers it only in a handler`,
@@ -2885,6 +2893,14 @@ export function createNativeViewPayload(
 			const service = Object.hasOwn(NATIVE_SCRIPT_HOST_GLOBALS, name)
 				? NATIVE_SCRIPT_HOST_GLOBALS[name]
 				: undefined;
+			if (service === 'media' && rendering) {
+				ok = false;
+				refuseScript(
+					`${what} reads \`${name}\` while rendering; a phone answers a media query only in a handler`,
+					global.span,
+				);
+				continue;
+			}
 			if (service) {
 				if (service !== 'engine') scriptServices.add(service);
 				if (Object.hasOwn(NATIVE_SCRIPT_DOM_CLASSES, name)) scriptNamesDomClasses = true;
@@ -3197,6 +3213,19 @@ export function createNativeViewPayload(
 		return value;
 	}
 
+	/** Whether a `style` value is being lowered, where a helper returning one template keeps its text around number holes. */
+	let readingStyle = false;
+	/** Whether the call's own source is one `return` of a template literal, as the analyzer read the function. */
+	const returnsTemplate = (found: ModuleFunction | undefined): boolean => {
+		const [only, ...more] = found?.fn.native.statements ?? [];
+		return more.length === 0 && only?.kind === 'return' && only.value.kind === 'template';
+	};
+	/** A template whose holes are each a number the build can see, not a script value that may be text. */
+	const numberHoles = (value: NativeExpr): boolean =>
+		'template' in value &&
+		value.template.every(
+			(part) => typeof part === 'string' || (!('script' in part) && mayBeNumber(part)),
+		);
 	/** Whether a call to an app function the data path cannot evaluate runs in the script instead: in a submit or change handler. */
 	let handlerCallsScript = false;
 	/** The script functions that call an app function for a handler: each such value runs once where it is written. */
@@ -3316,6 +3345,8 @@ export function createNativeViewPayload(
 			readonly statements: Set<number>;
 			readonly exports: Map<string, string>;
 			readonly slots: Map<number, number | null>;
+			/** Slots that import an asset (`import logo from './logo.png'`), with the URL the app shows it by. */
+			readonly assets: Map<number, string>;
 		};
 		const included = new Map<ModuleFacts, Included>();
 		const order: Included[] = [];
@@ -3337,6 +3368,7 @@ export function createNativeViewPayload(
 				statements: new Set(),
 				exports: new Map(),
 				slots: new Map(),
+				assets: new Map(),
 			};
 			included.set(module, entry);
 			order.push(entry);
@@ -3356,6 +3388,12 @@ export function createNativeViewPayload(
 			}
 			const { specifier, span } = factsOf(entry.module)!.imports[slot]!;
 			const module = moduleAt(entry.module, specifier);
+			const asset = module ? undefined : options.assetImport?.(specifier, entry.module.graph.filename);
+			if (asset !== undefined) {
+				entry.assets.set(slot, asset);
+				entry.slots.set(slot, null);
+				return undefined;
+			}
 			if (!module && missingModules.size === 0)
 				refuseScript(
 					`${where(entry.module)} imports \`${specifier}\`, which the build could not read for the phone's script`,
@@ -3497,7 +3535,10 @@ export function createNativeViewPayload(
 						entry.statements.has(index) ? [statement.code] : [],
 					),
 				].join('\n'),
-				imports: facts.imports.map((_, slot) => entry.slots.get(slot) ?? null),
+				imports: facts.imports.map((_, slot) => {
+					const asset = entry.assets.get(slot);
+					return asset !== undefined ? { asset } : (entry.slots.get(slot) ?? null);
+				}),
 				functions: [...scriptFunctions.values()]
 					.filter((fn) => fn.module === entry.module)
 					.map((fn) => ({ id: fn.id, code: fn.fact.code })),
@@ -3739,8 +3780,6 @@ export function createNativeViewPayload(
 		element: string,
 		attributes: Readonly<Record<string, string>>,
 		bindings: ReadonlyArray<{ readonly attribute: string } | { readonly property: string }>,
-		span: SourceSpan | undefined,
-		row: string | undefined,
 	): Pick<Extract<NativeNode, { kind: 'element' }>, 'live' | 'liveFollows'> => {
 		const LIVE_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
 			role: new Set(['status', 'alert', 'log']),
@@ -3758,14 +3797,8 @@ export function createNativeViewPayload(
 			const values = writtenValuesOf(bound.value);
 			return !values || [...values].some((value) => live.has(value));
 		});
+		// In a @for row each copy is its own live region, its rule read in that row.
 		if (follows) {
-			if (row !== undefined) {
-				refuse(
-					`a <${element}> in a @for row whose \`role\`, \`aria-live\` or \`aria-atomic\` follows state; a native host makes such a live region only outside a row`,
-					span,
-				);
-				return {};
-			}
 			return {
 				liveFollows: liveRuleOf(element, (name) => {
 					const bound = boundTo(name);
@@ -4392,6 +4425,11 @@ export function createNativeViewPayload(
 				const constant = constantAt(scope.module, expression.name);
 				if (constant) return moduleConstant(constant, what, scope);
 				const imported = scope.module.imports.get(expression.name);
+				const asset =
+					imported?.kind === 'default'
+						? options.assetImport?.(imported.source, scope.module.graph.filename)
+						: undefined;
+				if (asset !== undefined) return { literal: asset };
 				if (imported)
 					return refuse(
 						`${what} reads \`${expression.name}\` from \`${imported.source}\`, which this build cannot read as data`,
@@ -4809,7 +4847,24 @@ export function createNativeViewPayload(
 						inlining.delete(key);
 					}
 				};
-				if (!handlerCallsScript) return evaluate();
+				if (!handlerCallsScript) {
+					if (!readingStyle || !returnsTemplate(found)) return evaluate();
+					const data = attempt(evaluate);
+					if (!data.failed) return data.value;
+					data.rollBack();
+					// A style helper's one returned template keeps its text; a call in a hole that data cannot spell runs as JavaScript.
+					handlerCallsScript = true;
+					const holed = attempt(() => {
+						try {
+							return evaluate();
+						} finally {
+							handlerCallsScript = false;
+						}
+					});
+					if (!holed.failed && holed.value && numberHoles(holed.value)) return holed.value;
+					holed.rollBack();
+					return evaluate();
+				}
 				// The outermost call runs whole in the script, so a value its body uses twice is computed once.
 				const asData = <T>(run: () => T): T => {
 					handlerCallsScript = false;
@@ -5180,7 +5235,13 @@ export function createNativeViewPayload(
 			const target = read.target;
 			if (target.kind === 'text') return [];
 			if (target.kind === 'style') {
-				const value = exprOf(read.expression, 'the `style` attribute', scope);
+				readingStyle = true;
+				let value: NativeExpr | null;
+				try {
+					value = exprOf(read.expression, 'the `style` attribute', scope);
+				} finally {
+					readingStyle = false;
+				}
 				if (!value) return [];
 				const given = joinedStyle(stylePartsOf(value));
 				// A style that is one hole and no text is text the build cannot see (a helper's return), never a bare number.
@@ -5990,8 +6051,6 @@ export function createNativeViewPayload(
 					element ?? '*',
 					attributes,
 					bindings,
-					item.span,
-					place.row,
 				);
 				const parts = styleParts.get(id);
 				if (parts && place.row !== undefined)
@@ -8382,6 +8441,16 @@ export function createNativeViewPayload(
 			return resetOps(scope.resets.get(statement.name)!, scope, what, span);
 		if (statement.kind === 'invoke') {
 			const callee = [statement.name, ...(statement.path ?? [])].join('.');
+			// A click's stopPropagation(): the press reaches no handler of the elements around this one, as in a browser.
+			if (
+				scope.clicking &&
+				statement.name === scope.opaque &&
+				!scope.args.has(statement.name) &&
+				statement.path?.length === 1 &&
+				statement.path[0] === 'stopPropagation' &&
+				(statement.arguments ?? []).length === 0
+			)
+				return [{ op: 'stopPropagation' }];
 			if (
 				scope.submitting &&
 				statement.name === scope.opaque &&
@@ -9009,13 +9078,8 @@ export function createNativeViewPayload(
 				!isWithin(node.id, host)
 			)
 				continue;
-			if (events.some((other) => other.host === node.id && other.event === 'activate')) {
-				refuse(
-					`a press on ${node.id} is handled by its own click handler and by the one on ${host}, which reads where it landed`,
-					event.handlerSpan,
-				);
-				continue;
-			}
+			// An element with a click handler of its own runs it first; the press then reaches this copy, as it bubbles.
+			const ownPress = events.some((other) => other.host === node.id && other.event === 'activate');
 			const pressed = { target: node.id, currentTarget: host };
 			const marks = { diagnostics: diagnostics.length, cells: cells.length };
 			const rollBack = () => {
@@ -9024,7 +9088,7 @@ export function createNativeViewPayload(
 			};
 			// Lowered as the run it would reach, kept values and all: the same ops mean it needs no handler of its own.
 			pressedRow = node.row;
-			const around = reached(node.id);
+			const around = ownPress ? undefined : reached(node.id);
 			if (around) {
 				const same =
 					JSON.stringify(handlerOps(event, scope, around.id, pressed)) === around.spelled;
@@ -9048,9 +9112,10 @@ export function createNativeViewPayload(
 					.slice(marks.diagnostics)
 					.filter((diagnostic) => !seen.has(diagnostic.message)),
 			);
+			handlers.push({ id, ops });
+			if (ownPress) continue;
 			runs.set(node.id, { id, spelled: JSON.stringify(ops) });
 			events.push({ host: node.id, event: 'activate', handler: id });
-			handlers.push({ id, ops });
 		}
 		// The host's own run does nothing once the elements in it have theirs: it is not a control then.
 		if (handler.ops.length === 0 && runs.size > 1) {
@@ -9252,6 +9317,7 @@ export function createNativeViewPayload(
 		...(emailChecked ? { typeMismatch: NATIVE_EMAIL_MISMATCH_BY_LOCALE } : {}),
 		...(script ? { script } : {}),
 		...(tapPoints ? { tapPoints: true as const } : {}),
+		...(documentEvents ? { documentEvents: true as const } : {}),
 	});
 
 	/**

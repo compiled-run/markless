@@ -4,7 +4,8 @@
 import { spawn } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, openSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { ECHO_SERVER_PORT } from '../../proofs/ladder.ts';
+import { APP_SERVER_PORT, ECHO_SERVER_PORT } from '../../proofs/ladder.ts';
+import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { startEchoServer } from '../harness/echo-server.ts';
 import { PROOF_REPORT_VERSION, proofVerdict, type ProofReport } from '../harness/report.ts';
 import { androidTools, type AndroidTools } from '../harness/tools.ts';
@@ -119,6 +120,46 @@ const releaseEcho = async () => {
 	echo = undefined;
 	await (await server)?.close();
 };
+// A chunk with an app rung (alone in its chunk) holds that app's own web server on APP_SERVER_PORT, shared by the same rung's
+// chunks on other phones; another app waits for the port.
+let app:
+	| { key: string; users: number; server: Promise<BuiltServer | undefined>; released: Promise<void>; release: () => void }
+	| undefined;
+const holdApp = async (job: string, rung: string) => {
+	const key = `${job}/${rung}`;
+	while (app && app.key !== key) await app.released;
+	if (!app) {
+		let release = () => {};
+		const released = new Promise<void>((resolve) => (release = resolve));
+		app = {
+			key,
+			users: 0,
+			released,
+			release,
+			server: startBuiltServer(join(bundleRung(job, rung), 'server', 'server', 'index.mjs'), {
+				port: APP_SERVER_PORT,
+				env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
+			}).then(
+				(server) => (log(`${rung}'s web server on ${server.origin}`), server),
+				(error: unknown) => {
+					log(`${rung}'s web server not started: ${error instanceof Error ? error.message : String(error)}`);
+					return undefined;
+				},
+			),
+		};
+	}
+	app.users++;
+	return app.server;
+};
+const releaseApp = async () => {
+	if (!app || --app.users > 0) return;
+	const held = app;
+	app = undefined;
+	await (await held.server)?.close();
+	held.release();
+};
+const servedApp = (job: string, chunk: Chunk) =>
+	chunk.rungs.find((rung) => readJson<BundledRung>(join(bundleRung(job, rung), 'rung.json'))?.server === 'app');
 const fetches = (job: string, chunk: Chunk) =>
 	chunk.rungs.some(
 		(rung) =>
@@ -271,6 +312,8 @@ async function run(phone: Phone, job: string, name: string, queued: Chunk): Prom
 	move(phone, { type: 'take', chunk: `${job}/${name}` });
 	const echoed = fetches(job, queued);
 	if (echoed) await holdEcho();
+	const served = servedApp(job, queued);
+	if (served) await holdApp(job, served);
 	try {
 		log(`${id} runs ${job} ${name} (${queued.rungs.length} rungs)`);
 		mkdirSync(join(job, 'logs'), { recursive: true });
@@ -359,6 +402,7 @@ async function run(phone: Phone, job: string, name: string, queued: Chunk): Prom
 		if ((phone.state as PhoneState).state === 'busy') move(phone, { type: 'release' });
 	} finally {
 		if (echoed) await releaseEcho();
+		if (served) await releaseApp();
 	}
 	finishJobs();
 }

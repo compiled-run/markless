@@ -510,9 +510,7 @@ async function prepareBoundarySettle(
 			land,
 		);
 	};
-	// A composed child's arm records are minted in the child's own id space; the
-	// qualifier that re-spells them in page space is installed only by pages the
-	// bundler gave component edges (fns/composed-arm-records).
+	// A composed child's arm records arrive in its own id space; installMarklessComposedArmRecords re-spells them.
 	if (source === 'renderAsyncBoundary') {
 		const rendered = await input.renderAsyncBoundary!(boundary.id, status, input.graph);
 		if (newerRunPending() || claim?.() === false) return;

@@ -64,3 +64,13 @@ private func hex(_ value: Double) -> String {
 		}
 	}
 }
+
+@Test func laidOutKeepsDragonsReasonWhenItLeavesThePageRangeUndecided() throws {
+	let style = try StyleExport.decode(slotExport)
+	let relaid = try style.laidOut(width: 100, height: 100, scale: 1, slots: [5]) { _ in
+		let frame = [0, 0, 10, 10].map { hex(Double($0)) }.joined(separator: ",")
+		return "[\"ok\",[\"undecided\",\"m3\",\"an overflow clip on a box the page scrolls\"],[[\"h0\",[\(frame)],null,null,null,null]],[]]"
+	}
+	#expect(relaid.pageScrolls == [nil])
+	#expect(relaid.pageScrollUndecided == "m3: an overflow clip on a box the page scrolls")
+}
