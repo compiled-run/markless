@@ -38,6 +38,8 @@ import dev.markless.mobile.style.BandAtom
 import dev.markless.mobile.style.BandComparison
 import dev.markless.mobile.style.Bands
 import dev.markless.mobile.style.Rgba
+import dev.markless.mobile.style.CheckboxColors
+import dev.markless.mobile.style.CheckboxMarks
 import dev.markless.mobile.style.GlyphRun
 import dev.markless.mobile.style.StyleExport
 import dev.markless.mobile.style.shownRows
@@ -807,7 +809,7 @@ private fun selectArrows(fixtures: File) {
 		check(name, err != null && err.contains(fragment)) { "error was: $err" }
 	}
 	layoutFails("a select-arrow write with no arrow geometry names the node", Json.Arr(parts.take(3)).text(), "\"h3\" draws a drop-down arrow, but Dragon's layout gives it no arrow geometry")
-	layoutFails("a 4th element other than menulist-arrows is refused", Json.Arr(parts.take(3) + Json.Arr(listOf(Json.Str("other"), Json.Arr(emptyList())))).text(), "expected [\"menulist-arrows\", arrows]")
+	layoutFails("a 4th element other than menulist-arrows is refused", Json.Arr(parts.take(3) + Json.Arr(listOf(Json.Str("other"), Json.Arr(emptyList())))).text(), "unknown tag other")
 	val root = Json.parse(bytes) as Json.Obj
 	val target = (root.fields.getValue("targets") as Json.Obj).fields.getValue("android") as Json.Obj
 	val route = ((target.fields.getValue("routes") as Json.Arr).items[0] as Json.Obj).fields
@@ -816,6 +818,51 @@ private fun selectArrows(fixtures: File) {
 	route.remove("planRepeats")
 	val err = runCatching { StyleExport.decodeApp(root.text().toByteArray()) }.exceptionOrNull()?.message
 	check("a select-arrow write in an export with no plan names the node", err?.contains("\"h3\" draws a drop-down arrow, whose geometry only Dragon's plan layout gives, and the export has no plan") == true) { "error was: $err" }
+}
+
+/** The S27 rung's: a themed checkbox's colours, and the marks Dragon's plan layout gives in its tagged checkbox-marks suffix. */
+private fun checkboxMarks(fixtures: File) {
+	val bytes = File(fixtures, "s27-styled-checkbox.native-app-style.json").readBytes()
+	val style = StyleExport.decodeApp(bytes).getValue("/")
+	val laid = File(fixtures, "s27-styled-checkbox.layout.json").readText()
+	val box = style.assignments[0].byId.getValue("h3")
+	val white = Rgba(255, 255, 255, 255)
+	check("decodes a themed checkbox's colours", box.writes.filterIsInstance<StyleWrite.Checkbox>().map { it.colors } == listOf(CheckboxColors(white, Rgba(118, 118, 118, 255), white, Rgba(194, 65, 12, 255), white))) { "${box.writes}" }
+	val out = runCatching { style.laidOut(412.0, 870.0, 2.625, { laid }) }
+	check("reads the plan layout's checkbox marks", out.isSuccess) { out.exceptionOrNull().toString() }
+	fun bits(hex: String) = java.lang.Double.longBitsToDouble(java.lang.Long.parseUnsignedLong(hex, 16))
+	val expected = CheckboxMarks(0.0, bits("3ff5000000000000"), bits("404b900000000000"), false, bits("4015000000000000"), bits("3fe0cccccccccccd"), bits("3ff5000000000000"), bits("4005000000000000"),
+		listOf("40260ccccccccccd", "403ce00000000000", "40360ccccccccccd", "4043f33333333333", "40460ccccccccccd", "4028accccccccccd").map(::bits), bits("4021a3d70a3d70a4"))
+	out.getOrNull()?.let { e ->
+		for ((k, a) in e.assignments.withIndex()) {
+			check("assignment $k's checkbox takes Dragon's marks", a.byId.getValue("h3").checkboxMarks == expected) { "${a.byId.getValue("h3").checkboxMarks}" }
+			check("assignment $k: only the checkbox has marks", a.nodes.count { it.checkboxMarks != null } == 1) { "" }
+		}
+	}
+	val parts = (Json.parse(laid) as Json.Arr).items
+	fun layoutFails(name: String, result: String, fragment: String) {
+		val err = runCatching { style.laidOut(412.0, 870.0, 2.625, { result }) }.exceptionOrNull()?.message
+		check(name, err != null && err.contains(fragment)) { "error was: $err" }
+	}
+	layoutFails("a checkbox write with no marks names the node", Json.Arr(parts.take(3)).text(), "\"h3\" draws a themed checkbox, but Dragon's layout gives it no marks")
+	layoutFails("a tag given twice is refused", Json.Arr(parts + parts[3]).text(), "checkbox-marks is given twice")
+	val suffix = (parts[3] as Json.Arr).items
+	val entry = ((suffix[1] as Json.Arr).items[0] as Json.Arr).items
+	val stray = Json.Arr(listOf(Json.Str("h9")) + entry.drop(1))
+	layoutFails("marks for a node with no box are refused", Json.Arr(parts.take(3) + Json.Arr(listOf(suffix[0], Json.Arr((suffix[1] as Json.Arr).items + stray)))).text(), "gives checkbox marks for h9")
+	val arrows = Json.Arr(listOf(Json.Str("menulist-arrows"), Json.Arr(emptyList())))
+	for ((name, order) in listOf("before" to parts.take(3) + arrows + parts[3], "after" to parts + arrows)) {
+		val r = runCatching { style.laidOut(412.0, 870.0, 2.625, { Json.Arr(order).text() }) }
+		check("the tagged suffixes are read by tag, the arrows $name the marks", r.getOrNull()?.assignments?.get(0)?.byId?.getValue("h3")?.checkboxMarks == expected) { r.exceptionOrNull().toString() }
+	}
+	val root = Json.parse(bytes) as Json.Obj
+	val target = (root.fields.getValue("targets") as Json.Obj).fields.getValue("android") as Json.Obj
+	val route = ((target.fields.getValue("routes") as Json.Arr).items[0] as Json.Obj).fields
+	route.remove("plan")
+	route.remove("planNames")
+	route.remove("planRepeats")
+	val err = runCatching { StyleExport.decodeApp(root.text().toByteArray()) }.exceptionOrNull()?.message
+	check("a checkbox write in an export with no plan names the node", err?.contains("\"h3\" draws a themed checkbox, whose marks only Dragon's plan layout gives, and the export has no plan") == true) { "error was: $err" }
 }
 
 /** A slotted page with a menulist-button select (Dragon's slots example and a select): the plan layout gives the slot writes, then the arrows, tagged and last. */
@@ -834,7 +881,7 @@ private fun slottedSelectArrows(fixtures: File) {
 		val err = runCatching { style.laidOut(411.0, 818.0, 2.625, { Json.Arr(result).text() }, values) }.exceptionOrNull()?.message
 		check(name, err != null && fragment in err) { "error was: $err" }
 	}
-	fails("a slotted layout's arrows must be tagged", parts.take(4) + Json.Arr(listOf(Json.Str("other"), Json.Arr(emptyList()))), "expected [\"menulist-arrows\", arrows]")
+	fails("a slotted layout's arrows must be tagged", parts.take(4) + Json.Arr(listOf(Json.Str("other"), Json.Arr(emptyList()))), "unknown tag other")
 	fails("a slotted layout without its slot writes is refused", parts.take(3) + parts[4], "plan layout")
 	fails("a slotted layout with no arrows leaves its select without one", parts.take(4), "\"h20\" draws a drop-down arrow, but Dragon's layout gives it no arrow geometry")
 }
@@ -858,6 +905,7 @@ fun main(args: Array<String>) {
 	rowPressedStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	selectArrows(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	slottedSelectArrows(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	checkboxMarks(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	styleSlots()
 	rehostedStacking(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))

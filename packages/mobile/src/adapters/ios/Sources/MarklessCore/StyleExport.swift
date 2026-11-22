@@ -43,6 +43,37 @@ public enum StyleWrite: Sendable {
 	/// A select whose appearance devolves to menulist-button: its drop-down arrow is stroked in this colour, along the path
 	/// Dragon's plan layout gives (`StyleNode.selectArrow`).
 	case selectArrow(RGBA)
+	/// A themed checkbox (`appearance: auto`): drawn in these colours over the marks Dragon's plan layout gives
+	/// (`StyleNode.checkboxMarks`), checked or not as the input's live checkedness says.
+	case checkbox(CheckboxColors)
+}
+
+/// A themed checkbox's colours, as Chrome's theme gives them for its accent-color.
+public struct CheckboxColors: Equatable, Sendable {
+	public let uncheckedBackground: RGBA
+	public let uncheckedBorder: RGBA
+	public let checkedBackground: RGBA
+	public let fill: RGBA
+	public let check: RGBA
+}
+
+/// A themed checkbox's marks as Dragon's plan layout gives them, in device px from the snapped border box, which sits at
+/// `origin` relative to the node's frame: the square (`x`, `y`, `side`), drawn as one fill when `plain`; otherwise its background
+/// inset by `backgroundInset` and, unchecked, its border stroked `borderWidth` wide inset by `borderInset`, both rounded by
+/// `radius`; checked, the square filled and the open path `check` (three x, y pairs) stroked `checkWidth` wide.
+public struct CheckboxMarks: Equatable, Sendable {
+	public let originX: Double
+	public let originY: Double
+	public let x: Double
+	public let y: Double
+	public let side: Double
+	public let plain: Bool
+	public let radius: Double
+	public let backgroundInset: Double
+	public let borderInset: Double
+	public let borderWidth: Double
+	public let check: [Double]
+	public let checkWidth: Double
 }
 
 /// A select's drop-down arrow as Dragon's plan layout gives it: an open path of `points` (x, y pairs, the first moved to),
@@ -109,8 +140,11 @@ public struct StyleNode: Sendable {
 	public let lines: [TextLine]?
 	/// Only on a select with a `selectArrow` write, once Dragon's plan has laid the page out.
 	public var selectArrow: SelectArrow? = nil
+	/// Only on a checkbox with a `checkbox` write, once Dragon's plan has laid the page out.
+	public var checkboxMarks: CheckboxMarks? = nil
 
 	var drawsSelectArrow: Bool { writes.contains { if case .selectArrow = $0 { return true } else { return false } } }
+	var drawsCheckbox: Bool { writes.contains { if case .checkbox = $0 { return true } else { return false } } }
 
 	/// The node with no box: a list's template, which only its rows' copies show.
 	func hidden() -> StyleNode {
@@ -556,6 +590,9 @@ public struct StyleExport: Sendable {
 		} else if let node = assignments.lazy.flatMap(\.nodes).first(where: \.drawsSelectArrow) {
 			throw PayloadError(
 				path: chosen.path, reason: "\(node.id) draws a drop-down arrow, whose geometry only Dragon's plan layout gives, and the export has no plan")
+		} else if let node = assignments.lazy.flatMap(\.nodes).first(where: \.drawsCheckbox) {
+			throw PayloadError(
+				path: chosen.path, reason: "\(node.id) draws a themed checkbox, whose marks only Dragon's plan layout gives, and the export has no plan")
 		}
 		if targetFields.has("planNames") {
 			let perAssignment = try targetFields["planNames"]
@@ -627,8 +664,8 @@ public struct StyleExport: Sendable {
 			guard shown == nil || rowsLayout != nil else { throw PayloadError(path: "plan layout", reason: "a page with rows needs Dragon's rows layout") }
 			let result = try Reader(JSONValue.parse(Data((shown == nil ? layout(line) : rowsLayout!(line)).utf8)), at: "plan layout")
 			let parts = try result.array()
-			let tagged = parts.count > (slotted ? 4 : 3)
-			guard parts.count == (slotted ? 4 : 3) + (tagged ? 1 : 0), try parts[0].string() == "ok" else {
+			let fixed = slotted ? 4 : 3
+			guard parts.count >= fixed, parts.count <= fixed + 2, try parts[0].string() == "ok" else {
 				throw PayloadError(path: "plan layout", reason: "Dragon's layout at \(width) x \(height) points and \(scale)x failed: \(result.value.jsonText)")
 			}
 			// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
@@ -638,10 +675,29 @@ public struct StyleExport: Sendable {
 				return "\(names[base] ?? base)\(id[at...])"
 			}
 			var arrows: [String: (strokeWidth: Double, points: [Double])] = [:]
-			if tagged {
-				let last = parts[parts.count - 1]
-				let suffix = try last.array()
-				guard suffix.count == 2, try suffix[0].string() == "menulist-arrows" else { throw last.fail("expected [\"menulist-arrows\", arrows]") }
+			var marks: [String: CheckboxMarks] = [:]
+			var tags: Set<String> = []
+			for tagged in parts[fixed...] {
+				let suffix = try tagged.array()
+				guard suffix.count == 2 else { throw tagged.fail("expected [tag, entries]") }
+				let tag = try suffix[0].string()
+				guard tags.insert(tag).inserted else { throw tagged.fail("\(tag) is given twice") }
+				if tag == "checkbox-marks" {
+					for entry in try suffix[1].array() {
+						let m = try entry.array()
+						guard m.count == 11 else { throw entry.fail("expected id, square, plain, radius, insets, border width, check and check width") }
+						let id = exportId(try m[0].string())
+						guard marks[id] == nil else { throw entry.fail("\(id) has two checkbox marks") }
+						let n = { (k: Int) throws -> Double in try planNumber(m[k].value) }
+						let check = try m[9].array().map { try planNumber($0.value) }
+						guard check.count == 6 else { throw m[9].fail("a check is three points") }
+						marks[id] = CheckboxMarks(
+							originX: 0, originY: 0, x: try n(1), y: try n(2), side: try n(3), plain: try m[4].bool(), radius: try n(5),
+							backgroundInset: try n(6), borderInset: try n(7), borderWidth: try n(8), check: check, checkWidth: try n(10))
+					}
+					continue
+				}
+				guard tag == "menulist-arrows" else { throw tagged.fail("unknown tag \(tag)") }
 				for arrow in try suffix[1].array() {
 					let a = try arrow.array()
 					guard a.count == 3 else { throw arrow.fail("expected id, stroke width and path") }
@@ -752,9 +808,21 @@ public struct StyleExport: Sendable {
 				} else if node.drawsSelectArrow {
 					throw PayloadError(path: "plan layout", reason: "\(node.id) draws a drop-down arrow, but Dragon's layout gives it no arrow geometry")
 				}
+				if let m = marks.removeValue(forKey: node.id) {
+					guard node.drawsCheckbox else { throw PayloadError(path: "plan layout", reason: "Dragon's layout gives \(node.id) checkbox marks, but it draws no checkbox") }
+					nodes[index].checkboxMarks = CheckboxMarks(
+						originX: (at.x + 0.5).rounded(.down) - at.x, originY: (at.y + 0.5).rounded(.down) - at.y, x: m.x, y: m.y, side: m.side,
+						plain: m.plain, radius: m.radius, backgroundInset: m.backgroundInset, borderInset: m.borderInset, borderWidth: m.borderWidth,
+						check: m.check, checkWidth: m.checkWidth)
+				} else if node.drawsCheckbox {
+					throw PayloadError(path: "plan layout", reason: "\(node.id) draws a themed checkbox, but Dragon's layout gives it no marks")
+				}
 			}
 			if let stray = arrows.keys.sorted().first {
 				throw PayloadError(path: "plan layout", reason: "Dragon's layout gives an arrow for \(stray), which it shows no box for")
+			}
+			if let stray = marks.keys.sorted().first {
+				throw PayloadError(path: "plan layout", reason: "Dragon's layout gives checkbox marks for \(stray), which it shows no box for")
 			}
 			return (assignment.values, nodes, assignment.canvas, assignment.body)
 		}
@@ -951,6 +1019,17 @@ public struct StyleExport: Sendable {
 			try expectKey(f, "dragonStacking.order")
 			_ = try f["index"].number()
 			return .paintOrder(host: try f["host"].string(), bucket: Int(try f["bucket"].number()), rank: Int(try f["rank"].number()))
+		case "checkbox":
+			let f = try write.object(["kind", "checked", "colors", "key"])
+			try expectKey(f, "dragonCheckbox")
+			// The initial checkedness; the runtime keeps the live one, which a tap changes and a re-render does not reset.
+			_ = try f["checked"].bool()
+			let colors = try f["colors"].object(["unchecked", "checked"])
+			let off = try colors["unchecked"].object(["background", "border"])
+			let on = try colors["checked"].object(["background", "fill", "check"])
+			return .checkbox(CheckboxColors(
+				uncheckedBackground: try decodeColor(off["background"]), uncheckedBorder: try decodeColor(off["border"]),
+				checkedBackground: try decodeColor(on["background"]), fill: try decodeColor(on["fill"]), check: try decodeColor(on["check"])))
 		case "visibility":
 			let f = try write.object(["kind", "value", "canvas", "key"])
 			try expectKey(f, "visibility")
