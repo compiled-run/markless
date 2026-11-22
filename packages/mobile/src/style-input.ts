@@ -412,8 +412,7 @@ export function nativeStyleInput(
 		[{}],
 	);
 	const initialCells = new Map(payload.cells.map((cell) => [cell.id, cell.initial]));
-	// A <select>'s @for over a list the build folds to literals (a constant array) is written as plain options, one per row in order,
-	// so Dragon measures the select's widest option; any other list keeps its template row, and Dragon keeps refusing what reads it.
+	// A <select>'s @for over a constant list becomes plain options, so Dragon can measure its widest option.
 	const optionRows = new Map<string, ReadonlyArray<string>>();
 	for (const node of nodes) {
 		if (node.kind !== 'repeat' || node.row || node.keyParts || (!node.byIndex && node.key.length > 0)) continue;
