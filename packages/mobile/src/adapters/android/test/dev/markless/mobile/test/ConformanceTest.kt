@@ -710,6 +710,11 @@ private fun styleSlots() {
 	check("the layout line carries each slot's bit pattern", given == Json.Arr(listOf(Json.Str(hex(20.0).trim('"'))))) { "$given" }
 	val writes = laid.assignments[0].byId.getValue("h0").writes
 	check("a moved channel patches its write", writes == listOf(StyleWrite.BackgroundColor(Rgba(1, 200, 3, 255)))) { "$writes" }
+	val undecided = style.laidOut(100.0, 100.0, 2.0, { _ ->
+		val zero = hex(0.0)
+		"""["ok",["undecided","m3","an overflow clip on a box the page scrolls"],[["h0",[$zero,$zero,${hex(10.0)},${hex(10.0)}],null,null,null,null]],[]]"""
+	}, listOf(20.0))
+	check("a layout that leaves the page range undecided keeps Dragon's reason", undecided.assignments[0].pageScroll == null && undecided.pageScrollUndecided == "m3: an overflow clip on a box the page scrolls") { "${undecided.pageScrollUndecided}" }
 	val bad = runCatching { style.laidOut(100.0, 100.0, 2.0, layout("[\"colour\",\"g\"]"), listOf(20.0)) }.exceptionOrNull()?.message
 	check("a write path the host cannot write is refused by name", bad != null && "h0" in bad && "background-color" in bad && "[\"colour\",\"g\"]" in bad) { "$bad" }
 	val count = runCatching { style.laidOut(100.0, 100.0, 2.0, layout("[\"color\",\"g\"]")) }.exceptionOrNull()?.message
