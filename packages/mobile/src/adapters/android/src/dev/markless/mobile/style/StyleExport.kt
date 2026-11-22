@@ -55,6 +55,8 @@ sealed interface StyleWrite {
 	data object ClipText : StyleWrite
 	/** The box paints in another stacking context's order (Dragon's re-hosting); [host] is that context's node. */
 	data class PaintOrder(val host: String, val bucket: Int, val rank: Int) : StyleWrite
+	/** box-shadow: the computed shadows in list order. */
+	data class BoxShadow(val shadows: List<Shadow>) : StyleWrite
 	/** A themed checkbox (`appearance: auto`): drawn in [colors] over [StyledNode.checkboxMarks], checked or not as the input's live checkedness says. */
 	data class Checkbox(val colors: CheckboxColors) : StyleWrite
 	/** `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own. */
@@ -282,7 +284,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 	fun laidOut(width: Double, height: Double, scale: Double, layout: (String) -> String, slotValues: List<Double> = emptyList(), rows: ((Int) -> Map<String, List<LaidOutRow>>)? = null, rowsLayout: ((String) -> String)? = null): StyleExport {
 		val plan = plan ?: return this
 		if (slotValues.size != slots.size) throw MarklessDecodeError("the style export reads ${slots.size} slots; the layout was given ${slotValues.size} values")
-		val slotsText = if (slots.isEmpty()) "" else slotValues.joinToString(",", ",\"slots\":[", "]") { "\"${java.lang.Long.toHexString(it.toRawBits()).padStart(16, '0')}\"" }
+		val hex = { list: List<Double> -> Json.Arr(list.map { Json.Str(java.lang.Long.toHexString(it.toRawBits()).padStart(16, '0')) }) }
+		val slotsText = if (slots.isEmpty()) "" else ",\"slots\":${hex(slotValues).text()}"
 		var undecided: String? = null
 		val laid = assignments.indices.map { k ->
 			val names = planNames.getOrNull(k) ?: emptyMap()
@@ -293,17 +296,18 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					// A list an arm hides at this assignment has no box to hold rows: its rows are not laid out there.
 					val parentShown = r.parent == "body" || assignments[k].byId[names[r.parent] ?: r.parent]?.frame != null
 					obj("parent" to Json.Str(r.parent), "template" to Json.Arr(r.template.map { Json.Str(it) }), "rows" to Json.Arr((if (parentShown) byList[r.id] ?: emptyList() else emptyList()).map { row ->
-						obj("key" to Json.Str(row.key), "assignment" to Json.Num(row.assignment.toDouble()), "texts" to Json.Arr(row.texts.entries.sortedBy { it.key }.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }))
+						val fields = mutableListOf<Pair<String, Json>>("key" to Json.Str(row.key), "assignment" to Json.Num(row.assignment.toDouble()), "texts" to Json.Arr(row.texts.entries.sortedBy { it.key }.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }))
+						if (slots.isNotEmpty()) fields.add("slots" to hex(slots.mapIndexed { i, s -> row.slots[s.id] ?: slotValues[i] }))
+						obj(*fields.toTypedArray())
 					}))
 				}).text()
 			}
 			val line = "{\"assignment\":$k,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":$plan$slotsText${if (lists != null) ",\"rows\":$lists" else ""}}"
-			if (lists != null && slots.isNotEmpty()) throw MarklessDecodeError("a page with rows and style values that follow state, which Dragon's rows layout does not take yet")
 			if (lists != null && rowsLayout == null) throw MarklessDecodeError("a page with rows needs Dragon's rows layout")
 			val result = Json.parse(if (lists == null) layout(line) else rowsLayout!!(line))
 			val parts = result.arr("plan layout")
 			val slotted = slots.isNotEmpty()
-			val fixed = if (slotted) 4 else 3
+			val fixed = if (!slotted) 3 else if (lists == null) 4 else 5
 			if (parts.size < fixed || parts.size > fixed + 2 || parts[0] != Json.Str("ok")) throw MarklessDecodeError("Dragon's layout at $width x $height dp and ${scale}x failed: ${result.text()}")
 			// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
 			fun exportId(id: String): String {
@@ -364,6 +368,19 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				if (assignment.byId[id] == null) throw MarklessDecodeError("Dragon's layout moves a write of $id, which assignment $k has no node for")
 				moved.getOrPut(id) { ArrayList() }.add(f)
 			}
+			// Each row's own write numbers, by row key and the template node they write: the row's copy takes them.
+			val rowMoved = HashMap<String, HashMap<String, MutableList<List<Json>>>>()
+			if (slots.isNotEmpty() && lists != null) for (e in parts[4].arr("plan layout row writes")) {
+				val entry = e.arr("plan layout row writes[]")
+				if (entry.size != 2) throw MarklessDecodeError("plan layout row writes ${e.text()}: expected a row key and its writes")
+				val own = HashMap<String, MutableList<List<Json>>>()
+				for (w in entry[1].arr("plan layout row writes[].writes")) {
+					val f = w.arr("plan layout write")
+					if (f.size != 4) throw MarklessDecodeError("plan layout write ${w.text()}: expected node, write kind, path and value")
+					own.getOrPut(f[0].str("plan layout write node")) { ArrayList() }.add(f)
+				}
+				rowMoved[entry[0].str("plan layout row key")] = own
+			}
 			// The template of each list: one row's nodes, which no view shows; each row is a copy of them laid out here.
 			val template = HashMap<String, Pair<PlanRepeat, Boolean>>()
 			if (shown != null) for (r in planRepeats) {
@@ -384,7 +401,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				withRows.add(node.copy(frame = null, borderWidths = null, borderOps = null, scrollRange = null, lines = null))
 				for (row in shown[place.first.id] ?: emptyList()) {
 					val own = assignments[row.assignment].byId[node.id] ?: throw MarklessDecodeError("assignment ${row.assignment} has no node ${node.id} for row ${row.key}")
-					withRows.add(own.copy(id = "${node.id}@${row.key}", parent = if (place.second) node.parent else node.parent?.let { "$it@${row.key}" }, text = if (own.kind == "text") (row.texts[node.id] ?: own.text) else own.text))
+					val copy = own.copy(id = "${node.id}@${row.key}", parent = if (place.second) node.parent else node.parent?.let { "$it@${row.key}" }, text = if (own.kind == "text") (row.texts[node.id] ?: own.text) else own.text)
+					withRows.add(rowMoved[row.key]?.get(node.id)?.let { copy.copy(writes = slotWrites(copy, it)) } ?: copy)
 				}
 			}
 			assignment.copy(pageScroll = pageScroll, nodes = withRows.map { slotted ->
@@ -821,6 +839,15 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				}.also { if (it.size != 4) throw MarklessDecodeError("$what has ${it.size} inset edges, not 4") })
 				"clip-text" -> StyleWrite.ClipText.also { o.field("texts", what).arr("texts").forEach { t -> t.str("$what.texts[]") } }
 				"paint-order" -> StyleWrite.PaintOrder(o.field("host", what).str("host"), o.field("bucket", what).num("bucket").toInt(), o.field("rank", what).num("rank").toInt())
+				"box-shadow" -> {
+					if (o.field("key", what) != Json.Str("dragonShadow.shadows")) throw MarklessDecodeError("$what: a box-shadow write's key is dragonShadow.shadows")
+					StyleWrite.BoxShadow(o.field("shadows", what).arr("$what.shadows").mapIndexed { n, x ->
+						val at = "$what.shadows[$n]"
+						val sh = x.obj(at)
+						fun length(k: String) = sh.field(k, at).num("$at.$k")
+						Shadow((sh.field("inset", at) as? Json.Bool ?: throw MarklessDecodeError("$at.inset must be a boolean")).value, length("x"), length("y"), length("blur"), length("spread"), color(sh.field("color", at), "$at.color"))
+					})
+				}
 				"checkbox" -> {
 					// The initial checkedness; the runtime keeps the live one, which a tap changes and a re-render does not reset.
 					if (o.field("checked", what) !is Json.Bool) throw MarklessDecodeError("$what.checked must be a boolean")
@@ -894,4 +921,4 @@ fun stackingParent(s: StyledNode, order: StyleWrite.PaintOrder, styled: Assignme
 data class PlanRepeat(val id: String, val parent: String, val template: List<String>)
 
 /** A row a page shows now: its key, the assignment its own states reach from the page's, and its texts by text node id. */
-data class LaidOutRow(val key: String, val assignment: Int, val texts: Map<String, String>)
+data class LaidOutRow(val key: String, val assignment: Int, val texts: Map<String, String>, val slots: Map<String, Double> = emptyMap())
