@@ -1228,7 +1228,7 @@ export function Page() @{
 		);
 	});
 
-	it('makes a live region whose aria-live or role follows state, outside a row, with its politeness as an expression', async () => {
+	it('makes a live region whose aria-live or role follows state, with its politeness as an expression, in a @for row as outside one', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Page() @{
 	let paused = state(false);
@@ -1254,9 +1254,12 @@ export function Page() @{
 		}
 	</ul>
 }`);
-		expect(rows.diagnostics.map((d) => d.message).join('\n')).toContain(
-			'in a @for row whose `role`, `aria-live` or `aria-atomic` follows state',
-		);
+		expect(rows.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		const row = rows.payload!.nodes.find((node) => node.kind === 'element' && node.element === 'li');
+		expect(row).toMatchObject({
+			row: expect.any(String),
+			liveFollows: { politeness: expect.any(Object), atomic: expect.any(Object) },
+		});
 	});
 
 	it("folds a shared state's first value that reads module constants", async () => {
