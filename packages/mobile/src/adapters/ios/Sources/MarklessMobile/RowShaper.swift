@@ -3,6 +3,9 @@ import CoreText
 import Foundation
 import MarklessCore
 import UIKit
+#if canImport(DragonHBShaper)
+import DragonHBShaper
+#endif
 
 /// Dragon's feature records: tag, value, start, end per feature (layout/src/shaping.ts FEATURE_STRIDE).
 private let featureStride = 4
@@ -76,6 +79,31 @@ func coreTextRowShaper(faces: [String: SystemFace], dpr: Double) -> (String, Dou
 }
 
 /// Why a row's text is not shaped on the phone, named for the page's error.
+/// Shapes a row's text in a face the app bundles (a web font, decoded to its sfnt at build time) as Dragon's build shapes it:
+/// HarfBuzz through Dragon's shim at the face's default instance, the size in device px. Nil when the app is built without it.
+func bundledRowShaper() -> ((String, Data, Double, String, Int, Int, String, Bool, String, [Double]) throws -> [Double])? {
+	#if canImport(DragonHBShaper)
+	guard let shaper = try? DragonHBShaper() else { return nil }
+	var faces: [String: DragonHBFace] = [:]
+	var fonts: [String: DragonHBFont] = [:]
+	return { id, bytes, size, text, start, end, script, rtl, language, features in
+		let key = "\(id)@\(size.bitPattern)"
+		let font: DragonHBFont
+		if let made = fonts[key] {
+			font = made
+		} else {
+			let face = try faces[id] ?? DragonHBFace(bytes: [UInt8](bytes))
+			faces[id] = face
+			font = try DragonHBFont(face: face, size: Float(size), specifiedSize: Float(size), weight: 400, width: 100, slope: 0, opticalSizingAuto: true)
+			fonts[key] = font
+		}
+		return try shaper.shape(font: font, text: Array(text.utf16), start: start, end: end, script: script, rtl: rtl, language: language, featureRecords: features)
+	}
+	#else
+	return nil
+	#endif
+}
+
 struct RowShapingRefusal: Error, CustomStringConvertible {
 	let description: String
 }

@@ -104,8 +104,9 @@ export async function buildIosShell(hostPackage: string, shellDir: string): Prom
 		await exec('xcrun', ['--sdk', 'iphonesimulator', '--show-sdk-path'])
 	).stdout.trim();
 	const dragon = dragonModules(hostPackage);
+	const harfBuzz = await dragonHarfBuzzIos();
 	const inputs = [...filesUnder(hostPackage, '.swift'), ...filesUnder(shellDir, '.swift')];
-	const key = contentKey(hostPackage, inputs, [sdk, PROOF_APP_ID, SHELL_CACHE_FORMAT, infoPlist(''), dragon.key]);
+	const key = contentKey(hostPackage, inputs, [sdk, PROOF_APP_ID, SHELL_CACHE_FORMAT, infoPlist(''), dragon.key, harfBuzz?.key ?? '']);
 	const root = await cachedFolder(join(cacheRoot(), 'ios-shell', key), async (scratch) => {
 		const modules = join(scratch, 'modules');
 		const app = join(scratch, `${PROOF_APP_NAME}.app`);
@@ -120,9 +121,11 @@ export async function buildIosShell(hostPackage: string, shellDir: string): Prom
 			sdk,
 			'-target',
 			`arm64-apple-ios${deploymentTarget}-simulator`,
+			...(harfBuzz ? ['-I', harfBuzz.moduleMap] : []),
 		];
+		const modulesOf = harfBuzz ? [...dragon.modules, { name: 'DragonHBShaper', sources: [harfBuzz.source] }] : dragon.modules;
 		// Dragon's translated engine and its plan layout, before the host targets that import them.
-		for (const target of dragon.modules) {
+		for (const target of modulesOf) {
 			await exec('xcrun', [
 				...common,
 				'-parse-as-library',
@@ -169,7 +172,8 @@ export async function buildIosShell(hostPackage: string, shellDir: string): Prom
 			'-L',
 			modules,
 			...ordered.toReversed().map((target) => `-l${target.name}`),
-			...dragon.modules.toReversed().map((target) => `-l${target.name}`),
+			...modulesOf.toReversed().map((target) => `-l${target.name}`),
+			...(harfBuzz ? ['-L', harfBuzz.library, '-ldragon_hb', '-lc++'] : []),
 			...filesUnder(shellDir, '.swift'),
 			'-o',
 			join(app, PROOF_APP_NAME),
@@ -197,6 +201,35 @@ function dragonModules(hostPackage: string) {
 			{ name: 'DragonLayout', sources: engine },
 			{ name: 'DragonPlan', sources: [...harness, glue] },
 		],
+	};
+}
+
+/**
+ * Dragon's HarfBuzz shim for the simulator (`libdragon_hb.a`) and its Swift API, which the hosts shape a bundled web font's row
+ * text with: built from the Dragon checkout with Zig 0.16 (MARKLESS_ZIG, else `zig` on the PATH), cached by its sources. Null
+ * without Zig, and then the hosts refuse such text by name.
+ */
+async function dragonHarfBuzzIos() {
+	const zig = process.env.MARKLESS_ZIG ?? 'zig';
+	try {
+		await exec(zig, ['version']);
+	} catch {
+		return null;
+	}
+	assertDragonPin();
+	const shaper = join(dragonDir(), 'packages', 'text-shaper');
+	const sources = [...filesUnder(join(shaper, 'src'), '.zig'), join(shaper, 'build.zig'), join(shaper, 'build.zig.zon')];
+	const key = contentKey(shaper, sources, ['ios-simulator']);
+	const root = await cachedFolder(join(cacheRoot(), 'dragon-hb-ios', key), async (scratch) => {
+		await exec(zig, ['build', 'ios', '--prefix', scratch], { cwd: shaper });
+	});
+	const library = join(root, 'ios', 'ios-arm64-simulator');
+	if (!existsSync(join(library, 'libdragon_hb.a'))) throw new Error(`the Zig build of Dragon's shim made no ${library}/libdragon_hb.a`);
+	return {
+		key,
+		library,
+		moduleMap: join(shaper, 'swift', 'Sources', 'CDragonHB'),
+		source: join(shaper, 'swift', 'Sources', 'DragonHBShaper', 'DragonHBShaper.swift'),
 	};
 }
 

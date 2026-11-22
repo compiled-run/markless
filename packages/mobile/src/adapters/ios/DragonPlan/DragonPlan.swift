@@ -14,16 +14,16 @@ public enum DragonPlan {
 	}
 
 	/// `runMarklessRowsLayout`: the page with each list's rows in it. Text the build did not record is shaped by `shape`: face, size
-	/// in device px, text, start and end (UTF-16 offsets), language and Dragon's feature integers, giving Dragon's glyph records.
+	/// in device px, text, start and end (UTF-16 offsets), script tag, right-to-left, language and Dragon's feature integers, giving
+	/// Dragon's glyph records.
 	public static func rowsLayout(
-		_ line: String, shape: @escaping (String, Double, String, Int, Int, String, [Double]) throws -> [Double]
+		_ line: String, shape: @escaping (String, Double, String, Int, Int, String, Bool, String, [Double]) throws -> [Double]
 	) -> String {
 		// The translated harness turns any error into ["threw"]; the shaper's own reason is kept to report it by name.
 		var refused: String?
-		let shaper = GlyphShaper { face, size, text, start, end, _, rtl, language, features in
+		let shaper = GlyphShaper { face, size, text, start, end, script, rtl, language, features in
 			do {
-				if rtl { throw RowShapingError(description: "right-to-left text in a row is not shaped on iOS yet") }
-				return JsArray(try shape(face.description, size, text.description, Int(start), Int(end), language.description, features.items))
+				return JsArray(try shape(face.description, size, text.description, Int(start), Int(end), script.description, rtl, language.description, features.items))
 			} catch {
 				refused = "\(error)"
 				throw error
@@ -50,9 +50,4 @@ public enum DragonPlan {
 			return "[\"threw\"]"
 		}
 	}
-}
-
-/// A row's text this host cannot shape as the build does.
-struct RowShapingError: Error, CustomStringConvertible {
-	let description: String
 }

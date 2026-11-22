@@ -28,6 +28,8 @@ public final class MarklessViewController: UIViewController {
 	/// How long the last layout at the screen's size took, in milliseconds (Dragon's layout of every assignment and the views' move).
 	private var layoutMilliseconds: Double?
 	private let fonts: [String: Data]
+	/// Shapes a row's text in a face the app bundles with Dragon's HarfBuzz, when the app is built with it.
+	private lazy var bundledShaper = bundledRowShaper()
 	private let images: [String: NativeImageAsset]
 	private let store: NativeStore
 	private let device: NativeDevice
@@ -363,9 +365,14 @@ public final class MarklessViewController: UIViewController {
 			guard size.width > 0, size.height > 0, rowsMoved || size != laidOutFor?.size || slots.map(\.bitPattern) != laidOutFor?.slots.map(\.bitPattern) || texts != laidOutFor?.texts else { return }
 			let scale = Double(traitCollection.displayScale)
 			let shaper = coreTextRowShaper(faces: style.systemFaces, dpr: scale)
+			let bundled = bundledShaper
 			var unshaped = false
-			let shape: (String, Double, String, Int, Int, String, [Double]) throws -> [Double] = { face, size, text, start, end, language, features in
-				if style.systemFaces[face] == nil { unshaped = true }
+			let shape: (String, Double, String, Int, Int, String, Bool, String, [Double]) throws -> [Double] = { face, size, text, start, end, script, rtl, language, features in
+				if style.systemFaces[face] == nil {
+					if let bundled, let bytes = self.fonts[face] { return try bundled(face, bytes, size, text, start, end, script, rtl, language, features) }
+					unshaped = true
+				}
+				if rtl { throw RowShapingRefusal(description: "right-to-left text in a row is not shaped on iOS yet") }
 				return try shaper(face, size, text, start, end, language, features)
 			}
 			let rows = style.planRepeats.isEmpty ? nil : try style.shownRows(payload, runtime: runtime)
