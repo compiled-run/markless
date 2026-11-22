@@ -1,7 +1,8 @@
+import { execFile } from 'node:child_process';
 import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
-import { buildFixture } from '../../../router/test/support/fixture-build.ts';
+import { promisify } from 'node:util';
 
 const packagesRoot = join(import.meta.dirname, '..', '..', '..');
 
@@ -19,14 +20,14 @@ export async function buildAppServer(appDir: string, out: string): Promise<void>
 		await symlink(join(packagesRoot, 'headless/components'), join(root, 'node_modules/@markless/ui'), 'dir');
 		// API routes import the server runtime the router builds on.
 		await symlink(join(packagesRoot, 'router/node_modules/nitro'), join(root, 'node_modules/nitro'), 'dir');
-		const nodeEnv = process.env.NODE_ENV;
-		// Vitest's NODE_ENV=test leaves import.meta.env.DEV true in a build.
-		process.env.NODE_ENV = 'production';
 		try {
-			await buildFixture({ root, configFile: join(root, 'vite.config.ts') });
-		} finally {
-			if (nodeEnv === undefined) delete process.env.NODE_ENV;
-			else process.env.NODE_ENV = nodeEnv;
+			await promisify(execFile)(process.execPath, [join(import.meta.dirname, 'app-server-child.ts'), root], {
+				env: { ...process.env, NODE_ENV: 'production' },
+				maxBuffer: 64 * 1024 * 1024,
+			});
+		} catch (error) {
+			const failed = error as { stdout?: string; stderr?: string; message: string };
+			throw new Error(`${basename(appDir)}'s web build failed: ${[failed.stderr, failed.stdout].filter(Boolean).join('\n').trim() || failed.message}`);
 		}
 		await rm(out, { recursive: true, force: true });
 		await cp(join(root, '.output'), out, { recursive: true });
