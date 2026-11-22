@@ -462,6 +462,25 @@ export type NativeColor = {
 	readonly alpha: number;
 };
 
+/** A gradient's colour at `offset` (0 to 1, never less than the stop before it). */
+export type NativeGradientStop = { readonly offset: number; readonly color: NativeColor };
+
+/**
+ * An SVG `<linearGradient>` or `<radialGradient>` paint (SVG 2 §14.2), padded: the first stop's colour before it, the last
+ * one's after it. The first stop is at 0 and the last at 1. Colours blend unpremultiplied in sRGB, as the browser blends
+ * them; where two stops differ in both colour and alpha the compiler adds stops between them, so a host that blends
+ * premultiplied draws the same colours.
+ */
+export type NativeGradient = (
+	| { readonly linear: readonly [x1: number, y1: number, x2: number, y2: number] }
+	/** From the focal circle (fx, fy, fr) to the circle (cx, cy, r), which holds it. */
+	| { readonly radial: readonly [fx: number, fy: number, fr: number, cx: number, cy: number, r: number] }
+) & {
+	readonly stops: ReadonlyArray<NativeGradientStop>;
+	/** The affine map from the gradient's units to the shape's: its bounding box, then `gradientTransform`. */
+	readonly transform?: readonly [number, number, number, number, number, number];
+};
+
 /** One shape of a drawing; numbers are in the drawing's user units. */
 export type NativeShape = {
 	/**
@@ -470,9 +489,9 @@ export type NativeShape = {
 	 */
 	readonly path: ReadonlyArray<number>;
 	/** `currentColor` is the svg's text colour: its style export's, else the page's default black. */
-	readonly fill: NativeColor | 'currentColor' | null;
+	readonly fill: NativeColor | 'currentColor' | NativeGradient | null;
 	readonly fillRule: 'nonzero' | 'evenodd';
-	readonly stroke: NativeColor | 'currentColor' | null;
+	readonly stroke: NativeColor | 'currentColor' | NativeGradient | null;
 	readonly width: number;
 	readonly cap: 'butt' | 'round' | 'square';
 	readonly join: 'miter' | 'round' | 'bevel';

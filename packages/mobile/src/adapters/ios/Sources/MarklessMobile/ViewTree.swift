@@ -151,17 +151,32 @@ final class DrawingView: UIView {
 			}
 			if let fill = shape.fill {
 				context.addPath(path)
-				context.setFillColor(color(fill).cgColor)
-				context.fillPath(using: shape.evenOdd ? .evenOdd : .winding)
+				if case let .gradient(gradient) = fill {
+					context.saveGState()
+					context.clip(using: shape.evenOdd ? .evenOdd : .winding)
+					Self.draw(gradient, in: context)
+					context.restoreGState()
+				} else {
+					context.setFillColor(color(fill).cgColor)
+					context.fillPath(using: shape.evenOdd ? .evenOdd : .winding)
+				}
 			}
 			if let stroke = shape.stroke, shape.width > 0 {
 				context.addPath(path)
-				context.setStrokeColor(color(stroke).cgColor)
 				context.setLineWidth(shape.width)
 				context.setLineCap(shape.cap == "round" ? .round : shape.cap == "square" ? .square : .butt)
 				context.setLineJoin(shape.join == "round" ? .round : shape.join == "bevel" ? .bevel : .miter)
 				context.setMiterLimit(shape.miterLimit)
-				context.strokePath()
+				if case let .gradient(gradient) = stroke {
+					context.saveGState()
+					context.replacePathWithStrokedPath()
+					context.clip()
+					Self.draw(gradient, in: context)
+					context.restoreGState()
+				} else {
+					context.setStrokeColor(color(stroke).cgColor)
+					context.strokePath()
+				}
 			}
 			context.restoreGState()
 		}
@@ -277,6 +292,24 @@ final class DrawingView: UIView {
 		switch paint {
 		case .currentColor: currentColor
 		case let .color(c): UIColor(red: c.r / 255, green: c.g / 255, blue: c.b / 255, alpha: c.alpha / 255)
+		case .gradient: .clear
+		}
+	}
+
+	/// Fills the clip with a gradient, padded past its ends, its colours blended in sRGB as the browser blends them.
+	private static func draw(_ g: NativeGradient, in context: CGContext) {
+		let components = g.stops.flatMap { [$0.color.r / 255, $0.color.g / 255, $0.color.b / 255, $0.color.alpha / 255].map { CGFloat($0) } }
+		guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+			let gradient = CGGradient(colorSpace: space, colorComponents: components, locations: g.stops.map { CGFloat($0.offset) }, count: g.stops.count)
+		else { return }
+		if let t = g.transform { context.concatenate(CGAffineTransform(a: t[0], b: t[1], c: t[2], d: t[3], tx: t[4], ty: t[5])) }
+		let pad: CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+		if let l = g.linear {
+			context.drawLinearGradient(gradient, start: CGPoint(x: l[0], y: l[1]), end: CGPoint(x: l[2], y: l[3]), options: pad)
+		} else if let r = g.radial {
+			context.drawRadialGradient(
+				gradient, startCenter: CGPoint(x: r[0], y: r[1]), startRadius: r[2], endCenter: CGPoint(x: r[3], y: r[4]), endRadius: r[5],
+				options: pad)
 		}
 	}
 }

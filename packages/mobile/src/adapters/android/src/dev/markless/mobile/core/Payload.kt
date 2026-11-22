@@ -186,10 +186,12 @@ data class Rgba(val r: Int, val g: Int, val b: Int, val alpha: Int) {
 	val argb: Int get() = (alpha shl 24) or (r shl 16) or (g shl 8) or b
 }
 
-/** A shape's paint: a colour, the svg's text colour, or none. */
+/** A shape's paint: a colour, the svg's text colour, a gradient, or none. */
 sealed interface ShapePaint {
 	data class Color(val color: Rgba) : ShapePaint
 	data object Current : ShapePaint
+	/** A padded SVG gradient, stops 0 to 1: [linear] x1 y1 x2 y2, or [radial] fx fy fr cx cy r; [transform] maps it to the shape. */
+	data class Gradient(val linear: List<Double>?, val radial: List<Double>?, val offsets: List<Double>, val colors: List<Rgba>, val transform: List<Double>?) : ShapePaint
 }
 
 /** One shape: verb-coded path (0 move, 1 line, 3 cubic, 4 close), its paint and stroke, and an optional affine map [a,b,c,d,e,f]. */
@@ -881,18 +883,40 @@ data class Payload(
 			)
 		}
 
-		private fun paint(v: Json, what: String): ShapePaint? = when (v) {
+		private fun rgba(v: Json, what: String): Rgba {
+			val o = v.obj(what)
+			o.only(setOf("r", "g", "b", "alpha"), what)
+			fun channel(name: String): Int {
+				val n = o.field(name, what).num("$what.$name")
+				if (n < 0 || n > 255 || n != Math.floor(n)) throw MarklessDecodeError("$what.$name is $n; a channel is an integer 0-255")
+				return n.toInt()
+			}
+			return Rgba(channel("r"), channel("g"), channel("b"), channel("alpha"))
+		}
+
+		private fun paint(v: Json, what: String, gradients: Boolean = false): ShapePaint? = when (v) {
 			Json.Null -> null
 			is Json.Str -> if (v.value == "currentColor") ShapePaint.Current else throw MarklessDecodeError("$what must be a colour, \"currentColor\" or null")
 			else -> {
 				val o = v.obj(what)
-				o.only(setOf("r", "g", "b", "alpha"), what)
-				fun channel(name: String): Int {
-					val n = o.field(name, what).num("$what.$name")
-					if (n < 0 || n > 255 || n != Math.floor(n)) throw MarklessDecodeError("$what.$name is $n; a channel is an integer 0-255")
-					return n.toInt()
-				}
-				ShapePaint.Color(Rgba(channel("r"), channel("g"), channel("b"), channel("alpha")))
+				if (gradients && ("linear" in o || "radial" in o)) {
+					o.only(setOf("linear", "radial", "stops", "transform"), what)
+					fun numbers(name: String, count: Int) = o[name]?.arr("$what.$name")?.map { it.num("$what.$name[]") }?.also {
+						if (it.size != count) throw MarklessDecodeError("$what.$name must hold $count numbers")
+					}
+					val linear = numbers("linear", 4)
+					val radial = numbers("radial", 6)
+					if ((linear == null) == (radial == null)) throw MarklessDecodeError("$what is a linear or a radial gradient")
+					val stops = o.field("stops", what).arr("$what.stops").mapIndexed { n, sv ->
+						val so = sv.obj("$what.stops[$n]")
+						so.only(setOf("offset", "color"), "$what.stops[$n]")
+						so.field("offset", "$what.stops[$n]").num("$what.stops[$n].offset") to rgba(so.field("color", "$what.stops[$n]"), "$what.stops[$n].color")
+					}
+					val offsets = stops.map { it.first }
+					if (stops.size < 2 || offsets.first() != 0.0 || offsets.last() != 1.0 || offsets.zipWithNext().any { (a, b) -> a > b })
+						throw MarklessDecodeError("$what.stops must run in order from 0 to 1")
+					ShapePaint.Gradient(linear, radial, offsets, stops.map { it.second }, numbers("transform", 6))
+				} else ShapePaint.Color(rgba(v, what))
 			}
 		}
 
@@ -956,8 +980,8 @@ data class Payload(
 			val transform = so["transform"]?.arr("$w.transform")?.map { it.num("$w.transform[]") }
 			if (transform != null && transform.size != 6) throw MarklessDecodeError("$w.transform must hold six numbers")
 			return Shape(
-				path, paint(so.field("fill", w), "$w.fill"), oneOf(so, "fillRule", setOf("nonzero", "evenodd"), w) == "evenodd",
-				paint(so.field("stroke", w), "$w.stroke"), so.field("width", w).num("$w.width"),
+				path, paint(so.field("fill", w), "$w.fill", gradients = true), oneOf(so, "fillRule", setOf("nonzero", "evenodd"), w) == "evenodd",
+				paint(so.field("stroke", w), "$w.stroke", gradients = true), so.field("width", w).num("$w.width"),
 				oneOf(so, "cap", setOf("butt", "round", "square"), w), oneOf(so, "join", setOf("miter", "round", "bevel"), w),
 				so.field("miterLimit", w).num("$w.miterLimit"), transform,
 				so["text"]?.let { tv ->

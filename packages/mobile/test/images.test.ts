@@ -85,9 +85,33 @@ test('an SVG file is drawn from shapes compiled when the app is built, scaled to
 });
 
 test('an SVG file a native drawing cannot draw is refused, naming why; bytes that are not SVG are no image', () => {
-	const image = svg(`<svg ${NS} viewBox="0 0 4 2"><defs><linearGradient id="g"/></defs><rect width="4" height="2" fill="url(#g)"/></svg>`);
-	expect(image?.refusals.join('\n')).toContain('gradients');
+	const image = svg(`<svg ${NS} viewBox="0 0 4 2"><defs><pattern id="g"/></defs><rect width="4" height="2" fill="url(#g)"/></svg>`);
+	expect(image?.refusals).toEqual(['`fill="url(#g)"` on <rect> names a <pattern>, which a native drawing does not paint with yet']);
 	expect(svg('<svg><rect></svg>')).toBeNull();
 	expect(svg('<html xmlns="http://www.w3.org/1999/xhtml"/>')).toBeNull();
 	expect(svg('not markup')).toBeNull();
+});
+
+test("an SVG file's gradients paint its shapes, their stops read from the file and the href they name", () => {
+	const image = svg(`<svg ${NS} xmlns:xlink="http://www.w3.org/1999/xlink" width="40" height="20" viewBox="0 0 40 20">
+	<path d="M0 0H20V20H0Z" fill="url(#a)"/>
+	<rect x="20" width="20" height="20" fill="url(#b)"/>
+	<defs>
+		<linearGradient id="a" x1="0" y1="0" x2="20" y2="20" gradientUnits="userSpaceOnUse">
+			<stop stop-color="#41D1FF"/>
+			<stop offset="1" stop-color="#BD34FE"/>
+		</linearGradient>
+		<radialGradient id="b" xlink:href="#a" gradientUnits="objectBoundingBox"/>
+	</defs>
+</svg>`);
+	expect(image?.refusals).toEqual([]);
+	const [first, second] = image!.image.drawing.shapes;
+	expect(first?.fill).toEqual({
+		linear: [0, 0, 20, 20],
+		stops: [
+			{ offset: 0, color: { r: 0x41, g: 0xd1, b: 0xff, alpha: 255 } },
+			{ offset: 1, color: { r: 0xbd, g: 0x34, b: 0xfe, alpha: 255 } },
+		],
+	});
+	expect(second?.fill).toMatchObject({ radial: [0.5, 0.5, 0, 0.5, 0.5, 0.5], transform: [20, 0, 0, 20, 20, 0] });
 });

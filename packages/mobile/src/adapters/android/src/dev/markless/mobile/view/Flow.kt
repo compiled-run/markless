@@ -3,9 +3,12 @@ package dev.markless.mobile.view
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RadialGradient
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.text.SpannableStringBuilder
 import android.text.Spanned
@@ -255,13 +258,13 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double, 
 			shape.fill?.let { fill ->
 				paint.reset(); paint.isAntiAlias = true
 				paint.style = Paint.Style.FILL
-				paint.color = colorOf(fill)
+				paintWith(fill)
 				canvas.drawPath(path, paint)
 			}
 			shape.stroke?.let { stroke ->
 				paint.reset(); paint.isAntiAlias = true
 				paint.style = Paint.Style.STROKE
-				paint.color = colorOf(stroke)
+				paintWith(stroke)
 				paint.strokeWidth = shape.width.toFloat()
 				paint.strokeCap = when (shape.cap) { "round" -> Paint.Cap.ROUND; "square" -> Paint.Cap.SQUARE; else -> Paint.Cap.BUTT }
 				paint.strokeJoin = when (shape.join) { "round" -> Paint.Join.ROUND; "bevel" -> Paint.Join.BEVEL; else -> Paint.Join.MITER }
@@ -329,6 +332,29 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double, 
 	private fun colorOf(paint: ShapePaint): Int = when (paint) {
 		is ShapePaint.Color -> paint.color.argb
 		ShapePaint.Current -> currentColor
+		is ShapePaint.Gradient -> Color.TRANSPARENT
+	}
+
+	private val shaders = HashMap<ShapePaint.Gradient, Shader>()
+
+	private fun paintWith(given: ShapePaint) {
+		if (given !is ShapePaint.Gradient) { paint.color = colorOf(given); return }
+		paint.color = Color.BLACK
+		paint.shader = shaders.getOrPut(given) { shaderOf(given) }
+	}
+
+	/** A gradient clamped past its ends (SVG's pad), its colours blended in sRGB as the browser blends them. */
+	private fun shaderOf(g: ShapePaint.Gradient): Shader {
+		val colors = g.colors.map { it.argb }.toIntArray()
+		val offsets = g.offsets.map { it.toFloat() }.toFloatArray()
+		val shader = g.linear?.let { (x1, y1, x2, y2) -> LinearGradient(x1.toFloat(), y1.toFloat(), x2.toFloat(), y2.toFloat(), colors, offsets, Shader.TileMode.CLAMP) }
+			?: g.radial!!.let { r ->
+				RadialGradient(r[0].toFloat(), r[1].toFloat(), r[2].toFloat(), r[3].toFloat(), r[4].toFloat(), r[5].toFloat(), colors.map { Color.pack(it) }.toLongArray(), offsets, Shader.TileMode.CLAMP)
+			}
+		g.transform?.let { (a, b, c, d, e, f) ->
+			shader.setLocalMatrix(Matrix().apply { setValues(floatArrayOf(a.toFloat(), c.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) })
+		}
+		return shader
 	}
 }
 
