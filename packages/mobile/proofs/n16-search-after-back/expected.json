@@ -1,0 +1,47 @@
+{
+	"rung": "N16",
+	"name": "A list's search field in an @else arm that shows once a note is saved is still there after opening a note and going back, as on the web",
+	"steps": [
+		{ "visible": ["No notes yet", "Write your first note"], "title": "All notes" },
+		{
+			"do": { "tap": "Write your first note" },
+			"visible": ["New note", "Save note"],
+			"absent": ["No notes yet"],
+			"title": "New note"
+		},
+		{
+			"do": { "type": { "field": "Title", "text": "Groceries" } },
+			"visible": ["Save note"],
+			"fields": { "Title": "Groceries" }
+		},
+		{
+			"do": { "tap": "Save note" },
+			"visible": ["Groceries", "Edit"],
+			"absent": ["Save note"],
+			"title": "Note"
+		},
+		{
+			"do": { "tap": "Notes" },
+			"visible": ["All notes", "Groceries", "Search notes"],
+			"absent": ["Edit"],
+			"title": "All notes"
+		},
+		{
+			"do": { "tap": "Groceries" },
+			"visible": ["Edit"],
+			"absent": ["Search notes"],
+			"title": "Note"
+		},
+		{
+			"do": { "back": "button" },
+			"visible": ["All notes", "Groceries", "Search notes"],
+			"absent": ["Edit"],
+			"title": "All notes"
+		},
+		{
+			"do": { "type": { "field": "Search notes", "text": "zzz" } },
+			"visible": ["No notes match “zzz”"],
+			"absent": ["Groceries"]
+		}
+	]
+}

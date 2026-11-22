@@ -14,6 +14,11 @@ Android APK around the hosts in `src/adapters/`, embeds the payload, installs bo
 itself (and shuts down afterwards unless `--keep-devices`), runs the rung's `flow.yaml` with Maestro on each, saves a
 screenshot after every step and before every action to `<rung>/screenshots/{ios,android}/`, and checks every step of
 `expected.json`.
+
+A styled rung or app page gets its style export from Dragon (`MARKLESS_DRAGON_DIR`). An app's pages export at once, up to one
+per worker the machine queue gives (`HEAVY_WORKERS`). Each export is cached under `~/.cache/markless-proof/style-exports` by
+a hash of Dragon's commit, `--plan`, the OS release (the system fonts), the input file's path and bytes, and every font file it
+names; a Dragon checkout with uncommitted changes is never cached. A rebuild with nothing changed takes about a second.
 It exits 1 unless every rung passes on both platforms; there is no way to run one platform alone.
 
 | What                     | Where                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |

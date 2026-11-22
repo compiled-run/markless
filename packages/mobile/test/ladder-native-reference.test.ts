@@ -321,6 +321,8 @@ function mirror(
 		// A press on a <label> acts on the control its `for` names, as both hosts pass it on.
 		pressed: (host: string) => (nodeOf.get(baseOf(host))?.element === 'label' ? (attributes.get(`${host}\0for`) ?? host) : host),
 		disabled: (host: string) => attributes.get(`${host}\0disabled`) != null,
+		/** The control a <label> names, which a host types into when the label's text is the field's name. */
+		labelled: (host: string) => attributes.get(`${host}\0for`) ?? null,
 		/** Types into the emptied field and returns what it holds. */
 		typed: (host: string, text: string) => {
 			const bound = attributes.get(`${host}\0maxlength`);
@@ -337,7 +339,8 @@ function mirror(
 		},
 		check(step: LadderStep, index: number) {
 			for (const [field, value] of Object.entries(step.fields ?? {})) {
-				const host = elementReading(field);
+				const reading = elementReading(field);
+				const host = reading && (attributes.get(`${reading}\0for`) ?? reading);
 				expect(host && properties.get(host), `step ${index}: the field "${field}"`).toBe(
 					value,
 				);
@@ -466,9 +469,10 @@ function walkApp(
 			for (const entry of appRuntime.dispatch({ event: 'choose', host: choice.option })) top.apply(entry, index);
 		} else if (action) {
 			const top = stack.at(-1)!;
-			const host = top.elementReading(
+			const reading = top.elementReading(
 				'tap' in action ? action.tap : 'type' in action ? action.type.field : '',
 			);
+			const host = reading && 'type' in action ? (top.labelled(reading) ?? reading) : reading;
 			if (!host) throw new Error(`step ${index}: nothing on the top screen to act on`);
 			const journal =
 				'tap' in action
