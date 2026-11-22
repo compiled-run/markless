@@ -1,6 +1,7 @@
 package dev.markless.mobile.view
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
@@ -11,6 +12,7 @@ import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.TextView
+import dev.markless.mobile.style.PaddingBox
 
 /** The element view: children stack vertically until a style export assigns frames, then each child sits at its frame. */
 open class MarklessBox(context: Context) : FrameLayout(context) {
@@ -40,6 +42,37 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 			if (field != value) invalidate()
 			field = value
 		}
+
+	/** Each child's outer shadows: a bitmap drawn just before the child, at a device px offset from its top-left. */
+	private val childShadows = HashMap<View, Triple<Bitmap, Int, Int>>()
+
+	internal fun childShadow(child: View, shadow: Triple<Bitmap, Int, Int>?) {
+		if (childShadows[child] == shadow) return
+		if (shadow == null) childShadows.remove(child) else childShadows[child] = shadow
+		invalidate()
+	}
+
+	/** This box's inset shadows, over its background and under its children, at a device px offset from its top-left. */
+	internal var insetShadow: Triple<Bitmap, Int, Int>? = null
+		set(value) {
+			if (field != value) invalidate()
+			field = value
+		}
+
+	override fun drawChild(canvas: Canvas, child: View, drawingTime: Long): Boolean {
+		childShadows[child]?.let { (bitmap, dx, dy) -> canvas.drawBitmap(bitmap, (child.left + dx).toFloat(), (child.top + dy).toFloat(), null) }
+		return super.drawChild(canvas, child, drawingTime)
+	}
+
+	override fun onDraw(canvas: Canvas) {
+		super.onDraw(canvas)
+		insetShadow?.let { (bitmap, dx, dy) -> canvas.drawBitmap(bitmap, dx.toFloat(), dy.toFloat(), null) }
+	}
+
+	override fun onViewRemoved(child: View) {
+		super.onViewRemoved(child)
+		childShadows.remove(child)
+	}
 
 	override fun draw(canvas: Canvas) {
 		val c = clip ?: return super.draw(canvas)
@@ -166,10 +199,10 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 		}
 	}
 
-	/** overflow clipping to a rounded padding box: its corner radii in px (x, y per corner from top left), which its children draw inside. */
-	internal var childClipRadii: FloatArray? = null
+	/** Overflow other than visible: the padding box its children, and their shadows, draw inside; null when overflow is visible. */
+	internal var childClip: PaddingBox? = null
 		set(value) {
-			if (!(field contentEquals value)) invalidate()
+			if (field != value) invalidate()
 			field = value
 		}
 
@@ -177,11 +210,13 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 		kotlin.math.ceil(maxOf(markerPaint.measureText(DISCLOSURE_CLOSED), markerPaint.measureText(DISCLOSURE_OPEN)) + gap).toInt()
 
 	override fun dispatchDraw(canvas: Canvas) {
-		val radii = childClipRadii
-		if (radii == null) super.dispatchDraw(canvas)
+		val box = childClip
+		if (box == null) super.dispatchDraw(canvas)
 		else {
 			val saved = canvas.save()
-			canvas.clipPath(Path().apply { addRoundRect(RectF(0f, 0f, width.toFloat(), height.toFloat()), radii, Path.Direction.CW) })
+			val inner = RectF(box.left.toFloat(), box.top.toFloat(), width - box.right.toFloat(), height - box.bottom.toFloat())
+			if (box.rounded) canvas.clipPath(Path().apply { addRoundRect(inner, box.radii.map { it.toFloat() }.toFloatArray(), Path.Direction.CW) })
+			else canvas.clipRect(inner)
 			super.dispatchDraw(canvas)
 			canvas.restoreToCount(saved)
 		}

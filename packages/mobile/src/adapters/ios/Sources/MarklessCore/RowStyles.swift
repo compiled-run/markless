@@ -54,6 +54,7 @@ extension StyleExport {
 		let texts = Dictionary(try runtime.texts().map { ($0.node, $0.text) }, uniquingKeysWith: { a, _ in a })
 		let attributes = Dictionary(try runtime.attributes().map { ("\($0.node)\u{0}\($0.name)", $0.value) }, uniquingKeysWith: { a, _ in a })
 		let lists = Dictionary(try runtime.rows().map { ($0.node, $0.keys) }, uniquingKeysWith: { a, _ in a })
+		let slotValues = Dictionary(try runtime.slots().map { ($0.slot, $0.value) }, uniquingKeysWith: { a, _ in a })
 		// Each row state of the export: its index, the template element and attribute it follows, and the values it lists.
 		var rowStates: [(state: Int, node: String, attribute: String, options: [String?], list: String)] = []
 		for (index, state) in states.enumerated() {
@@ -90,7 +91,9 @@ extension StyleExport {
 					}
 					var own: [String: String] = [:]
 					for text in rowTexts where text.row == node.id { own[text.id] = texts["\(text.id)@\(key)"] ?? "" }
-					return LaidOutRow(key: key, assignment: reached, texts: own)
+					var ownSlots: [String: Double] = [:]
+					for slot in payload.slots where slot.row == node.id { ownSlots[slot.id] = slotValues["\(slot.id)@\(key)"] }
+					return LaidOutRow(key: key, assignment: reached, texts: own, slots: ownSlots)
 				}
 			}
 			return out

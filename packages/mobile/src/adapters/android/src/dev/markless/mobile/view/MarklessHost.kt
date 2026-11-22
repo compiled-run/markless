@@ -23,6 +23,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewParent
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -60,7 +61,10 @@ import dev.markless.mobile.core.Runtime
 import dev.markless.mobile.core.Scope
 import dev.markless.mobile.core.Store
 import dev.markless.mobile.style.Assignment
+import dev.markless.mobile.style.Edges
+import dev.markless.mobile.style.paddingBox
 import dev.markless.mobile.style.BAND_KEY
+import dev.markless.mobile.style.ShadowPaint
 import dev.markless.mobile.style.StyleExport
 import dev.markless.mobile.style.shownRows
 import dev.markless.mobile.core.pickerContent
@@ -172,6 +176,8 @@ class MarklessHost(
 		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
 		onScriptEntry = AppScriptEngine::entryRan
 		measure = this@MarklessHost::measureBox
+		// Chrome on Android reports the display density as devicePixelRatio.
+		devicePixelRatio = { context.resources.displayMetrics.density.toDouble() }
 		// "Remove animations" sets the animator duration scale to 0, as Chrome on Android reads prefers-reduced-motion.
 		media = {
 			val scale = android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
@@ -186,7 +192,10 @@ class MarklessHost(
 		val slots = style?.slots.orEmpty()
 		if (slots.isNotEmpty() && planLayout == null) throw MarklessHostError("style values that follow state need Dragon's layout plan, which this host does not link")
 		val integer = payload.slots.associate { it.id to it.integer }
+		val rowSlots = payload.slots.filter { it.row != null }.map { it.id }.toSet()
 		for (s in slots) {
+			// A slot inside a row has a value per row copy, which the rows carry; the page lays its template out at the first value.
+			if (s.id in rowSlots) values.putIfAbsent(s.id, s.initial)
 			if (s.id !in values) throw MarklessHostError("style export reads slot \"${s.id}\", which the payload does not have")
 			if (s.integer && integer[s.id] != true) throw MarklessHostError("style export laid slot \"${s.id}\" out at whole numbers only, but the payload's slot may take any number")
 		}
@@ -208,6 +217,8 @@ class MarklessHost(
 	private val glyphLines = HashMap<TextView, GlyphLines>()
 	/** Each styled text view's node and its frame origin inside the view, for drawing its lines again when its text changes. */
 	private val lineSources = HashMap<TextView, Pair<StyledNode, Pair<Double, Double>>>()
+	/** The shadow each box's bitmaps were rastered for. */
+	private val shadowsDrawn = HashMap<View, ShadowPaint>()
 	/** Without a style export, text flows in paragraphs (one text view each); with one, Dragon lays out every text node. */
 	private val flow: TextFlow? = if (style == null) TextFlow(payload) else null
 	/** Each shown text instance's current string, which its paragraph view is rendered from. */
@@ -573,6 +584,7 @@ class MarklessHost(
 	fun apply(journal: List<JournalEntry>) {
 		dismissMessage()
 		var slotMoved = false
+		var rowSlotMoved = false
 		for (entry in journal) {
 			when (entry) {
 				is JournalEntry.Text -> if (flow != null) {
@@ -594,8 +606,10 @@ class MarklessHost(
 					repaint()
 				}
 				is JournalEntry.Slot -> {
-					if (slotValues.put(entry.slot, entry.value) == null) throw MarklessHostError("journal sets slot \"${entry.slot}\", which the payload does not have")
-					slotMoved = slotMoved || planned?.slots.orEmpty().any { it.id == entry.slot }
+					val base = entry.slot.substringBefore('@')
+					if (slotValues.put(entry.slot, entry.value) == null && base == entry.slot) throw MarklessHostError("journal sets slot \"${entry.slot}\", which the payload does not have")
+					slotMoved = slotMoved || planned?.slots.orEmpty().any { it.id == base }
+					rowSlotMoved = rowSlotMoved || base != entry.slot
 				}
 				// Each select's shown choice is read again once the whole journal is applied.
 				is JournalEntry.Selected -> {}
@@ -638,7 +652,7 @@ class MarklessHost(
 			}
 			Log.i(TAG, "journal ${entry.toJson()}")
 		}
-		if (slotMoved) laidOutFor?.let { layOutAt(it.first, it.second) }
+		if (slotMoved) laidOutFor?.let { layOutAt(it.first, it.second, rowsMoved = rowSlotMoved) }
 		syncSheets()
 		refreshRelations()
 		refreshSelects()
@@ -1519,6 +1533,7 @@ class MarklessHost(
 			if (view is MarklessBox) sizeScroller(inst.id, view, s, rect)
 		}
 		paint(view, s, styled)
+		paintShadow(view, s, styled)
 		if (view is SelectBox) selectLabel(view, s, styled, absolute)
 		if (view is TextView && node is Node.Text) {
 			lineSources[view] = s to inView
@@ -1548,6 +1563,34 @@ class MarklessHost(
 		} else {
 			view.accessibilityTraversalAfter = View.NO_ID
 			reorder(box)
+		}
+	}
+
+	/** box-shadow: rastered by Dragon's translated painter after a layout that moves or changes the box or what is beneath it. */
+	private fun paintShadow(view: View, s: StyledNode, styled: Assignment) {
+		val shadow = ShadowPaint.of(s, styled, dpr)
+		val parent = view.parent as? MarklessBox
+		if (shadow == null) {
+			shadowsDrawn.remove(view)
+			parent?.childShadow(view, null)
+			(view as? MarklessBox)?.insetShadow = null
+			return
+		}
+		if (shadowsDrawn[view] == shadow) return
+		if (shadow.hasOuter && parent == null) throw MarklessHostError("\"${s.id}\" has an outer box-shadow outside any box; not implemented on Android")
+		if (shadow.hasInset && view !is MarklessBox) throw MarklessHostError("\"${s.id}\" has an inset box-shadow on a ${view.javaClass.simpleName}; not implemented on Android")
+		if (shadow.hasOuter && (view as? MarklessBox)?.clip != null) throw MarklessHostError("\"${s.id}\" has a box-shadow and a clip-path; not implemented on Android")
+		val raster = ShadowRaster.dragon ?: throw MarklessHostError("box-shadow is rastered by Dragon's translated painter, which this build does not link")
+		val (outer, inset) = raster.raster(shadow)
+		parent?.childShadow(view, outer)
+		(view as? MarklessBox)?.insetShadow = inset
+		shadowsDrawn[view] = shadow
+		// The shadow reaches past its box: each box around it up to one that clips its overflow lets its children draw outside them.
+		var at: ViewParent? = parent
+		while (outer != null && at is MarklessBox && at.childClip == null) {
+			val around = at.parent as? MarklessBox ?: break
+			around.clipChildren = false
+			at = around
 		}
 	}
 
@@ -1648,17 +1691,20 @@ class MarklessHost(
 			}
 			StyleWrite.ClipText -> {}
 			is StyleWrite.PaintOrder -> {}
+			is StyleWrite.BoxShadow -> {}
 			is StyleWrite.Checkbox -> if (view !is CheckBox) throw MarklessHostError("\"${s.id}\" draws a themed checkbox but is not a checkbox")
 			is StyleWrite.Visibility -> {}
 			is StyleWrite.RuntimeImage -> {}
 			is StyleWrite.SelectArrow -> if (view !is SelectBox) throw MarklessHostError("\"${s.id}\" draws a drop-down arrow but is not a select")
 		}
 		if (s.kind != "text") {
-			val edges = s.borderWidths
-			if (clipsChildren && edges != null && listOf(edges.top, edges.right, edges.bottom, edges.left).any { it != 0.0 }) throw MarklessHostError("\"${s.id}\" clips overflow to its padding box past borders, which is not implemented on Android")
+			val edges = s.borderWidths ?: Edges(0.0, 0.0, 0.0, 0.0)
+			val bordered = listOf(edges.top, edges.right, edges.bottom, edges.left).any { it != 0.0 }
+			if (clipsChildren && bordered && s.borderOps != null) throw MarklessHostError("\"${s.id}\" clips overflow to its padding box inside a dashed or dotted border, which is not implemented on Android")
 			if (view is MarklessBox) {
 				view.clip = clip
-				view.childClipRadii = if (clipsChildren) radii?.takeIf { r -> r.any { it != 0.0 } }?.map { it.toFloat() }?.toFloatArray() else null
+				// Always its own clip: a shadow elsewhere may have turned off its parent's clipChildren.
+				view.childClip = if (clipsChildren) paddingBox(edges, radii) else null
 			}
 			else if (clip != null) throw MarklessHostError("\"${s.id}\" has a clip-path on a ${view.javaClass.simpleName}, which is not implemented on Android")
 		}
@@ -1680,7 +1726,7 @@ class MarklessHost(
 			val image = s.runtimeImage ?: throw MarklessHostError("\"${s.id}\" draws the images its app loads, but the style export gives it no runtime-image write")
 			val place = s.runtimeImagePlace ?: throw MarklessHostError("\"${s.id}\" draws an image its app loads, but has no content box")
 			loaded.spec = Triple(image, place, dpr)
-			loaded.edge = radii to listOf(bw.top, bw.right, bw.bottom, bw.left)
+			loaded.edge = paddingBox(bw, radii)
 		}
 		val checkbox = s.checkboxMarks?.let { ThemedCheckbox(it, s.writes.filterIsInstance<StyleWrite.Checkbox>().last().colors) }
 		if (checkbox != null) (view as CheckBox).buttonDrawable = null
@@ -1701,7 +1747,14 @@ class MarklessHost(
 		val anyBorder = widths.any { it > 0 }
 		if ((fill == null || (fill ushr 24) == 0) && !anyBorder) { view.background = arrow; return }
 		if (anyBorder && (widths.distinct().size != 1 || colors?.distinct()?.size != 1)) {
-			if (radii?.any { it != 0.0 } == true) throw MarklessHostError("\"${s.id}\" has unequal border sides with rounded corners; not implemented on Android")
+			val rounded = radii?.takeIf { r -> r.any { it != 0.0 } }
+			if (rounded != null) {
+				val drawn = colors?.filterIndexed { i, _ -> widths[i] > 0 }?.distinct()
+				if (drawn?.size != 1) throw MarklessHostError("\"${s.id}\" has border sides of different colours with rounded corners; not implemented on Android")
+				val inner = paddingBox(Edges(widths[0], widths[1], widths[2], widths[3]), rounded)
+				view.background = withArrow { RoundedSides(it, drawn[0], rounded, inner) }
+				return
+			}
 			val sides = colors ?: throw MarklessHostError("\"${s.id}\" has border sides but no colours")
 			view.background = withArrow { SideBorders(it, widths.map { w -> w.toFloat() }, sides) }
 			return

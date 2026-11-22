@@ -10,7 +10,10 @@ import android.graphics.RectF
 import android.media.ExifInterface
 import android.view.View
 import dev.markless.mobile.core.Drawing
+import dev.markless.mobile.style.Edges
 import dev.markless.mobile.style.Frame
+import dev.markless.mobile.style.PaddingBox
+import dev.markless.mobile.style.paddingBox
 import dev.markless.mobile.style.LoadedImageSpec
 import dev.markless.mobile.style.RuntimeImagePaint
 import dev.markless.mobile.style.RuntimeImagePlace
@@ -87,7 +90,7 @@ class LoadedImageView(context: Context, private val packaged: Map<String, Packag
 	var spec: Triple<LoadedImageSpec, RuntimeImagePlace, Double>? = null
 		set(value) { field = value; invalidate() }
 	/** The img's corner radii (eight, device px) and border widths (top, right, bottom, left), for the rounded edge of its content box. */
-	var edge: Pair<List<Double>?, List<Double>> = null to listOf(0.0, 0.0, 0.0, 0.0)
+	var edge: PaddingBox = paddingBox(Edges(0.0, 0.0, 0.0, 0.0), null)
 		set(value) { field = value; invalidate() }
 
 	init {
@@ -131,12 +134,7 @@ class LoadedImageView(context: Context, private val packaged: Map<String, Packag
 				val dest = local(destAt)
 				val saved = canvas.save()
 				canvas.clipRect(local(drawn))
-				val (radii, borders) = edge
-				if (radii != null && radii.any { it != 0.0 }) {
-					// The content box's rounded edge: each outer radius less the border on its side.
-					val inner = FloatArray(8) { k -> maxOf(0.0, radii[k] - borders[RADIUS_SIDES[k]]).toFloat() }
-					canvas.clipPath(Path().apply { addRoundRect(local(contentAt), inner, Path.Direction.CW) })
-				}
+				if (edge.rounded) canvas.clipPath(Path().apply { addRoundRect(local(contentAt), edge.radii.map { it.toFloat() }.toFloatArray(), Path.Direction.CW) })
 				when (picture) {
 					is LoadedPicture.Bitmap -> canvas.drawBitmap(picture.bitmap, null, dest, Paint(if (image.pixelated) 0 else Paint.FILTER_BITMAP_FLAG))
 					is LoadedPicture.Svg -> {
@@ -154,6 +152,3 @@ class LoadedImageView(context: Context, private val packaged: Map<String, Packag
 		}
 	}
 }
-
-/** The border side (top, right, bottom, left) each corner radius (x then y, from top-left clockwise) is inset by. */
-private val RADIUS_SIDES = intArrayOf(3, 0, 1, 0, 1, 2, 3, 2)

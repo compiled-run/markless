@@ -45,6 +45,8 @@ public enum StyleWrite: Sendable {
 	case clipText
 	/// The box paints in another stacking context's order (Dragon's re-hosting); `host` is that context's node.
 	case paintOrder(host: String, bucket: Int, rank: Int)
+	/// box-shadow: the computed shadows in list order.
+	case boxShadow([BoxShadow.Shadow])
 	/// `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own.
 	case visibility(String)
 	/// An `<img>` whose src the app sets as it runs: the host draws whatever image loads into its content box, as Chrome does.
@@ -675,7 +677,8 @@ public struct StyleExport: Sendable {
 			throw PayloadError(path: "plan layout", reason: "the export has \(slots.count) slots and the layout was given \(values.count) values")
 		}
 		let slotted = !slots.isEmpty
-		let slotLine = slotted ? ",\"slots\":[" + values.map { "\"" + String($0.bitPattern, radix: 16).leftPadded(16) + "\"" }.joined(separator: ",") + "]" : ""
+		let hex = { (list: [Double]) -> JSONValue in .array(list.map { .string(String($0.bitPattern, radix: 16).leftPadded(16)) }) }
+		let slotLine = slotted ? ",\"slots\":\(hex(values).jsonText)" : ""
 		var out = self
 		var pages: [ScrollOffsetRange?] = []
 		var undecided: String?
@@ -695,18 +698,17 @@ public struct StyleExport: Sendable {
 							.object([
 								("key", .string(row.key)), ("assignment", .number(Double(row.assignment))),
 								("texts", .array(row.texts.sorted { $0.key < $1.key }.map { .array([.string(dragonId[$0.key] ?? $0.key), .string($0.value)]) })),
-							])
+							] + (slotted ? [("slots", hex(zip(slots, values).map { row.slots[$0.id] ?? $1 }))] : []))
 						})),
 					])
 				}
 				line += ",\"rows\":\(JSONValue.array(lists).jsonText)"
 			}
 			line += "}"
-			guard shown == nil || !slotted else { throw PayloadError(path: "plan layout", reason: "a page with rows and style values that follow state, which Dragon's rows layout does not take yet") }
 			guard shown == nil || rowsLayout != nil else { throw PayloadError(path: "plan layout", reason: "a page with rows needs Dragon's rows layout") }
 			let result = try Reader(JSONValue.parse(Data((shown == nil ? layout(line) : rowsLayout!(line)).utf8)), at: "plan layout")
 			let parts = try result.array()
-			let fixed = slotted ? 4 : 3
+			let fixed = !slotted ? 3 : (shown == nil ? 4 : 5)
 			guard parts.count >= fixed, parts.count <= fixed + 2, try parts[0].string() == "ok" else {
 				throw PayloadError(path: "plan layout", reason: "Dragon's layout at \(width) x \(height) points and \(scale)x failed: \(result.value.jsonText)")
 			}
@@ -772,6 +774,21 @@ public struct StyleExport: Sendable {
 					slotWrites[try w[0].string(), default: []].append((try w[1].string(), w[2], try planNumber(w[3].value)))
 				}
 			}
+			// Each row's own write numbers, by row key and the template node they write: the row's copy takes them.
+			var rowWrites: [String: [String: [(kind: String, path: Reader, value: Double)]]] = [:]
+			if slotted, shown != nil {
+				for entry in try parts[4].array() {
+					let e = try entry.array()
+					guard e.count == 2 else { throw entry.fail("expected a row key and its writes") }
+					var own: [String: [(kind: String, path: Reader, value: Double)]] = [:]
+					for write in try e[1].array() {
+						let w = try write.array()
+						guard w.count == 4 else { throw write.fail("expected node, write kind, path and value") }
+						own[try w[0].string(), default: []].append((try w[1].string(), w[2], try planNumber(w[3].value)))
+					}
+					rowWrites[try e[0].string()] = own
+				}
+			}
 			let assignment = assignments[k]
 			// The template of each list: one row's nodes, which no view shows; each row is a copy of them laid out here.
 			var template: [String: (list: PlanRepeat, top: Bool)] = [:]
@@ -796,11 +813,12 @@ public struct StyleExport: Sendable {
 					guard let own = assignments[row.assignment].nodes.first(where: { $0.id == node.id }) else {
 						throw PayloadError(path: "plan layout", reason: "assignment \(row.assignment) has no node \(node.id) for row \(row.key)")
 					}
-					withRows.append(StyleNode(
+					let copy = StyleNode(
 						id: "\(node.id)@\(row.key)", parent: top ? node.parent : node.parent.map { "\($0)@\(row.key)" },
 						isText: own.isText, isAnonymous: own.isAnonymous, text: own.isText ? (row.texts[node.id] ?? own.text) : own.text,
 						frame: own.frame, borderWidths: own.borderWidths, writes: own.writes, borderOps: own.borderOps, scrollRange: own.scrollRange,
-						lines: own.lines))
+						lines: own.lines)
+					withRows.append(try (rowWrites[row.key]?[node.id] ?? []).reduce(copy) { try StyleExport.patched($0, kind: $1.kind, path: $1.path, value: $1.value) })
 				}
 			}
 			if let missing = slotWrites.keys.first(where: { id in !assignment.nodes.contains { $0.id == id } }) {
@@ -1114,6 +1132,15 @@ public struct StyleExport: Sendable {
 			try expectKey(f, "dragonStacking.order")
 			_ = try f["index"].number()
 			return .paintOrder(host: try f["host"].string(), bucket: Int(try f["bucket"].number()), rank: Int(try f["rank"].number()))
+		case "box-shadow":
+			let f = try write.object(["kind", "shadows", "key"])
+			try expectKey(f, "dragonShadow.shadows")
+			return .boxShadow(try f["shadows"].array().map { shadow in
+				let s = try shadow.object(["inset", "x", "y", "blur", "spread", "color"])
+				return BoxShadow.Shadow(
+					inset: try s["inset"].bool(), x: try s["x"].number(), y: try s["y"].number(), blur: try s["blur"].number(),
+					spread: try s["spread"].number(), color: try decodeColor(try s["color"]))
+			})
 		case "checkbox":
 			let f = try write.object(["kind", "checked", "colors", "key"])
 			try expectKey(f, "dragonCheckbox")
@@ -1192,11 +1219,14 @@ public struct LaidOutRow: Sendable, Equatable {
 	public let key: String
 	public let assignment: Int
 	public let texts: [String: String]
+	/// The row's own values of the slots its template's style reads, by slot id.
+	public var slots: [String: Double] = [:]
 
-	public init(key: String, assignment: Int, texts: [String: String]) {
+	public init(key: String, assignment: Int, texts: [String: String], slots: [String: Double] = [:]) {
 		self.key = key
 		self.assignment = assignment
 		self.texts = texts
+		self.slots = slots
 	}
 }
 
