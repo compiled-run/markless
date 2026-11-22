@@ -30,6 +30,9 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 	// Stable: children with equal keys keep tree order; touch dispatch follows the same order.
 	override fun getChildDrawingOrder(childCount: Int, drawingPosition: Int): Int =
 		(0 until childCount).sortedBy { orderKeys[getChildAt(it)] ?: 0 }[drawingPosition]
+
+	/** The children in the order they are drawn. */
+	internal fun drawingOrder(): List<View> = (0 until childCount).sortedBy { orderKeys[getChildAt(it)] ?: 0 }.map(::getChildAt)
 	/** clip-path: inset(): the rect in px, relative to the box, it and its children draw inside; empty draws nothing. Accessibility is untouched. */
 	internal var clip: Rect? = null
 		set(value) {

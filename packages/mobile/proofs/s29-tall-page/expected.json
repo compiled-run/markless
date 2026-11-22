@@ -1,0 +1,20 @@
+{
+	"rung": "S29",
+	"name": "a styled page that grows taller than the screen after it opens scrolls to its end, as the web scrolls it",
+	"steps": [
+		{
+			"visible": ["Notes", "Groceries", "Add ten notes", "End of list"],
+			"absent": ["Note 3"],
+			"title": "Notes"
+		},
+		{
+			"do": { "tap": "Add ten notes" },
+			"visible": ["Groceries", "Note 3"],
+			"offScreen": ["End of list"]
+		},
+		{
+			"do": { "swipe": { "from": [50, 80], "to": [50, 25], "until": "End of list" } },
+			"visible": ["Note 12", "End of list"]
+		}
+	]
+}

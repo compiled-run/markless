@@ -66,6 +66,7 @@ import dev.markless.mobile.style.shownRows
 import dev.markless.mobile.style.rowStates
 import dev.markless.mobile.style.StyleWrite
 import dev.markless.mobile.style.StyledNode
+import dev.markless.mobile.style.stackingParent
 import kotlin.math.roundToInt
 
 class MarklessHostError(message: String) : RuntimeException(message)
@@ -189,6 +190,7 @@ class MarklessHost(
 	}
 	private val scriptServices = ScriptServices()
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
+	private val nodeIds = payload.nodes.mapTo(HashSet()) { it.id }
 	private val events = payload.events.groupBy { it.host }
 	private val views = HashMap<String, View>()
 	/** The images the app packaged, by the src a page writes. */
@@ -1468,6 +1470,7 @@ class MarklessHost(
 		if (sheet != null) (views.getValue(sheet) as MarklessBox).fixedSize = Math.round(layout.export.viewportWidth * dpr).toInt() to Math.round(maxOf(layout.export.viewportHeight * dpr, layout.contentBottom())).toInt()
 		val (ax, ay) = origin
 		val parentId = parentOf(inst)
+		val paintOrder = s.writes.filterIsInstance<StyleWrite.PaintOrder>().firstOrNull()
 		// The node's frame origin inside its view: a label's inside its button, other text's inside its outward-rounded view.
 		var inView = (ax - Math.floor(ax)) to (ay - Math.floor(ay))
 		if (node is Node.Text && view is Button) {
@@ -1480,17 +1483,24 @@ class MarklessHost(
 				maxOf(0, (bx + box.width).roundToInt() - Math.ceil(ax + frame.width).toInt()), maxOf(0, (by + box.height).roundToInt() - Math.ceil(ay + frame.height).toInt()),
 			)
 		} else {
+			// A box its stacking context paints past ancestors with later siblings sits in that context's view, in its order.
+			val stackParent = paintOrder?.let { stackingParent(s, it, styled, { id -> id.substringBefore('@') in nodeIds }, parentId) }
+			val frameParent = stackParent ?: parentId
 			// A sheet's top-level content sits in the sheet's content box, which is its document's origin.
-			var (ox, oy) = parentId?.takeIf { it != sheet }?.let { absolute.getValue(it) }?.let { it.first.roundToInt() to it.second.roundToInt() } ?: (0 to 0)
+			var (ox, oy) = frameParent?.takeIf { it != sheet }?.let { absolute.getValue(it) }?.let { it.first.roundToInt() to it.second.roundToInt() } ?: (0 to 0)
 			// Inside a scroll container, frames count from its padding box, where its content box starts.
-			parentId?.let { scrollers[it] }?.let { styled.byId.getValue(parentId).borderWidths?.let { bw -> ox += bw.left.roundToInt(); oy += bw.top.roundToInt() } }
+			frameParent?.let { scrollers[it] }?.let { styled.byId.getValue(frameParent).borderWidths?.let { bw -> ox += bw.left.roundToInt(); oy += bw.top.roundToInt() } }
 			// Text rounds outward: a run a fraction of a pixel narrower than its frame wraps.
 			val rect = if (node is Node.Text) {
 				Rect(Math.floor(ax).toInt() - ox, Math.floor(ay).toInt() - oy, Math.ceil(ax + frame.width).toInt() - ox, Math.ceil(ay + frame.height).toInt() - oy)
 			} else {
 				Rect(ax.roundToInt() - ox, ay.roundToInt() - oy, (ax + frame.width).roundToInt() - ox, (ay + frame.height).roundToInt() - oy)
 			}
-			if (parentId == null) rootFrame = rect else (scrollers[parentId]?.second ?: views.getValue(parentId) as MarklessBox).frames[view] = rect
+			if (frameParent == null) rootFrame = rect else {
+				val box = scrollers[frameParent]?.second ?: views.getValue(frameParent) as MarklessBox
+				if (view.parent !== box) moveInto(view, box, lifted = stackParent != null)
+				box.frames[view] = rect
+			}
 			if (view is MarklessBox) sizeScroller(inst.id, view, s, rect)
 		}
 		paint(view, s)
@@ -1502,7 +1512,29 @@ class MarklessHost(
 		}
 		// A box that paints nothing (an empty clip) has no order to keep.
 		val paintsNothing = (view as? MarklessBox)?.clip?.isEmpty == true
-		(view.parent as? MarklessBox)?.order(view, s.writes.filterIsInstance<StyleWrite.PaintOrder>().firstOrNull()?.takeIf { !paintsNothing }?.let { checkSiblingOrderSuffices(s, it, styled); it.bucket * 100_000 + it.rank + 1 } ?: 0)
+		// A button's text is the button's own view, whose order its element keeps.
+		if (!(node is Node.Text && view is Button)) (view.parent as? MarklessBox)?.order(view, paintOrder?.takeIf { !paintsNothing }?.let { it.bucket * 100_000 + it.rank + 1 } ?: 0)
+	}
+
+	/**
+	 * Moves [view] into [box]: its stacking parent's view, read by TalkBack right after what preceded it where it was built, or
+	 * back to the view it was built in, in document order.
+	 */
+	private fun moveInto(view: View, box: MarklessBox, lifted: Boolean) {
+		val home = view.parent as? ViewGroup
+		val before = home?.let { h -> h.indexOfChild(view).takeIf { it > 0 }?.let { h.getChildAt(it - 1) } ?: h }
+		home?.let { h ->
+			(h as? MarklessBox)?.frames?.remove(view)
+			h.removeView(view)
+		}
+		box.addView(view)
+		if (lifted && before != null) {
+			if (before.id == View.NO_ID) before.id = View.generateViewId()
+			view.accessibilityTraversalAfter = before.id
+		} else {
+			view.accessibilityTraversalAfter = View.NO_ID
+			reorder(box)
+		}
 	}
 
 	/** box-shadow: rastered by Dragon's translated painter after a layout that moves or changes the box or what is beneath it. */
@@ -1593,23 +1625,6 @@ class MarklessHost(
 			absolute[s.id] = (p.first + f.x) to (p.second + f.y)
 		}
 		return absolute
-	}
-
-	/**
-	 * Ordering a box among its own siblings paints it where its stacking context does when the context is its parent, or when every
-	 * box between them is the last painting child of its parent and clips nothing: then nothing of the context paints after it
-	 * outside the parent. Anything else is refused by name.
-	 */
-	private fun checkSiblingOrderSuffices(s: StyledNode, order: StyleWrite.PaintOrder, styled: Assignment) {
-		var cursor = s.parent
-		while (cursor != null && cursor != order.host) {
-			val between = styled.byId[cursor] ?: throw MarklessHostError("\"${s.id}\"'s stacking context ${order.host} is not an ancestor")
-			val painting = styled.nodes.filter { it.parent == between.parent && it.frame != null }
-			val clips = between.writes.any { it == StyleWrite.PaddingBoxClip || it is StyleWrite.ClipPathInset }
-			if (order.bucket < 0 || painting.lastOrNull()?.id != between.id || clips) throw MarklessHostError("\"${s.id}\" paints in ${order.host}'s stacking order past ${between.id}, which has later siblings or clips; not implemented on Android")
-			cursor = between.parent
-		}
-		if (cursor == null) throw MarklessHostError("\"${s.id}\"'s stacking context ${order.host} is not an ancestor")
 	}
 
 	private fun paint(view: View, s: StyledNode, styled: Assignment) {
