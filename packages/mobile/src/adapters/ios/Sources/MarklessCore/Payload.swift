@@ -233,6 +233,14 @@ public struct NativeShape: Equatable, Sendable {
 	public var text: NativeDrawingText?
 	/// Clip outlines in the drawing's units (nonzero); the shape shows only where all of them cover.
 	public var clip: [[Double]] = []
+	/// Whether each `clip` outline is filled even-odd (a luminance mask's black shapes cut out) rather than nonzero.
+	public var clipEvenOdd: [Bool] = []
+	/// An SVG `feGaussianBlur` of the shape alone: its standard deviation and the filter region (verb-coded), in the drawing's units.
+	public var blur: Blur?
+	public struct Blur: Equatable, Sendable {
+		public let deviation: Double
+		public let region: [Double]
+	}
 }
 
 /// An SVG `<text>`: runs laid out from the pen, each chunk placed by `anchor`, glyphs on `baseline` relative to the pen.
@@ -1219,7 +1227,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let color = try reader.object(["r", "g", "b", "alpha"])
 			return .color(RGBA(r: try color["r"].number(), g: try color["g"].number(), b: try color["b"].number(), alpha: try color["alpha"].number()))
 		}
-		let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "text", "clip"])
+		let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "text", "clip", "clipRule", "blur"])
 		let transform = s.has("transform") ? try s["transform"].array().map { try $0.number() } : nil
 		if let transform, transform.count != 6 { throw shape.fail("a transform has six numbers") }
 		let rule = try s["fillRule"].string()
@@ -1229,6 +1237,18 @@ public struct NativeViewPayload: Equatable, Sendable {
 			stroke: try paint(try s["stroke"]), width: try s["width"].number(), cap: try s["cap"].string(), join: try s["join"].string(),
 			miterLimit: try s["miterLimit"].number(), transform: transform)
 		if s.has("clip") { decoded.clip = try s["clip"].array().map { try $0.array().map { try $0.number() } } }
+		if s.has("clipRule") {
+			decoded.clipEvenOdd = try s["clipRule"].array().map { rule in
+				let name = try rule.string()
+				guard name == "nonzero" || name == "evenodd" else { throw shape.fail("unknown clipRule \(name)") }
+				return name == "evenodd"
+			}
+			guard decoded.clipEvenOdd.count == decoded.clip.count else { throw shape.fail("a clipRule for each clip") }
+		}
+		if s.has("blur") {
+			let b = try s["blur"].object(["deviation", "region"])
+			decoded.blur = NativeShape.Blur(deviation: try b["deviation"].number(), region: try b["region"].array().map { try $0.number() })
+		}
 		if s.has("text") {
 			let t = try s["text"].object(["anchor", "baseline", "runs"])
 			let anchor = try t["anchor"].string()
