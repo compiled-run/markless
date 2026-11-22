@@ -432,7 +432,8 @@ if (!host) {
 	}
 	// The form a submit handler's event names: only FormData reads it, as its entries when the form was sent.
 	host.Form = function (entries) { Object.defineProperty(this, 'entries', { value: entries }); };
-	if (typeof g.FormData !== 'function') {
+	// Built in its own function: a hoisted var FormData would hide the global in every later payload's script.
+	if (typeof g.FormData !== 'function') (function () {
 		var FormData = function FormData(form, submitter) {
 			if (!(this instanceof FormData)) throw new TypeError("Failed to construct 'FormData': Please use the 'new' operator");
 			if (submitter !== undefined && submitter !== null) throw new TypeError("FormData on a phone does not read a submitter yet");
@@ -469,7 +470,7 @@ if (!host) {
 		FormData.prototype.values = function () { return iterate(this, function (entry) { return entry[1]; }); };
 		FormData.prototype[Symbol.iterator] = FormData.prototype.entries;
 		g.FormData = FormData;
-	}
+	})();
 }`;
 
 // One payload's script: its modules, its functions, and the entry points a host calls (`enter`, then `leave`).
@@ -810,6 +811,8 @@ g.__markless[id] = {
 			}
 			// A key's or paste's cancel reaches the host, as a browser reads defaultPrevented before the handler first awaits.
 			if (event && event.defaultPrevented && (entry.event.type === 'keydown' || entry.event.type === 'paste')) host.out.prevented = true;
+			// A handler that sets its text field's value writes the field, as the DOM's value setter does.
+			if (event && typeof entry.event.value === 'string' && event.target && !(event.target instanceof host.Form) && typeof event.target.value === 'string' && event.target.value !== entry.event.value) host.out.value = event.target.value;
 		} else if (entry.kind === 'timer') {
 			var timer = host.timers[entry.timer];
 			if (timer) {
@@ -863,6 +866,7 @@ g.__markless[id] = {
 		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands, pending: out.pending, settled: out.settled, raises: out.raises };
 		if (out.calls.length > 0) left.calls = out.calls;
 		if (out.prevented) left.prevented = true;
+		if (out.value !== undefined) left.value = out.value;
 		if (out.navigate) left.navigate = out.navigate;
 		return JSON.stringify(left);
 	},

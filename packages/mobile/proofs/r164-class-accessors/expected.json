@@ -1,0 +1,17 @@
+{
+	"rung": 164,
+	"name": "a class's getters, setters and static getter run in phone JavaScript as on the web",
+	"steps": [
+		{ "visible": ["Class accessors", "Not turned", "Turn half"] },
+		{
+			"do": { "tap": "Turn half" },
+			"visible": ["2 turns, half 1, not full, keys turns"],
+			"absent": ["Not turned"]
+		},
+		{
+			"do": { "tap": "Turn half" },
+			"visible": ["4 turns, half 2, full, keys turns"],
+			"absent": ["2 turns, half 1, not full, keys turns"]
+		}
+	]
+}

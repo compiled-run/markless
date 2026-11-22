@@ -6,6 +6,7 @@ name: u121-label-focus
 - assertVisible: New note
 - assertVisible: Title
 - assertVisible: Body
+- assertVisible: Tag
 - assertVisible: Pin to top
 - assertVisible: Not editing
 - assertVisible: Pinned no
@@ -19,8 +20,13 @@ name: u121-label-focus
 - assertVisible: Editing body
 - assertVisible: Pinned no
 - assertNotVisible: Editing title
+- tapOn: Tag
+- assertNotVisible: Editing body
+- assertVisible: Left body
+- assertVisible: Pinned no
+- assertNotVisible: Editing body
 - tapOn: Pin to top
 - assertNotVisible: Pinned no
 - assertVisible: Pinned yes
-- assertVisible: Editing body
+- assertVisible: Left body
 - assertNotVisible: Pinned no

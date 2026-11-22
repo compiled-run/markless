@@ -57,6 +57,8 @@ sealed interface StyleWrite {
 	data class PaintOrder(val host: String, val bucket: Int, val rank: Int) : StyleWrite
 	/** A select whose appearance devolves to menulist-button: its drop-down arrow is stroked in [color], along [StyledNode.selectArrow]. */
 	data class SelectArrow(val color: Rgba) : StyleWrite
+	/** `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own. */
+	data class Visibility(val value: String) : StyleWrite
 }
 
 /**
@@ -768,6 +770,12 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				"clip-text" -> StyleWrite.ClipText.also { o.field("texts", what).arr("texts").forEach { t -> t.str("$what.texts[]") } }
 				"paint-order" -> StyleWrite.PaintOrder(o.field("host", what).str("host"), o.field("bucket", what).num("bucket").toInt(), o.field("rank", what).num("rank").toInt())
 				"select-arrow" -> StyleWrite.SelectArrow(color(o.field("color", what), "$what.color"))
+				"visibility" -> {
+					val value = o.field("value", what).str("$what.value")
+					if (value != "visible" && value != "hidden" && value != "collapse") throw MarklessDecodeError("$what: visibility $value is not visible, hidden or collapse")
+					if (o.field("canvas", what) !is Json.Bool) throw MarklessDecodeError("$what.canvas must be a boolean")
+					StyleWrite.Visibility(value)
+				}
 				else -> throw MarklessDecodeError("$what has unknown style write kind \"$kind\"")
 			}
 		}

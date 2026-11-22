@@ -140,6 +140,7 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		161,
 		162,
 		163,
+		164,
 		'T1',
 		'T2',
 		101,
@@ -177,6 +178,7 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		146,
 		147,
 		148,
+		205,
 		151,
 		170,
 		171,
@@ -278,6 +280,7 @@ test('the navigation ladder has one app folder per rung, in rung order', () => {
 		'N12',
 		'N13',
 		'N14',
+		'N15',
 		138,
 		139,
 		140,
@@ -308,6 +311,7 @@ test('the styles ladder has one app folder per rung, in rung order', () => {
 		'S21',
 		'S23',
 		'S24',
+		'S25',
 		'S26',
 	]);
 	for (const folder of styleRungFolders())

@@ -1,9 +1,17 @@
 {
 	"rung": 221,
-	"name": "A tap on a <label>'s text acts on the control inside it, as the web does: a text field takes the keyboard, a checkbox toggles",
+	"name": "A tap on a <label>'s text acts on the control inside it, as the web does: a text field takes the keyboard, a select takes focus from the field that had it, a checkbox toggles",
 	"steps": [
 		{
-			"visible": ["New note", "Title", "Body", "Pin to top", "Not editing", "Pinned no"]
+			"visible": [
+				"New note",
+				"Title",
+				"Body",
+				"Tag",
+				"Pin to top",
+				"Not editing",
+				"Pinned no"
+			]
 		},
 		{
 			"do": {
@@ -21,9 +29,16 @@
 		},
 		{
 			"do": {
+				"tap": "Tag"
+			},
+			"visible": ["Left body", "Pinned no"],
+			"absent": ["Editing body"]
+		},
+		{
+			"do": {
 				"tap": "Pin to top"
 			},
-			"visible": ["Pinned yes", "Editing body"],
+			"visible": ["Pinned yes", "Left body"],
 			"absent": ["Pinned no"]
 		}
 	]
