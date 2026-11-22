@@ -1,0 +1,10 @@
+{
+	"rung": 165,
+	"name": "a press runs the pressed element's click handler, then the handlers around it, unless one stops propagation, as on the web",
+	"steps": [
+		{ "visible": ["Bubbling", "Inner", "Stop", "start"] },
+		{ "do": { "tap": "Inner" }, "visible": ["start>button>card"], "absent": ["start"] },
+		{ "do": { "tap": "Stop" }, "visible": ["start>button>card>stopped"], "absent": ["start>button>card"] },
+		{ "do": { "tap": "Card body" }, "visible": ["start>button>card>stopped>card"], "absent": ["start>button>card>stopped"] }
+	]
+}

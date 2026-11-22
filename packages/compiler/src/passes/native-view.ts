@@ -8412,6 +8412,16 @@ export function createNativeViewPayload(
 			return resetOps(scope.resets.get(statement.name)!, scope, what, span);
 		if (statement.kind === 'invoke') {
 			const callee = [statement.name, ...(statement.path ?? [])].join('.');
+			// A click's stopPropagation(): the press reaches no handler of the elements around this one, as in a browser.
+			if (
+				scope.clicking &&
+				statement.name === scope.opaque &&
+				!scope.args.has(statement.name) &&
+				statement.path?.length === 1 &&
+				statement.path[0] === 'stopPropagation' &&
+				(statement.arguments ?? []).length === 0
+			)
+				return [{ op: 'stopPropagation' }];
 			if (
 				scope.submitting &&
 				statement.name === scope.opaque &&
@@ -9039,13 +9049,8 @@ export function createNativeViewPayload(
 				!isWithin(node.id, host)
 			)
 				continue;
-			if (events.some((other) => other.host === node.id && other.event === 'activate')) {
-				refuse(
-					`a press on ${node.id} is handled by its own click handler and by the one on ${host}, which reads where it landed`,
-					event.handlerSpan,
-				);
-				continue;
-			}
+			// An element with a click handler of its own runs it first; the press then reaches this copy, as it bubbles.
+			const ownPress = events.some((other) => other.host === node.id && other.event === 'activate');
 			const pressed = { target: node.id, currentTarget: host };
 			const marks = { diagnostics: diagnostics.length, cells: cells.length };
 			const rollBack = () => {
@@ -9054,7 +9059,7 @@ export function createNativeViewPayload(
 			};
 			// Lowered as the run it would reach, kept values and all: the same ops mean it needs no handler of its own.
 			pressedRow = node.row;
-			const around = reached(node.id);
+			const around = ownPress ? undefined : reached(node.id);
 			if (around) {
 				const same =
 					JSON.stringify(handlerOps(event, scope, around.id, pressed)) === around.spelled;
@@ -9078,9 +9083,10 @@ export function createNativeViewPayload(
 					.slice(marks.diagnostics)
 					.filter((diagnostic) => !seen.has(diagnostic.message)),
 			);
+			handlers.push({ id, ops });
+			if (ownPress) continue;
 			runs.set(node.id, { id, spelled: JSON.stringify(ops) });
 			events.push({ host: node.id, event: 'activate', handler: id });
-			handlers.push({ id, ops });
 		}
 		// The host's own run does nothing once the elements in it have theirs: it is not a control then.
 		if (handler.ops.length === 0 && runs.size > 1) {

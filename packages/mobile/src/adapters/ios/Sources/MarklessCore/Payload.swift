@@ -377,6 +377,8 @@ public enum NativeOp: Equatable, Sendable {
 	case script(fn: String, type: String, bindings: [NativeScriptBinding], catch: String?)
 	/// `event.preventDefault()` in a text field's `keydown` or `paste` handler.
 	case preventDefault
+	/// `event.stopPropagation()` in a click handler: the press runs no handler of the elements around this one.
+	case stopPropagation
 	/// `field.value = text` on a text field: its text becomes the value, with no input event; `node` evaluates to its id.
 	case fieldText(node: NativeExpr, value: NativeExpr)
 	/// `reset` of `@catch (error, reset)`: clears `catch` and runs again each of `cells` (read where the handler runs) that holds an error.
@@ -1026,6 +1028,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 				case "preventDefault":
 					_ = try op.object(["op"])
 					return .preventDefault
+				case "stopPropagation":
+					_ = try op.object(["op"])
+					return .stopPropagation
 				case "command":
 					let keys = Set(try op.keys())
 					let opField = try op.object(required: ["op", "node", "command"], optional: ["preventScroll"])
