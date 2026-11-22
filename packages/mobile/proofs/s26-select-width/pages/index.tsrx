@@ -30,7 +30,7 @@ export default function Sizing() @{
 		</style>
 		<title>Sizing</title>
 		<label class="field">
-			Category
+			<span>Category</span>
 			<select aria-label="Tag" onChange={(event) => (tag = (event.target as HTMLSelectElement).value)}>
 				@for (const option of TAGS; key option) {
 					<option value={option} selected={option === tag}>

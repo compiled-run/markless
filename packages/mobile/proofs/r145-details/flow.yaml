@@ -1,0 +1,35 @@
+appId: ${APP_ID}
+name: r145-details
+---
+- launchApp:
+      clearState: true
+- assertVisible: Help
+- assertVisible: Shipping
+- assertVisible: Returns, peeked 0
+- assertVisible: Send it back within a month\.
+- assertVisible: Refunds take a week\.
+- assertNotVisible: Orders leave in two days\.
+- tapOn: Shipping
+- assertVisible: Orders leave in two days\.
+- assertVisible: Orders leave in two days\.
+- assertVisible: Returns, peeked 0
+- assertVisible: Send it back within a month\.
+- assertVisible: Refunds take a week\.
+- tapOn: Returns, peeked 0
+- assertNotVisible: Send it back within a month\.
+- assertNotVisible: Refunds take a week\.
+- assertVisible: Returns, peeked 1
+- assertVisible: Orders leave in two days\.
+- assertNotVisible: Send it back within a month\.
+- assertNotVisible: Refunds take a week\.
+- tapOn: Returns, peeked 1
+- assertVisible: Send it back within a month\.
+- assertVisible: Refunds take a week\.
+- assertVisible: Returns, peeked 2
+- assertVisible: Send it back within a month\.
+- assertVisible: Refunds take a week\.
+- assertVisible: Orders leave in two days\.
+- tapOn: Shipping
+- assertNotVisible: Orders leave in two days\.
+- assertVisible: Returns, peeked 2
+- assertNotVisible: Orders leave in two days\.
