@@ -194,6 +194,9 @@ private func pressed(_ edit: (String) -> String = { $0 }) -> Data {
 	#expect(plain.styles["h2"] != button)
 	let backdrop = try StyleExport.decode(pressed { $0.replacingOccurrences(of: "\"backdrop\": null", with: "\"backdrop\": \"h0\"").replacingOccurrences(of: ", \"after\": \"h0\"", with: "") })
 	#expect(try backdrop.resolve(for: decoded, initialTexts: texts, value: noCells).styles["h2"]?.group == OpacityGroup(opacity: 0.85, backdrop: "h0", painters: ["h1"], after: nil))
+	#expect(button.group?.unstable == [])
+	let unstable = try StyleExport.decode(pressed { $0.replacingOccurrences(of: "\"after\": \"h0\",", with: "\"after\": \"h0\", \"unstable\": [\"h1\", \"h0\"],") })
+	#expect(try unstable.resolve(for: decoded, initialTexts: texts, value: noCells).styles["h2"]?.group == OpacityGroup(opacity: 0.85, backdrop: nil, painters: ["h1"], after: "h0", unstable: ["h1", "h0"]))
 }
 
 @Test(arguments: [
@@ -203,6 +206,9 @@ private func pressed(_ edit: (String) -> String = { $0 }) -> Data {
 	("\"opacity\": 0.85", "\"opacity\": 1", "opacity-group opacity 1.0 is not in (0, 1)"),
 	("\"painters\": [\"h1\"]", "\"painters\": [1]", "painters"),
 	("\"kind\": \"opacity-group\"", "\"kind\": \"filter-group\"", "unknown style write kind \"filter-group\""),
+	("\"after\": \"h0\",", "\"after\": \"h0\", \"unstable\": [3],", "unstable"),
+	("\"after\": \"h0\",", "\"after\": \"h0\", \"unstable\": \"h1\",", "unstable"),
+	("\"after\": \"h0\",", "\"after\": \"h0\", \"stable\": [],", "stable"),
 ])
 func refusesTransformsAndGroupsItCannotDraw(find: String, replace: String, reason: String) throws {
 	let (decoded, texts) = try payload()

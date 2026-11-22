@@ -983,6 +983,10 @@ final class ViewTree {
 			let suffix = from.firstIndex(of: "@").map { String(from[$0...]) } ?? ""
 			return (self.groups[painter + suffix] ?? self.groups[painter]).flatMap { $0.superview == nil ? nil : $0 }
 		},
+		view: { [unowned self] id, from in
+			let suffix = from.firstIndex(of: "@").map { String(from[$0...]) } ?? ""
+			return self.elements[id + suffix] ?? self.elements[id]
+		},
 		overlays: { [unowned self] in Array(self.groups.values) })
 
 	/// Draws Dragon's lines over a label in a system face while its text is the one Dragon laid out; otherwise the label draws its own.

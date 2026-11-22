@@ -62,9 +62,9 @@ sealed interface StyleWrite {
 	/**
 	 * `opacity` below 1 that Dragon pre-composites: the box keeps alpha 1 and shows the group composited over what paints before it.
 	 * [backdrop] is the box whose background holds it (null: the canvas), [painters] the earlier groups its backdrop shows, [after]
-	 * the sticky box it paints after.
+	 * the sticky box it paints after, [unstable] the earlier paint whose platform capture may differ from the screen.
 	 */
-	data class OpacityGroup(val opacity: Double, val backdrop: String?, val painters: List<String>, val after: String?) : StyleWrite
+	data class OpacityGroup(val opacity: Double, val backdrop: String?, val painters: List<String>, val after: String?, val unstable: List<String> = emptyList()) : StyleWrite
 }
 
 /** A transform length: CSS px (`px`), a percentage of the border box (`percent`), or both (`calc`). */
@@ -782,12 +782,12 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					StyleWrite.Transform(functions, length(origin.field("x", what), "$what.origin.x"), length(origin.field("y", what), "$what.origin.y"))
 				}
 				"opacity-group" -> {
-					o.only(setOf("kind", "opacity", "backdrop", "painters", "after", "key"), what)
+					o.only(setOf("kind", "opacity", "backdrop", "painters", "after", "unstable", "key"), what)
 					key(o, "dragonGroup", what)
 					val opacity = o.field("opacity", what).num("$what.opacity")
 					if (!(opacity > 0 && opacity < 1)) throw MarklessDecodeError("$what: opacity-group opacity $opacity is not in (0, 1)")
 					val backdrop = o.field("backdrop", what).let { if (it == Json.Null) null else it.str("$what.backdrop") }
-					StyleWrite.OpacityGroup(opacity, backdrop, o.field("painters", what).arr("$what.painters").map { it.str("$what.painters[]") }, o["after"]?.str("$what.after"))
+					StyleWrite.OpacityGroup(opacity, backdrop, o.field("painters", what).arr("$what.painters").map { it.str("$what.painters[]") }, o["after"]?.str("$what.after"), o["unstable"]?.arr("$what.unstable")?.map { it.str("$what.unstable[]") } ?: emptyList())
 				}
 				else -> throw MarklessDecodeError("$what has unknown style write kind \"$kind\"")
 			}

@@ -326,6 +326,10 @@ class MarklessHost(
 			val suffix = from.indexOf('@').let { if (it < 0) "" else from.substring(it) }
 			(groups[painter + suffix] ?: groups[painter])?.takeIf { views[it.id] === it.view }
 		},
+		view = { id, from ->
+			val suffix = from.indexOf('@').let { if (it < 0) "" else from.substring(it) }
+			views[id + suffix] ?: views[id]
+		},
 		overlays = { groups.values.toList() },
 	)
 

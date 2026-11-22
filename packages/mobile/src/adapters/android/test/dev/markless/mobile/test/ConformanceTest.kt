@@ -398,6 +398,12 @@ private fun pressedStyles(text: String, refusesStyle: (String, String, String) -
 	refusesStyle("an opaque opacity group", pressed { it.replace("\"opacity\": 0.85", "\"opacity\": 1") }, "opacity-group opacity 1.0 is not in (0, 1)")
 	refusesStyle("a painter that is not an id", pressed { it.replace("\"painters\": [\"h1\"]", "\"painters\": [1]") }, "painters")
 	refusesStyle("a filter group", pressed { it.replace("\"kind\": \"opacity-group\"", "\"kind\": \"filter-group\"") }, "unknown style write kind \"filter-group\"")
+	check("a group without unstable paint lists none", (h2.firstOrNull { it is StyleWrite.OpacityGroup } as? StyleWrite.OpacityGroup)?.unstable == emptyList<String>()) { "$h2" }
+	val unstable = runCatching { StyleExport.decode(pressed { it.replace("\"after\": \"h0\",", "\"after\": \"h0\", \"unstable\": [\"h1\", \"h0\"],") }.toByteArray()) }
+	check("decodes a group's unstable earlier paint", unstable.getOrNull()?.assignments?.get(0)?.byId?.get("h2")?.writes?.contains(StyleWrite.OpacityGroup(0.85, null, listOf("h1"), "h0", listOf("h1", "h0"))) == true) { "${unstable.exceptionOrNull() ?: unstable.getOrNull()?.assignments?.get(0)?.byId?.get("h2")}" }
+	refusesStyle("unstable paint that is not ids", pressed { it.replace("\"after\": \"h0\",", "\"after\": \"h0\", \"unstable\": [3],") }, "unstable")
+	refusesStyle("unstable paint that is not a list", pressed { it.replace("\"after\": \"h0\",", "\"after\": \"h0\", \"unstable\": \"h1\",") }, "unstable")
+	refusesStyle("a group field it does not know", pressed { it.replace("\"after\": \"h0\",", "\"after\": \"h0\", \"stable\": [],") }, "stable")
 }
 
 private fun dashedBorders(fixtures: File) {

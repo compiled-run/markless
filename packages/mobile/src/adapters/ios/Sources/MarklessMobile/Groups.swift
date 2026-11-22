@@ -40,6 +40,8 @@ struct GroupContext {
 	let rootOverflows: () -> Bool
 	/// The overlay of an earlier group, by Dragon id, seen from the group with this instance id.
 	let overlay: (_ painter: String, _ from: String) -> GroupOverlayView?
+	/// The view of an element, by Dragon id, seen from the group with this instance id.
+	let view: (_ id: String, _ from: String) -> UIView?
 	/// Every live overlay, so the groups that show this one in their backdrop recompute after it.
 	let overlays: () -> [GroupOverlayView]
 }
@@ -54,6 +56,8 @@ final class GroupOverlayView: UIView {
 	private let context: GroupContext
 	private let bitmap = CALayer()
 	private var dirty = true
+	/// Whether this group has warned that unstable earlier paint lies under it.
+	private var warnedUnstable = false
 	/// The box's own border: Core Animation draws a layer's border above its sublayers, so it stays off screen and is drawn into L.
 	private var boxBorder: (width: CGFloat, color: CGColor?) = (0, nil)
 	/// How deep a composite is running: a composite's own hiding and restoring marks nothing stale.
@@ -192,6 +196,18 @@ final class GroupOverlayView: UIView {
 			let corners = [(ext[0], ext[1]), (ext[2], ext[1]), (ext[2], ext[3]), (ext[0], ext[3])].map { toRoot(Double($0.0) / s, Double($0.1) / s) }
 			let xs = corners.map { Double($0.x) * s }, ys = corners.map { Double($0.y) * s }
 			bext = clamp([Int(xs.min()!.rounded(.down)), Int(ys.min()!.rounded(.down)), Int(xs.max()!.rounded(.up)), Int(ys.max()!.rounded(.up))], rootEdges)
+		}
+		// Earlier paint Dragon marks unstable (its capture may differ from the screen) under the group: warned once, still drawn.
+		if !warnedUnstable {
+			for painter in group.unstable {
+				guard let v = context.view(painter, id), v.isDescendant(of: root) else { continue }
+				let e = outer(layoutRect(v, in: root), s)
+				if e[0] < bext[2], bext[0] < e[2], e[1] < bext[3], bext[1] < e[3] {
+					warnedUnstable = true
+					NSLog("Markless iOS host: opacity group %@ is drawn over %@, whose capture may differ from the screen", id, painter)
+					break
+				}
+			}
 		}
 		// B: the platform's drawing of what paints before the group over the canvas, the group and every layer painted after it hidden.
 		let bw = max(bext[2] - bext[0], 0), bh = max(bext[3] - bext[1], 0)

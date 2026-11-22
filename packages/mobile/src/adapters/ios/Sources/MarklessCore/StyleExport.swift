@@ -70,12 +70,14 @@ public struct StyleTransform: Equatable, Sendable {
 }
 
 /// A pre-composited opacity group: its opacity, the box whose background holds it (nil: the canvas), the earlier groups its
-/// backdrop shows (Dragon ids), and the sticky box it paints after, when there is one.
+/// backdrop shows (Dragon ids), the sticky box it paints after, when there is one, and the earlier paint whose platform capture
+/// may differ from the screen (`unstable`).
 public struct OpacityGroup: Equatable, Sendable {
 	public let opacity: Double
 	public let backdrop: String?
 	public let painters: [String]
 	public let after: String?
+	public var unstable: [String] = []
 }
 
 /// A dashed or dotted border as Dragon's own native paint draws it (its port of Blink's side painter): operations in device px,
@@ -943,13 +945,13 @@ public struct StyleExport: Sendable {
 			let origin = try f["origin"].object(["x", "y"])
 			return .transform(StyleTransform(functions: functions, originX: try decodeLength(try origin["x"]), originY: try decodeLength(try origin["y"])))
 		case "opacity-group":
-			let f = try write.object(required: ["kind", "opacity", "backdrop", "painters", "key"], optional: ["after"])
+			let f = try write.object(required: ["kind", "opacity", "backdrop", "painters", "key"], optional: ["after", "unstable"])
 			try expectKey(f, "dragonGroup")
 			let opacity = try f["opacity"].number()
 			guard opacity > 0, opacity < 1 else { throw PayloadError(path: write.path + ".opacity", reason: "opacity-group opacity \(opacity) is not in (0, 1)") }
 			return .opacityGroup(OpacityGroup(
 				opacity: opacity, backdrop: try f["backdrop"].optionalString(), painters: try f["painters"].array().map { try $0.string() },
-				after: f.has("after") ? try f["after"].string() : nil))
+				after: f.has("after") ? try f["after"].string() : nil, unstable: f.has("unstable") ? try f["unstable"].array().map { try $0.string() } : []))
 		default:
 			throw PayloadError(path: write.path + ".kind", reason: "unknown style write kind \"\(kind)\"")
 		}

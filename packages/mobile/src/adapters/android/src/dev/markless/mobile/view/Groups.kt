@@ -139,6 +139,8 @@ internal class GroupContext(
 	val rootOverflows: () -> Boolean,
 	/** The overlay of an earlier group, by Dragon id, seen from the group with this instance id. */
 	val overlay: (painter: String, from: String) -> GroupOverlay?,
+	/** The view of an element, by Dragon id, seen from the group with this instance id. */
+	val view: (id: String, from: String) -> View?,
 	val overlays: () -> List<GroupOverlay>,
 )
 
@@ -156,6 +158,8 @@ internal class GroupOverlay(
 	private val context: GroupContext,
 ) : Drawable(), ViewTreeObserver.OnPreDrawListener, View.OnAttachStateChangeListener {
 	private var dirty = true
+	/** Whether this group has warned that unstable earlier paint lies under it. */
+	private var warnedUnstable = false
 	private var skipping = false
 	private var bitmap: Bitmap? = null
 	/** Where the composite draws, relative to the view, in device px. */
@@ -274,6 +278,17 @@ internal class GroupOverlay(
 				maxOf(Math.floor(cs.minOf { it[0].toDouble() }).toInt(), 0), maxOf(Math.floor(cs.minOf { it[1].toDouble() }).toInt(), 0),
 				minOf(Math.ceil(cs.maxOf { it[0].toDouble() }).toInt(), root.width), minOf(Math.ceil(cs.maxOf { it[1].toDouble() }).toInt(), root.height),
 			)
+		}
+		// Earlier paint Dragon marks unstable (its capture may differ from the screen) under the group: warned once, still drawn.
+		if (!warnedUnstable) for (painter in group.unstable) {
+			val v = context.view(painter, id) ?: continue
+			if (generateSequence(v.parent) { it.parent }.none { it === root }) continue
+			val o = layoutOffset(v, root)
+			if (o[0] < bext[2] && bext[0] < o[0] + v.width && o[1] < bext[3] && bext[1] < o[1] + v.height) {
+				warnedUnstable = true
+				android.util.Log.w(MarklessHost.TAG, "opacity group \"$id\" is drawn over \"$painter\", whose capture may differ from the screen")
+				break
+			}
 		}
 		// B: the platform's drawing of what paints before the group, the group and every view drawn after it left out.
 		val bw = maxOf(bext[2] - bext[0], 0)
