@@ -12,6 +12,7 @@ import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.TextView
+import dev.markless.mobile.style.PaddingBox
 
 /** The element view: children stack vertically until a style export assigns frames, then each child sits at its frame. */
 open class MarklessBox(context: Context) : FrameLayout(context) {
@@ -72,9 +73,6 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 		super.onViewRemoved(child)
 		childShadows.remove(child)
 	}
-
-	/** Overflow other than visible: the children, and their shadows, are clipped to this box. */
-	internal var clipsOverflow = false
 
 	override fun draw(canvas: Canvas) {
 		val c = clip ?: return super.draw(canvas)
@@ -201,10 +199,10 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 		}
 	}
 
-	/** overflow clipping to a rounded padding box: its corner radii in px (x, y per corner from top left), which its children draw inside. */
-	internal var childClipRadii: FloatArray? = null
+	/** Overflow other than visible: the padding box its children, and their shadows, draw inside; null when overflow is visible. */
+	internal var childClip: PaddingBox? = null
 		set(value) {
-			if (!(field contentEquals value)) invalidate()
+			if (field != value) invalidate()
 			field = value
 		}
 
@@ -212,11 +210,13 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 		kotlin.math.ceil(maxOf(markerPaint.measureText(DISCLOSURE_CLOSED), markerPaint.measureText(DISCLOSURE_OPEN)) + gap).toInt()
 
 	override fun dispatchDraw(canvas: Canvas) {
-		val radii = childClipRadii
-		if (radii == null) super.dispatchDraw(canvas)
+		val box = childClip
+		if (box == null) super.dispatchDraw(canvas)
 		else {
 			val saved = canvas.save()
-			canvas.clipPath(Path().apply { addRoundRect(RectF(0f, 0f, width.toFloat(), height.toFloat()), radii, Path.Direction.CW) })
+			val inner = RectF(box.left.toFloat(), box.top.toFloat(), width - box.right.toFloat(), height - box.bottom.toFloat())
+			if (box.rounded) canvas.clipPath(Path().apply { addRoundRect(inner, box.radii.map { it.toFloat() }.toFloatArray(), Path.Direction.CW) })
+			else canvas.clipRect(inner)
 			super.dispatchDraw(canvas)
 			canvas.restoreToCount(saved)
 		}
