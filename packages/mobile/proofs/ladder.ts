@@ -12,6 +12,8 @@ export type LadderAction =
 				readonly text: string;
 				/** Leave the keyboard up afterwards, so the screenshot after the step shows what it covers. */
 				readonly keepKeyboard?: true;
+				/** Type after what the field holds instead of clearing it first: clearing presses Backspace, which a tag field reads. */
+				readonly append?: true;
 			};
 	  }
 	/**
@@ -460,7 +462,7 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 	if ('type' in action)
 		return [
 			{ tapOn: selector(action.type.field) },
-			'eraseText',
+			...(action.type.append ? [] : ['eraseText']),
 			{ inputText: action.type.text },
 			...(action.type.keepKeyboard ? [] : ['hideKeyboard']),
 		];

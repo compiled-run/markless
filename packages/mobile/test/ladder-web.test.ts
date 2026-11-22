@@ -281,7 +281,7 @@ async function act(page: Page, step: LadderStep) {
 		await ('tap' in action ? target.click() : target.dblclick());
 	} else if ('type' in action) {
 		const field = typedField(page, action.type.field);
-		await field.fill('');
+		if (!action.type.append) await field.fill('');
 		await field.pressSequentially(action.type.text);
 	} else if ('submit' in action)
 		await typedField(page, action.submit).press('Enter');

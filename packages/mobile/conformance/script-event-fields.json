@@ -1,0 +1,2234 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:own.tags",
+				"name": "own.tags",
+				"initial": [
+					"tea"
+				]
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value",
+				"name": "taglist.value",
+				"initial": [],
+				"follows": {
+					"cell": "state:own.tags"
+				}
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled",
+				"name": "taglist.disabled",
+				"initial": false,
+				"styled": true
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required",
+				"name": "taglist.required",
+				"initial": false,
+				"styled": true
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid",
+				"name": "taglist.invalid",
+				"initial": false,
+				"styled": true
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max",
+				"name": "taglist.max",
+				"initial": 0
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter",
+				"name": "taglist.delimiter",
+				"initial": ","
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable",
+				"name": "taglist.editable",
+				"initial": false
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name",
+				"name": "taglist.name",
+				"initial": "topics"
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input",
+				"name": "taglist.input",
+				"initial": ""
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted",
+				"name": "taglist.highlighted",
+				"initial": ""
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing",
+				"name": "taglist.editing",
+				"initial": ""
+			},
+			{
+				"id": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken",
+				"name": "taglist.spoken",
+				"initial": ""
+			},
+			{
+				"id": "component-edge:2/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistItemState/state:item.value",
+				"name": "item.value",
+				"initial": "",
+				"row": "repeat:0",
+				"first": {
+					"item": "repeat:0"
+				},
+				"rebuiltBy": [
+					{
+						"item": "repeat:0"
+					}
+				]
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Pantry"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Tags: ",
+								{
+									"method": "join",
+									"target": {
+										"cell": "state:own.tags"
+									},
+									"arguments": [
+										{
+											"literal": ", "
+										}
+									]
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "div",
+				"parent": "h0",
+				"attributes": {
+					"role": "group"
+				},
+				"bindings": [
+					{
+						"attribute": "ui-disabled",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+						}
+					},
+					{
+						"attribute": "ui-required",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+						}
+					},
+					{
+						"attribute": "ui-invalid",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+						}
+					},
+					{
+						"attribute": "ui-empty",
+						"value": {
+							"binary": "===",
+							"left": {
+								"member": {
+									"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+								},
+								"property": "length"
+							},
+							"right": {
+								"literal": 0
+							}
+						}
+					},
+					{
+						"attribute": "aria-labelledby",
+						"value": {
+							"literal": "component-edge:1/h2"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/component-edge:0/h0",
+				"element": "span",
+				"parent": "component-edge:0/h0",
+				"attributes": {
+					"style": "clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px;"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h1",
+				"element": "output",
+				"parent": "component-edge:0/component-edge:0/h0",
+				"attributes": {
+					"aria-live": "polite",
+					"aria-atomic": "true"
+				},
+				"live": {
+					"politeness": "polite",
+					"atomic": true
+				}
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h1:text0",
+				"parent": "component-edge:0/h1",
+				"parts": [
+					{
+						"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h2",
+				"element": "label",
+				"parent": "component-edge:0/h0",
+				"bindings": [
+					{
+						"attribute": "for",
+						"value": {
+							"literal": "component-edge:4/h3"
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h2:text0",
+				"parent": "component-edge:1/h2",
+				"parts": [
+					{
+						"text": "Topics"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "div",
+				"parent": "component-edge:0/h0",
+				"attributes": {
+					"role": "presentation"
+				}
+			},
+			{
+				"kind": "repeat",
+				"id": "repeat:0",
+				"parent": "h3",
+				"list": {
+					"cell": "state:own.tags"
+				},
+				"key": []
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:2/h4",
+				"element": "div",
+				"parent": "h3",
+				"bindings": [
+					{
+						"attribute": "ui-value",
+						"value": {
+							"cell": "component-edge:2/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistItemState/state:item.value"
+						}
+					},
+					{
+						"attribute": "ui-highlighted",
+						"value": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+							},
+							"right": {
+								"cell": "component-edge:2/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistItemState/state:item.value"
+							}
+						}
+					},
+					{
+						"attribute": "ui-editing",
+						"value": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+							},
+							"right": {
+								"cell": "component-edge:2/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistItemState/state:item.value"
+							}
+						}
+					},
+					{
+						"attribute": "ui-disabled",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+						}
+					}
+				],
+				"row": "repeat:0"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/h5",
+				"element": "span",
+				"parent": "component-edge:2/h4",
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+							},
+							"right": {
+								"cell": "component-edge:2/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistItemState/state:item.value"
+							}
+						}
+					}
+				],
+				"row": "repeat:0"
+			},
+			{
+				"kind": "branch",
+				"id": "component-edge:3/branch-site:0",
+				"parent": "component-edge:3/h5",
+				"test": {
+					"literal": null
+				},
+				"arms": 2,
+				"row": "repeat:0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:3/h5:text0",
+				"parent": "component-edge:3/h5",
+				"parts": [
+					{
+						"cell": "component-edge:2/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistItemState/state:item.value"
+					}
+				],
+				"row": "repeat:0",
+				"arm": {
+					"branch": "component-edge:3/branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:4/h3",
+				"element": "input",
+				"parent": "component-edge:0/h0",
+				"attributes": {
+					"placeholder": "Add a topic",
+					"type": "text",
+					"autocomplete": "off"
+				},
+				"bindings": [
+					{
+						"property": "value",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+						}
+					},
+					{
+						"attribute": "disabled",
+						"value": {
+							"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+						}
+					},
+					{
+						"attribute": "aria-invalid",
+						"value": {
+							"if": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+							},
+							"whenTrue": {
+								"literal": "true"
+							},
+							"whenFalse": {
+								"literal": "false"
+							}
+						}
+					},
+					{
+						"attribute": "aria-required",
+						"value": {
+							"if": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+							},
+							"whenTrue": {
+								"literal": "true"
+							},
+							"whenFalse": {
+								"literal": "false"
+							}
+						}
+					},
+					{
+						"attribute": "ui-empty",
+						"value": {
+							"binary": "===",
+							"left": {
+								"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+							},
+							"right": {
+								"literal": ""
+							}
+						}
+					},
+					{
+						"attribute": "aria-labelledby",
+						"value": {
+							"literal": "component-edge:1/h2"
+						}
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:2/h4",
+				"event": "activate",
+				"handler": "handler:component-edge:2/event:3"
+			},
+			{
+				"host": "component-edge:4/h3",
+				"event": "input",
+				"handler": "handler:component-edge:4/event:0"
+			},
+			{
+				"host": "component-edge:4/h3",
+				"event": "paste",
+				"handler": "handler:component-edge:4/event:1"
+			},
+			{
+				"host": "component-edge:4/h3",
+				"event": "keydown",
+				"handler": "handler:component-edge:4/event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:2/event:3",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"onClick": {
+								"value": {
+									"literal": null
+								}
+							},
+							"taglistState": {
+								"shared": {
+									"value": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+									},
+									"disabled": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+									},
+									"required": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+									},
+									"invalid": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+									},
+									"max": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+									},
+									"delimiter": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+									},
+									"editable": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+									},
+									"name": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+									},
+									"input": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+									},
+									"highlighted": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+									},
+									"editing": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+									},
+									"spoken": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+									},
+									"labelEl": {
+										"elements": {
+											"literal": "component-edge:1/h2"
+										}
+									},
+									"inputEl": {
+										"elements": {
+											"literal": "component-edge:4/h3"
+										}
+									},
+									"descriptionEl": {
+										"elements": {
+											"literal": "#unbound"
+										}
+									},
+									"errorEl": {
+										"elements": {
+											"literal": "#unbound"
+										}
+									},
+									"closeEls": {
+										"elements": {
+											"array": []
+										}
+									},
+									"editEls": {
+										"elements": {
+											"array": []
+										}
+									},
+									"take": {
+										"method": "fn:1",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									},
+									"remove": {
+										"method": "fn:3",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									},
+									"highlight": {
+										"method": "fn:4",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									},
+									"edit": {
+										"method": "fn:5",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											},
+											"editEls": {
+												"value": {
+													"array": []
+												}
+											}
+										}
+									},
+									"settle": {
+										"method": "fn:6",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							},
+							"taglistItemState": {
+								"shared": {
+									"value": {
+										"cell": "component-edge:2/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistItemState/state:item.value"
+									}
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:4/event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:7",
+						"type": "input",
+						"bindings": {
+							"onInput": {
+								"value": {
+									"literal": null
+								}
+							},
+							"taglistState": {
+								"shared": {
+									"value": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+									},
+									"disabled": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+									},
+									"required": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+									},
+									"invalid": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+									},
+									"max": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+									},
+									"delimiter": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+									},
+									"editable": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+									},
+									"name": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+									},
+									"input": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+									},
+									"highlighted": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+									},
+									"editing": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+									},
+									"spoken": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+									},
+									"labelEl": {
+										"elements": {
+											"literal": "component-edge:1/h2"
+										}
+									},
+									"inputEl": {
+										"elements": {
+											"literal": "component-edge:4/h3"
+										}
+									},
+									"descriptionEl": {
+										"elements": {
+											"literal": "#unbound"
+										}
+									},
+									"errorEl": {
+										"elements": {
+											"literal": "#unbound"
+										}
+									},
+									"closeEls": {
+										"elements": {
+											"array": []
+										}
+									},
+									"editEls": {
+										"elements": {
+											"array": []
+										}
+									},
+									"take": {
+										"method": "fn:1",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									},
+									"remove": {
+										"method": "fn:3",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									},
+									"highlight": {
+										"method": "fn:4",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									},
+									"edit": {
+										"method": "fn:5",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											},
+											"editEls": {
+												"value": {
+													"array": []
+												}
+											}
+										}
+									},
+									"settle": {
+										"method": "fn:6",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:4/event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:8",
+						"type": "paste",
+						"bindings": {
+							"onPaste": {
+								"value": {
+									"literal": null
+								}
+							},
+							"taglistState": {
+								"shared": {
+									"value": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+									},
+									"disabled": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+									},
+									"required": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+									},
+									"invalid": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+									},
+									"max": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+									},
+									"delimiter": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+									},
+									"editable": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+									},
+									"name": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+									},
+									"input": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+									},
+									"highlighted": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+									},
+									"editing": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+									},
+									"spoken": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+									},
+									"labelEl": {
+										"elements": {
+											"literal": "component-edge:1/h2"
+										}
+									},
+									"inputEl": {
+										"elements": {
+											"literal": "component-edge:4/h3"
+										}
+									},
+									"descriptionEl": {
+										"elements": {
+											"literal": "#unbound"
+										}
+									},
+									"errorEl": {
+										"elements": {
+											"literal": "#unbound"
+										}
+									},
+									"closeEls": {
+										"elements": {
+											"array": []
+										}
+									},
+									"editEls": {
+										"elements": {
+											"array": []
+										}
+									},
+									"take": {
+										"method": "fn:1",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									},
+									"remove": {
+										"method": "fn:3",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									},
+									"highlight": {
+										"method": "fn:4",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									},
+									"edit": {
+										"method": "fn:5",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											},
+											"editEls": {
+												"value": {
+													"array": []
+												}
+											}
+										}
+									},
+									"settle": {
+										"method": "fn:6",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:4/event:2",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:9",
+						"type": "keydown",
+						"bindings": {
+							"onKeydown": {
+								"value": {
+									"literal": null
+								}
+							},
+							"taglistState": {
+								"shared": {
+									"value": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+									},
+									"disabled": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+									},
+									"required": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+									},
+									"invalid": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+									},
+									"max": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+									},
+									"delimiter": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+									},
+									"editable": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+									},
+									"name": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+									},
+									"input": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+									},
+									"highlighted": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+									},
+									"editing": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+									},
+									"spoken": {
+										"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+									},
+									"labelEl": {
+										"elements": {
+											"literal": "component-edge:1/h2"
+										}
+									},
+									"inputEl": {
+										"elements": {
+											"literal": "component-edge:4/h3"
+										}
+									},
+									"descriptionEl": {
+										"elements": {
+											"literal": "#unbound"
+										}
+									},
+									"errorEl": {
+										"elements": {
+											"literal": "#unbound"
+										}
+									},
+									"closeEls": {
+										"elements": {
+											"array": []
+										}
+									},
+									"editEls": {
+										"elements": {
+											"array": []
+										}
+									},
+									"take": {
+										"method": "fn:1",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									},
+									"remove": {
+										"method": "fn:3",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									},
+									"highlight": {
+										"method": "fn:4",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									},
+									"edit": {
+										"method": "fn:5",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											},
+											"editEls": {
+												"value": {
+													"array": []
+												}
+											}
+										}
+									},
+									"settle": {
+										"method": "fn:6",
+										"bindings": {
+											"taglist": {
+												"object": {
+													"value": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.value"
+													},
+													"disabled": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.disabled"
+													},
+													"required": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.required"
+													},
+													"invalid": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.invalid"
+													},
+													"max": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.max"
+													},
+													"delimiter": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.delimiter"
+													},
+													"editable": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editable"
+													},
+													"name": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.name"
+													},
+													"input": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.input"
+													},
+													"highlighted": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.highlighted"
+													},
+													"editing": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.editing"
+													},
+													"spoken": {
+														"cell": "component-edge:0/shared:packages/headless/components/src/taglist/taglist.tsrx#taglistState/state:taglist.spoken"
+													},
+													"onChange": {
+														"method": "fn:2",
+														"bindings": {
+															"own": {
+																"fields": {
+																	"tags": "state:own.tags"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "049ed8d0089d0c9e",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0,\"fn:3\":0,\"fn:4\":0,\"fn:5\":0,\"fn:6\":0,\"fn:7\":0,\"fn:8\":0,\"fn:9\":0,\"fn:2\":3};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [null, load(2), load(1)];\n\nfunctions[\"fn:0\"] = function (__s) {\nconst taglist = __s.taglistState();\nconst item = __s.taglistItemState();\nreturn ((event) => {\n const close = __i[2][\"elementForValue\"](taglist.closeEls, item.value);\n const fromClose = close !== undefined && close.contains(event.target);\n if (!fromClose && taglist.disabled !== true) taglist.highlight(item.value);\n if (!fromClose && __i[1][\"opensEdit\"](event.detail, true) && taglist.editable === true) {\n  taglist.edit(item.value);\n }\n __s.onClick?.(event);\n});\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (function(incoming) {\n if (__s.taglist.disabled) return;\n const held = __s.taglist.value;\n const after = __i[2][\"admit\"](held, incoming, __s.taglist.max);\n const cap = __s.taglist.max;\n if (after === held && cap > 0 && held.length >= cap) {\n  __s.taglist.spoken = `${cap} tags is the limit`;\n  return;\n }\n if (after === held) return;\n const added = after.length - held.length;\n __s.taglist.value = after;\n __s.taglist.spoken = added === 1 ? `${after[after.length - 1]} added` : `${added} tags added`;\n __s.taglist.onChange?.(after);\n});\n};\nfunctions[\"fn:3\"] = function (__s) {\nreturn (function(value) {\n if (__s.taglist.disabled) return;\n const held = __s.taglist.value;\n if (!held.includes(value)) return;\n const after = held.filter((tag) => tag !== value);\n __s.taglist.highlighted = __i[2][\"afterRemoval\"](held, value);\n __s.taglist.editing = '';\n __s.taglist.value = after;\n __s.taglist.spoken = `${value} removed`;\n __s.taglist.onChange?.(after);\n});\n};\nfunctions[\"fn:4\"] = function (__s) {\nreturn (function(value) {\n __s.taglist.highlighted = value;\n});\n};\nfunctions[\"fn:5\"] = function (__s) {\nreturn (function(value) {\n if (__s.taglist.disabled || __s.taglist.editable !== true) return;\n __s.taglist.editing = value;\n __s.taglist.highlighted = value;\n __i[1][\"landCaret\"](__i[2][\"elementForValue\"](__s.editEls, value), value);\n});\n};\nfunctions[\"fn:6\"] = function (__s) {\nreturn (function(was, now, keep) {\n __s.taglist.editing = '';\n const held = __s.taglist.value;\n const one = __i[1][\"settled\"](was, now, keep);\n const after = __i[2][\"rename\"](held, was, one);\n if (after === held) return;\n __s.taglist.highlighted = held.includes(one) || one === '' ? '' : one;\n __s.taglist.value = after;\n __s.taglist.spoken = one === '' ? `${was} removed` : `${was} is now ${one}`;\n __s.taglist.onChange?.(after);\n});\n};\nfunctions[\"fn:7\"] = function (__s) {\nconst taglist = __s.taglistState();\nreturn ((event) => {\n if ((event).isComposing === true) {\n  __s.onInput?.(event);\n  return;\n }\n const field = event.target;\n const next = field.value;\n const mark = taglist.delimiter;\n const at = mark === '' ? -1 : next.lastIndexOf(mark);\n if (at >= 0) taglist.take(__i[2][\"splitPasted\"](next.slice(0, at), mark));\n const committed = at >= 0 ? next.slice(0, at + mark.length) : '';\n const now = field.value;\n const rest = committed !== '' && now.startsWith(committed) ? now.slice(committed.length) : now;\n if (rest !== now) field.value = rest;\n taglist.input = rest;\n __s.onInput?.(event);\n});\n};\nfunctions[\"fn:8\"] = function (__s) {\nconst taglist = __s.taglistState();\nreturn ((event) => {\n event.preventDefault();\n const text = (event).clipboardData?.getData('text') ?? '';\n const mark = taglist.delimiter;\n taglist.take(__i[2][\"splitPasted\"](text, mark === '' ? ',' : mark));\n __s.onPaste?.(event);\n});\n};\nfunctions[\"fn:9\"] = function (__s) {\nconst taglist = __s.taglistState();\nreturn ((event) => {\n if (event.isComposing === true) {\n  __s.onKeydown?.(event);\n  return;\n }\n if (event.key === 'Enter' || ((event.key === 'ArrowRight' || event.key === 'Backspace' || event.key === 'Delete' || event.key === 'Escape') && taglist.highlighted)) {\n  event.preventDefault();\n }\n const key = event.key;\n const field = event.target;\n const wasEmpty = taglist.input === '';\n const atStart = field.selectionStart === 0 && field.selectionEnd === 0;\n const held = taglist.highlighted;\n const isEditable = taglist.editable === true;\n if (key === 'Enter' && held !== '' && isEditable) {\n  taglist.edit(held);\n } else if (key === 'Enter') {\n  taglist.take(__i[2][\"splitPasted\"](taglist.input, taglist.delimiter === '' ? ',' : taglist.delimiter));\n  taglist.input = '';\n } else if (key === 'ArrowLeft' && (wasEmpty || atStart)) {\n  const landing = __i[2][\"nextHighlight\"](taglist.value, held, key);\n  if (landing !== undefined) taglist.highlight(landing);\n } else if (key === 'ArrowRight' && held !== '') {\n  const landing = __i[2][\"nextHighlight\"](taglist.value, held, key);\n  if (landing !== undefined) taglist.highlight(landing);\n } else if (key === 'Backspace' && held !== '') {\n  taglist.remove(held);\n } else if (key === 'Backspace' && wasEmpty) {\n  const landing = __i[2][\"nextHighlight\"](taglist.value, held, 'ArrowLeft');\n  if (landing !== undefined) taglist.highlight(landing);\n } else if (key === 'Delete' && held !== '') {\n  taglist.remove(held);\n } else if (key === 'Escape' && held !== '') {\n  taglist.highlight('');\n }\n __s.onKeydown?.(event);\n});\n};\n};\nmodules[1] = function (exports) {\n\"use strict\";\nvar __i = [];\n__export(exports, {\n\"elementForValue\": function () { return elementForValue; },\n\"admit\": function () { return admit; },\n\"afterRemoval\": function () { return afterRemoval; },\n\"rename\": function () { return rename; },\n\"splitPasted\": function () { return splitPasted; },\n\"nextHighlight\": function () { return nextHighlight; }\n});\nconst NO_TAG = '';\nfunction nextHighlight(values, current, key) {\n if (values.length === 0) return undefined;\n const last = values[values.length - 1];\n if (key === 'Home') return values[0];\n if (key === 'End') return last;\n const at = values.indexOf(current);\n if (key === 'ArrowLeft') {\n  if (at === -1) return last;\n  if (at === 0) return undefined;\n  return values[at - 1];\n }\n if (key === 'ArrowRight') {\n  if (at === -1) return undefined;\n  if (at === values.length - 1) return NO_TAG;\n  return values[at + 1];\n }\n return undefined;\n}\nfunction afterRemoval(values, removed) {\n const at = values.indexOf(removed);\n if (at === -1) return NO_TAG;\n const next = values[at + 1];\n if (next !== undefined) return next;\n const before = values[at - 1];\n return before ?? NO_TAG;\n}\nfunction splitPasted(text, delimiter) {\n const parts = delimiter === '' ? [text] : text.split(delimiter);\n return parts.map((part) => part.trim()).filter((part) => part !== '');\n}\nfunction admit(held, incoming, max) {\n const after = [...held];\n for (const raw of incoming) {\n  const one = raw.trim();\n  if (one === '') continue;\n  if (after.includes(one)) continue;\n  if (max > 0 && after.length >= max) break;\n  after.push(one);\n }\n return after.length === held.length ? held : after;\n}\nfunction rename(held, was, now) {\n const at = held.indexOf(was);\n if (at === -1) return held;\n const one = now.trim();\n if (one === was) return held;\n if (one === '') return held.filter((tag) => tag !== was);\n if (held.includes(one)) return held.filter((tag) => tag !== was);\n const after = [...held];\n after[at] = one;\n return after;\n}\nfunction elementForValue(elements, value) {\n if (!elements || value === NO_TAG) return undefined;\n return elements.find((one) => one.getAttribute('ui-value') === value);\n}\n};\nmodules[2] = function (exports) {\n\"use strict\";\nvar __i = [];\n__export(exports, {\n\"opensEdit\": function () { return opensEdit; },\n\"landCaret\": function () { return landCaret; },\n\"settled\": function () { return settled; }\n});\nfunction opensEdit(detail, onDoubleClick) {\n if (detail === 0) return true;\n if (onDoubleClick) return detail >= 2;\n return true;\n}\nfunction settled(previous, typed, keep) {\n if (!keep) return previous;\n return typed.trim();\n}\nfunction landCaret(box, words) {\n if (box === undefined) return;\n box.value = words;\n box.focus();\n box.select();\n}\n};\nmodules[3] = function (exports) {\n\"use strict\";\nvar __i = [null];\n\nfunctions[\"fn:2\"] = function (__s) {\nreturn ((next) => {\n __s.own.tags = next;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"049ed8d0089d0c9e\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Pantry"
+		],
+		[
+			"h2:text0",
+			"Tags: tea"
+		],
+		[
+			"component-edge:0/h1:text0",
+			""
+		],
+		[
+			"component-edge:1/h2:text0",
+			"Topics"
+		],
+		[
+			"component-edge:3/h5:text0@tea",
+			"tea"
+		]
+	],
+	"initialAttributes": [
+		[
+			"component-edge:0/h0",
+			"ui-disabled",
+			null
+		],
+		[
+			"component-edge:0/h0",
+			"ui-required",
+			null
+		],
+		[
+			"component-edge:0/h0",
+			"ui-invalid",
+			null
+		],
+		[
+			"component-edge:0/h0",
+			"ui-empty",
+			null
+		],
+		[
+			"component-edge:0/h0",
+			"aria-labelledby",
+			"component-edge:1/h2"
+		],
+		[
+			"component-edge:1/h2",
+			"for",
+			"component-edge:4/h3"
+		],
+		[
+			"component-edge:2/h4@tea",
+			"ui-value",
+			"tea"
+		],
+		[
+			"component-edge:2/h4@tea",
+			"ui-highlighted",
+			null
+		],
+		[
+			"component-edge:2/h4@tea",
+			"ui-editing",
+			null
+		],
+		[
+			"component-edge:2/h4@tea",
+			"ui-disabled",
+			null
+		],
+		[
+			"component-edge:3/h5@tea",
+			"hidden",
+			null
+		],
+		[
+			"component-edge:4/h3",
+			"disabled",
+			null
+		],
+		[
+			"component-edge:4/h3",
+			"aria-invalid",
+			"false"
+		],
+		[
+			"component-edge:4/h3",
+			"aria-required",
+			"false"
+		],
+		[
+			"component-edge:4/h3",
+			"ui-empty",
+			""
+		],
+		[
+			"component-edge:4/h3",
+			"aria-labelledby",
+			"component-edge:1/h2"
+		]
+	],
+	"initialProperties": [
+		[
+			"component-edge:4/h3",
+			"value",
+			""
+		]
+	],
+	"initialArms": [
+		[
+			"component-edge:3/branch-site:0@tea",
+			1
+		]
+	],
+	"initialRows": [
+		[
+			"repeat:0",
+			[
+				"tea"
+			]
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "input",
+				"host": "component-edge:4/h3",
+				"value": "milk"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "component-edge:4/h3",
+					"name": "ui-empty",
+					"value": null
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "keydown",
+				"host": "component-edge:4/h3",
+				"key": "Enter"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Tags: tea, milk"
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h1:text0",
+					"value": "milk added"
+				},
+				{
+					"op": "rows",
+					"node": "repeat:0",
+					"keys": [
+						"tea",
+						"milk"
+					]
+				},
+				{
+					"op": "property",
+					"node": "component-edge:4/h3",
+					"name": "value",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:4/h3",
+					"name": "ui-empty",
+					"value": ""
+				},
+				{
+					"op": "preventDefault"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "input",
+				"host": "component-edge:4/h3",
+				"value": "sugar,"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Tags: tea, milk, sugar"
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h1:text0",
+					"value": "sugar added"
+				},
+				{
+					"op": "rows",
+					"node": "repeat:0",
+					"keys": [
+						"tea",
+						"milk",
+						"sugar"
+					]
+				},
+				{
+					"op": "property",
+					"node": "component-edge:4/h3",
+					"name": "value",
+					"value": ""
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "paste",
+				"host": "component-edge:4/h3",
+				"text": "salt,pepper"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Tags: tea, milk, sugar, salt, pepper"
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h1:text0",
+					"value": "2 tags added"
+				},
+				{
+					"op": "rows",
+					"node": "repeat:0",
+					"keys": [
+						"tea",
+						"milk",
+						"sugar",
+						"salt",
+						"pepper"
+					]
+				},
+				{
+					"op": "preventDefault"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "keydown",
+				"host": "component-edge:4/h3",
+				"key": "Backspace"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h4@pepper",
+					"name": "ui-highlighted",
+					"value": ""
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:2/h4@tea",
+				"detail": 1
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h4@tea",
+					"name": "ui-highlighted",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "component-edge:2/h4@pepper",
+					"name": "ui-highlighted",
+					"value": null
+				}
+			]
+		}
+	]
+}
