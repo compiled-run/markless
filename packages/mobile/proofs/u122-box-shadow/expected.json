@@ -1,0 +1,29 @@
+{
+	"rung": 222,
+	"name": "box-shadow, outer and inset, square and rounded with spread: the phone rasters each shadow with Dragon's translated painter after every layout, as Chrome draws it",
+	"steps": [
+		{
+			"visible": [
+				"Box shadow",
+				"Outer shadow",
+				"Inset shadow",
+				"Rounded with spread",
+				"Grow",
+				"Short"
+			],
+			"placed": ["Outer shadow", "Inset shadow", "Rounded with spread", "Grow"]
+		},
+		{
+			"do": { "tap": "Grow" },
+			"visible": ["Tall"],
+			"absent": ["Short"],
+			"placed": ["Outer shadow", "Inset shadow", "Rounded with spread", "Grow"]
+		},
+		{
+			"do": { "tap": "Grow" },
+			"visible": ["Short"],
+			"absent": ["Tall"],
+			"placed": ["Outer shadow", "Inset shadow", "Rounded with spread", "Grow"]
+		}
+	]
+}

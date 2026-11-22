@@ -56,6 +56,12 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h2' }],
 	},
 	{
+		// A handler's devicePixelRatio reads the screen, which a conformance run fixes at 1.
+		name: 'device-pixel-ratio',
+		fixture: 'proofs/u132-device-pixel-ratio/App.tsrx',
+		actions: [{ event: 'activate', host: 'h2' }],
+	},
+	{
 		// A class that follows state keeps the module's style scope class around it, as the web writes it.
 		name: 'class-scope',
 		fixture: 'proofs/r161-class-scope/App.tsrx',
@@ -90,6 +96,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h2' },
 			{ event: 'activate', host: 'h3' },
 			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'row-slots',
+		fixture: 'test/fixtures/RowSlots.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
 		],
 	},
 	{

@@ -399,9 +399,15 @@ function stylesHaveRows(assets: ProofAssets): boolean {
 	const bytes = assets.get(PROOF_STYLE_PATH);
 	if (!bytes) return false;
 	const style = JSON.parse(new TextDecoder().decode(bytes)) as {
-		readonly targets?: { readonly android?: { readonly routes?: ReadonlyArray<{ readonly planRepeats?: ReadonlyArray<unknown> }> } };
+		readonly targets?: {
+			readonly android?: {
+				readonly planRepeats?: ReadonlyArray<unknown>;
+				readonly routes?: ReadonlyArray<{ readonly planRepeats?: ReadonlyArray<unknown> }>;
+			};
+		};
 	};
-	return (style.targets?.android?.routes ?? []).some((route) => (route.planRepeats ?? []).length > 0);
+	const android = style.targets?.android;
+	return [android, ...(android?.routes ?? [])].some((page) => (page?.planRepeats ?? []).length > 0);
 }
 
 /**

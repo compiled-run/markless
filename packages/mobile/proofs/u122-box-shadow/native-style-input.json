@@ -1,0 +1,146 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "App",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "mk-7h9amk"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-7h9amk"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Box shadow"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "card outer mk-7h9amk"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Outer shadow"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "card inset mk-7h9amk"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Inset shadow"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "card rounded mk-7h9amk"
+			},
+			"attributesByState": {
+				"style": [
+					{
+						"when": {
+							"state:tall": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"state:tall": true
+						},
+						"value": "height: 120px;"
+					}
+				]
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Rounded with spread"
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"class": "tap mk-7h9amk"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Grow"
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-7h9amk"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h6:text0",
+			"parent": "h6",
+			"text": "Short",
+			"textByState": [
+				{
+					"when": {
+						"state:tall": false
+					},
+					"value": "Short"
+				},
+				{
+					"when": {
+						"state:tall": true
+					},
+					"value": "Tall"
+				}
+			]
+		}
+	],
+	"css": "main.mk-7h9amk {\n\t\t\t\tpadding: 4px 0 12px;\n\t\t\t\tbackground: #f4f1ea;\n\t\t\t}\n\t\t\t.card.mk-7h9amk {\n\t\t\t\tmargin: 18px 20px;\n\t\t\t\tpadding: 14px 16px;\n\t\t\t\tfont-size: 17px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #22223b;\n\t\t\t}\n\t\t\t.outer.mk-7h9amk {\n\t\t\t\tbox-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);\n\t\t\t}\n\t\t\t.inset.mk-7h9amk {\n\t\t\t\tbox-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.35);\n\t\t\t}\n\t\t\t.rounded.mk-7h9amk {\n\t\t\t\tborder: 2px solid #1d3557;\n\t\t\t\tborder-radius: 14px;\n\t\t\t\tbox-shadow: 0 4px 10px 3px rgba(30, 60, 120, 0.35);\n\t\t\t}\n\t\t\t.tap.mk-7h9amk {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin: 12px 20px;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tpadding: 10px 18px;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffd166;\n\t\t\t\tcolor: #22223b;\n\t\t\t}",
+	"states": [
+		{
+			"cell": "state:tall",
+			"domain": [
+				false,
+				true
+			],
+			"initial": false
+		}
+	]
+}

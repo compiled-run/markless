@@ -1,0 +1,22 @@
+appId: ${APP_ID}
+name: s26-select-width
+---
+- launchApp:
+    clearState: true
+- assertVisible: Category
+- assertVisible: Home
+- assertVisible: Small
+- assertVisible: Tagged Home
+- assertNotVisible: Work
+- assertNotVisible: Ideas
+- assertNotVisible: Extra large
+- assertVisible: Sizing
+- tapOn: Tag
+- tapOn:
+    text: Groceries
+- assertNotVisible: Tagged Home
+- assertVisible: Groceries
+- assertVisible: Tagged Groceries
+- assertVisible: Small
+- assertNotVisible: Tagged Home
+- assertVisible: Sizing
