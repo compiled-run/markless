@@ -251,6 +251,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 		val plan = plan ?: return this
 		if (slotValues.size != slots.size) throw MarklessDecodeError("the style export reads ${slots.size} slots; the layout was given ${slotValues.size} values")
 		val slotsText = if (slots.isEmpty()) "" else slotValues.joinToString(",", ",\"slots\":[", "]") { "\"${java.lang.Long.toHexString(it.toRawBits()).padStart(16, '0')}\"" }
+		var undecided: String? = null
 		val laid = assignments.indices.map { k ->
 			val names = planNames.getOrNull(k) ?: emptyMap()
 			val dragonId = names.entries.associate { (d, m) -> m to d }
@@ -271,6 +272,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val parts = result.arr("plan layout")
 			if (parts.size != (if (slots.isEmpty()) 3 else 4) || parts[0] != Json.Str("ok")) throw MarklessDecodeError("Dragon's layout at $width x $height dp and ${scale}x failed: ${result.text()}")
 			val page = parts[1].arr("plan layout page scroll")
+			// Dragon's ["undecided", node, reason] when it could not decide the page's range at this size.
+			if (page.size == 3) undecided = "${page[1].str("plan layout page scroll node")}: ${page[2].str("plan layout page scroll reason")}"
 			val pageScroll = if (page.size == 3) null else range(rangeJson(page, "plan layout page scroll"), "plan layout page scroll")
 			val geometry = HashMap<String, List<Json>>()
 			for (g in parts[2].arr("plan layout nodes")) {
@@ -336,7 +339,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				)
 			})
 		}
-		return copy(dpr = scale, viewportWidth = width, viewportHeight = height, assignments = laid)
+		return copy(dpr = scale, viewportWidth = width, viewportHeight = height, assignments = laid, pageScrollUndecided = undecided ?: pageScrollUndecided)
 	}
 
 	companion object {
