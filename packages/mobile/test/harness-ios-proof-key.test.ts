@@ -50,6 +50,7 @@ const files: Record<string, string> = {
 	'job/bundle/rungs/02-b/rung.json': '{"name":"02-b"}',
 	'job/bundle/rungs/02-b/assets/ios/payload.json': 'ios b',
 	'job/bundle/rungs/02-b/assets/android/payload.json': 'android b',
+	'job/bundle/rungs/02-b/server/server/index.mjs': 'web build',
 };
 const edited = (path: string) =>
 	path.endsWith('.json') ? JSON.stringify({ edited: path }) : `${files[path]}, edited`;
@@ -68,6 +69,7 @@ describe('the Native proofs iOS pass key', () => {
 			'job/bundle/mobile/conformance/counter.json',
 			'job/bundle/rungs/01-a/rung.json',
 			'job/bundle/rungs/02-b/assets/ios/payload.json',
+			'job/bundle/rungs/02-b/server/server/index.mjs',
 			'repo/packages/mobile/dragon.json',
 			'repo/pnpm-lock.yaml',
 			'repo/.github/workflows/native-proofs.yml',

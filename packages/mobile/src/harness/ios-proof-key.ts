@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
+import { buildAppServer } from './app-server.ts';
 import { repoRoot, rungDir, writeBundle, type BundledRung } from '../runner/bundle.ts';
 import { hashFolder, hostFingerprint, rungFingerprint } from '../runner/reuse.ts';
 import { bundleRung, type JobSpec, readJson } from '../runner/store.ts';
@@ -37,8 +38,10 @@ export function iosProofKey(input: {
 	const hash = createHash('sha256').update('native-proofs-ios/1\0');
 	const host = hostFingerprint(input.job, input.spec, 'ios');
 	hash.update(`${host}\0`);
-	for (const rung of input.spec.rungs)
+	for (const rung of input.spec.rungs) {
 		hash.update(`${rung}\0${rungFingerprint(input.job, rung, 'ios', host)}\0`);
+		hashFolder(hash, join(bundleRung(input.job, rung), 'server'));
+	}
 	const except = new Set(NOT_READ_BY_IOS.map((path) => join(input.repo, path)));
 	const proofs = new Set(input.rungDirs.map((dir) => dirname(dir)));
 	const sources = [
@@ -67,6 +70,11 @@ async function main(names: ReadonlyArray<string>): Promise<number> {
 			host: 'adapters',
 			log: (line) => console.error(line),
 		});
+		for (const dir of rungDirs) {
+			const rung = bundleRung(job, basename(dir));
+			const bundled = readJson<BundledRung>(join(rung, 'rung.json'));
+			if (bundled?.server === 'app' && !bundled.buildError) await buildAppServer(dir, join(rung, 'server'));
+		}
 		const result = iosProofKey({ job, spec, repo: repoRoot, rungDirs });
 		if ('key' in result) console.log(result.key);
 		else console.error(`no key: ${result.notBuilt.join(', ')} did not build here, so the iOS job runs`);
