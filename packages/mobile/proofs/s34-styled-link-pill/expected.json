@@ -1,0 +1,28 @@
+{
+	"rung": "S34",
+	"name": "A link styled as a pill, whose border-radius is far more than half its height, draws its background and border, as CSS shrinks overlapping corner radii to fit the box; and a heading in a web font with negative letter-spacing shows whole, drawn glyph for glyph where Dragon placed it, on the web, iOS and Android",
+	"steps": [
+		{
+			"visible": [
+				"All notes",
+				"New note"
+			],
+			"absent": [
+				"Blank note"
+			],
+			"title": "Home"
+		},
+		{
+			"do": {
+				"tap": "New note"
+			},
+			"visible": [
+				"Blank note"
+			],
+			"absent": [
+				"All notes"
+			],
+			"title": "New"
+		}
+	]
+}

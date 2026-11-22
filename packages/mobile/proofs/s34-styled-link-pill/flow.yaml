@@ -1,0 +1,16 @@
+appId: ${APP_ID}
+name: s34-styled-link-pill
+---
+- launchApp:
+    clearState: true
+- assertVisible: All notes
+- assertVisible: New note
+- assertNotVisible: Blank note
+- assertVisible: Home
+- tapOn: New note
+- assertVisible: Blank note
+- assertNotVisible: All notes
+- assertVisible: New
+- assertVisible: Blank note
+- assertNotVisible: All notes
+- assertVisible: New
