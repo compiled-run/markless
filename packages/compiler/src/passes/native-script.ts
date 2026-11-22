@@ -15,8 +15,11 @@ import { SVG_GEOMETRY_SOURCE } from './native-svg-geometry.ts';
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
 export type NativeScriptModuleInput = {
 	readonly code: string;
-	/** The module each `__i` slot loads, or null for a slot nothing the script keeps reads. */
-	readonly imports: ReadonlyArray<number | null>;
+	/**
+	 * The module each `__i` slot loads, or null for a slot nothing the script keeps reads; `{ asset }` for an asset import,
+	 * a module whose default export is the asset's URL.
+	 */
+	readonly imports: ReadonlyArray<number | null | { readonly asset: string }>;
 	readonly functions: ReadonlyArray<{ readonly id: string; readonly code: string }>;
 };
 
@@ -811,6 +814,8 @@ g.__markless[id] = {
 			}
 			// A key's or paste's cancel reaches the host, as a browser reads defaultPrevented before the handler first awaits.
 			if (event && event.defaultPrevented && (entry.event.type === 'keydown' || entry.event.type === 'paste')) host.out.prevented = true;
+			// A handler that sets its text field's value writes the field, as the DOM's value setter does.
+			if (event && typeof entry.event.value === 'string' && event.target && !(event.target instanceof host.Form) && typeof event.target.value === 'string' && event.target.value !== entry.event.value) host.out.value = event.target.value;
 		} else if (entry.kind === 'timer') {
 			var timer = host.timers[entry.timer];
 			if (timer) {
@@ -864,6 +869,7 @@ g.__markless[id] = {
 		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands, pending: out.pending, settled: out.settled, raises: out.raises };
 		if (out.calls.length > 0) left.calls = out.calls;
 		if (out.prevented) left.prevented = true;
+		if (out.value !== undefined) left.value = out.value;
 		if (out.navigate) left.navigate = out.navigate;
 		return JSON.stringify(left);
 	},
@@ -903,7 +909,15 @@ export function nativeScriptOf(
 		return [
 			`modules[${index}] = function (exports) {`,
 			'"use strict";',
-			`var __i = [${module.imports.map((target) => (target === null ? 'null' : `load(${target})`)).join(', ')}];`,
+			`var __i = [${module.imports
+				.map((target) =>
+					target === null
+						? 'null'
+						: typeof target === 'object'
+							? `{ "default": ${JSON.stringify(target.asset)} }`
+							: `load(${target})`,
+				)
+				.join(', ')}];`,
 			module.code,
 			...module.functions.map(
 				(fn) => `functions[${JSON.stringify(fn.id)}] = function (__s) {\n${fn.code}\n};`,

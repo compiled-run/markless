@@ -24,7 +24,14 @@ import {
 	type NativeRuntime,
 	type NativeScreen,
 } from '../src/index.ts';
-import { compileRungApp, readAppConfig, readWorkspaceModule, servedReader } from '../src/harness/rung.ts';
+import {
+	assetReader,
+	compileRungApp,
+	readAppConfig,
+	readWorkspaceModule,
+	servedFileReader,
+	servedReader,
+} from '../src/harness/rung.ts';
 import { echoText } from '../src/harness/echo-server.ts';
 import { nativeMaxLength, nativeRangeValue } from '@markless/serializer/native-view';
 import { nodeScriptHost } from '../src/node-engine.ts';
@@ -1111,7 +1118,7 @@ function walk(
 			// Typing shows the text in the field at once; the input event then runs the handler.
 			const text =
 				'type' in action
-					? typedInto(action.type.text, attributeNow(host, 'maxlength'))
+					? typedInto((action.type.append ? fieldText(host) : '') + action.type.text, attributeNow(host, 'maxlength'))
 					: undefined;
 			if (text !== undefined) {
 				if (properties.has(host)) properties.set(host, text);
@@ -1375,6 +1382,8 @@ test.each(
 			...(page ? { page } : {}),
 			readModule: readWorkspaceModule,
 			readServedStylesheet: servedReader(join(proofsDir, folder)),
+			readServedFile: servedFileReader(join(proofsDir, folder)),
+			readAsset: assetReader,
 			...readAppConfig(join(proofsDir, folder)),
 			target,
 		});
