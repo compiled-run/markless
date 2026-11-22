@@ -1,0 +1,52 @@
+{
+	"rung": 145,
+	"name": "<details> and <summary>: a press on the summary opens and closes its details after its own click handler, as on the web",
+	"steps": [
+		{
+			"visible": [
+				"Help",
+				"Shipping",
+				"Returns, peeked 0",
+				"Send it back within a month.",
+				"Refunds take a week."
+			],
+			"absent": ["Orders leave in two days."]
+		},
+		{
+			"do": {
+				"tap": "Shipping"
+			},
+			"visible": [
+				"Orders leave in two days.",
+				"Returns, peeked 0",
+				"Send it back within a month.",
+				"Refunds take a week."
+			]
+		},
+		{
+			"do": {
+				"tap": "Returns, peeked 0"
+			},
+			"visible": ["Returns, peeked 1", "Orders leave in two days."],
+			"absent": ["Send it back within a month.", "Refunds take a week."]
+		},
+		{
+			"do": {
+				"tap": "Returns, peeked 1"
+			},
+			"visible": [
+				"Returns, peeked 2",
+				"Send it back within a month.",
+				"Refunds take a week.",
+				"Orders leave in two days."
+			]
+		},
+		{
+			"do": {
+				"tap": "Shipping"
+			},
+			"visible": ["Returns, peeked 2"],
+			"absent": ["Orders leave in two days."]
+		}
+	]
+}
