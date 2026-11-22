@@ -1437,7 +1437,7 @@ function composedBoundaryGraph(
 	};
 }
 
-/** Re-spells a composed child's arm records in page space; a page with component edges and every browser-rendered arm's symbol call it. */
+/** Re-spells a composed child's arm records in page space; a page with component edges and each MDX island's loader call it. */
 export function installMarklessComposedArmRecords(): void {
 	liveRoute = (page, instancePath, graphNodeId, path) =>
 		marklessPropRoute(liveProps.get(page)?.get(instancePath)?.routes, graphNodeId, path);

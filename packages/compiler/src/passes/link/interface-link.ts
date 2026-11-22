@@ -353,9 +353,6 @@ function linkedRenderDataSymbolPreamble(
 		// Dynamic: the resolver loads this module, so a static edge back would defeat its lazy import.
 		`const marklessLoadLocalSymbol = (symbolId) => import(${JSON.stringify(input.resolverId)}).then((resolver) => resolver.loadSymbol(symbolId));`,
 		`import { ${entry} } from '@markless/web/fns/prerender-resume';`,
-		// An arm rendered here may sit in a composed instance or an MDX island, whose records must be re-spelled in page space.
-		"import { installMarklessComposedArmRecords } from '@markless/web/fns/instance-scope';",
-		'installMarklessComposedArmRecords();',
 		'function marklessLoadLinkedSymbol(symbolId) {',
 		...input.routes.flatMap((route) => [
 			`\tif (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
