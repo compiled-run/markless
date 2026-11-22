@@ -36,16 +36,24 @@ import { echoText } from '../src/harness/echo-server.ts';
 import { nativeMaxLength, nativeRangeValue } from '@markless/serializer/native-view';
 import { nodeScriptHost } from '../src/node-engine.ts';
 import {
+	describeText,
 	looksOnly,
 	navRungFolders,
 	sheetStyleRungFolders,
 	styleRungFolders,
 	proofsDir,
 	readRung,
+	readsAs,
 	rungFolders,
+	selector,
 	type LadderRung,
 	type LadderStep,
+	type LadderText,
 } from '../proofs/ladder.ts';
+
+// A text named by how it starts is on screen when some shown text starts with it, as Maestro's anchored selector matches.
+const reading = (text: LadderText) =>
+	typeof text === 'string' ? text : expect.stringMatching(new RegExp(selector(text), 's'));
 
 /**
  * The key, at a `rows` entry's list, of the row an instance id sits in, when it sits in that copy of the list: an inner
@@ -229,10 +237,10 @@ function mirror(
 			return label !== null && shownNode(node.id) ? [[node.id, label] as const] : [];
 		});
 	// The element a text names: a labelled element, or the element holding that text (a row instance keeps its key).
-	const elementReading = (text: string) => {
-		const labelled = labels().find(([, label]) => label === text)?.[0];
+	const elementReading = (text: LadderText) => {
+		const labelled = labels().find(([, label]) => readsAs(label, text))?.[0];
 		if (labelled) return labelled;
-		const node = [...texts].find(([id, shown]) => shown === text && !inClosedSheet(id))?.[0];
+		const node = [...texts].find(([id, shown]) => readsAs(shown, text) && !inClosedSheet(id))?.[0];
 		if (!node) return undefined;
 		const parent = nodeOf.get(baseOf(node))?.parent ?? undefined;
 		return parent && node.includes('@') && nodeOf.get(parent)?.row
@@ -321,9 +329,9 @@ function mirror(
 			);
 			const read = styled ? [...open.values()] : nativeShownTexts(payload, open);
 			const shown = [...read, ...labels().map(([, label]) => label)];
-			expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
+			expect(shown, `step ${index}`).toEqual(expect.arrayContaining(step.visible.map(reading)));
 			for (const text of step.absent ?? [])
-				expect(shown, `step ${index}`).not.toContain(text);
+				expect(shown, `step ${index}`).not.toEqual(expect.arrayContaining([reading(text)]));
 			// Which texts a page's styles hide is Dragon's layout; the payload must still hold them.
 			for (const text of step.hidden ?? [])
 				expect([...open.values()], `step ${index}`).toContain(text);
@@ -719,15 +727,15 @@ function walk(
 		return label !== null && shownNode(node.id) ? [[id, label] as const] : [];
 	};
 	// A text field by its accessible name, as the web finds a textbox: a control named the same (a preview button) is not one.
-	const fieldReading = (text: string) =>
+	const fieldReading = (text: LadderText) =>
 		labels().find(([id, label]) => {
 			const element = nodeOf.get(id.split('@')[0]!);
-			return label === text && element?.kind === 'element' && (element.element === 'input' || element.element === 'textarea');
+			return readsAs(label, text) && element?.kind === 'element' && (element.element === 'input' || element.element === 'textarea');
 		})?.[0] ?? elementReading(text);
-	const elementReading = (text: string) => {
-		const labelled = labels().find(([, label]) => label === text)?.[0];
+	const elementReading = (text: LadderText) => {
+		const labelled = labels().find(([, label]) => readsAs(label, text))?.[0];
 		if (labelled) return labelled;
-		const node = shownTexts().find(([id, shown]) => shown === text && !hiddenWithin(id))?.[0];
+		const node = shownTexts().find(([id, shown]) => readsAs(shown, text) && !hiddenWithin(id))?.[0];
 		return node ? parentOf(node) : undefined;
 	};
 	// A field's text: what its `value` binding or attribute gave it, then what was typed or the journal wrote.
@@ -1113,10 +1121,10 @@ function walk(
 			const host = 'tap' in action || 'doubleTap' in action ? elementReading(name) : fieldReading(name);
 			if (!host)
 				throw new Error(
-					`step ${index}: nothing reads "${name}" to ${'tap' in action ? 'tap' : 'type into'}`,
+					`step ${index}: nothing reads ${describeText(name)} to ${'tap' in action ? 'tap' : 'type into'}`,
 				);
 			if (attributeNow(host, 'disabled') != null)
-				throw new Error(`step ${index}: "${name}" is disabled`);
+				throw new Error(`step ${index}: ${describeText(name)} is disabled`);
 			// Typing shows the text in the field at once; the input event then runs the handler.
 			const text =
 				'type' in action
@@ -1327,8 +1335,9 @@ function walk(
 				.map(([, label]) => label),
 			...chosenLabels(),
 		];
-		expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
-		for (const text of step.absent ?? []) expect(shown, `step ${index}`).not.toContain(text);
+		expect(shown, `step ${index}`).toEqual(expect.arrayContaining(step.visible.map(reading)));
+		for (const text of step.absent ?? [])
+			expect(shown, `step ${index}`).not.toEqual(expect.arrayContaining([reading(text)]));
 		for (const [node, value] of runtime.selections())
 			expect(selected.get(node) ?? false, `step ${index}: the journal left ${node}'s selectedness stale`).toBe(value);
 		expect(shown, `step ${index}: scrolled out of sight, still held`).toEqual(

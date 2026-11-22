@@ -43,12 +43,12 @@
 			"do": {
 				"back": "button"
 			},
-			"visible": ["All notes", "Groceries"],
+			"visible": ["All notes", { "startsWith": "Groceries" }],
 			"absent": ["Save note"]
 		},
 		{
 			"do": {
-				"tap": "Groceries"
+				"tap": { "startsWith": "Groceries" }
 			},
 			"visible": ["Edit"],
 			"absent": ["Search notes"]
@@ -57,7 +57,7 @@
 			"do": {
 				"back": "button"
 			},
-			"visible": ["All notes", "Groceries"],
+			"visible": ["All notes", { "startsWith": "Groceries" }],
 			"absent": ["Edit"]
 		},
 		{
@@ -68,7 +68,7 @@
 				}
 			},
 			"visible": ["No notes match “zzz”"],
-			"absent": ["Groceries"]
+			"absent": [{ "startsWith": "Groceries" }]
 		}
 	]
 }
