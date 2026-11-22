@@ -93,6 +93,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'row-slots',
+		fixture: 'test/fixtures/RowSlots.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
 		name: 'style-cases',
 		fixture: 'test/fixtures/StyleCases.tsrx',
 		actions: [

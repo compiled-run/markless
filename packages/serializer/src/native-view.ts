@@ -1084,6 +1084,8 @@ export type NativeViewPayload = {
 		readonly integer?: true;
 		/** Evaluated only while this style case has `value`; otherwise the slot keeps its last value (0 before the first). */
 		readonly when?: { readonly case: string; readonly value: boolean };
+		/** Inside a @for row: one value per row, `<slot>@<row key>`, evaluated with that row's item. */
+		readonly row?: string;
 	}>;
 	/**
 	 * Conditions a style follows (an element's `styleWhen`): each is whether its test is truthy now, journalled as `state`
