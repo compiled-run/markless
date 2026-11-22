@@ -32,6 +32,8 @@ struct TextLook: Equatable {
 	var shift: String?
 	var highlight = false
 	var preformatted = false
+	/// Inside a `<center>`: blocks sit in the middle of the line and text is centred (`text-align: -webkit-center`).
+	var centered = false
 
 	func applying(_ style: NativeDefaultStyle?) -> TextLook {
 		guard let style else { return self }
@@ -44,6 +46,7 @@ struct TextLook: Equatable {
 		next.shift = style.shift ?? shift
 		next.highlight = highlight || style.highlight
 		next.preformatted = preformatted || style.preformatted
+		next.centered = centered || style.center
 		return next
 	}
 
@@ -166,17 +169,32 @@ final class DrawingView: UIView {
 			}
 			if let fill = shape.fill {
 				context.addPath(path)
-				context.setFillColor((shadow?(color(fill)) ?? color(fill)).cgColor)
-				context.fillPath(using: shape.evenOdd ? .evenOdd : .winding)
+				if case let .gradient(gradient) = fill {
+					context.saveGState()
+					context.clip(using: shape.evenOdd ? .evenOdd : .winding)
+					Self.draw(gradient, in: context)
+					context.restoreGState()
+				} else {
+					context.setFillColor((shadow?(color(fill)) ?? color(fill)).cgColor)
+					context.fillPath(using: shape.evenOdd ? .evenOdd : .winding)
+				}
 			}
 			if let stroke = shape.stroke, shape.width > 0 {
 				context.addPath(path)
-				context.setStrokeColor((shadow?(color(stroke)) ?? color(stroke)).cgColor)
 				context.setLineWidth(shape.width)
 				context.setLineCap(shape.cap == "round" ? .round : shape.cap == "square" ? .square : .butt)
 				context.setLineJoin(shape.join == "round" ? .round : shape.join == "bevel" ? .bevel : .miter)
 				context.setMiterLimit(shape.miterLimit)
-				context.strokePath()
+				if case let .gradient(gradient) = stroke {
+					context.saveGState()
+					context.replacePathWithStrokedPath()
+					context.clip()
+					Self.draw(gradient, in: context)
+					context.restoreGState()
+				} else {
+					context.setStrokeColor((shadow?(color(stroke)) ?? color(stroke)).cgColor)
+					context.strokePath()
+				}
 			}
 			context.restoreGState()
 		}
@@ -292,6 +310,24 @@ final class DrawingView: UIView {
 		switch paint {
 		case .currentColor: currentColor
 		case let .color(c): UIColor(red: c.r / 255, green: c.g / 255, blue: c.b / 255, alpha: c.alpha / 255)
+		case .gradient: .clear
+		}
+	}
+
+	/// Fills the clip with a gradient, padded past its ends, its colours blended in sRGB as the browser blends them.
+	private static func draw(_ g: NativeGradient, in context: CGContext) {
+		let components = g.stops.flatMap { [$0.color.r / 255, $0.color.g / 255, $0.color.b / 255, $0.color.alpha / 255].map { CGFloat($0) } }
+		guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+			let gradient = CGGradient(colorSpace: space, colorComponents: components, locations: g.stops.map { CGFloat($0.offset) }, count: g.stops.count)
+		else { return }
+		if let t = g.transform { context.concatenate(CGAffineTransform(a: t[0], b: t[1], c: t[2], d: t[3], tx: t[4], ty: t[5])) }
+		let pad: CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+		if let l = g.linear {
+			context.drawLinearGradient(gradient, start: CGPoint(x: l[0], y: l[1]), end: CGPoint(x: l[2], y: l[3]), options: pad)
+		} else if let r = g.radial {
+			context.drawRadialGradient(
+				gradient, startCenter: CGPoint(x: r[0], y: r[1]), startRadius: r[2], endCenter: CGPoint(x: r[3], y: r[4]), endRadius: r[5],
+				options: pad)
 		}
 	}
 }
@@ -365,6 +401,8 @@ final class ViewTree {
 	/// Lists and the marker kind their items show; each item's marker label.
 	private var listMarkers: [ObjectIdentifier: String] = [:]
 	private var itemMarkers: [ObjectIdentifier: UILabel] = [:]
+	/// Containers whose children sit in the middle of the line (inside a `<center>`).
+	private var centered: Set<ObjectIdentifier> = []
 	/// Each summary's disclosure triangle, in its start inset.
 	private var disclosures: [ObjectIdentifier: UILabel] = [:]
 	/// Table structure: tables, their rows and the rows' cells.
@@ -381,6 +419,8 @@ final class ViewTree {
 	private var scrollViews: [String: ContainerScrollView] = [:]
 	/// Each box's shadow layers, while it has a shadow.
 	private var shadows: [String: ShadowLayers] = [:]
+	/// Each outlined box's outline view, in the view of its outline's host.
+	private var outlines: [String: OutlineView] = [:]
 	/// The view each box that clips overflow past its borders hosts its children in.
 	private var clipViews: [String: PaddingClipView] = [:]
 	/// What a stopped submit says, shown until the person's next action.
@@ -944,12 +984,24 @@ final class ViewTree {
 		else if style.childClip != nil { throw HostError("\(id) began clipping overflow past its borders after it was built") }
 		if let host = view.superview as? ContainerScrollView { view.frame.origin = CGPoint(x: view.frame.minX - host.inset.left, y: view.frame.minY - host.inset.top) }
 		try paintShadow(id, view, style)
+		try paintOutline(id, style)
 		guard let scroll = scrollViews[id] else {
 			if style.scroll != nil { throw HostError("\(id) became a scroll container after it was built") }
 			return
 		}
 		guard let s = style.scroll else { throw HostError("\(id) stopped being a scroll container after it was built") }
 		scroll.configure(s, in: view.bounds.size, cornerRadius: style.cornerRadius)
+	}
+
+	private func paintOutline(_ id: String, _ style: ResolvedStyle) throws {
+		guard let outline = style.outline else {
+			outlines.removeValue(forKey: id)?.removeFromSuperview()
+			return
+		}
+		guard let host = elements[outline.host] else { throw HostError("\(id): its outline is drawn in \(outline.host), which has no view") }
+		let view = outlines[id] ?? OutlineView()
+		outlines[id] = view
+		try view.apply(outline, in: host)
 	}
 
 	/// Views inserted beside a box since its shadow was placed go beneath that shadow again.
@@ -1339,6 +1391,7 @@ final class ViewTree {
 				inner.heading = context.heading || headings.contains(element)
 				inner.look = context.look.applying(node.defaultStyle)
 				if layout == nil, let style = node.defaultStyle { applyBlockStyle(style, to: view) }
+				if layout == nil, inner.look.centered { centered.insert(ObjectIdentifier(view)) }
 				if layout == nil, element == "li", listMarkers[ObjectIdentifier(container)] != nil { addMarker(to: view) }
 				view.accessibilityIdentifier = id
 				elements[id] = view
@@ -1532,6 +1585,7 @@ final class ViewTree {
 		labels.removeValue(forKey: id)?.removeFromSuperview()
 		scrollViews.removeValue(forKey: id)
 		shadows.removeValue(forKey: id)?.remove()
+		outlines.removeValue(forKey: id)?.removeFromSuperview()
 		paragraphs.removeValue(forKey: id)?.view.removeFromSuperview()
 		paragraphTexts.removeValue(forKey: id)
 		flowing.remove(id)
@@ -1681,6 +1735,7 @@ final class ViewTree {
 		var constraints: [NSLayoutConstraint] = []
 		var above = container.topAnchor
 		let indent = indents[ObjectIdentifier(container)] ?? 0
+		let middle = centered.contains(ObjectIdentifier(container))
 		var top = container
 		while let parent = top.superview { top = parent }
 		for child in stacked(container) {
@@ -1688,11 +1743,14 @@ final class ViewTree {
 			let wide = fullWidth.contains(ObjectIdentifier(child))
 			constraints += [
 				child.topAnchor.constraint(equalTo: above),
-				child.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: indent),
+				middle && !wide
+					? child.centerXAnchor.constraint(equalTo: container.centerXAnchor, constant: indent / 2)
+					: child.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: indent),
 				wide
 					? child.trailingAnchor.constraint(equalTo: container.trailingAnchor)
 					: child.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor),
 			]
+			if middle && !wide { constraints.append(child.leadingAnchor.constraint(greaterThanOrEqualTo: container.leadingAnchor, constant: indent)) }
 			if wide {
 				// As wide as the page allows: a box with no width of its own (a rule, a code block) takes the line.
 				let page = child.widthAnchor.constraint(equalTo: top.widthAnchor)
@@ -1842,6 +1900,7 @@ final class ViewTree {
 		let label = UILabel()
 		label.isUserInteractionEnabled = false
 		label.numberOfLines = 0
+		if context.look.centered { label.textAlignment = .center }
 		label.accessibilityIdentifier = run[0] + context.suffix
 		if context.button != nil {
 			label.isAccessibilityElement = false
@@ -2451,48 +2510,53 @@ private final class DashedBorderLayer: CALayer {
 
 	override func draw(in ctx: CGContext) {
 		guard let border else { return }
-		ctx.saveGState()
-		ctx.scaleBy(x: 1 / border.scale, y: 1 / border.scale)
-		ctx.translateBy(x: border.ops.originX, y: border.ops.originY)
-		for o in border.ops.ops {
-			let pts = o.points
-			switch o.op {
-			case "begin-layer":
-				ctx.saveGState()
-				ctx.setAlpha(o.alpha)
-				ctx.beginTransparencyLayer(auxiliaryInfo: nil)
-			case "end-layer":
-				ctx.endTransparencyLayer()
-				ctx.restoreGState()
-			case "save": ctx.saveGState()
-			case "restore": ctx.restoreGState()
-			case "clip":
-				ctx.setShouldAntialias(o.antialias)
-				ctx.addPath(polygon(pts))
-				ctx.clip()
-				ctx.setShouldAntialias(true)
-			default:
-				let c = border.colors[o.side]
-				ctx.setFillColor(UIColor(red: c.r / 255, green: c.g / 255, blue: c.b / 255, alpha: o.alpha).cgColor)
-				ctx.setShouldAntialias(o.antialias)
-				if o.op == "fill" {
-					ctx.addPath(polygon(pts))
-					ctx.fillPath()
-				} else {
-					ctx.fillEllipse(in: CGRect(x: pts[0] - pts[2], y: pts[1] - pts[2], width: 2 * pts[2], height: 2 * pts[2]))
-				}
-				ctx.setShouldAntialias(true)
-			}
-		}
-		ctx.restoreGState()
+		drawBorderOps(ctx, border.ops.ops, colors: border.colors, scale: border.scale, dx: border.ops.originX, dy: border.ops.originY)
 	}
+}
 
-	private func polygon(_ pts: [Double]) -> CGPath {
-		let path = CGMutablePath()
-		path.addLines(between: stride(from: 0, to: pts.count - 1, by: 2).map { CGPoint(x: pts[$0], y: pts[$0 + 1]) })
-		path.closeSubpath()
-		return path
+/// Dragon's side-painter operations (paint-dash.ts) in device px, shifted by dx, dy, as Dragon's own UIKit paint draws them.
+func drawBorderOps(_ ctx: CGContext, _ ops: [BorderOps.Op], colors: [RGBA], scale: Double, dx: Double, dy: Double) {
+	ctx.saveGState()
+	ctx.scaleBy(x: 1 / scale, y: 1 / scale)
+	ctx.translateBy(x: dx, y: dy)
+	for o in ops {
+		let pts = o.points
+		switch o.op {
+		case "begin-layer":
+			ctx.saveGState()
+			ctx.setAlpha(o.alpha)
+			ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+		case "end-layer":
+			ctx.endTransparencyLayer()
+			ctx.restoreGState()
+		case "save": ctx.saveGState()
+		case "restore": ctx.restoreGState()
+		case "clip":
+			ctx.setShouldAntialias(o.antialias)
+			ctx.addPath(polygon(pts))
+			ctx.clip()
+			ctx.setShouldAntialias(true)
+		default:
+			let c = colors[o.side]
+			ctx.setFillColor(UIColor(red: c.r / 255, green: c.g / 255, blue: c.b / 255, alpha: o.alpha).cgColor)
+			ctx.setShouldAntialias(o.antialias)
+			if o.op == "fill" {
+				ctx.addPath(polygon(pts))
+				ctx.fillPath()
+			} else {
+				ctx.fillEllipse(in: CGRect(x: pts[0] - pts[2], y: pts[1] - pts[2], width: 2 * pts[2], height: 2 * pts[2]))
+			}
+			ctx.setShouldAntialias(true)
+		}
 	}
+	ctx.restoreGState()
+}
+
+private func polygon(_ pts: [Double]) -> CGPath {
+	let path = CGMutablePath()
+	path.addLines(between: stride(from: 0, to: pts.count - 1, by: 2).map { CGPoint(x: pts[$0], y: pts[$0 + 1]) })
+	path.closeSubpath()
+	return path
 }
 
 /// A checkbox or radio button. On a styled page a checkbox draws Chrome's theme marks from Dragon's plan, in the checkedness the

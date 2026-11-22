@@ -95,6 +95,8 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 	/** A list's markers (`•`, `1.`), drawn in its start padding beside each item's first line; not text a reader reaches. */
 	internal var markers: Map<View, String> = emptyMap()
 		set(value) { field = value; invalidate() }
+	/** Inside a `<center>`: each child sits in the middle of the line. */
+	internal var centred = false
 	/** A summary's triangle, ▸ collapsed or ▾ expanded, drawn in a start inset beside its first line; null on any other box. */
 	internal var disclosure: Boolean? = null
 		set(value) {
@@ -166,7 +168,7 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 			height += child.measuredHeight
 			widest = maxOf(widest, child.measuredWidth)
 		}
-		val w = if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.EXACTLY) MeasureSpec.getSize(widthMeasureSpec) else widest + paddingLeft + paddingRight
+		val w = if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.EXACTLY || centred) MeasureSpec.getSize(widthMeasureSpec) else widest + paddingLeft + paddingRight
 		setMeasuredDimension(maxOf(w, minimumWidth), resolveSize(maxOf(height, minimumHeight), heightMeasureSpec))
 	}
 
@@ -194,7 +196,8 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 		for (i in 0 until childCount) {
 			val child = getChildAt(i)
 			if (child.visibility == View.GONE) continue
-			child.layout(paddingLeft, y, paddingLeft + child.measuredWidth, y + child.measuredHeight)
+			val x = if (centred) paddingLeft + (width - paddingLeft - paddingRight - child.measuredWidth) / 2 else paddingLeft
+			child.layout(x, y, x + child.measuredWidth, y + child.measuredHeight)
 			y += child.measuredHeight
 		}
 	}

@@ -38,6 +38,8 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var checkbox: CheckboxPaint?
 	/// A select's label: the box Dragon lays out inside it for its text, and that text's font and colour.
 	public var selectLabel: SelectLabel?
+	/// `outline`, drawn with Dragon's translated painters in the view of `OutlinePaint.host`.
+	public var outline: OutlinePaint?
 
 	public static func == (a: ResolvedStyle, b: ResolvedStyle) -> Bool {
 		a.frame == b.frame && a.background == b.background && a.borderWidth == b.borderWidth && a.borderColor == b.borderColor
@@ -45,7 +47,7 @@ public struct ResolvedStyle: Equatable, Sendable {
 			&& a.textColor == b.textColor && a.lines == b.lines && a.linesText == b.linesText && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll && a.hidden == b.hidden
 			&& a.clipsChildren == b.clipsChildren && a.childClip == b.childClip && a.clipRect == b.clipRect
 			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank && a.stackingParent == b.stackingParent && a.shadow == b.shadow
-			&& a.selectArrow == b.selectArrow && a.selectLabel == b.selectLabel && a.checkbox == b.checkbox
+			&& a.selectArrow == b.selectArrow && a.selectLabel == b.selectLabel && a.checkbox == b.checkbox && a.outline == b.outline
 	}
 
 	public struct SelectArrowPaint: Equatable, Sendable {
@@ -294,6 +296,9 @@ extension StyleExport {
 			if case .element("select", _, _)? = payloadById[id]?.kind { return true }
 			return false
 		}
+		let postOrder = StyleExport.postOrder(nodes)
+		let base = { (id: String) -> String in id.firstIndex(of: "@").map { String(id[..<$0]) } ?? id }
+		let isView = { (id: String) in payloadIds.contains(id) || (id.contains("@") && payloadIds.contains(base(id))) }
 		var styles: [String: ResolvedStyle] = [:]
 		for node in payloadNodes {
 			// Dragon lays out no box for what shows only in a select's picker.
@@ -326,6 +331,7 @@ extension StyleExport {
 			}
 			var style = try resolve(styled, styled.writes)
 			style.shadow = try BoxShadow.of(styled, byId: byId, canvas: canvas, body: body, dpr: dpr)
+			style.outline = try outline(of: styled, byId: byId, nodes: nodes, isView: isView, postOrder: postOrder)
 			if styled.isText, let parent = styled.parent, hiddenBoxes.contains(parent) { style.hidden = true }
 			// A box that paints nothing (an empty clip) has no order to keep.
 			if style.clipRect.map({ $0.width == 0 || $0.height == 0 }) ?? false { style.paintOrder = nil }
@@ -342,8 +348,6 @@ extension StyleExport {
 			styles[node.id] = style
 		}
 		// Each row's copy of a payload node ("<id>@<key>"), placed in its own copies of the boxes around it.
-		let base = { (id: String) -> String in id.firstIndex(of: "@").map { String(id[..<$0]) } ?? id }
-		let isView = { (id: String) in payloadIds.contains(id) || (id.contains("@") && payloadIds.contains(base(id))) }
 		for styled in nodes where styled.id.contains("@") && payloadIds.contains(base(styled.id)) {
 			var offset = (x: 0.0, y: 0.0)
 			var cursor = styled.parent
@@ -355,6 +359,7 @@ extension StyleExport {
 			}
 			var style = try resolve(styled, styled.writes)
 			style.shadow = try BoxShadow.of(styled, byId: byId, canvas: canvas, body: body, dpr: dpr)
+			style.outline = try outline(of: styled, byId: byId, nodes: nodes, isView: isView, postOrder: postOrder)
 			if styled.isText, let parent = styled.parent, hiddenBoxes.contains(parent) { style.hidden = true }
 			if let frame = style.frame {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
@@ -479,6 +484,7 @@ extension StyleExport {
 				if let arrow = node.selectArrow { style.selectArrow = ResolvedStyle.SelectArrowPaint(arrow: arrow, color: color, scale: dpr) }
 			case let .checkbox(colors):
 				if let marks = node.checkboxMarks { style.checkbox = ResolvedStyle.CheckboxPaint(marks: marks, colors: colors, scale: dpr) }
+			case .outline: break
 			}
 		}
 		// A scroll view clips its own content; any other box clips its children.
@@ -533,4 +539,4 @@ extension StyleExport {
 	}
 }
 
-private func styleError(_ reason: String) -> PayloadError { PayloadError(path: "style", reason: reason) }
+func styleError(_ reason: String) -> PayloadError { PayloadError(path: "style", reason: reason) }
