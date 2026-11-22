@@ -733,6 +733,25 @@ private fun overlays() {
 	refuses("focused other than true", payload.replace("{\"focusOrigin\":{\"literal\":\"h1\"}}", "{\"focused\":false}"), "focused must be true")
 }
 
+/** A page text whose current string is not the one laid out goes to the live layout as `texts`, beside no rows. */
+private fun planTexts() {
+	fun hex(v: Double) = "\"${java.lang.Long.toHexString(v.toRawBits()).padStart(16, '0')}\""
+	val export = """{"schema":"dragon.native-style-export/1","targets":{"android":{"backend":"android-views","viewport":{"width":100,"height":100},"dpr":2,"states":[],"initial":0,"next":[[]],"assignments":[{"values":{},"nodes":[{"id":"h0","parent":null,"kind":"element","frame":{"x":0,"y":0,"width":10,"height":10},"writes":[]},{"id":"h0:text0","parent":"h0","kind":"text","text":"Home","frame":{"x":0,"y":0,"width":10,"height":10},"writes":[]}]}],"plan":{"version":"dragon.markless-plan/1"}}}}"""
+	val style = StyleExport.decode(export.toByteArray())
+	fun answer(height: Double): String {
+		val zero = hex(0.0)
+		val box = "[$zero,$zero,${hex(10.0)},${hex(height)}]"
+		return """["ok",[$zero,$zero,$zero,$zero],[["h0",$box,null,null,null,null],["h0:text0",$box,null,null,null,null]]]"""
+	}
+	var live: String? = null
+	val laid = style.laidOut(100.0, 100.0, 2.0, { answer(10.0) }, rowsLayout = { line -> live = line; answer(30.0) }, texts = mapOf("h0:text0" to "Home and the garden shed"))
+	check("a changed page text goes to the live layout beside no rows", live?.endsWith(""","rows":[],"texts":[["h0:text0","Home and the garden shed"]]}""") == true) { "$live" }
+	check("the live layout's boxes are the page's", laid.assignments[0].byId.getValue("h0").frame?.height == 30.0) { "${laid.assignments[0].byId.getValue("h0").frame}" }
+	var replayed: String? = null
+	style.laidOut(100.0, 100.0, 2.0, { line -> replayed = line; answer(10.0) }, rowsLayout = { throw AssertionError("used the live layout") }, texts = mapOf("h0:text0" to "Home"))
+	check("a page text at its laid-out string keeps the recorded layout", replayed != null && "texts" !in replayed!!) { "$replayed" }
+}
+
 /** A style slot journals its new value; the plan's layout gets slot values and its moved write numbers patch the export. */
 private fun styleSlots() {
 	val payload = """{"version":"markless.native-view/0","component":"C","cells":[{"id":"c","name":"c","initial":1}],"slots":[{"id":"slot:x","value":{"binary":"*","left":{"cell":"c"},"right":{"literal":10}},"integer":true}],"nodes":[{"kind":"element","id":"h0","element":"div","parent":null,"style":["--x: ",{"slot":"slot:x"},"%"]},{"kind":"element","id":"h1","element":"button","parent":"h0"},{"kind":"element","id":"h2","element":"button","parent":"h0"},{"kind":"element","id":"h3","element":"button","parent":"h0"}],"events":[{"host":"h1","event":"activate","handler":"up"},{"host":"h2","event":"activate","handler":"same"},{"host":"h3","event":"activate","handler":"half"}],"handlers":[{"id":"up","ops":[{"op":"assign","cell":"c","value":{"binary":"+","left":{"cell":"c"},"right":{"literal":1}}}]},{"id":"same","ops":[{"op":"assign","cell":"c","value":{"cell":"c"}}]},{"id":"half","ops":[{"op":"assign","cell":"c","value":{"literal":0.25}}]}]}"""
@@ -958,6 +977,7 @@ fun main(args: Array<String>) {
 	decoderStrictness()
 	styleSlots()
 	rehostedStacking(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	planTexts()
 	val dirs = args.map(::File)
 	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)
 	val files = dirs.flatMap { d -> d.listFiles { f -> f.name.endsWith(".json") }?.sortedBy { it.name } ?: error("no vector directory $d") }
