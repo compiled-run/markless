@@ -1,5 +1,5 @@
 {
-	"rung": "S34",
+	"rung": "S36",
 	"name": "Styled @for rows in a web font the app bundles: each row's text shaped on the phone as the build shapes it, so the rows and the boxes after them lay out as the web lays them out",
 	"steps": [
 		{

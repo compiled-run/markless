@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: s34-web-font-rows
+name: s36-web-font-rows
 ---
 - launchApp:
       clearState: true
