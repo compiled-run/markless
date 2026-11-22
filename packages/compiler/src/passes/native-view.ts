@@ -5929,6 +5929,16 @@ export function createNativeViewPayload(
 					const texts: { path: ReadonlyArray<number>; text: string }[] = [];
 					for (const other of inside) {
 						if (drawnLive.some((path) => isPrefix(path, other.path))) continue;
+						// A <path> written in the <svg> whose `d` follows state is drawn while the app runs, as a component's is.
+						if (
+							other.kind === 'host' &&
+							other.path.length === item.path.length + 1 &&
+							scope.module.tagOf.get(other.id) === 'path' &&
+							boundAt(other.path).includes('d')
+						) {
+							drawnLive.push(other.path);
+							continue;
+						}
 						if (other.kind === 'host' && drawnLive.length > 0)
 							refuseAs(
 								'svg',
