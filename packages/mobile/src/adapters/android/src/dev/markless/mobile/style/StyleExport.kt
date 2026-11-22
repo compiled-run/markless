@@ -302,8 +302,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					}))
 				}).text()
 			}
-			// The page's own texts whose current string is not the one this assignment was laid out with, by Dragon id.
-			val changed = texts.entries.filter { (id, text) -> assignments[k].byId[id]?.text?.let { it != text } ?: false }.sortedBy { it.key }
+			// The page's own texts whose current string is not the one this assignment was laid out with, by Dragon id; a text an arm hides there has no box to lay out.
+			val changed = texts.entries.filter { (id, text) -> assignments[k].byId[id]?.takeIf { it.frame != null }?.text?.let { it != text } ?: false }.sortedBy { it.key }
 			val live = lists != null || changed.isNotEmpty()
 			val textsText = if (changed.isEmpty()) "" else (if (lists == null) ",\"rows\":[]" else "") + ",\"texts\":" + Json.Arr(changed.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }).text()
 			val line = "{\"assignment\":$k,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":$plan$slotsText${if (lists != null) ",\"rows\":$lists" else ""}$textsText}"
