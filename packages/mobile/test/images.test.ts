@@ -13,6 +13,12 @@ test("an image's natural size comes from its header: PNG, JPEG and GIF", () => {
 	expect(imageHeader(gif)).toEqual({ format: 'gif', width: 18, height: 18 });
 });
 
+test("a WebP's natural size comes from its first chunk: lossy, lossless and extended, its EXIF orientation left unapplied as Chrome does", () => {
+	expect(imageHeader(readFileSync(join(proofs, 'r170-webp-images/public/static/photo.webp')))).toEqual({ format: 'webp', width: 200, height: 120 });
+	expect(imageHeader(readFileSync(join(proofs, 'lib/square.webp')))).toEqual({ format: 'webp', width: 64, height: 64 });
+	expect(imageHeader(readFileSync(join(proofs, 'r170-webp-images/public/static/turned.webp')))).toEqual({ format: 'webp', width: 96, height: 48 });
+});
+
 test('bytes that are not an image the build reads have no header, so the phone shows the alt text', () => {
 	expect(imageHeader(readFileSync(join(proofs, 'r155-images/public/static/broken.png')))).toBeNull();
 	expect(imageHeader(new Uint8Array())).toBeNull();
@@ -85,11 +91,35 @@ test('an SVG file is drawn from shapes compiled when the app is built, scaled to
 });
 
 test('an SVG file a native drawing cannot draw is refused, naming why; bytes that are not SVG are no image', () => {
-	const image = svg(`<svg ${NS} viewBox="0 0 4 2"><defs><linearGradient id="g"/></defs><rect width="4" height="2" fill="url(#g)"/></svg>`);
-	expect(image?.refusals.join('\n')).toContain('gradients');
+	const image = svg(`<svg ${NS} viewBox="0 0 4 2"><defs><pattern id="g"/></defs><rect width="4" height="2" fill="url(#g)"/></svg>`);
+	expect(image?.refusals).toEqual(['`fill="url(#g)"` on <rect> names a <pattern>, which a native drawing does not paint with yet']);
 	expect(svg('<svg><rect></svg>')).toBeNull();
 	expect(svg('<html xmlns="http://www.w3.org/1999/xhtml"/>')).toBeNull();
 	expect(svg('not markup')).toBeNull();
+});
+
+test("an SVG file's gradients paint its shapes, their stops read from the file and the href they name", () => {
+	const image = svg(`<svg ${NS} xmlns:xlink="http://www.w3.org/1999/xlink" width="40" height="20" viewBox="0 0 40 20">
+	<path d="M0 0H20V20H0Z" fill="url(#a)"/>
+	<rect x="20" width="20" height="20" fill="url(#b)"/>
+	<defs>
+		<linearGradient id="a" x1="0" y1="0" x2="20" y2="20" gradientUnits="userSpaceOnUse">
+			<stop stop-color="#41D1FF"/>
+			<stop offset="1" stop-color="#BD34FE"/>
+		</linearGradient>
+		<radialGradient id="b" xlink:href="#a" gradientUnits="objectBoundingBox"/>
+	</defs>
+</svg>`);
+	expect(image?.refusals).toEqual([]);
+	const [first, second] = image!.image.drawing.shapes;
+	expect(first?.fill).toEqual({
+		linear: [0, 0, 20, 20],
+		stops: [
+			{ offset: 0, color: { r: 0x41, g: 0xd1, b: 0xff, alpha: 255 } },
+			{ offset: 1, color: { r: 0xbd, g: 0x34, b: 0xfe, alpha: 255 } },
+		],
+	});
+	expect(second?.fill).toMatchObject({ radial: [0.5, 0.5, 0, 0.5, 0.5, 0.5], transform: [20, 0, 0, 20, 20, 0] });
 });
 
 test("an SVG file's style that only sets mask-type is read as that attribute; any other style is still refused", () => {
@@ -103,4 +133,26 @@ test("an SVG file's style that only sets mask-type is read as that attribute; an
 	expect(svgImage(svg('mask-type:alpha; opacity: 0.5'))!.refusals).toContain(
 		'`style="mask-type:alpha; opacity: 0.5"` on <mask> in an SVG file: its CSS is not read for a native drawing yet',
 	);
+});
+
+test('a gradient fill inside a <mask> is refused as partial coverage', () => {
+	const image = svg(`<svg ${NS} width="20" height="20" viewBox="0 0 20 20">
+	<defs>
+		<linearGradient id="g"><stop stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+		<mask id="m" x="0" y="0" width="20" height="20" maskUnits="userSpaceOnUse"><rect width="20" height="20" fill="url(#g)"/></mask>
+	</defs>
+	<rect width="20" height="20" fill="#000" mask="url(#m)"/>
+</svg>`);
+	expect(image?.refusals.join('\n')).toContain('a mask of partial coverage is not drawn natively yet');
+});
+
+test('a gradient fill under a blur filter is refused', () => {
+	const image = svg(`<svg ${NS} width="20" height="20" viewBox="0 0 20 20">
+	<defs>
+		<linearGradient id="g"><stop stop-color="#41D1FF"/><stop offset="1" stop-color="#BD34FE"/></linearGradient>
+		<filter id="f" x="0" y="0" width="20" height="20" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="2"/></filter>
+	</defs>
+	<rect width="20" height="20" fill="url(#g)" filter="url(#f)"/>
+</svg>`);
+	expect(image?.refusals.join('\n')).toContain('a gradient `fill` under a `filter`');
 });

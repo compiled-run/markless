@@ -338,6 +338,8 @@ public final class NativeRuntime {
 	/// The device's answers to the media features a script's `matchMedia` reads (`prefers-reduced-motion`, `prefers-color-scheme`),
 	/// read as each entry begins; the web's defaults when the host gives none.
 	public var media: () -> [(String, String)] = { [("prefers-reduced-motion", "no-preference"), ("prefers-color-scheme", "light")] }
+	/// The screen's device pixels per CSS px, which a script's `devicePixelRatio` reads as each entry begins.
+	public var devicePixelRatio: () -> Double = { 1 }
 
 	/// The device's clock, in milliseconds since 1970 (UTC).
 	private let now: () -> Double
@@ -782,12 +784,14 @@ public final class NativeRuntime {
 		let crypto = payload.script?.services.contains(.crypto) == true
 		let navigate = payload.script?.services.contains(.navigate) == true
 		let media = payload.script?.services.contains(.media) == true
+		let screen = payload.script?.services.contains(.screen) == true
 		let nonFinite: [(String, JSONValue)] = if case let .array(found) = split.nonFinite, !found.isEmpty { [("nonFinite", split.nonFinite)] } else { [] }
 		return [("cells", split.json)] + nonFinite
 			+ (unset.isEmpty ? [] : [("unset", .array(unset.sorted().map { .string($0) }))])
 			+ (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
 			+ (navigate ? [("params", .object(params.map { ($0.name, .string($0.value)) }))] : [])
 			+ (media ? [("media", .object(self.media().map { ($0.0, .string($0.1)) }))] : [])
+			+ (screen ? [("screen", .object([("devicePixelRatio", .number(devicePixelRatio()))]))] : [])
 	}
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
@@ -816,7 +820,7 @@ public final class NativeRuntime {
 			focus = [("focused", .string(focused)), ("focusElements", try elementFacts(.object([]), also: [focused]))]
 		}
 		let text = try scriptHost.unwrap().entry { () throws -> String in
-			_ = try callScript("enter", .object(entry + focus + entryCells()))
+			_ = try callScript("enter", .object(entry + [("screen", .number(Double(screen)))] + focus + entryCells()))
 			return try callScript("leave")
 		}
 		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave")
@@ -1016,7 +1020,7 @@ public final class NativeRuntime {
 			let sent = JSONValue.array([listed, .array(tasks.map { .array($0.frame.map { readFrame($0.1) }) })]).jsonText
 			if sent == asyncSent && retry.isEmpty { return out }
 			asyncSent = sent
-			var entry: [(String, JSONValue)] = [("kind", .string("tasks")), ("screen", .number(Double(screen))), ("tasks", listed)]
+			var entry: [(String, JSONValue)] = [("kind", .string("tasks")), ("tasks", listed)]
 			if !retry.isEmpty { entry.append(("retry", .array(retry.map { .string($0) }))) }
 			retry = []
 			out += try enter(entry)
@@ -1068,7 +1072,7 @@ public final class NativeRuntime {
 	/// The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel.
 	public func leave() throws -> [NativeJournalEntry] {
 		guard asyncSent != nil else { return [] }
-		return try enter([("kind", .string("tasks")), ("screen", .number(Double(screen))), ("tasks", .array([])), ("leave", .bool(true))])
+		return try enter([("kind", .string("tasks")), ("tasks", .array([])), ("leave", .bool(true))])
 			.filter { if case .abort = $0 { true } else { false } }
 	}
 

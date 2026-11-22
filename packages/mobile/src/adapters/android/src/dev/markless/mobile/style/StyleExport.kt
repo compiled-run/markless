@@ -55,13 +55,23 @@ sealed interface StyleWrite {
 	data object ClipText : StyleWrite
 	/** The box paints in another stacking context's order (Dragon's re-hosting); [host] is that context's node. */
 	data class PaintOrder(val host: String, val bucket: Int, val rank: Int) : StyleWrite
+	/** box-shadow: the computed shadows in list order. */
+	data class BoxShadow(val shadows: List<Shadow>) : StyleWrite
 	/** A themed checkbox (`appearance: auto`): drawn in [colors] over [StyledNode.checkboxMarks], checked or not as the input's live checkedness says. */
 	data class Checkbox(val colors: CheckboxColors) : StyleWrite
 	/** `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own. */
 	data class Visibility(val value: String) : StyleWrite
 	/** A select whose appearance devolves to menulist-button: its drop-down arrow is stroked in [color], along [StyledNode.selectArrow]. */
 	data class SelectArrow(val color: Rgba) : StyleWrite
+	/**
+	 * `outline`: [style], [width] and [offset] in CSS px, [color], a 3D style's lighter and darker [tones], the box's corner radius
+	 * lengths (percent, value; null: square) and the node whose paint layer paints it, after that layer's flow content.
+	 */
+	data class Outline(val style: String, val width: Double, val offset: Double, val color: Rgba, val tones: Pair<Rgba, Rgba>?, val radii: List<Pair<Boolean, Double>>?, val layer: String) : StyleWrite
 }
+
+/** The outline styles Dragon draws natively: solid and double rings, the others with Blink's side painter. */
+val OUTLINE_STYLES = listOf("solid", "double", "dotted", "dashed", "groove", "ridge", "inset", "outset")
 
 /**
  * A select's drop-down arrow as Dragon's plan layout gives it: an open path of [points] (x, y pairs, the first moved to), stroked
@@ -271,7 +281,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 	 * `runMarklessLayout`; [slotValues] are the current values of [slots], in their order, and the writes they move are written
 	 * in. Without a plan the export is returned as it is.
 	 */
-	fun laidOut(width: Double, height: Double, scale: Double, layout: (String) -> String, slotValues: List<Double> = emptyList(), rows: ((Int) -> Map<String, List<LaidOutRow>>)? = null, rowsLayout: ((String) -> String)? = null): StyleExport {
+	fun laidOut(width: Double, height: Double, scale: Double, layout: (String) -> String, slotValues: List<Double> = emptyList(), rows: ((Int) -> Map<String, List<LaidOutRow>>)? = null, rowsLayout: ((String) -> String)? = null, texts: Map<String, String> = emptyMap()): StyleExport {
 		val plan = plan ?: return this
 		if (slotValues.size != slots.size) throw MarklessDecodeError("the style export reads ${slots.size} slots; the layout was given ${slotValues.size} values")
 		val hex = { list: List<Double> -> Json.Arr(list.map { Json.Str(java.lang.Long.toHexString(it.toRawBits()).padStart(16, '0')) }) }
@@ -292,9 +302,13 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					}))
 				}).text()
 			}
-			val line = "{\"assignment\":$k,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":$plan$slotsText${if (lists != null) ",\"rows\":$lists" else ""}}"
-			if (lists != null && rowsLayout == null) throw MarklessDecodeError("a page with rows needs Dragon's rows layout")
-			val result = Json.parse(if (lists == null) layout(line) else rowsLayout!!(line))
+			// The page's own texts whose current string is not the one this assignment was laid out with, by Dragon id; a text an arm hides there has no box to lay out.
+			val changed = texts.entries.filter { (id, text) -> assignments[k].byId[id]?.takeIf { it.frame != null }?.text?.let { it != text } ?: false }.sortedBy { it.key }
+			val live = lists != null || changed.isNotEmpty()
+			val textsText = if (changed.isEmpty()) "" else (if (lists == null) ",\"rows\":[]" else "") + ",\"texts\":" + Json.Arr(changed.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }).text()
+			val line = "{\"assignment\":$k,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":$plan$slotsText${if (lists != null) ",\"rows\":$lists" else ""}$textsText}"
+			if (live && rowsLayout == null) throw MarklessDecodeError("a page whose rows or texts follow state needs Dragon's live layout")
+			val result = Json.parse(if (live) rowsLayout!!(line) else layout(line))
 			val parts = result.arr("plan layout")
 			val slotted = slots.isNotEmpty()
 			val fixed = if (!slotted) 3 else if (lists == null) 4 else 5
@@ -829,6 +843,15 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				}.also { if (it.size != 4) throw MarklessDecodeError("$what has ${it.size} inset edges, not 4") })
 				"clip-text" -> StyleWrite.ClipText.also { o.field("texts", what).arr("texts").forEach { t -> t.str("$what.texts[]") } }
 				"paint-order" -> StyleWrite.PaintOrder(o.field("host", what).str("host"), o.field("bucket", what).num("bucket").toInt(), o.field("rank", what).num("rank").toInt())
+				"box-shadow" -> {
+					if (o.field("key", what) != Json.Str("dragonShadow.shadows")) throw MarklessDecodeError("$what: a box-shadow write's key is dragonShadow.shadows")
+					StyleWrite.BoxShadow(o.field("shadows", what).arr("$what.shadows").mapIndexed { n, x ->
+						val at = "$what.shadows[$n]"
+						val sh = x.obj(at)
+						fun length(k: String) = sh.field(k, at).num("$at.$k")
+						Shadow((sh.field("inset", at) as? Json.Bool ?: throw MarklessDecodeError("$at.inset must be a boolean")).value, length("x"), length("y"), length("blur"), length("spread"), color(sh.field("color", at), "$at.color"))
+					})
+				}
 				"checkbox" -> {
 					// The initial checkedness; the runtime keeps the live one, which a tap changes and a re-render does not reset.
 					if (o.field("checked", what) !is Json.Bool) throw MarklessDecodeError("$what.checked must be a boolean")
@@ -847,6 +870,26 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					StyleWrite.Visibility(value)
 				}
 				"select-arrow" -> StyleWrite.SelectArrow(color(o.field("color", what), "$what.color"))
+				"outline" -> {
+					if (o.field("key", what) != Json.Str("dragonOutline.rings")) throw MarklessDecodeError("$what: an outline write's key is dragonOutline.rings")
+					val style = o.field("style", what).str("$what.style")
+					if (style !in OUTLINE_STYLES) throw MarklessDecodeError("$what: outline style $style has no native paint")
+					val width = o.field("width", what).num("$what.width")
+					val offset = o.field("offset", what).num("$what.offset")
+					if (!(width > 0.0) || width.isInfinite() || !offset.isFinite()) throw MarklessDecodeError("$what: outline width $width or offset $offset is out of range")
+					val threeD = style in listOf("groove", "ridge", "inset", "outset")
+					val tones = o.field("tones", what).takeIf { it != Json.Null }?.arr("$what.tones")?.let { pair ->
+						if (pair.size != 2) throw MarklessDecodeError("$what.tones: expected a lighter and a darker colour")
+						color(pair[0], "$what.tones[0]") to color(pair[1], "$what.tones[1]")
+					}
+					if ((tones != null) != threeD) throw MarklessDecodeError("$what: a $style outline ${if (threeD) "needs" else "has no"} lighter and darker colours")
+					val radii = o.field("radii", what).takeIf { it != Json.Null }?.arr("$what.radii")?.map {
+						val l = it.obj("$what.radii[]")
+						val percent = l.field("percent", what) as? Json.Bool ?: throw MarklessDecodeError("$what.radii[].percent must be a boolean")
+						percent.value to l.field("value", what).num("$what.radii[].value")
+					}?.also { if (it.size != 8) throw MarklessDecodeError("$what: an outline's radii are 8 lengths, not ${it.size}") }
+					StyleWrite.Outline(style, width, offset, color(o.field("color", what), "$what.color"), tones, radii, o.field("layer", what).str("$what.layer"))
+				}
 				else -> throw MarklessDecodeError("$what has unknown style write kind \"$kind\"")
 			}
 		}

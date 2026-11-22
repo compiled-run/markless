@@ -507,6 +507,8 @@ class Runtime(
 	var measure: ((id: String) -> ElementBox?)? = null
 	/** The device's answers to the media features a script's `matchMedia` reads, read as each entry begins; the web's defaults when the host gives none. */
 	var media: () -> List<Pair<String, String>> = { listOf("prefers-reduced-motion" to "no-preference", "prefers-color-scheme" to "light") }
+	/** The screen's device pixels per CSS px, which a script's `devicePixelRatio` reads as each entry begins. */
+	var devicePixelRatio: () -> Double = { 1.0 }
 
 	/** Called with each engine entry's duration in nanoseconds, including starting the engine when the entry had to. */
 	var onScriptEntry: ((nanos: Long) -> Unit)? = null
@@ -652,6 +654,8 @@ class Runtime(
 			append(",\"params\":" + params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" })
 		if (payload.script?.services?.contains("media") == true)
 			append(",\"media\":" + media().joinToString(",", "{", "}") { "${jsonString(it.first)}:${jsonString(it.second)}" })
+		if (payload.script?.services?.contains("screen") == true)
+			append(",\"screen\":{\"devicePixelRatio\":${jsonValue(JsValue.Num(devicePixelRatio()))}}")
 	}
 
 	/** Submissions held by a script promise not settled yet, by the engine's run number. */
@@ -672,7 +676,7 @@ class Runtime(
 	private fun enter(fields: String, submission: Submission? = null): List<JournalEntry> {
 		// A handler may read the focused element; a computed, which renders, never does, so only entries carry it.
 		val focus = focused?.takeIf { it != NATIVE_DOCUMENT_BODY }?.let { ",\"focused\":${jsonString(it)},\"focusElements\":${elementFacts(emptyMap(), Scope.EMPTY, listOf(it))}" } ?: ""
-		val entry = "{$fields$focus${entryCells()}}"
+		val entry = "{$fields,\"screen\":$screen$focus${entryCells()}}"
 		val started = System.nanoTime()
 		scriptCall("enter", entry)
 		val result = Json.parse(scriptCall("leave", null)).obj("leave()")
@@ -850,7 +854,7 @@ class Runtime(
 			asyncSent = sent
 			val again = if (retry.isEmpty()) "" else retry.joinToString(",", ",\"retry\":[", "]", transform = ::jsonString)
 			retry.clear()
-			out.addAll(enter("\"kind\":\"tasks\",\"screen\":$screen,\"tasks\":$tasks$again"))
+			out.addAll(enter("\"kind\":\"tasks\",\"tasks\":$tasks$again"))
 		}
 		throw MarklessRuntimeError("async values that keep starting each other")
 	}
@@ -871,7 +875,7 @@ class Runtime(
 	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
 	fun leave(): List<JournalEntry> =
 		if (asyncSent == null) emptyList()
-		else enter("\"kind\":\"tasks\",\"screen\":$screen,\"tasks\":[],\"leave\":true").filter { it is JournalEntry.Abort }
+		else enter("\"kind\":\"tasks\",\"tasks\":[],\"leave\":true").filter { it is JournalEntry.Abort }
 
 	/** The host's answer to a `fetch` entry: `{ status, statusText, headers, body }`, or `{ error }` for a network failure. */
 	fun response(id: Int, response: JsValue): List<JournalEntry> =

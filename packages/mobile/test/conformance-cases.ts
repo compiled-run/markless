@@ -56,6 +56,12 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h2' }],
 	},
 	{
+		// A handler's devicePixelRatio reads the screen, which a conformance run fixes at 1.
+		name: 'device-pixel-ratio',
+		fixture: 'proofs/u132-device-pixel-ratio/App.tsrx',
+		actions: [{ event: 'activate', host: 'h2' }],
+	},
+	{
 		// A class that follows state keeps the module's style scope class around it, as the web writes it.
 		name: 'class-scope',
 		fixture: 'proofs/r161-class-scope/App.tsrx',
@@ -486,6 +492,14 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		name: 'svg-markers',
 		fixture: 'proofs/u77-svg-markers/App.tsrx',
 		actions: [{ event: 'activate', host: 'h2' }],
+	},
+	{
+		name: 'svg-gradients',
+		fixture: 'proofs/u128-svg-gradients/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h20' },
+			{ event: 'activate', host: 'h20' },
+		],
 	},
 	{
 		name: 'types',
@@ -1365,6 +1379,21 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// numberbox's step buttons: a press steps and starts the hold's clock, the lift stops it; a press the platform takes
+		// for a scroll steps and is cancelled, which stops it too.
+		name: 'press-cancel',
+		fixture: 'proofs/u40-numberbox/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'pointerdown', host: 'component-edge:4/h5' },
+			{ event: 'pointerup', host: 'component-edge:4/h5' },
+			{ event: 'pointerdown', host: 'component-edge:2/h4' },
+			{ event: 'pointerup', host: 'component-edge:2/h4' },
+			{ event: 'pointerdown', host: 'component-edge:4/h5' },
+			{ event: 'pointercancel', host: 'component-edge:4/h5' },
+		],
+	},
+	{
 		// qr-code: the svg's viewBox and its path's outline follow the code's value; the engine turns each into numbers.
 		name: 'live-drawing',
 		fixture: 'proofs/u42-qr-code/App.tsrx',
@@ -1763,6 +1792,22 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	{
 		name: 'script-render-list',
 		fixture: 'proofs/j9-render-list/App.tsrx',
+		modules: true,
+		actions: [{ event: 'activate', host: 'h4' }],
+	},
+	{
+		name: 'script-url',
+		fixture: 'proofs/j52-url/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h7' },
+		],
+	},
+	{
+		name: 'center',
+		fixture: 'proofs/r171-center/App.tsrx',
 		modules: true,
 		actions: [{ event: 'activate', host: 'h4' }],
 	},

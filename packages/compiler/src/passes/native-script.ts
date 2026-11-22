@@ -10,6 +10,7 @@ import {
 	NATIVE_SCRIPT_SUBMITTED_FORM,
 	NATIVE_UNBOUND_HANDLE,
 } from '@markless/serializer/native-view';
+import { NATIVE_SCRIPT_URL } from './native-script-url.ts';
 import { SVG_GEOMETRY_SOURCE } from './native-svg-geometry.ts';
 
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
@@ -427,12 +428,20 @@ if (!host) {
 			addListener: changes,
 		};
 	};
+	Object.defineProperty(g, 'devicePixelRatio', {
+		get: function () {
+			if (!host.screen) throw new TypeError('devicePixelRatio is read in a handler on a phone');
+			return host.screen.devicePixelRatio;
+		},
+	});
 	g.window = g.self = g;
 	// The page answers its focused element (the body when none is) and keeps listeners a handler adds; the host passes each
 	// pointer event to them after the element's own handlers, as the browser bubbles it to the document.
 	host.listeners = {};
 	g.document = {
 		get activeElement() { return host.focus(); },
+		// A page whose <html> has no lang, as code guarded by typeof document read it before the page had a document.
+		documentElement: { lang: '' },
 		addEventListener: function (type, listener) {
 			var list = host.listeners[String(type)] || (host.listeners[String(type)] = []);
 			if (typeof listener === 'function' && list.indexOf(listener) < 0) { list.push(listener); host.listened = true; }
@@ -442,6 +451,33 @@ if (!host) {
 			var at = list.indexOf(listener);
 			if (at >= 0) { list.splice(at, 1); host.listened = true; }
 		},
+	};
+	// Each screen is a history entry with its own state; one written after navigate() is the next screen's, as on the web.
+	host.historyStates = {};
+	host.historyNext = undefined;
+	host.screen = null;
+	host.screensSeen = 0;
+	var historyHasNext = function () { return !!(host.out && host.out.navigate); };
+	g.history = {
+		get state() {
+			if (historyHasNext()) return host.historyNext === undefined ? null : host.historyNext;
+			return Object.prototype.hasOwnProperty.call(host.historyStates, host.screen) ? host.historyStates[host.screen] : null;
+		},
+		replaceState: function (data, unused) {
+			if (arguments.length < 2) throw new TypeError("Failed to execute 'replaceState' on 'History': 2 arguments required, but only " + arguments.length + ' present.');
+			var kept = data === undefined ? null : g.structuredClone(data);
+			if (historyHasNext()) host.historyNext = kept;
+			else host.historyStates[host.screen] = kept;
+		},
+	};
+	host.enterScreen = function (screen, leaving) {
+		if (typeof screen !== 'number') return;
+		if (screen > host.screensSeen) {
+			host.screensSeen = screen;
+			if (host.historyNext !== undefined) { host.historyStates[screen] = host.historyNext; host.historyNext = undefined; }
+		}
+		host.screen = screen;
+		if (leaving) delete host.historyStates[screen];
 	};
 	host.Response = Response;
 	// The HTML structured clone, as Chromium runs it, for an engine that has none.
@@ -786,6 +822,7 @@ var begin = function (entry) {
 	host.seed = entry.seed || null;
 	host.focused = entry.focused || null;
 	host.media = entry.media || null;
+	host.screen = entry.screen || null;
 	for (var known in entry.focusElements || {}) if (!elementFacts[known]) elementFacts[known] = entry.focusElements[known];
 	host.focus = function () { return elementOf(host.focused || BODY); };
 	host.counter = 0;
@@ -815,6 +852,8 @@ var eventOf = function (given, frame) {
 		key: given.key,
 		isTrusted: given.isTrusted !== false,
 		isComposing: false,
+		// A phone's browser reports a finger as a touch pointer.
+		pointerType: String(given.type).indexOf('pointer') === 0 ? 'touch' : undefined,
 		defaultPrevented: false,
 		preventDefault: function () { this.defaultPrevented = true; },
 		propagationStopped: false,
@@ -893,6 +932,7 @@ g.__markless[id] = {
 	enter: function (text) {
 		var entry = JSON.parse(text);
 		begin(entry);
+		host.enterScreen(entry.screen, entry.kind === 'tasks' && entry.leave);
 		if (entry.kind === 'compute') {
 			var value = fn(entry.fn)(frameOf(entry.frame))();
 			host.out = null;
@@ -1024,6 +1064,8 @@ export function nativeScriptOf(
 	/** The app's origin (app.json `origin`), which a URL from the root resolves against. */
 	origin?: string,
 	engine: NativeScriptEngine = NATIVE_SCRIPT_ENGINE,
+	/** The script reads `URL` or `URLSearchParams`: the engine carries the URL Standard's code for engines without them. */
+	url = false,
 ): NativeScript {
 	const owners: Record<string, number> = {};
 	const definitions = modules.map((module, index) => {
@@ -1058,6 +1100,6 @@ export function nativeScriptOf(
 		engine.entries,
 	].join('\n');
 	const id = contentId(body);
-	const source = `(function (g, id) {\n${engine.services}\ng.__markless = g.__markless || {};\n${body}\n})(globalThis, ${JSON.stringify(id)});\n`;
+	const source = `(function (g, id) {\n${engine.services}\n${url ? `${NATIVE_SCRIPT_URL}\n` : ''}g.__markless = g.__markless || {};\n${body}\n})(globalThis, ${JSON.stringify(id)});\n`;
 	return { id, source, services };
 }

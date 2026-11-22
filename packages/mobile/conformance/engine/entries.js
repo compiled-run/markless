@@ -233,6 +233,7 @@ var begin = function (entry) {
 	host.seed = entry.seed || null;
 	host.focused = entry.focused || null;
 	host.media = entry.media || null;
+	host.screen = entry.screen || null;
 	for (var known in entry.focusElements || {}) if (!elementFacts[known]) elementFacts[known] = entry.focusElements[known];
 	host.focus = function () { return elementOf(host.focused || BODY); };
 	host.counter = 0;
@@ -262,6 +263,8 @@ var eventOf = function (given, frame) {
 		key: given.key,
 		isTrusted: given.isTrusted !== false,
 		isComposing: false,
+		// A phone's browser reports a finger as a touch pointer.
+		pointerType: String(given.type).indexOf('pointer') === 0 ? 'touch' : undefined,
 		defaultPrevented: false,
 		preventDefault: function () { this.defaultPrevented = true; },
 		propagationStopped: false,
@@ -340,6 +343,7 @@ g.__markless[id] = {
 	enter: function (text) {
 		var entry = JSON.parse(text);
 		begin(entry);
+		host.enterScreen(entry.screen, entry.kind === 'tasks' && entry.leave);
 		if (entry.kind === 'compute') {
 			var value = fn(entry.fn)(frameOf(entry.frame))();
 			host.out = null;

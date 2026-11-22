@@ -321,7 +321,7 @@ export default function Tags() @{
 	expect(rows[0]!.row).toBeDefined();
 });
 
-test("a styled page refuses a <summary> by name, since Dragon does not draw its disclosure triangle yet", async () => {
+test("a styled page refuses <summary> and <center> by name, since Dragon has no default look for them yet", async () => {
 	const build = await compileNativeApp({
 		pages: [
 			{
@@ -333,6 +333,7 @@ test("a styled page refuses a <summary> by name, since Dragon does not draw its 
 			p { padding: 4px; }
 		</style>
 		<details><summary>Shipping</summary><p>Two days.</p></details>
+		<center><p>Vote</p></center>
 	</main>
 }`,
 			},
@@ -340,5 +341,6 @@ test("a styled page refuses a <summary> by name, since Dragon does not draw its 
 	});
 	expect(build.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
 		'the <summary> h2 on a styled page, whose disclosure triangle Dragon does not draw yet',
+		'the <center> h4 on a styled page, whose default look Dragon does not have yet',
 	]);
 });

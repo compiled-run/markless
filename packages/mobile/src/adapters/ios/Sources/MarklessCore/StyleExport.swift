@@ -38,6 +38,8 @@ public enum StyleWrite: Sendable {
 	case clipText
 	/// The box paints in another stacking context's order (Dragon's re-hosting); `host` is that context's node.
 	case paintOrder(host: String, bucket: Int, rank: Int)
+	/// box-shadow: the computed shadows in list order.
+	case boxShadow([BoxShadow.Shadow])
 	/// `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own.
 	case visibility(String)
 	/// A select whose appearance devolves to menulist-button: its drop-down arrow is stroked in this colour, along the path
@@ -46,6 +48,27 @@ public enum StyleWrite: Sendable {
 	/// A themed checkbox (`appearance: auto`): drawn in these colours over the marks Dragon's plan layout gives
 	/// (`StyleNode.checkboxMarks`), checked or not as the input's live checkedness says.
 	case checkbox(CheckboxColors)
+	/// `outline`: drawn after its stacking context's flow content, in the view of its paint layer (`Outline.layer`).
+	case outline(Outline)
+}
+
+/// An outline as Dragon lowers it: its style, width and offset in CSS px, its colour, a 3D style's lighter and darker colours,
+/// the box's corner radius lengths (nil: square), and the node whose paint layer paints it.
+public struct Outline: Equatable, Sendable {
+	public static let styles = ["solid", "double", "dotted", "dashed", "groove", "ridge", "inset", "outset"]
+	public let style: String
+	public let width: Double
+	public let offset: Double
+	public let color: RGBA
+	public let tones: (light: RGBA, dark: RGBA)?
+	public let radii: [(percent: Bool, value: Double)]?
+	public let layer: String
+
+	public static func == (a: Outline, b: Outline) -> Bool {
+		a.style == b.style && a.width == b.width && a.offset == b.offset && a.color == b.color && a.layer == b.layer
+			&& a.tones?.light == b.tones?.light && a.tones?.dark == b.tones?.dark
+			&& a.radii?.map(\.percent) == b.radii?.map(\.percent) && a.radii?.map(\.value) == b.radii?.map(\.value)
+	}
 }
 
 /// A themed checkbox's colours, as Chrome's theme gives them for its accent-color.
@@ -95,6 +118,14 @@ public struct BorderOps: Equatable, Sendable {
 		public let alpha: Double
 		public let antialias: Bool
 		public let points: [Double]
+
+		public init(op: String, side: Int, alpha: Double, antialias: Bool, points: [Double]) {
+			self.op = op
+			self.side = side
+			self.alpha = alpha
+			self.antialias = antialias
+			self.points = points
+		}
 	}
 	public let originX: Double
 	public let originY: Double
@@ -626,7 +657,8 @@ public struct StyleExport: Sendable {
 	/// that follow them are written into each assignment's nodes. Without a plan the export is returned as it is.
 	public func laidOut(
 		width: Double, height: Double, scale: Double, slots values: [Double] = [], layout: (String) -> String,
-		rows: ((Int) throws -> [String: [LaidOutRow]])? = nil, rowsLayout: ((String) -> String)? = nil
+		rows: ((Int) throws -> [String: [LaidOutRow]])? = nil, rowsLayout: ((String) -> String)? = nil,
+		texts: [String: String] = [:]
 	) throws -> StyleExport {
 		guard let plan else { return self }
 		guard values.count == slots.count else {
@@ -660,9 +692,21 @@ public struct StyleExport: Sendable {
 				}
 				line += ",\"rows\":\(JSONValue.array(lists).jsonText)"
 			}
+			// The page's own texts whose current string is not the one this assignment was laid out with, by Dragon id; a text an arm
+			// hides there has no box to lay out.
+			let nodeText = Dictionary(assignments[k].nodes.compactMap { node in node.frame == nil ? nil : node.text.map { (node.id, $0) } }, uniquingKeysWith: { a, _ in a })
+			let changed = texts.filter { id, text in nodeText[id].map { $0 != text } ?? false }.sorted { $0.key < $1.key }
+			// The page's texts as this layout lays them out: the changed ones with their current string.
+			let relaidTexts = Dictionary(changed.map { ($0.key, $0.value) }, uniquingKeysWith: { a, _ in a })
+			let live = shown != nil || !changed.isEmpty
+			if !changed.isEmpty {
+				if shown == nil { line += ",\"rows\":[]" }
+				line += ",\"texts\":" + JSONValue.array(changed.map { .array([.string(dragonId[$0.key] ?? $0.key), .string($0.value)]) }).jsonText
+			}
 			line += "}"
+			guard !live || rowsLayout != nil else { throw PayloadError(path: "plan layout", reason: "a page whose texts follow state needs Dragon's live layout") }
 			guard shown == nil || rowsLayout != nil else { throw PayloadError(path: "plan layout", reason: "a page with rows needs Dragon's rows layout") }
-			let result = try Reader(JSONValue.parse(Data((shown == nil ? layout(line) : rowsLayout!(line)).utf8)), at: "plan layout")
+			let result = try Reader(JSONValue.parse(Data((live ? rowsLayout!(line) : layout(line)).utf8)), at: "plan layout")
 			let parts = try result.array()
 			let fixed = !slotted ? 3 : (shown == nil ? 4 : 5)
 			guard parts.count >= fixed, parts.count <= fixed + 2, try parts[0].string() == "ok" else {
@@ -800,7 +844,8 @@ public struct StyleExport: Sendable {
 				let ops = f[4].isNull ? nil : try StyleExport.decodeBorderOps(Reader(try planBorderOps(f[4]), at: f[4].path))
 				let range = f[5].isNull ? nil : try StyleExport.decodeRange(Reader(.object(zip(["minX", "maxX", "minY", "maxY"], try f[5].array().map { try bits($0) }).map { ($0, $1) }), at: f[5].path))
 				return StyleNode(
-					id: node.id, parent: node.parent, isText: node.isText, isAnonymous: node.isAnonymous, text: node.text,
+					id: node.id, parent: node.parent, isText: node.isText, isAnonymous: node.isAnonymous,
+					text: node.isText ? (relaidTexts[node.id] ?? node.text) : node.text,
 					frame: Frame(x: frame[0], y: frame[1], width: frame[2], height: frame[3]),
 					borderWidths: widths.map { ($0[0], $0[1], $0[2], $0[3]) }, writes: node.writes, borderOps: ops,
 					scrollRange: range, lines: node.isText ? lines : nil)
@@ -1035,6 +1080,15 @@ public struct StyleExport: Sendable {
 			try expectKey(f, "dragonStacking.order")
 			_ = try f["index"].number()
 			return .paintOrder(host: try f["host"].string(), bucket: Int(try f["bucket"].number()), rank: Int(try f["rank"].number()))
+		case "box-shadow":
+			let f = try write.object(["kind", "shadows", "key"])
+			try expectKey(f, "dragonShadow.shadows")
+			return .boxShadow(try f["shadows"].array().map { shadow in
+				let s = try shadow.object(["inset", "x", "y", "blur", "spread", "color"])
+				return BoxShadow.Shadow(
+					inset: try s["inset"].bool(), x: try s["x"].number(), y: try s["y"].number(), blur: try s["blur"].number(),
+					spread: try s["spread"].number(), color: try decodeColor(try s["color"]))
+			})
 		case "checkbox":
 			let f = try write.object(["kind", "checked", "colors", "key"])
 			try expectKey(f, "dragonCheckbox")
@@ -1057,6 +1111,33 @@ public struct StyleExport: Sendable {
 			let f = try write.object(["kind", "color", "key"])
 			try expectKey(f, "dragonSelectArrow")
 			return .selectArrow(try decodeColor(try f["color"]))
+		case "outline":
+			let f = try write.object(["kind", "style", "width", "offset", "color", "tones", "radii", "layer", "key"])
+			try expectKey(f, "dragonOutline.rings")
+			let style = try f["style"].string()
+			guard Outline.styles.contains(style) else { throw PayloadError(path: write.path + ".style", reason: "outline style \(style) has no native paint") }
+			let width = try f["width"].number(), offset = try f["offset"].number()
+			guard width > 0, width.isFinite, offset.isFinite else { throw PayloadError(path: write.path, reason: "outline width \(width) or offset \(offset) is out of range") }
+			let threeD = ["groove", "ridge", "inset", "outset"].contains(style)
+			var tones: (light: RGBA, dark: RGBA)?
+			if try !f["tones"].isNull {
+				let pair = try f["tones"].array()
+				guard pair.count == 2 else { throw PayloadError(path: write.path + ".tones", reason: "expected a lighter and a darker colour") }
+				tones = (try decodeColor(pair[0]), try decodeColor(pair[1]))
+			}
+			guard (tones != nil) == threeD else { throw PayloadError(path: write.path + ".tones", reason: "a \(style) outline \(threeD ? "needs" : "has no") lighter and darker colours") }
+			var radii: [(percent: Bool, value: Double)]?
+			if try !f["radii"].isNull {
+				let lengths = try f["radii"].array()
+				guard lengths.count == 8 else { throw PayloadError(path: write.path + ".radii", reason: "an outline's radii are 8 lengths") }
+				radii = try lengths.map { length in
+					let l = try length.object(["percent", "value"])
+					return (percent: try l["percent"].bool(), value: try l["value"].number())
+				}
+			}
+			return .outline(Outline(
+				style: style, width: width, offset: offset, color: try decodeColor(try f["color"]), tones: tones, radii: radii,
+				layer: try f["layer"].string()))
 		default:
 			throw PayloadError(path: write.path + ".kind", reason: "unknown style write kind \"\(kind)\"")
 		}

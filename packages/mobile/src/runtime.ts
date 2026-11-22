@@ -33,6 +33,7 @@ import {
 	nativeTooLongMessage,
 	NATIVE_SCRIPT_MEDIA_DEFAULTS,
 	type NativeScriptMedia,
+	type NativeScriptScreen,
 } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeScriptEngine } from './script-engine.ts';
@@ -738,6 +739,8 @@ export function createNativeRuntime(
 	measure?: (id: string) => NativeElementBox | null,
 	/** The device's answers to the media features a script's `matchMedia` reads, read as each entry begins. */
 	media: () => NativeScriptMedia = () => NATIVE_SCRIPT_MEDIA_DEFAULTS,
+	/** The screen's device pixels per CSS px that a script's `devicePixelRatio` reads, read as each entry begins. */
+	screenFacts: () => NativeScriptScreen = () => ({ devicePixelRatio: 1 }),
 ): NativeRuntime {
 	const base: NativeScope = {
 		...EMPTY_SCOPE,
@@ -1003,6 +1006,7 @@ export function createNativeRuntime(
 			: {}),
 		...(script?.services.includes('navigate') ? { params } : {}),
 		...(script?.services.includes('media') ? { media: media() } : {}),
+		...(script?.services.includes('screen') ? { screen: screenFacts() } : {}),
 	});
 	/** One engine entry, then what it asked for: its writes land in cells; timers, clears and requests become entries. */
 	/** Submissions held by a script promise not settled yet, by the engine's run number. */
@@ -1016,7 +1020,7 @@ export function createNativeRuntime(
 			focused !== null && focused !== NATIVE_DOCUMENT_BODY
 				? { focused, focusElements: elementFacts({}, [focused]) }
 				: {};
-		call('enter', { ...entry, ...focus, ...entryCells() });
+		call('enter', { ...entry, screen, ...focus, ...entryCells() });
 		const result = JSON.parse(call('leave')) as {
 			readonly pending: ReadonlyArray<number>;
 			readonly settled: ReadonlyArray<number>;
@@ -1283,7 +1287,6 @@ export function createNativeRuntime(
 			out.push(
 				...enter({
 					kind: 'tasks',
-					screen,
 					tasks,
 					...(again.length > 0 ? { retry: again } : {}),
 				}),
@@ -2235,7 +2238,7 @@ export function createNativeRuntime(
 		leave: () =>
 			asyncSent === null
 				? []
-				: enter({ kind: 'tasks', screen, tasks: [], leave: true }).filter(
+				: enter({ kind: 'tasks', tasks: [], leave: true }).filter(
 						(entry) => entry.op === 'abort',
 					),
 		dispatch(action) {

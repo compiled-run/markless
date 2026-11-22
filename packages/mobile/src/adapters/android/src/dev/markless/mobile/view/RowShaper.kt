@@ -26,6 +26,8 @@ class RowShaper(private val faces: Map<String, SystemFace>) {
 	/** Why the last call was refused, kept because the translated harness reports any error only as ["threw"]. */
 	var refused: String? = null
 		private set
+	/** Whether a call asked for a face the export gives no system font for, as a web font's. */
+	var unshapedFace = false
 
 	init {
 		System.loadLibrary("dragon_hb")
@@ -44,7 +46,7 @@ class RowShaper(private val faces: Map<String, SystemFace>) {
 	}
 
 	private fun fontAt(id: String, size: Double): Long = fonts.getOrPut("$id@$size") {
-		val face = faces[id] ?: refuse("a row's text in $id, which this host does not shape on the phone yet")
+		val face = faces[id] ?: run { unshapedFace = true; refuse("a row's text in $id, which this host does not shape on the phone yet") }
 		val bytes = File("/system/fonts", face.file).readBytes()
 		val handle = hbFaces.getOrPut("${face.file}#${face.index}") {
 			(call(faceCreate, bytes, face.index) as Long).also { if (it == 0L) refuse("HarfBuzz cannot read /system/fonts/${face.file}") }

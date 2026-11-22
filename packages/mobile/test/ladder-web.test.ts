@@ -161,9 +161,12 @@ function recordDeviceCalls() {
 
 // A visible text or an accessible name, the two ways a Maestro selector finds a view.
 // A closed select shows its chosen option's label, as the phones draw it.
-/** The field a person types into by its name: a text field, or a number field (a spinbutton). */
+/** The field a person types into by its name: a text field, a number field (a spinbutton) or a search field (a searchbox). */
 const typedField = (page: Page, name: string): Locator =>
-	page.getByRole('textbox', { name, exact: true }).or(page.getByRole('spinbutton', { name, exact: true }));
+	page
+		.getByRole('textbox', { name, exact: true })
+		.or(page.getByRole('spinbutton', { name, exact: true }))
+		.or(page.getByRole('searchbox', { name, exact: true }));
 // A text named by how it starts matches as a plain one does, each element's whole text or name beginning with it.
 const named = (text: LadderText): string | RegExp =>
 	typeof text === 'string' ? text : new RegExp(selector(text), 's');

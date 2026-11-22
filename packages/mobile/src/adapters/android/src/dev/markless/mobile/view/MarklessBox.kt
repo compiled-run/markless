@@ -1,6 +1,7 @@
 package dev.markless.mobile.view
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
@@ -42,6 +43,37 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 			field = value
 		}
 
+	/** Each child's outer shadows: a bitmap drawn just before the child, at a device px offset from its top-left. */
+	private val childShadows = HashMap<View, Triple<Bitmap, Int, Int>>()
+
+	internal fun childShadow(child: View, shadow: Triple<Bitmap, Int, Int>?) {
+		if (childShadows[child] == shadow) return
+		if (shadow == null) childShadows.remove(child) else childShadows[child] = shadow
+		invalidate()
+	}
+
+	/** This box's inset shadows, over its background and under its children, at a device px offset from its top-left. */
+	internal var insetShadow: Triple<Bitmap, Int, Int>? = null
+		set(value) {
+			if (field != value) invalidate()
+			field = value
+		}
+
+	override fun drawChild(canvas: Canvas, child: View, drawingTime: Long): Boolean {
+		childShadows[child]?.let { (bitmap, dx, dy) -> canvas.drawBitmap(bitmap, (child.left + dx).toFloat(), (child.top + dy).toFloat(), null) }
+		return super.drawChild(canvas, child, drawingTime)
+	}
+
+	override fun onDraw(canvas: Canvas) {
+		super.onDraw(canvas)
+		insetShadow?.let { (bitmap, dx, dy) -> canvas.drawBitmap(bitmap, dx.toFloat(), dy.toFloat(), null) }
+	}
+
+	override fun onViewRemoved(child: View) {
+		super.onViewRemoved(child)
+		childShadows.remove(child)
+	}
+
 	override fun draw(canvas: Canvas) {
 		val c = clip ?: return super.draw(canvas)
 		if (c.isEmpty) return
@@ -63,6 +95,8 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 	/** A list's markers (`•`, `1.`), drawn in its start padding beside each item's first line; not text a reader reaches. */
 	internal var markers: Map<View, String> = emptyMap()
 		set(value) { field = value; invalidate() }
+	/** Inside a `<center>`: each child sits in the middle of the line. */
+	internal var centred = false
 	/** A summary's triangle, ▸ collapsed or ▾ expanded, drawn in a start inset beside its first line; null on any other box. */
 	internal var disclosure: Boolean? = null
 		set(value) {
@@ -134,7 +168,7 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 			height += child.measuredHeight
 			widest = maxOf(widest, child.measuredWidth)
 		}
-		val w = if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.EXACTLY) MeasureSpec.getSize(widthMeasureSpec) else widest + paddingLeft + paddingRight
+		val w = if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.EXACTLY || centred) MeasureSpec.getSize(widthMeasureSpec) else widest + paddingLeft + paddingRight
 		setMeasuredDimension(maxOf(w, minimumWidth), resolveSize(maxOf(height, minimumHeight), heightMeasureSpec))
 	}
 
@@ -162,12 +196,13 @@ open class MarklessBox(context: Context) : FrameLayout(context) {
 		for (i in 0 until childCount) {
 			val child = getChildAt(i)
 			if (child.visibility == View.GONE) continue
-			child.layout(paddingLeft, y, paddingLeft + child.measuredWidth, y + child.measuredHeight)
+			val x = if (centred) paddingLeft + (width - paddingLeft - paddingRight - child.measuredWidth) / 2 else paddingLeft
+			child.layout(x, y, x + child.measuredWidth, y + child.measuredHeight)
 			y += child.measuredHeight
 		}
 	}
 
-	/** overflow clipping past borders or round corners: the padding box its children draw inside; null leaves the view's own bounds. */
+	/** Overflow other than visible: the padding box its children, and their shadows, draw inside; null when overflow is visible. */
 	internal var childClip: PaddingBox? = null
 		set(value) {
 			if (field != value) invalidate()

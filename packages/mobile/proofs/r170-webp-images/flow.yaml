@@ -1,0 +1,16 @@
+appId: ${APP_ID}
+name: r170-webp-images
+---
+- launchApp:
+    clearState: true
+- assertVisible: WebP images
+- assertVisible: Orange photo
+- assertVisible: Badge as stored
+- assertVisible: Show square
+- assertNotVisible: Blue square
+- tapOn: Show square
+- assertVisible: Blue square
+- assertNotVisible: Show square
+- assertVisible: Blue square
+- assertVisible: Hide square
+- assertNotVisible: Show square

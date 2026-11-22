@@ -4,9 +4,12 @@ import android.content.Context
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RadialGradient
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.text.SpannableStringBuilder
 import android.text.Spanned
@@ -31,7 +34,7 @@ import dev.markless.mobile.core.ShapePaint
 import dev.markless.mobile.core.TextRun
 
 /** The text style a block gives the text inside it: its own default style and its ancestors', combined. */
-data class BlockText(val bold: Boolean, val italic: Boolean, val monospace: Boolean, val size: Double, val preformatted: Boolean)
+data class BlockText(val bold: Boolean, val italic: Boolean, val monospace: Boolean, val size: Double, val preformatted: Boolean, val centered: Boolean = false)
 
 /**
  * Text flow without a style export, as `nativeParagraphs` (packages/mobile/src/paragraphs.ts) defines it: among one parent's
@@ -78,16 +81,16 @@ class TextFlow(payload: Payload) {
 
 	/** The style text inherits inside [parent]: every non-flowing ancestor's default style, nearest last. */
 	fun blockText(parent: String?): BlockText {
-		var bold = false; var italic = false; var mono = false; var size = 1.0; var pre = false
+		var bold = false; var italic = false; var mono = false; var size = 1.0; var pre = false; var centered = false
 		var at = parent
 		while (at != null) {
 			val n = byId[at] ?: break
 			if (n is Node.Element && !flowing(n)) n.defaultStyle?.let { s ->
-				bold = bold || s.bold; italic = italic || s.italic; mono = mono || s.monospace; size *= s.size; pre = pre || s.preformatted
+				bold = bold || s.bold; italic = italic || s.italic; mono = mono || s.monospace; size *= s.size; pre = pre || s.preformatted; centered = centered || s.center
 			}
 			at = n.parent
 		}
-		return BlockText(bold, italic, mono, size, pre)
+		return BlockText(bold, italic, mono, size, pre, centered)
 	}
 
 	/**
@@ -262,14 +265,14 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double, 
 			shape.fill?.let { fill ->
 				paint.reset(); paint.isAntiAlias = true
 				paint.style = Paint.Style.FILL
-				paint.color = colorOf(fill)
+				paintWith(fill)
 				paint.maskFilter = mask
 				canvas.drawPath(drawn, paint)
 			}
 			shape.stroke?.let { stroke ->
 				paint.reset(); paint.isAntiAlias = true
 				paint.style = Paint.Style.STROKE
-				paint.color = colorOf(stroke)
+				paintWith(stroke)
 				paint.strokeWidth = shape.width.toFloat() * if (blur != null) shape.transform?.let { (a, b, c, d) -> kotlin.math.sqrt(kotlin.math.abs(a * d - b * c)).toFloat() } ?: 1f else 1f
 				paint.strokeCap = when (shape.cap) { "round" -> Paint.Cap.ROUND; "square" -> Paint.Cap.SQUARE; else -> Paint.Cap.BUTT }
 				paint.strokeJoin = when (shape.join) { "round" -> Paint.Join.ROUND; "bevel" -> Paint.Join.BEVEL; else -> Paint.Join.MITER }
@@ -338,6 +341,29 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double, 
 	private fun colorOf(paint: ShapePaint): Int = when (paint) {
 		is ShapePaint.Color -> paint.color.argb
 		ShapePaint.Current -> currentColor
+		is ShapePaint.Gradient -> Color.TRANSPARENT
+	}
+
+	private val shaders = HashMap<ShapePaint.Gradient, Shader>()
+
+	private fun paintWith(given: ShapePaint) {
+		if (given !is ShapePaint.Gradient) { paint.color = colorOf(given); return }
+		paint.color = Color.BLACK
+		paint.shader = shaders.getOrPut(given) { shaderOf(given) }
+	}
+
+	/** A gradient clamped past its ends (SVG's pad), its colours blended in sRGB as the browser blends them. */
+	private fun shaderOf(g: ShapePaint.Gradient): Shader {
+		val colors = g.colors.map { it.argb }.toIntArray()
+		val offsets = g.offsets.map { it.toFloat() }.toFloatArray()
+		val shader = g.linear?.let { (x1, y1, x2, y2) -> LinearGradient(x1.toFloat(), y1.toFloat(), x2.toFloat(), y2.toFloat(), colors, offsets, Shader.TileMode.CLAMP) }
+			?: g.radial!!.let { r ->
+				RadialGradient(r[0].toFloat(), r[1].toFloat(), r[2].toFloat(), r[3].toFloat(), r[4].toFloat(), r[5].toFloat(), colors.map { Color.pack(it) }.toLongArray(), offsets, Shader.TileMode.CLAMP)
+			}
+		g.transform?.let { (a, b, c, d, e, f) ->
+			shader.setLocalMatrix(Matrix().apply { setValues(floatArrayOf(a.toFloat(), c.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) })
+		}
+		return shader
 	}
 }
 

@@ -21,9 +21,11 @@ test('only relative urls name files: a remote, data:, root-relative or local() s
 	expect(stylesheetFonts([{ file: 'app/styles/app.css', cssText }])).toEqual([
 		{ url: '../fonts/My%20Face.ttf?v=2#x', file: 'app/fonts/My Face.ttf' },
 	]);
-	expect(stylesheetFonts([{ file: '/abs/app/app.css', cssText: '@font-face { src: url(./a.ttf) }' }])).toEqual([
-		{ url: './a.ttf', file: '/abs/app/a.ttf' },
-	]);
+	expect(
+		stylesheetFonts([
+			{ file: '/abs/app/app.css', cssText: '@font-face { src: url(./a.ttf) }' },
+		]),
+	).toEqual([{ url: './a.ttf', file: '/abs/app/a.ttf' }]);
 });
 
 test('one url naming two files from two stylesheets is refused, since the joined CSS cannot tell them apart', () => {
@@ -33,7 +35,9 @@ test('one url naming two files from two stylesheets is refused, since the joined
 			{ file: 'one/app.css', cssText: face },
 			{ file: 'two/app.css', cssText: face },
 		]),
-	).toThrow('two/app.css and one/app.css both name the font url ./a.ttf, for two/a.ttf and one/a.ttf');
+	).toThrow(
+		'two/app.css and one/app.css both name the font url ./a.ttf, for two/a.ttf and one/a.ttf',
+	);
 	expect(
 		stylesheetFonts([
 			{ file: 'one/app.css', cssText: face },
@@ -83,4 +87,21 @@ test("the app's faces keep where each file is, the Dragon checkout or beside the
 			{ pattern: '/more', exported: exported([{ id: lato.id, file: lato.file }]) },
 		]),
 	).toThrow('font sha256:bb names two files');
+});
+
+test('pages at different depths that share one web font give one face: Dragon decodes it beside each style input, and the id is its bytes', () => {
+	const decoded = (dir: string) => ({
+		id: 'sha256:cc',
+		file: `${dir}dragon-decoded-fonts/cc.ttf`,
+		from: 'input' as const,
+	});
+	const pages = [
+		{ pattern: '/', exported: exported([decoded('native-style-input/')]) },
+		{ pattern: '/tags', exported: exported([decoded('native-style-input/tags/')]) },
+		{ pattern: '/notes/[id]', exported: exported([decoded('native-style-input/notes/[id]/')]) },
+	];
+	expect(appStyleFonts(pages)).toEqual([decoded('native-style-input/')]);
+	expect(nativeAppStyle(pages).fonts).toEqual([
+		{ id: 'sha256:cc', file: 'native-style-input/dragon-decoded-fonts/cc.ttf' },
+	]);
 });
