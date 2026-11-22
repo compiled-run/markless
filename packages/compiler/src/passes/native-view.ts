@@ -2354,6 +2354,12 @@ export function createNativeViewPayload(
 			undefinedFirst.delete(cell);
 			return;
 		}
+		// An element handle passed down is known once the tree is bound: the host reads it when the screen opens.
+		if (rowCell.row === undefined && cellsOf(lowered).size === 0 && mentionsDeferredHandle(lowered)) {
+			cells[cellIndex.get(cell)!] = { ...rowCell, initial: null, seed: lowered };
+			undefinedFirst.delete(cell);
+			return;
+		}
 		if (!folded || cellsOf(lowered).size > 0 || !isNativeValue(folded.value)) {
 			refuse(
 				`${what} sets \`${statement.target}.${fieldName}\` from a value that follows state; pass a fixed value or leave the prop out`,
@@ -3630,6 +3636,11 @@ export function createNativeViewPayload(
 	};
 	/** Set while handlers are lowered, after the whole tree: only then does every handle know the elements it is bound to. */
 	let lateLowering = false;
+	/** Handles read as a value while the tree is lowered (a prop or a seed): each one's expression, filled in once every element is bound. */
+	const deferredHandles: { readonly expr: Record<string, unknown>; readonly key: string; readonly plural: boolean; readonly what: string }[] = [];
+	const deferredExprs = new WeakSet<object>();
+	const mentionsDeferredHandle = (tree: unknown): boolean =>
+		!!tree && typeof tree === 'object' && (deferredExprs.has(tree) || Object.values(tree).some(mentionsDeferredHandle));
 	/** The @for row whose element a tap run is lowered for, while it is. */
 	let pressedRow: string | undefined;
 	/** Set while a tap's handler is lowered for where the tap landed. */
@@ -3679,7 +3690,12 @@ export function createNativeViewPayload(
 
 	/** A handle read as a value in a handler: its element (null when unbound), or its elements in order when plural. */
 	const handleValue = (key: string, plural: boolean, what: string): NativeExpr | null => {
-		if (!lateLowering) return refuse(`${what} as a value outside a handler`);
+		if (!lateLowering) {
+			const expr: Record<string, unknown> = {};
+			deferredHandles.push({ expr, key, plural, what });
+			deferredExprs.add(expr);
+			return expr as NativeExpr;
+		}
 		const bound = boundHandles.get(key) ?? [];
 		const byId = nodeById();
 		if (bound.some((id) => byId.get(id)?.arm) && !bound.some((id) => byId.get(id)?.row)) {
@@ -4367,7 +4383,8 @@ export function createNativeViewPayload(
 							`${what} reads \`${expression.name}\`, a roster whose handle this build cannot place`,
 						);
 					const counted: { literal: number } = { literal: 0 };
-					rosterCounts.push({ expr: counted, roster: rosterKey, what });
+					if (lateLowering) settleRosterCount({ expr: counted, roster: rosterKey, what });
+					else rosterCounts.push({ expr: counted, roster: rosterKey, what });
 					return counted;
 				}
 				if (computed) {
@@ -5210,6 +5227,17 @@ export function createNativeViewPayload(
 	};
 	/** Roster sizes read while the tree was walked, settled from the handles bound once it is built. */
 	const rosterCounts: { expr: { literal: number }; roster: string; what: string }[] = [];
+	/** A roster's size, once every part is bound: a handler's copy of the expression takes it, as the web counts the parts it rendered. */
+	const settleRosterCount = (read: (typeof rosterCounts)[number]) => {
+		const byId = nodeById();
+		const members = boundHandles.get(read.roster) ?? [];
+		// A part in an @if arm or a @for row joins and leaves the roster while the app runs, which a fixed number cannot follow.
+		if (members.some((id) => byId.get(id)?.arm || byId.get(id)?.row))
+			refuse(
+				`${read.what}: a roster with a part inside an @if arm or @for row, whose size changes while the app runs`,
+			);
+		else read.expr.literal = members.length;
+	};
 	const dialogOps: { op: 'dialog'; node: string; method: 'showModal' | 'close' }[] = [];
 	const handleReferences: {
 		readonly node: string;
@@ -9063,6 +9091,19 @@ export function createNativeViewPayload(
 	// A tap lands on the innermost element that handles it, so a handler that reads `event.target` runs once per element a
 	// part names inside its host (rows, triggers): the containment it asks about is the same for every element within one.
 	lateLowering = true;
+	for (const read of rosterCounts) settleRosterCount(read);
+	// A handle read while rendering takes the element it is bound to, as the web's handle holds it by the time anything reads it.
+	for (const { expr, key, plural, what } of deferredHandles) {
+		const value = handleValue(key, plural, what);
+		if (value !== null) Object.assign(expr, value);
+	}
+	// A state's first value is an element by its node id, as a handler reads one.
+	for (const [index, cell] of cells.entries()) {
+		if (!cell.seed || !mentionsElement(cell.seed)) continue;
+		const converted = elementsAsIds(cell.seed);
+		if ('misuse' in converted) refuse(`the first value of ${cell.name} reads ${converted.misuse}, which a native host has no meaning for yet`);
+		else cells[index] = { ...cell, seed: converted.value as NativeExpr };
+	}
 	const extended = new Set(
 		pendingHandlers.flatMap((pending) => (pending.after ? [pending.handler] : [])),
 	);
@@ -9181,16 +9222,6 @@ export function createNativeViewPayload(
 	}
 	lateLowering = false;
 
-	for (const read of rosterCounts) {
-		const byId = nodeById();
-		const members = boundHandles.get(read.roster) ?? [];
-		// A part in an @if arm or a @for row joins and leaves the roster while the app runs, which a fixed number cannot follow.
-		if (members.some((id) => byId.get(id)?.arm || byId.get(id)?.row))
-			refuse(
-				`${read.what}: a roster with a part inside an @if arm or @for row, whose size changes while the app runs`,
-			);
-		else read.expr.literal = members.length;
-	}
 	for (const op of dialogOps) {
 		const bound = boundHandles.get(op.node) ?? [];
 		const element = bound.length === 1 ? nodes.find((node) => node.id === bound[0]) : undefined;
