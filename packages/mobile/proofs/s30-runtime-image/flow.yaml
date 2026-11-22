@@ -1,0 +1,23 @@
+appId: ${APP_ID}
+name: s30-runtime-image
+---
+- launchApp:
+    clearState: true
+- assertVisible: Gallery
+- assertVisible: Desk lamp
+- assertVisible: Arm chair
+- assertVisible: Tall mug
+- assertVisible: No photo yet
+- assertNotVisible: Photo added
+- assertVisible: Gallery
+- tapOn: Light the lamp
+- assertNotVisible: Desk lamp
+- assertVisible: Lit lamp
+- assertVisible: Arm chair
+- assertVisible: Tall mug
+- assertNotVisible: Desk lamp
+- assertNotVisible: Photo added
+- tapOn: Add a photo
+- assertVisible: Photo added
+- assertVisible: Photo added
+- assertNotVisible: No photo yet
