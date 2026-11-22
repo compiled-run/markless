@@ -4059,6 +4059,24 @@ export function App() @{
 		expect(code).toContain('this.bits = []');
 	});
 
+	it("lowers a class's getters and setters to definitions on its prototype and on itself", async () => {
+		const { payload, diagnostics } = await nativeView(
+			source('class Bits {\n\tget size() { return this.bits.length; }\n\tset size(n: number) { this.bits.length = n; }\n\tstatic get kind() { return 1; }'),
+		);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		const code = payload!.script!.source;
+		expect(code).not.toMatch(/\bclass\s+Bits/);
+		expect(code).toContain('Object["defineProperty"](Bits.prototype, "size", { get: function');
+		expect(code).toContain('}, enumerable: false, configurable: true });\n Object["defineProperty"](Bits, "kind", { get: function');
+	});
+
+	it('refuses a getter or setter with a computed name', async () => {
+		const { diagnostics } = await nativeView(source("class Bits {\n\tget ['size']() { return this.bits.length; }"));
+		expect(diagnostics.map((diagnostic) => diagnostic.message).join('\n')).toContain(
+			'a class getter or setter with a computed name, which Hermes cannot run',
+		);
+	});
+
 	it('refuses a class it cannot lower, naming why', async () => {
 		const { diagnostics } = await nativeView(source('class Base {}\nclass Bits extends Base {'));
 		expect(diagnostics.map((diagnostic) => diagnostic.message).join('\n')).toContain(
