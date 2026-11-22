@@ -1,0 +1,33 @@
+appId: ${APP_ID}
+name: u135-tour-target
+---
+- launchApp:
+    clearState: true
+- assertVisible: Editor
+- assertVisible: Save
+- assertVisible: Share
+- assertVisible: Take the tour
+- assertVisible: Step 0
+- assertNotVisible: Save your work
+- assertNotVisible: Share it
+- tapOn: Take the tour
+- assertVisible: Save your work
+- assertVisible: Save your work
+- assertVisible: Next
+- assertVisible: Step 0
+- assertNotVisible: Share it
+- tapOn: Next
+- assertVisible: Share it
+- assertNotVisible: Save your work
+- assertNotVisible: Step 0
+- assertVisible: Share it
+- assertVisible: Done
+- assertVisible: Step 1
+- assertNotVisible: Save your work
+- assertNotVisible: Step 0
+- tapOn: Done
+- assertNotVisible: Share it
+- assertVisible: Take the tour
+- assertVisible: Step 1
+- assertNotVisible: Share it
+- assertNotVisible: Save your work

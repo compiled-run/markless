@@ -1,0 +1,15 @@
+appId: ${APP_ID}
+name: s35-app-shadow
+---
+- launchApp:
+      clearState: true
+- assertVisible: Groceries
+- assertVisible: Plumber
+- assertVisible: Resting
+- assertVisible: Shadow cards
+- tapOn: Lift the second card
+- assertNotVisible: Resting
+- assertVisible: Groceries
+- assertVisible: Plumber
+- assertVisible: Lifted
+- assertNotVisible: Resting

@@ -1,0 +1,15 @@
+{
+	"rung": "S35",
+	"name": "a styled app's cards draw their box-shadow, and a state that changes one card's shadow draws the new one, as the web does",
+	"steps": [
+		{
+			"visible": ["Groceries", "Plumber", "Resting"],
+			"title": "Shadow cards"
+		},
+		{
+			"do": { "tap": "Lift the second card" },
+			"visible": ["Groceries", "Plumber", "Lifted"],
+			"absent": ["Resting"]
+		}
+	]
+}

@@ -268,10 +268,11 @@ export function appStyleFonts(pages: ReadonlyArray<NativeAppStylePage>): StyleFo
 		for (const font of [exported, ...(sheets ?? []).map((sheet) => sheet.exported)].flatMap(
 			(e) => e.fonts,
 		)) {
-			const seen = fonts.get(font.id) ?? font;
-			if (seen.file !== font.file || seen.from !== font.from)
+			// The id is the file's sha256, so a face decoded beside each page's input is one face.
+			const seen = fonts.get(font.id);
+			if (seen !== undefined && seen.from !== font.from)
 				throw new Error(`font ${font.id} names two files`);
-			fonts.set(font.id, font);
+			if (seen === undefined) fonts.set(font.id, font);
 		}
 	return [...fonts.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
 }
