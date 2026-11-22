@@ -908,6 +908,7 @@ const MDX_INSTANCE_PATH_KEYS = ['instancePath', 'composedInstancePath'] as const
 const MDX_NESTED_RECORD_KEYS = [
 	'testReads',
 	'contentReads',
+	'armSeeds',
 	'asyncReads',
 	'inputGraphReads',
 	'composedGraphProps',

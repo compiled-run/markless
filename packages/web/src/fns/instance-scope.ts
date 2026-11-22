@@ -1238,6 +1238,9 @@ function composedBoundaryArmRecords(
 						id: prefix + branch.id,
 						sourceId: branch.sourceId ?? branch.id,
 						testReads: branch.testReads.map(qualifyRead),
+						...(branch.armSeeds && {
+							armSeeds: branch.armSeeds.map((seed) => ({ ...seed, graphNodeId: node(seed.graphNodeId) })),
+						}),
 						...(contentReadsOf(branch)
 							? { contentReads: contentReadsOf(branch)!.map(qualifyRead) }
 							: {}),

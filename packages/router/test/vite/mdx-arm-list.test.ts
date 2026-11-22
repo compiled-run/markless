@@ -1,7 +1,7 @@
 import { cp, mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
-import { chromium, type Browser } from '@playwright/test';
+import { chromium, type Browser, type Page } from '@playwright/test';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { buildFixture } from '../support/fixture-build.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
@@ -95,6 +95,29 @@ test("two islands of one component: a refresh marks only its own island's bindin
 	await page.locator('[data-more]').nth(1).click();
 	await expect.poll(totals).toBe('1 -|1 true');
 	await expect.poll(totals).toBe('1 -|2 -');
+	expect(errors).toEqual([]);
+	await page.close();
+}, 60_000);
+
+const shownText = (page: Page, selector: string) =>
+	page.evaluate((s) => [...document.querySelectorAll(s)].map((node) => node.textContent?.trim()).join('|'), selector);
+
+// Spec 01 "Conditional identity": state an MDX island's arm declares starts over when the arm opens again.
+test('MDX islands: state declared in an @if starts over when it reopens', async () => {
+	const page = await browser!.newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto(`${server!.origin}/arm-state`);
+	const presses = page.locator('.presses').nth(1);
+	await presses.locator('[data-open]').click();
+	await expect.poll(() => shownText(page, '[data-press]')).toBe('0');
+	await presses.locator('[data-press]').click();
+	await presses.locator('[data-press]').click();
+	await expect.poll(() => shownText(page, '[data-press]')).toBe('2');
+	await presses.locator('[data-open]').click();
+	await expect.poll(() => shownText(page, '[data-press]')).toBe('');
+	await presses.locator('[data-open]').click();
+	await expect.poll(() => shownText(page, '[data-press]')).toBe('0');
 	expect(errors).toEqual([]);
 	await page.close();
 }, 60_000);

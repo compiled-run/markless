@@ -41,7 +41,11 @@ import {
 import { marklessSerializeGraphValue } from './state-serialize.ts';
 import type { SsrDataStructure } from '../ssr-data/renderer.ts';
 import { ASYNC_BOUNDARY_ARM, serializeGraphValue, valueAlongPaths } from '@markless/serializer';
-import type { ProtocolBranchIdrefSite, ProtocolComposedGraphProp } from '@markless/serializer';
+import type {
+	ProtocolBranchArmSeed,
+	ProtocolBranchIdrefSite,
+	ProtocolComposedGraphProp,
+} from '@markless/serializer';
 
 // SSR composition works on DRAFT payload records: the shapes the protocol
 // eventually serializes, still mutable and still carrying producer-only fields.
@@ -92,6 +96,7 @@ type SsrBranchRecord = SsrAnchoredRecord & {
 	readonly contentReads?: ReadonlyArray<ComposeGraphRead>;
 	readonly symbolId?: string;
 	readonly takenArm?: number;
+	readonly armSeeds?: ReadonlyArray<ProtocolBranchArmSeed>;
 	readonly armRecords?: ReadonlyArray<SsrArmRecordSet>;
 	readonly escalates?: true;
 	readonly servedArmRecords?: SsrArmRecordSet;
@@ -1860,6 +1865,12 @@ function marklessSsrLiftBranch(
 			: {}),
 		...(keepSymbol ? { symbolId: marklessBoundSymbolId(child, childSymbolId!) } : {}),
 		...(armRecords ? { armRecords } : {}),
+		...(branch.armSeeds && {
+			armSeeds: branch.armSeeds.flatMap((seed) => {
+				const cell = marklessSsrRemapChildGraph({ graphNodeId: seed.graphNodeId, path: [] }, child.graphProps, instancePath);
+				return cell ? [{ ...seed, graphNodeId: cell.graphNodeId }] : [];
+			}),
+		}),
 		...(keepSymbol && marklessSsrComposedRoutes(branch, child, instancePath)),
 		// The served arm keeps its arm-relative coordinates; only ids and symbols take the prefixes.
 		...(servedArmRecords && {
