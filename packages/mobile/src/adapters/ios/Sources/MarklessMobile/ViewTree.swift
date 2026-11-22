@@ -414,6 +414,8 @@ final class ViewTree {
 	private var scrollViews: [String: ContainerScrollView] = [:]
 	/// Each box's shadow layers, while it has a shadow.
 	private var shadows: [String: ShadowLayers] = [:]
+	/// Each outlined box's outline view, in the view of its outline's host.
+	private var outlines: [String: OutlineView] = [:]
 	/// The view each box that clips overflow past its borders hosts its children in.
 	private var clipViews: [String: PaddingClipView] = [:]
 	/// What a stopped submit says, shown until the person's next action.
@@ -977,12 +979,24 @@ final class ViewTree {
 		else if style.childClip != nil { throw HostError("\(id) began clipping overflow past its borders after it was built") }
 		if let host = view.superview as? ContainerScrollView { view.frame.origin = CGPoint(x: view.frame.minX - host.inset.left, y: view.frame.minY - host.inset.top) }
 		try paintShadow(id, view, style)
+		try paintOutline(id, style)
 		guard let scroll = scrollViews[id] else {
 			if style.scroll != nil { throw HostError("\(id) became a scroll container after it was built") }
 			return
 		}
 		guard let s = style.scroll else { throw HostError("\(id) stopped being a scroll container after it was built") }
 		scroll.configure(s, in: view.bounds.size, cornerRadius: style.cornerRadius)
+	}
+
+	private func paintOutline(_ id: String, _ style: ResolvedStyle) throws {
+		guard let outline = style.outline else {
+			outlines.removeValue(forKey: id)?.removeFromSuperview()
+			return
+		}
+		guard let host = elements[outline.host] else { throw HostError("\(id): its outline is drawn in \(outline.host), which has no view") }
+		let view = outlines[id] ?? OutlineView()
+		outlines[id] = view
+		try view.apply(outline, in: host)
 	}
 
 	/// Views inserted beside a box since its shadow was placed go beneath that shadow again.
@@ -1565,6 +1579,7 @@ final class ViewTree {
 		labels.removeValue(forKey: id)?.removeFromSuperview()
 		scrollViews.removeValue(forKey: id)
 		shadows.removeValue(forKey: id)?.remove()
+		outlines.removeValue(forKey: id)?.removeFromSuperview()
 		paragraphs.removeValue(forKey: id)?.view.removeFromSuperview()
 		paragraphTexts.removeValue(forKey: id)
 		flowing.remove(id)
@@ -2484,48 +2499,53 @@ private final class DashedBorderLayer: CALayer {
 
 	override func draw(in ctx: CGContext) {
 		guard let border else { return }
-		ctx.saveGState()
-		ctx.scaleBy(x: 1 / border.scale, y: 1 / border.scale)
-		ctx.translateBy(x: border.ops.originX, y: border.ops.originY)
-		for o in border.ops.ops {
-			let pts = o.points
-			switch o.op {
-			case "begin-layer":
-				ctx.saveGState()
-				ctx.setAlpha(o.alpha)
-				ctx.beginTransparencyLayer(auxiliaryInfo: nil)
-			case "end-layer":
-				ctx.endTransparencyLayer()
-				ctx.restoreGState()
-			case "save": ctx.saveGState()
-			case "restore": ctx.restoreGState()
-			case "clip":
-				ctx.setShouldAntialias(o.antialias)
-				ctx.addPath(polygon(pts))
-				ctx.clip()
-				ctx.setShouldAntialias(true)
-			default:
-				let c = border.colors[o.side]
-				ctx.setFillColor(UIColor(red: c.r / 255, green: c.g / 255, blue: c.b / 255, alpha: o.alpha).cgColor)
-				ctx.setShouldAntialias(o.antialias)
-				if o.op == "fill" {
-					ctx.addPath(polygon(pts))
-					ctx.fillPath()
-				} else {
-					ctx.fillEllipse(in: CGRect(x: pts[0] - pts[2], y: pts[1] - pts[2], width: 2 * pts[2], height: 2 * pts[2]))
-				}
-				ctx.setShouldAntialias(true)
-			}
-		}
-		ctx.restoreGState()
+		drawBorderOps(ctx, border.ops.ops, colors: border.colors, scale: border.scale, dx: border.ops.originX, dy: border.ops.originY)
 	}
+}
 
-	private func polygon(_ pts: [Double]) -> CGPath {
-		let path = CGMutablePath()
-		path.addLines(between: stride(from: 0, to: pts.count - 1, by: 2).map { CGPoint(x: pts[$0], y: pts[$0 + 1]) })
-		path.closeSubpath()
-		return path
+/// Dragon's side-painter operations (paint-dash.ts) in device px, shifted by dx, dy, as Dragon's own UIKit paint draws them.
+func drawBorderOps(_ ctx: CGContext, _ ops: [BorderOps.Op], colors: [RGBA], scale: Double, dx: Double, dy: Double) {
+	ctx.saveGState()
+	ctx.scaleBy(x: 1 / scale, y: 1 / scale)
+	ctx.translateBy(x: dx, y: dy)
+	for o in ops {
+		let pts = o.points
+		switch o.op {
+		case "begin-layer":
+			ctx.saveGState()
+			ctx.setAlpha(o.alpha)
+			ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+		case "end-layer":
+			ctx.endTransparencyLayer()
+			ctx.restoreGState()
+		case "save": ctx.saveGState()
+		case "restore": ctx.restoreGState()
+		case "clip":
+			ctx.setShouldAntialias(o.antialias)
+			ctx.addPath(polygon(pts))
+			ctx.clip()
+			ctx.setShouldAntialias(true)
+		default:
+			let c = colors[o.side]
+			ctx.setFillColor(UIColor(red: c.r / 255, green: c.g / 255, blue: c.b / 255, alpha: o.alpha).cgColor)
+			ctx.setShouldAntialias(o.antialias)
+			if o.op == "fill" {
+				ctx.addPath(polygon(pts))
+				ctx.fillPath()
+			} else {
+				ctx.fillEllipse(in: CGRect(x: pts[0] - pts[2], y: pts[1] - pts[2], width: 2 * pts[2], height: 2 * pts[2]))
+			}
+			ctx.setShouldAntialias(true)
+		}
 	}
+	ctx.restoreGState()
+}
+
+private func polygon(_ pts: [Double]) -> CGPath {
+	let path = CGMutablePath()
+	path.addLines(between: stride(from: 0, to: pts.count - 1, by: 2).map { CGPoint(x: pts[$0], y: pts[$0 + 1]) })
+	path.closeSubpath()
+	return path
 }
 
 /// A checkbox or radio button. On a styled page a checkbox draws Chrome's theme marks from Dragon's plan, in the checkedness the

@@ -65,6 +65,7 @@ import dev.markless.mobile.style.Edges
 import dev.markless.mobile.style.paddingBox
 import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.ShadowPaint
+import dev.markless.mobile.style.OutlinePaint
 import dev.markless.mobile.style.StyleExport
 import dev.markless.mobile.style.shownRows
 import dev.markless.mobile.core.pickerContent
@@ -219,6 +220,8 @@ class MarklessHost(
 	private val lineSources = HashMap<TextView, Pair<StyledNode, Pair<Double, Double>>>()
 	/** The shadow each box's bitmaps were rastered for. */
 	private val shadowsDrawn = HashMap<View, ShadowPaint>()
+	/** Each outlined box's outline view, in the box of its outline's host. */
+	private val outlineViews = HashMap<String, OutlineView>()
 	/** Without a style export, text flows in paragraphs (one text view each); with one, Dragon lays out every text node. */
 	private val flow: TextFlow? = if (style == null) TextFlow(payload) else null
 	/** Each shown text instance's current string, which its paragraph view is rendered from. */
@@ -858,6 +861,7 @@ class MarklessHost(
 				continue
 			}
 			val view = views.remove(inst.id)!!
+			removeOutline(inst.id)
 			built.remove(inst.id)
 			scrollers.remove(inst.id)
 			textViews.remove(inst.id)
@@ -1489,6 +1493,7 @@ class MarklessHost(
 		val s = styled.byId[inst.id] ?: if (node.row != null && layout.export.planRepeats.isNotEmpty()) {
 			// A row not laid out yet (at mount, or just added): the page is laid out again with its rows, which places it.
 			view.visibility = View.GONE
+			removeOutline(inst.id)
 			return
 		} else throw MarklessHostError("style export has no node \"${inst.id}\"")
 		if (s.kind != (if (node is Node.Text) "text" else "element")) throw MarklessHostError("style node \"${inst.id}\" is a ${s.kind}")
@@ -1497,11 +1502,13 @@ class MarklessHost(
 		val origin = absolute[s.id]
 		if (inst.id in inert) {
 			view.visibility = View.GONE
+			removeOutline(inst.id)
 			return
 		}
 		// Dragon gives an element it does not render (`display: none`, `[hidden]`), and everything inside it, no frame.
 		if (frame == null || origin == null) {
 			view.visibility = View.GONE
+			removeOutline(inst.id)
 			return
 		}
 		view.visibility = View.VISIBLE
@@ -1544,6 +1551,7 @@ class MarklessHost(
 		}
 		paint(view, s, styled)
 		paintShadow(view, s, styled)
+		paintOutline(inst.id, s, styled)
 		if (view is SelectBox) selectLabel(view, s, styled, absolute)
 		if (view is TextView && node is Node.Text) {
 			lineSources[view] = s to inView
@@ -1553,6 +1561,43 @@ class MarklessHost(
 		val paintsNothing = (view as? MarklessBox)?.clip?.isEmpty == true
 		// A button's text is the button's own view, whose order its element keeps.
 		if (!(node is Node.Text && view is Button)) (view.parent as? MarklessBox)?.order(view, paintOrder?.takeIf { !paintsNothing }?.let { it.bucket * 100_000 + it.rank + 1 } ?: 0)
+	}
+
+	/** outline: a view in its host's box, drawn after the flow children and before the stacking context's later boxes. */
+	private fun paintOutline(id: String, s: StyledNode, styled: Assignment) {
+		if (s.writes.none { it is StyleWrite.Outline }) return removeOutline(id)
+		val outline = OutlinePaint.of(s, styled, ::isView, OutlinePaint.postOrder(styled.nodes), dpr) ?: return removeOutline(id)
+		val host = views[outline.host] as? MarklessBox
+		if (host == null || outline.host in scrollers) throw MarklessHostError("\"$id\": its outline is drawn in ${outline.host}, which is not a box view; not implemented on Android")
+		val view = outlineViews.getOrPut(id) { OutlineView(context) }
+		val ring = view.apply(outline)
+		if (view.parent !== host) {
+			removeFrom(view)
+			host.addView(view)
+		}
+		val hx = Math.round(outline.hostX).toInt()
+		val hy = Math.round(outline.hostY).toInt()
+		host.frames[view] = Rect(ring.left - hx, ring.top - hy, ring.right - hx, ring.bottom - hy)
+		host.order(view, OUTLINE_ORDER + outline.order)
+		host.requestLayout()
+		// The ring reaches past its host: each box around it up to one that clips its overflow lets its children draw outside them.
+		var at: MarklessBox = host
+		while (at.childClip == null) {
+			val around = at.parent as? MarklessBox ?: break
+			around.clipChildren = false
+			at = around
+		}
+	}
+
+	private fun removeOutline(id: String) {
+		outlineViews.remove(id)?.let(::removeFrom)
+	}
+
+	private fun removeFrom(view: View) {
+		(view.parent as? ViewGroup)?.let { p ->
+			(p as? MarklessBox)?.frames?.remove(view)
+			p.removeView(view)
+		}
 	}
 
 	/**
@@ -1705,6 +1750,7 @@ class MarklessHost(
 			is StyleWrite.Checkbox -> if (view !is CheckBox) throw MarklessHostError("\"${s.id}\" draws a themed checkbox but is not a checkbox")
 			is StyleWrite.Visibility -> {}
 			is StyleWrite.SelectArrow -> if (view !is SelectBox) throw MarklessHostError("\"${s.id}\" draws a drop-down arrow but is not a select")
+			is StyleWrite.Outline -> {}
 		}
 		if (s.kind != "text") {
 			val edges = s.borderWidths ?: Edges(0.0, 0.0, 0.0, 0.0)
@@ -1794,6 +1840,8 @@ class MarklessHost(
 	private fun isView(id: String): Boolean = payloadIds.contains(id.substringBefore('@'))
 
 	companion object {
+		/** An outline's order key: above the flow children (0), below the stacking context's later boxes (from 100_001). */
+		private const val OUTLINE_ORDER = 50_000
 		const val TAG = "MarklessHost"
 
 		/** Dragon's translated `runMarklessLayout`, when the app is built with Dragon's engine; without it a page keeps the size it was exported at. */
