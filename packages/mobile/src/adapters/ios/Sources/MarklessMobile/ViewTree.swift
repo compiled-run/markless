@@ -997,7 +997,7 @@ final class ViewTree {
 		try paint(view, style, faces: faces)
 		if let label = view as? UILabel { drawLines(label, style) }
 		if let clip = clipViews[id] { clip.shape(style.childClip, in: view.bounds) }
-		else if style.childClip != nil { throw HostError("\(id) began clipping overflow past its borders after it was built") }
+		else if style.childClip != nil, !(view is TextField) { throw HostError("\(id) began clipping overflow past its borders after it was built") }
 		if let host = view.superview as? ContainerScrollView { view.frame.origin = CGPoint(x: view.frame.minX - host.inset.left, y: view.frame.minY - host.inset.top) }
 		try paintShadow(id, view, style)
 		try paintOutline(id, style)
@@ -1437,7 +1437,8 @@ final class ViewTree {
 						view.addSubview(scroll)
 						scrollViews[id] = scroll
 					}
-					if style.childClip != nil || layout?.assignments.contains(where: { ($0[id] ?? $0[template])?.childClip != nil }) == true {
+					// A text field clips its value to the editor box itself; a view over it would take its touches.
+					if !(view is TextField), style.childClip != nil || layout?.assignments.contains(where: { ($0[id] ?? $0[template])?.childClip != nil }) == true {
 						let clip = PaddingClipView()
 						view.addSubview(clip)
 						clipViews[id] = clip
@@ -2418,6 +2419,10 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 		box.paint(style.checkbox)
 		return
 	}
+	if let field = view as? TextField {
+		try field.paint(style.textField, faces: faces)
+		return
+	}
 	if style.checkbox != nil { throw HostError("\(view.accessibilityIdentifier ?? "a box") draws a themed checkbox but is not a checkbox") }
 	guard let label = view as? UILabel else {
 		if style.font != nil || style.textColor != nil { throw HostError("\(view.accessibilityIdentifier ?? "a box") has text styles but is not text") }
@@ -2878,6 +2883,45 @@ final class TextField: UITextField, KeyedInput, UITextFieldDelegate {
 	override func paste(_ sender: Any?) {
 		if pasteLeavesOut() { return }
 		super.paste(sender)
+	}
+
+	private var styled: ResolvedStyle.TextFieldPaint?
+
+	/// On a styled page: the value and caret in Dragon's editor box, in its font and colour, and Dragon's placeholder in its box.
+	func paint(_ paint: ResolvedStyle.TextFieldPaint?, faces: [String: UIFontDescriptor]) throws {
+		let font = { (family: String, size: Double) throws -> UIFont in
+			guard let face = faces[family] else { throw HostError("font \(family) was not registered") }
+			return UIFont(descriptor: face, size: size)
+		}
+		if let paint {
+			self.font = try font(paint.fontFamily, paint.fontSize)
+			if let color = paint.color { textColor = uiColor(color) }
+		}
+		attributedPlaceholder = try paint?.placeholder.map { shown in
+			var look: [NSAttributedString.Key: Any] = [.font: try font(shown.fontFamily, shown.fontSize)]
+			if let color = shown.color { look[.foregroundColor] = uiColor(color) }
+			return NSAttributedString(string: shown.text, attributes: look)
+		}
+		styled = paint
+		setNeedsLayout()
+	}
+
+	private func rect(_ frame: Frame?, or fallback: CGRect) -> CGRect {
+		frame.map { CGRect(x: $0.x, y: $0.y, width: $0.width, height: $0.height) } ?? fallback
+	}
+
+	/// The editor box's columns at the height UIKit asks for, moved by how far the box's middle is from the field's: UIKit centres
+	/// the line there, and draws no value or caret in a rect it did not size itself.
+	private func valueRect(_ bounds: CGRect) -> CGRect? {
+		guard let editor = styled?.editor else { return nil }
+		let shift = editor.y + editor.height / 2 - self.bounds.midY
+		return CGRect(x: editor.x, y: bounds.minY + shift, width: editor.width, height: bounds.height)
+	}
+
+	override func textRect(forBounds bounds: CGRect) -> CGRect { valueRect(bounds) ?? super.textRect(forBounds: bounds) }
+	override func editingRect(forBounds bounds: CGRect) -> CGRect { valueRect(bounds) ?? super.editingRect(forBounds: bounds) }
+	override func placeholderRect(forBounds bounds: CGRect) -> CGRect {
+		rect(styled?.placeholder?.frame ?? styled?.editor, or: super.placeholderRect(forBounds: bounds))
 	}
 }
 

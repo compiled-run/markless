@@ -178,6 +178,8 @@ const shown = (page: Page, given: LadderText): Locator => {
 		.or(page.getByRole('img', { name: text, exact: true }))
 		// An image is found by its alt text, its accessible name, as a phone's screen reader names it.
 		.or(page.getByAltText(text, { exact: true }))
+		// A placeholder is on screen only while its field is empty, as a phone's hint is.
+		.or(page.locator(':placeholder-shown').and(page.getByPlaceholder(text, { exact: true })))
 		.or(page.getByRole('combobox').filter({ has: page.locator('option:checked').getByText(text, { exact: true }) }));
 };
 
@@ -363,7 +365,7 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 		if ((await onScreen(text).count()) === 0 || !(await onScreen(text).first().isDisabled()))
 			failed.push(`"${text}" is not a disabled control on screen`);
 	for (const [name, value] of Object.entries(step.fields ?? {})) {
-		const held = await page.getByRole('textbox', { name, exact: true }).inputValue();
+		const held = await typedField(page, name).inputValue();
 		if (held !== value) failed.push(`field "${name}" holds "${held}"`);
 	}
 	if (step.title !== undefined && (await page.title()) !== step.title)

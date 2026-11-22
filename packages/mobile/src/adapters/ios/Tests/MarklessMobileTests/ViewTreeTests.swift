@@ -551,4 +551,45 @@ private func scrollingCounterExport() throws -> Data {
 	#expect(spoken.map(\.text) == ["Report saved"], "\(spoken)")
 	#expect(spoken.first?.assertive == false)
 }
+
+/// Which rows and which columns of a field hold dark pixels once it is drawn, holding `text`.
+@MainActor private func inked(_ field: UITextField, _ text: String) throws -> (rows: [Int], columns: [Int]) {
+	let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 354, height: 42))
+	field.frame = window.bounds
+	field.backgroundColor = .white
+	window.addSubview(field)
+	window.isHidden = false
+	field.text = text
+	field.layoutIfNeeded()
+	func display(_ layer: CALayer) {
+		layer.layoutIfNeeded()
+		layer.setNeedsDisplay()
+		layer.displayIfNeeded()
+		for sub in layer.sublayers ?? [] { display(sub) }
+	}
+	display(field.layer)
+	let format = UIGraphicsImageRendererFormat()
+	format.scale = 1
+	let image = UIGraphicsImageRenderer(bounds: field.bounds, format: format).image { field.layer.render(in: $0.cgContext) }
+	let cg = try #require(image.cgImage)
+	let pixels = try #require(cg.dataProvider?.data as Data?)
+	let dark = { (x: Int, y: Int) in pixels[y * cg.bytesPerRow + x * 4] < 128 }
+	return ((0..<42).filter { y in (0..<354).contains { dark($0, y) } }, (0..<354).filter { x in (0..<42).contains { dark(x, $0) } })
+}
+
+/// A styled field draws the value it holds in Dragon's editor box, in the editor's font: Ahem inks each character as a 1em box.
+@MainActor @Test func aStyledTextFieldDrawsItsValueInItsEditorBox() throws {
+	let dragon = try #require(ProcessInfo.processInfo.environment["MARKLESS_DRAGON_DIR"], "set TEST_RUNNER_MARKLESS_DRAGON_DIR")
+	let ahem = try Data(contentsOf: URL(fileURLWithPath: dragon).appendingPathComponent("vendor/fonts/Ahem.ttf"))
+	let face = try #require(CTFontManagerCreateFontDescriptorFromData(ahem as CFData)) as UIFontDescriptor
+	let field = TextField()
+	try field.paint(
+		.init(editor: Frame(x: 17, y: 13, width: 309, height: 16), fontFamily: "Ahem", fontSize: 16, color: RGBA(r: 0, g: 0, b: 0, alpha: 255), placeholder: nil),
+		faces: ["Ahem": face])
+	let ink = try inked(field, "milk")
+	#expect(ink.rows.first.map { (12...14).contains($0) } == true, "\(ink.rows)")
+	#expect(ink.rows.last.map { (27...29).contains($0) } == true, "\(ink.rows)")
+	#expect(ink.columns.first.map { (16...18).contains($0) } == true, "\(ink.columns)")
+	#expect(ink.columns.last.map { (79...81).contains($0) } == true, "\(ink.columns)")
+}
 #endif

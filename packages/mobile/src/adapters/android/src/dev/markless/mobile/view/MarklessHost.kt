@@ -94,7 +94,7 @@ fun interface FontSource {
 	fun bytes(id: String): ByteArray? = null
 }
 
-/** Faces bundled as APK assets at `markless-fonts/<hex>.ttf`, the hex of the font file's SHA-256. */
+/** Faces bundled as APK assets at `markless-fonts/<hex>.ttf`, the hex of the font file's SHA-256, or `<name>.ttf` for a named face. */
 class AssetFonts(private val context: Context) : FontSource {
 	private val cache = HashMap<String, Typeface>()
 	override fun typeface(id: String): Typeface = cache.getOrPut(id) {
@@ -109,8 +109,10 @@ class AssetFonts(private val context: Context) : FontSource {
 	}
 
 	private fun path(id: String): String {
-		if (!id.startsWith("sha256:")) throw MarklessHostError("font id \"$id\" is not a sha256 id")
-		return "markless-fonts/${id.removePrefix("sha256:")}.ttf"
+		if (id.startsWith("sha256:")) return "markless-fonts/${id.removePrefix("sha256:")}.ttf"
+		// Dragon names the face it bundles (Ahem) by name.
+		if (id.isEmpty() || !id.all { it.isLetterOrDigit() }) throw MarklessHostError("font id \"$id\" is neither a sha256 id nor a face name")
+		return "markless-fonts/$id.ttf"
 	}
 }
 
@@ -1013,8 +1015,13 @@ class MarklessHost(
 			(0 until minOf(pa.size, pb.size)).map { pa[it].compareTo(pb[it]) }.firstOrNull { it != 0 } ?: pa.size.compareTo(pb.size)
 		}
 		if (wanted == current) return
-		box.removeAllViews()
-		for (v in wanted) box.addView(v)
+		// Only the views out of place move: removing a focused field would end its typing.
+		val focused = box.findFocus()
+		for ((i, v) in wanted.withIndex()) if (box.getChildAt(i) !== v) {
+			box.removeView(v)
+			box.addView(v, i)
+		}
+		if (focused != null && !focused.isFocused) focused.requestFocus()
 	}
 
 	private fun named(view: View, id: String, heading: Boolean = false, control: Boolean = false, link: Boolean = false, image: Boolean = false) {
@@ -1597,6 +1604,7 @@ class MarklessHost(
 		paintShadow(view, s, styled)
 		paintOutline(inst.id, s, styled)
 		if (view is SelectBox) selectLabel(view, s, styled, absolute)
+		if (view is MarklessField) textField(view, s, styled, absolute)
 		if (view is TextView && node is Node.Text) {
 			lineSources[view] = s to inView
 			drawLines(view)
@@ -1894,6 +1902,45 @@ class MarklessHost(
 			Rect(at.first.roundToInt() - ox, at.second.roundToInt() - oy, (at.first + box.width).roundToInt() - ox, (at.second + box.height).roundToInt() - oy),
 			fonts.typeface(font.family), font.size * dpr, text.writes.filterIsInstance<StyleWrite.TextColor>().lastOrNull()?.color?.argb,
 		)
+	}
+
+	/**
+	 * A field the host edits: its text area is the editor box Dragon lays out inside it (`<id>::editor`), in the value's font and
+	 * colour, and its hint is Dragon's placeholder while the value is empty. A field with no editor box is left as it is.
+	 */
+	private fun textField(view: MarklessField, s: StyledNode, styled: Assignment, absolute: Map<String, Pair<Double, Double>>) {
+		val editor = styled.byId["${s.id}::editor"]?.takeIf { it.parent == s.id } ?: return
+		val box = editor.frame ?: throw MarklessHostError("\"${s.id}\": its editor box has no frame")
+		val field = s.frame!!
+		val (fx, fy) = absolute.getValue(s.id)
+		val (ex, ey) = absolute.getValue(editor.id)
+		view.setPadding(
+			maxOf(0, ex.roundToInt() - fx.roundToInt()), maxOf(0, ey.roundToInt() - fy.roundToInt()),
+			maxOf(0, (fx + field.width).roundToInt() - (ex + box.width).roundToInt()), maxOf(0, (fy + field.height).roundToInt() - (ey + box.height).roundToInt()),
+		)
+		view.gravity = Gravity.CENTER_VERTICAL or Gravity.START
+		fun look(n: StyledNode): Pair<StyleWrite.Font, Int?> =
+			(n.writes.filterIsInstance<StyleWrite.Font>().lastOrNull() ?: throw MarklessHostError("\"${n.id}\" has no font")) to
+				n.writes.filterIsInstance<StyleWrite.TextColor>().lastOrNull()?.color?.argb
+		val (font, color) = look(editor)
+		view.paintFlags = view.paintFlags or Paint.SUBPIXEL_TEXT_FLAG or Paint.LINEAR_TEXT_FLAG
+		view.paint.hinting = Paint.HINTING_OFF
+		view.typeface = fonts.typeface(font.family)
+		view.setTextSize(TypedValue.COMPLEX_UNIT_PX, (font.size * dpr).toFloat())
+		color?.let { view.setTextColor(it) }
+		val shown = styled.byId["${s.id}::placeholder"]?.takeIf { it.parent == s.id && it.frame != null }
+		val words = shown?.let { styled.byId["${it.id}:text0"] }?.takeIf { it.parent == shown.id && it.text != null }
+		if (shown == null || words == null) {
+			view.hint = null
+			return
+		}
+		if (shown.frame != box || absolute[shown.id] != absolute[editor.id])
+			throw MarklessHostError("\"${s.id}\": a placeholder box other than the editor box is not implemented on Android")
+		val (hintFont, hintColor) = look(words)
+		if (hintFont.family != font.family || hintFont.size != font.size)
+			throw MarklessHostError("\"${s.id}\": a placeholder in another font than the value's is not implemented on Android")
+		view.hint = words.text
+		hintColor?.let { view.setHintTextColor(it) }
 	}
 
 	/** Whether a style node is a payload node's, or a row's copy of one. */
