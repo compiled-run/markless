@@ -1,0 +1,25 @@
+{
+	"rung": 237,
+	"name": "A tour whose steps name their targets by element handles passed as props builds and walks its steps on phones, as the web runs it",
+	"steps": [
+		{
+			"visible": ["Editor", "Save", "Share", "Take the tour", "Step 0"],
+			"absent": ["Save your work", "Share it"]
+		},
+		{
+			"do": { "tap": "Take the tour" },
+			"visible": ["Save your work", "Next", "Step 0"],
+			"absent": ["Share it"]
+		},
+		{
+			"do": { "tap": "Next" },
+			"visible": ["Share it", "Done", "Step 1"],
+			"absent": ["Save your work", "Step 0"]
+		},
+		{
+			"do": { "tap": "Done" },
+			"visible": ["Take the tour", "Step 1"],
+			"absent": ["Share it", "Save your work"]
+		}
+	]
+}
