@@ -1,0 +1,20 @@
+{
+	"rung": "S28",
+	"name": "a box with z-index that its stacking context hosts past ancestors with later siblings paints over a later sibling and takes the tap there, as Chrome paints and hit-tests it",
+	"steps": [
+		{
+			"visible": ["Re-hosted", "Lifted 0", "Card footer", "Later 0"],
+			"title": "Re-hosted"
+		},
+		{
+			"do": { "tap": "Lifted 0" },
+			"visible": ["Lifted 1", "Later 0"],
+			"absent": ["Lifted 0"]
+		},
+		{
+			"do": { "tap": "Later 0" },
+			"visible": ["Lifted 1", "Later 1"],
+			"absent": ["Later 0"]
+		}
+	]
+}

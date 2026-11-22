@@ -743,6 +743,31 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 	}
 }
 
+/**
+ * Where a box Dragon paints in its stacking context's order ([order]'s host) is placed so its view's siblings are that order: the
+ * host when it is a view's node ([isView]), else the page's top node; null when that is [viewParent], its view's parent already.
+ * A box in between that clips, scrolls or keeps an order of its own would have to carry the box with it, and is refused by name,
+ * as is a box below the flow (a negative z-index) placed past its parent.
+ */
+fun stackingParent(s: StyledNode, order: StyleWrite.PaintOrder, styled: Assignment, isView: (String) -> Boolean, viewParent: String?): String? {
+	val chain = ArrayList<StyledNode>()
+	var cursor = s.parent
+	while (cursor != null && cursor != order.host) {
+		val between = styled.byId[cursor] ?: throw MarklessDecodeError("\"${s.id}\"'s stacking context ${order.host} is not an ancestor")
+		chain.add(between)
+		cursor = between.parent
+	}
+	if (cursor == null) throw MarklessDecodeError("\"${s.id}\"'s stacking context ${order.host} is not an ancestor")
+	val target = if (isView(order.host)) order.host else chain.lastOrNull { isView(it.id) }?.id
+	for (box in chain.takeWhile { it.id != target }) {
+		if (box.writes.any { it == StyleWrite.PaddingBoxClip || it is StyleWrite.ClipPathInset || it is StyleWrite.ScrollContainer }) throw MarklessDecodeError("\"${s.id}\" paints in ${order.host}'s stacking order past ${box.id}, which clips or scrolls; not implemented on Android")
+		if (box.writes.any { it is StyleWrite.PaintOrder }) throw MarklessDecodeError("\"${s.id}\" paints in ${order.host}'s stacking order past ${box.id}, which keeps an order of its own; not implemented on Android")
+	}
+	if (target == null || target == viewParent) return null
+	if (order.bucket < 0) throw MarklessDecodeError("\"${s.id}\" paints below the flow of ${order.host} past ${viewParent ?: "the page"}; not implemented on Android")
+	return target
+}
+
 /** A list whose rows a phone lays out (Dragon's `planRepeats`): the box its rows hang from and one row's top boxes, by Dragon id. */
 data class PlanRepeat(val id: String, val parent: String, val template: List<String>)
 

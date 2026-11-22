@@ -18,6 +18,7 @@ import dev.markless.mobile.core.ScriptEngine
 import dev.markless.mobile.core.ScriptHost
 import dev.markless.mobile.core.TouchPoint
 import dev.markless.mobile.core.arr
+import dev.markless.mobile.core.text
 import dev.markless.mobile.core.field
 import dev.markless.mobile.core.num
 import dev.markless.mobile.core.ScrollAlign
@@ -43,6 +44,7 @@ import dev.markless.mobile.style.rowStates
 import dev.markless.mobile.style.SystemFace
 import dev.markless.mobile.style.TextLine
 import dev.markless.mobile.style.StyleWrite
+import dev.markless.mobile.style.stackingParent
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -752,6 +754,31 @@ private fun rowPressedStyles(fixtures: File) {
 	check("only the picked row takes the pressed assignment", rows.getOrNull()?.map { it.assignment == k } == listOf(false, true, false)) { "${rows.getOrNull()?.map { it.key to it.assignment }} from $k" }
 }
 
+/** The S28 rung's: a z-index box in .actions in .card, both with later siblings, which Dragon paints in html's stacking order. */
+private fun rehostedStacking(fixtures: File) {
+	val text = File(fixtures, "s28-rehosted-stacking.native-app-style.json").readText()
+	val page = StyleExport.decodeApp(text.toByteArray()).getValue("/")
+	val styled = page.assignments[page.initial]
+	val views = setOf("h0", "h2", "h2:text0", "h3", "h4", "h5", "h5:text0", "h6", "h6:text0", "h7", "h7:text0")
+	fun place(id: String, parent: String?) = styled.byId.getValue(id).let { s -> s.writes.filterIsInstance<StyleWrite.PaintOrder>().firstOrNull()?.let { stackingParent(s, it, styled, views::contains, parent) } }
+	check("a box html orders past .actions and .card, which have later siblings, is placed in the page's top box", place("h5", "h4") == "h0") { "${place("h5", "h4")}" }
+	check("a box without an order stays where it is", place("h7", "h0") == null) { "" }
+	val writesIndex = Json.parse(text).obj("app").field("targets", "app").obj("targets").field("android", "targets").obj("android")
+	val h4 = (writesIndex.field("routes", "android").arr("routes")[0].obj("route").field("assignments", "route").arr("assignments")[0].obj("a").field("nodes", "a").arr("nodes").first { it.obj("n")["id"] == Json.Str("h4") }).obj("n").field("writes", "n").num("writes").toInt()
+	val lists = writesIndex.field("writes", "android").arr("writes")
+	val clipped = Json.Obj(LinkedHashMap(Json.parse(text).obj("app")).also { app ->
+		val targets = LinkedHashMap(app.getValue("targets").obj("targets"))
+		val android = LinkedHashMap(targets.getValue("android").obj("android"))
+		android["writes"] = Json.Arr(lists.mapIndexed { i, l -> if (i == h4) Json.Arr(l.arr("w") + Json.parse("""{"kind":"padding-box-clip","key":"dragonClip.frame"}""")) else l })
+		targets["android"] = Json.Obj(android)
+		app["targets"] = Json.Obj(targets)
+	}).text()
+	val clippedPage = StyleExport.decodeApp(clipped.toByteArray()).getValue("/")
+	val c = clippedPage.assignments[clippedPage.initial]
+	val err = runCatching { c.byId.getValue("h5").let { s -> stackingParent(s, s.writes.filterIsInstance<StyleWrite.PaintOrder>().first(), c, views::contains, "h4") } }.exceptionOrNull()?.message
+	check("a box painted past an ancestor that clips is refused by name", err == "\"h5\" paints in html's stacking order past h4, which clips or scrolls; not implemented on Android") { "$err" }
+}
+
 fun main(args: Array<String>) {
 	routes()
 	arrays()
@@ -771,6 +798,7 @@ fun main(args: Array<String>) {
 	rowPressedStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	styleSlots()
+	rehostedStacking(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	val dirs = args.map(::File)
 	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)
 	val files = dirs.flatMap { d -> d.listFiles { f -> f.name.endsWith(".json") }?.sortedBy { it.name } ?: error("no vector directory $d") }
