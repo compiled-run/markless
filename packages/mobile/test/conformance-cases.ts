@@ -827,6 +827,14 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'row-live',
+		fixture: 'proofs/r166-row-live/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
 		name: 'radio-follows',
 		fixture: 'proofs/r163-radio-follows/App.tsrx',
 		modules: true,
@@ -1746,6 +1754,17 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		fixture: 'proofs/j9-render-list/App.tsrx',
 		modules: true,
 		actions: [{ event: 'activate', host: 'h4' }],
+	},
+	{
+		name: 'details',
+		fixture: 'proofs/r145-details/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h3' },
+		],
 	},
 	{
 		// The real modal family: trigger, a press inside the dialog, a press on its backdrop, an alert that refuses one, Escape.

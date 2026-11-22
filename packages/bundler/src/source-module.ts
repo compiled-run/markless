@@ -1135,11 +1135,7 @@ export function emitQueuedResumeContainerEvent(
 	].join('\n');
 }
 
-// Composed arm-record qualification is pay-per-use: only a page with component
-// edges can hold a child-owned async boundary whose records were minted in the
-// child's own id space, so the gate that emits its symbol routes also emits
-// this install. The call is explicit because `@markless/web` declares
-// `sideEffects: false`, which would drop a bare side-effect import.
+// A page that composes children re-spells their arm records; explicit because `@markless/web` is `sideEffects: false`.
 function emitComposedArmRecordsInstall(): string {
 	return [
 		"import { installMarklessComposedArmRecords } from '@markless/web/fns/instance-scope';",

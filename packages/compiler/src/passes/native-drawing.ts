@@ -1,3 +1,4 @@
+import { parse as parseCss } from 'yuku-css';
 import type {
 	NativeColor,
 	NativeDrawing,
@@ -54,8 +55,16 @@ type Inherited = {
 	/** In user units, or in ems of the font size. */
 	readonly letterSpacing: { readonly value: number; readonly em: boolean };
 	readonly preserve: boolean;
-	/** The clip outlines of it and its groups, in the drawing's units. */
-	readonly clips: ReadonlyArray<ReadonlyArray<number>>;
+	/** The clip outlines of it and its groups, in the drawing's units, each with the rule that fills it. */
+	readonly clips: ReadonlyArray<Clip>;
+	/** The `filter` blur over it: its deviation and region in the drawing's units, the clips that apply after it, and how many shapes it holds. */
+	readonly blur?: {
+		readonly element: string;
+		readonly deviation: number;
+		readonly region: ReadonlyArray<number>;
+		readonly clips: number;
+		readonly drawn: { count: number };
+	};
 	/** The <marker> each of a path's vertices gets: its first, its middle ones, its last. */
 	readonly markers: {
 		readonly start?: DrawingElement;
@@ -63,6 +72,14 @@ type Inherited = {
 		readonly end?: DrawingElement;
 	};
 };
+type Clip = { readonly outline: ReadonlyArray<number>; readonly rule: 'nonzero' | 'evenodd' };
+const clipFields = (clips: ReadonlyArray<Clip>) =>
+	clips.length === 0
+		? {}
+		: {
+				clip: clips.map((clip) => clip.outline),
+				...(clips.some((clip) => clip.rule === 'evenodd') ? { clipRule: clips.map((clip) => clip.rule) } : {}),
+			};
 const INITIAL: Inherited = {
 	fill: { r: 0, g: 0, b: 0, alpha: 255 },
 	stroke: null,
@@ -89,7 +106,11 @@ const INITIAL: Inherited = {
 
 export const SHAPES: ReadonlySet<string> = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
 /** Elements that draw nothing themselves and whose content is never drawn in place. */
-const NEVER_DRAWN = new Set(['defs', 'symbol', 'title', 'desc', 'metadata', 'clipPath', 'marker']);
+const NEVER_DRAWN = new Set(['defs', 'symbol', 'title', 'desc', 'metadata', 'clipPath', 'mask', 'marker', 'filter']);
+/** What a <filter> may carry: its region, its units and the colour space it works in. */
+const FILTER_ATTRIBUTES: ReadonlySet<string> = new Set(['id', 'x', 'y', 'width', 'height', 'filterUnits', 'primitiveUnits', 'color-interpolation-filters']);
+/** What a <mask> may carry: its region, its units and its type. */
+const MASK_ATTRIBUTES: ReadonlySet<string> = new Set(['id', 'x', 'y', 'width', 'height', 'maskUnits', 'maskContentUnits', 'mask-type']);
 /** Shapes that get markers at their vertices. */
 const MARKABLE = new Set(['path', 'line', 'polyline', 'polygon']);
 /** Attributes that change nothing a native drawing shows. */
@@ -150,6 +171,8 @@ const PRESENTATION = new Set([
 	'dominant-baseline',
 	'letter-spacing',
 	'clip-path',
+	'mask',
+	'filter',
 	'marker-start',
 	'marker-mid',
 	'marker-end',
@@ -168,6 +191,33 @@ const BASELINES: Readonly<Record<string, NativeDrawingText['baseline']>> = {
 	'text-bottom': 'text-bottom',
 	ideographic: 'ideographic',
 };
+
+/** CSS properties an SVG file's `style` attribute may set that a native drawing reads as the presentation attribute of that name. */
+const STYLE_AS_ATTRIBUTES: ReadonlySet<string> = new Set(['mask-type']);
+
+/**
+ * An SVG file's `style` attribute as the presentation attributes it sets, when each of its declarations is one a native
+ * drawing reads that way with a single keyword (`style="mask-type:alpha"`); null when it holds anything else.
+ */
+export function svgStyleAttributes(style: string): Record<string, string> | null {
+	let list;
+	try {
+		list = parseCss(style, { context: 'declarationList' }).ast;
+	} catch {
+		return null;
+	}
+	if (list.type !== 'DeclarationList') return null;
+	const attributes: Record<string, string> = {};
+	for (const declaration of list.children) {
+		if (declaration.type !== 'Declaration' || declaration.important || !STYLE_AS_ATTRIBUTES.has(declaration.property))
+			return null;
+		const value = declaration.value.type === 'Value' ? declaration.value.children : [];
+		const only = value.length === 1 ? value[0] : undefined;
+		if (only?.type !== 'Identifier') return null;
+		attributes[declaration.property] = only.name;
+	}
+	return attributes;
+}
 
 export function compileDrawing(
 	svg: Readonly<Record<string, string>>,
@@ -396,8 +446,15 @@ export function compileDrawing(
 				`a see-through \`currentColor\` paint on <${element.tag}>: its colour comes from the page's styles`,
 			);
 		if (outline.length === 0) return;
+		if (style.blur) {
+			if (style.clips.length > style.blur.clips)
+				refuse(element.id, `a clip or mask inside a filtered element, which applies before its blur`);
+			if (++style.blur.drawn.count > 1)
+				refuse(style.blur.element, `a \`filter\` over more than one shape: a native drawing blurs one shape at a time`);
+		}
 		shapes.push({
-			...(style.clips.length > 0 ? { clip: style.clips } : {}),
+			...clipFields(style.clips),
+			...(style.blur ? { blur: { deviation: style.blur.deviation, region: style.blur.region } } : {}),
 			path: outline,
 			fill: alpha(style.fill, style.fillOpacity * style.opacity),
 			fillRule: style.fillRule,
@@ -554,9 +611,10 @@ export function compileDrawing(
 		}
 		const shown = runs.filter((run) => run.text !== '' || run.x !== undefined || run.y !== undefined);
 		if (shown.every((run) => run.text === '')) return;
+		if (style.blur) refuse(style.blur.element, `a \`filter\` over text, which a native drawing does not blur yet`);
 		spoken.push(shown.map((run) => run.text).join('').trim());
 		shapes.push({
-			...(style.clips.length > 0 ? { clip: style.clips } : {}),
+			...clipFields(style.clips),
 			path: [],
 			fill: paintOf(style),
 			fillRule: 'nonzero',
@@ -608,7 +666,89 @@ export function compileDrawing(
 				refuse(child.id, `\`clip-path\` on a shape inside <clipPath>`);
 			outline.push(...mapOutline(outlineOf(child), multiply(base, transformOf(child))));
 		}
-		return { ...style, clips: [...style.clips, outline] };
+		return { ...style, clips: [...style.clips, { outline, rule: 'nonzero' }] };
+	};
+
+	/**
+	 * `mask="url(#id)"` (CSS Masking 1 §7): a <mask> in user space whose content is shapes filled with one opaque colour (any
+	 * colour for `mask-type="alpha"`, white for the default luminance) lets through exactly what those shapes cover inside its
+	 * region, so it draws as a clip by them; any other mask is refused by name.
+	 */
+	const masked = (element: DrawingElement, style: Inherited, own: Matrix): Inherited => {
+		const raw = element.attributes.mask?.trim();
+		if (raw === undefined || raw === 'none') return style;
+		const id = raw.startsWith('url(#') && raw.endsWith(')') ? raw.slice(5, -1).trim() : undefined;
+		const target = id === undefined ? undefined : byId.get(id);
+		if (!target || target.tag !== 'mask') {
+			refuse(element.id, `\`mask="${raw}"\` on <${element.tag}>, which names no <mask> inside this <svg>`);
+			return style;
+		}
+		for (const name of Object.keys(target.attributes))
+			if (!MASK_ATTRIBUTES.has(name) && !PRESENTATION.has(name) && !NO_DRAWING_EFFECT.has(name) && !name.startsWith('data-'))
+				refuse(target.id, `\`${name}\` on <mask>, which a native drawing does not draw yet`);
+		const units = target.attributes.maskUnits?.trim() ?? 'objectBoundingBox';
+		if (units !== 'userSpaceOnUse') {
+			refuse(target.id, `\`maskUnits="${units}"\` on <mask>: a mask's region is drawn in user space only`);
+			return style;
+		}
+		const contentUnits = target.attributes.maskContentUnits?.trim();
+		if (contentUnits !== undefined && contentUnits !== 'userSpaceOnUse')
+			refuse(target.id, `\`maskContentUnits="${contentUnits}"\` on <mask>: a mask's content is drawn in user space only`);
+		const type = target.attributes['mask-type']?.trim() ?? 'luminance';
+		if (type !== 'luminance' && type !== 'alpha') {
+			refuse(target.id, `\`mask-type="${type}"\` on <mask>`);
+			return style;
+		}
+		const sides = ['x', 'y', 'width', 'height'] as const;
+		if (sides.some((side) => target.attributes[side] === undefined)) {
+			refuse(target.id, '<mask> without `x`, `y`, `width` and `height`: its default region depends on the box of what it masks');
+			return style;
+		}
+		const [x, y, width, height] = sides.map((side) => number(target, side));
+		const base = multiply(own, transformOf(target));
+		const region = mapOutline([0, x, y, 1, x + width, y, 1, x + width, y + height, 1, x, y + height, 4], base);
+		const outline: number[] = [];
+		const cuts: Clip[] = [];
+		const maskStyle = inherit(target, INITIAL);
+		for (const child of childrenOf(target.path)) {
+			if (!SHAPES.has(child.tag)) {
+				if (!NEVER_DRAWN.has(child.tag))
+					refuse(child.id, `<${child.tag}> inside <mask>, whose filled shapes alone mask natively yet`);
+				continue;
+			}
+			for (const name of ['clip-path', 'mask', 'filter'])
+				if (child.attributes[name] !== undefined) refuse(child.id, `\`${name}\` on a shape inside <mask>`);
+			const shape = inherit(child, maskStyle);
+			const fill = shape.fill === 'currentColor' ? shape.color : shape.fill;
+			if (fill === null) continue;
+			const opaque = fill.alpha === 255 && shape.fillOpacity === 1 && shape.opacity === 1;
+			const white = fill.r === 255 && fill.g === 255 && fill.b === 255;
+			const black = fill.r === 0 && fill.g === 0 && fill.b === 0;
+			const mapped = () => mapOutline(outlineOf(child), multiply(base, transformOf(child)));
+			// Black painted over white in a luminance mask hides what it covers: the region with that shape cut out, filled even-odd.
+			if (type === 'luminance' && opaque && black && shape.stroke === null) {
+				if (shape.fillRule !== 'evenodd' && !['rect', 'circle', 'ellipse'].includes(child.tag) && !simpleOutline(outlineOf(child)))
+					refuse(child.id, `a black <${child.tag}> filled nonzero that crosses itself or has several parts, inside a luminance <mask>: only an even-odd fill or one simple outline cuts a mask natively yet`);
+				else cuts.push({ outline: [...region, ...mapped()], rule: 'evenodd' });
+				continue;
+			}
+			if (cuts.length > 0 && white) {
+				refuse(child.id, `a white <${child.tag}> after a black shape inside a luminance <mask>, which would show through the cut again`);
+				continue;
+			}
+			if (!opaque || (type === 'luminance' && !white) || shape.stroke !== null || shape.fillRule !== 'nonzero') {
+				refuse(
+					child.id,
+					`a <${child.tag}> inside a ${type} <mask> that is not one opaque ${type === 'luminance' ? 'white ' : ''}fill with no stroke: a mask of partial coverage is not drawn natively yet`,
+				);
+				continue;
+			}
+			outline.push(...mapped());
+		}
+		return {
+			...style,
+			clips: [...style.clips, { outline: region, rule: 'nonzero' }, { outline, rule: 'nonzero' }, ...cuts],
+		};
 	};
 
 	/**
@@ -659,7 +799,7 @@ export function compileDrawing(
 			const content = multiply(viewport, fit);
 			const markerStyle: Inherited = {
 				...inherit(marker, rootStyle),
-				clips: [...style.clips, mapOutline([0, 0, 0, 1, width, 0, 1, width, height, 1, 0, height, 4], viewport)],
+				clips: [...style.clips, { outline: mapOutline([0, 0, 0, 1, width, 0, 1, width, height, 1, 0, height, 4], viewport), rule: 'nonzero' }],
 			};
 			const inner = new Set([...using, marker.id]);
 			for (const child of childrenOf(marker.path)) visit(child, markerStyle, content, inner);
@@ -669,6 +809,88 @@ export function compileDrawing(
 			const marker = index === 0 ? start : index === vertices.length - 1 ? end : mid;
 			if (marker) place(marker, vertex, index === 0);
 		});
+	};
+
+	/**
+	 * `filter="url(#id)"` (Filter Effects 1): a filter that only blurs its source graphic, as design tools export a layer blur
+	 * (an optional transparent `feFlood` with a normal `feBlend` of `SourceGraphic` over it, then one `feGaussianBlur`), in
+	 * sRGB with a user-space region, over an element that draws one shape: that shape is drawn blurred inside the region. A
+	 * clip or mask on the element or around it applies after; any other filter is refused by name.
+	 */
+	const filtered = (element: DrawingElement, style: Inherited, own: Matrix): Inherited => {
+		const raw = element.attributes.filter?.trim();
+		if (raw === undefined || raw === 'none') return style;
+		const target = raw.startsWith('url(#') && raw.endsWith(')') ? byId.get(raw.slice(5, -1)) : undefined;
+		if (!target || target.tag !== 'filter') {
+			refuse(element.id, `\`filter="${raw}"\` on <${element.tag}>, which names no <filter> inside this <svg>`);
+			return style;
+		}
+		if (style.blur) {
+			refuse(element.id, `a \`filter\` inside another filtered element, which a native drawing does not draw yet`);
+			return style;
+		}
+		const fail = (what: string): Inherited => {
+			refuse(target.id, `${what}: a native drawing draws a filter that only blurs its source graphic`);
+			return style;
+		};
+		for (const name of Object.keys(target.attributes))
+			if (!FILTER_ATTRIBUTES.has(name)) return fail(`\`${name}\` on <filter>`);
+		if (target.attributes.filterUnits?.trim() !== 'userSpaceOnUse') return fail('a <filter> region not in user space');
+		if ((target.attributes.primitiveUnits?.trim() ?? 'userSpaceOnUse') !== 'userSpaceOnUse')
+			return fail('a <filter> whose primitives are not in user space');
+		if (target.attributes['color-interpolation-filters']?.trim() !== 'sRGB')
+			return fail('a <filter> that blurs in linearRGB (no `color-interpolation-filters="sRGB"`)');
+		for (const side of ['x', 'y', 'width', 'height'])
+			if (target.attributes[side] === undefined) return fail(`a <filter> without \`${side}\``);
+		const steps = childrenOf(target.path);
+		let source = 'SourceGraphic';
+		let at = 0;
+		const flood = steps[at];
+		if (flood?.tag === 'feFlood') {
+			if (Object.keys(flood.attributes).some((name) => name !== 'flood-opacity' && name !== 'result' && name !== 'flood-color'))
+				return fail('an <feFlood> with more than a colour, an opacity and a result');
+			if (Number(flood.attributes['flood-opacity'] ?? '1') !== 0) return fail('an <feFlood> that is not transparent');
+			const blend = steps[at + 1];
+			if (
+				blend?.tag !== 'feBlend' ||
+				(blend.attributes.mode?.trim() ?? 'normal') !== 'normal' ||
+				blend.attributes.in?.trim() !== 'SourceGraphic' ||
+				blend.attributes.in2?.trim() !== flood.attributes.result?.trim() ||
+				Object.keys(blend.attributes).some((name) => !['mode', 'in', 'in2', 'result'].includes(name))
+			)
+				return fail('an <feFlood> not followed by a normal <feBlend> of SourceGraphic over it');
+			source = blend.attributes.result?.trim() ?? '';
+			at += 2;
+		}
+		const blur = steps[at];
+		if (blur?.tag !== 'feGaussianBlur' || at + 1 !== steps.length) return fail('a <filter> that does not end in one <feGaussianBlur>');
+		if (Object.keys(blur.attributes).some((name) => !['stdDeviation', 'in', 'result', 'edgeMode'].includes(name)))
+			return fail('an <feGaussianBlur> with more than a deviation, an input and a result');
+		if ((blur.attributes.edgeMode?.trim() ?? 'none') !== 'none') return fail('an <feGaussianBlur> with an edge mode');
+		const input = blur.attributes.in?.trim();
+		if (input !== undefined && input !== source && !(at === 0 && input === 'SourceGraphic'))
+			return fail('an <feGaussianBlur> of something other than the source graphic');
+		const deviations = (blur.attributes.stdDeviation ?? '').trim().split(/[\s,]+/).map(Number);
+		if (deviations.some((d) => !Number.isFinite(d) || d < 0) || (deviations.length === 2 && deviations[0] !== deviations[1]) || deviations.length > 2)
+			return fail('an <feGaussianBlur> whose deviation is not one non-negative number');
+		const [a, b, c, d] = own;
+		const sx = Math.hypot(a, b);
+		const sy = Math.hypot(c, d);
+		if (Math.abs(sx - sy) > 1e-9 * Math.max(sx, sy) || Math.abs(a * c + b * d) > 1e-9 * sx * sy) {
+			refuse(element.id, `a \`filter\` under a transform that stretches one axis more than the other`);
+			return style;
+		}
+		const [x, y, width, height] = ['x', 'y', 'width', 'height'].map((side) => number(target, side));
+		return {
+			...style,
+			blur: {
+				element: element.id,
+				deviation: deviations[0]! * sx,
+				region: mapOutline([0, x, y, 1, x + width, y, 1, x + width, y + height, 1, x, y + height, 4], own),
+				clips: style.clips.length,
+				drawn: { count: 0 },
+			},
+		};
 	};
 
 	const visit = (
@@ -687,7 +909,7 @@ export function compileDrawing(
 		}
 		checkAttributes(element);
 		const own = multiply(matrix, transformOf(element));
-		const style = clipped(element, inherit(element, from), own);
+		const style = filtered(element, masked(element, clipped(element, inherit(element, from), own), own), own);
 		if (SHAPES.has(element.tag)) {
 			const outline = outlineOf(element);
 			emit(element, outline, style, own);
@@ -853,6 +1075,60 @@ function parseAngle(raw: string): number | null {
 	const unit = raw.slice(match[0].length);
 	const scale: Readonly<Record<string, number>> = { '': 1, deg: 1, rad: 180 / Math.PI, grad: 0.9, turn: 360 };
 	return scale[unit] === undefined ? null : value * scale[unit]!;
+}
+
+/**
+ * Whether a verb-coded outline is one closed subpath that never crosses itself (its cubics flattened), so that its nonzero
+ * fill is its even-odd fill.
+ */
+function simpleOutline(outline: ReadonlyArray<number>): boolean {
+	const points: Array<[number, number]> = [];
+	let i = 0;
+	while (i < outline.length) {
+		const verb = outline[i++]!;
+		if (verb === 0) {
+			if (points.length > 0) return false;
+			points.push([outline[i]!, outline[i + 1]!]);
+			i += 2;
+		} else if (verb === 1) {
+			points.push([outline[i]!, outline[i + 1]!]);
+			i += 2;
+		} else if (verb === 3) {
+			const [x0, y0] = points[points.length - 1]!;
+			const [x1, y1, x2, y2, x3, y3] = outline.slice(i, i + 6) as [number, number, number, number, number, number];
+			for (let step = 1; step <= 16; step++) {
+				const t = step / 16;
+				const u = 1 - t;
+				points.push([
+					u * u * u * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3,
+					u * u * u * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3,
+				]);
+			}
+			i += 6;
+		} else if (verb === 4) {
+			if (i !== outline.length) return false;
+		} else return false;
+	}
+	const [first] = points;
+	const last = points[points.length - 1];
+	if (first && last && (first[0] !== last[0] || first[1] !== last[1])) points.push(first);
+	const n = points.length - 1;
+	if (n < 3) return false;
+	const cross = (a: [number, number], b: [number, number], c: [number, number]) =>
+		(b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+	const meet = (a: [number, number], b: [number, number], c: [number, number], d: [number, number]) => {
+		const [d1, d2, d3, d4] = [cross(c, d, a), cross(c, d, b), cross(a, b, c), cross(a, b, d)];
+		if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+		const on = (p: [number, number], q: [number, number], r: [number, number], side: number) =>
+			side === 0 && Math.min(p[0], q[0]) <= r[0] && r[0] <= Math.max(p[0], q[0]) && Math.min(p[1], q[1]) <= r[1] && r[1] <= Math.max(p[1], q[1]);
+		return on(c, d, a, d1) || on(c, d, b, d2) || on(a, b, c, d3) || on(a, b, d, d4);
+	};
+	for (let a = 0; a < n; a++)
+		for (let b = a + 2; b < n; b++) {
+			if (a === 0 && b === n - 1) continue;
+			if (meet(points[a]!, points[a + 1]!, points[b]!, points[b + 1]!)) return false;
+		}
+	return true;
 }
 
 /** A verb-coded outline with every point mapped by `m`; an affine map keeps lines and cubics what they are. */

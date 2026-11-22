@@ -177,6 +177,8 @@ data class DefaultStyle(
 	val rule: Boolean = false,
 	/** "disc" or "decimal", on a list. */
 	val marker: String? = null,
+	/** On a summary: a ▸ (collapsed) or ▾ (expanded) before its content, by its aria-expanded. */
+	val disclosure: Boolean = false,
 	/** "table", "row" or "cell". */
 	val table: String? = null,
 )
@@ -193,7 +195,9 @@ sealed interface ShapePaint {
 }
 
 /** One shape: verb-coded path (0 move, 1 line, 3 cubic, 4 close), its paint and stroke, and an optional affine map [a,b,c,d,e,f]. */
-data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val text: DrawingText? = null, val clip: List<List<Double>> = emptyList())
+data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val text: DrawingText? = null, val clip: List<List<Double>> = emptyList(), val blur: Blur? = null, val clipEvenOdd: List<Boolean> = emptyList()) {
+	data class Blur(val deviation: Double, val region: List<Double>)
+}
 
 /** An SVG `<text>`: runs laid out from the pen, each chunk placed by [anchor], glyphs on [baseline] relative to the pen. */
 data class DrawingText(val anchor: String, val baseline: String, val runs: List<TextRun>)
@@ -864,7 +868,7 @@ data class Payload(
 
 		private fun defaultStyle(v: Json, what: String): DefaultStyle {
 			val o = v.obj(what)
-			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "rule", "marker", "table"), what)
+			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "rule", "marker", "disclosure", "table"), what)
 			fun flag(name: String): Boolean = o[name]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.$name must be true when present"); true } ?: false
 			fun word(name: String, allowed: Set<String>): String? = o[name]?.let { oneOf(o, name, allowed, what) }
 			return DefaultStyle(
@@ -877,6 +881,7 @@ data class Payload(
 				indent = o["indent"]?.num("$what.indent") ?: 0.0,
 				rule = flag("rule"),
 				marker = word("marker", setOf("disc", "decimal")),
+				disclosure = flag("disclosure"),
 				table = word("table", setOf("table", "row", "cell")),
 			)
 		}
@@ -951,7 +956,7 @@ data class Payload(
 
 		private fun shape(sv: Json, w: String): Shape {
 			val so = sv.obj(w)
-			so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "text", "clip"), w)
+			so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "text", "clip", "clipRule", "blur"), w)
 			val path = so.field("path", w).arr("$w.path").map { it.num("$w.path[]") }
 			val transform = so["transform"]?.arr("$w.transform")?.map { it.num("$w.transform[]") }
 			if (transform != null && transform.size != 6) throw MarklessDecodeError("$w.transform must hold six numbers")
@@ -980,7 +985,15 @@ data class Payload(
 					)
 				},
 				so["clip"]?.arr("$w.clip")?.map { c -> c.arr("$w.clip[]").map { it.num("$w.clip[][]") } } ?: emptyList(),
-			)
+				so["blur"]?.let { b ->
+					val bo = b.obj("$w.blur")
+					bo.only(setOf("deviation", "region"), "$w.blur")
+					Shape.Blur(bo.field("deviation", "$w.blur").num("$w.blur.deviation"), bo.field("region", "$w.blur").arr("$w.blur.region").map { it.num("$w.blur.region[]") })
+				},
+				so["clipRule"]?.arr("$w.clipRule")?.map {
+					when (val rule = it.str("$w.clipRule[]")) { "evenodd" -> true; "nonzero" -> false; else -> throw MarklessDecodeError("$w has unknown clipRule \"$rule\"") }
+				} ?: emptyList(),
+			).also { if (it.clipEvenOdd.isNotEmpty() && it.clipEvenOdd.size != it.clip.size) throw MarklessDecodeError("$w.clipRule must hold a rule for each clip") }
 		}
 
 		private fun node(v: Json, what: String): Node {

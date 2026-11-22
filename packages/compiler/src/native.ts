@@ -18,7 +18,9 @@ export {
 } from './passes/native-view.ts';
 export {
 	compileDrawing,
+	svgStyleAttributes,
 	type DrawingElement,
 	type DrawingResult,
 } from './passes/native-drawing.ts';
 export { fontFaceSources } from './passes/native-font-faces.ts';
+export { NATIVE_SCRIPT_ENGINE, type NativeScriptEngine } from './passes/native-script.ts';

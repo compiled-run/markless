@@ -13,6 +13,7 @@ import {
 	nativeRefusal,
 	nativeUnsupported,
 	selectorAttributes,
+	type NativeScriptEngine,
 	type NativeViewArtifact,
 } from '@markless/compiler/native';
 import {
@@ -177,6 +178,8 @@ export async function compileNativeComponent(input: {
 	readonly unbuilt?: ReadonlySet<string>;
 	/** The app config's `origin`: where the app's site is served, which a URL from the root fetched on a phone reaches. */
 	readonly origin?: string;
+	/** The engine text a payload's script carries (`NativeViewOptions['scriptEngine']`). */
+	readonly scriptEngine?: NativeScriptEngine;
 }): Promise<NativeBuild> {
 	if (input.origin !== undefined) checkOrigin(input.origin);
 	const manifest =
@@ -352,6 +355,7 @@ export async function compileNativeComponent(input: {
 				file === input.filename ? own.source : read.get(file)?.source,
 			...(input.scriptHandlers ? { scriptHandlers: input.scriptHandlers } : {}),
 			...(input.origin !== undefined ? { origin: input.origin } : {}),
+			...(input.scriptEngine ? { scriptEngine: input.scriptEngine } : {}),
 			...(input.manifest
 				? {
 						routes: input.manifest.routes.map((entry) => ({
@@ -440,7 +444,7 @@ export async function compileNativeComponent(input: {
 	};
 }
 
-/** Elements a native host draws only on a page Dragon does not lay out: Dragon has no box for a pop-up list yet. */
+/** Elements a native host draws only on a page Dragon does not lay out: Dragon has no box for a pop-up list or a summary's triangle yet. */
 function unstyledOnly(
 	payload: NativeViewPayload,
 	sources: NativeViewArtifact['elementSources'],
@@ -455,6 +459,13 @@ function unstyledOnly(
 			return [
 				nativeUnsupported(
 					`the <select> ${node.id} on a styled page, which Dragon does not lay out yet`,
+					span,
+				),
+			];
+		if (node.element === 'summary')
+			return [
+				nativeUnsupported(
+					`the <summary> ${node.id} on a styled page, whose disclosure triangle Dragon does not draw yet`,
 					span,
 				),
 			];
@@ -520,6 +531,7 @@ export async function compileNativeApp(input: {
 	readonly target?: 'ios' | 'android';
 	/** Keep the routes whose page builds when others refuse (their diagnostics are still returned). */
 	readonly partial?: boolean;
+	readonly scriptEngine?: NativeScriptEngine;
 	/** The `icons` option of the app's `ui()` plugin, as `compileNativeComponent` takes it. */
 	readonly icons?: false | IconsOptions;
 	/** The app config's `origin`, for every page (see `compileNativeComponent`). */
@@ -581,6 +593,7 @@ export async function compileNativeApp(input: {
 			...(input.readAsset ? { readAsset: input.readAsset } : {}),
 			...(input.device ? { device: input.device } : {}),
 			...(input.target ? { target: input.target } : {}),
+			...(input.scriptEngine ? { scriptEngine: input.scriptEngine } : {}),
 			...(unbuilt ? { unbuilt } : {}),
 			icons,
 			...(input.origin !== undefined ? { origin: input.origin } : {}),
