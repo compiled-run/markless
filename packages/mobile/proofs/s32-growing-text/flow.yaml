@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: s30-growing-text
+name: s32-growing-text
 ---
 - launchApp:
     clearState: true

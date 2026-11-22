@@ -1,5 +1,5 @@
 {
-	"rung": "S30",
+	"rung": "S32",
 	"name": "a styled text that follows state with no finite domain is laid out around its current string, so a longer value wraps and pushes what follows, as the web lays it out",
 	"steps": [
 		{ "visible": ["Tagged Home", "Below the tag", "Grow tag"], "title": "Growing text" },

@@ -8,7 +8,7 @@ const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)
 const style = (planRepeats: unknown[]) => bytes({ targets: { android: { routes: [{ planRepeats }] } } });
 
 test("an APK carries Dragon's text shaper when its styles lay rows out, or a page text that follows state", async () => {
-	const growing = (await compileRungApp(proof('s30-growing-text'))).payload!;
+	const growing = (await compileRungApp(proof('s32-growing-text'))).payload!;
 	const fixed = (await compileRungApp(proof('s20-styled-arms'))).payload!;
 	const app = (payload: unknown, planRepeats: unknown[] = []) =>
 		new Map([
