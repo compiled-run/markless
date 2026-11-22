@@ -1,0 +1,30 @@
+appId: ${APP_ID}
+name: n15-component-save
+---
+- launchApp:
+      clearState: true
+- assertVisible: No notes yet
+- assertVisible: Write your first note
+- assertVisible: All notes
+- tapOn: Write your first note
+- assertNotVisible: No notes yet
+- assertVisible: New note
+- assertVisible: New note
+- assertVisible: Save note
+- assertNotVisible: No notes yet
+- assertVisible: New note
+- tapOn: Title
+- eraseText
+- inputText: Groceries
+- hideKeyboard
+- assertVisible: Groceries
+- assertVisible: Save note
+- assertVisible: Groceries
+- tapOn: Save note
+- assertNotVisible: Save note
+- assertVisible: Note
+- assertVisible: Groceries
+- assertVisible: Not pinned
+- assertVisible: Personal
+- assertNotVisible: Save note
+- assertVisible: Note
