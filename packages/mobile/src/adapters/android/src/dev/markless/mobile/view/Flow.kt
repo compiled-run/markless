@@ -1,6 +1,7 @@
 package dev.markless.mobile.view
 
 import android.content.Context
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
@@ -244,9 +245,15 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double, 
 			val (shape, path) = drawn
 			canvas.save()
 			for (clip in clips.getOrNull(index).orEmpty()) canvas.clipPath(clip)
-			shape.transform?.let { (a, b, c, d, e, f) ->
-				canvas.concat(Matrix().apply { setValues(floatArrayOf(a.toFloat(), c.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) })
+			val blur = shape.blur
+			val matrix = shape.transform?.let { (a, b, c, d, e, f) ->
+				Matrix().apply { setValues(floatArrayOf(a.toFloat(), c.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) }
 			}
+			// The blur's deviation is in the drawing's units, so a blurred path is transformed rather than the canvas.
+			if (blur != null) canvas.clipPath(pathOf(blur.region)) else matrix?.let { canvas.concat(it) }
+			val drawn = if (blur != null && matrix != null) Path().also { path.transform(matrix, it) } else path
+			// Skia's blur mask takes a radius it turns into a deviation of 0.57735 radius + 0.5, in the canvas's units.
+			val mask = blur?.let { BlurMaskFilter(maxOf(((it.deviation - 0.5) / 0.57735).toFloat(), 0.001f), BlurMaskFilter.Blur.NORMAL) }
 			shape.text?.let { text ->
 				draw(canvas, text)
 				canvas.restore()
@@ -256,17 +263,19 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double, 
 				paint.reset(); paint.isAntiAlias = true
 				paint.style = Paint.Style.FILL
 				paint.color = colorOf(fill)
-				canvas.drawPath(path, paint)
+				paint.maskFilter = mask
+				canvas.drawPath(drawn, paint)
 			}
 			shape.stroke?.let { stroke ->
 				paint.reset(); paint.isAntiAlias = true
 				paint.style = Paint.Style.STROKE
 				paint.color = colorOf(stroke)
-				paint.strokeWidth = shape.width.toFloat()
+				paint.strokeWidth = shape.width.toFloat() * if (blur != null) shape.transform?.let { (a, b, c, d) -> kotlin.math.sqrt(kotlin.math.abs(a * d - b * c)).toFloat() } ?: 1f else 1f
 				paint.strokeCap = when (shape.cap) { "round" -> Paint.Cap.ROUND; "square" -> Paint.Cap.SQUARE; else -> Paint.Cap.BUTT }
 				paint.strokeJoin = when (shape.join) { "round" -> Paint.Join.ROUND; "bevel" -> Paint.Join.BEVEL; else -> Paint.Join.MITER }
 				paint.strokeMiter = shape.miterLimit.toFloat()
-				canvas.drawPath(path, paint)
+				paint.maskFilter = mask
+				canvas.drawPath(drawn, paint)
 			}
 			canvas.restore()
 		}

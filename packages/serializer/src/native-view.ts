@@ -486,6 +486,12 @@ export type NativeShape = {
 	 * drawn only where every one of them covers, as the browser clips it.
 	 */
 	readonly clip?: ReadonlyArray<ReadonlyArray<number>>;
+	/**
+	 * An SVG `filter` that blurs the shape alone (`feGaussianBlur` of its source graphic, in sRGB): the blur's standard
+	 * deviation in the drawing's units, and the filter region the blurred shape is drawn inside (verb-coded, in the drawing's
+	 * units). Its `clip`s apply to the blurred result, as they do on the web.
+	 */
+	readonly blur?: { readonly deviation: number; readonly region: ReadonlyArray<number> };
 };
 
 /**

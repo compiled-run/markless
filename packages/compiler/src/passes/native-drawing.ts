@@ -57,6 +57,14 @@ type Inherited = {
 	readonly preserve: boolean;
 	/** The clip outlines of it and its groups, in the drawing's units. */
 	readonly clips: ReadonlyArray<ReadonlyArray<number>>;
+	/** The `filter` blur over it: its deviation and region in the drawing's units, the clips that apply after it, and how many shapes it holds. */
+	readonly blur?: {
+		readonly element: string;
+		readonly deviation: number;
+		readonly region: ReadonlyArray<number>;
+		readonly clips: number;
+		readonly drawn: { count: number };
+	};
 	/** The <marker> each of a path's vertices gets: its first, its middle ones, its last. */
 	readonly markers: {
 		readonly start?: DrawingElement;
@@ -90,7 +98,9 @@ const INITIAL: Inherited = {
 
 export const SHAPES: ReadonlySet<string> = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
 /** Elements that draw nothing themselves and whose content is never drawn in place. */
-const NEVER_DRAWN = new Set(['defs', 'symbol', 'title', 'desc', 'metadata', 'clipPath', 'mask', 'marker']);
+const NEVER_DRAWN = new Set(['defs', 'symbol', 'title', 'desc', 'metadata', 'clipPath', 'mask', 'marker', 'filter']);
+/** What a <filter> may carry: its region, its units and the colour space it works in. */
+const FILTER_ATTRIBUTES: ReadonlySet<string> = new Set(['id', 'x', 'y', 'width', 'height', 'filterUnits', 'primitiveUnits', 'color-interpolation-filters']);
 /** What a <mask> may carry: its region, its units and its type. */
 const MASK_ATTRIBUTES: ReadonlySet<string> = new Set(['id', 'x', 'y', 'width', 'height', 'maskUnits', 'maskContentUnits', 'mask-type']);
 /** Shapes that get markers at their vertices. */
@@ -154,6 +164,7 @@ const PRESENTATION = new Set([
 	'letter-spacing',
 	'clip-path',
 	'mask',
+	'filter',
 	'marker-start',
 	'marker-mid',
 	'marker-end',
@@ -427,8 +438,15 @@ export function compileDrawing(
 				`a see-through \`currentColor\` paint on <${element.tag}>: its colour comes from the page's styles`,
 			);
 		if (outline.length === 0) return;
+		if (style.blur) {
+			if (style.clips.length > style.blur.clips)
+				refuse(element.id, `a clip or mask inside a filtered element, which applies before its blur`);
+			if (++style.blur.drawn.count > 1)
+				refuse(style.blur.element, `a \`filter\` over more than one shape: a native drawing blurs one shape at a time`);
+		}
 		shapes.push({
 			...(style.clips.length > 0 ? { clip: style.clips } : {}),
+			...(style.blur ? { blur: { deviation: style.blur.deviation, region: style.blur.region } } : {}),
 			path: outline,
 			fill: alpha(style.fill, style.fillOpacity * style.opacity),
 			fillRule: style.fillRule,
@@ -585,6 +603,7 @@ export function compileDrawing(
 		}
 		const shown = runs.filter((run) => run.text !== '' || run.x !== undefined || run.y !== undefined);
 		if (shown.every((run) => run.text === '')) return;
+		if (style.blur) refuse(style.blur.element, `a \`filter\` over text, which a native drawing does not blur yet`);
 		spoken.push(shown.map((run) => run.text).join('').trim());
 		shapes.push({
 			...(style.clips.length > 0 ? { clip: style.clips } : {}),
@@ -767,6 +786,88 @@ export function compileDrawing(
 		});
 	};
 
+	/**
+	 * `filter="url(#id)"` (Filter Effects 1): a filter that only blurs its source graphic, as design tools export a layer blur
+	 * (an optional transparent `feFlood` with a normal `feBlend` of `SourceGraphic` over it, then one `feGaussianBlur`), in
+	 * sRGB with a user-space region, over an element that draws one shape: that shape is drawn blurred inside the region. A
+	 * clip or mask on the element or around it applies after; any other filter is refused by name.
+	 */
+	const filtered = (element: DrawingElement, style: Inherited, own: Matrix): Inherited => {
+		const raw = element.attributes.filter?.trim();
+		if (raw === undefined || raw === 'none') return style;
+		const target = raw.startsWith('url(#') && raw.endsWith(')') ? byId.get(raw.slice(5, -1)) : undefined;
+		if (!target || target.tag !== 'filter') {
+			refuse(element.id, `\`filter="${raw}"\` on <${element.tag}>, which names no <filter> inside this <svg>`);
+			return style;
+		}
+		if (style.blur) {
+			refuse(element.id, `a \`filter\` inside another filtered element, which a native drawing does not draw yet`);
+			return style;
+		}
+		const fail = (what: string): Inherited => {
+			refuse(target.id, `${what}: a native drawing draws a filter that only blurs its source graphic`);
+			return style;
+		};
+		for (const name of Object.keys(target.attributes))
+			if (!FILTER_ATTRIBUTES.has(name)) return fail(`\`${name}\` on <filter>`);
+		if (target.attributes.filterUnits?.trim() !== 'userSpaceOnUse') return fail('a <filter> region not in user space');
+		if ((target.attributes.primitiveUnits?.trim() ?? 'userSpaceOnUse') !== 'userSpaceOnUse')
+			return fail('a <filter> whose primitives are not in user space');
+		if (target.attributes['color-interpolation-filters']?.trim() !== 'sRGB')
+			return fail('a <filter> that blurs in linearRGB (no `color-interpolation-filters="sRGB"`)');
+		for (const side of ['x', 'y', 'width', 'height'])
+			if (target.attributes[side] === undefined) return fail(`a <filter> without \`${side}\``);
+		const steps = childrenOf(target.path);
+		let source = 'SourceGraphic';
+		let at = 0;
+		const flood = steps[at];
+		if (flood?.tag === 'feFlood') {
+			if (Object.keys(flood.attributes).some((name) => name !== 'flood-opacity' && name !== 'result' && name !== 'flood-color'))
+				return fail('an <feFlood> with more than a colour, an opacity and a result');
+			if (Number(flood.attributes['flood-opacity'] ?? '1') !== 0) return fail('an <feFlood> that is not transparent');
+			const blend = steps[at + 1];
+			if (
+				blend?.tag !== 'feBlend' ||
+				(blend.attributes.mode?.trim() ?? 'normal') !== 'normal' ||
+				blend.attributes.in?.trim() !== 'SourceGraphic' ||
+				blend.attributes.in2?.trim() !== flood.attributes.result?.trim() ||
+				Object.keys(blend.attributes).some((name) => !['mode', 'in', 'in2', 'result'].includes(name))
+			)
+				return fail('an <feFlood> not followed by a normal <feBlend> of SourceGraphic over it');
+			source = blend.attributes.result?.trim() ?? '';
+			at += 2;
+		}
+		const blur = steps[at];
+		if (blur?.tag !== 'feGaussianBlur' || at + 1 !== steps.length) return fail('a <filter> that does not end in one <feGaussianBlur>');
+		if (Object.keys(blur.attributes).some((name) => !['stdDeviation', 'in', 'result', 'edgeMode'].includes(name)))
+			return fail('an <feGaussianBlur> with more than a deviation, an input and a result');
+		if ((blur.attributes.edgeMode?.trim() ?? 'none') !== 'none') return fail('an <feGaussianBlur> with an edge mode');
+		const input = blur.attributes.in?.trim();
+		if (input !== undefined && input !== source && !(at === 0 && input === 'SourceGraphic'))
+			return fail('an <feGaussianBlur> of something other than the source graphic');
+		const deviations = (blur.attributes.stdDeviation ?? '').trim().split(/[\s,]+/).map(Number);
+		if (deviations.some((d) => !Number.isFinite(d) || d < 0) || (deviations.length === 2 && deviations[0] !== deviations[1]) || deviations.length > 2)
+			return fail('an <feGaussianBlur> whose deviation is not one non-negative number');
+		const [a, b, c, d] = own;
+		const sx = Math.hypot(a, b);
+		const sy = Math.hypot(c, d);
+		if (Math.abs(sx - sy) > 1e-9 * Math.max(sx, sy) || Math.abs(a * c + b * d) > 1e-9 * sx * sy) {
+			refuse(element.id, `a \`filter\` under a transform that stretches one axis more than the other`);
+			return style;
+		}
+		const [x, y, width, height] = ['x', 'y', 'width', 'height'].map((side) => number(target, side));
+		return {
+			...style,
+			blur: {
+				element: element.id,
+				deviation: deviations[0]! * sx,
+				region: mapOutline([0, x, y, 1, x + width, y, 1, x + width, y + height, 1, x, y + height, 4], own),
+				clips: style.clips.length,
+				drawn: { count: 0 },
+			},
+		};
+	};
+
 	const visit = (
 		element: DrawingElement,
 		from: Inherited,
@@ -783,7 +884,7 @@ export function compileDrawing(
 		}
 		checkAttributes(element);
 		const own = multiply(matrix, transformOf(element));
-		const style = masked(element, clipped(element, inherit(element, from), own), own);
+		const style = filtered(element, masked(element, clipped(element, inherit(element, from), own), own), own);
 		if (SHAPES.has(element.tag)) {
 			const outline = outlineOf(element);
 			emit(element, outline, style, own);

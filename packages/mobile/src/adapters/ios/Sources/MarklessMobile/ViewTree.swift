@@ -143,6 +143,21 @@ final class DrawingView: UIView {
 				context.addPath(Self.path(clip))
 				context.clip(using: .winding)
 			}
+			// A blur draws the shape far off to the side and only its shadow, offset back, inside the filter region.
+			var shadow: ((UIColor) -> UIColor)? = nil
+			if let blur = shape.blur {
+				context.addPath(Self.path(blur.region))
+				context.clip(using: .winding)
+				let ctm = context.ctm, scale = contentScaleFactor, far: CGFloat = 100_000
+				let linear = CGAffineTransform(a: ctm.a, b: ctm.b, c: ctm.c, d: ctm.d, tx: 0, ty: 0)
+				let shift = CGPoint(x: far, y: 0).applying(linear.inverted())
+				let sigma = blur.deviation * sqrt(abs(ctm.a * ctm.d - ctm.b * ctm.c))
+				context.translateBy(x: shift.x, y: shift.y)
+				shadow = { paint in
+					context.setShadow(offset: CGSize(width: -far / scale, height: 0), blur: 2 * sigma / scale, color: paint.cgColor)
+					return .black
+				}
+			}
 			if let t = shape.transform { context.concatenate(CGAffineTransform(a: t[0], b: t[1], c: t[2], d: t[3], tx: t[4], ty: t[5])) }
 			if let text = shape.text {
 				draw(text)
@@ -151,12 +166,12 @@ final class DrawingView: UIView {
 			}
 			if let fill = shape.fill {
 				context.addPath(path)
-				context.setFillColor(color(fill).cgColor)
+				context.setFillColor((shadow?(color(fill)) ?? color(fill)).cgColor)
 				context.fillPath(using: shape.evenOdd ? .evenOdd : .winding)
 			}
 			if let stroke = shape.stroke, shape.width > 0 {
 				context.addPath(path)
-				context.setStrokeColor(color(stroke).cgColor)
+				context.setStrokeColor((shadow?(color(stroke)) ?? color(stroke)).cgColor)
 				context.setLineWidth(shape.width)
 				context.setLineCap(shape.cap == "round" ? .round : shape.cap == "square" ? .square : .butt)
 				context.setLineJoin(shape.join == "round" ? .round : shape.join == "bevel" ? .bevel : .miter)
