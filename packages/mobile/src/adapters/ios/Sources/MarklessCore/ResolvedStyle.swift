@@ -5,7 +5,7 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var borderWidth: Double = 0
 	public var borderColor: RGBA?
 	public var cornerRadius: Double = 0
-	/// Solid sides that differ (top, right, bottom, left; width in points, 0 for none), drawn on a square box; nil when uniform.
+	/// Solid sides that differ (top, right, bottom, left; width in points, 0 for none); on a rounded box they share one colour. Nil when uniform.
 	public var sides: [Side]?
 	public var font: (family: String, size: Double)?
 	public var textColor: RGBA?
@@ -14,8 +14,10 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var linesText: String?
 	/// A dashed or dotted border: Dragon's operations, the four side colours and the device scale they are drawn at.
 	public var dashedBorder: DashedBorder?
-	/// Overflow other than visible: the children are clipped to the box (Dragon clips them to the padding box; without borders the same).
+	/// Overflow other than visible: the children are clipped to the box, or to `childClip` when it has borders.
 	public var clipsChildren = false
+	/// Overflow clipping on a box with borders: the padding box its children are clipped to.
+	public var childClip: PaddingBox?
 	/// clip-path: inset(): the rect in points, relative to the box, the box and everything in it are clipped to; empty when nothing shows.
 	public var clipRect: Frame?
 	/// Painted in a stacking context's layer order (a positioned or z-index box): its bucket (-1 below the flow, 1 auto or 0, 2 above)
@@ -28,13 +30,42 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var scroll: ResolvedScroll?
 	/// `visibility` other than visible (a text takes its element's): the view keeps its place, but paints nothing of its own.
 	public var hidden = false
+	/// A select's drop-down arrow, once Dragon's plan has laid the page out.
+	public var selectArrow: SelectArrowPaint?
+	/// A themed checkbox's marks and colours, once Dragon's plan has laid the page out.
+	public var checkbox: CheckboxPaint?
+	/// A select's label: the box Dragon lays out inside it for its text, and that text's font and colour.
+	public var selectLabel: SelectLabel?
 
 	public static func == (a: ResolvedStyle, b: ResolvedStyle) -> Bool {
 		a.frame == b.frame && a.background == b.background && a.borderWidth == b.borderWidth && a.borderColor == b.borderColor
 			&& a.cornerRadius == b.cornerRadius && a.font?.family == b.font?.family && a.font?.size == b.font?.size
 			&& a.textColor == b.textColor && a.lines == b.lines && a.linesText == b.linesText && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll && a.hidden == b.hidden
-			&& a.clipsChildren == b.clipsChildren && a.clipRect == b.clipRect
+			&& a.clipsChildren == b.clipsChildren && a.childClip == b.childClip && a.clipRect == b.clipRect
 			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank && a.stackingParent == b.stackingParent
+			&& a.selectArrow == b.selectArrow && a.selectLabel == b.selectLabel && a.checkbox == b.checkbox
+	}
+
+	public struct SelectArrowPaint: Equatable, Sendable {
+		public let arrow: SelectArrow
+		public let color: RGBA
+		/// Device px per point: the arrow's geometry is in device px.
+		public let scale: Double
+	}
+
+	public struct CheckboxPaint: Equatable, Sendable {
+		public let marks: CheckboxMarks
+		public let colors: CheckboxColors
+		/// Device px per point: the marks are in device px.
+		public let scale: Double
+	}
+
+	/// `frame` in points from the select's border box; `fontSize` in points.
+	public struct SelectLabel: Equatable, Sendable {
+		public let frame: Frame
+		public let fontFamily: String
+		public let fontSize: Double
+		public let color: RGBA?
 	}
 
 	public struct DashedBorder: Equatable, Sendable {
@@ -46,6 +77,34 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public struct Side: Equatable, Sendable {
 		public let width: Double
 		public let color: RGBA
+	}
+}
+
+/// The border box inset by each side's border width, in points, each corner's radii the outer radius less the adjacent border
+/// widths, never below 0, as CSS shapes inner corners.
+public struct PaddingBox: Equatable, Sendable {
+	public let top: Double
+	public let right: Double
+	public let bottom: Double
+	public let left: Double
+	/// Each corner's horizontal and vertical radius, from the top left, clockwise.
+	public let corners: [Corner]
+
+	public struct Corner: Equatable, Sendable {
+		public let x: Double
+		public let y: Double
+		public init(x: Double, y: Double) {
+			self.x = x
+			self.y = y
+		}
+	}
+
+	public init(radius: Double, top: Double, right: Double, bottom: Double, left: Double) {
+		self.top = top
+		self.right = right
+		self.bottom = bottom
+		self.left = left
+		corners = [(left, top), (right, top), (right, bottom), (left, bottom)].map { Corner(x: max(0, radius - $0.0), y: max(0, radius - $0.1)) }
 	}
 }
 
@@ -187,9 +246,10 @@ extension StyleExport {
 		guard let start = matches(initial) ? initial : assignments.indices.first(where: matches) else {
 			throw styleError("no assignment of the style export matches the cells' values \(current.map(\.jsonText))")
 		}
+		let picker = payload.pickerContent
 		return StyleLayout(
 			assignments: try assignments.indices.map { index in
-				try resolveNodes(assignments[index].nodes, for: nodes, root: root, initialTexts: index == start ? initialTexts : nil)
+				try resolveNodes(assignments[index].nodes, for: nodes, picker: picker, root: root, initialTexts: index == start ? initialTexts : nil)
 			},
 			canvases: assignments.map(\.canvas),
 			bodies: try assignments.map { assignment in
@@ -215,7 +275,7 @@ extension StyleExport {
 	}
 
 	private func resolveNodes(
-		_ nodes: [StyleNode], for payloadNodes: [NativeNode], root: String?, initialTexts: [(node: String, text: String)]?
+		_ nodes: [StyleNode], for payloadNodes: [NativeNode], picker: Set<String>, root: String?, initialTexts: [(node: String, text: String)]?
 	) throws -> [String: ResolvedStyle] {
 		let byId = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
 		// Boxes whose visibility is not visible: their text, which Dragon writes no visibility for, is hidden with them.
@@ -224,8 +284,15 @@ extension StyleExport {
 		}.map(\.id))
 		let payloadIds = Set(payloadNodes.map(\.id))
 		let texts = initialTexts.map { Dictionary(uniqueKeysWithValues: $0.map { ($0.node, $0.text) }) }
+		let payloadById = Dictionary(uniqueKeysWithValues: payloadNodes.map { ($0.id, $0) })
+		let isSelect = { (id: String) -> Bool in
+			if case .element("select", _, _)? = payloadById[id]?.kind { return true }
+			return false
+		}
 		var styles: [String: ResolvedStyle] = [:]
 		for node in payloadNodes {
+			// Dragon lays out no box for what shows only in a select's picker.
+			if picker.contains(node.id), byId[node.id] == nil { continue }
 			if case .branch = node.kind { continue }
 			if case .repeat = node.kind { continue }
 			if case .sheet = node.kind { throw styleError("\(node.id): a system sheet inside another sheet's content is not styled on iOS") }
@@ -265,6 +332,7 @@ extension StyleExport {
 			if let frame = style.frame {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
 			}
+			if isSelect(node.id), !style.hidden { style.selectLabel = try selectLabel(styled, nodes, isView: payloadIds.contains) }
 			styles[node.id] = style
 		}
 		// Each row's copy of a payload node ("<id>@<key>"), placed in its own copies of the boxes around it.
@@ -284,9 +352,31 @@ extension StyleExport {
 			if let frame = style.frame {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
 			}
+			if isSelect(base(styled.id)), !style.hidden { style.selectLabel = try selectLabel(styled, nodes, isView: isView) }
 			styles[styled.id] = style
 		}
 		return styles
+	}
+
+	/// The box Dragon lays out inside a select for its label (Chrome's `::inner`, which no payload node names), with the font
+	/// and colour of the text in it; nil when the select or that box shows nothing.
+	private func selectLabel(_ select: StyleNode, _ nodes: [StyleNode], isView: (String) -> Bool) throws -> ResolvedStyle.SelectLabel? {
+		guard select.frame != nil else { return nil }
+		let inner = nodes.filter { $0.parent == select.id && !isView($0.id) }
+		guard inner.count == 1, !inner[0].isText else {
+			throw styleError("\(select.id): a select's style export holds one box for its label, not \(inner.count)")
+		}
+		guard let box = inner[0].frame, let text = nodes.first(where: { $0.parent == inner[0].id && $0.isText }) else { return nil }
+		var font: (family: String, size: Double)?
+		var color: RGBA?
+		for write in text.writes {
+			if case let .font(family, size) = write { font = (family, size) }
+			if case let .textColor(c) = write { color = c }
+		}
+		guard let font else { throw styleError("\(select.id): its label's text has no font") }
+		return ResolvedStyle.SelectLabel(
+			frame: Frame(x: box.x / dpr, y: box.y / dpr, width: box.width / dpr, height: box.height / dpr),
+			fontFamily: font.family, fontSize: font.size, color: color)
 	}
 
 
@@ -377,6 +467,10 @@ extension StyleExport {
 			case .clipText: break
 			case let .paintOrder(_, bucket, rank): style.paintOrder = (bucket, rank)
 			case let .visibility(value): style.hidden = value != "visible"
+			case let .selectArrow(color):
+				if let arrow = node.selectArrow { style.selectArrow = ResolvedStyle.SelectArrowPaint(arrow: arrow, color: color, scale: dpr) }
+			case let .checkbox(colors):
+				if let marks = node.checkboxMarks { style.checkbox = ResolvedStyle.CheckboxPaint(marks: marks, colors: colors, scale: dpr) }
 			}
 		}
 		// A scroll view clips its own content; any other box clips its children.
@@ -399,7 +493,7 @@ extension StyleExport {
 		} else if let widths = node.borderWidths {
 			let all = [widths.top, widths.right, widths.bottom, widths.left]
 			if style.clipsChildren, all.contains(where: { $0 != 0 }) {
-				throw styleError("\(node.id): overflow clipping on a box with borders (to its padding box) is not implemented on iOS")
+				style.childClip = PaddingBox(radius: style.cornerRadius, top: all[0] / dpr, right: all[1] / dpr, bottom: all[2] / dpr, left: all[3] / dpr)
 			}
 			if all.contains(where: { $0 != 0 }) {
 				guard borderStyles.count == 4, borderStyles.allSatisfy({ ["solid", "none", "hidden"].contains($0) }), borderColors.count == 4 else {
@@ -410,8 +504,9 @@ extension StyleExport {
 					style.borderWidth = widths[0] / dpr
 					style.borderColor = borderColors[0]
 				} else {
-					guard style.cornerRadius == 0 else {
-						throw styleError("\(node.id): border sides that differ, with rounded corners, are not implemented on iOS")
+					let drawn = zip(widths, borderColors).filter { $0.0 > 0 }.map(\.1)
+					guard style.cornerRadius == 0 || drawn.allSatisfy({ $0 == drawn[0] }) else {
+						throw styleError("\(node.id): border sides of different colours, with rounded corners, are not implemented on iOS")
 					}
 					style.sides = zip(widths, borderColors).map { ResolvedStyle.Side(width: $0 / dpr, color: $1) }
 				}
@@ -424,6 +519,7 @@ extension StyleExport {
 			style.borderColor = nil
 			style.sides = nil
 			style.dashedBorder = nil
+			style.selectArrow = nil
 		}
 		return style
 	}

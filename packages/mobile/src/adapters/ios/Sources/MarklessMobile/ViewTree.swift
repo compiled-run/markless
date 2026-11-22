@@ -379,6 +379,8 @@ final class ViewTree {
 	private var topLayer: (layer: TopLayerView, home: UIView, index: Int)?
 	/// The scroll view each scroll container hosts its children in.
 	private var scrollViews: [String: ContainerScrollView] = [:]
+	/// The view each box that clips overflow past its borders hosts its children in.
+	private var clipViews: [String: PaddingClipView] = [:]
 	/// What a stopped submit says, shown until the person's next action.
 	private var message: UILabel?
 	private var touches: TouchWatcher?
@@ -944,6 +946,8 @@ final class ViewTree {
 		try restack(id, view, style)
 		try paint(view, style, faces: faces)
 		if let label = view as? UILabel { drawLines(label, style) }
+		if let clip = clipViews[id] { clip.shape(style.childClip, in: view.bounds) }
+		else if style.childClip != nil { throw HostError("\(id) began clipping overflow past its borders after it was built") }
 		if let host = view.superview as? ContainerScrollView { view.frame.origin = CGPoint(x: view.frame.minX - host.inset.left, y: view.frame.minY - host.inset.top) }
 		guard let scroll = scrollViews[id] else {
 			if style.scroll != nil { throw HostError("\(id) became a scroll container after it was built") }
@@ -958,7 +962,7 @@ final class ViewTree {
 	private func restack(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws {
 		guard style.frame != nil else { return }
 		if let parent = style.stackingParent {
-			guard let target = scrollViews[parent] ?? elements[parent] else { throw HostError("\(id) paints in the order of \(parent), which has no view") }
+			guard let target = scrollViews[parent] ?? clipViews[parent] ?? elements[parent] else { throw HostError("\(id) paints in the order of \(parent), which has no view") }
 			if view.superview === target { return }
 			if restacked[id] == nil, let home = view.superview, let at = home.subviews.firstIndex(of: view) {
 				restacked[id] = Restacked(home: home, next: at + 1 < home.subviews.count ? home.subviews[at + 1] : nil)
@@ -1254,7 +1258,7 @@ final class ViewTree {
 				} else if element == "input", ["checkbox", "radio"].contains(staticAttributes["type"]) {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					if !context.suffix.isEmpty { throw HostError("a checkbox in a list row (\(id)) has no iOS host support yet") }
-					let control = UIButton(type: .custom)
+					let control = CheckboxButton(type: .custom)
 					control.isAccessibilityElement = true
 					control.accessibilityTraits = staticAttributes["type"] == "checkbox" ? [.button, .toggleButton] : .button
 					ticks[id] = (staticAttributes["type"] == "radio", try runtime.isChecked(id))
@@ -1350,6 +1354,11 @@ final class ViewTree {
 						view.addSubview(scroll)
 						scrollViews[id] = scroll
 					}
+					if style.childClip != nil || layout?.assignments.contains(where: { ($0[id] ?? $0[template])?.childClip != nil }) == true {
+						let clip = PaddingClipView()
+						view.addSubview(clip)
+						clipViews[id] = clip
+					}
 					try place(id, view, style)
 				}
 				try wire(events[template] ?? [], on: view, element: element, id: id)
@@ -1375,7 +1384,7 @@ final class ViewTree {
 					if let area = view as? TextArea { area.text = text ?? "" } else { (view as? UITextField)?.text = text }
 				}
 				var childIndex = 0
-				_ = try build(template, in: scrollViews[id] ?? view, at: &childIndex, inner)
+				_ = try build(template, in: scrollViews[id] ?? clipViews[id] ?? view, at: &childIndex, inner)
 				applyAttributes(id, view)
 				// The stacking layout sizes a control by its text; one with none (a switch's thumb) gets the 44 pt touch target.
 				if layout == nil, view is UIButton, text(within: view).isEmpty {
@@ -1611,9 +1620,13 @@ final class ViewTree {
 
 	private func drawTick(_ id: String, _ view: UIView) {
 		guard let tick = ticks[id], let button = view as? UIButton else { return }
+		button.accessibilityValue = tick.checked ? "1" : "0"
+		if let box = button as? CheckboxButton {
+			box.show(checked: tick.checked)
+			if box.themed { return }
+		}
 		let symbol = tick.radio ? (tick.checked ? "largecircle.fill.circle" : "circle") : (tick.checked ? "checkmark.square.fill" : "square")
 		button.setImage(UIImage(systemName: symbol), for: .normal)
-		button.accessibilityValue = tick.checked ? "1" : "0"
 	}
 
 	/// Each select shows its chosen option's label, as the web's closed `<select>` does.
@@ -2046,6 +2059,40 @@ final class SelectButton: UIButton {
 		display.text = label
 		accessibilityValue = label
 	}
+
+	private let arrow = CAShapeLayer()
+
+	/// On a styled page: the label in Dragon's box for it, vertically centred, and Dragon's arrow stroked over the background
+	/// and under the border, as Chrome paints a menulist-button.
+	func paint(arrow paint: ResolvedStyle.SelectArrowPaint?, label: ResolvedStyle.SelectLabel?, faces: [String: UIFontDescriptor]) throws {
+		if let label {
+			guard let face = faces[label.fontFamily] else { throw HostError("font \(label.fontFamily) was not registered") }
+			display.font = UIFont(descriptor: face, size: label.fontSize)
+			if let color = label.color { display.textColor = uiColor(color) }
+			display.lineBreakMode = .byClipping
+			display.frame = CGRect(x: label.frame.x, y: label.frame.y, width: label.frame.width, height: label.frame.height)
+		}
+		display.isHidden = label == nil
+		guard let paint else {
+			arrow.removeFromSuperlayer()
+			return
+		}
+		let a = paint.arrow
+		let point = { (k: Int) in CGPoint(x: (a.originX + a.points[k]) / paint.scale, y: (a.originY + a.points[k + 1]) / paint.scale) }
+		let path = CGMutablePath()
+		path.move(to: point(0))
+		for k in stride(from: 2, to: a.points.count, by: 2) { path.addLine(to: point(k)) }
+		arrow.path = path
+		arrow.fillColor = nil
+		arrow.strokeColor = uiColor(paint.color).cgColor
+		arrow.lineWidth = a.strokeWidth / paint.scale
+		arrow.lineCap = .butt
+		arrow.lineJoin = .miter
+		arrow.miterLimit = 4
+		arrow.frame = bounds
+		arrow.contentsScale = paint.scale
+		if arrow.superlayer == nil { layer.addSublayer(arrow) }
+	}
 }
 
 final class TopLayerView: UIView {
@@ -2254,7 +2301,7 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	view.layer.borderWidth = style.borderWidth
 	view.layer.borderColor = style.borderColor.map(uiColor)?.cgColor
 	view.layer.cornerRadius = style.cornerRadius
-	view.clipsToBounds = style.clipsChildren
+	view.clipsToBounds = style.clipsChildren && style.childClip == nil
 	// Siblings draw by zPosition: in-flow boxes at 0, negative z-index below them, positioned boxes above in their context's order.
 	view.layer.zPosition = style.paintOrder.map { CGFloat($0.bucket) * 100_000 + CGFloat($0.rank) + 1 } ?? 0
 	// A layer mask clips the box and its subviews without touching their accessibility, as Chrome keeps clipped text exposed.
@@ -2266,7 +2313,7 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	} else {
 		view.layer.mask = nil
 	}
-	paintSides(view, style.sides)
+	paintSides(view, style.sides, radius: style.cornerRadius)
 	paintDashed(view, style.dashedBorder)
 	if let drawing = view as? DrawingView {
 		// An svg's text colour is what its currentColor paints.
@@ -2274,6 +2321,15 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 		drawing.isHidden = style.hidden
 		return
 	}
+	if let select = view as? SelectButton {
+		try select.paint(arrow: style.selectArrow, label: style.selectLabel, faces: faces)
+		return
+	}
+	if let box = view as? CheckboxButton {
+		box.paint(style.checkbox)
+		return
+	}
+	if style.checkbox != nil { throw HostError("\(view.accessibilityIdentifier ?? "a box") draws a themed checkbox but is not a checkbox") }
 	guard let label = view as? UILabel else {
 		if style.font != nil || style.textColor != nil { throw HostError("\(view.accessibilityIdentifier ?? "a box") has text styles but is not text") }
 		return
@@ -2329,13 +2385,28 @@ func systemFont(_ face: SystemFace, size: Double) -> CTFont {
 private func uiColor(_ color: RGBA) -> UIColor {
 	UIColor(red: color.r / 255, green: color.g / 255, blue: color.b / 255, alpha: color.alpha / 255)
 }
-/// One sublayer per side, for borders whose sides differ; Chrome's diagonal corner joins are not drawn.
+/// One sublayer per side, for borders whose sides differ; Chrome's diagonal corner joins are not drawn. A rounded box's sides,
+/// which share a colour, are one ring between its outer corners and its padding box.
 @MainActor
-private func paintSides(_ view: UIView, _ sides: [ResolvedStyle.Side]?) {
+private func paintSides(_ view: UIView, _ sides: [ResolvedStyle.Side]?, radius: Double) {
 	let name = "markless-border-side"
 	view.layer.sublayers?.filter { $0.name == name }.forEach { $0.removeFromSuperlayer() }
 	guard let sides else { return }
 	let b = view.bounds
+	if radius > 0, let color = sides.first(where: { $0.width > 0 })?.color {
+		let inner = PaddingBox(radius: radius, top: sides[0].width, right: sides[1].width, bottom: sides[2].width, left: sides[3].width)
+		let ring = CAShapeLayer()
+		ring.name = name
+		ring.frame = b
+		let path = CGMutablePath()
+		path.addPath(roundedPath(b, Array(repeating: PaddingBox.Corner(x: radius, y: radius), count: 4)))
+		path.addPath(paddingBoxPath(inner, in: b))
+		ring.path = path
+		ring.fillRule = .evenOdd
+		ring.fillColor = uiColor(color).cgColor
+		view.layer.addSublayer(ring)
+		return
+	}
 	let rects = [
 		CGRect(x: 0, y: 0, width: b.width, height: sides[0].width),
 		CGRect(x: b.width - sides[1].width, y: 0, width: sides[1].width, height: b.height),
@@ -2423,6 +2494,95 @@ private final class DashedBorderLayer: CALayer {
 	}
 }
 
+/// A checkbox or radio button. On a styled page a checkbox draws Chrome's theme marks from Dragon's plan, in the checkedness the
+/// runtime keeps (`show`); otherwise the platform's symbol.
+final class CheckboxButton: UIButton {
+	private var drawn: CheckboxLayer?
+	private var checked = false
+	var themed: Bool { drawn != nil }
+
+	func show(checked: Bool) {
+		self.checked = checked
+		drawn?.checked = checked
+		drawn?.setNeedsDisplay()
+	}
+
+	func paint(_ paint: ResolvedStyle.CheckboxPaint?) {
+		guard let paint else {
+			drawn?.removeFromSuperlayer()
+			drawn = nil
+			return
+		}
+		let marks = drawn ?? CheckboxLayer()
+		marks.paint = paint
+		marks.checked = checked
+		marks.frame = bounds
+		marks.contentsScale = paint.scale
+		// Over the background and under the border, as Chrome paints the theme's checkbox.
+		if drawn == nil { layer.insertSublayer(marks, at: 0) }
+		drawn = marks
+		setImage(nil, for: .normal)
+		marks.setNeedsDisplay()
+	}
+
+	override func layoutSubviews() {
+		super.layoutSubviews()
+		drawn?.frame = bounds
+	}
+}
+
+/// Dragon's `dragonPaintCheckbox`: the marks in device px from the snapped border box.
+private final class CheckboxLayer: CALayer {
+	var paint: ResolvedStyle.CheckboxPaint?
+	var checked = false
+
+	override func draw(in ctx: CGContext) {
+		guard let paint else { return }
+		let m = paint.marks, c = paint.colors
+		ctx.saveGState()
+		ctx.scaleBy(x: 1 / paint.scale, y: 1 / paint.scale)
+		ctx.translateBy(x: m.originX, y: m.originY)
+		ctx.setShouldAntialias(true)
+		let square = CGRect(x: m.x, y: m.y, width: m.side, height: m.side)
+		let rounded = { (r: CGRect) -> CGPath in
+			let k = min(CGFloat(m.radius), min(r.width, r.height) / 2)
+			return CGPath(roundedRect: r, cornerWidth: k, cornerHeight: k, transform: nil)
+		}
+		if m.plain {
+			ctx.setFillColor(uiColor(checked ? c.check : c.uncheckedBorder).cgColor)
+			ctx.fill(square)
+			ctx.restoreGState()
+			return
+		}
+		let inset = CGFloat(m.backgroundInset)
+		ctx.addPath(rounded(square.insetBy(dx: inset, dy: inset)))
+		ctx.setFillColor(uiColor(checked ? c.checkedBackground : c.uncheckedBackground).cgColor)
+		ctx.fillPath()
+		if checked {
+			ctx.addPath(rounded(square))
+			ctx.setFillColor(uiColor(c.fill).cgColor)
+			ctx.fillPath()
+			let p = m.check
+			ctx.move(to: CGPoint(x: p[0], y: p[1]))
+			ctx.addLine(to: CGPoint(x: p[2], y: p[3]))
+			ctx.addLine(to: CGPoint(x: p[4], y: p[5]))
+			ctx.setLineWidth(CGFloat(m.checkWidth))
+			ctx.setLineCap(.butt)
+			ctx.setLineJoin(.miter)
+			ctx.setMiterLimit(4)
+			ctx.setStrokeColor(uiColor(c.check).cgColor)
+			ctx.strokePath()
+		} else {
+			let border = CGFloat(m.borderInset)
+			ctx.addPath(rounded(square.insetBy(dx: border, dy: border)))
+			ctx.setLineWidth(CGFloat(m.borderWidth))
+			ctx.setStrokeColor(uiColor(c.uncheckedBorder).cgColor)
+			ctx.strokePath()
+		}
+		ctx.restoreGState()
+	}
+}
+
 /// A checkbox or hidden `<input>`: the form reads its state, the screen shows nothing for it.
 private final class AbsentField: UIView {
 	override init(frame: CGRect) {
@@ -2472,6 +2632,54 @@ private final class ActivateGesture: UITapGestureRecognizer {
 
 /// How many quick taps in one place a button's current press is: its `event.detail`.
 final class TapCount { var value = 1 }
+
+/// The children of a box that clips overflow past its borders: a view over the whole box masked to its padding box, so the
+/// box's own border and background are not clipped and its children keep their frames.
+@MainActor
+final class PaddingClipView: UIView {
+	func shape(_ box: PaddingBox?, in bounds: CGRect) {
+		frame = bounds
+		guard let box else {
+			layer.mask = nil
+			return
+		}
+		CATransaction.begin()
+		CATransaction.setDisableActions(true)
+		let mask = layer.mask as? CAShapeLayer ?? CAShapeLayer()
+		mask.frame = bounds
+		mask.path = paddingBoxPath(box, in: bounds)
+		layer.mask = mask
+		CATransaction.commit()
+	}
+}
+
+func paddingBoxPath(_ box: PaddingBox, in bounds: CGRect) -> CGPath {
+	let rect = CGRect(
+		x: box.left, y: box.top, width: max(0, bounds.width - box.left - box.right), height: max(0, bounds.height - box.top - box.bottom))
+	return roundedPath(rect, box.corners)
+}
+
+/// A rect with each corner (from the top left, clockwise) a quarter ellipse of its radii; a corner with a zero radius is square.
+func roundedPath(_ r: CGRect, _ corners: [PaddingBox.Corner]) -> CGPath {
+	let path = CGMutablePath()
+	let vertices = [CGPoint(x: r.minX, y: r.minY), CGPoint(x: r.maxX, y: r.minY), CGPoint(x: r.maxX, y: r.maxY), CGPoint(x: r.minX, y: r.maxY)]
+	let inward: [(x: CGFloat, y: CGFloat)] = [(1, 1), (-1, 1), (-1, -1), (1, -1)]
+	let rounded = corners.map { $0.x > 0 && $0.y > 0 }
+	path.move(to: rounded[0] ? CGPoint(x: r.minX + corners[0].x, y: r.minY) : vertices[0])
+	for k in [1, 2, 3, 0] {
+		guard rounded[k] else {
+			path.addLine(to: vertices[k])
+			continue
+		}
+		let c = corners[k]
+		let center = CGPoint(x: vertices[k].x + inward[k].x * c.x, y: vertices[k].y + inward[k].y * c.y)
+		path.addRelativeArc(
+			center: .zero, radius: 1, startAngle: CGFloat(k + 2) * .pi / 2, delta: .pi / 2,
+			transform: CGAffineTransform(translationX: center.x, y: center.y).scaledBy(x: c.x, y: c.y))
+	}
+	path.closeSubpath()
+	return path
+}
 
 /// A scroll container's scroll view over its padding box. A drag that starts toward an edge it is already at goes to the
 /// scroll view around it, as the web chains a scroll to the page once a box is at its end.

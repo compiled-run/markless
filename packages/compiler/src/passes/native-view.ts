@@ -5243,6 +5243,7 @@ export function createNativeViewPayload(
 		readonly value: NativeExpr;
 		readonly integer?: true;
 		readonly when?: { readonly case: string; readonly value: boolean };
+		readonly row?: string;
 	}[] = [];
 	const bindingsOf = (
 		host: string,
@@ -6069,16 +6070,16 @@ export function createNativeViewPayload(
 				const { value: label, ...unlabelled } = attributes;
 				const live = liveRegionOf(element ?? '*', attributes, bindings);
 				const parts = styleParts.get(id);
-				if (parts && place.row !== undefined)
+				if (parts && place.row !== undefined && caseOf.has(id))
 					refuse(
-						'a `style` that follows state inside a @for row, which Dragon lays out once for every row',
+						'a `style` inside a @for row that is a template or empty text by a condition; Dragon lays each row out from one template',
 					);
 				const styleCase = place.row === undefined ? caseOf.get(id) : undefined;
 				const styleWhen = styleCase && { case: `case:${id}`, value: styleCase.value };
 				if (styleCase && styleWhen)
 					styleCases.push({ id: styleWhen.case, value: styleCase.test });
 				const style =
-					parts && place.row === undefined
+					parts && !(place.row !== undefined && caseOf.has(id))
 						? parts.map((part) => {
 								if (typeof part === 'string') return part;
 								const slot = `slot:${id}#${slots.length}`;
@@ -6087,6 +6088,7 @@ export function createNativeViewPayload(
 									value: part.hole,
 									...(part.integer ? { integer: true as const } : {}),
 									...(styleWhen ? { when: styleWhen } : {}),
+									...(place.row !== undefined ? { row: place.row } : {}),
 								});
 								return { slot };
 							})

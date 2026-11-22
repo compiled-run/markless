@@ -1627,20 +1627,40 @@ export function createNativeRuntime(
 		);
 	// A slot whose style case does not show its text keeps its last value: its expression may not hold then (`point.x`).
 	const keptSlots = new Map<string, number>();
+	// The element whose style holds each slot: a slot inside a row has one value per row copy, `<slot>@<key>`.
+	const slotOwner = new Map(
+		payload.nodes.flatMap((node) =>
+			node.kind === 'element'
+				? (node.style ?? []).flatMap((part) =>
+						typeof part === 'string' ? [] : [[part.slot, node] as const],
+					)
+				: [],
+		),
+	);
 	const slotValues = () => {
 		const cases = new Map(caseValues());
-		return (payload.slots ?? []).map((slot) => {
+		return (payload.slots ?? []).flatMap((slot): (readonly [string, number])[] => {
 			if (slot.when && cases.get(slot.when.case) !== slot.when.value)
-				return [slot.id, keptSlots.get(slot.id) ?? 0] as const;
-			const value = evaluate(slot.value);
-			if (typeof value !== 'number' || !Number.isFinite(value))
-				throw new Error(
-					`style slot ${slot.id} is ${JSON.stringify(value)}, not a finite number`,
-				);
-			if (slot.integer && !Number.isInteger(value))
-				throw new Error(`style slot ${slot.id} is ${value}, not a whole number`);
-			keptSlots.set(slot.id, value);
-			return [slot.id, value] as const;
+				return [[slot.id, keptSlots.get(slot.id) ?? 0]];
+			const owner = slotOwner.get(slot.id);
+			const copies =
+				slot.row && owner
+					? instances(owner).map(
+							({ id, scope }) =>
+								[`${slot.id}${id.slice(owner.id.length)}`, scope] as const,
+						)
+					: [[slot.id, base] as const];
+			return copies.map(([id, scope]) => {
+				const value = evaluate(slot.value, undefined, scope);
+				if (typeof value !== 'number' || !Number.isFinite(value))
+					throw new Error(
+						`style slot ${id} is ${JSON.stringify(value)}, not a finite number`,
+					);
+				if (slot.integer && !Number.isInteger(value))
+					throw new Error(`style slot ${id} is ${value}, not a whole number`);
+				keptSlots.set(id, value);
+				return [id, value] as const;
+			});
 		});
 	};
 	/** Text fields with no `value` binding whose text a handler wrote (`field.value = text`): their text is journalled too. */
