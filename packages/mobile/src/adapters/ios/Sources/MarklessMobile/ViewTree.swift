@@ -379,6 +379,8 @@ final class ViewTree {
 	private var topLayer: (layer: TopLayerView, home: UIView, index: Int)?
 	/// The scroll view each scroll container hosts its children in.
 	private var scrollViews: [String: ContainerScrollView] = [:]
+	/// The view each box that clips overflow past its borders hosts its children in.
+	private var clipViews: [String: PaddingClipView] = [:]
 	/// What a stopped submit says, shown until the person's next action.
 	private var message: UILabel?
 	private var touches: TouchWatcher?
@@ -934,6 +936,8 @@ final class ViewTree {
 		try restack(id, view, style)
 		try paint(view, style, faces: faces)
 		if let label = view as? UILabel { drawLines(label, style) }
+		if let clip = clipViews[id] { clip.shape(style.childClip, in: view.bounds) }
+		else if style.childClip != nil { throw HostError("\(id) began clipping overflow past its borders after it was built") }
 		if let host = view.superview as? ContainerScrollView { view.frame.origin = CGPoint(x: view.frame.minX - host.inset.left, y: view.frame.minY - host.inset.top) }
 		guard let scroll = scrollViews[id] else {
 			if style.scroll != nil { throw HostError("\(id) became a scroll container after it was built") }
@@ -948,7 +952,7 @@ final class ViewTree {
 	private func restack(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws {
 		guard style.frame != nil else { return }
 		if let parent = style.stackingParent {
-			guard let target = scrollViews[parent] ?? elements[parent] else { throw HostError("\(id) paints in the order of \(parent), which has no view") }
+			guard let target = scrollViews[parent] ?? clipViews[parent] ?? elements[parent] else { throw HostError("\(id) paints in the order of \(parent), which has no view") }
 			if view.superview === target { return }
 			if restacked[id] == nil, let home = view.superview, let at = home.subviews.firstIndex(of: view) {
 				restacked[id] = Restacked(home: home, next: at + 1 < home.subviews.count ? home.subviews[at + 1] : nil)
@@ -1331,6 +1335,11 @@ final class ViewTree {
 						view.addSubview(scroll)
 						scrollViews[id] = scroll
 					}
+					if style.childClip != nil || layout?.assignments.contains(where: { ($0[id] ?? $0[template])?.childClip != nil }) == true {
+						let clip = PaddingClipView()
+						view.addSubview(clip)
+						clipViews[id] = clip
+					}
 					try place(id, view, style)
 				}
 				try wire(events[template] ?? [], on: view, element: element, id: id)
@@ -1356,7 +1365,7 @@ final class ViewTree {
 					if let area = view as? TextArea { area.text = text ?? "" } else { (view as? UITextField)?.text = text }
 				}
 				var childIndex = 0
-				_ = try build(template, in: scrollViews[id] ?? view, at: &childIndex, inner)
+				_ = try build(template, in: scrollViews[id] ?? clipViews[id] ?? view, at: &childIndex, inner)
 				applyAttributes(id, view)
 				// The stacking layout sizes a control by its text; one with none (a switch's thumb) gets the 44 pt touch target.
 				if layout == nil, view is UIButton, text(within: view).isEmpty {
@@ -2271,7 +2280,7 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	view.layer.borderWidth = style.borderWidth
 	view.layer.borderColor = style.borderColor.map(uiColor)?.cgColor
 	view.layer.cornerRadius = style.cornerRadius
-	view.clipsToBounds = style.clipsChildren
+	view.clipsToBounds = style.clipsChildren && style.childClip == nil
 	// Siblings draw by zPosition: in-flow boxes at 0, negative z-index below them, positioned boxes above in their context's order.
 	view.layer.zPosition = style.paintOrder.map { CGFloat($0.bucket) * 100_000 + CGFloat($0.rank) + 1 } ?? 0
 	// A layer mask clips the box and its subviews without touching their accessibility, as Chrome keeps clipped text exposed.
@@ -2283,7 +2292,7 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	} else {
 		view.layer.mask = nil
 	}
-	paintSides(view, style.sides)
+	paintSides(view, style.sides, radius: style.cornerRadius)
 	paintDashed(view, style.dashedBorder)
 	if let drawing = view as? DrawingView {
 		// An svg's text colour is what its currentColor paints.
@@ -2355,13 +2364,28 @@ func systemFont(_ face: SystemFace, size: Double) -> CTFont {
 private func uiColor(_ color: RGBA) -> UIColor {
 	UIColor(red: color.r / 255, green: color.g / 255, blue: color.b / 255, alpha: color.alpha / 255)
 }
-/// One sublayer per side, for borders whose sides differ; Chrome's diagonal corner joins are not drawn.
+/// One sublayer per side, for borders whose sides differ; Chrome's diagonal corner joins are not drawn. A rounded box's sides,
+/// which share a colour, are one ring between its outer corners and its padding box.
 @MainActor
-private func paintSides(_ view: UIView, _ sides: [ResolvedStyle.Side]?) {
+private func paintSides(_ view: UIView, _ sides: [ResolvedStyle.Side]?, radius: Double) {
 	let name = "markless-border-side"
 	view.layer.sublayers?.filter { $0.name == name }.forEach { $0.removeFromSuperlayer() }
 	guard let sides else { return }
 	let b = view.bounds
+	if radius > 0, let color = sides.first(where: { $0.width > 0 })?.color {
+		let inner = PaddingBox(radius: radius, top: sides[0].width, right: sides[1].width, bottom: sides[2].width, left: sides[3].width)
+		let ring = CAShapeLayer()
+		ring.name = name
+		ring.frame = b
+		let path = CGMutablePath()
+		path.addPath(roundedPath(b, Array(repeating: PaddingBox.Corner(x: radius, y: radius), count: 4)))
+		path.addPath(paddingBoxPath(inner, in: b))
+		ring.path = path
+		ring.fillRule = .evenOdd
+		ring.fillColor = uiColor(color).cgColor
+		view.layer.addSublayer(ring)
+		return
+	}
 	let rects = [
 		CGRect(x: 0, y: 0, width: b.width, height: sides[0].width),
 		CGRect(x: b.width - sides[1].width, y: 0, width: sides[1].width, height: b.height),
@@ -2587,6 +2611,54 @@ private final class ActivateGesture: UITapGestureRecognizer {
 
 /// How many quick taps in one place a button's current press is: its `event.detail`.
 final class TapCount { var value = 1 }
+
+/// The children of a box that clips overflow past its borders: a view over the whole box masked to its padding box, so the
+/// box's own border and background are not clipped and its children keep their frames.
+@MainActor
+final class PaddingClipView: UIView {
+	func shape(_ box: PaddingBox?, in bounds: CGRect) {
+		frame = bounds
+		guard let box else {
+			layer.mask = nil
+			return
+		}
+		CATransaction.begin()
+		CATransaction.setDisableActions(true)
+		let mask = layer.mask as? CAShapeLayer ?? CAShapeLayer()
+		mask.frame = bounds
+		mask.path = paddingBoxPath(box, in: bounds)
+		layer.mask = mask
+		CATransaction.commit()
+	}
+}
+
+func paddingBoxPath(_ box: PaddingBox, in bounds: CGRect) -> CGPath {
+	let rect = CGRect(
+		x: box.left, y: box.top, width: max(0, bounds.width - box.left - box.right), height: max(0, bounds.height - box.top - box.bottom))
+	return roundedPath(rect, box.corners)
+}
+
+/// A rect with each corner (from the top left, clockwise) a quarter ellipse of its radii; a corner with a zero radius is square.
+func roundedPath(_ r: CGRect, _ corners: [PaddingBox.Corner]) -> CGPath {
+	let path = CGMutablePath()
+	let vertices = [CGPoint(x: r.minX, y: r.minY), CGPoint(x: r.maxX, y: r.minY), CGPoint(x: r.maxX, y: r.maxY), CGPoint(x: r.minX, y: r.maxY)]
+	let inward: [(x: CGFloat, y: CGFloat)] = [(1, 1), (-1, 1), (-1, -1), (1, -1)]
+	let rounded = corners.map { $0.x > 0 && $0.y > 0 }
+	path.move(to: rounded[0] ? CGPoint(x: r.minX + corners[0].x, y: r.minY) : vertices[0])
+	for k in [1, 2, 3, 0] {
+		guard rounded[k] else {
+			path.addLine(to: vertices[k])
+			continue
+		}
+		let c = corners[k]
+		let center = CGPoint(x: vertices[k].x + inward[k].x * c.x, y: vertices[k].y + inward[k].y * c.y)
+		path.addRelativeArc(
+			center: .zero, radius: 1, startAngle: CGFloat(k + 2) * .pi / 2, delta: .pi / 2,
+			transform: CGAffineTransform(translationX: center.x, y: center.y).scaledBy(x: c.x, y: c.y))
+	}
+	path.closeSubpath()
+	return path
+}
 
 /// A scroll container's scroll view over its padding box. A drag that starts toward an edge it is already at goes to the
 /// scroll view around it, as the web chains a scroll to the page once a box is at its end.
