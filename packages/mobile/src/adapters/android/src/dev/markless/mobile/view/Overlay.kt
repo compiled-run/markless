@@ -33,7 +33,7 @@ import kotlin.math.roundToInt
  */
 internal class Overlays(private val host: MarklessHost, private val context: Context, private val dpr: Double) {
 	private val reportsTouches = host.payload.nodes.any { it is Node.Element && OVERLAY_ATTRIBUTE in it.attributes } ||
-		host.payload.events.any { it.event.pointer } || host.payload.tapPoints
+		host.payload.events.any { it.event.pointer } || host.payload.tapPoints || host.payload.documentEvents
 
 	private val pressesLong = host.payload.events.any { it.event == EventName.ContextMenu }
 	private val longPress = Handler(Looper.getMainLooper())
@@ -218,7 +218,9 @@ internal class Overlays(private val host: MarklessHost, private val context: Con
 		val rect = Rect()
 		fun deepest(v: View): String? {
 			if (v.visibility != View.VISIBLE || !v.getGlobalVisibleRect(rect) || !rect.contains(x, y)) return null
-			if (v is ViewGroup) for (i in v.childCount - 1 downTo 0) deepest(v.getChildAt(i))?.let { return it }
+			// The topmost child first, as the box draws them: a box in a stacking context's order over the flow before it.
+			if (v is MarklessBox) for (c in v.drawingOrder().asReversed()) deepest(c)?.let { return it }
+			else if (v is ViewGroup) for (i in v.childCount - 1 downTo 0) deepest(v.getChildAt(i))?.let { return it }
 			return nodes[v]
 		}
 		lifted?.let { return deepest(it.layer) ?: it.id }

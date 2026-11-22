@@ -818,6 +818,23 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'press-bubbles',
+		fixture: 'proofs/r165-press-bubbles/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h2' },
+		],
+	},
+	{
+		name: 'row-live',
+		fixture: 'proofs/r166-row-live/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
 		name: 'radio-follows',
 		fixture: 'proofs/r163-radio-follows/App.tsrx',
 		modules: true,
@@ -997,6 +1014,28 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'paste', host: 'component-edge:4/h3', text: 'salt,pepper' },
 			{ event: 'keydown', host: 'component-edge:4/h3', key: 'Backspace' },
 			{ event: 'activate', host: 'component-edge:2/h4@tea', detail: 1 },
+		],
+	},
+	{
+		// A press adds document listeners: the moves bubble to them after the element's own handlers, and the lift removes them.
+		name: 'document-listeners',
+		fixture: 'test/fixtures/DocumentListeners.tsrx',
+		actions: [
+			{ event: 'pointerdown', host: 'h1', pointerId: 1, x: 20, y: 40, time: 1000 },
+			{ event: 'pointermove', host: 'h1', pointerId: 1, x: 20, y: 60, time: 1016 },
+			{ event: 'pointermove', host: 'h1', pointerId: 1, x: 20, y: 90, time: 1032 },
+			{ event: 'pointerup', host: 'h1', pointerId: 1, x: 20, y: 90, time: 1048 },
+			{ event: 'pointerdown', host: 'h1', pointerId: 2, x: 20, y: 40, time: 2000 },
+		],
+	},
+	{
+		// A DataTransfer built in a handler and kept in a WeakMap keyed by an element, across two presses.
+		name: 'file-store',
+		fixture: 'test/fixtures/FileStore.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h2' },
 		],
 	},
 	{
@@ -1702,6 +1741,17 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h4' }],
 	},
 	{
+		name: 'details',
+		fixture: 'proofs/r145-details/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
 		// The real modal family: trigger, a press inside the dialog, a press on its backdrop, an alert that refuses one, Escape.
 		name: 'overlay',
 		fixture: 'proofs/u20-modal/App.tsrx',
@@ -1876,6 +1926,18 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'component-edge:1/h1' },
 			{ event: 'activate', host: 'component-edge:2' },
 			{ event: 'activate', host: 'component-edge:1/h1' },
+			{ event: 'back' },
+		],
+	},
+	{
+		// Each screen has its own runtime over the device's one store: Back shows the screen below the storage() value a
+		// screen above wrote, with its texts and arms following.
+		name: 'storage-back',
+		app: 'proofs/u227-storage-back',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0' },
+			{ event: 'activate', host: 'h4' },
 			{ event: 'back' },
 		],
 	},

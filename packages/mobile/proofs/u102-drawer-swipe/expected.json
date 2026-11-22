@@ -1,0 +1,28 @@
+{
+	"rung": 233,
+	"name": "@markless/ui drawer: opens from the side, follows a finger swiped toward its edge and closes, then opens at rest again and closes from its close part",
+	"steps": [
+		{
+			"visible": ["Side drawer", "Closed 0 times", "Open the panel"],
+			"absent": ["Swipe this panel away", "Close the panel"]
+		},
+		{
+			"do": { "tap": "Open the panel" },
+			"visible": ["Swipe this panel away", "Close the panel"]
+		},
+		{
+			"do": { "drag": { "on": "Swipe this panel away", "direction": "right" } },
+			"visible": ["Closed 1 times", "Open the panel"],
+			"absent": ["Swipe this panel away", "Closed 0 times"]
+		},
+		{
+			"do": { "tap": "Open the panel" },
+			"visible": ["Swipe this panel away", "Close the panel"]
+		},
+		{
+			"do": { "tap": "Close the panel" },
+			"visible": ["Closed 2 times"],
+			"absent": ["Swipe this panel away", "Closed 1 times"]
+		}
+	]
+}

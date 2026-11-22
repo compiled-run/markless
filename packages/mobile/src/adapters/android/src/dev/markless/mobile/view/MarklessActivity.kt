@@ -95,7 +95,7 @@ abstract class MarklessActivity : Activity() {
 	override fun onResume() {
 		super.onResume()
 		device.resumed()
-		// Shown again after Back: the app-wide cells a screen above changed reach this one.
+		// Shown again after Back: the app-wide and storage cells a screen above changed reach this one.
 		if (::host.isInitialized) host.apply(host.runtime.resume())
 	}
 

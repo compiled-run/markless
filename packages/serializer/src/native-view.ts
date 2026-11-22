@@ -305,6 +305,8 @@ export type NativeDefaultStyle = {
 	readonly rule?: true;
 	/** On `<ul>` and `<ol>`: the marker each item shows before its content. */
 	readonly marker?: 'disc' | 'decimal';
+	/** On `<summary>`: a triangle before its content, not read aloud: ▸ while its `aria-expanded` is false, ▾ while true. */
+	readonly disclosure?: true;
 	/** Table structure: `<td>` and `<th>` cells line up in columns across the rows of their `<table>`. */
 	readonly table?: 'table' | 'row' | 'cell';
 };
@@ -398,6 +400,8 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	audio: {},
 	label: {},
 	dialog: {},
+	details: {},
+	summary: { disclosure: true },
 	form: {},
 	select: {},
 	option: {},
@@ -830,6 +834,8 @@ export type NativeOp =
 	  }
 	/** `event.preventDefault()` in a text field's `keydown` or `paste` handler: the host leaves out what the key or paste does. */
 	| { readonly op: 'preventDefault' }
+	/** `event.stopPropagation()` in a click handler: the press runs no handler of the elements around this one. */
+	| { readonly op: 'stopPropagation' }
 	/**
 	 * `field.value = text` on a text field: its text becomes `value` (as a string), as if typed but with no input event; the
 	 * journal's `property` entry carries it to the field. `node` is a fixed id or an expression giving one (null: nothing).
@@ -1093,6 +1099,8 @@ export type NativeViewPayload = {
 	readonly script?: NativeScript;
 	/** A click handler reads where its tap landed: the host reports touches even with no pointer handler, as a browser fires them. */
 	readonly tapPoints?: true;
+	/** A script adds listeners to the document: the host reports every touch and its moves, which bubble to them. */
+	readonly documentEvents?: true;
 };
 
 export const NATIVE_APP_VERSION = 'markless.native-app/0';
@@ -1663,6 +1671,8 @@ export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptSer
 		structuredClone: 'engine',
 		performance: 'engine',
 		DOMException: 'engine',
+		File: 'engine',
+		DataTransfer: 'engine',
 		// Answers an element's `direction` only, from the host's facts.
 		getComputedStyle: 'engine',
 		console: 'console',
@@ -1711,7 +1721,7 @@ export const NATIVE_SCRIPT_SUBMITTED_FORM = 'submitted form';
 
 /** Members of a page global a phone answers, read straight off it: the focused element, as a proxy. */
 export const NATIVE_SCRIPT_PAGE_MEMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
-	document: ['activeElement'],
+	document: ['activeElement', 'addEventListener', 'removeEventListener'],
 };
 
 /** What a touch adds to a script pointer handler's event: its plain values. The elements it names reach only data handlers. */

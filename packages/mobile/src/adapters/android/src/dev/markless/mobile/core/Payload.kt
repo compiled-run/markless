@@ -177,6 +177,8 @@ data class DefaultStyle(
 	val rule: Boolean = false,
 	/** "disc" or "decimal", on a list. */
 	val marker: String? = null,
+	/** On a summary: a ▸ (collapsed) or ▾ (expanded) before its content, by its aria-expanded. */
+	val disclosure: Boolean = false,
 	/** "table", "row" or "cell". */
 	val table: String? = null,
 )
@@ -250,6 +252,8 @@ sealed interface Op {
 	data class Script(val fn: String, val type: String, val bindings: Map<String, ScriptBinding>, val catch: String? = null) : Op
 	/** `event.preventDefault()` in a text field's `keydown` or `paste` handler. */
 	data object PreventDefault : Op
+	/** `event.stopPropagation()` in a click handler: the press runs no handler of the elements around this one. */
+	data object StopPropagation : Op
 	/** `field.value = text` on a text field: its text becomes [value], with no input event; [node] evaluates to its id. */
 	data class FieldText(val node: Expr, val value: Expr) : Op
 	/** `reset` of `@catch (error, reset)`: clears [catch] and runs again each of [cells] that holds an error. */
@@ -480,13 +484,15 @@ data class Payload(
 	val slots: List<StyleSlot> = emptyList(),
 	/** The conditions element styles follow, in payload order. */
 	val styleCases: List<StyleCase> = emptyList(),
+	/** A script adds listeners to the document: the host reports every touch and its moves, which bubble to them. */
+	val documentEvents: Boolean = false,
 ) {
 	companion object {
 		fun decode(bytes: ByteArray): Payload = decode(Json.parse(bytes))
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "numberMessages", "typeMismatch", "script", "tapPoints", "slots", "styleCases"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "title", "objects", "forms", "valueMissing", "tooLong", "numberMessages", "typeMismatch", "script", "tapPoints", "slots", "styleCases", "documentEvents"), "payload")
 			val route = root["route"]?.obj("payload.route")?.let { r ->
 				r.only(setOf("pattern", "params"), "payload.route")
 				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
@@ -601,7 +607,8 @@ data class Payload(
 			}
 			for (node in nodes) if (node is Node.Element) node.styleWhen?.let { if (it.case !in caseIds) throw MarklessDecodeError("node \"${node.id}\"'s style names unknown style case \"${it.case}\"") }
 			val tapPoints = root["tapPoints"]?.let { it == Json.Bool(true) || throw MarklessDecodeError("payload.tapPoints is true when present") } ?: false
-			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, numberMessages, typeMismatch, script, tapPoints, slots, styleCases)
+			val documentEvents = root["documentEvents"]?.let { it == Json.Bool(true) || throw MarklessDecodeError("payload.documentEvents is true when present") } ?: false
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, title, objects, forms, valueMissing, tooLong, numberMessages, typeMismatch, script, tapPoints, slots, styleCases, documentEvents)
 		}
 
 		private fun readsOf(node: Node): List<Expr> = when (node) {
@@ -646,7 +653,7 @@ data class Payload(
 				is Op.Navigate -> op.params.values.any(::hasScript)
 				is Op.After -> hasScript(op.ms) || op.capture.any { hasScript(it.second) } || scriptOps(op.ops)
 				is Op.Capture -> hasScript(op.node) || hasScript(op.pointer)
-				is Op.Dialog, is Op.Command, is Op.Submit, is Op.Tick, Op.PreventDefault, is Op.Reset -> false
+				is Op.Dialog, is Op.Command, is Op.Submit, is Op.Tick, Op.PreventDefault, Op.StopPropagation, is Op.Reset -> false
 				is Op.FieldText -> hasScript(op.node) || hasScript(op.value)
 			}
 		}
@@ -859,7 +866,7 @@ data class Payload(
 
 		private fun defaultStyle(v: Json, what: String): DefaultStyle {
 			val o = v.obj(what)
-			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "rule", "marker", "table"), what)
+			o.only(setOf("flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "rule", "marker", "disclosure", "table"), what)
 			fun flag(name: String): Boolean = o[name]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.$name must be true when present"); true } ?: false
 			fun word(name: String, allowed: Set<String>): String? = o[name]?.let { oneOf(o, name, allowed, what) }
 			return DefaultStyle(
@@ -872,6 +879,7 @@ data class Payload(
 				indent = o["indent"]?.num("$what.indent") ?: 0.0,
 				rule = flag("rule"),
 				marker = word("marker", setOf("disc", "decimal")),
+				disclosure = flag("disclosure"),
 				table = word("table", setOf("table", "row", "cell")),
 			)
 		}
@@ -1115,6 +1123,10 @@ data class Payload(
 			if (name == "preventDefault") {
 				o.only(setOf("op"), what)
 				return Op.PreventDefault
+			}
+			if (name == "stopPropagation") {
+				o.only(setOf("op"), what)
+				return Op.StopPropagation
 			}
 			if (name == "fieldText") {
 				o.only(setOf("op", "node", "value"), what)

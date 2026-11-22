@@ -1,6 +1,6 @@
 import { parseAllDocuments } from 'yaml';
 import { describe, expect, it } from 'vitest';
-import { renderFlow, type LadderRung } from '../proofs/ladder.ts';
+import { flowSteps, renderFlow, selector, type LadderRung } from '../proofs/ladder.ts';
 import { readProofExpected } from '../src/harness/expected.ts';
 import { instrumentFlow } from '../src/harness/flow.ts';
 
@@ -65,6 +65,74 @@ describe('instrumentFlow', () => {
 		expect(() =>
 			instrumentFlow(flow.replace('${APP_ID}', 'com.example.other'), rung, 'flow.yaml'),
 		).toThrow('appId must be');
+	});
+});
+
+describe('a text named by how it starts', () => {
+	const prefixed = readProofExpected(
+		{
+			steps: [
+				{ visible: ['All notes', { startsWith: 'Groceries' }] },
+				{
+					do: { tap: { startsWith: 'Groceries' } },
+					visible: ['Edit'],
+					absent: [{ startsWith: 'Groceries' }],
+				},
+			],
+		},
+		'e.json',
+	);
+
+	it('writes an anchored selector that runs on across the rest of the label', () => {
+		expect(flowSteps(prefixed)).toEqual([
+			[
+				{ launchApp: { clearState: true } },
+				{ assertVisible: 'All notes' },
+				{ assertVisible: '^Groceries.*' },
+			],
+			[
+				{ tapOn: '^Groceries.*' },
+				// The change witness keys a text named by how it starts as it keys a plain one.
+				{ assertNotVisible: '^Groceries.*' },
+				{ assertVisible: 'Edit' },
+				{ assertNotVisible: '^Groceries.*' },
+			],
+		]);
+	});
+
+	it('escapes what it starts with, and matches as Maestro does, across line breaks', () => {
+		const pattern = selector({ startsWith: 'A (b). $5? [x]*' });
+		expect(pattern).toBe('^A \\(b\\)\\. \\$5\\? \\[x\\]\\*.*');
+		// Maestro's Regex.matches is a whole-label match with IGNORE_CASE and DOT_MATCHES_ALL.
+		const maestro = new RegExp(`^(?:${pattern})$`, 'is');
+		expect(maestro.test('A (b). $5? [x]*Personal\nNov 21')).toBe(true);
+		expect(maestro.test('A (b). $5? [x]*')).toBe(true);
+		expect(maestro.test('A (bc). $5? [x]*')).toBe(false);
+		expect(maestro.test('xA (b). $5? [x]*')).toBe(false);
+		expect(selector('Groceries')).toBe('Groceries');
+	});
+
+	it('refuses any other object in place of a text', () => {
+		const launch = { visible: ['x'] };
+		for (const bad of [
+			{},
+			{ startsWith: '' },
+			{ startsWith: 1 },
+			{ startsWith: 'a', endsWith: 'b' },
+		]) {
+			expect(() => readProofExpected({ steps: [{ visible: [bad] }] }, 'e.json')).toThrow(
+				'no "visible" text list',
+			);
+			expect(() =>
+				readProofExpected(
+					{ steps: [launch, { do: { tap: 'x' }, visible: [], absent: [bad] }] },
+					'e.json',
+				),
+			).toThrow('"absent" is not a text list');
+			expect(() =>
+				readProofExpected({ steps: [launch, { do: { tap: bad }, visible: [] }] }, 'e.json'),
+			).toThrow('"tap" is neither a text');
+		}
 	});
 });
 

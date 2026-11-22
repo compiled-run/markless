@@ -8,8 +8,8 @@ import WebKit
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"canvas", "details", "embed", "object",
-	"picture", "summary", "video",
+	"canvas", "embed", "object",
+	"picture", "video",
 ]
 
 /// Where an instance is built: its row (`@key`, empty outside lists), the names its expressions see, and what encloses it.
@@ -350,6 +350,8 @@ final class ViewTree {
 	/// Lists and the marker kind their items show; each item's marker label.
 	private var listMarkers: [ObjectIdentifier: String] = [:]
 	private var itemMarkers: [ObjectIdentifier: UILabel] = [:]
+	/// Each summary's disclosure triangle, in its start inset.
+	private var disclosures: [ObjectIdentifier: UILabel] = [:]
 	/// Table structure: tables, their rows and the rows' cells.
 	private var tables = Set<ObjectIdentifier>()
 	private var tableRows = Set<ObjectIdentifier>()
@@ -368,6 +370,8 @@ final class ViewTree {
 	/// Each drawn checkbox (false) or radio button (true) and whether it is checked.
 	private var ticks: [String: (radio: Bool, checked: Bool)] = [:]
 	private(set) var overlays: OverlayHost!
+	/// Each box moved into its stacking parent's view, by instance id: the view it was built in and the view that followed it there.
+	private var restacked: [String: Restacked] = [:]
 
 	init(
 		runtime: NativeRuntime, layout: StyleLayout?, sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:],
@@ -806,11 +810,14 @@ final class ViewTree {
 		return nil
 	}
 
-	/// How a live region speaks now: as built, or, when its attributes follow state, as they read at this moment.
-	private func liveNow(_ node: String) -> NativeLive? {
-		guard let follows = nodes[node]?.liveFollows else { return nodes[node]?.live }
-		guard case let .string(politeness) = try? runtime.evaluate(follows.politeness) else { return nil }
-		return NativeLive(assertive: politeness == "assertive", atomic: (try? runtime.evaluate(follows.atomic)) == .bool(true))
+	/// How a live region (a row's copy keeps its `@key`) speaks now: as built, or, when its attributes follow state, as they
+	/// read at this moment in its own row.
+	private func liveNow(_ region: String) -> NativeLive? {
+		let base = region.split(separator: "@").first.map(String.init) ?? region
+		guard let node = nodes[base], let follows = node.liveFollows else { return nodes[base]?.live }
+		let scope = (try? runtime.instances(of: node).first { $0.id == region }?.scope) ?? .empty
+		guard case let .string(politeness) = try? runtime.evaluate(follows.politeness, in: scope) else { return nil }
+		return NativeLive(assertive: politeness == "assertive", atomic: (try? runtime.evaluate(follows.atomic, in: scope)) == .bool(true))
 	}
 
 	/// Each live region a journal changed, spoken once: whole when atomic, else the text that changed.
@@ -822,8 +829,7 @@ final class ViewTree {
 			changed[region, default: []].append(text)
 		}
 		for region in order {
-			let base = region.split(separator: "@").first.map(String.init) ?? region
-			guard let live = liveNow(base), let view = elements[region] ?? paragraphs[region]?.view else { continue }
+			guard let live = liveNow(region), let view = elements[region] ?? paragraphs[region]?.view else { continue }
 			let spoken = live.atomic ? text(within: view) : changed[region, default: []].joined(separator: " ")
 			if !spoken.isEmpty { announce(spoken, live.assertive) }
 		}
@@ -881,7 +887,8 @@ final class ViewTree {
 
 	/// The text an element shows, in view order: what `aria-labelledby` and `aria-describedby` read from it.
 	private func text(within view: UIView, skipping skipped: UIView? = nil) -> String {
-		if view === skipped { return "" }
+		// A list item's marker is a decoration (CSS's ::marker), not text of the element.
+		if view === skipped || decorations.contains(ObjectIdentifier(view)) { return "" }
 		if let label = view as? UILabel { return label.text ?? "" }
 		return view.subviews.map { text(within: $0, skipping: skipped) }.filter { !$0.isEmpty }.joined(separator: " ")
 	}
@@ -909,6 +916,7 @@ final class ViewTree {
 
 	/// Paints a view and puts it at its frame; inside a scroll container, frames count from the scroll view's padding box.
 	private func place(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws {
+		try restack(id, view, style)
 		try paint(view, style, faces: faces)
 		if let label = view as? UILabel { drawLines(label, style) }
 		if let host = view.superview as? ContainerScrollView { view.frame.origin = CGPoint(x: view.frame.minX - host.inset.left, y: view.frame.minY - host.inset.top) }
@@ -918,6 +926,32 @@ final class ViewTree {
 		}
 		guard let s = style.scroll else { throw HostError("\(id) stopped being a scroll container after it was built") }
 		scroll.configure(s, in: view.bounds.size, cornerRadius: style.cornerRadius)
+	}
+
+	/// Moves a box whose stacking context paints it past ancestors with later siblings into the view of its `stackingParent`, where
+	/// its zPosition orders it among that context's boxes, and back to the view it was built in when it no longer is.
+	private func restack(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws {
+		guard style.frame != nil else { return }
+		if let parent = style.stackingParent {
+			guard let target = scrollViews[parent] ?? elements[parent] else { throw HostError("\(id) paints in the order of \(parent), which has no view") }
+			if view.superview === target { return }
+			if restacked[id] == nil, let home = view.superview, let at = home.subviews.firstIndex(of: view) {
+				restacked[id] = Restacked(home: home, next: at + 1 < home.subviews.count ? home.subviews[at + 1] : nil)
+			}
+			view.removeFromSuperview()
+			// After the boxes moved there that paint below it, so hit testing, which walks subviews from the last, meets the topmost first.
+			let z = style.paintOrder.map { CGFloat($0.bucket) * 100_000 + CGFloat($0.rank) + 1 } ?? 0
+			let moved = Set(restacked.keys.compactMap { elements[$0].map(ObjectIdentifier.init) })
+			if let above = target.subviews.firstIndex(where: { moved.contains(ObjectIdentifier($0)) && $0.layer.zPosition > z }) {
+				target.insertSubview(view, at: above)
+			} else {
+				target.addSubview(view)
+			}
+		} else if let place = restacked.removeValue(forKey: id) {
+			guard let home = place.home else { return }
+			view.removeFromSuperview()
+			if let next = place.next, next.superview === home { home.insertSubview(view, belowSubview: next) } else { home.addSubview(view) }
+		}
 	}
 
 	/// Draws Dragon's lines over a label in a system face while its text is the one Dragon laid out; otherwise the label draws its own.
@@ -1120,7 +1154,7 @@ final class ViewTree {
 						}
 					}
 					view = drawn
-				} else if element == "button" || element == "a" {
+				} else if element == "button" || element == "a" || element == "summary" {
 					if context.button != nil { throw HostError("<\(element)> \(id) is inside another control") }
 					let control = UIButton(type: .custom)
 					control.isAccessibilityElement = true
@@ -1460,6 +1494,7 @@ final class ViewTree {
 			view.removeFromSuperview()
 		}
 		contexts.removeValue(forKey: id)
+		restacked.removeValue(forKey: id)
 		templates.removeValue(forKey: id)
 		attributes.removeValue(forKey: id)
 	}
@@ -1525,6 +1560,7 @@ final class ViewTree {
 			}
 			view.accessibilityValue = current["aria-expanded"].map { $0 == "true" ? "expanded" : "collapsed" }
 		}
+		disclosures[ObjectIdentifier(view)]?.text = current["aria-expanded"] == "true" ? "\u{25BE}" : "\u{25B8}"
 		view.accessibilityElementsHidden = current["aria-hidden"] == "true"
 		// With a style export Dragon decides visibility (a hidden element has no frame); the stacking layout reads `hidden`.
 		if layout == nil, !dialogIds.contains(id) {
@@ -1567,7 +1603,7 @@ final class ViewTree {
 		// As the web names a button from its content: its text, and the label of an image or svg inside it.
 		func texts(_ view: UIView) -> [String] {
 			view.subviews.flatMap { child -> [String] in
-				if let label = child as? UILabel { return [label.text ?? ""] }
+				if let label = child as? UILabel { return decorations.contains(ObjectIdentifier(label)) ? [] : [label.text ?? ""] }
 				if child is DrawingView || child is UIImageView {
 					let own = child.accessibilityIdentifier.flatMap { attributes[$0] }
 					if own?["aria-hidden"] == "true" { return [] }
@@ -1707,6 +1743,7 @@ final class ViewTree {
 			])
 		}
 		if let marker = style.marker { listMarkers[id] = marker }
+		if style.disclosure { addDisclosure(to: view) }
 		switch style.table {
 		case "table":
 			tables.insert(id)
@@ -1715,6 +1752,24 @@ final class ViewTree {
 		case "cell": tableCells.insert(id)
 		default: break
 		}
+	}
+
+	/// A summary's triangle (`list-style: disclosure-closed inside`), in an inset before its content; it is not read.
+	private func addDisclosure(to summary: UIView) {
+		let marker = UILabel()
+		marker.isAccessibilityElement = false
+		marker.isUserInteractionEnabled = false
+		marker.translatesAutoresizingMaskIntoConstraints = false
+		marker.text = "\u{25B8}"
+		summary.addSubview(marker)
+		decorations.insert(ObjectIdentifier(marker))
+		disclosures[ObjectIdentifier(summary)] = marker
+		let glyphs = ["\u{25B8} ", "\u{25BE} "].map { ($0 as NSString).size(withAttributes: [.font: marker.font as Any]).width }
+		indents[ObjectIdentifier(summary)] = ceil(glyphs.max() ?? 0)
+		NSLayoutConstraint.activate([
+			marker.leadingAnchor.constraint(equalTo: summary.leadingAnchor),
+			marker.topAnchor.constraint(equalTo: summary.topAnchor),
+		])
 	}
 
 	/// A list item's marker, beside it in its list's inset; it is neither read nor part of the item's text.
@@ -1869,6 +1924,16 @@ final class ViewTree {
 
 /// `<audio controls>`: a button reading "Play", or "Pause" while its file plays.
 @MainActor
+/// Where a box moved into its stacking parent's view was built: its home view and the view after it there.
+final class Restacked {
+	weak var home: UIView?
+	weak var next: UIView?
+	init(home: UIView, next: UIView?) {
+		self.home = home
+		self.next = next
+	}
+}
+
 final class AudioButton: UIButton, AVAudioPlayerDelegate {
 	private var player: AVAudioPlayer?
 	private var source: String?

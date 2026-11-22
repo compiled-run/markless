@@ -99,6 +99,15 @@ describe('native conformance vectors', () => {
 		expect(deep.initial.stack).toEqual(['/', '/orders', '/orders/42']);
 	});
 
+	it('storage-back: Back shows the screen below the storage() value a screen above wrote, its texts and arm following', () => {
+		const kept = committed('storage-back.json') as ReturnType<typeof nativeAppConformance>;
+		expect(kept.steps.at(-1)!.journal).toEqual([
+			{ op: 'text', node: 'h3:text0', value: 'Home kept 1' },
+			{ op: 'text', node: 'h4:text0', value: 'Next is 2' },
+			{ op: 'arm', node: 'branch-site:0', index: 1 },
+		]);
+	});
+
 	it('contextmenu: a long press reaches the element pressed, then each element it is inside, with its place', () => {
 		const vectors = committed('contextmenu.json') as ReturnType<typeof nativeConformance>;
 		expect(vectors.steps.map((step) => step.journal)).toEqual([

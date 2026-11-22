@@ -5,10 +5,10 @@ name: shop
       clearState: true
 - assertVisible: New this week
 - assertVisible: Refresh
-- assertVisible: Desk lamp
-- assertVisible: Copper kettle
+- assertVisible: Desk lamp£48\.00
+- assertVisible: Copper kettle£64\.00
 - assertVisible: Shop
-- tapOn: Copper kettle
+- tapOn: Copper kettle£64\.00
 - assertNotVisible: New this week
 - assertVisible: Whistles when it is ready\. Works on every hob\.
 - assertVisible: Choose option
@@ -43,7 +43,7 @@ name: shop
           - pressKey: back
 - assertNotVisible: Added to your cart
 - assertVisible: New this week
-- assertVisible: Copper kettle
+- assertVisible: Copper kettle£64\.00
 - assertVisible: 1 in cart
 - assertNotVisible: Added to your cart
 - tapOn: Cart

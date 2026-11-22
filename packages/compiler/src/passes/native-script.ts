@@ -134,6 +134,35 @@ if (!host) {
 		};
 		g.DOMException.prototype = Object.create(Error.prototype, { constructor: { value: g.DOMException, writable: true, configurable: true } });
 	}
+	// Files as a page holds them: a File's name, size, type and lastModified, a FileList, and a DataTransfer to build one.
+	var utf8Length = function (text) { return unescape(encodeURIComponent(text)).length; };
+	if (typeof g.File !== 'function') {
+		g.File = function File(bits, name, options) {
+			this.name = String(name);
+			this.type = options && options.type !== undefined ? String(options.type).toLowerCase() : '';
+			this.lastModified = options && options.lastModified !== undefined ? Number(options.lastModified) : Date.now();
+			var size = 0;
+			(bits || []).forEach(function (part) { size += typeof part === 'string' ? utf8Length(part) : part && typeof part.size === 'number' ? part.size : 0; });
+			this.size = size;
+		};
+	}
+	host.fileListOf = function (files) {
+		var list = files.slice();
+		list.item = function (index) { return list[index] || null; };
+		return list;
+	};
+	if (typeof g.DataTransfer !== 'function') {
+		g.DataTransfer = function DataTransfer() {
+			var held = [];
+			this.items = {
+				add: function (file) { held.push(file); return { kind: 'file', type: file.type }; },
+				remove: function (index) { held.splice(index, 1); },
+				clear: function () { held.length = 0; },
+			};
+			Object.defineProperty(this.items, 'length', { get: function () { return held.length; } });
+			Object.defineProperty(this, 'files', { get: function () { return host.fileListOf(held); } });
+		};
+	}
 	var Headers = function (pairs) {
 		this.get = function (name) {
 			var key = String(name).toLowerCase(), found = [];
@@ -399,8 +428,21 @@ if (!host) {
 		};
 	};
 	g.window = g.self = g;
-	// The page's one member a phone answers: the focused element (the body when none is), which the build allows alone.
-	g.document = { get activeElement() { return host.focus(); } };
+	// The page answers its focused element (the body when none is) and keeps listeners a handler adds; the host passes each
+	// pointer event to them after the element's own handlers, as the browser bubbles it to the document.
+	host.listeners = {};
+	g.document = {
+		get activeElement() { return host.focus(); },
+		addEventListener: function (type, listener) {
+			var list = host.listeners[String(type)] || (host.listeners[String(type)] = []);
+			if (typeof listener === 'function' && list.indexOf(listener) < 0) { list.push(listener); host.listened = true; }
+		},
+		removeEventListener: function (type, listener) {
+			var list = host.listeners[String(type)] || [];
+			var at = list.indexOf(listener);
+			if (at >= 0) { list.splice(at, 1); host.listened = true; }
+		},
+	};
 	host.Response = Response;
 	// The HTML structured clone, as Chromium runs it, for an engine that has none.
 	if (typeof g.structuredClone !== 'function') {
@@ -704,7 +746,6 @@ var stable = function (value) {
 var begin = function (entry) {
 	host.origin = origin;
 	elementFacts = entry.elements || {};
-	proxies = {};
 	captured = {};
 	cells = join(entry.cells, entry.nonFinite);
 	unset = {};
@@ -748,7 +789,8 @@ var eventOf = function (given, frame) {
 		isComposing: false,
 		defaultPrevented: false,
 		preventDefault: function () { this.defaultPrevented = true; },
-		stopPropagation: function () {},
+		propagationStopped: false,
+		stopPropagation: function () { this.propagationStopped = true; },
 	};
 	${JSON.stringify([...new Set([...NATIVE_SCRIPT_POINTER_FIELDS, ...NATIVE_SCRIPT_CLICK_FIELDS, ...NATIVE_SCRIPT_KEY_FIELDS])])}.forEach(function (field) { if (field in given) event[field] = given[field]; });
 	// A dismiss's detail is an object whose pressTarget is an element; a click's detail is its press count.
@@ -847,8 +889,14 @@ g.__markless[id] = {
 			}
 			// A key's or paste's cancel reaches the host, as a browser reads defaultPrevented before the handler first awaits.
 			if (event && event.defaultPrevented && (entry.event.type === 'keydown' || entry.event.type === 'paste')) host.out.prevented = true;
+			// A click's stopPropagation() before it first awaits keeps the press from the handlers around it, as a browser's.
+			if (event && event.propagationStopped && entry.event.type === 'click') host.out.stopped = true;
 			// A handler that sets its text field's value writes the field, as the DOM's value setter does.
 			if (event && typeof entry.event.value === 'string' && event.target && !(event.target instanceof host.Form) && typeof event.target.value === 'string' && event.target.value !== entry.event.value) host.out.value = event.target.value;
+		} else if (entry.kind === 'document') {
+			var heard = (host.listeners[entry.event.type] || []).slice();
+			var bubbled = heard.length > 0 ? eventOf(entry.event, {}) : null;
+			heard.forEach(function (listener) { try { listener(bubbled); } catch (error) { fail(null, error); } });
 		} else if (entry.kind === 'timer') {
 			var timer = host.timers[entry.timer];
 			if (timer) {
@@ -902,8 +950,15 @@ g.__markless[id] = {
 		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands, pending: out.pending, settled: out.settled, raises: out.raises };
 		if (out.calls.length > 0) left.calls = out.calls;
 		if (out.prevented) left.prevented = true;
+		if (out.stopped) left.stopped = true;
 		if (out.value !== undefined) left.value = out.value;
 		if (out.navigate) left.navigate = out.navigate;
+		// The document's listener types now, and the elements the entry that changed them held, whose facts later entries need.
+		if (host.listened) {
+			left.listening = Object.keys(host.listeners).filter(function (type) { return host.listeners[type].length > 0; });
+			left.watch = Object.keys(proxies);
+			host.listened = false;
+		}
 		return JSON.stringify(left);
 	},
 };`;

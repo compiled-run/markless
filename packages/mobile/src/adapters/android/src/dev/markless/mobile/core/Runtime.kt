@@ -254,6 +254,9 @@ data class Row(val key: String, val item: JsValue)
 /** Each screen's async values run under their own number in an engine the app's screens share. */
 private var screens = 0
 
+/** A pointer run that is the document's, not an element handler's. */
+private const val DOCUMENT_RUN = "\u0000document:"
+
 class Runtime(
 	val payload: Payload,
 	private val store: Store = MemoryStore(),
@@ -276,6 +279,9 @@ class Runtime(
 	private val fired = HashSet<String>()
 	private val storageKeys = payload.cells.mapNotNull { c -> c.storageKey?.let { c.id to it } }.toMap()
 	private val handlers = payload.handlers.associateBy { it.id }
+
+	/** A click handler called stopPropagation(): the press goes no further out. */
+	private var propagationStopped = false
 	private val continuations = HashMap<String, Continuation>().also { found ->
 		fun collect(ops: List<Op>) {
 			for (op in ops) if (op is Op.Call && op.after != null) {
@@ -652,6 +658,17 @@ class Runtime(
 	private val scriptRuns = HashMap<Int, Submission>()
 
 	/** One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries, in that order. */
+	/** A pointer event bubbled to the document's listeners: its plain fields, and the elements it names as proxies. */
+	private fun document(type: String, fields: Map<String, JsValue>): List<JournalEntry> {
+		val plain = listOf("button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp")
+			.mapNotNull { f -> fields[f]?.let { ",${jsonString(f)}:${jsonValue(it)}" } }.joinToString("")
+		val target = (fields["target"] as? JsValue.Str)?.value
+		val related = (fields["relatedTarget"] as? JsValue.Str)?.value
+		val nodes = ",\"nodes\":{\"target\":${target?.let(::jsonString) ?: "null"},\"currentTarget\":null,\"relatedTarget\":${related?.let(::jsonString) ?: "null"}}"
+		val watched = documentElements.sorted() + listOfNotNull(target)
+		return enter("\"kind\":\"document\",\"event\":{\"type\":${jsonString(type)}$plain$nodes},\"elements\":${elementFacts(emptyMap(), Scope.EMPTY, watched)}")
+	}
+
 	private fun enter(fields: String, submission: Submission? = null): List<JournalEntry> {
 		// A handler may read the focused element; a computed, which renders, never does, so only entries carry it.
 		val focus = focused?.takeIf { it != NATIVE_DOCUMENT_BODY }?.let { ",\"focused\":${jsonString(it)},\"focusElements\":${elementFacts(emptyMap(), Scope.EMPTY, listOf(it))}" } ?: ""
@@ -672,6 +689,8 @@ class Runtime(
 			unset.remove(slot)
 			storageKeys[cell]?.let { store.set(it, v) }
 		}
+		result["listening"]?.let { l -> documentListening.clear(); l.arr("leave().listening").forEach { documentListening.add(it.str("leave().listening[]")) } }
+		result["watch"]?.arr("leave().watch")?.forEach { documentElements.add(it.str("leave().watch[]")) }
 		for (l in list("logs")) {
 			val pair = l.arr("leave().logs[]")
 			val level = pair[0].str("leave().logs[][0]")
@@ -734,6 +753,8 @@ class Runtime(
 				if (command == "focus") focused = node
 				JournalEntry.Command(node, command, (parts[2] as? Json.Bool)?.value == true)
 			} +
+			// A click handler called stopPropagation() before it first awaited.
+			(if ((result["stopped"] as? Json.Bool)?.value == true) { propagationStopped = true; emptyList() } else emptyList<JournalEntry>()) +
 			// A key or paste handler called preventDefault() before it first awaited.
 			(if ((result["prevented"] as? Json.Bool)?.value == true) listOf(JournalEntry.PreventDefault) else emptyList()) +
 			// An input handler that set its field's value (`event.target.value = …`) writes the field, as the DOM's setter does.
@@ -754,6 +775,9 @@ class Runtime(
 	private var raising = 0
 	/** The text field whose input event is running, which a handler's `event.target.value` write lands on. */
 	private var typing: String? = null
+	/** The event types the page's document has listeners for, and the elements those listeners may read. */
+	private val documentListening = HashSet<String>()
+	private val documentElements = HashSet<String>()
 
 	/**
 	 * An event a script dispatched on an element (or its `click()`), raised once the script returned: `click` as a press on
@@ -770,8 +794,7 @@ class Runtime(
 			fun scopeOf(id: String): Scope? = byId[id.substringBefore('@')]?.let { node -> instances(node).firstOrNull { it.id == id }?.scope }
 			if (type == "click") {
 				val pressed = chain.firstOrNull { handlerFor(it.substringBefore('@'), EventName.Activate) != null } ?: return emptyList()
-				val scope = scopeOf(pressed) ?: return emptyList()
-				return withFields(clickFields(trusted = false)) { run(handlers[handlerFor(pressed.substringBefore('@'), EventName.Activate)]?.ops.orEmpty(), scope) }
+				return withFields(clickFields(trusted = false)) { press(pressed) }
 			}
 			val name = EventName.entries.firstOrNull { it.wire == type } ?: return emptyList()
 			fun optional(key: String, fallback: JsValue): JsValue = event[key]?.let { JsValue.fromJson(it) } ?: fallback
@@ -831,14 +854,16 @@ class Runtime(
 	}
 
 	/** Starts the async values the script computes, once the screen is built; the host applies its journal as an action's. */
-	/** The screen shows again (Back): app-scoped shared fields take the values the app holds now; the journal of what moved. */
 	fun start(): List<JournalEntry> = if (asyncCells.isEmpty()) emptyList() else change(null, null) { emptyList() }
 
-	/** The screen shows again after Back: it takes the app's values of its app-wide cells that a page above it changed. */
+	/** The screen shows again after Back: it takes the app's values of its app-wide cells and the device's of its storage cells, which a page above it may have changed. */
 	fun resume(): List<JournalEntry> {
-		val moved = payload.cells.filter { c -> c.app && session.values[c.id]?.let { it != values[c.id] } == true }
+		val moved = payload.cells.mapNotNull { c ->
+			val kept = if (c.app) session.values[c.id] else c.storageKey?.let(store::get)
+			if (kept == null || kept == values[c.id]) null else c.id to kept
+		}
 		if (moved.isEmpty()) return emptyList()
-		return change(null, null) { for (c in moved) values[c.id] = session.values.getValue(c.id); emptyList() }
+		return change(null, null) { for ((cell, value) in moved) { values[cell] = value; unset.remove(cell) }; emptyList() }
 	}
 
 	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
@@ -1336,7 +1361,36 @@ class Runtime(
 			else -> null
 		}
 		return change(host, if (event == EventName.Input || event == EventName.Commit) value else null) {
-			withFields(carried) { run(handler.ops, scope) }
+			withFields(carried) { if (event == EventName.Activate) press(host) else run(handler.ops, scope) }
+		}
+	}
+
+	/**
+	 * A press on [pressed], as a browser's click: its own handler, then the handler of each element around it, innermost first,
+	 * until one stops propagation. An element around it whose handler reads where the press landed runs its copy for the
+	 * pressed element (`<handler>@<node>`), which a pressed element with no handler of its own holds as its own.
+	 */
+	private fun press(pressed: String): List<JournalEntry> {
+		propagationStopped = false
+		try {
+			val own = pressed.substringBefore('@')
+			val ownHandler = handlerFor(own, EventName.Activate)
+			val journal = ArrayList<JournalEntry>()
+			for (id in chain(pressed)) {
+				val node = id.substringBefore('@')
+				val bound = handlerFor(node, EventName.Activate) ?: continue
+				val scope = byId[node]?.let { element -> instances(element).firstOrNull { it.id == id }?.scope } ?: continue
+				// A copy stands for the handler around it, and runs only as the pressed element's own.
+				if (node != own && '@' in bound) continue
+				val copy = if (node == own) null else "$bound@$own"
+				if (copy != null && ownHandler == copy) continue
+				val chosen = copy?.takeIf { it in handlers } ?: bound
+				journal.addAll(run(handlers[chosen]?.ops.orEmpty(), scope))
+				if (propagationStopped || journal.any { it is JournalEntry.Navigate }) break
+			}
+			return journal
+		} finally {
+			propagationStopped = false
 		}
 	}
 
@@ -1438,6 +1492,8 @@ class Runtime(
 			val runs = ArrayList<Triple<String, Map<String, JsValue>, Scope?>>()
 			fun raise(type: EventName, target: String, related: String? = null) {
 				for (node in chain(target)) handlerFor(node.substringBefore('@'), type)?.let { runs.add(Triple(it, fieldsOf(type, target, node, related), null)) }
+				// The event bubbles on to the document's listeners after the element's own handlers.
+				if (type.wire in documentListening) runs.add(Triple(DOCUMENT_RUN + type.wire, fieldsOf(type, target, target, related), null))
 			}
 			/** `pointerenter` on each element [target] is in that [from] is not, outermost first; `pointerleave` the other way. */
 			fun crossing(type: EventName, target: String, from: String?, related: String?) {
@@ -1450,6 +1506,7 @@ class Runtime(
 				val taken = runs.toList()
 				runs.clear()
 				for ((id, f, at) in taken) {
+					if (id.startsWith(DOCUMENT_RUN)) { calls.addAll(document(id.removePrefix(DOCUMENT_RUN), f)); continue }
 					val handler = handlers[id] ?: throw MarklessRuntimeError("unknown handler \"$id\"")
 					val out = withFields(f) { run(handler.ops, at ?: scope) }
 					if (out.firstOrNull() is JournalEntry.Navigate) return out
@@ -1677,6 +1734,7 @@ class Runtime(
 				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope, named?.values?.filterNotNull().orEmpty() + listOfNotNull(pressed))},\"event\":$event$catch", submission))
 			}
 			Op.PreventDefault -> calls.add(JournalEntry.PreventDefault)
+			Op.StopPropagation -> propagationStopped = true
 			is Op.FieldText -> {
 				val node = evaluate(op.node, scope)
 				if (node == JsValue.Null) continue

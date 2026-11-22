@@ -51,9 +51,9 @@ name: notes
           - pressKey: back
 - assertNotVisible: Save note
 - assertVisible: All notes
-- assertVisible: Groceries
+- assertVisible: ^Groceries.*
 - assertNotVisible: Save note
-- tapOn: Groceries
+- tapOn: ^Groceries.*
 - assertVisible: Edit
 - assertNotVisible: Search notes
 - runFlow:
@@ -69,12 +69,12 @@ name: notes
           - pressKey: back
 - assertNotVisible: Edit
 - assertVisible: All notes
-- assertVisible: Groceries
+- assertVisible: ^Groceries.*
 - assertNotVisible: Edit
 - tapOn: Search notes
 - eraseText
 - inputText: zzz
 - hideKeyboard
-- assertNotVisible: Groceries
+- assertNotVisible: ^Groceries.*
 - assertVisible: No notes match “zzz”
-- assertNotVisible: Groceries
+- assertNotVisible: ^Groceries.*

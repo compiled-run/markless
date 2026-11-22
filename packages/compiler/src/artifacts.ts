@@ -132,6 +132,8 @@ export type SemanticScriptGlobal = {
 	readonly property?: string;
 	/** `document.activeElement`: the member this use reads straight off the global, when it reads one by name. */
 	readonly member?: string;
+	/** A module statement's use inside a function it declares: it runs when that function is called, not as the module loads. */
+	readonly deferred?: true;
 };
 
 /** A handler's or computed's own JavaScript, as a phone's script engine runs it. Native builds only. */
