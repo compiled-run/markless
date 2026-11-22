@@ -25,6 +25,8 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var scroll: ResolvedScroll?
 	/// A select's drop-down arrow, once Dragon's plan has laid the page out.
 	public var selectArrow: SelectArrowPaint?
+	/// A themed checkbox's marks and colours, once Dragon's plan has laid the page out.
+	public var checkbox: CheckboxPaint?
 	/// A select's label: the box Dragon lays out inside it for its text, and that text's font and colour.
 	public var selectLabel: SelectLabel?
 	/// `visibility` other than visible (a text takes its element's): the view keeps its place, but paints nothing of its own.
@@ -36,13 +38,20 @@ public struct ResolvedStyle: Equatable, Sendable {
 			&& a.textColor == b.textColor && a.lines == b.lines && a.linesText == b.linesText && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll && a.hidden == b.hidden
 			&& a.clipsChildren == b.clipsChildren && a.clipRect == b.clipRect
 			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank
-			&& a.selectArrow == b.selectArrow && a.selectLabel == b.selectLabel
+			&& a.selectArrow == b.selectArrow && a.selectLabel == b.selectLabel && a.checkbox == b.checkbox
 	}
 
 	public struct SelectArrowPaint: Equatable, Sendable {
 		public let arrow: SelectArrow
 		public let color: RGBA
 		/// Device px per point: the arrow's geometry is in device px.
+		public let scale: Double
+	}
+
+	public struct CheckboxPaint: Equatable, Sendable {
+		public let marks: CheckboxMarks
+		public let colors: CheckboxColors
+		/// Device px per point: the marks are in device px.
 		public let scale: Double
 	}
 
@@ -404,6 +413,8 @@ extension StyleExport {
 			case let .paintOrder(_, bucket, rank): style.paintOrder = (bucket, rank)
 			case let .selectArrow(color):
 				if let arrow = node.selectArrow { style.selectArrow = ResolvedStyle.SelectArrowPaint(arrow: arrow, color: color, scale: dpr) }
+			case let .checkbox(colors):
+				if let marks = node.checkboxMarks { style.checkbox = ResolvedStyle.CheckboxPaint(marks: marks, colors: colors, scale: dpr) }
 			case let .visibility(value): style.hidden = value != "visible"
 			}
 		}

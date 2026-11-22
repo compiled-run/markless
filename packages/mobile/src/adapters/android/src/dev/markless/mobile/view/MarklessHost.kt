@@ -1606,6 +1606,7 @@ class MarklessHost(
 			StyleWrite.ClipText -> {}
 			is StyleWrite.PaintOrder -> {}
 			is StyleWrite.SelectArrow -> if (view !is SelectBox) throw MarklessHostError("\"${s.id}\" draws a drop-down arrow but is not a select")
+			is StyleWrite.Checkbox -> if (view !is CheckBox) throw MarklessHostError("\"${s.id}\" draws a themed checkbox but is not a checkbox")
 			is StyleWrite.Visibility -> {}
 		}
 		if (s.kind != "text") {
@@ -1628,8 +1629,10 @@ class MarklessHost(
 			return
 		}
 		val bw = s.borderWidths ?: throw MarklessHostError("element \"${s.id}\" has no border widths")
-		val arrow = s.selectArrow?.let { MenuListArrow(it, s.writes.filterIsInstance<StyleWrite.SelectArrow>().last().color.argb) }
-		// Chrome paints a menulist-button's arrow over its background and under its border.
+		val checkbox = s.checkboxMarks?.let { ThemedCheckbox(it, s.writes.filterIsInstance<StyleWrite.Checkbox>().last().colors) }
+		if (checkbox != null) (view as CheckBox).buttonDrawable = null
+		val arrow = s.selectArrow?.let { MenuListArrow(it, s.writes.filterIsInstance<StyleWrite.SelectArrow>().last().color.argb) } ?: checkbox
+		// Chrome paints a menulist-button's arrow, and the theme's checkbox, over the background and under the border.
 		fun withArrow(box: (Int) -> Drawable): Drawable = if (arrow == null) box(fill ?: 0) else LayerDrawable(arrayOf(
 			GradientDrawable().apply { setColor(fill ?: 0); radii?.let { r -> cornerRadii = r.map { it.toFloat() }.toFloatArray() } }, arrow, box(0),
 		))

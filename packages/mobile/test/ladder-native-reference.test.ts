@@ -300,6 +300,8 @@ function mirror(
 		mount,
 		apply,
 		elementReading,
+		// A press on a <label> acts on the control its `for` names, as both hosts pass it on.
+		pressed: (host: string) => (nodeOf.get(baseOf(host))?.element === 'label' ? (attributes.get(`${host}\0for`) ?? host) : host),
 		disabled: (host: string) => attributes.get(`${host}\0disabled`) != null,
 		/** Types into the emptied field and returns what it holds. */
 		typed: (host: string, text: string) => {
@@ -450,7 +452,7 @@ function walkApp(
 			if (!host) throw new Error(`step ${index}: nothing on the top screen to act on`);
 			const journal =
 				'tap' in action
-					? appRuntime.dispatch({ event: 'activate', host })
+					? appRuntime.dispatch({ event: 'activate', host: top.pressed(host) })
 					: 'type' in action
 						? appRuntime.dispatch({
 								event: 'input',
