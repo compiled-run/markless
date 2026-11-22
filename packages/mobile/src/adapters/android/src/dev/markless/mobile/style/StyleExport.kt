@@ -251,6 +251,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 		val plan = plan ?: return this
 		if (slotValues.size != slots.size) throw MarklessDecodeError("the style export reads ${slots.size} slots; the layout was given ${slotValues.size} values")
 		val slotsText = if (slots.isEmpty()) "" else slotValues.joinToString(",", ",\"slots\":[", "]") { "\"${java.lang.Long.toHexString(it.toRawBits()).padStart(16, '0')}\"" }
+		var undecided: String? = null
 		val laid = assignments.indices.map { k ->
 			val names = planNames.getOrNull(k) ?: emptyMap()
 			val dragonId = names.entries.associate { (d, m) -> m to d }
@@ -271,6 +272,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val parts = result.arr("plan layout")
 			if (parts.size != (if (slots.isEmpty()) 3 else 4) || parts[0] != Json.Str("ok")) throw MarklessDecodeError("Dragon's layout at $width x $height dp and ${scale}x failed: ${result.text()}")
 			val page = parts[1].arr("plan layout page scroll")
+			// Dragon's ["undecided", node, reason] when it could not decide the page's range at this size.
+			if (page.size == 3) undecided = "${page[1].str("plan layout page scroll node")}: ${page[2].str("plan layout page scroll reason")}"
 			val pageScroll = if (page.size == 3) null else range(rangeJson(page, "plan layout page scroll"), "plan layout page scroll")
 			val geometry = HashMap<String, List<Json>>()
 			for (g in parts[2].arr("plan layout nodes")) {
@@ -336,7 +339,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				)
 			})
 		}
-		return copy(dpr = scale, viewportWidth = width, viewportHeight = height, assignments = laid)
+		return copy(dpr = scale, viewportWidth = width, viewportHeight = height, assignments = laid, pageScrollUndecided = undecided ?: pageScrollUndecided)
 	}
 
 	companion object {
@@ -741,6 +744,31 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			}
 		}
 	}
+}
+
+/**
+ * Where a box Dragon paints in its stacking context's order ([order]'s host) is placed so its view's siblings are that order: the
+ * host when it is a view's node ([isView]), else the page's top node; null when that is [viewParent], its view's parent already.
+ * A box in between that clips, scrolls or keeps an order of its own would have to carry the box with it, and is refused by name,
+ * as is a box below the flow (a negative z-index) placed past its parent.
+ */
+fun stackingParent(s: StyledNode, order: StyleWrite.PaintOrder, styled: Assignment, isView: (String) -> Boolean, viewParent: String?): String? {
+	val chain = ArrayList<StyledNode>()
+	var cursor = s.parent
+	while (cursor != null && cursor != order.host) {
+		val between = styled.byId[cursor] ?: throw MarklessDecodeError("\"${s.id}\"'s stacking context ${order.host} is not an ancestor")
+		chain.add(between)
+		cursor = between.parent
+	}
+	if (cursor == null) throw MarklessDecodeError("\"${s.id}\"'s stacking context ${order.host} is not an ancestor")
+	val target = if (isView(order.host)) order.host else chain.lastOrNull { isView(it.id) }?.id
+	for (box in chain.takeWhile { it.id != target }) {
+		if (box.writes.any { it == StyleWrite.PaddingBoxClip || it is StyleWrite.ClipPathInset || it is StyleWrite.ScrollContainer }) throw MarklessDecodeError("\"${s.id}\" paints in ${order.host}'s stacking order past ${box.id}, which clips or scrolls; not implemented on Android")
+		if (box.writes.any { it is StyleWrite.PaintOrder }) throw MarklessDecodeError("\"${s.id}\" paints in ${order.host}'s stacking order past ${box.id}, which keeps an order of its own; not implemented on Android")
+	}
+	if (target == null || target == viewParent) return null
+	if (order.bucket < 0) throw MarklessDecodeError("\"${s.id}\" paints below the flow of ${order.host} past ${viewParent ?: "the page"}; not implemented on Android")
+	return target
 }
 
 /** A list whose rows a phone lays out (Dragon's `planRepeats`): the box its rows hang from and one row's top boxes, by Dragon id. */

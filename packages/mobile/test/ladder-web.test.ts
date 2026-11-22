@@ -23,13 +23,16 @@ import type { ScrollVectors } from '../src/scroll.ts';
 import {
 	allRungFolders,
 	callsText,
+	describeText,
 	proofsDir,
 	readRung,
+	selector,
 	sheetStyleRungFolders,
 	styleRungFolders,
 	SWIPES_UNTIL,
 	type LadderRung,
 	type LadderStep,
+	type LadderText,
 } from '../proofs/ladder.ts';
 
 // The web column of the ladder: each rung's App.tsrx built as the page of a real router app,
@@ -161,21 +164,26 @@ function recordDeviceCalls() {
 /** The field a person types into by its name: a text field, or a number field (a spinbutton). */
 const typedField = (page: Page, name: string): Locator =>
 	page.getByRole('textbox', { name, exact: true }).or(page.getByRole('spinbutton', { name, exact: true }));
-const shown = (page: Page, text: string): Locator =>
-	page
+// A text named by how it starts matches as a plain one does, each element's whole text or name beginning with it.
+const named = (text: LadderText): string | RegExp =>
+	typeof text === 'string' ? text : new RegExp(selector(text), 's');
+const shown = (page: Page, given: LadderText): Locator => {
+	const text = named(given);
+	return page
 		.getByText(text, { exact: true })
 		.or(page.getByLabel(text, { exact: true }))
 		.or(page.getByRole('img', { name: text, exact: true }))
 		// An image is found by its alt text, its accessible name, as a phone's screen reader names it.
 		.or(page.getByAltText(text, { exact: true }))
 		.or(page.getByRole('combobox').filter({ has: page.locator('option:checked').getByText(text, { exact: true }) }));
+};
 
 // The phone the style exports lay out for (Dragon's iOS viewport): a rung that scrolls scrolls here as on the phones.
 const PHONE = { width: 402, height: 778 };
 
 // On screen: drawn (not visibility: hidden) and some of it inside the viewport, not clipped away by a scrolling box, as an
 // IntersectionObserver reports.
-const onScreenCount = (page: Page, text: string): Promise<number> =>
+const onScreenCount = (page: Page, text: LadderText): Promise<number> =>
 	shown(page, text).evaluateAll(async (elements) => {
 		const seen = await Promise.all(
 			elements.map(
@@ -272,13 +280,13 @@ async function act(page: Page, step: LadderStep) {
 		const tap = 'tap' in action ? action.tap : action.doubleTap;
 		// A text that is also a control's accessible name (a label and the switch it names) taps the control, as on a phone;
 		// a button named by its own text comes first, over a region its heading also names.
-		const button = page.getByRole('button', { name: tap, exact: true });
-		const named = page.getByLabel(tap, { exact: true });
+		const button = page.getByRole('button', { name: named(tap), exact: true });
+		const labelled = page.getByLabel(named(tap), { exact: true });
 		const target =
 			(await button.count()) === 1
 				? button
-				: (await named.count()) === 1
-					? named
+				: (await labelled.count()) === 1
+					? labelled
 					: shown(page, tap);
 		await ('tap' in action ? target.click() : target.dblclick());
 	} else if ('type' in action) {
@@ -336,9 +344,10 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 	const failed: string[] = [];
 	const onScreen = (text: string) => shown(page, text).filter({ visible: true });
 	for (const text of step.visible)
-		if ((await onScreenCount(page, text)) === 0) failed.push(`"${text}" is not on screen`);
+		if ((await onScreenCount(page, text)) === 0)
+			failed.push(`${describeText(text)} is not on screen`);
 	for (const text of step.absent ?? [])
-		if ((await onScreenCount(page, text)) > 0) failed.push(`"${text}" is on screen`);
+		if ((await onScreenCount(page, text)) > 0) failed.push(`${describeText(text)} is on screen`);
 	for (const text of step.hidden ?? []) {
 		if ((await shown(page, text).count()) === 0) failed.push(`"${text}" is not on the page`);
 		else if ((await onScreenCount(page, text)) > 0) failed.push(`"${text}" is on screen`);

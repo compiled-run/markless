@@ -218,7 +218,9 @@ internal class Overlays(private val host: MarklessHost, private val context: Con
 		val rect = Rect()
 		fun deepest(v: View): String? {
 			if (v.visibility != View.VISIBLE || !v.getGlobalVisibleRect(rect) || !rect.contains(x, y)) return null
-			if (v is ViewGroup) for (i in v.childCount - 1 downTo 0) deepest(v.getChildAt(i))?.let { return it }
+			// The topmost child first, as the box draws them: a box in a stacking context's order over the flow before it.
+			if (v is MarklessBox) for (c in v.drawingOrder().asReversed()) deepest(c)?.let { return it }
+			else if (v is ViewGroup) for (i in v.childCount - 1 downTo 0) deepest(v.getChildAt(i))?.let { return it }
 			return nodes[v]
 		}
 		lifted?.let { return deepest(it.layer) ?: it.id }
