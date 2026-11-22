@@ -10,6 +10,7 @@ import {
 	NATIVE_SCRIPT_SUBMITTED_FORM,
 	NATIVE_UNBOUND_HANDLE,
 } from '@markless/serializer/native-view';
+import { SVG_GEOMETRY_SOURCE } from './native-svg-geometry.ts';
 
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
 export type NativeScriptModuleInput = {
@@ -431,7 +432,8 @@ if (!host) {
 	}
 	// The form a submit handler's event names: only FormData reads it, as its entries when the form was sent.
 	host.Form = function (entries) { Object.defineProperty(this, 'entries', { value: entries }); };
-	if (typeof g.FormData !== 'function') {
+	// Built in its own function: a hoisted var FormData would hide the global in every later payload's script.
+	if (typeof g.FormData !== 'function') (function () {
 		var FormData = function FormData(form, submitter) {
 			if (!(this instanceof FormData)) throw new TypeError("Failed to construct 'FormData': Please use the 'new' operator");
 			if (submitter !== undefined && submitter !== null) throw new TypeError("FormData on a phone does not read a submitter yet");
@@ -468,7 +470,7 @@ if (!host) {
 		FormData.prototype.values = function () { return iterate(this, function (entry) { return entry[1]; }); };
 		FormData.prototype[Symbol.iterator] = FormData.prototype.entries;
 		g.FormData = FormData;
-	}
+	})();
 }`;
 
 // One payload's script: its modules, its functions, and the entry points a host calls (`enter`, then `leave`).
@@ -890,6 +892,8 @@ export function nativeScriptOf(
 	classes?: Readonly<Record<string, string>>,
 	/** For `navigate()`: the page's route pattern, and the app's route patterns in the router's order. */
 	navigation?: { readonly here: string; readonly routes: ReadonlyArray<string> },
+	/** A drawing's geometry follows state: the engine carries the svg grammars (`__svgPath`, `__svgViewBox`). */
+	svg = false,
 	/** The app's origin (app.json `origin`), which a URL from the root resolves against. */
 	origin?: string,
 ): NativeScript {
@@ -914,6 +918,7 @@ export function nativeScriptOf(
 		...(classes ? [`var classes = ${JSON.stringify(classes)};`] : []),
 		`var navigation = ${JSON.stringify(navigation ?? null)};`,
 		...definitions,
+		...(svg ? [SVG_GEOMETRY_SOURCE] : []),
 		ENTRIES,
 	].join('\n');
 	const id = contentId(body);

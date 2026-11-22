@@ -42,15 +42,23 @@ for (const folder of readdirSync(families, { withFileTypes: true })
 		if (exportedComponents.get(source)!.has(entry.importedName)) parts.push(entry.exportName);
 	}
 	const name = namespace(folder);
+	// A part shown on a device object takes that object as `el` and no children, as its props say; the rest wrap text.
+	const usesCamera = parts.includes('camera');
 	const inner = parts
 		.filter((part) => part !== 'root')
-		.map((part) => `<${name}.${part}>x</${name}.${part}>`)
+		.map((part) =>
+			part === 'camera' ? `<${name}.camera el={cam} />` : `<${name}.${part}>x</${name}.${part}>`,
+		)
 		.join('');
 	const body = parts.includes('root') ? `<${name}.root>${inner}</${name}.root>` : inner;
 	const build = await compileNativeComponent({
 		filename: `packages/mobile/proofs/probe-${folder}.tsrx`,
-		source: `import { ${name} } from '@markless/ui';\nexport default function App() @{\n<main>${body}</main>\n}\n`,
+		source: usesCamera
+			? `import { ${name} } from '@markless/ui';\nimport { camera } from '@markless/device';\nexport default function App() @{\nconst cam = camera();\n<main>${body}</main>\n}\n`
+			: `import { ${name} } from '@markless/ui';\nexport default function App() @{\n<main>${body}</main>\n}\n`,
 		readModule: readWorkspaceModule,
+		// An app that shows a camera says why it asks for one, as an app's config does.
+		...(usesCamera ? { device: { usage: { camera: 'The probe shows a camera.' } } } : {}),
 	});
 	report[folder] = {
 		payload: build.payload !== null,

@@ -40,6 +40,8 @@ public enum StyleWrite: Sendable {
 	case paintOrder(host: String, bucket: Int, rank: Int)
 	/// box-shadow: the computed shadows in list order.
 	case boxShadow([BoxShadow.Shadow])
+	/// `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own.
+	case visibility(String)
 }
 
 /// A dashed or dotted border as Dragon's own native paint draws it (its port of Blink's side painter): operations in device px,
@@ -893,6 +895,13 @@ public struct StyleExport: Sendable {
 					inset: try s["inset"].bool(), x: try s["x"].number(), y: try s["y"].number(), blur: try s["blur"].number(),
 					spread: try s["spread"].number(), color: try decodeColor(try s["color"]))
 			})
+		case "visibility":
+			let f = try write.object(["kind", "value", "canvas", "key"])
+			try expectKey(f, "visibility")
+			let value = try f["value"].string()
+			guard ["visible", "hidden", "collapse"].contains(value) else { throw PayloadError(path: write.path + ".value", reason: "visibility \(value) is not visible, hidden or collapse") }
+			_ = try f["canvas"].bool()
+			return .visibility(value)
 		default:
 			throw PayloadError(path: write.path + ".kind", reason: "unknown style write kind \"\(kind)\"")
 		}

@@ -25,6 +25,7 @@ import dev.markless.mobile.core.Drawing
 import dev.markless.mobile.core.DrawingText
 import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.Payload
+import dev.markless.mobile.core.Shape
 import dev.markless.mobile.core.ShapePaint
 import dev.markless.mobile.core.TextRun
 
@@ -160,8 +161,10 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 	/** What `currentColor` paints: the svg's text colour from a style export, else black. */
 	var currentColor: Int = Color.BLACK
 		set(value) { field = value; invalidate() }
-	private val paths = drawing.shapes.map { shape -> pathOf(shape.path).apply { fillType = if (shape.evenOdd) Path.FillType.EVEN_ODD else Path.FillType.WINDING } }
-	private val clips = drawing.shapes.map { shape -> shape.clip.map(::pathOf) }
+	private val clips = drawing.shapes.map { shape -> shape.clip.map { pathOf(it) } }
+	private fun pathOf(shape: Shape, v: List<Double>) = pathOf(v).apply {
+		fillType = if (shape.evenOdd) Path.FillType.EVEN_ODD else Path.FillType.WINDING
+	}
 
 	/** A verb-coded outline: 0 move x y, 1 line x y, 3 cubic x1 y1 x2 y2 x y, 4 close. */
 	private fun pathOf(v: List<Double>) = Path().apply {
@@ -176,13 +179,37 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 			}
 		}
 	}
+	private val paths = drawing.shapes.map { pathOf(it, it.path) }
 	private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
+	/** min-x, min-y, width and height: the compiled one, or what a `viewBox` that follows state gives. */
+	var viewBox: List<Double>? = drawing.viewBox
+		private set
+	/** Shapes from inside it (a component's `<path>`), in tree order, each with the outline it has now. */
+	private val live = ArrayList<Triple<String, Shape, Path>>()
 	/** What the drawing's `<text>` says, read when the svg has no name. */
 	val label: String? get() = drawing.label
 
 	/** The width over the height the web gives it without a size: the viewBox's, else 300 by 150. */
-	private val ratio: Double = drawing.viewBox?.let { it[3] / it[2] } ?: 0.5
+	private val ratio: Double get() = viewBox?.let { it[3] / it[2] } ?: 0.5
+
+	fun addShape(id: String, shape: Shape, outline: String?) {
+		live.add(Triple(id, shape, pathOf(shape, if (shape.path.isEmpty()) numbers(outline) else shape.path)))
+		invalidate()
+	}
+
+	fun setOutline(id: String, outline: String?) {
+		val at = live.indexOfFirst { it.first == id }
+		if (at < 0) return
+		live[at] = Triple(id, live[at].second, pathOf(live[at].second, numbers(outline)))
+		invalidate()
+	}
+
+	fun setViewBox(text: String?) {
+		viewBox = numbers(text).takeIf { it.size == 4 }
+		requestLayout()
+		invalidate()
+	}
 
 	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
 		val available = MeasureSpec.getSize(widthMeasureSpec).toDouble()
@@ -193,7 +220,7 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 
 	override fun onDraw(canvas: Canvas) {
 		canvas.save()
-		drawing.viewBox?.let { (x, y, w, h) ->
+		viewBox?.let { (x, y, w, h) ->
 			// SVG 2 §8.5: the viewBox placed in the box by preserveAspectRatio, xMidYMid meet when it has none.
 			when (val aspect = drawing.aspect) {
 				Aspect.None -> {
@@ -211,9 +238,10 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 				}
 			}
 		} ?: canvas.scale(density, density)
-		for ((index, shape) in drawing.shapes.withIndex()) {
+		for ((index, drawn) in (drawing.shapes.zip(paths) + live.map { it.second to it.third }).withIndex()) {
+			val (shape, path) = drawn
 			canvas.save()
-			for (clip in clips[index]) canvas.clipPath(clip)
+			for (clip in clips.getOrNull(index).orEmpty()) canvas.clipPath(clip)
 			shape.transform?.let { (a, b, c, d, e, f) ->
 				canvas.concat(Matrix().apply { setValues(floatArrayOf(a.toFloat(), c.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) })
 			}
@@ -226,7 +254,7 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 				paint.reset(); paint.isAntiAlias = true
 				paint.style = Paint.Style.FILL
 				paint.color = colorOf(fill)
-				canvas.drawPath(paths[index], paint)
+				canvas.drawPath(path, paint)
 			}
 			shape.stroke?.let { stroke ->
 				paint.reset(); paint.isAntiAlias = true
@@ -236,7 +264,7 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 				paint.strokeCap = when (shape.cap) { "round" -> Paint.Cap.ROUND; "square" -> Paint.Cap.SQUARE; else -> Paint.Cap.BUTT }
 				paint.strokeJoin = when (shape.join) { "round" -> Paint.Join.ROUND; "bevel" -> Paint.Join.BEVEL; else -> Paint.Join.MITER }
 				paint.strokeMiter = shape.miterLimit.toFloat()
-				canvas.drawPath(paths[index], paint)
+				canvas.drawPath(path, paint)
 			}
 			canvas.restore()
 		}
@@ -303,3 +331,6 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 }
 
 private operator fun <T> List<T>.component6(): T = this[5]
+
+/** The engine's numbers, space-separated, as the journal carries a drawing's outline or viewBox; nil or empty is none. */
+internal fun numbers(text: String?): List<Double> = text.orEmpty().split(' ').mapNotNull { it.toDoubleOrNull() }

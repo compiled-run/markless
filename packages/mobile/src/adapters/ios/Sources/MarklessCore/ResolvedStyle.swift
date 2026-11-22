@@ -25,11 +25,13 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var scroll: ResolvedScroll?
 	/// box-shadow, rastered by Dragon's translated painter after every layout.
 	public var shadow: BoxShadow?
+	/// `visibility` other than visible (a text takes its element's): the view keeps its place, but paints nothing of its own.
+	public var hidden = false
 
 	public static func == (a: ResolvedStyle, b: ResolvedStyle) -> Bool {
 		a.frame == b.frame && a.background == b.background && a.borderWidth == b.borderWidth && a.borderColor == b.borderColor
 			&& a.cornerRadius == b.cornerRadius && a.font?.family == b.font?.family && a.font?.size == b.font?.size
-			&& a.textColor == b.textColor && a.lines == b.lines && a.linesText == b.linesText && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll
+			&& a.textColor == b.textColor && a.lines == b.lines && a.linesText == b.linesText && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll && a.hidden == b.hidden
 			&& a.clipsChildren == b.clipsChildren && a.clipRect == b.clipRect
 			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank && a.shadow == b.shadow
 	}
@@ -218,6 +220,10 @@ extension StyleExport {
 		canvas: RGBA?, body: RGBA?
 	) throws -> [String: ResolvedStyle] {
 		let byId = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
+		// Boxes whose visibility is not visible: their text, which Dragon writes no visibility for, is hidden with them.
+		let hiddenBoxes = Set(nodes.filter { node in
+			node.writes.contains { if case let .visibility(value) = $0 { return value != "visible" }; return false }
+		}.map(\.id))
 		let payloadIds = Set(payloadNodes.map(\.id))
 		let texts = initialTexts.map { Dictionary(uniqueKeysWithValues: $0.map { ($0.node, $0.text) }) }
 		var styles: [String: ResolvedStyle] = [:]
@@ -250,6 +256,7 @@ extension StyleExport {
 			}
 			var style = try resolve(styled, styled.writes)
 			style.shadow = try BoxShadow.of(styled, byId: byId, canvas: canvas, body: body, dpr: dpr)
+			if styled.isText, let parent = styled.parent, hiddenBoxes.contains(parent) { style.hidden = true }
 			// A box that paints nothing (an empty clip) has no order to keep.
 			if style.clipRect.map({ $0.width == 0 || $0.height == 0 }) ?? false { style.paintOrder = nil }
 			if style.paintOrder != nil, let host = reHostOf(styled.writes) { try checkSiblingOrderSuffices(styled, host: host, byId: byId, nodes: nodes) }
@@ -272,6 +279,7 @@ extension StyleExport {
 			}
 			var style = try resolve(styled, styled.writes)
 			style.shadow = try BoxShadow.of(styled, byId: byId, canvas: canvas, body: body, dpr: dpr)
+			if styled.isText, let parent = styled.parent, hiddenBoxes.contains(parent) { style.hidden = true }
 			if let frame = style.frame {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
 			}
@@ -351,6 +359,7 @@ extension StyleExport {
 			case .clipText: break
 			case let .paintOrder(_, bucket, rank): style.paintOrder = (bucket, rank)
 			case .boxShadow: break
+			case let .visibility(value): style.hidden = value != "visible"
 			}
 		}
 		// A scroll view clips its own content; any other box clips its children.
@@ -390,6 +399,14 @@ extension StyleExport {
 					style.sides = zip(widths, borderColors).map { ResolvedStyle.Side(width: $0 / dpr, color: $1) }
 				}
 			}
+		}
+		// A box that is not visible paints none of its own decorations; its children paint as their own visibility says.
+		if style.hidden {
+			style.background = nil
+			style.borderWidth = 0
+			style.borderColor = nil
+			style.sides = nil
+			style.dashedBorder = nil
 		}
 		return style
 	}
