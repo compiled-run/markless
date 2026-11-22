@@ -4481,6 +4481,46 @@ export function Page() @{
 		expect(plain.payload!.script).toBeUndefined();
 	});
 
+	it('opens a <details> from a press on its <summary>, after the summary\'s own handler; refuses what it cannot keep', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let peeks = state(0);
+	<details open>
+		<summary onClick={() => peeks++}>More {peeks}</summary>
+		<p>Body</p>
+	</details>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.cells).toContainEqual({ id: 'details:h0', name: 'open', initial: true });
+		const toggle = { op: 'assign', cell: 'details:h0', value: { unary: '!', value: { cell: 'details:h0' } } };
+		expect(payload!.handlers[0]!.ops.at(-1)).toEqual(toggle);
+		const node = (id: string) => payload!.nodes.find((one) => one.id === id) as { attributes?: object; bindings?: unknown[] };
+		expect(node('h0').attributes).toBeUndefined();
+		expect(node('h2').bindings).toEqual([{ attribute: 'hidden', value: { unary: '!', value: { cell: 'details:h0' } } }]);
+		const refused = async (source: string) =>
+			(await nativeView(`import { state } from '@markless/core';\n${source}`)).diagnostics.map((diagnostic) => diagnostic.message);
+		expect(await refused(`export function Page() @{ <details><p>No legend</p></details> }`)).toEqual([
+			'the <details> h0 has no <summary>, so the browser writes its label, which a native build does not yet',
+		]);
+		expect(
+			await refused(`export function Page() @{
+	let shown = state(false);
+	<details open={shown}><summary>S</summary><p>B</p></details>
+}`),
+		).toEqual(['the <details> h0 binds `open`; a native build opens it from a press on its <summary>']);
+		expect(await refused(`export function Page() @{ <details name="faq"><summary>S</summary><p>B</p></details> }`)).toEqual([
+			'the <details> h0 has `name`, an exclusive group a native build does not keep yet',
+		]);
+		expect(
+			await refused(`export function Page() @{
+	let n = state(0);
+	<details><summary onClick={(event) => { n++; if (n > 1) event.preventDefault(); }}>S</summary><p>B</p></details>
+}`),
+		).toEqual([
+			'the click handler on the <summary> h1 may call `event.preventDefault()` in JavaScript, which a phone cannot report before the toggle yet',
+		]);
+	});
+
 	it('passes a component a prop that calls app code through the script', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function total(text: string): number {

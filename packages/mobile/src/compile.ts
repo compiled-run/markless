@@ -441,7 +441,7 @@ export async function compileNativeComponent(input: {
 	};
 }
 
-/** Elements a native host cannot draw on a styled page from what Dragon exports for it. */
+/** Elements a native host cannot draw on a styled page from what Dragon exports for it: a select in a system sheet and a summary's triangle. */
 function unstyledOnly(
 	payload: NativeViewPayload,
 	sources: NativeViewArtifact['elementSources'],
@@ -458,6 +458,13 @@ function unstyledOnly(
 			return [
 				nativeUnsupported(
 					`the <select> ${node.id} inside the system sheet ${sheet} on a styled page: a sheet's content is exported without Dragon's plan layout, so no geometry for its drop-down arrow reaches the phone`,
+					span,
+				),
+			];
+		if (node.element === 'summary')
+			return [
+				nativeUnsupported(
+					`the <summary> ${node.id} on a styled page, whose disclosure triangle Dragon does not draw yet`,
 					span,
 				),
 			];
