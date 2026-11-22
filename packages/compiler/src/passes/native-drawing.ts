@@ -87,7 +87,7 @@ const INITIAL: Inherited = {
 	markers: {},
 };
 
-const SHAPES = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
+export const SHAPES: ReadonlySet<string> = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
 /** Elements that draw nothing themselves and whose content is never drawn in place. */
 const NEVER_DRAWN = new Set(['defs', 'symbol', 'title', 'desc', 'metadata', 'clipPath', 'marker']);
 /** Shapes that get markers at their vertices. */
@@ -1578,3 +1578,34 @@ const NAMED_COLORS: Readonly<Record<string, number>> = {
 	yellow: 0xffff00,
 	yellowgreen: 0x9acd32,
 };
+
+/**
+ * A `<path>` an svg draws while the app runs (it comes from a component or the svg's children): its paint, inherited from
+ * the svg, read when the app is built. A `d` that follows state leaves `path` empty; the host draws what the engine
+ * makes of it. Other attributes that follow state are refused, as on a compiled drawing.
+ */
+export function compileLiveShape(
+	svg: Readonly<Record<string, string>>,
+	element: DrawingElement,
+	svgId: string,
+): { readonly shape?: NativeShape; readonly refusals: ReadonlyArray<DrawingRefusal> } {
+	const live = element.bound.includes('d');
+	const result = compileDrawing(
+		svg,
+		[
+			{
+				...element,
+				path: [0],
+				attributes: live ? { ...element.attributes, d: 'M0 0' } : element.attributes,
+				bound: element.bound.filter((name) => name !== 'd'),
+			},
+		],
+		[],
+		svgId,
+	);
+	const shape = result.drawing.shapes[0];
+	return {
+		...(shape ? { shape: live ? { ...shape, path: [] } : shape } : {}),
+		refusals: result.refusals.filter((refusal) => refusal.element === element.id),
+	};
+}

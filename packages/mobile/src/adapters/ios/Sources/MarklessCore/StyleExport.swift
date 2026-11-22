@@ -38,6 +38,8 @@ public enum StyleWrite: Sendable {
 	case clipText
 	/// The box paints in another stacking context's order (Dragon's re-hosting); `host` is that context's node.
 	case paintOrder(host: String, bucket: Int, rank: Int)
+	/// `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own.
+	case visibility(String)
 }
 
 /// A dashed or dotted border as Dragon's own native paint draws it (its port of Blink's side painter): operations in device px,
@@ -898,6 +900,13 @@ public struct StyleExport: Sendable {
 			try expectKey(f, "dragonStacking.order")
 			_ = try f["index"].number()
 			return .paintOrder(host: try f["host"].string(), bucket: Int(try f["bucket"].number()), rank: Int(try f["rank"].number()))
+		case "visibility":
+			let f = try write.object(["kind", "value", "canvas", "key"])
+			try expectKey(f, "visibility")
+			let value = try f["value"].string()
+			guard ["visible", "hidden", "collapse"].contains(value) else { throw PayloadError(path: write.path + ".value", reason: "visibility \(value) is not visible, hidden or collapse") }
+			_ = try f["canvas"].bool()
+			return .visibility(value)
 		default:
 			throw PayloadError(path: write.path + ".kind", reason: "unknown style write kind \"\(kind)\"")
 		}

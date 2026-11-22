@@ -1,0 +1,19 @@
+{
+	"rung": "S25",
+	"name": "visibility: hidden hides a styled box and its text while it keeps its space, and showing it again draws both",
+	"steps": [
+		{
+			"visible": ["Visibility", "Secret note", "Below the note"],
+			"title": "Visibility"
+		},
+		{
+			"do": { "tap": "Toggle note" },
+			"visible": ["Below the note"],
+			"hidden": ["Secret note"]
+		},
+		{
+			"do": { "tap": "Toggle note" },
+			"visible": ["Secret note", "Below the note"]
+		}
+	]
+}

@@ -9,7 +9,10 @@
 				"name": "size",
 				"initial": "medium",
 				"styled": true,
-				"domain": ["medium", "small"]
+				"domain": [
+					"medium",
+					"small"
+				]
 			},
 			{
 				"id": "component-edge:0/shared:packages/headless/components/src/radio-group/radio-group.tsrx#radiogroupState/state:group.value",
@@ -853,43 +856,168 @@
 		]
 	},
 	"initial": [
-		["h1:text0", "Photo size"],
-		["component-edge:1/h1:text0", "Photo size"],
-		["component-edge:4/h5:text0", "Pick small"],
-		["component-edge:7/h5:text0", "Pick medium"],
-		["h2:text0", "Size: medium"]
+		[
+			"h1:text0",
+			"Photo size"
+		],
+		[
+			"component-edge:1/h1:text0",
+			"Photo size"
+		],
+		[
+			"component-edge:4/h5:text0",
+			"Pick small"
+		],
+		[
+			"component-edge:7/h5:text0",
+			"Pick medium"
+		],
+		[
+			"h2:text0",
+			"Size: medium"
+		]
 	],
 	"initialAttributes": [
-		["component-edge:0/component-edge:0/h0", "aria-orientation", "vertical"],
-		["component-edge:0/component-edge:0/h0", "aria-disabled", null],
-		["component-edge:0/component-edge:0/h0", "aria-required", null],
-		["component-edge:0/component-edge:0/h0", "aria-invalid", null],
-		["component-edge:0/component-edge:0/h0", "ui-horizontal", null],
-		["component-edge:0/component-edge:0/h0", "ui-disabled", null],
-		["component-edge:0/component-edge:0/h0", "ui-required", null],
-		["component-edge:0/component-edge:0/h0", "aria-labelledby", "component-edge:1/h1"],
-		["component-edge:2/h4", "ui-selected", null],
-		["component-edge:2/h4", "ui-disabled", null],
-		["component-edge:3/h8", "name", ""],
-		["component-edge:3/h8", "value", "small"],
-		["component-edge:3/h8", "disabled", null],
-		["component-edge:3/h8", "required", null],
-		["component-edge:3/h8", "tabindex", "-1"],
-		["component-edge:4/h5", "ui-selected", null],
-		["component-edge:4/h5", "ui-disabled", null],
-		["component-edge:5/h4", "ui-selected", ""],
-		["component-edge:5/h4", "ui-disabled", null],
-		["component-edge:6/h8", "name", ""],
-		["component-edge:6/h8", "value", "medium"],
-		["component-edge:6/h8", "disabled", null],
-		["component-edge:6/h8", "required", null],
-		["component-edge:6/h8", "tabindex", "0"],
-		["component-edge:7/h5", "ui-selected", ""],
-		["component-edge:7/h5", "ui-disabled", null]
+		[
+			"component-edge:0/component-edge:0/h0",
+			"aria-orientation",
+			"vertical"
+		],
+		[
+			"component-edge:0/component-edge:0/h0",
+			"aria-disabled",
+			null
+		],
+		[
+			"component-edge:0/component-edge:0/h0",
+			"aria-required",
+			null
+		],
+		[
+			"component-edge:0/component-edge:0/h0",
+			"aria-invalid",
+			null
+		],
+		[
+			"component-edge:0/component-edge:0/h0",
+			"ui-horizontal",
+			null
+		],
+		[
+			"component-edge:0/component-edge:0/h0",
+			"ui-disabled",
+			null
+		],
+		[
+			"component-edge:0/component-edge:0/h0",
+			"ui-required",
+			null
+		],
+		[
+			"component-edge:0/component-edge:0/h0",
+			"aria-labelledby",
+			"component-edge:1/h1"
+		],
+		[
+			"component-edge:2/h4",
+			"ui-selected",
+			null
+		],
+		[
+			"component-edge:2/h4",
+			"ui-disabled",
+			null
+		],
+		[
+			"component-edge:3/h8",
+			"name",
+			""
+		],
+		[
+			"component-edge:3/h8",
+			"value",
+			"small"
+		],
+		[
+			"component-edge:3/h8",
+			"disabled",
+			null
+		],
+		[
+			"component-edge:3/h8",
+			"required",
+			null
+		],
+		[
+			"component-edge:3/h8",
+			"tabindex",
+			"-1"
+		],
+		[
+			"component-edge:4/h5",
+			"ui-selected",
+			null
+		],
+		[
+			"component-edge:4/h5",
+			"ui-disabled",
+			null
+		],
+		[
+			"component-edge:5/h4",
+			"ui-selected",
+			""
+		],
+		[
+			"component-edge:5/h4",
+			"ui-disabled",
+			null
+		],
+		[
+			"component-edge:6/h8",
+			"name",
+			""
+		],
+		[
+			"component-edge:6/h8",
+			"value",
+			"medium"
+		],
+		[
+			"component-edge:6/h8",
+			"disabled",
+			null
+		],
+		[
+			"component-edge:6/h8",
+			"required",
+			null
+		],
+		[
+			"component-edge:6/h8",
+			"tabindex",
+			"0"
+		],
+		[
+			"component-edge:7/h5",
+			"ui-selected",
+			""
+		],
+		[
+			"component-edge:7/h5",
+			"ui-disabled",
+			null
+		]
 	],
 	"initialChecks": [
-		["component-edge:3/h8", false],
-		["component-edge:6/h8", true]
+		[
+			"component-edge:3/h8",
+			false
+		],
+		[
+			"component-edge:6/h8",
+			true
+		]
 	],
 	"steps": [
 		{

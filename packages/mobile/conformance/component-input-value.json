@@ -435,11 +435,29 @@
 		}
 	},
 	"initial": [
-		["h2:text0", "New note"],
-		["h4:text0", "Bumped 0"]
+		[
+			"h2:text0",
+			"New note"
+		],
+		[
+			"h4:text0",
+			"Bumped 0"
+		]
 	],
-	"initialAttributes": [["h3", "aria-busy", null]],
-	"initialProperties": [["component-edge:0/h0", "value", ""]],
+	"initialAttributes": [
+		[
+			"h3",
+			"aria-busy",
+			null
+		]
+	],
+	"initialProperties": [
+		[
+			"component-edge:0/h0",
+			"value",
+			""
+		]
+	],
 	"steps": [
 		{
 			"action": {

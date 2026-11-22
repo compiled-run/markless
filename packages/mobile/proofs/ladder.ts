@@ -12,6 +12,8 @@ export type LadderAction =
 				readonly text: string;
 				/** Leave the keyboard up afterwards, so the screenshot after the step shows what it covers. */
 				readonly keepKeyboard?: true;
+				/** Type after what the field holds instead of clearing it first: clearing presses Backspace, which a tag field reads. */
+				readonly append?: true;
 			};
 	  }
 	/**
@@ -227,6 +229,8 @@ export type LadderRung = {
 	readonly route?: string;
 	/** The path the app opens at; `/` when absent. */
 	readonly start?: string;
+	/** Pages under `pages/` the phones do not build, each refused by name: the app builds without them, and a link to one opens the not-found page. */
+	readonly refusedPages?: readonly string[];
 	/**
 	 * The text of the first element the screens and the browser leave below the first screen. The reference runtime has no
 	 * layout, so it raises `visible` only for elements before that one in document order.
@@ -458,7 +462,7 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 	if ('type' in action)
 		return [
 			{ tapOn: selector(action.type.field) },
-			'eraseText',
+			...(action.type.append ? [] : ['eraseText']),
 			{ inputText: action.type.text },
 			...(action.type.keepKeyboard ? [] : ['hideKeyboard']),
 		];

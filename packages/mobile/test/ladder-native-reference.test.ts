@@ -77,6 +77,8 @@ const bindsValue = (nodeOf: ReadonlyMap<string, NativeViewPayload['nodes'][numbe
 };
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
 const REFUSED_RUNGS = new Set(['y4-sheet-beside-drawer', 'j7-page-refused']);
+// The <input> types a host draws as a control a press acts on; every other type is a text field that takes the keyboard.
+const PRESSED_INPUT_TYPES = new Set(['checkbox', 'radio', 'range', 'hidden']);
 
 /**
  * The script services as a phone's host provides them, on a clock that moves only when a step waits: a timer fires once
@@ -432,21 +434,26 @@ function walkApp(
 								value: top.typed(host, action.type.text),
 							})
 						: [];
-			const answered: NativeAction[] = [];
-			for (const entry of journal) {
-				const answer = services.answer(entry);
-				if (answer) answered.push(answer);
-				if (entry.op !== 'navigate') {
-					top.apply(entry, index);
-					continue;
+			// What a journal shows goes to the top screen; a navigation opens the next one, as the hosts push it.
+			const show = (entries: ReadonlyArray<NativeJournalEntry>) => {
+				const answered: NativeAction[] = [];
+				for (const entry of entries) {
+					const answer = services.answer(entry);
+					if (answer) answered.push(answer);
+					if (entry.op !== 'navigate') {
+						stack.at(-1)!.apply(entry, index);
+						continue;
+					}
+					const opened = appRuntime.screens().at(-1)!;
+					expect(opened.route, `step ${index}: the screen opened`).toBe(entry.route);
+					if (entry.replace) stack.pop();
+					stack.push(open(opened));
 				}
-				const opened = appRuntime.screens().at(-1)!;
-				expect(opened.route, `step ${index}: the screen opened`).toBe(entry.route);
-				if (entry.replace) stack.pop();
-				stack.push(open(opened));
-			}
-			for (const next of answered)
-				for (const entry of appRuntime.dispatch(next)) stack.at(-1)!.apply(entry, index);
+				for (const next of answered) show(appRuntime.dispatch(next));
+			};
+			show(journal);
+			// A timer already due fires at once, as on a phone: a handler's `await` of a zero-delay timer resumes.
+			services.advance(0, (fire) => show(appRuntime.dispatch(fire)));
 		}
 		expect(stack.length, `step ${index}: the stack`).toBe(appRuntime.screens().length);
 		stack.at(-1)!.check(step, index);
@@ -1100,7 +1107,7 @@ function walk(
 			// Typing shows the text in the field at once; the input event then runs the handler.
 			const text =
 				'type' in action
-					? typedInto(action.type.text, attributeNow(host, 'maxlength'))
+					? typedInto((action.type.append ? fieldText(host) : '') + action.type.text, attributeNow(host, 'maxlength'))
 					: undefined;
 			if (text !== undefined) {
 				if (properties.has(host)) properties.set(host, text);
@@ -1129,12 +1136,31 @@ function walk(
 				node = nodeOf.get(node)?.parent;
 				pressed = node && nodeOf.get(node)?.row ? `${node}${key}` : node;
 			}
+			// A press on a <label> acts on the control it names, as the web does: a text field takes the keyboard, any other is pressed.
+			let focusing: string | undefined;
+			if ('tap' in action && !pressed) {
+				let climb: string | null | undefined = at < 0 ? host : host.slice(0, at);
+				while (climb) {
+					const element = nodeOf.get(climb);
+					if (element?.kind === 'element' && element.element === 'label') break;
+					climb = element?.parent;
+				}
+				const named = climb ? attributeNow(nodeOf.get(climb)?.row ? `${climb}${key}` : climb, 'for') : null;
+				const control = named ? nodeOf.get(named.split('@')[0]!) : undefined;
+				if (named && control?.kind === 'element') {
+					const type = control.attributes?.['type'] ?? 'text';
+					const pressable = payload.events.some((event) => event.host === control.id && event.event === 'activate');
+					if (control.element === 'textarea' || (control.element === 'input' && !PRESSED_INPUT_TYPES.has(type)) || !pressable)
+						focusing = named;
+					else pressed = named;
+				}
+			}
 			// The return key in a field that submits nothing only puts the keyboard away.
 			const returns = payload.events.some(
 				(event) => event.host === host && event.event === 'enter',
 			);
 			const activates = !!pressed;
-			if ('tap' in action && !activates && touched.length === 0)
+			if ('tap' in action && !activates && !focusing && touched.length === 0)
 				throw new Error(`step ${index}: "${name}" is not a control and the press changed nothing`);
 			// A field takes the keyboard when typed into, and gives it up when anything else is tapped: its focus and blur run.
 			const handles = (node: string, event: 'input' | 'focus' | 'blur' | 'keydown' | 'keyup') =>
@@ -1144,9 +1170,13 @@ function walk(
 				focused = host;
 				if (handles(host, 'focus')) apply(runtime.dispatch({ event: 'focus', host }), index);
 			}
-			if (('tap' in action || 'doubleTap' in action) && focused && focused !== host) {
+			if (('tap' in action || 'doubleTap' in action) && focused && focused !== host && focused !== focusing) {
 				if (handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
 				focused = undefined;
+			}
+			if (focusing && focused !== focusing) {
+				focused = focusing;
+				if (handles(focusing, 'focus')) apply(runtime.dispatch({ event: 'focus', host: focusing }), index);
 			}
 			// Backspace with the cursor at the end takes the last character; the input event then runs the handler.
 			const erased = (field: string): ReturnType<typeof runtime.dispatch> => {
@@ -1189,7 +1219,7 @@ function walk(
 				apply(runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 1 }), index);
 			const dispatched =
 				'tap' in action
-					? activates
+					? activates && !focusing
 						? runtime.dispatch({ event: 'activate', host: pressed ?? host })
 						: []
 					: 'doubleTap' in action
@@ -1400,13 +1430,22 @@ test.each([...navRungFolders(), ...styleRungFolders(), ...sheetStyleRungFolders(
 	'%s: the app payload walks the steps as a stack of screens',
 	async (folder) => {
 		const rung = readRung(folder);
-		const build = await compileRungApp(
-			join(proofsDir, folder),
-			readAppConfig(join(proofsDir, folder)),
-		);
+		const build = await compileRungApp(join(proofsDir, folder), {
+			...readAppConfig(join(proofsDir, folder)),
+			...(rung.refusedPages ? { partial: true } : {}),
+		});
+		// Only the pages the rung names are refused, each by name; every other page builds clean.
+		const refused = new Set(rung.refusedPages ?? []);
 		expect(
-			build.diagnostics.map((diagnostic) => `${diagnostic.page}: ${diagnostic.message}`),
+			build.diagnostics
+				.filter((diagnostic) => !refused.has(diagnostic.page))
+				.map((diagnostic) => `${diagnostic.page}: ${diagnostic.message}`),
 		).toEqual([]);
+		for (const page of refused)
+			expect(
+				build.diagnostics.some((diagnostic) => diagnostic.page === page && diagnostic.severity === 'error'),
+				`${page} is refused`,
+			).toBe(true);
 		walkApp(
 			build.payload!,
 			rung.steps,

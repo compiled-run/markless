@@ -171,13 +171,15 @@ const shown = (page: Page, text: string): Locator =>
 // The phone the style exports lay out for (Dragon's iOS viewport): a rung that scrolls scrolls here as on the phones.
 const PHONE = { width: 402, height: 778 };
 
-// On screen: some of it is inside the viewport and not clipped away by a scrolling box, as an IntersectionObserver reports.
+// On screen: drawn (not visibility: hidden) and some of it inside the viewport, not clipped away by a scrolling box, as an
+// IntersectionObserver reports.
 const onScreenCount = (page: Page, text: string): Promise<number> =>
 	shown(page, text).evaluateAll(async (elements) => {
 		const seen = await Promise.all(
 			elements.map(
 				(element) =>
 					new Promise<boolean>((resolve) => {
+						if (!element.checkVisibility({ visibilityProperty: true })) return resolve(false);
 						const observer = new IntersectionObserver(([entry]) => {
 							observer.disconnect();
 							resolve(
@@ -279,7 +281,7 @@ async function act(page: Page, step: LadderStep) {
 		await ('tap' in action ? target.click() : target.dblclick());
 	} else if ('type' in action) {
 		const field = typedField(page, action.type.field);
-		await field.fill('');
+		if (!action.type.append) await field.fill('');
 		await field.pressSequentially(action.type.text);
 	} else if ('submit' in action)
 		await typedField(page, action.submit).press('Enter');

@@ -988,6 +988,21 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// taglist's field: its key, input and paste handlers run as JavaScript, reading the key and the pasted text, and the
+		// Enter they prevent is journalled; a tag's click reads its press count.
+		name: 'script-event-fields',
+		fixture: 'proofs/u41-taglist/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'input', host: 'component-edge:4/h3', value: 'milk' },
+			{ event: 'keydown', host: 'component-edge:4/h3', key: 'Enter' },
+			{ event: 'input', host: 'component-edge:4/h3', value: 'sugar,' },
+			{ event: 'paste', host: 'component-edge:4/h3', text: 'salt,pepper' },
+			{ event: 'keydown', host: 'component-edge:4/h3', key: 'Backspace' },
+			{ event: 'activate', host: 'component-edge:2/h4@tea', detail: 1 },
+		],
+	},
+	{
 		name: 'script-keys',
 		fixture: 'test/fixtures/ScriptKeys.tsrx',
 		actions: [
@@ -1285,6 +1300,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h5' },
 			{ event: 'activate', host: 'component-edge:1/h1' },
 			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		// qr-code: the svg's viewBox and its path's outline follow the code's value; the engine turns each into numbers.
+		name: 'live-drawing',
+		fixture: 'proofs/u42-qr-code/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
 		],
 	},
 	{

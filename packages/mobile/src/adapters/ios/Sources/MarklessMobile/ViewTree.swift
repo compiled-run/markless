@@ -94,13 +94,19 @@ final class Paragraph {
 /// A `<pre>` paragraph's sideways scroller: its line is never wrapped.
 final class PreformattedScroll: UIScrollView {}
 
-/// An inline `<svg>`: draws the shapes compiled when the app was built, fitted into its box as the web fits the viewBox.
+/// An inline `<svg>`: draws the shapes compiled when the app was built, then the shapes inside it that come from components,
+/// whose outline the engine gives while the app runs, fitted into its box as the web fits the viewBox.
 final class DrawingView: UIView {
 	let drawing: NativeDrawing
 	var currentColor: UIColor = .black { didSet { setNeedsDisplay() } }
+	/// min-x, min-y, width and height: the compiled one, or what a `viewBox` that follows state gives.
+	private(set) var viewBox: [Double]?
+	/// Shapes from inside it, in tree order, each with the outline it has now.
+	private var live: [(id: String, shape: NativeShape, path: [Double])] = []
 
 	init(_ drawing: NativeDrawing) {
 		self.drawing = drawing
+		viewBox = drawing.viewBox
 		super.init(frame: .zero)
 		isOpaque = false
 		backgroundColor = .clear
@@ -112,7 +118,7 @@ final class DrawingView: UIView {
 
 	override func draw(_ rect: CGRect) {
 		guard let context = UIGraphicsGetCurrentContext() else { return }
-		if let box = drawing.viewBox?.map({ CGFloat($0) }), box[2] > 0, box[3] > 0 {
+		if let box = viewBox?.map({ CGFloat($0) }), box.count == 4, box[2] > 0, box[3] > 0 {
 			// SVG 2 §8.5: the viewBox placed in the box by preserveAspectRatio, xMidYMid meet when it has none.
 			switch drawing.aspect {
 			case .none?:
@@ -130,8 +136,8 @@ final class DrawingView: UIView {
 				context.scaleBy(x: scale, y: scale)
 			}
 		}
-		for shape in drawing.shapes {
-			let path = Self.path(shape.path)
+		for (shape, p) in drawing.shapes.map({ ($0, $0.path) }) + live.map({ ($0.shape, $0.path) }) {
+			let path = Self.path(p)
 			context.saveGState()
 			for clip in shape.clip {
 				context.addPath(Self.path(clip))
@@ -159,6 +165,28 @@ final class DrawingView: UIView {
 			}
 			context.restoreGState()
 		}
+	}
+
+	/// The engine's numbers, space-separated, as the journal carries them; nil or empty draws nothing.
+	static func numbers(_ text: String?) -> [Double] {
+		(text ?? "").split(separator: " ").compactMap { Double($0) }
+	}
+
+	func addShape(_ id: String, _ shape: NativeShape, outline: String?) {
+		live.append((id, shape, shape.path.isEmpty ? Self.numbers(outline) : shape.path))
+		setNeedsDisplay()
+	}
+
+	func setOutline(_ id: String, _ outline: String?) {
+		guard let at = live.firstIndex(where: { $0.id == id }) else { return }
+		live[at].path = Self.numbers(outline)
+		setNeedsDisplay()
+	}
+
+	func setViewBox(_ text: String?) {
+		let box = Self.numbers(text)
+		viewBox = box.count == 4 ? box : nil
+		setNeedsDisplay()
 	}
 
 	/// A verb-coded outline: 0 move x y, 1 line x y, 3 cubic x1 y1 x2 y2 x y, 4 close.
@@ -276,6 +304,10 @@ final class ViewTree {
 	private let slots: [String: [String]]
 	private let events: [String: [NativeEvent]]
 	private(set) var elements: [String: UIView] = [:]
+	/// Shapes inside an svg, by node: the drawing that draws each one.
+	private var shapeOwners: [String: DrawingView] = [:]
+	/// svgs whose viewBox follows state: the journal's `viewBox` attribute gives it.
+	private var followingViewBox: Set<String> = []
 	private(set) var labels: [String: UILabel] = [:]
 	private var contexts: [String: Context] = [:]
 	private var templates: [String: String] = [:]
@@ -621,6 +653,16 @@ final class ViewTree {
 				guard let field = elements[node] as? UITextField else { throw HostError("journal names input \(node), which is not a shown field") }
 				field.text = value
 			case let .attribute(node, name, value):
+				if let drawn = shapeOwners[node] {
+					attributes[node, default: [:]][name] = value
+					if name == "d" { drawn.setOutline(node, value) }
+					continue
+				}
+				if followingViewBox.contains(node), name == "viewBox", let drawn = elements[node] as? DrawingView {
+					attributes[node, default: [:]][name] = value
+					drawn.setViewBox(value)
+					continue
+				}
 				if flowing.contains(node) {
 					attributes[node, default: [:]][name] = value
 					continue
@@ -834,13 +876,14 @@ final class ViewTree {
 	}
 
 	/// The text an element shows, in view order: what `aria-labelledby` and `aria-describedby` read from it.
-	private func text(within view: UIView) -> String {
+	private func text(within view: UIView, skipping skipped: UIView? = nil) -> String {
+		if view === skipped { return "" }
 		if let label = view as? UILabel { return label.text ?? "" }
-		return view.subviews.map { text(within: $0) }.filter { !$0.isEmpty }.joined(separator: " ")
+		return view.subviews.map { text(within: $0, skipping: skipped) }.filter { !$0.isEmpty }.joined(separator: " ")
 	}
 
-	/// Labels and hints taken from the elements an attribute names by id, kept current after every journal; a `<label for>`
-	/// names its control, so VoiceOver reads it there and not a second time on the label.
+	/// Labels and hints taken from the elements an attribute names by id, kept current after every journal; a `<label>` names
+	/// its control with its text, so VoiceOver reads it there and not a second time on the label.
 	private func refreshRelations() {
 		for (id, view) in elements {
 			let current = attributes[id] ?? [:]
@@ -851,7 +894,12 @@ final class ViewTree {
 			}
 			if current["aria-label"] == nil, let label = named("aria-labelledby") { view.accessibilityLabel = label }
 			if let hint = named("aria-describedby") { view.accessibilityHint = hint }
-			if current["for"].flatMap({ elements[$0] }) != nil { view.accessibilityElementsHidden = true }
+			guard let target = current["for"], let control = elements[target] else { continue }
+			let own = attributes[target] ?? [:]
+			let unnamed = own["aria-label"] == nil && own["aria-labelledby"] == nil
+			if unnamed { control.accessibilityLabel = text(within: view, skipping: control) }
+			if !control.isDescendant(of: view) { view.accessibilityElementsHidden = true }
+			else if unnamed { for sub in view.subviews where sub !== control && !control.isDescendant(of: sub) { sub.accessibilityElementsHidden = true } }
 		}
 	}
 
@@ -1019,14 +1067,32 @@ final class ViewTree {
 			contexts[id] = context
 			switch node.kind {
 			case let .element(element, staticAttributes, bindings):
+				if let shape = node.shape {
+					guard let drawn = container as? DrawingView else { throw HostError("the shape \(id) is not inside a drawing") }
+					var current = staticAttributes
+					for binding in bindings where !binding.isProperty {
+						current[binding.name] = marklessAttributeValue(binding.name, try runtime.evaluate(binding.value, in: context.scope))
+					}
+					attributes[id] = current
+					shapeOwners[id] = drawn
+					drawn.addShape(id, shape, outline: current["d"])
+					continue
+				}
 				if unimplementedElements.contains(element) { throw HostError("<\(element)> \(id) has no iOS view yet") }
 				let view: UIView
 				if let drawing = node.drawing {
 					let drawn = DrawingView(drawing)
+					let boundBox = try bindings.first { !$0.isProperty && $0.name == "viewBox" }.map {
+						marklessAttributeValue("viewBox", try runtime.evaluate($0.value, in: context.scope))
+					}
+					if let boundBox {
+						followingViewBox.insert(id)
+						drawn.setViewBox(boundBox)
+					}
 					drawn.isUserInteractionEnabled = context.button == nil
 					if layout == nil {
 						leaves.insert(ObjectIdentifier(drawn))
-						let ratio = drawing.viewBox.map { $0[3] / $0[2] }
+						let ratio = drawn.viewBox.map { $0[3] / $0[2] }
 						let unit = drawing.em ? Double(TextLook.baseSize * context.look.scale) : 1
 						switch (drawing.width.map { $0 * unit }, drawing.height.map { $0 * unit }) {
 						case let (width?, height?):
@@ -1222,11 +1288,11 @@ final class ViewTree {
 				try wire(events[template] ?? [], on: view, element: element, id: id)
 				let boundFor = try bindings.first { $0.name == "for" }.map { try runtime.evaluate($0.value, in: context.scope).text }
 				if element == "label", let target = staticAttributes["for"] ?? boundFor {
-					// A press on a label activates its control, as a browser does.
-					let forward = LabelForward(target: target, onAction: onAction)
+					let pressable = (events[String(target.split(separator: "@", maxSplits: 1)[0])] ?? []).contains { $0.event == .activate }
+					let forward = LabelForward(target: target, pressable: pressable, control: { [weak self] in self?.elements[target] }, onAction: onAction)
 					forwards.append(forward)
 					view.isUserInteractionEnabled = true
-					view.addGestureRecognizer(UITapGestureRecognizer(target: forward, action: #selector(LabelForward.press)))
+					view.addGestureRecognizer(UITapGestureRecognizer(target: forward, action: #selector(LabelForward.press(_:))))
 				}
 				var current = staticAttributes
 				for binding in bindings where !binding.isProperty {
@@ -2033,12 +2099,25 @@ final class LengthLimit: NSObject, UITextFieldDelegate {
 @MainActor
 final class LabelForward: NSObject {
 	private let target: String
+	private let pressable: Bool
+	private let control: () -> UIView?
 	private let onAction: (NativeAction) -> Void
-	init(target: String, onAction: @escaping (NativeAction) -> Void) {
+	init(target: String, pressable: Bool, control: @escaping () -> UIView?, onAction: @escaping (NativeAction) -> Void) {
 		self.target = target
+		self.pressable = pressable
+		self.control = control
 		self.onAction = onAction
 	}
-	@objc func press() { onAction(NativeAction(event: .activate, host: target)) }
+	/// As a browser: a text field takes the keyboard; focus leaves the field that had it for any other control, which is pressed when
+	/// a press acts on it (a checkbox, a button) and only focused otherwise (a select), which a phone does not show.
+	@objc func press(_ gesture: UITapGestureRecognizer) {
+		if let field = control(), field is UITextField || field is UITextView {
+			field.becomeFirstResponder()
+			return
+		}
+		gesture.view?.window?.endEditing(true)
+		if pressable { onAction(NativeAction(event: .activate, host: target)) }
+	}
 }
 
 /// A tap or drag outside a field puts the keyboard away, as a scrolling screen does.
@@ -2080,6 +2159,7 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	if let drawing = view as? DrawingView {
 		// An svg's text colour is what its currentColor paints.
 		if let color = style.textColor { drawing.currentColor = uiColor(color) }
+		drawing.isHidden = style.hidden
 		return
 	}
 	guard let label = view as? UILabel else {
@@ -2091,6 +2171,8 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 		label.font = UIFont(descriptor: face, size: font.size)
 	}
 	if let color = style.textColor { label.textColor = uiColor(color) }
+	// Text that is not visible keeps its place but neither shows nor reads out, as the web hides it.
+	label.isHidden = style.hidden
 }
 
 /// A text node's lines drawn glyph for glyph at Dragon's positions in the platform's own font (`CTFontDrawGlyphs`).
