@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: notes
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: No notes yet
 - assertVisible: Write your first note
 - assertVisible: All notes
@@ -24,31 +24,31 @@ name: notes
 - assertVisible: Edit
 - assertNotVisible: Save note
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertVisible: Save note
 - assertNotVisible: Edit
 - assertVisible: Save note
 - assertNotVisible: Edit
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertNotVisible: Save note
 - assertVisible: All notes
 - assertVisible: ^Groceries.*
@@ -57,16 +57,16 @@ name: notes
 - assertVisible: Edit
 - assertNotVisible: Search notes
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertNotVisible: Edit
 - assertVisible: All notes
 - assertVisible: ^Groceries.*

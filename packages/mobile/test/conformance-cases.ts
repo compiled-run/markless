@@ -41,6 +41,14 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'animation-events',
+		fixture: 'test/fixtures/AnimationEvents.tsrx',
+		actions: [
+			{ event: 'animationstart', host: 'h1', animationName: 'close', elapsedTime: 0 },
+			{ event: 'animationend', host: 'h1', animationName: 'close', elapsedTime: 0.25 },
+		],
+	},
+	{
 		// A component's `value={prop}` that never changes leaves the typed text in the field.
 		name: 'component-input-value',
 		fixture: 'proofs/u120-component-input-value/App.tsrx',

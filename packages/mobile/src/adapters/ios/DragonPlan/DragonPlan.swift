@@ -42,6 +42,15 @@ public enum DragonPlan {
 		return out
 	}
 
+	/// `runMarklessAnimation`: a page's animation events and frame from its export's animator tables, over every step so far.
+	public static func animation(_ line: String) -> String {
+		do {
+			return try harness_runMarklessAnimation(JsString(line)).description
+		} catch {
+			return "[\"threw\"]"
+		}
+	}
+
 	/// Dragon's translated library cases; `rt-band` looks a page's `@media` band up by its size.
 	public static func library(_ line: String) -> String {
 		do {

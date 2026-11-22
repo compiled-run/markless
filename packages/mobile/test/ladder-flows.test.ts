@@ -345,6 +345,7 @@ test('the styles ladder has one app folder per rung, in rung order', () => {
 		'S31',
 		'S32',
 		'S33',
+		'S34',
 		'S35',
 		'S40',
 	]);

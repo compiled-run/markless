@@ -5,7 +5,8 @@ public struct NativeAction: Equatable, Sendable {
 	public let event: NativeEventName
 	/// The element acted on; "" for a `timer`.
 	public let host: String
-	/// For `input`: the field's whole text after the edit; for `keydown`, the key; for `paste`, the pasted text.
+	/// For `input`: the field's whole text after the edit; for `keydown`, the key; for `paste`, the pasted text; for an animation
+	/// event, the animation's name (its elapsed time in seconds is `time`).
 	public let value: String?
 	/// For `timer`: the journalled timer whose time has come.
 	public let timer: String?
@@ -1592,6 +1593,8 @@ public final class NativeRuntime {
 		case .keydown, .keyup: eventFields = [.key: .string(action.value ?? "")]
 		case .paste: eventFields = [.text: .string(action.value ?? "")]
 		case .activate: eventFields = clickFields(trusted: true).merging([.detail: .number(Double(action.detail ?? 1))]) { _, new in new }
+		case .animationstart, .animationiteration, .animationend, .animationcancel:
+			eventFields = [.animationName: .string(action.value ?? ""), .elapsedTime: .number(action.time ?? 0)]
 		default: break
 		}
 		if [.keydown, .keyup, .paste].contains(action.event) { targetText = try textOf(field: action.host) }
