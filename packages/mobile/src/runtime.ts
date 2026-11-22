@@ -342,7 +342,7 @@ export type NativeRuntime = {
 	readonly start: () => ReadonlyArray<NativeJournalEntry>;
 	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
 	readonly leave: () => ReadonlyArray<NativeJournalEntry>;
-	/** The screen shows again after Back: it takes the app's values of its app-wide cells that a page above it changed. */
+	/** The screen shows again after Back: it takes the app's values of its app-wide cells and the device's of its storage cells, which a page above it may have changed. */
 	readonly resume: () => ReadonlyArray<NativeJournalEntry>;
 };
 
@@ -2119,16 +2119,24 @@ export function createNativeRuntime(
 		slots: slotValues,
 		styleCases: caseValues,
 		start: () => (asyncCells.length === 0 ? [] : change(undefined, undefined, () => [])),
-		resume: () =>
-			appCells.some(
-				(cell) => session.has(cell) && !Object.is(session.get(cell), values.get(cell)),
-			)
-				? change(undefined, undefined, () => {
-						for (const cell of appCells)
-							if (session.has(cell)) values.set(cell, session.get(cell)!);
+		resume: () => {
+			const moved = payload.cells.flatMap((cell): Array<readonly [string, Value]> => {
+				const [keeper, key] = cell.app
+					? [session, cell.id]
+					: cell.storage
+						? [store, cell.storage.key]
+						: [undefined, ''];
+				if (!keeper?.has(key)) return [];
+				const kept = keeper.get(key)!;
+				return Object.is(kept, values.get(cell.id)) ? [] : [[cell.id, kept]];
+			});
+			return moved.length === 0
+				? []
+				: change(undefined, undefined, () => {
+						for (const [cell, value] of moved) values.set(cell, value);
 						return [];
-					})
-				: [],
+					});
+		},
 		leave: () =>
 			asyncSent === null
 				? []

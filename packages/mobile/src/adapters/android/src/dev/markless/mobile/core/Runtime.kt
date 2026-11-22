@@ -831,14 +831,16 @@ class Runtime(
 	}
 
 	/** Starts the async values the script computes, once the screen is built; the host applies its journal as an action's. */
-	/** The screen shows again (Back): app-scoped shared fields take the values the app holds now; the journal of what moved. */
 	fun start(): List<JournalEntry> = if (asyncCells.isEmpty()) emptyList() else change(null, null) { emptyList() }
 
-	/** The screen shows again after Back: it takes the app's values of its app-wide cells that a page above it changed. */
+	/** The screen shows again after Back: it takes the app's values of its app-wide cells and the device's of its storage cells, which a page above it may have changed. */
 	fun resume(): List<JournalEntry> {
-		val moved = payload.cells.filter { c -> c.app && session.values[c.id]?.let { it != values[c.id] } == true }
+		val moved = payload.cells.mapNotNull { c ->
+			val kept = if (c.app) session.values[c.id] else c.storageKey?.let(store::get)
+			if (kept == null || kept == values[c.id]) null else c.id to kept
+		}
 		if (moved.isEmpty()) return emptyList()
-		return change(null, null) { for (c in moved) values[c.id] = session.values.getValue(c.id); emptyList() }
+		return change(null, null) { for ((cell, value) in moved) { values[cell] = value; unset.remove(cell) }; emptyList() }
 	}
 
 	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
