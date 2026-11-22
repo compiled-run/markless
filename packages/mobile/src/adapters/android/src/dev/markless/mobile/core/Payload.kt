@@ -250,6 +250,8 @@ sealed interface Op {
 	data class Script(val fn: String, val type: String, val bindings: Map<String, ScriptBinding>, val catch: String? = null) : Op
 	/** `event.preventDefault()` in a text field's `keydown` or `paste` handler. */
 	data object PreventDefault : Op
+	/** `event.stopPropagation()` in a click handler: the press runs no handler of the elements around this one. */
+	data object StopPropagation : Op
 	/** `field.value = text` on a text field: its text becomes [value], with no input event; [node] evaluates to its id. */
 	data class FieldText(val node: Expr, val value: Expr) : Op
 	/** `reset` of `@catch (error, reset)`: clears [catch] and runs again each of [cells] that holds an error. */
@@ -649,7 +651,7 @@ data class Payload(
 				is Op.Navigate -> op.params.values.any(::hasScript)
 				is Op.After -> hasScript(op.ms) || op.capture.any { hasScript(it.second) } || scriptOps(op.ops)
 				is Op.Capture -> hasScript(op.node) || hasScript(op.pointer)
-				is Op.Dialog, is Op.Command, is Op.Submit, is Op.Tick, Op.PreventDefault, is Op.Reset -> false
+				is Op.Dialog, is Op.Command, is Op.Submit, is Op.Tick, Op.PreventDefault, Op.StopPropagation, is Op.Reset -> false
 				is Op.FieldText -> hasScript(op.node) || hasScript(op.value)
 			}
 		}
@@ -1118,6 +1120,10 @@ data class Payload(
 			if (name == "preventDefault") {
 				o.only(setOf("op"), what)
 				return Op.PreventDefault
+			}
+			if (name == "stopPropagation") {
+				o.only(setOf("op"), what)
+				return Op.StopPropagation
 			}
 			if (name == "fieldText") {
 				o.only(setOf("op", "node", "value"), what)

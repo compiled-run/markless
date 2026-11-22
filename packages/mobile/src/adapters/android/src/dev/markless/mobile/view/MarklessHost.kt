@@ -875,7 +875,7 @@ class MarklessHost(
 				else -> continue
 			}
 			views[inst.id] = view
-			(node as? Node.Element)?.let { liveRegion(it, view) }
+			(node as? Node.Element)?.let { liveRegion(it, view, inst.scope) }
 			built[inst.id] = inst
 			val parentId = parentOf(inst)
 			val outer = if (parentId != null) views[parentId] else pageBox
@@ -1244,10 +1244,13 @@ class MarklessHost(
 		return view
 	}
 
-	/** How TalkBack speaks a change inside the element: as built, or, when its live attributes follow state, as they read now. */
-	private fun liveRegion(node: Node.Element, view: View) {
+	/**
+	 * How TalkBack speaks a change inside the element: as built, or, when its live attributes follow state, as they read now in
+	 * [scope], its own row's for a row's copy.
+	 */
+	private fun liveRegion(node: Node.Element, view: View, scope: Scope) {
 		val follows = node.liveFollows
-		val assertive = if (follows != null) when ((runtime.evaluate(follows.politeness) as? JsValue.Str)?.value) {
+		val assertive = if (follows != null) when ((runtime.evaluate(follows.politeness, scope) as? JsValue.Str)?.value) {
 			"assertive" -> true
 			"polite" -> false
 			else -> null
@@ -1274,7 +1277,9 @@ class MarklessHost(
 		if (value == null) current.remove(name) else current[name] = value
 		if (id in inert && (name == "aria-hidden" || name == "hidden")) return
 		if (view is RangeBar && name in RangeBar.SHAPE) view.show(current)
-		if (name == "role" || name == "aria-live") (payload.nodes.firstOrNull { it.id == id.substringBefore('@') } as? Node.Element)?.takeIf { it.liveFollows != null }?.let { liveRegion(it, view) }
+		if (name == "role" || name == "aria-live") (payload.nodes.firstOrNull { it.id == id.substringBefore('@') } as? Node.Element)?.takeIf { it.liveFollows != null }?.let { node ->
+			liveRegion(node, view, built[id]?.scope ?: runtime.instances(node).firstOrNull { it.id == id }?.scope ?: Scope.EMPTY)
+		}
 		when (name) {
 			// A press on a label acts on its control, as the web does: a text field takes the keyboard, any other is pressed.
 			"for" -> if (value != null) view.setOnClickListener {
@@ -1643,7 +1648,10 @@ class MarklessHost(
 		if (s.kind != "text") {
 			val edges = s.borderWidths
 			if (clipsChildren && edges != null && listOf(edges.top, edges.right, edges.bottom, edges.left).any { it != 0.0 }) throw MarklessHostError("\"${s.id}\" clips overflow to its padding box past borders, which is not implemented on Android")
-			if (view is MarklessBox) view.clip = clip
+			if (view is MarklessBox) {
+				view.clip = clip
+				view.childClipRadii = if (clipsChildren) radii?.takeIf { r -> r.any { it != 0.0 } }?.map { it.toFloat() }?.toFloatArray() else null
+			}
 			else if (clip != null) throw MarklessHostError("\"${s.id}\" has a clip-path on a ${view.javaClass.simpleName}, which is not implemented on Android")
 		}
 		if (s.kind == "text") {

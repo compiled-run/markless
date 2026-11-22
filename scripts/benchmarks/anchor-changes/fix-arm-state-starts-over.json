@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 48,
+			"reason": "state inside an arm starts over in composed components (armSeeds renamed into page ids in ssr.ts and instance-scope.ts), and MDX islands install the composed arm-record qualifier in mdxSymbolLoader so nested branches update",
+			"date": "2026-11-22"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 48,
+			"reason": "state inside an arm starts over in composed components (armSeeds renamed into page ids in ssr.ts and instance-scope.ts), and MDX islands install the composed arm-record qualifier in mdxSymbolLoader so nested branches update",
+			"date": "2026-11-22"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 48,
+			"reason": "state inside an arm starts over in composed components (armSeeds renamed into page ids in ssr.ts and instance-scope.ts), and MDX islands install the composed arm-record qualifier in mdxSymbolLoader so nested branches update",
+			"date": "2026-11-22"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 18,
+			"reason": "state inside an arm starts over in composed components: armSeeds renamed into page ids in ssr.ts and instance-scope.ts (no MDX islands on this site)",
+			"date": "2026-11-22"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 18,
+			"reason": "state inside an arm starts over in composed components: armSeeds renamed into page ids in ssr.ts and instance-scope.ts (no MDX islands on this site)",
+			"date": "2026-11-22"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 18,
+			"reason": "state inside an arm starts over in composed components: armSeeds renamed into page ids in ssr.ts and instance-scope.ts (no MDX islands on this site)",
+			"date": "2026-11-22"
+		}
+	]
+}

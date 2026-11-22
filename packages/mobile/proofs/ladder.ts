@@ -3,9 +3,20 @@ import { join } from 'node:path';
 import { stringify } from 'yaml';
 import { PROOF_URL_SCHEME } from '../src/harness/proof-app.ts';
 
+/** A visible text or accessible name, whole or by how it starts (`{ "startsWith": "Groceries" }`, for a text ending in a run's date). */
+export type LadderText = string | { readonly startsWith: string };
+
+/** Whether a text a screen shows is the one `text` names. */
+export const readsAs = (shown: string, text: LadderText): boolean =>
+	typeof text === 'string' ? shown === text : shown.startsWith(text.startsWith);
+
+/** `text` as a message names it: in quotes, or `"Groceries…"` for a text named by how it starts. */
+export const describeText = (text: LadderText): string =>
+	typeof text === 'string' ? JSON.stringify(text) : `${JSON.stringify(text.startsWith).slice(0, -1)}…"`;
+
 /** One person's action between two looks at the screen. Every target is a visible text or an accessible name. */
 export type LadderAction =
-	| { readonly tap: string }
+	| { readonly tap: LadderText }
 	| {
 			readonly type: {
 				readonly field: string;
@@ -39,7 +50,7 @@ export type LadderAction =
 	/** The keyboard's delete key in the text field with this accessible name, its text cursor at the end. */
 	| { readonly erase: string }
 	/** Two quick taps on this text or accessible name: the second press's `event.detail` is 2. */
-	| { readonly doubleTap: string }
+	| { readonly doubleTap: LadderText }
 	/** Opens the `<select>` with this accessible name and picks the option with this label from its list. */
 	| { readonly choose: { readonly field: string; readonly option: string } }
 	/** Scroll until this text is on screen. */
@@ -119,9 +130,9 @@ export const SWIPES_UNTIL = 80;
 export type LadderStep = {
 	readonly do?: LadderAction;
 	/** Texts or accessible names that are on screen. */
-	readonly visible: readonly string[];
+	readonly visible: readonly LadderText[];
 	/** Texts or accessible names that are not on screen. */
-	readonly absent?: readonly string[];
+	readonly absent?: readonly LadderText[];
 	/** Texts or accessible names the page holds but that are scrolled out of sight. */
 	readonly offScreen?: readonly string[];
 	/** Texts the page holds but its styles do not show at this size (`display: none` in this band). */
@@ -322,8 +333,13 @@ export const looksOnly = (action: LadderAction | undefined): boolean =>
 export const readRung = (folder: string): LadderRung =>
 	JSON.parse(readFileSync(join(proofsDir, folder, 'expected.json'), 'utf8')) as LadderRung;
 
-// Maestro reads a selector's text as a regular expression over the whole label.
-const selector = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeSelector = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** `text` as a regular expression over a whole label, the way Maestro (with DOT_MATCHES_ALL) reads a selector. */
+export const selector = (text: LadderText): string =>
+	typeof text === 'string' ? escapeSelector(text) : `^${escapeSelector(text.startsWith)}.*`;
+
+const textKey = (text: LadderText): string => JSON.stringify(text);
 
 /**
  * The expectations of `step` that the previous step's screen contradicts. An action step needs at
@@ -331,12 +347,12 @@ const selector = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * it ends only once the app is back.
  */
 export function changeWitness(previous: LadderStep, step: LadderStep): LadderStep {
-	const wasShown = new Set(previous.visible);
-	const wasAbsent = new Set([
-		...(previous.absent ?? []),
-		...(previous.offScreen ?? []),
-		...(previous.hidden ?? []),
-	]);
+	const wasShown = new Set(previous.visible.map(textKey));
+	const wasAbsent = new Set(
+		[...(previous.absent ?? []), ...(previous.offScreen ?? []), ...(previous.hidden ?? [])].map(
+			textKey,
+		),
+	);
 	const order = step.order?.join('\n') !== previous.order?.join('\n') ? step.order : undefined;
 	const placed = step.placed?.join('\n') !== previous.placed?.join('\n') ? step.placed : undefined;
 	const fields = Object.fromEntries(
@@ -347,13 +363,13 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 	const calls =
 		step.calls && step.calls.join('\n') !== previous.calls?.join('\n') ? step.calls : undefined;
 	return {
-		visible: step.visible.filter((text) => wasAbsent.has(text)),
-		absent: (step.absent ?? []).filter((text) => wasShown.has(text)),
-		...((step.hidden ?? []).some((text) => wasShown.has(text)) && {
-			hidden: (step.hidden ?? []).filter((text) => wasShown.has(text)),
+		visible: step.visible.filter((text) => wasAbsent.has(textKey(text))),
+		absent: (step.absent ?? []).filter((text) => wasShown.has(textKey(text))),
+		...((step.hidden ?? []).some((text) => wasShown.has(textKey(text))) && {
+			hidden: (step.hidden ?? []).filter((text) => wasShown.has(textKey(text))),
 		}),
-		...((step.offScreen ?? []).some((text) => wasShown.has(text)) && {
-			offScreen: (step.offScreen ?? []).filter((text) => wasShown.has(text)),
+		...((step.offScreen ?? []).some((text) => wasShown.has(textKey(text))) && {
+			offScreen: (step.offScreen ?? []).filter((text) => wasShown.has(textKey(text))),
 		}),
 		...(order && { order }),
 		...(placed && { placed }),

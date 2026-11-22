@@ -1,0 +1,34 @@
+appId: ${APP_ID}
+name: u102-drawer-swipe
+---
+- launchApp:
+    clearState: true
+- assertVisible: Side drawer
+- assertVisible: Closed 0 times
+- assertVisible: Open the panel
+- assertNotVisible: Swipe this panel away
+- assertNotVisible: Close the panel
+- tapOn: Open the panel
+- assertVisible: Swipe this panel away
+- assertVisible: Close the panel
+- assertVisible: Swipe this panel away
+- assertVisible: Close the panel
+- swipe:
+    from:
+      text: Swipe this panel away
+    direction: RIGHT
+    duration: 800
+- assertNotVisible: Swipe this panel away
+- assertVisible: Closed 1 times
+- assertVisible: Open the panel
+- assertNotVisible: Swipe this panel away
+- assertNotVisible: Closed 0 times
+- tapOn: Open the panel
+- assertVisible: Swipe this panel away
+- assertVisible: Swipe this panel away
+- assertVisible: Close the panel
+- tapOn: Close the panel
+- assertNotVisible: Swipe this panel away
+- assertVisible: Closed 2 times
+- assertNotVisible: Swipe this panel away
+- assertNotVisible: Closed 1 times
