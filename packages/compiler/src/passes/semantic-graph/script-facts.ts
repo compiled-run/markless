@@ -188,17 +188,17 @@ function cloneWith(node: AnyNode, replace: (node: AnyNode) => AnyNode | undefine
 }
 
 /**
- * Hermes runs no class syntax. A class with no `extends`, accessors, private members or static blocks is lowered to a
- * constructor function: its fields first in the constructor, as the class runs them, its methods on the prototype. Null
- * when it can be lowered; else what stops it.
+ * Hermes runs no class syntax. A class with no `extends`, private members or static blocks is lowered to a constructor
+ * function: its fields first in the constructor, as the class runs them, its methods on the prototype, and its getters and
+ * setters defined there as the class defines them. Null when it can be lowered; else what stops it.
  */
 function classLowering(node: AnyNode): string | null {
 	if (node.superClass) return 'a class that extends another';
 	for (const member of ((node.body as AnyNode).body as AnyNode[]) ?? []) {
 		if (member.type === 'StaticBlock') return 'a class with a `static` block';
 		if ((member.key as AnyNode | undefined)?.type === 'PrivateIdentifier') return 'a class with a private member';
-		if (member.type === 'MethodDefinition' && (member.kind === 'get' || member.kind === 'set'))
-			return 'a class with a getter or setter';
+		if (member.type === 'MethodDefinition' && (member.kind === 'get' || member.kind === 'set') && member.computed === true)
+			return 'a class getter or setter with a computed name';
 		if (member.type !== 'MethodDefinition' && member.type !== 'PropertyDefinition')
 			return `a class member \`${String(member.type)}\``;
 	}
@@ -240,11 +240,49 @@ function lowerClass(node: AnyNode): AnyNode {
 		body: { type: 'BlockStatement', body: [...fields, ...(((ctor?.body as AnyNode | undefined)?.body as AnyNode[]) ?? [])] },
 	} as unknown as AnyNode;
 	const prototype = { type: 'MemberExpression', object: self, property: identifier('prototype'), computed: false, optional: false } as unknown as AnyNode;
+	const accessors = new Map<string, { target: AnyNode; name: string; get?: AnyNode; set?: AnyNode }>();
 	const rest = members.flatMap((member): AnyNode[] => {
 		if (member === constructor) return [];
+		if (member.type === 'MethodDefinition' && (member.kind === 'get' || member.kind === 'set')) {
+			const key = member.key as AnyNode;
+			const keyName = String(key.type === 'Identifier' ? key.name : key.value);
+			const slot = `${member.static ? 'static' : 'prototype'}:${keyName}`;
+			const entry = accessors.get(slot) ?? { target: member.static ? self : prototype, name: keyName };
+			entry[member.kind as 'get' | 'set'] = member.value as AnyNode;
+			accessors.set(slot, entry);
+			return [];
+		}
 		if (member.type === 'MethodDefinition') return [assign(keyed(member.static ? self : prototype, member), member.value as AnyNode)];
 		return member.static ? [assign(keyed(self, member), (member.value as AnyNode | null) ?? undefinedValue)] : [];
 	});
+	const property = (name: string, value: AnyNode): AnyNode =>
+		({ type: 'Property', key: identifier(name), value, kind: 'init', computed: false, method: false, shorthand: false }) as unknown as AnyNode;
+	const literal = (value: string | boolean): AnyNode => ({ type: 'Literal', value }) as unknown as AnyNode;
+	// Class accessors are configurable and not enumerable.
+	const defined = [...accessors.values()].map(
+		({ target, name: keyName, get, set }): AnyNode =>
+			({
+				type: 'ExpressionStatement',
+				expression: {
+					type: 'CallExpression',
+					callee: member(identifier('Object'), 'defineProperty'),
+					arguments: [
+						target,
+						literal(keyName),
+						{
+							type: 'ObjectExpression',
+							properties: [
+								...(get ? [property('get', get)] : []),
+								...(set ? [property('set', set)] : []),
+								property('enumerable', literal(false)),
+								property('configurable', literal(true)),
+							],
+						},
+					],
+					optional: false,
+				},
+			}) as unknown as AnyNode,
+	);
 	const made = {
 		type: 'CallExpression',
 		callee: {
@@ -253,7 +291,7 @@ function lowerClass(node: AnyNode): AnyNode {
 			async: false,
 			generator: false,
 			params: [],
-			body: { type: 'BlockStatement', body: [declaration, ...rest, { type: 'ReturnStatement', argument: self }] },
+			body: { type: 'BlockStatement', body: [declaration, ...rest, ...defined, { type: 'ReturnStatement', argument: self }] },
 		},
 		arguments: [],
 		optional: false,
