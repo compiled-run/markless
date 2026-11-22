@@ -166,7 +166,7 @@ class MarklessHost(
 	/** Dragon's HarfBuzz over this phone's system fonts, made when a page first lays its rows out. */
 	private var rowShaper: RowShaper? = null
 	/** The page size in device px and the slot values (export order) the page was last laid out at. */
-	private var laidOutFor: Triple<Int, Int, List<Double>>? = null
+	private var laidOutFor: Triple<Int, Int, Pair<List<Double>, Map<String, String>>>? = null
 	private val fonts: FontSource = if (style?.systemFaces.isNullOrEmpty()) bundledFonts else SystemFonts(style!!.systemFaces, bundledFonts)
 	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine).apply {
 		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
@@ -638,7 +638,8 @@ class MarklessHost(
 			}
 			Log.i(TAG, "journal ${entry.toJson()}")
 		}
-		if (slotMoved) laidOutFor?.let { layOutAt(it.first, it.second) }
+		// A page text that changes may change its box: the layout compares the texts it last laid out with.
+		if (slotMoved || journal.any { it is JournalEntry.Text && '@' !in it.node }) laidOutFor?.let { layOutAt(it.first, it.second) }
 		syncSheets()
 		refreshRelations()
 		refreshSelects()
@@ -683,14 +684,20 @@ class MarklessHost(
 		val p = page ?: return false
 		val layout = planLayout ?: return false
 		if (planned?.plan == null || widthPx <= 0 || heightPx <= 0) return false
-		val at = Triple(widthPx, heightPx, planned.slots.map { slotValues.getValue(it.id) })
+		val pageTextNodes = payload.nodes.filterIsInstance<Node.Text>().filter { it.row == null }.map { it.id }.toSet()
+		val texts = runtime.texts().filter { it.first in pageTextNodes }.toMap()
+		val at = Triple(widthPx, heightPx, planned.slots.map { slotValues.getValue(it.id) } to texts)
 		if (!rowsMoved && laidOutFor == at) return false
 		val withRows = planned.planRepeats.isNotEmpty()
-		val shaper = if (withRows) rowShaper ?: RowShaper(planned.systemFaces).also { rowShaper = it } else null
+		val live: (String) -> String = { line ->
+			val shaper = rowShaper ?: RowShaper(planned.systemFaces).also { rowShaper = it }
+			(RowShaper.rowsLayout(shaper) ?: throw MarklessHostError("a page with styled rows or texts that follow state needs Dragon's live layout in the app"))(line)
+		}
 		val next = planned.laidOut(
-			Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout, at.third,
+			Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout, at.third.first,
 			rows = if (withRows) planned.shownRows(payload, runtime) else null,
-			rowsLayout = shaper?.let { RowShaper.rowsLayout(it) ?: throw MarklessHostError("a page with styled rows needs Dragon's rows layout in the app") },
+			rowsLayout = live,
+			texts = texts,
 		)
 		style = next
 		p.relaid(next)

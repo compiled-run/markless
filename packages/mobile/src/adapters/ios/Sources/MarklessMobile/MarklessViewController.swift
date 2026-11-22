@@ -20,7 +20,7 @@ public final class MarklessViewController: UIViewController {
 	private let payload: NativeViewPayload
 	private let style: StyleExport?
 	/// The page area in points and the slot values the views were last laid out for by Dragon's plan; nil until then.
-	private var laidOutFor: (size: CGSize, slots: [Double])?
+	private var laidOutFor: (size: CGSize, slots: [Double], texts: [String: String])?
 	/// Each style slot's current number, by slot id: what Dragon's plan lays the page out with.
 	private var slotValues: [String: Double] = [:]
 	/// The texts at mount, which the style export laid out: a later layout checks the export against them, not the texts now.
@@ -355,18 +355,20 @@ public final class MarklessViewController: UIViewController {
 				guard let value = slotValues[slot.id] else { throw HostError("the style export lays out slot \(slot.id), which the payload does not compute") }
 				return value
 			}
-			guard size.width > 0, size.height > 0, rowsMoved || size != laidOutFor?.size || slots.map(\.bitPattern) != laidOutFor?.slots.map(\.bitPattern) else { return }
+			let pageRows = Dictionary(payload.nodes.map { ($0.id, $0.row) }, uniquingKeysWith: { a, _ in a })
+			let texts = Dictionary(try runtime.texts().filter { pageRows[$0.node] != nil && pageRows[$0.node]! == nil }.map { ($0.node, $0.text) }, uniquingKeysWith: { a, _ in a })
+			guard size.width > 0, size.height > 0, rowsMoved || size != laidOutFor?.size || slots.map(\.bitPattern) != laidOutFor?.slots.map(\.bitPattern) || texts != laidOutFor?.texts else { return }
 			let scale = Double(traitCollection.displayScale)
 			let shape = coreTextRowShaper(faces: style.systemFaces, dpr: scale)
 			let relaid = try style.laidOut(
 				width: Double(size.width), height: Double(size.height), scale: scale, slots: slots, layout: DragonPlan.layout,
 				rows: style.planRepeats.isEmpty ? nil : try style.shownRows(payload, runtime: runtime),
-				rowsLayout: { DragonPlan.rowsLayout($0, shape: shape) })
+				rowsLayout: { DragonPlan.rowsLayout($0, shape: shape) }, texts: texts)
 			let now = try relaid.resolve(
 				for: payload, initialTexts: mountTexts, value: runtime.value(of:), dark: traitCollection.userInterfaceStyle == .dark)
 			try tree.relayout(now)
 			layout = now
-			laidOutFor = (size, slots)
+			laidOutFor = (size, slots, texts)
 			applyBand()
 			layoutMilliseconds = (CFAbsoluteTimeGetCurrent() - started) * 1000
 		} catch {
@@ -376,13 +378,15 @@ public final class MarklessViewController: UIViewController {
 		writeLayoutDump()
 	}
 
-	/// A `slot` entry's value lays the page out again at its current size, once the rest of the journal is applied.
+	/// A `slot` entry's value, or a page text's change, lays the page out again at its current size, once the rest of the journal is applied.
 	private func followSlots(_ journal: [NativeJournalEntry]) {
 		var moved = false
 		for case let .slot(slot, value) in journal {
 			slotValues[slot] = value
 			moved = true
 		}
+		// A page text that changes may change its box: the layout compares the texts it last laid out with.
+		for case let .text(node, _) in journal where !node.contains("@") { moved = true }
 		if moved, isViewLoaded { layOutAtScreenSize() }
 	}
 

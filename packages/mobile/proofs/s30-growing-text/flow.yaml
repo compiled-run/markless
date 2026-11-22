@@ -1,0 +1,19 @@
+appId: ${APP_ID}
+name: s30-growing-text
+---
+- launchApp:
+    clearState: true
+- assertVisible: Tagged Home
+- assertVisible: Below the tag
+- assertVisible: Grow tag
+- assertVisible: Growing text
+- tapOn: Grow tag
+- assertNotVisible: Tagged Home
+- assertVisible: Tagged Home and the garden shed out back
+- assertVisible: Below the tag
+- assertNotVisible: Tagged Home
+- tapOn: Grow tag
+- assertNotVisible: Tagged Home and the garden shed out back
+- assertVisible: Tagged Home and the garden shed out back and the garden shed out back
+- assertVisible: Below the tag
+- assertNotVisible: Tagged Home and the garden shed out back

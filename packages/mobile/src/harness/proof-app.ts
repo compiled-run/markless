@@ -1,3 +1,5 @@
+import type { NativeAppPayload, NativeViewPayload } from '@markless/serializer';
+
 /** The one app id both shells install under, so one flow.yaml (`appId: ${APP_ID}`) runs on iOS and Android. */
 export const PROOF_APP_ID = 'dev.markless.proof';
 
@@ -25,3 +27,23 @@ export const PROOF_PLATFORMS: ReadonlyArray<ProofPlatform> = ['ios', 'android'];
 
 /** The link scheme both shells answer: `markless-proof://device/<live value>?value=<json>` sets a test build's device value. */
 export const PROOF_LINK_SCHEME = PROOF_URL_SCHEME;
+
+/**
+ * Whether the app's styles lay text out on the phone: a list's rows, or a page text that follows state, which the plan lays
+ * out around its current string. Either needs Dragon's HarfBuzz shim in the APK.
+ */
+export function stylesShapeText(assets: ReadonlyMap<string, Uint8Array>): boolean {
+	const bytes = assets.get(PROOF_STYLE_PATH);
+	if (!bytes) return false;
+	const style = JSON.parse(new TextDecoder().decode(bytes)) as {
+		readonly targets?: { readonly android?: { readonly routes?: ReadonlyArray<{ readonly planRepeats?: ReadonlyArray<unknown> }> } };
+	};
+	if ((style.targets?.android?.routes ?? []).some((route) => (route.planRepeats ?? []).length > 0)) return true;
+	const payload = assets.get(PROOF_PAYLOAD_PATH);
+	if (!payload) return false;
+	const read = JSON.parse(new TextDecoder().decode(payload)) as NativeViewPayload | NativeAppPayload;
+	const pages = 'routes' in read ? read.routes.map((route) => route.page) : [read];
+	return pages.some((page) =>
+		page.nodes.some((node) => node.kind === 'text' && !node.row && node.parts.some((part) => !('text' in part))),
+	);
+}
