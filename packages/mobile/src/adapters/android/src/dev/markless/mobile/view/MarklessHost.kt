@@ -60,6 +60,8 @@ import dev.markless.mobile.core.Runtime
 import dev.markless.mobile.core.Scope
 import dev.markless.mobile.core.Store
 import dev.markless.mobile.style.Assignment
+import dev.markless.mobile.style.Edges
+import dev.markless.mobile.style.paddingBox
 import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.StyleExport
 import dev.markless.mobile.style.shownRows
@@ -172,6 +174,8 @@ class MarklessHost(
 		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
 		onScriptEntry = AppScriptEngine::entryRan
 		measure = this@MarklessHost::measureBox
+		// Chrome on Android reports the display density as devicePixelRatio.
+		devicePixelRatio = { context.resources.displayMetrics.density.toDouble() }
 		// "Remove animations" sets the animator duration scale to 0, as Chrome on Android reads prefers-reduced-motion.
 		media = {
 			val scale = android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
@@ -186,7 +190,10 @@ class MarklessHost(
 		val slots = style?.slots.orEmpty()
 		if (slots.isNotEmpty() && planLayout == null) throw MarklessHostError("style values that follow state need Dragon's layout plan, which this host does not link")
 		val integer = payload.slots.associate { it.id to it.integer }
+		val rowSlots = payload.slots.filter { it.row != null }.map { it.id }.toSet()
 		for (s in slots) {
+			// A slot inside a row has a value per row copy, which the rows carry; the page lays its template out at the first value.
+			if (s.id in rowSlots) values.putIfAbsent(s.id, s.initial)
 			if (s.id !in values) throw MarklessHostError("style export reads slot \"${s.id}\", which the payload does not have")
 			if (s.integer && integer[s.id] != true) throw MarklessHostError("style export laid slot \"${s.id}\" out at whole numbers only, but the payload's slot may take any number")
 		}
@@ -573,6 +580,7 @@ class MarklessHost(
 	fun apply(journal: List<JournalEntry>) {
 		dismissMessage()
 		var slotMoved = false
+		var rowSlotMoved = false
 		for (entry in journal) {
 			when (entry) {
 				is JournalEntry.Text -> if (flow != null) {
@@ -594,8 +602,10 @@ class MarklessHost(
 					repaint()
 				}
 				is JournalEntry.Slot -> {
-					if (slotValues.put(entry.slot, entry.value) == null) throw MarklessHostError("journal sets slot \"${entry.slot}\", which the payload does not have")
-					slotMoved = slotMoved || planned?.slots.orEmpty().any { it.id == entry.slot }
+					val base = entry.slot.substringBefore('@')
+					if (slotValues.put(entry.slot, entry.value) == null && base == entry.slot) throw MarklessHostError("journal sets slot \"${entry.slot}\", which the payload does not have")
+					slotMoved = slotMoved || planned?.slots.orEmpty().any { it.id == base }
+					rowSlotMoved = rowSlotMoved || base != entry.slot
 				}
 				// Each select's shown choice is read again once the whole journal is applied.
 				is JournalEntry.Selected -> {}
@@ -638,7 +648,7 @@ class MarklessHost(
 			}
 			Log.i(TAG, "journal ${entry.toJson()}")
 		}
-		if (slotMoved) laidOutFor?.let { layOutAt(it.first, it.second) }
+		if (slotMoved) laidOutFor?.let { layOutAt(it.first, it.second, rowsMoved = rowSlotMoved) }
 		syncSheets()
 		refreshRelations()
 		refreshSelects()
@@ -1650,11 +1660,12 @@ class MarklessHost(
 			is StyleWrite.SelectArrow -> if (view !is SelectBox) throw MarklessHostError("\"${s.id}\" draws a drop-down arrow but is not a select")
 		}
 		if (s.kind != "text") {
-			val edges = s.borderWidths
-			if (clipsChildren && edges != null && listOf(edges.top, edges.right, edges.bottom, edges.left).any { it != 0.0 }) throw MarklessHostError("\"${s.id}\" clips overflow to its padding box past borders, which is not implemented on Android")
+			val edges = s.borderWidths ?: Edges(0.0, 0.0, 0.0, 0.0)
+			val bordered = listOf(edges.top, edges.right, edges.bottom, edges.left).any { it != 0.0 }
+			if (clipsChildren && bordered && s.borderOps != null) throw MarklessHostError("\"${s.id}\" clips overflow to its padding box inside a dashed or dotted border, which is not implemented on Android")
 			if (view is MarklessBox) {
 				view.clip = clip
-				view.childClipRadii = if (clipsChildren) radii?.takeIf { r -> r.any { it != 0.0 } }?.map { it.toFloat() }?.toFloatArray() else null
+				view.childClip = if (clipsChildren) paddingBox(edges, radii).takeIf { bordered || it.rounded } else null
 			}
 			else if (clip != null) throw MarklessHostError("\"${s.id}\" has a clip-path on a ${view.javaClass.simpleName}, which is not implemented on Android")
 		}
@@ -1691,7 +1702,14 @@ class MarklessHost(
 		val anyBorder = widths.any { it > 0 }
 		if ((fill == null || (fill ushr 24) == 0) && !anyBorder) { view.background = arrow; return }
 		if (anyBorder && (widths.distinct().size != 1 || colors?.distinct()?.size != 1)) {
-			if (radii?.any { it != 0.0 } == true) throw MarklessHostError("\"${s.id}\" has unequal border sides with rounded corners; not implemented on Android")
+			val rounded = radii?.takeIf { r -> r.any { it != 0.0 } }
+			if (rounded != null) {
+				val drawn = colors?.filterIndexed { i, _ -> widths[i] > 0 }?.distinct()
+				if (drawn?.size != 1) throw MarklessHostError("\"${s.id}\" has border sides of different colours with rounded corners; not implemented on Android")
+				val inner = paddingBox(Edges(widths[0], widths[1], widths[2], widths[3]), rounded)
+				view.background = withArrow { RoundedSides(it, drawn[0], rounded, inner) }
+				return
+			}
 			val sides = colors ?: throw MarklessHostError("\"${s.id}\" has border sides but no colours")
 			view.background = withArrow { SideBorders(it, widths.map { w -> w.toFloat() }, sides) }
 			return

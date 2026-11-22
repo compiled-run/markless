@@ -751,6 +751,8 @@ public struct NativeSlot: Equatable, Sendable {
 	public let integer: Bool
 	/// Evaluated only while this style case has this value; otherwise the slot keeps its last value (0 before the first).
 	public var when: NativeStyleWhen? = nil
+	/// Inside a @for row: one value per row, `<slot>@<row key>`, evaluated with that row's item.
+	public var row: String? = nil
 }
 
 public struct NativeStyleWhen: Equatable, Sendable {
@@ -798,6 +800,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 	public var slots: [NativeSlot] = []
 	/// The conditions element styles follow, in payload order.
 	public var styleCases: [NativeStyleCase] = []
+	/// The element whose style holds each slot: a slot inside a row has one value per row copy.
+	public var slotOwners: [String: String] = [:]
 	/// What the web says when an email field holds no email address, by locale, in payload order.
 	public var typeMismatch: [(locale: String, message: NativeEmailMismatch)] = []
 
@@ -839,10 +843,13 @@ public struct NativeViewPayload: Equatable, Sendable {
 			guard caseIds.contains(styleCase) else { throw PayloadError(path: reader.path, reason: "names unknown style case \(styleCase)") }
 			return NativeStyleWhen(styleCase: styleCase, value: try w["value"].bool())
 		}
+		var slotOwners: [String: String] = [:]
 		let slots: [NativeSlot] = fields.has("slots") ? try fields["slots"].array().map { slot in
-			let f = try slot.object(required: ["id", "value"], optional: ["integer", "when"])
+			let f = try slot.object(required: ["id", "value"], optional: ["integer", "when", "row"])
 			if f.has("integer"), try !f["integer"].bool() { throw PayloadError(path: try f["integer"].path, reason: "integer is only ever true") }
-			return NativeSlot(id: try f["id"].string(), value: try decodeExpr(try f["value"]), integer: f.has("integer"), when: f.has("when") ? try styleWhen(try f["when"]) : nil)
+			return NativeSlot(
+				id: try f["id"].string(), value: try decodeExpr(try f["value"]), integer: f.has("integer"), when: f.has("when") ? try styleWhen(try f["when"]) : nil,
+				row: f.has("row") ? try f["row"].string() : nil)
 		} : []
 		var slotIds = Set<String>()
 		for slot in slots where !slotIds.insert(slot.id).inserted {
@@ -904,6 +911,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 					for part in try field["style"].array() where !part.isString {
 						let slot = try part.object(["slot"])["slot"].string()
 						guard slotIds.contains(slot) else { throw PayloadError(path: part.path, reason: "names unknown slot \(slot)") }
+						slotOwners[slot] = try field["id"].string()
 					}
 				}
 				if field.has("styleWhen") { _ = try styleWhen(try field["styleWhen"]) }
@@ -1148,7 +1156,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		var payload = NativeViewPayload(
 			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers,
 			title: fields.has("title") ? try decodeParts(try fields["title"]) : nil,
-			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong, slots: slots, styleCases: styleCases, typeMismatch: typeMismatch,
+			objects: objects, forms: forms, valueMissing: valueMissing, tooLong: tooLong, slots: slots, styleCases: styleCases, slotOwners: slotOwners, typeMismatch: typeMismatch,
 			script: fields.has("script") ? try decodeScript(try fields["script"]) : nil)
 		if fields.has("numberMessages") {
 			let reader = try fields["numberMessages"]

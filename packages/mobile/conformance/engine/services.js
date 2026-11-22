@@ -401,6 +401,12 @@ if (!host) {
 			addListener: changes,
 		};
 	};
+	Object.defineProperty(g, 'devicePixelRatio', {
+		get: function () {
+			if (!host.screen) throw new TypeError('devicePixelRatio is read in a handler on a phone');
+			return host.screen.devicePixelRatio;
+		},
+	});
 	g.window = g.self = g;
 	// The page answers its focused element (the body when none is) and keeps listeners a handler adds; the host passes each
 	// pointer event to them after the element's own handlers, as the browser bubbles it to the document.
