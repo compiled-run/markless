@@ -308,6 +308,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			}
 			// The page's own texts whose current string is not the one this assignment was laid out with, by Dragon id; a text an arm hides there has no box to lay out.
 			val changed = texts.entries.filter { (id, text) -> assignments[k].byId[id]?.takeIf { it.frame != null }?.text?.let { it != text } ?: false }.sortedBy { it.key }
+			// The page's texts as this layout lays them out: the changed ones with their current string, which its lines draw.
+			val relaidTexts = changed.associate { it.key to it.value }
 			val live = lists != null || changed.isNotEmpty()
 			val textsText = if (changed.isEmpty()) "" else (if (lists == null) ",\"rows\":[]" else "") + ",\"texts\":" + Json.Arr(changed.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }).text()
 			val line = "{\"assignment\":$k,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":$plan$slotsText${if (lists != null) ",\"rows\":$lists" else ""}$textsText}"
@@ -440,6 +442,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				node.copy(
 					frame = Frame(frame[0], frame[1], frame[2], frame[3]), borderWidths = widths?.let { Edges(it[0], it[1], it[2], it[3]) },
 					borderOps = ops, scrollRange = scroll, lines = if (node.kind == "text") lines else null, selectArrow = arrow, checkboxMarks = mark,
+					text = if (node.kind == "text") (relaidTexts[node.id] ?: node.text) else node.text,
 				)
 			}).also {
 				if (arrows.isNotEmpty()) throw MarklessDecodeError("Dragon's layout gives an arrow for ${arrows.keys.sorted().first()}, which it shows no box for")

@@ -830,6 +830,8 @@ private fun planTexts() {
 	val laid = style.laidOut(100.0, 100.0, 2.0, { answer(10.0) }, rowsLayout = { line -> live = line; answer(30.0) }, texts = mapOf("h0:text0" to "Home and the garden shed"))
 	check("a changed page text goes to the live layout beside no rows", live?.endsWith(""","rows":[],"texts":[["h0:text0","Home and the garden shed"]]}""") == true) { "$live" }
 	check("the live layout's boxes are the page's", laid.assignments[0].byId.getValue("h0").frame?.height == 30.0) { "${laid.assignments[0].byId.getValue("h0").frame}" }
+	// The host draws a text's lines only while its string is the one they were laid out for; the re-laid box carries it (checkpoint H9).
+	check("a re-laid text carries the string its lines are for", laid.assignments[0].byId.getValue("h0:text0").text == "Home and the garden shed") { "${laid.assignments[0].byId.getValue("h0:text0").text}" }
 	var replayed: String? = null
 	style.laidOut(100.0, 100.0, 2.0, { line -> replayed = line; answer(10.0) }, rowsLayout = { throw AssertionError("used the live layout") }, texts = mapOf("h0:text0" to "Home"))
 	check("a page text at its laid-out string keeps the recorded layout", replayed != null && "texts" !in replayed!!) { "$replayed" }

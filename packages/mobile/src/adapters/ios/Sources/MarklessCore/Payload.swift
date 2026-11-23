@@ -242,6 +242,10 @@ public struct NativeShape: Equatable, Sendable {
 	public var clip: [[Double]] = []
 	/// Whether each `clip` outline is filled even-odd (a luminance mask's black shapes cut out) rather than nonzero.
 	public var clipEvenOdd: [Bool] = []
+	/// `stroke-dasharray`: dash and gap lengths in turn, an even count; nil for a solid stroke.
+	public var dash: [Double]?
+	/// `stroke-dashoffset`: how far into the dash pattern the stroke starts.
+	public var dashOffset: Double = 0
 	/// An SVG `feGaussianBlur` of the shape alone: its standard deviation and the filter region (verb-coded), in the drawing's units.
 	public var blur: Blur?
 	public struct Blur: Equatable, Sendable {
@@ -1285,7 +1289,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			else { throw reader.fail("a gradient's stops run in order from 0 to 1") }
 			return .gradient(NativeGradient(linear: linear, radial: radial, stops: stops, transform: transform))
 		}
-		let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "text", "clip", "clipRule", "blur"])
+		let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "text", "clip", "clipRule", "blur", "dash", "dashOffset"])
 		let transform = s.has("transform") ? try s["transform"].array().map { try $0.number() } : nil
 		if let transform, transform.count != 6 { throw shape.fail("a transform has six numbers") }
 		let rule = try s["fillRule"].string()
@@ -1303,6 +1307,12 @@ public struct NativeViewPayload: Equatable, Sendable {
 			}
 			guard decoded.clipEvenOdd.count == decoded.clip.count else { throw shape.fail("a clipRule for each clip") }
 		}
+		if s.has("dash") {
+			let dash = try s["dash"].array().map { try $0.number() }
+			guard !dash.isEmpty, dash.count % 2 == 0, dash.allSatisfy({ $0 >= 0 }) else { throw shape.fail("a dash holds an even count of lengths") }
+			decoded.dash = dash
+		}
+		if s.has("dashOffset") { decoded.dashOffset = try s["dashOffset"].number() }
 		if s.has("blur") {
 			let b = try s["blur"].object(["deviation", "region"])
 			decoded.blur = NativeShape.Blur(deviation: try b["deviation"].number(), region: try b["region"].array().map { try $0.number() })

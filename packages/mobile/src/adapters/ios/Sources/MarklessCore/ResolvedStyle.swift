@@ -521,7 +521,8 @@ extension StyleExport {
 				guard lengths.allSatisfy({ !$0.percent && $0.value == lengths[0].value }) else {
 					throw styleError("\(node.id): only one uniform pixel corner radius is implemented on iOS")
 				}
-				style.cornerRadius = lengths[0].value
+				// CSS shrinks radii that overlap until they fit; Core Animation draws no background at all past half the shorter side.
+				style.cornerRadius = style.frame.map { min(lengths[0].value, $0.width / 2, $0.height / 2) } ?? lengths[0].value
 			case let .font(family, size): style.font = (family, size)
 			case let .textColor(color): style.textColor = color
 			case .syntheticBold: throw styleError("\(node.id): synthetic-bold is not implemented on iOS")

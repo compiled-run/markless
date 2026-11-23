@@ -1852,6 +1852,13 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h4' }],
 	},
 	{
+		// Dashed strokes reach the hosts as even dash lists with their offset.
+		name: 'svg-dashes',
+		fixture: 'proofs/r172-svg-dashes/App.tsrx',
+		modules: true,
+		actions: [],
+	},
+	{
 		name: 'details',
 		fixture: 'proofs/r145-details/App.tsrx',
 		modules: true,
