@@ -9,7 +9,7 @@ import { LOAD_PLATFORM } from '../benchmarks/perf-guards/evaluate.mjs';
 
 const ARTIFACT = 'perf-guards-measurement';
 const JOB = 'perf-guards';
-// Past this many commits with runs, a page falls back to its anchor rather than spending minutes of API calls.
+// Past this many commits looked up, a page falls back to its anchor rather than spending minutes of API calls.
 const MAX_LOOKUPS = 40;
 const POLL_MS = 20_000;
 const USAGE =
@@ -28,24 +28,16 @@ const gh = (...args) =>
 	});
 const json = (path, jq) => JSON.parse(gh('api', path, '--jq', jq));
 
-/** ci.yml runs of merge-queue commits and pushes to main, newest first, by commit. */
-function runsByCommit(repo, pages = 3) {
-	const bySha = new Map();
-	for (const event of ['merge_group', 'push'])
-		for (let page = 1; page <= pages; page++) {
-			const runs = json(
-				`repos/${repo}/actions/workflows/ci.yml/runs?event=${event}&per_page=100&page=${page}`,
-				'[.workflow_runs[] | {id, sha: .head_sha}]',
-			);
-			for (const run of runs) bySha.set(run.sha, [...(bySha.get(run.sha) ?? []), run.id]);
-			if (runs.length < 100) break;
-		}
-	return bySha;
-}
+/** ci.yml runs of one commit from the merge queue or a push to main, newest first, however long ago it ran. */
+const runsOfCommit = (repo, sha) =>
+	json(
+		`repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${sha}&per_page=100`,
+		'[.workflow_runs[] | select(.event == "merge_group" or .event == "push") | .id]',
+	);
 
 /** Whether a run can no longer upload a measurement: it finished, or its perf-guards job did. */
 function settled(repo, run) {
-	if (json(`repos/${repo}/actions/runs/${run}`, '.status') === 'completed') return true;
+	if (json(`repos/${repo}/actions/runs/${run}`, '[.status]')[0] === 'completed') return true;
 	return json(
 		`repos/${repo}/actions/runs/${run}/jobs?per_page=100`,
 		`[.jobs[] | select(.name == "${JOB}") | .status]`,
@@ -91,16 +83,15 @@ function main(argv) {
 	try {
 		if (!repo) throw new Error('no repository: pass --repo or set GITHUB_REPOSITORY');
 		const history = ledgerHistory({ depth });
-		const runs = runsByCommit(repo);
 		const measurements = new Map();
 		let lookups = 0;
 		const measurementAt = (i) => {
 			if (!measurements.has(i)) {
-				const commitRuns = runs.get(history.chain[i].sha) ?? [];
-				const reachable = commitRuns.length > 0 && lookups++ < MAX_LOOKUPS;
 				try {
+					const sha = history.chain[i].sha;
+					const commitRuns = lookups++ < MAX_LOOKUPS ? runsOfCommit(repo, sha) : [];
 					measurements.set(i, {
-						value: reachable
+						value: commitRuns.length > 0
 							? measurementOf(repo, commitRuns, scratch, deadline, console.log)
 							: undefined,
 					});
