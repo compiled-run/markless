@@ -4,14 +4,14 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildAndroidShell, installProofApk } from '../harness/android.ts';
+import { buildAndroidShell, emulatorAnswers, installProofApk } from '../harness/android.ts';
 import { iosHostTests, androidHostTests, describeHostTests } from '../harness/host-tests.ts';
 import { exec } from '../harness/exec.ts';
 import { buildIosShell, installProofApp } from '../harness/ios.ts';
 import { simctl, SimulatorStuck } from '../harness/simctl.ts';
 import { runFlow } from '../harness/maestro.ts';
 import type { ProofPlatform } from '../harness/proof-app.ts';
-import { androidTools, cacheRoot } from '../harness/tools.ts';
+import { androidTools, type AndroidTools, cacheRoot } from '../harness/tools.ts';
 import { SERVER_PORTS } from '../../proofs/ladder.ts';
 import { dragonDir } from '../style-export.ts';
 import { type BundledRung, readAssets } from './bundle.ts';
@@ -34,9 +34,13 @@ if (!job || !chunkName || !device)
 const spec = readJson<JobSpec>(join(job, 'job.json'))!;
 // The shells take Dragon's engine from the checkout the job's styles were compiled with, as long as it has not moved since.
 if (spec.dragon) {
-	const head = execFileSync('git', ['-C', spec.dragon.dir, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+	const head = execFileSync('git', ['-C', spec.dragon.dir, 'rev-parse', 'HEAD'], {
+		encoding: 'utf8',
+	}).trim();
 	if (head !== spec.dragon.commit)
-		throw new Error(`the job's Dragon checkout ${spec.dragon.dir} moved from ${spec.dragon.commit} to ${head} after the submit; submit again`);
+		throw new Error(
+			`the job's Dragon checkout ${spec.dragon.dir} moved from ${spec.dragon.commit} to ${head} after the submit; submit again`,
+		);
 	process.env.MARKLESS_DRAGON_DIR = spec.dragon.dir;
 	if (spec.dragon.zig) process.env.MARKLESS_ZIG = spec.dragon.zig;
 }
@@ -48,6 +52,13 @@ const hostRoot =
 		? join(mobile, 'src', 'harness', 'stub-host')
 		: join(mobile, 'src', 'adapters');
 const shells = join(mobile, 'src', 'harness', 'shells');
+const answersWithin = async (tools: AndroidTools, serial: string, limit: number) => {
+	for (let waited = 0; waited < limit; waited += 5) {
+		if (await emulatorAnswers(tools, serial)) return true;
+		await new Promise((resolve) => setTimeout(resolve, 5000));
+	}
+	return false;
+};
 const seconds = (since: number) => (performance.now() - since) / 1000;
 
 const results: RungResult[] = [];
@@ -127,7 +138,7 @@ try {
 		} else {
 			const installStarted = performance.now();
 			let installError: string | undefined;
-			try {
+			const prepare = async () => {
 				// A rung that switched to dark leaves the phone dark for the next job's rungs: each starts light.
 				if (platform === 'ios') await simctl(['ui', device, 'appearance', 'light']);
 				else
@@ -142,10 +153,30 @@ try {
 						`tcp:${SERVER_PORTS[rung.server]}`,
 						`tcp:${SERVER_PORTS[rung.server]}`,
 					]);
+			};
+			try {
+				await prepare();
 			} catch (error) {
 				// A stuck simulator fails every rung left, so the queue moves on and the runner restarts it.
 				if (error instanceof SimulatorStuck) throw error;
 				installError = error instanceof Error ? error.message : String(error);
+			}
+			// adb drops an emulator for a few seconds while another emulator on the machine is busy ("device offline"):
+			// once it answers again, the install runs once more.
+			if (
+				installError &&
+				platform === 'android' &&
+				(await answersWithin(tools!, device, 60))
+			) {
+				console.log(
+					`${name}: the emulator dropped during the install and answers again; installing once more`,
+				);
+				installError = undefined;
+				try {
+					await prepare();
+				} catch (error) {
+					installError = error instanceof Error ? error.message : String(error);
+				}
 			}
 			const installSeconds = seconds(installStarted);
 			if (installError)

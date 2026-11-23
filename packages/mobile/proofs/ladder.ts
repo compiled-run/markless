@@ -49,6 +49,11 @@ export type LadderAction =
 	| { readonly submit: string }
 	/** The keyboard's delete key in the text field with this accessible name, its text cursor at the end. */
 	| { readonly erase: string }
+	/**
+	 * The clear control of the focused search field with this accessible name: Chrome's cancel button on the web, the hosts'
+	 * clear control (`CLEAR_BUTTON_LABEL`) on the phones.
+	 */
+	| { readonly clear: string }
 	/** Two quick taps on this text or accessible name: the second press's `event.detail` is 2. */
 	| { readonly doubleTap: LadderText }
 	/** Opens the `<select>` with this accessible name and picks the option with this label from its list. */
@@ -85,6 +90,11 @@ export type LadderAction =
 	/** A press that starts and ends on the topmost overlay element itself, beside what it holds (a modal's backdrop). */
 	| { readonly pressBackdrop: true }
 	/**
+	 * A tap at a point of the screen, `[x, y]` in percent of it, on the element showing `on` there (a box drawn over another, as
+	 * a sticky header over the rows scrolled beneath it); the web test checks Chrome's element at that point is inside it.
+	 */
+	| { readonly tapAt: { readonly point: readonly [number, number]; readonly on: string } }
+	/**
 	 * A finger pressed on the element showing `on`, dragged toward `direction` and lifted. `scrolls` says the drag runs along
 	 * a box that scrolls that way, so the platform takes the touch for the scroll (the web's `pointercancel`); the phones and
 	 * the browser find that out for themselves, the reference ladder, which lays nothing out, is told.
@@ -109,6 +119,9 @@ export type LadderAction =
 
 /** Where a phone flow presses the backdrop: above a centred surface, below the status bar. */
 export const BACKDROP_POINT = '50%,8%';
+
+/** The accessible name of a search field's clear control: UIKit's for its clear button, which the Android host gives its own. */
+export const CLEAR_BUTTON_LABEL = 'Clear text';
 
 /** Permissions a rung sets or clears, by the name Maestro's `launchApp` takes. */
 export type DevicePermission = 'location' | 'camera' | 'microphone';
@@ -505,6 +518,7 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 		];
 	if ('submit' in action) return [{ tapOn: selector(action.submit) }, { pressKey: 'Enter' }];
 	if ('erase' in action) return [{ tapOn: selector(action.erase) }, { pressKey: 'Backspace' }];
+	if ('clear' in action) return [{ tapOn: selector(CLEAR_BUTTON_LABEL) }];
 	if ('doubleTap' in action) return [{ doubleTapOn: selector(action.doubleTap) }];
 	if ('choose' in action)
 		return [
@@ -614,6 +628,8 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 	if ('longPress' in action) return [{ longPressOn: { text: selector(action.longPress) } }];
 	if ('escape' in action) return ['back'];
 	if ('pressBackdrop' in action) return [{ tapOn: { point: BACKDROP_POINT } }];
+	if ('tapAt' in action)
+		return [{ tapOn: { point: `${action.tapAt.point[0]}%,${action.tapAt.point[1]}%` } }];
 	return [
 		{
 			extendedWaitUntil: {

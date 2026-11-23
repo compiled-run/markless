@@ -100,6 +100,28 @@ final class PreformattedScroll: UIScrollView {}
 /// The page's scroll view: a drag that starts on a button or field scrolls the page, as it does in Safari; a tap still presses it.
 final class PageScroll: UIScrollView {
 	override func touchesShouldCancel(in view: UIView) -> Bool { true }
+
+	/// A touch goes to the box drawn on top, as a browser's does: siblings by zPosition (a positioned or sticky box over the flow
+	/// after it), later ones first, where UIKit's own walk goes by subview order alone.
+	override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+		guard isUserInteractionEnabled, !isHidden, alpha > 0.01, self.point(inside: point, with: event) else { return nil }
+		return PageScroll.topmost(in: self, at: point, with: event) ?? self
+	}
+
+	private static func topmost(in view: UIView, at point: CGPoint, with event: UIEvent?) -> UIView? {
+		let order = view.subviews.enumerated().sorted { ($0.element.layer.zPosition, $0.offset) > ($1.element.layer.zPosition, $1.offset) }
+		for (_, child) in order {
+			let p = child.convert(point, from: view)
+			if type(of: child) == UIView.self {
+				guard child.isUserInteractionEnabled, !child.isHidden, child.alpha > 0.01 else { continue }
+				if let hit = topmost(in: child, at: p, with: event) { return hit }
+				if child.point(inside: p, with: event) { return child }
+			} else if let hit = child.hitTest(p, with: event) {
+				return hit
+			}
+		}
+		return nil
+	}
 }
 
 /// An inline `<svg>`: draws the shapes compiled when the app was built, then the shapes inside it that come from components,
@@ -378,6 +400,11 @@ final class ViewTree {
 	private(set) var sheets: [String: SystemSheet] = [:]
 	/// Sheets built since the last stacking pass, whose content an unstyled page still has to stack.
 	private var unstacked: Set<String> = []
+	/// POSX-s scroll: Dragon's `runMarklessSticky`, set by the controller; without it sticky boxes stay where the layout put them.
+	var stickyShift: ((String) -> String)?
+	private var stickyWatch: NSKeyValueObservation?
+	/// Each sticky view's center as the layout placed it, and Dragon's shift for it at scroll offset 0 (already in that place).
+	private var stickyRest: [String: (center: CGPoint, dx: Double, dy: Double)] = [:]
 	/// The controller that presents the page's system sheets.
 	weak var presenter: UIViewController?
 	private var anchors = Set<ObjectIdentifier>()
@@ -583,10 +610,40 @@ final class ViewTree {
 		let range = layout.pageScrolls[shown]
 		page.contentSize = CGSize(width: viewport.width + (range?.maxX ?? 0), height: viewport.height + (range?.maxY ?? 0))
 		root.frame = CGRect(origin: .zero, size: page.contentSize)
+		try restSticky()
 		guard range == nil else { return }
 		let drawn = root.subviews.reduce(CGRect.null) { $0.union($1.frame) }
 		if drawn.maxX > viewport.width + 0.5 || drawn.maxY > viewport.height + 0.5 {
 			throw HostError("the page is \(drawn.maxY) points tall on a \(viewport.height) point screen, and Dragon does not decide its scroll range: \(layout.pageScrollUndecided ?? "the style export has no page range")")
+		}
+	}
+
+	/// The sticky views' places as just laid out, then moved for the page's current scroll offset.
+	private func restSticky() throws {
+		stickyRest = [:]
+		guard let layout, let run = stickyShift else { return }
+		for (id, d) in try layout.stickyShifts(assignment: assignment, x: 0, y: 0, run: run) {
+			guard let view = elements[id] else { continue }
+			stickyRest[id] = (view.center, d.dx, d.dy)
+		}
+		if stickyWatch == nil && !stickyRest.isEmpty {
+			stickyWatch = page.observe(\.contentOffset) { [weak self] _, _ in MainActor.assumeIsolated { self?.stick() } }
+		}
+		stick()
+	}
+
+	/// Each sticky view moved by Dragon's shift at the page's scroll offset, less the shift its laid-out place already holds.
+	private func stick() {
+		guard let layout, let run = stickyShift, !stickyRest.isEmpty else { return }
+		do {
+			// The scrollport starts below the bars the page scrolls under, as the web's viewport starts at the top of the page.
+			let x = Double(page.contentOffset.x + page.adjustedContentInset.left), y = Double(page.contentOffset.y + page.adjustedContentInset.top)
+			for (id, d) in try layout.stickyShifts(assignment: assignment, x: x, y: y, run: run) {
+				guard let rest = stickyRest[id], let view = elements[id] else { continue }
+				view.center = CGPoint(x: rest.center.x + CGFloat(d.dx - rest.dx), y: rest.center.y + CGFloat(d.dy - rest.dy))
+			}
+		} catch {
+			fatalError("Markless iOS host: \(error)")
 		}
 	}
 
@@ -765,6 +822,7 @@ final class ViewTree {
 				}
 				if flowing.contains(node) {
 					attributes[node, default: [:]][name] = value
+					if let button = contexts[node]?.button { refreshLabel(of: button) }
 					continue
 				}
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
@@ -1020,7 +1078,7 @@ final class ViewTree {
 		try paint(view, style, faces: faces)
 		if let label = view as? UILabel { drawLines(label, style) }
 		if let clip = clipViews[id] { clip.shape(style.childClip, in: view.bounds) }
-		else if style.childClip != nil { throw HostError("\(id) began clipping overflow past its borders after it was built") }
+		else if style.childClip != nil, !(view is TextField) { throw HostError("\(id) began clipping overflow past its borders after it was built") }
 		if let host = view.superview as? ContainerScrollView { view.frame.origin = CGPoint(x: view.frame.minX - host.inset.left, y: view.frame.minY - host.inset.top) }
 		try paintShadow(id, view, style)
 		try paintOutline(id, style)
@@ -1533,7 +1591,8 @@ final class ViewTree {
 						view.addSubview(scroll)
 						scrollViews[id] = scroll
 					}
-					if style.childClip != nil || layout?.assignments.contains(where: { ($0[id] ?? $0[template])?.childClip != nil }) == true {
+					// A text field clips its value to the editor box itself; a view over it would take its touches.
+					if !(view is TextField), style.childClip != nil || layout?.assignments.contains(where: { ($0[id] ?? $0[template])?.childClip != nil }) == true {
 						let clip = PaddingClipView()
 						view.addSubview(clip)
 						clipViews[id] = clip
@@ -1727,6 +1786,8 @@ final class ViewTree {
 	/// Static and bound attributes as platform state; `class` reaches views only through the style export.
 	private func applyAttributes(_ id: String, _ view: UIView) {
 		let current = attributes[id] ?? [:]
+		// A control's name is read from its content, so an attribute inside it (hidden, aria-label) renames it.
+		defer { if let button = contexts[id]?.button, button !== view { refreshLabel(of: button) } }
 		if view is AbsentField { return }
 		if let slider = view as? RangeSlider {
 			slider.show(current)
@@ -1793,8 +1854,31 @@ final class ViewTree {
 			let hidden = current["hidden"] != nil || view.superview is SelectButton
 			if view.isHidden != hidden {
 				view.isHidden = hidden
-				if let parent = view.superview, !(parent is UIButton || parent is OverlayCard) { stack(parent) }
+				if contexts[id]?.button != nil {
+					let labels = hideLabels(in: view, hidden)
+					stackTree(view)
+					if hidden {
+						for label in labels {
+							label.translatesAutoresizingMaskIntoConstraints = true
+							label.frame = .zero
+						}
+					}
+				}
+				if let parent = view.superview, !(parent is SelectButton || parent is OverlayCard) { stack(parent) }
 			}
+		}
+	}
+
+	/// A hidden element inside a control has no layout, as `display: none`: UIKit's automation tree lists a control's labels
+	/// at their frames whatever their `isHidden`, so each label under it is hidden and unplaced. One under a still-hidden
+	/// element stays so.
+	private func hideLabels(in view: UIView, _ hidden: Bool) -> [UILabel] {
+		view.subviews.filter { !decorations.contains(ObjectIdentifier($0)) && !leaves.contains(ObjectIdentifier($0)) }.flatMap { child -> [UILabel] in
+			if let label = child as? UILabel {
+				label.isHidden = hidden
+				return [label]
+			}
+			return child.isHidden ? [] : hideLabels(in: child, hidden)
 		}
 	}
 
@@ -1829,19 +1913,40 @@ final class ViewTree {
 			button.accessibilityLabel = label
 			return
 		}
-		// As the web names a button from its content: its text, and the label of an image or svg inside it.
+		// As the web names a button from its content: its shown text, and the label of an element, image or svg inside it.
 		func texts(_ view: UIView) -> [String] {
 			view.subviews.flatMap { child -> [String] in
-				if let label = child as? UILabel { return decorations.contains(ObjectIdentifier(label)) ? [] : [label.text ?? ""] }
+				if let label = child as? UILabel {
+					if decorations.contains(ObjectIdentifier(label)) { return [] }
+					if let id = label.accessibilityIdentifier, let paragraph = paragraphs[id], paragraph.label === label { return [spokenName(of: paragraph)] }
+					return [label.text ?? ""]
+				}
+				let own = child.accessibilityIdentifier.flatMap { attributes[$0] }
+				if child.isHidden || own?["hidden"] != nil || own?["aria-hidden"] == "true" { return [] }
 				if child is DrawingView || child is UIImageView {
-					let own = child.accessibilityIdentifier.flatMap { attributes[$0] }
-					if own?["aria-hidden"] == "true" { return [] }
 					return [own?["aria-label"] ?? (child is UIImageView ? own?["alt"] : nil) ?? ""]
 				}
+				if let label = own?["aria-label"] { return [label] }
 				return texts(child)
 			}
 		}
-		button.accessibilityLabel = texts(button).joined()
+		button.accessibilityLabel = texts(button).joined().split(whereSeparator: \.isWhitespace).joined(separator: " ")
+	}
+
+	/// A paragraph's part of a control's name, as the web reads it: without hidden or aria-hidden phrase elements, and an
+	/// element's aria-label in place of its text.
+	private func spokenName(of paragraph: Paragraph) -> String {
+		func walk(_ template: String) -> String {
+			guard let node = nodes[template] else { return "" }
+			if node.isText { return paragraphTexts[template + paragraph.suffix] ?? "" }
+			if node.defaultStyle?.flow == .break { return " " }
+			let own = attributes[template + paragraph.suffix] ?? [:]
+			if own["hidden"] != nil || own["aria-hidden"] == "true" { return "" }
+			if let label = own["aria-label"] { return label }
+			let inner = (slots[template] ?? []).map(walk).joined()
+			return node.defaultStyle?.quotes == true ? "\u{201C}\(inner)\u{201D}" : inner
+		}
+		return paragraph.nodes.map(walk).joined()
 	}
 
 	private func stackTree(_ view: UIView) {
@@ -2514,6 +2619,10 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 		box.paint(style.checkbox)
 		return
 	}
+	if let field = view as? TextField {
+		try field.paint(style.textField, faces: faces)
+		return
+	}
 	if style.checkbox != nil { throw HostError("\(view.accessibilityIdentifier ?? "a box") draws a themed checkbox but is not a checkbox") }
 	guard let label = view as? UILabel else {
 		if style.font != nil || style.textColor != nil { throw HostError("\(view.accessibilityIdentifier ?? "a box") has text styles but is not text") }
@@ -3031,6 +3140,57 @@ final class TextField: UITextField, KeyedInput, UITextFieldDelegate {
 	override func paste(_ sender: Any?) {
 		if pasteLeavesOut() { return }
 		super.paste(sender)
+	}
+
+	private var styled: ResolvedStyle.TextFieldPaint?
+
+	/// On a styled page: the value and caret in Dragon's editor box, in its font and colour, and Dragon's placeholder in its box.
+	func paint(_ paint: ResolvedStyle.TextFieldPaint?, faces: [String: UIFontDescriptor]) throws {
+		let font = { (family: String, size: Double) throws -> UIFont in
+			guard let face = faces[family] else { throw HostError("font \(family) was not registered") }
+			return UIFont(descriptor: face, size: size)
+		}
+		if let paint {
+			self.font = try font(paint.fontFamily, paint.fontSize)
+			if let color = paint.color { textColor = uiColor(color) }
+		}
+		attributedPlaceholder = try paint?.placeholder.map { shown in
+			var look: [NSAttributedString.Key: Any] = [.font: try font(shown.fontFamily, shown.fontSize)]
+			if let color = shown.color { look[.foregroundColor] = uiColor(color) }
+			return NSAttributedString(string: shown.text, attributes: look)
+		}
+		styled = paint
+		clearButtonMode = paint?.clear == nil ? .never : .whileEditing
+		setNeedsLayout()
+	}
+
+	/// The clear button empties the field as typing does, so the page's input handler sees it, as Chrome's cancel button fires input.
+	func textFieldShouldClear(_ textField: UITextField) -> Bool {
+		text = ""
+		sendActions(for: .editingChanged)
+		return false
+	}
+
+	override func clearButtonRect(forBounds bounds: CGRect) -> CGRect {
+		rect(styled?.clear, or: super.clearButtonRect(forBounds: bounds))
+	}
+
+	private func rect(_ frame: Frame?, or fallback: CGRect) -> CGRect {
+		frame.map { CGRect(x: $0.x, y: $0.y, width: $0.width, height: $0.height) } ?? fallback
+	}
+
+	/// The editor box's columns at the height UIKit asks for, moved by how far the box's middle is from the field's: UIKit centres
+	/// the line there, and draws no value or caret in a rect it did not size itself.
+	private func valueRect(_ bounds: CGRect) -> CGRect? {
+		guard let editor = styled?.editor else { return nil }
+		let shift = editor.y + editor.height / 2 - self.bounds.midY
+		return CGRect(x: editor.x, y: bounds.minY + shift, width: editor.width, height: bounds.height)
+	}
+
+	override func textRect(forBounds bounds: CGRect) -> CGRect { valueRect(bounds) ?? super.textRect(forBounds: bounds) }
+	override func editingRect(forBounds bounds: CGRect) -> CGRect { valueRect(bounds) ?? super.editingRect(forBounds: bounds) }
+	override func placeholderRect(forBounds bounds: CGRect) -> CGRect {
+		rect(styled?.placeholder?.frame ?? styled?.editor, or: super.placeholderRect(forBounds: bounds))
 	}
 }
 

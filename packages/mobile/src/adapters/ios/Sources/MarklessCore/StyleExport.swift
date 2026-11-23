@@ -336,6 +336,8 @@ public struct StyleExport: Sendable {
 	public let bands: StyleBands?
 	/// Each assignment's page scroll range in device px; nil when Dragon does not decide it (see `pageScrollUndecided`).
 	public private(set) var pageScrolls: [ScrollOffsetRange?]
+	/// POSX-s scroll: each assignment's sticky boxes as Dragon's plan layout wrote them (device px), which `runMarklessSticky` reads back.
+	public private(set) var pageSticky: [[StickyRow]] = []
 	/// Dragon's reason, for this target, when it leaves a page scroll range undecided.
 	public private(set) var pageScrollUndecided: String?
 	/// Each system sheet's content, laid out as its own document at every resting height (app style files only).
@@ -756,6 +758,7 @@ public struct StyleExport: Sendable {
 		let slotLine = slotted ? ",\"slots\":\(hex(values).jsonText)" : ""
 		var out = self
 		var pages: [ScrollOffsetRange?] = []
+		var stickies: [[StickyRow]] = []
 		var undecided: String?
 		out.assignments = try assignments.indices.map { k in
 			let names = k < planNames.count ? planNames[k] : [:]
@@ -793,14 +796,14 @@ public struct StyleExport: Sendable {
 				if shown == nil { line += ",\"rows\":[]" }
 				line += ",\"texts\":" + JSONValue.array(changed.map { .array([.string(dragonId[$0.key] ?? $0.key), .string($0.value)]) }).jsonText
 			}
-			line += "}"
+			line += ",\"sticky\":true}"
 			guard !live || rowsLayout != nil else { throw PayloadError(path: "plan layout", reason: "a page whose texts follow state needs Dragon's live layout") }
 			guard shown == nil || rowsLayout != nil else { throw PayloadError(path: "plan layout", reason: "a page with rows needs Dragon's rows layout") }
 			let result = try Reader(JSONValue.parse(Data((live ? rowsLayout!(line) : layout(line)).utf8)), at: "plan layout")
 			let parts = try result.array()
 			// Dragon's live layout answers a slotted page with each row's write numbers, an empty list when it lays out texts and no rows.
 			let fixed = !slotted ? 3 : (live ? 5 : 4)
-			guard parts.count >= fixed, parts.count <= fixed + 2, try parts[0].string() == "ok" else {
+			guard parts.count >= fixed, parts.count <= fixed + 3, try parts[0].string() == "ok" else {
 				throw PayloadError(path: "plan layout", reason: "Dragon's layout at \(width) x \(height) points and \(scale)x failed: \(result.value.jsonText)")
 			}
 			// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
@@ -811,12 +814,21 @@ public struct StyleExport: Sendable {
 			}
 			var arrows: [String: (strokeWidth: Double, points: [Double])] = [:]
 			var marks: [String: CheckboxMarks] = [:]
+			var sticky: [StickyRow] = []
 			var tags: Set<String> = []
 			for tagged in parts[fixed...] {
 				let suffix = try tagged.array()
 				guard suffix.count == 2 else { throw tagged.fail("expected [tag, entries]") }
 				let tag = try suffix[0].string()
 				guard tags.insert(tag).inserted else { throw tagged.fail("\(tag) is given twice") }
+				if tag == "sticky" {
+					for entry in try suffix[1].array() {
+						let s = try entry.array()
+						guard s.count == 15 else { throw entry.fail("expected an id and 14 numbers") }
+						sticky.append(StickyRow(id: exportId(try s[0].string()), row: entry.value))
+					}
+					continue
+				}
 				if tag == "checkbox-marks" {
 					for entry in try suffix[1].array() {
 						let m = try entry.array()
@@ -850,6 +862,7 @@ public struct StyleExport: Sendable {
 					arrows[id] = (try planNumber(a[1].value), points)
 				}
 			}
+			stickies.append(sticky)
 			let bits = { (reader: Reader) throws -> JSONValue in try planNumbers(reader.value) }
 			let page = try parts[1].array()
 			// Dragon's ["undecided", node, reason] when it could not decide the page's range at this size.
@@ -979,6 +992,7 @@ public struct StyleExport: Sendable {
 			return (assignment.values, nodes, assignment.canvas, assignment.body)
 		}
 		out.pageScrolls = pages
+		out.pageSticky = stickies
 		if let undecided { out.pageScrollUndecided = undecided }
 		out.viewport = (width, height)
 		out.dpr = scale
@@ -1267,4 +1281,10 @@ public struct LaidOutRow: Sendable, Equatable {
 		self.texts = texts
 		self.slots = slots
 	}
+}
+
+/// A sticky box of a laid-out assignment: its export id, and its row as Dragon's plan layout wrote it (with Dragon's own id).
+public struct StickyRow: Equatable, Sendable {
+	public let id: String
+	public let row: JSONValue
 }

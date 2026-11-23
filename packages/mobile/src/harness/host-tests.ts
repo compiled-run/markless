@@ -10,6 +10,7 @@ import { cacheRoot, contentKey, filesUnder } from './tools.ts';
 export const DRAGON_FONT_TESTS = [
 	'MarklessMobileTests/paintsDragonsExport()',
 	'MarklessMobileTests/refusesMissingOrWrongFonts()',
+	'MarklessMobileTests/aStyledTextFieldDrawsItsValueInItsEditorBox()',
 ] as const;
 
 export type HostTestOutcome = {

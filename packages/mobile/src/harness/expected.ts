@@ -56,6 +56,18 @@ export function readProofExpected(json: unknown, source: string): LadderRung {
 		if (index > 0 && (typeof fields.do !== 'object' || fields.do === null))
 			fail(`step ${index} has no "do" action`);
 		const action = fields.do as Record<string, unknown> | undefined;
+		const at = action?.tapAt as { point?: unknown; on?: unknown } | undefined;
+		if (
+			at !== undefined &&
+			(typeof at !== 'object' ||
+				at === null ||
+				!Array.isArray(at.point) ||
+				at.point.length !== 2 ||
+				!at.point.every((v) => typeof v === 'number' && v >= 0 && v <= 100) ||
+				typeof at.on !== 'string' ||
+				at.on === '')
+		)
+			fail(`step ${index} "tapAt" is not { "point": [x, y] in percent, "on": <text> }`);
 		for (const key of ['tap', 'doubleTap'] as const) {
 			if (action?.[key] !== undefined && !isText(action[key]))
 				fail(`step ${index} "${key}" is neither a text nor { "startsWith": <text> }`);

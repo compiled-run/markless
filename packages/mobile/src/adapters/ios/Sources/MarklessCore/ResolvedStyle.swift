@@ -1,3 +1,5 @@
+import Foundation
+
 /// One box's look in points, ready for a host to assign: the only arithmetic between Dragon's export and the views.
 public struct ResolvedStyle: Equatable, Sendable {
 	public var frame: Frame?
@@ -38,6 +40,8 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var checkbox: CheckboxPaint?
 	/// A select's label: the box Dragon lays out inside it for its text, and that text's font and colour.
 	public var selectLabel: SelectLabel?
+	/// A text field the host edits: Dragon's editor and placeholder boxes inside it.
+	public var textField: TextFieldPaint?
 	/// `outline`, drawn with Dragon's translated painters in the view of `OutlinePaint.host`.
 	public var outline: OutlinePaint?
 
@@ -47,7 +51,7 @@ public struct ResolvedStyle: Equatable, Sendable {
 			&& a.textColor == b.textColor && a.lines == b.lines && a.linesText == b.linesText && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll && a.hidden == b.hidden
 			&& a.clipsChildren == b.clipsChildren && a.childClip == b.childClip && a.clipRect == b.clipRect
 			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank && a.stackingParent == b.stackingParent && a.shadow == b.shadow
-			&& a.selectArrow == b.selectArrow && a.selectLabel == b.selectLabel && a.checkbox == b.checkbox && a.outline == b.outline
+			&& a.selectArrow == b.selectArrow && a.selectLabel == b.selectLabel && a.textField == b.textField && a.checkbox == b.checkbox && a.outline == b.outline
 	}
 
 	public struct SelectArrowPaint: Equatable, Sendable {
@@ -70,6 +74,25 @@ public struct ResolvedStyle: Equatable, Sendable {
 		public let fontFamily: String
 		public let fontSize: Double
 		public let color: RGBA?
+	}
+
+	/// Frames in points from the field's border box; font sizes in points. `editor` is where the host draws the value, in
+	/// `font` and `color`; `placeholder` is laid out only while the value is empty; `clear` is a search field's cancel button.
+	public struct TextFieldPaint: Equatable, Sendable {
+		public let editor: Frame
+		public let fontFamily: String
+		public let fontSize: Double
+		public let color: RGBA?
+		public let placeholder: Placeholder?
+		public var clear: Frame? = nil
+
+		public struct Placeholder: Equatable, Sendable {
+			public let frame: Frame
+			public let text: String
+			public let fontFamily: String
+			public let fontSize: Double
+			public let color: RGBA?
+		}
 	}
 
 	public struct DashedBorder: Equatable, Sendable {
@@ -148,6 +171,8 @@ public struct StyleLayout: Sendable {
 	public let pageScrolls: [ScrollOffsetRange?]
 	/// Why Dragon left the page scroll range undecided, when it says.
 	public let pageScrollUndecided: String?
+	/// Each assignment's sticky boxes, in device px, for Dragon's `runMarklessSticky` on every scroll.
+	public let pageSticky: [[StickyRow]]
 	/// Device pixels per point the frames were laid out for; a screen with another scale is refused.
 	public let dpr: Double
 	public let fontFiles: [(id: String, file: String)]
@@ -274,6 +299,7 @@ extension StyleExport {
 			},
 			start: start, stateCells: stateCells, domains: states.map(\.domain), next: next,
 			viewport: viewport, pageScrolls: try pageScrolls.map { try $0.map(points) }, pageScrollUndecided: pageScrollUndecided,
+			pageSticky: pageSticky.isEmpty ? assignments.map { _ in [] } : pageSticky,
 			dpr: dpr, fontFiles: fonts, systemFaces: systemFaces, bands: bands,
 			extents: assignments.map { assignment in
 				let byId = Dictionary(uniqueKeysWithValues: assignment.nodes.map { ($0.id, $0) })
@@ -300,6 +326,10 @@ extension StyleExport {
 		let payloadById = Dictionary(uniqueKeysWithValues: payloadNodes.map { ($0.id, $0) })
 		let isSelect = { (id: String) -> Bool in
 			if case .element("select", _, _)? = payloadById[id]?.kind { return true }
+			return false
+		}
+		let isInput = { (id: String) -> Bool in
+			if case .element("input", _, _)? = payloadById[id]?.kind { return true }
 			return false
 		}
 		let postOrder = StyleExport.postOrder(nodes)
@@ -361,6 +391,7 @@ extension StyleExport {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
 			}
 			if isSelect(node.id), !style.hidden { style.selectLabel = try selectLabel(styled, nodes, isView: payloadIds.contains) }
+			if isInput(node.id) { style.textField = try textField(styled, byId) }
 			styles[node.id] = style
 		}
 		// Each row's copy of a payload node ("<id>@<key>"), placed in its own copies of the boxes around it.
@@ -400,6 +431,7 @@ extension StyleExport {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
 			}
 			if isSelect(base(styled.id)), !style.hidden { style.selectLabel = try selectLabel(styled, nodes, isView: isView) }
+			if isInput(base(styled.id)) { style.textField = try textField(styled, byId) }
 			styles[styled.id] = style
 		}
 		return styles
@@ -475,6 +507,36 @@ extension StyleExport {
 			}
 		}
 		return nil
+	}
+
+	/// A field the host edits: the editor box Dragon lays out inside it (`<id>::editor`, which no payload node names) with the
+	/// value's font and colour, and the placeholder box and text while the value is empty; nil for an input with no editor.
+	private func textField(_ field: StyleNode, _ byId: [String: StyleNode]) throws -> ResolvedStyle.TextFieldPaint? {
+		guard field.frame != nil, let editor = byId[field.id + "::editor"], editor.parent == field.id else { return nil }
+		guard let box = editor.frame else { throw styleError("\(field.id): its editor box has no frame") }
+		let points = { (f: Frame) in Frame(x: f.x / dpr, y: f.y / dpr, width: f.width / dpr, height: f.height / dpr) }
+		let look = { (node: StyleNode) throws -> (font: (family: String, size: Double), color: RGBA?) in
+			var font: (family: String, size: Double)?
+			var color: RGBA?
+			for write in node.writes {
+				if case let .font(family, size) = write { font = (family, size) }
+				if case let .textColor(c) = write { color = c }
+			}
+			guard let font else { throw styleError("\(node.id) has no font") }
+			return (font, color)
+		}
+		let value = try look(editor)
+		var placeholder: ResolvedStyle.TextFieldPaint.Placeholder?
+		if let shown = byId[field.id + "::placeholder"], shown.parent == field.id, let frame = shown.frame,
+			let text = byId[shown.id + ":text0"], text.parent == shown.id, let words = text.text
+		{
+			let drawn = try look(text)
+			placeholder = .init(frame: points(frame), text: words, fontFamily: drawn.font.family, fontSize: drawn.font.size, color: drawn.color)
+		}
+		let cancel = byId[field.id + "::cancel"].flatMap { $0.parent == field.id ? $0.frame : nil }
+		return ResolvedStyle.TextFieldPaint(
+			editor: points(box), fontFamily: value.font.family, fontSize: value.font.size, color: value.color, placeholder: placeholder,
+			clear: cancel.map(points))
 	}
 
 	private func reHostOf(_ writes: [StyleWrite]) -> String? {
@@ -572,6 +634,8 @@ extension StyleExport {
 			case .outline: break
 			}
 		}
+		// Radii that overlap scale down until they fit (css-backgrounds-3 §5.5); Core Animation draws no background past half the box.
+		if let frame = style.frame { style.cornerRadius = min(style.cornerRadius, frame.width / 2, frame.height / 2) }
 		// A scroll view clips its own content; any other box clips its children.
 		style.clipsChildren = clips && scrollAxes == nil
 		if let axes = scrollAxes {
@@ -625,3 +689,25 @@ extension StyleExport {
 }
 
 func styleError(_ reason: String) -> PayloadError { PayloadError(path: "style", reason: reason) }
+
+extension StyleLayout {
+	/// POSX-s scroll: each sticky box of `assignment` moved for the page scrolled to (`x`, `y`) points, in points from its in-flow
+	/// place, by Dragon's `runMarklessSticky` (`run`); empty when the assignment has no sticky box.
+	public func stickyShifts(assignment: Int, x: Double, y: Double, run: (String) -> String) throws -> [String: (dx: Double, dy: Double)] {
+		let rows = assignment < pageSticky.count ? pageSticky[assignment] : []
+		if rows.isEmpty { return [:] }
+		let line = "{\"sticky\":\(JSONValue.array(rows.map(\.row)).jsonText),\"scroll\":[\(JSONValue.number(x * dpr).jsonText),\(JSONValue.number(y * dpr).jsonText)]}"
+		let answer = run(line)
+		let parts = try Reader(JSONValue.parse(Data(answer.utf8)), at: "sticky shift").array()
+		guard parts.count == 2, try parts[0].string() == "ok" else { throw PayloadError(path: "sticky shift", reason: "Dragon's sticky shift failed: \(answer)") }
+		let items = try parts[1].array()
+		guard items.count == rows.count else { throw parts[1].fail("expected \(rows.count) shifts") }
+		var out: [String: (dx: Double, dy: Double)] = [:]
+		for (row, item) in zip(rows, items) {
+			let t = try item.array()
+			guard t.count == 3 else { throw item.fail("expected an id, dx and dy") }
+			out[row.id] = (try planNumber(t[1].value) / dpr, try planNumber(t[2].value) / dpr)
+		}
+		return out
+	}
+}

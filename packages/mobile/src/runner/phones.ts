@@ -8,6 +8,7 @@ import { bootSimulator } from '../harness/ios.ts';
 import { simctl, simulatorAnswers } from '../harness/simctl.ts';
 import type { AndroidTools } from '../harness/tools.ts';
 import type { PhoneAddress, PhoneSpec } from './pool.ts';
+import { remoteAnswers, remoteStop } from './remote.ts';
 
 /** Boots (or finds running) the phone and returns its address; the caller holds the machine queue's admission meanwhile. */
 export async function bootPhone(
@@ -29,6 +30,7 @@ export async function phoneAnswers(
 	tools: AndroidTools | undefined,
 ): Promise<boolean> {
 	if (spec.platform === 'ios') return simulatorAnswers(address.device);
+	if (spec.remote !== undefined) return remoteAnswers({ ...spec, remote: spec.remote });
 	return tools !== undefined && emulatorAnswers(tools, address.device);
 }
 
@@ -42,7 +44,9 @@ export async function phoneRunning(
 			tools !== undefined &&
 			(await phoneAnswers(spec, { device: `emulator-${spec.port}` }, tools))
 		);
-	const listed = await simctl(['list', 'devices', '--json'], { allowFailure: true }).catch(() => undefined);
+	const listed = await simctl(['list', 'devices', '--json'], {
+		allowFailure: true,
+	}).catch(() => undefined);
 	if (listed?.code !== 0) return false;
 	return Object.values(
 		(
@@ -61,6 +65,7 @@ export async function stopPhone(spec: PhoneSpec, tools: AndroidTools | undefined
 		await simctl(['shutdown', spec.name], { allowFailure: true }).catch(() => undefined);
 		return;
 	}
+	if (spec.remote !== undefined) return remoteStop({ ...spec, remote: spec.remote });
 	if (!tools) return;
 	const serial = `emulator-${spec.port}`;
 	await exec(tools.adb, ['-s', serial, 'emu', 'kill'], {
@@ -68,7 +73,9 @@ export async function stopPhone(spec: PhoneSpec, tools: AndroidTools | undefined
 		timeoutMs: 20_000,
 	}).catch(() => undefined);
 	for (let waited = 0; waited < 60; waited++) {
-		const state = await exec(tools.adb, ['-s', serial, 'get-state'], { allowFailure: true });
+		const state = await exec(tools.adb, ['-s', serial, 'get-state'], {
+			allowFailure: true,
+		});
 		if (state.code !== 0) return;
 		await new Promise((resolve) => setTimeout(resolve, 1000));
 	}

@@ -1,0 +1,58 @@
+appId: ${APP_ID}
+name: r173-hidden-in-press
+---
+- launchApp:
+    clearState: true
+- assertVisible: Basket
+- assertVisible: Add
+- assertVisible: Empty
+- assertVisible: "Items: 0"
+- assertVisible: Bag
+- assertVisible: Cart
+- assertNotVisible: \(0\)
+- tapOn: Add
+- assertNotVisible: "Items: 0"
+- assertVisible: "Items: 1"
+- assertNotVisible: "Items: 0"
+- assertNotVisible: \(0\)
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertVisible: Bag\(1\)
+      - assertVisible: Cart\(1\)
+      - assertVisible: \(1\)
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible: \(1\)
+- tapOn: Add
+- assertNotVisible: "Items: 1"
+- assertVisible: "Items: 2"
+- assertNotVisible: "Items: 1"
+- assertNotVisible: \(1\)
+- assertNotVisible: Bag\(1\)
+- assertNotVisible: Cart\(1\)
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertVisible: Bag\(2\)
+      - assertVisible: Cart\(2\)
+      - assertVisible: \(2\)
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible: \(2\)
+- tapOn: Empty
+- assertNotVisible: "Items: 2"
+- assertVisible: "Items: 0"
+- assertVisible: Bag
+- assertVisible: Cart
+- assertNotVisible: "Items: 2"
+- assertNotVisible: \(0\)
+- assertNotVisible: \(2\)
+- assertNotVisible: Bag\(2\)
+- assertNotVisible: Cart\(2\)
