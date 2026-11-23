@@ -33,7 +33,7 @@ name: s36-sticky-tap
 - assertNotVisible: Header taps 0
 - assertNotVisible: Button taps 0
 - tapOn:
-      point: 80%,10%
+      point: 80%,15%
 - assertNotVisible: Header taps 1
 - assertVisible: Header taps 2
 - assertVisible: Button taps 1

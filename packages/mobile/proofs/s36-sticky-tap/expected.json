@@ -27,7 +27,7 @@
 		{
 			"do": {
 				"tapAt": {
-					"point": [80, 10],
+					"point": [80, 15],
 					"on": "Sticky header"
 				}
 			},

@@ -51,6 +51,15 @@ public enum DragonPlan {
 		}
 	}
 
+	/// POSX-s scroll: `runMarklessSticky`, each sticky box's shift at the page's scroll offset.
+	public static func sticky(_ line: String) -> String {
+		do {
+			return try harness_runMarklessSticky(JsString(line)).description
+		} catch {
+			return "[\"threw\"]"
+		}
+	}
+
 	/// Dragon's translated library cases; `rt-band` looks a page's `@media` band up by its size.
 	public static func library(_ line: String) -> String {
 		do {

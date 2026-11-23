@@ -816,7 +816,7 @@ private fun planTexts() {
 	}
 	var live: String? = null
 	val laid = style.laidOut(100.0, 100.0, 2.0, { answer(10.0) }, rowsLayout = { line -> live = line; answer(30.0) }, texts = mapOf("h0:text0" to "Home and the garden shed"))
-	check("a changed page text goes to the live layout beside no rows", live?.endsWith(""","rows":[],"texts":[["h0:text0","Home and the garden shed"]]}""") == true) { "$live" }
+	check("a changed page text goes to the live layout beside no rows", live?.endsWith(""","rows":[],"texts":[["h0:text0","Home and the garden shed"]],"sticky":true}""") == true) { "$live" }
 	check("the live layout's boxes are the page's", laid.assignments[0].byId.getValue("h0").frame?.height == 30.0) { "${laid.assignments[0].byId.getValue("h0").frame}" }
 	var replayed: String? = null
 	style.laidOut(100.0, 100.0, 2.0, { line -> replayed = line; answer(10.0) }, rowsLayout = { throw AssertionError("used the live layout") }, texts = mapOf("h0:text0" to "Home"))

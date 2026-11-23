@@ -47,7 +47,7 @@ private func hex(_ value: Double) -> String {
 		let frame = [0, 0, 10, 10].map { hex(Double($0)) }.joined(separator: ",")
 		return "[\"ok\",[\(hex(0)),\(hex(0)),\(hex(0)),\(hex(0))],[[\"h0\",[\(frame)],null,null,null,null]],[[\"h0\",\"background-color\",[\"color\",\"r\"],\(hex(5))]]]"
 	}
-	#expect(sent.count == 1 && sent[0].hasSuffix(",\"slots\":[\(hex(5))]}"))
+	#expect(sent.count == 1 && sent[0].hasSuffix(",\"slots\":[\(hex(5))],\"sticky\":true}"))
 	guard case let .backgroundColor(color)? = relaid.assignments[0].nodes[0].writes.first else {
 		Issue.record("no background-color write")
 		return
