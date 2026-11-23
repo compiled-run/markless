@@ -3,7 +3,9 @@ package dev.markless.mobile.view
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import dev.markless.mobile.core.FetchBody
 import dev.markless.mobile.core.FetchRequest
+import dev.markless.mobile.core.FormPart
 import dev.markless.mobile.core.JsValue
 import dev.markless.mobile.core.Runtime
 import dev.markless.mobile.core.ScriptEngine
@@ -13,6 +15,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.SecureRandom
 import java.util.Locale
+import java.util.UUID
 
 /**
  * The app process's one JavaScript engine, shared by every screen and started the first time one needs it. The engine
@@ -94,7 +97,7 @@ object AppScriptEngine : ScriptHost {
 }
 
 /** The requests one screen's script sent: each is sent on its own thread and answered on the main thread, unless aborted first. */
-internal class ScriptServices {
+internal class ScriptServices(private val context: android.content.Context) {
 	private val main = Handler(Looper.getMainLooper())
 	private var stopped = false
 	private val inFlight = HashMap<Int, Request>()
@@ -130,6 +133,29 @@ internal class ScriptServices {
 		inFlight.clear()
 	}
 
+	/**
+	 * A FormData as a browser sends it: each entry a part, a file's with its filename, its type and its bytes, read from the
+	 * file the picker chose (by its URI, the reference the host gave it) or from the text it was made of.
+	 */
+	private fun multipart(parts: List<FormPart>, boundary: String): ByteArray {
+		val out = java.io.ByteArrayOutputStream()
+		val quoted = { text: String -> text.replace("\"", "%22").replace("\r", "%0D").replace("\n", "%0A") }
+		val write = { text: String -> out.write(text.toByteArray(Charsets.UTF_8)) }
+		for (part in parts) {
+			write("--$boundary\r\nContent-Disposition: form-data; name=\"${quoted(part.name)}\"")
+			val file = part.file
+			if (file == null) write("\r\n\r\n${part.text}\r\n")
+			else {
+				write("; filename=\"${quoted(file.name)}\"\r\nContent-Type: ${file.type.ifEmpty { "application/octet-stream" }}\r\n\r\n")
+				if (file.ref != null) context.contentResolver.openInputStream(android.net.Uri.parse(file.ref))!!.use { it.copyTo(out) }
+				else write(file.text.orEmpty())
+				write("\r\n")
+			}
+		}
+		write("--$boundary--\r\n")
+		return out.toByteArray()
+	}
+
 	private fun send(request: FetchRequest, call: Request): JsValue = try {
 		val connection = URL(request.url).openConnection() as HttpURLConnection
 		call.connection = connection
@@ -137,9 +163,20 @@ internal class ScriptServices {
 		try {
 			connection.requestMethod = request.method
 			for ((name, value) in request.headers) connection.addRequestProperty(name, value)
-			request.body?.let { body ->
-				connection.doOutput = true
-				connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+			when (val body = request.body) {
+				is FetchBody.Text -> {
+					connection.doOutput = true
+					connection.outputStream.use { it.write(body.text.toByteArray(Charsets.UTF_8)) }
+				}
+				is FetchBody.Form -> {
+					val boundary = "MarklessBoundary" + UUID.randomUUID().toString().replace("-", "")
+					if (request.headers.none { it.first.equals("content-type", ignoreCase = true) })
+						connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+					val bytes = multipart(body.parts, boundary)
+					connection.doOutput = true
+					connection.outputStream.use { it.write(bytes) }
+				}
+				null -> {}
 			}
 			val status = connection.responseCode
 			val body = (if (status >= 400) connection.errorStream else connection.inputStream)?.use { String(it.readBytes(), Charsets.UTF_8) } ?: ""
