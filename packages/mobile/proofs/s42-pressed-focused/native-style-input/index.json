@@ -8,7 +8,7 @@
 			"element": "main",
 			"parent": null,
 			"attributes": {
-				"class": "page mk-9f5d1e"
+				"class": "page mk-1f8a9n5"
 			}
 		},
 		{
@@ -17,7 +17,7 @@
 			"element": "h1",
 			"parent": "h0",
 			"attributes": {
-				"class": "mk-9f5d1e"
+				"class": "mk-1f8a9n5"
 			}
 		},
 		{
@@ -32,7 +32,7 @@
 			"element": "div",
 			"parent": "h0",
 			"attributes": {
-				"class": "press mk-9f5d1e"
+				"class": "press mk-1f8a9n5"
 			}
 		},
 		{
@@ -47,7 +47,7 @@
 			"element": "p",
 			"parent": "h0",
 			"attributes": {
-				"class": "mk-9f5d1e"
+				"class": "mk-1f8a9n5"
 			}
 		},
 		{
@@ -62,7 +62,7 @@
 			"element": "label",
 			"parent": "h0",
 			"attributes": {
-				"class": "row mk-9f5d1e"
+				"class": "row mk-1f8a9n5"
 			}
 		},
 		{
@@ -72,7 +72,7 @@
 			"parent": "h5",
 			"attributes": {
 				"type": "checkbox",
-				"class": "agree mk-9f5d1e"
+				"class": "agree mk-1f8a9n5"
 			}
 		},
 		{
@@ -87,7 +87,7 @@
 			"element": "p",
 			"parent": "h0",
 			"attributes": {
-				"class": "mk-9f5d1e"
+				"class": "mk-1f8a9n5"
 			}
 		},
 		{
@@ -111,7 +111,7 @@
 			]
 		}
 	],
-	"css": "@font-face {\n\tfont-family: 'Harbour Lato';\n\tsrc: url('./fonts/Lato-Regular.woff2') format('woff2');\n\tfont-weight: 400;\n}\n\nbody {\n\tmargin: 0;\n\tfont-family: 'Harbour Lato';\n\tcolor: #1d2a24;\n\tbackground: #f6f3ea;\n}\n\n.page.mk-9f5d1e {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\th1.mk-9f5d1e {\n\t\t\t\tfont-size: 28px;\n\t\t\t\tfont-weight: 400;\n\t\t\t}\n\t\t\t.press.mk-9f5d1e {\n\t\t\t\twidth: 200px;\n\t\t\t\tpadding: 12px 16px;\n\t\t\t\tborder: 2px solid #2f6b4f;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #2f6b4f;\n\t\t\t}\n\t\t\t.press.mk-9f5d1e:active {\n\t\t\t\tbackground: #2f6b4f;\n\t\t\t\tcolor: #ffffff;\n\t\t\t}\n\t\t\t.row.mk-9f5d1e {\n\t\t\t\tdisplay: flex;\n\t\t\t\talign-items: center;\n\t\t\t\tgap: 12px;\n\t\t\t\tmargin-top: 24px;\n\t\t\t}\n\t\t\t.agree.mk-9f5d1e:focus {\n\t\t\t\toutline: 3px solid #c9a227;\n\t\t\t\toutline-offset: 2px;\n\t\t\t}",
+	"css": "@font-face {\n\tfont-family: 'Harbour Lato';\n\tsrc: url('./fonts/Lato-Regular.woff2') format('woff2');\n\tfont-weight: 400;\n}\n\nbody {\n\tmargin: 0;\n\tfont-family: 'Harbour Lato';\n\tcolor: #1d2a24;\n\tbackground: #f6f3ea;\n}\n\n.page.mk-1f8a9n5 {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\th1.mk-1f8a9n5 {\n\t\t\t\tfont-size: 28px;\n\t\t\t\tfont-weight: 400;\n\t\t\t}\n\t\t\t.press.mk-1f8a9n5 {\n\t\t\t\twidth: 200px;\n\t\t\t\tpadding: 12px 16px;\n\t\t\t\tborder: 2px solid #2f6b4f;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #2f6b4f;\n\t\t\t}\n\t\t\t.press.mk-1f8a9n5:active {\n\t\t\t\tbackground: #2f6b4f;\n\t\t\t\tcolor: #ffffff;\n\t\t\t}\n\t\t\t.row.mk-1f8a9n5 {\n\t\t\t\tdisplay: flex;\n\t\t\t\talign-items: center;\n\t\t\t\tgap: 12px;\n\t\t\t\tmargin-top: 24px;\n\t\t\t}\n\t\t\t.agree.mk-1f8a9n5:focus {\n\t\t\t\toutline: 3px solid #c9a227;\n\t\t\t\toutline-offset: 2px;\n\t\t\t}",
 	"states": [
 		{
 			"cell": "state:agreed",
