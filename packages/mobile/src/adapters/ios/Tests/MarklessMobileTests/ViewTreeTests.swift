@@ -95,6 +95,36 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	#expect(throws: HostError.self) { try views.apply([.text(node: "h3:text0", value: "gone")]) }
 }
 
+@MainActor @Test func aHiddenElementInsideAControlTakesItsPlaceAndNameOnlyWhileShown() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("hidden-in-control"), store: MemoryStore())
+	let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 778))
+	window.rootViewController = controller
+	window.makeKeyAndVisible()
+	let views = try tree(controller)
+	let add = try #require(views.elements["h1"] as? UIButton)
+	let count = try #require(views.elements["h2"])
+	let link = try #require(views.elements["h4"] as? UIButton)
+	let badge = try #require(views.elements["h6"])
+	let width = { (view: UIView) -> CGFloat in
+		controller.view.layoutIfNeeded()
+		return view.frame.width
+	}
+	#expect(count.isHidden && badge.isHidden)
+	#expect(add.accessibilityLabel == "Add")
+	#expect(link.accessibilityLabel == "Cart")
+
+	add.sendActions(for: .touchUpInside)
+	#expect(!count.isHidden && !badge.isHidden)
+	#expect(width(count) > 0 && width(badge) > 0)
+	#expect(add.accessibilityLabel == "Add (1)")
+	#expect(link.accessibilityLabel == "Cart 1 in cart")
+
+	controller.perform(NativeAction(event: .activate, host: "h3"))
+	#expect(count.isHidden && badge.isHidden)
+	#expect(add.accessibilityLabel == "Add")
+	#expect(link.accessibilityLabel == "Cart")
+}
+
 @Test func userDefaultsKeepEachValueAsItsOwnType() throws {
 	let defaults = try #require(UserDefaults(suiteName: "markless-ios-host-tests"))
 	defaults.removePersistentDomain(forName: "markless-ios-host-tests")

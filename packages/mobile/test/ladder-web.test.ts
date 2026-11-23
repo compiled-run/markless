@@ -175,6 +175,9 @@ const shown = (page: Page, given: LadderText): Locator => {
 	return page
 		.getByText(text, { exact: true })
 		.or(page.getByLabel(text, { exact: true }))
+		// A control is found by its accessible name, as a phone's label for it reads: without the text of a hidden child.
+		.or(page.getByRole('button', { name: text, exact: true }))
+		.or(page.getByRole('link', { name: text, exact: true }))
 		.or(page.getByRole('img', { name: text, exact: true }))
 		// An image is found by its alt text, its accessible name, as a phone's screen reader names it.
 		.or(page.getByAltText(text, { exact: true }))

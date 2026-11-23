@@ -817,6 +817,37 @@ function walk(
 						.join(' '));
 		return label !== null && shownNode(node.id) ? [[id, label] as const] : [];
 	};
+	// iOS reads a button or a link as one element, named as the web names it from content: shown text and inner labels.
+	const contentName = (parent: string, suffix: string): string =>
+		payload.nodes
+			.filter((child) => child.parent === parent)
+			.map((child) => {
+				const id = `${child.id}${child.row ? suffix : ''}`;
+				if (!shownNode(id)) return '';
+				if (child.kind === 'text') return texts.get(id) ?? '';
+				if (child.kind !== 'element' || hiddenWithin(id)) return '';
+				const ariaHidden = attributes.get(`${id}\0aria-hidden`);
+				if ((ariaHidden !== undefined ? ariaHidden : child.attributes?.['aria-hidden']) === 'true') return '';
+				return labelOf(child, id)[0]?.[1] ?? contentName(child.id, suffix);
+			})
+			.join('');
+	const controlNames = () =>
+		payload.nodes.flatMap((node) => {
+			if (node.kind !== 'element' || !['button', 'a'].includes(node.element)) return [];
+			const ids = node.row
+				? (new Map(runtime.rows()).get(node.row) ?? []).map((key) => `${node.id}@${key}`)
+				: [node.id];
+			return ids
+				.filter((id) => shownNode(id) && !hiddenWithin(id) && labelOf(node, id).length === 0)
+				.map((id) =>
+					[...contentName(node.id, instanceOf(id).suffix)]
+						.map((character) => (character.trim() === '' ? ' ' : character))
+						.join('')
+						.split(' ')
+						.filter((word) => word !== '')
+						.join(' '),
+				);
+		});
 	// A text field by its accessible name, as the web finds a textbox: a control named the same (a preview button) is not one.
 	const fieldReading = (text: LadderText) =>
 		labels().find(([id, label]) => {
@@ -1531,9 +1562,10 @@ function walk(
 				.map(([, label]) => label),
 			...chosenLabels(),
 		];
-		expect(shown, `step ${index}`).toEqual(expect.arrayContaining(step.visible.map(reading)));
+		const found = [...shown, ...(target === 'ios' ? controlNames() : [])];
+		expect(found, `step ${index}`).toEqual(expect.arrayContaining(step.visible.map(reading)));
 		for (const text of step.absent ?? [])
-			expect(shown, `step ${index}`).not.toEqual(expect.arrayContaining([reading(text)]));
+			expect(found, `step ${index}`).not.toEqual(expect.arrayContaining([reading(text)]));
 		for (const [node, value] of runtime.selections())
 			expect(
 				selected.get(node) ?? false,

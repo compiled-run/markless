@@ -968,6 +968,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'hidden-in-control',
+		fixture: 'test/fixtures/HiddenInControl.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
 		name: 'field-focus',
 		fixture: 'test/fixtures/FieldFocus.tsrx',
 		actions: [
