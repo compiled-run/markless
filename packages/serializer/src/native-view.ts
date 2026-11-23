@@ -682,6 +682,8 @@ export type NativeNode = NativePlace &
 				readonly byIndex?: true;
 				/** A key joined from the item's fields, as the web joins it; `key` is then empty and is not the key. */
 				readonly keyParts?: ProtocolRepeatKeyParts;
+				/** The only values an item's field can hold, by its path joined with `.`, where the build can list them. */
+				readonly itemValues?: Readonly<Record<string, ReadonlyArray<string | number | boolean | null>>>;
 		  }
 		| {
 				/**

@@ -120,6 +120,7 @@ export function rowAttributeOptions(
 	name: string,
 	expr: NativeExpr,
 	booleanCells: ReadonlySet<string> = new Set(),
+	itemValues: ItemValues = () => undefined,
 ): ReadonlyArray<string | null> | undefined {
 	if (givesBoolean(expr, booleanCells))
 		return [
@@ -127,11 +128,33 @@ export function rowAttributeOptions(
 		];
 	if ('literal' in expr) return [marklessAttributeValue(name, expr.literal)];
 	if ('if' in expr) {
-		const whenTrue = rowAttributeOptions(name, expr.whenTrue, booleanCells);
-		const whenFalse = rowAttributeOptions(name, expr.whenFalse, booleanCells);
+		const whenTrue = rowAttributeOptions(name, expr.whenTrue, booleanCells, itemValues);
+		const whenFalse = rowAttributeOptions(name, expr.whenFalse, booleanCells, itemValues);
 		return whenTrue && whenFalse ? [...new Set([...whenTrue, ...whenFalse])] : undefined;
 	}
-	return undefined;
+	const listed = itemValues(expr);
+	return listed && [...new Set(listed.map((value) => marklessAttributeValue(name, value)))];
+}
+
+/** The values a read of a row's item field can give, when its list's `itemValues` lists them. */
+type ItemValues = (expr: NativeExpr) => ReadonlyArray<string | number | boolean | null> | undefined;
+
+/** Reads each repeat's `itemValues` for `rowAttributeOptions`: a field path read off a row's item. */
+export function itemValuesOf(payload: NativeViewPayload): ItemValues {
+	const lists = new Map(
+		payload.nodes.flatMap((node) =>
+			node.kind === 'repeat' && node.itemValues ? [[node.id, node.itemValues] as const] : [],
+		),
+	);
+	return (expr) => {
+		const path: string[] = [];
+		let at = expr;
+		while ('member' in at && typeof at.property === 'string') {
+			path.unshift(at.property);
+			at = at.member;
+		}
+		return 'item' in at && path.length > 0 ? lists.get(at.item)?.[path.join('.')] : undefined;
+	};
 }
 
 /**
@@ -418,6 +441,7 @@ export function nativeStyleInput(
 				binding.attribute,
 				binding.value,
 				booleanCellsOf(payload),
+				itemValuesOf(payload),
 			);
 			if (options)
 				rowOptions.set(`${node.id}#${binding.attribute}`, {
