@@ -9,6 +9,7 @@ import {
 	openSync,
 	readdirSync,
 	readFileSync,
+	renameSync,
 	rmSync,
 	statSync,
 	writeFileSync,
@@ -100,9 +101,11 @@ switch (command) {
 		for (const old of readdirSync(jobs))
 			if (Date.now() - statSync(join(jobs, old)).mtimeMs > JOB_DAYS * 86_400_000)
 				rmSync(join(jobs, old), { recursive: true, force: true });
+		const incoming = `${job}.incoming-${process.pid}`;
+		mkdirSync(incoming, { recursive: true });
+		ran('tar', ['-x', '-f', '-', '--warning=no-unknown-keyword', '-C', incoming]);
 		rmSync(job, { recursive: true, force: true });
-		mkdirSync(job, { recursive: true });
-		ran('tar', ['-x', '-f', '-', '--warning=no-unknown-keyword', '-C', job]);
+		renameSync(incoming, job);
 		break;
 	}
 	case 'run': {

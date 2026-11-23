@@ -127,7 +127,8 @@ function tar(args: ReadonlyArray<string>, stdio: 'in' | 'out') {
 	return { child, done };
 }
 
-const sent = new Set<string>();
+/** One upload per job and machine, shared by that job's chunks on the machine's other phones. */
+const sent = new Map<string, Promise<void>>();
 
 /** Sends the job's bundle once, then the chunk; the agent's result file and screenshots land in the job folder as a local chunk writes them. */
 export async function runRemoteChunk(
@@ -140,18 +141,21 @@ export async function runRemoteChunk(
 ): Promise<void> {
 	const id = basename(job);
 	const key = `${spec.remote}/${id}`;
-	if (!sent.has(key)) {
+	let upload = sent.get(key);
+	if (!upload) {
 		const pack = tar(['-c', '-f', '-', '-C', job, 'job.json', 'bundle'], 'out');
-		await Promise.all([
+		upload = Promise.all([
 			callAgent(spec, ['put', id], {
 				input: pack.child.stdout!,
 				stderr: log,
 				timeoutMs: 600_000,
 			}),
 			pack.done,
-		]);
-		sent.add(key);
+		]).then(() => undefined);
+		sent.set(key, upload);
+		upload.catch(() => sent.delete(key));
 	}
+	await upload;
 	const unpack = tar(['-x', '-f', '-', '-C', job], 'in');
 	await Promise.all([
 		callAgent(spec, ['run', id, name, String(spec.port), driver], {
