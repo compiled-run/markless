@@ -56,6 +56,8 @@ export async function callAgent(
 	let err = '';
 	const stdin = child.stdin!;
 	const stdout = child.stdout!;
+	// An ssh that ends early closes its stdin; its exit code says what happened, so the write's EPIPE is not a crash.
+	stdin.on('error', () => {});
 	if (call.stdout) stdout.pipe(call.stdout);
 	else stdout.on('data', (data: Buffer) => (out += data.toString()));
 	if (child.stderr) {
@@ -116,6 +118,7 @@ function tar(args: ReadonlyArray<string>, stdio: 'in' | 'out') {
 		env: { ...process.env, COPYFILE_DISABLE: '1' },
 	});
 	let err = '';
+	child.stdin?.on('error', () => {});
 	child.stderr!.on('data', (data: Buffer) => (err += data.toString()));
 	const done = new Promise<void>((resolve, reject) =>
 		child.on('close', (code) =>
