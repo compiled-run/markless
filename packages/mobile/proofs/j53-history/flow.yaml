@@ -1,0 +1,54 @@
+appId: ${APP_ID}
+name: j53-history
+---
+- launchApp:
+      clearState: true
+- assertVisible: Story list
+- assertVisible: Not read yet
+- assertVisible: Keep seven
+- assertVisible: Read state
+- assertVisible: Home
+- tapOn: Keep seven
+- assertNotVisible: Not read yet
+- assertVisible: Story list
+- assertVisible: Kept seven
+- assertNotVisible: Not read yet
+- assertVisible: Home
+- tapOn: Read state
+- assertNotVisible: Kept seven
+- assertVisible: 'Read: \{"kept":7\}'
+- assertNotVisible: Kept seven
+- assertVisible: Home
+- tapOn: Upvote
+- assertVisible: Login
+- assertVisible: Log in to vote
+- assertVisible: Login not read
+- assertNotVisible: Story list
+- assertVisible: Login
+- tapOn: Read login state
+- assertNotVisible: Login not read
+- assertVisible: 'Login read: \{"from":"home"\}'
+- assertNotVisible: Login not read
+- assertVisible: Login
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertVisible: Home
+- assertVisible: Story list
+- assertVisible: Read again
+- assertNotVisible: Log in to vote
+- assertNotVisible: 'Back home: \{"kept":7\}'
+- assertVisible: Home
+- tapOn: Read again
+- assertVisible: 'Back home: \{"kept":7\}'
+- assertVisible: 'Back home: \{"kept":7\}'
+- assertNotVisible: Log in to vote
+- assertVisible: Home

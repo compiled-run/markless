@@ -14,8 +14,9 @@ const val CLOSE_DEPTH = 16
 const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
 const val OVERLAY_MODAL_VALUE = "true"
 
-/** The events that carry a string: an `input` or `commit` the field's text, a `keydown` or `keyup` its key, a `paste` the pasted text. */
-private val VALUED = setOf(EventName.Input, EventName.Commit, EventName.Keydown, EventName.Keyup, EventName.Paste)
+private val ANIMATION_EVENTS = setOf(EventName.AnimationStart, EventName.AnimationIteration, EventName.AnimationEnd, EventName.AnimationCancel)
+/** The events that carry a string: an `input` or `commit` the field's text, a `keydown` or `keyup` its key, a `paste` the pasted text, an animation event the animation's name. */
+private val VALUED = setOf(EventName.Input, EventName.Commit, EventName.Keydown, EventName.Keyup, EventName.Paste, EventName.AnimationStart, EventName.AnimationIteration, EventName.AnimationEnd, EventName.AnimationCancel)
 
 sealed interface JournalEntry {
 	val node: String
@@ -676,7 +677,7 @@ class Runtime(
 	private fun enter(fields: String, submission: Submission? = null): List<JournalEntry> {
 		// A handler may read the focused element; a computed, which renders, never does, so only entries carry it.
 		val focus = focused?.takeIf { it != NATIVE_DOCUMENT_BODY }?.let { ",\"focused\":${jsonString(it)},\"focusElements\":${elementFacts(emptyMap(), Scope.EMPTY, listOf(it))}" } ?: ""
-		val entry = "{$fields$focus${entryCells()}}"
+		val entry = "{$fields,\"screen\":$screen$focus${entryCells()}}"
 		val started = System.nanoTime()
 		scriptCall("enter", entry)
 		val result = Json.parse(scriptCall("leave", null)).obj("leave()")
@@ -754,6 +755,8 @@ class Runtime(
 					setDialog(node, command == "showModal")
 					return@mapNotNull null
 				}
+				// A file input shows the names of the files a handler gave it.
+				if (command == "files") return@mapNotNull JournalEntry.Property(node, "files", parts[2].str("leave().commands[][2]"))
 				if (command == "focus") focused = node
 				JournalEntry.Command(node, command, (parts[2] as? Json.Bool)?.value == true)
 			} +
@@ -852,7 +855,7 @@ class Runtime(
 			asyncSent = sent
 			val again = if (retry.isEmpty()) "" else retry.joinToString(",", ",\"retry\":[", "]", transform = ::jsonString)
 			retry.clear()
-			out.addAll(enter("\"kind\":\"tasks\",\"screen\":$screen,\"tasks\":$tasks$again"))
+			out.addAll(enter("\"kind\":\"tasks\",\"tasks\":$tasks$again"))
 		}
 		throw MarklessRuntimeError("async values that keep starting each other")
 	}
@@ -873,7 +876,7 @@ class Runtime(
 	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
 	fun leave(): List<JournalEntry> =
 		if (asyncSent == null) emptyList()
-		else enter("\"kind\":\"tasks\",\"screen\":$screen,\"tasks\":[],\"leave\":true").filter { it is JournalEntry.Abort }
+		else enter("\"kind\":\"tasks\",\"tasks\":[],\"leave\":true").filter { it is JournalEntry.Abort }
 
 	/** The host's answer to a `fetch` entry: `{ status, statusText, headers, body }`, or `{ error }` for a network failure. */
 	fun response(id: Int, response: JsValue): List<JournalEntry> =
@@ -1303,7 +1306,7 @@ class Runtime(
 	 * ([EventName.touch], at [point]) raises the browser's pointer events, after a `dismiss` of the topmost overlay when a
 	 * `pointerdown` lands outside it.
 	 */
-	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null, detail: Int? = null, point: TouchPoint? = null): List<JournalEntry> {
+	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null, detail: Int? = null, point: TouchPoint? = null, elapsedTime: Double? = null): List<JournalEntry> {
 		if (event == EventName.Choose) {
 			val option = byId[host.substringBefore('@')] as? Node.Element
 			val select = option?.parent
@@ -1324,6 +1327,7 @@ class Runtime(
 		if ((event in VALUED) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
 		if (reason != null && event != EventName.Dismiss) throw MarklessRuntimeError("a ${event.wire} event carries no reason")
 		if (point != null && !event.touch && event != EventName.ContextMenu) throw MarklessRuntimeError("a ${event.wire} event carries no touch")
+		if (elapsedTime != null && event !in ANIMATION_EVENTS) throw MarklessRuntimeError("a ${event.wire} event carries no elapsed time")
 		if (event == EventName.Dismiss && reason != null) {
 			if (stack.lastOrNull() != host) throw MarklessRuntimeError("\"$host\" is not the topmost overlay")
 			val dismiss = handlerFor(host, event)?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
@@ -1362,10 +1366,25 @@ class Runtime(
 			EventName.Keydown, EventName.Keyup -> mapOf("key" to JsValue.Str(value!!), "value" to JsValue.Str(textOf(host)))
 			EventName.Paste -> mapOf("text" to JsValue.Str(value!!), "value" to JsValue.Str(textOf(host)))
 			EventName.Activate -> clickFields(trusted = true) + ("detail" to JsValue.Num((detail ?: 1).toDouble()))
+			// An animation event: `value` is the animation's name.
+			EventName.AnimationStart, EventName.AnimationIteration, EventName.AnimationEnd, EventName.AnimationCancel ->
+				mapOf("animationName" to JsValue.Str(value ?: ""), "elapsedTime" to JsValue.Num(elapsedTime ?: 0.0))
 			else -> null
 		}
 		return change(host, if (event == EventName.Input || event == EventName.Commit) value else null) {
 			withFields(carried) { if (event == EventName.Activate) press(host) else run(handler.ops, scope) }
+		}
+	}
+
+	/** The files a person chose in the picker the file input [host] opened: its `input` and `change` handlers run with them. */
+	fun pick(host: String, files: List<PickedFile>): List<JournalEntry> {
+		val template = host.substringBefore('@')
+		val handlerId = handlerFor(template, EventName.Input) ?: throw MarklessRuntimeError("no input handler on \"$host\"")
+		val scope = (instances(node(template)).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")).scope
+		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
+		val chosen = JsValue.Arr(files.mapTo(ArrayList()) { it.value })
+		return change(host, null) {
+			withFields(mapOf("files" to chosen, "target" to JsValue.Str(host), "currentTarget" to JsValue.Str(host))) { run(handler.ops, scope) }
 		}
 	}
 
@@ -1730,7 +1749,8 @@ class Runtime(
 					",\"detail\":{\"reason\":${jsonString(it.value)},\"pressTarget\":${pressed?.let(::jsonString) ?: "null"}}"
 				} ?: ""
 				val touch = TOUCH_FIELDS.mapNotNull { f -> fields?.get(f)?.let { ",${jsonString(f)}:${jsonValue(it)}" } }.joinToString("")
-				val typed = listOf("key", "text").mapNotNull { f -> (fields?.get(f) as? JsValue.Str)?.let { ",${jsonString(f)}:${jsonString(it.value)}" } }.joinToString("")
+				val typed = listOf("key", "text").mapNotNull { f -> (fields?.get(f) as? JsValue.Str)?.let { ",${jsonString(f)}:${jsonString(it.value)}" } }.joinToString("") +
+					(fields?.get("files")?.let { ",\"files\":${jsonValue(it)}" } ?: "")
 				val named = if (fields?.get("currentTarget") is JsValue.Str) listOf("target", "currentTarget", "relatedTarget").associateWith { (fields?.get(it) as? JsValue.Str)?.value } else null
 				val nodes = named?.let { n -> ",\"nodes\":" + n.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value?.let(::jsonString) ?: "null"}" } } ?: ""
 				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$typed$touch$nodes$detail}"
@@ -1974,4 +1994,10 @@ class Runtime(
 		settled(submission)
 		return taken
 	}
+}
+
+/** A file a picker chose, as a page's `File` describes it. */
+data class PickedFile(val name: String, val size: Double, val type: String, val lastModified: Double) {
+	internal val value: JsValue
+		get() = JsValue.Obj(linkedMapOf("name" to JsValue.Str(name), "size" to JsValue.Num(size), "type" to JsValue.Str(type), "lastModified" to JsValue.Num(lastModified)))
 }

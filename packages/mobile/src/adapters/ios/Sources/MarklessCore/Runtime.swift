@@ -5,7 +5,8 @@ public struct NativeAction: Equatable, Sendable {
 	public let event: NativeEventName
 	/// The element acted on; "" for a `timer`.
 	public let host: String
-	/// For `input`: the field's whole text after the edit; for `keydown`, the key; for `paste`, the pasted text.
+	/// For `input`: the field's whole text after the edit; for `keydown`, the key; for `paste`, the pasted text; for an animation
+	/// event, the animation's name (its elapsed time in seconds is `time`).
 	public let value: String?
 	/// For `timer`: the journalled timer whose time has come.
 	public let timer: String?
@@ -20,13 +21,16 @@ public struct NativeAction: Equatable, Sendable {
 	public let x: Double?
 	public let y: Double?
 	public let time: Double?
+	/// For `pick`: the files chosen, each `{ name, size, type, lastModified }`.
+	public let files: [NativePickedFile]?
 
 	public init(
 		event: NativeEventName, host: String, value: String? = nil, reason: String? = nil, detail: Int? = nil, pointerId: Double? = nil,
-		x: Double? = nil, y: Double? = nil, time: Double? = nil
+		x: Double? = nil, y: Double? = nil, time: Double? = nil, files: [NativePickedFile]? = nil
 	) {
 		self.event = event
 		self.host = host
+		self.files = files
 		self.value = value
 		self.detail = detail
 		timer = nil
@@ -44,10 +48,30 @@ public struct NativeAction: Equatable, Sendable {
 		detail = nil
 		self.timer = timer
 		reason = nil
+		files = nil
 		pointerId = nil
 		x = nil
 		y = nil
 		time = nil
+	}
+}
+
+/// A file a picker chose, as a page's `File` describes it.
+public struct NativePickedFile: Equatable, Sendable {
+	public let name: String
+	public let size: Double
+	public let type: String
+	public let lastModified: Double
+
+	public init(name: String, size: Double, type: String, lastModified: Double) {
+		self.name = name
+		self.size = size
+		self.type = type
+		self.lastModified = lastModified
+	}
+
+	var value: NativeValue {
+		.object([("name", .string(name)), ("size", .number(size)), ("type", .string(type)), ("lastModified", .number(lastModified))])
 	}
 }
 
@@ -797,7 +821,7 @@ public final class NativeRuntime {
 			focus = [("focused", .string(focused)), ("focusElements", try elementFacts(.object([]), also: [focused]))]
 		}
 		let text = try scriptHost.unwrap().entry { () throws -> String in
-			_ = try callScript("enter", .object(entry + focus + entryCells()))
+			_ = try callScript("enter", .object(entry + [("screen", .number(Double(screen)))] + focus + entryCells()))
 			return try callScript("leave")
 		}
 		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave")
@@ -868,6 +892,8 @@ public final class NativeRuntime {
 				setDialog(node, name == "showModal")
 				return nil
 			}
+			// A file input shows the names of the files a handler gave it.
+			if name == "files" { return .property(node: node, name: "files", value: try parts[2].string()) }
 			if name == "focus" { focused = node }
 			return .command(node: node, command: name, preventScroll: try parts[2].bool())
 		}
@@ -995,7 +1021,7 @@ public final class NativeRuntime {
 			let sent = JSONValue.array([listed, .array(tasks.map { .array($0.frame.map { readFrame($0.1) }) })]).jsonText
 			if sent == asyncSent && retry.isEmpty { return out }
 			asyncSent = sent
-			var entry: [(String, JSONValue)] = [("kind", .string("tasks")), ("screen", .number(Double(screen))), ("tasks", listed)]
+			var entry: [(String, JSONValue)] = [("kind", .string("tasks")), ("tasks", listed)]
 			if !retry.isEmpty { entry.append(("retry", .array(retry.map { .string($0) }))) }
 			retry = []
 			out += try enter(entry)
@@ -1047,7 +1073,7 @@ public final class NativeRuntime {
 	/// The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel.
 	public func leave() throws -> [NativeJournalEntry] {
 		guard asyncSent != nil else { return [] }
-		return try enter([("kind", .string("tasks")), ("screen", .number(Double(screen))), ("tasks", .array([])), ("leave", .bool(true))])
+		return try enter([("kind", .string("tasks")), ("tasks", .array([])), ("leave", .bool(true))])
 			.filter { if case .abort = $0 { true } else { false } }
 	}
 
@@ -1577,7 +1603,8 @@ public final class NativeRuntime {
 		}
 		// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
 		let host = action.host.firstIndex(of: "@").map { String(action.host[..<$0]) } ?? action.host
-		guard let bound = payload.events.first(where: { $0.host == host && $0.event == action.event }), let node = nodesById[host] else {
+		let named: NativeEventName = action.event == .pick ? .input : action.event
+		guard let bound = payload.events.first(where: { $0.host == host && $0.event == named }), let node = nodesById[host] else {
 			throw RuntimeError(reason: "no \(action.event.rawValue) handler on \(action.host)")
 		}
 		guard let instance = try instances(of: node).first(where: { $0.id == action.host }) else {
@@ -1591,7 +1618,13 @@ public final class NativeRuntime {
 		switch action.event {
 		case .keydown, .keyup: eventFields = [.key: .string(action.value ?? "")]
 		case .paste: eventFields = [.text: .string(action.value ?? "")]
+		case .pick:
+			eventFields = [
+				.files: .array((action.files ?? []).map(\.value)), .target: .string(action.host), .currentTarget: .string(action.host),
+			]
 		case .activate: eventFields = clickFields(trusted: true).merging([.detail: .number(Double(action.detail ?? 1))]) { _, new in new }
+		case .animationstart, .animationiteration, .animationend, .animationcancel:
+			eventFields = [.animationName: .string(action.value ?? ""), .elapsedTime: .number(action.time ?? 0)]
 		default: break
 		}
 		if [.keydown, .keyup, .paste].contains(action.event) { targetText = try textOf(field: action.host) }
@@ -1952,7 +1985,7 @@ public final class NativeRuntime {
 				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
 			case let .script(fn, type, bindings, catchCell):
 				let touch = touchFields.compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
-				let typed = [NativeEventField.key, .text].compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
+				let typed = [NativeEventField.key, .text, .files].compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
 				var fields: [(String, JSONValue)] = [("type", .string(type))] + ((eventValue ?? targetText).map { [("value", JSONValue.string($0))] } ?? []) + typed + touch
 				var named: [String] = []
 				if case .string? = eventFields?[.currentTarget] {

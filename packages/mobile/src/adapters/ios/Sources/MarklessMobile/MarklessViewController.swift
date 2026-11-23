@@ -33,6 +33,10 @@ public final class MarklessViewController: UIViewController {
 	private let device: NativeDevice
 	private var runtime: NativeRuntime
 	private var layout: StyleLayout?
+	/// The page's transitions and animations run by Dragon's animator, and the display link that moves them while they run.
+	private var animation: AnimationRun?
+	private var animationLink: CADisplayLink?
+	private var animationLast: CFTimeInterval?
 	/// The `@media` band the views show, and the bands it is picked from; nil without bands.
 	private var band: Int?
 	private var bands: StyleBands?
@@ -190,6 +194,11 @@ public final class MarklessViewController: UIViewController {
 			ask: { [weak self] action in self?.perform(action) ?? false },
 			objectView: { object, kind in try device.view(for: object, device: kind) }, images: images)
 		tree?.presenter = self
+		#if canImport(DragonPlan)
+		if let style, style.anim != nil, let tree {
+			animation = AnimationRun(style: style, initial: tree.assignment, run: DragonPlan.animation)
+		}
+		#endif
 		navigationItem.title = try runtime.title()
 		try runCalls(try runtime.tasks())
 		apply { try self.runtime.start() }
@@ -262,12 +271,48 @@ public final class MarklessViewController: UIViewController {
 			followSlots(journal)
 			if movesRows(journal) { layOutAtScreenSize(rowsMoved: true) }
 			try runCalls(journal)
+			if let tree { animation?.moved(to: tree.assignment) }
 		} catch {
 			fatalError("Markless iOS host: \(error)")
 		}
+		runAnimation()
 		writeLayoutDump()
 		tree?.presenter = self
 		scheduleLoadEvents()
+	}
+
+	/// Runs Dragon's animator up to now: dispatches each animation event a handler listens for, and keeps the display link
+	/// running while an animation or transition does.
+	private func runAnimation() {
+		guard let animation else { return }
+		let size = view.safeAreaLayoutGuide.layoutFrame.size
+		guard size.width > 0, size.height > 0 else { return }
+		let next: (events: [AnimationEvent], busy: Bool)
+		do {
+			next = try animation.next(dpr: Double(traitCollection.displayScale), width: Double(size.width), height: Double(size.height))
+		} catch {
+			fatalError("Markless iOS host: \(error)")
+		}
+		if next.busy, animationLink == nil {
+			let link = CADisplayLink(target: self, selector: #selector(animationFrame(_:)))
+			link.add(to: .main, forMode: .common)
+			animationLink = link
+		} else if !next.busy {
+			animationLink?.invalidate()
+			animationLink = nil
+			animationLast = nil
+		}
+		for event in next.events {
+			let host = event.node.firstIndex(of: "@").map { String(event.node[..<$0]) } ?? event.node
+			guard payload.events.contains(where: { $0.host == host && $0.event == event.event }) else { continue }
+			apply { try self.runtime.dispatch(NativeAction(event: event.event, host: event.node, value: event.name, time: event.elapsedTime)) }
+		}
+	}
+
+	@objc private func animationFrame(_ link: CADisplayLink) {
+		if let last = animationLast { animation?.advanced(ms: (link.timestamp - last) * 1000) }
+		animationLast = link.timestamp
+		runAnimation()
 	}
 
 	/// After the first frame and after every journal: `idle` for the elements due one, `visible` for those on screen.
@@ -362,10 +407,10 @@ public final class MarklessViewController: UIViewController {
 			let texts = Dictionary(try runtime.texts().filter { pageRows[$0.node] != nil && pageRows[$0.node]! == nil }.map { ($0.node, $0.text) }, uniquingKeysWith: { a, _ in a })
 			guard size.width > 0, size.height > 0, rowsMoved || size != laidOutFor?.size || slots.map(\.bitPattern) != laidOutFor?.slots.map(\.bitPattern) || texts != laidOutFor?.texts else { return }
 			let scale = Double(traitCollection.displayScale)
-			let shaper = coreTextRowShaper(faces: style.systemFaces, dpr: scale)
+			let shaper = coreTextRowShaper(faces: style.systemFaces, authored: fonts, dpr: scale)
 			var unshaped = false
 			let shape: (String, Double, String, Int, Int, String, [Double]) throws -> [Double] = { face, size, text, start, end, language, features in
-				if style.systemFaces[face] == nil { unshaped = true }
+				if style.systemFaces[face] == nil && self.fonts[face] == nil { unshaped = true }
 				return try shaper(face, size, text, start, end, language, features)
 			}
 			let rows = style.planRepeats.isEmpty ? nil : try style.shownRows(payload, runtime: runtime)
@@ -376,9 +421,14 @@ public final class MarklessViewController: UIViewController {
 			}
 			// Page texts in a face this host cannot shape keep the boxes the build laid them out in, as before they followed state.
 			let relaid: StyleExport
-			do { relaid = try lay(texts) } catch where unshaped && !texts.isEmpty { relaid = try lay([:]) }
+			// The layout holds the texts the page shows now, unless it kept the build's boxes.
+			var laidTexts = try runtime.texts()
+			do { relaid = try lay(texts) } catch where unshaped && !texts.isEmpty {
+				relaid = try lay([:])
+				laidTexts = mountTexts
+			}
 			let now = try relaid.resolve(
-				for: payload, initialTexts: mountTexts, value: runtime.value(of:), dark: traitCollection.userInterfaceStyle == .dark)
+				for: payload, initialTexts: laidTexts, value: runtime.value(of:), dark: traitCollection.userInterfaceStyle == .dark)
 			try tree.relayout(now)
 			layout = now
 			laidOutFor = (size, slots, texts)
@@ -400,8 +450,9 @@ public final class MarklessViewController: UIViewController {
 			moved = true
 			if slot.contains("@") { rowMoved = true }
 		}
-		// A page text that changes may change its box: the layout compares the texts it last laid out with.
+		// A page text that changes, or one an arm shows, may change its box: the layout compares the texts it last laid out with.
 		for case let .text(node, _) in journal where !node.contains("@") { moved = true }
+		for case let .arm(node, _) in journal where !node.contains("@") { moved = true }
 		if moved, isViewLoaded { layOutAtScreenSize(rowsMoved: rowMoved) }
 	}
 
@@ -503,9 +554,11 @@ public final class MarklessViewController: UIViewController {
 			if movesRows(journal) { layOutAtScreenSize(rowsMoved: true) }
 			try runCalls(journal)
 			paintCanvas()
+			if let tree { animation?.moved(to: tree.assignment) }
 		} catch {
 			fatalError("Markless iOS host: \(error)")
 		}
+		runAnimation()
 		scheduleLoadEvents()
 		return prevented
 	}

@@ -16,8 +16,12 @@ public enum OverlayProtocol {
 /// What an event carries, by the field an `{ event }` expression names.
 public enum NativeEventField: String, Sendable {
 	case value, reason, pressTarget, key, text, detail
+	/// A file input's `input` or `change`: what the picker chose, each file's name, size, type and lastModified.
+	case files
 	/// A pointer event's, as a phone's browser reports a touch.
 	case target, currentTarget, relatedTarget, button, buttons, clientX, clientY, pointerId, pointerType, isPrimary, timeStamp
+	/// An animation event's: its `@keyframes` name and its elapsed time in seconds.
+	case animationName, elapsedTime
 	/// A click's, as a phone's browser fills it for a tap; `isTrusted` is false only for an event a script raised.
 	case shiftKey, ctrlKey, altKey, metaKey, isTrusted
 }
@@ -332,6 +336,10 @@ public enum NativeEventName: String, Sendable {
 	case submit
 	/// A range input let go after its value moved: the web's `change` on it.
 	case commit
+	/// The files a person chose in the picker a file input opened; its `input` and `change` handlers run with them.
+	case pick
+	/// A CSS animation's events on a styled page, from the host's run of Dragon's animator.
+	case animationstart, animationiteration, animationend, animationcancel
 	/// A `timer` journal entry's time has come.
 	case timer
 	/// The host is idle after the element appeared; once for each shown instance.

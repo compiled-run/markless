@@ -99,8 +99,16 @@ abstract class MarklessActivity : Activity() {
 		if (::host.isInitialized) host.apply(host.runtime.resume())
 	}
 
+	/** The file input whose picker is open. */
+	internal var picking: FileInputView? = null
+
 	override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
 		super.onActivityResult(requestCode, resultCode, data)
+		if (requestCode == FileInputView.PICK_REQUEST) {
+			picking?.answered(resultCode, data)
+			picking = null
+			return
+		}
 		device.activityResult(requestCode)
 	}
 

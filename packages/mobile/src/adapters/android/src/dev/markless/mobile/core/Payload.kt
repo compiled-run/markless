@@ -230,6 +230,8 @@ enum class EventName(val wire: String, val pointer: Boolean = false, val touch: 
 	Choose("choose"),
 	/** A range input let go after its value moved: the web's `change` on it. */
 	Commit("commit"),
+	/** A CSS animation's events on a styled page, from the host's run of Dragon's animator. */
+	AnimationStart("animationstart"), AnimationIteration("animationiteration"), AnimationEnd("animationend"), AnimationCancel("animationcancel"),
 	/** A long press, as Chrome on Android raises `contextmenu`: carries a [TouchPoint] for its place, and reaches each element it is inside. */
 	ContextMenu("contextmenu"),
 }
@@ -737,7 +739,7 @@ data class Payload(
 		private val BINARY = setOf("+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">=")
 		private val LOGICAL = setOf("&&", "||", "??")
 		private val METHODS = setOf("filter", "map", "findIndex", "some", "every", "includes", "indexOf", "join", "concat", "slice", "reverse", "toReversed", "toUpperCase", "toLowerCase", "trim")
-		private val EVENT_FIELDS = setOf("value", "reason", "pressTarget", "target", "currentTarget", "relatedTarget", "button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp", "key", "text", "detail")
+		private val EVENT_FIELDS = setOf("value", "reason", "pressTarget", "target", "currentTarget", "relatedTarget", "button", "buttons", "clientX", "clientY", "pointerId", "pointerType", "isPrimary", "timeStamp", "key", "text", "detail", "animationName", "elapsedTime")
 		private val BUILTINS = setOf("String", "Number", "Boolean", "Math.abs", "Math.floor", "Math.max", "Math.min", "Math.round", "Date.now", "Date.toISOString")
 
 		private fun oneOf(o: Map<String, Json>, key: String, allowed: Set<String>, what: String): String {

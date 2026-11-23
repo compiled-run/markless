@@ -1,0 +1,46 @@
+{
+	"rung": "J53",
+	"name": "history.replaceState and history.state in JavaScript on the phone: each screen keeps its own state, and one written after navigate() is the page it opened",
+	"steps": [
+		{
+			"visible": ["Story list", "Not read yet", "Keep seven", "Read state"],
+			"title": "Home"
+		},
+		{
+			"do": { "tap": "Keep seven" },
+			"visible": ["Story list", "Kept seven"],
+			"absent": ["Not read yet"],
+			"title": "Home"
+		},
+		{
+			"do": { "tap": "Read state" },
+			"visible": ["Read: {\"kept\":7}"],
+			"absent": ["Kept seven"],
+			"title": "Home"
+		},
+		{
+			"do": { "tap": "Upvote" },
+			"visible": ["Log in to vote", "Login not read"],
+			"absent": ["Story list"],
+			"title": "Login"
+		},
+		{
+			"do": { "tap": "Read login state" },
+			"visible": ["Login read: {\"from\":\"home\"}"],
+			"absent": ["Login not read"],
+			"title": "Login"
+		},
+		{
+			"do": { "back": "button" },
+			"visible": ["Story list", "Read again"],
+			"absent": ["Log in to vote", "Back home: {\"kept\":7}"],
+			"title": "Home"
+		},
+		{
+			"do": { "tap": "Read again" },
+			"visible": ["Back home: {\"kept\":7}"],
+			"absent": ["Log in to vote"],
+			"title": "Home"
+		}
+	]
+}

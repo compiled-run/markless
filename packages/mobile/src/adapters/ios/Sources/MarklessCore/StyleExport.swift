@@ -209,7 +209,7 @@ extension String {
 	fileprivate func leftPadded(_ count: Int) -> String { String(repeating: "0", count: max(0, count - self.count)) + self }
 }
 
-private func planNumber(_ value: JSONValue) throws -> Double {
+func planNumber(_ value: JSONValue) throws -> Double {
 	guard case let .string(hex) = value, hex.utf8.count == 16, let bits = UInt64(hex, radix: 16) else {
 		throw PayloadError(path: "plan layout", reason: "\(value.jsonText) is not a number's bit pattern")
 	}
@@ -340,6 +340,8 @@ public struct StyleExport: Sendable {
 	public var slots: [StyleSlot] = []
 	/// Each list whose rows the phone lays out: the box its rows hang from and the Dragon ids of one row's top boxes, in order.
 	public var planRepeats: [PlanRepeat] = []
+	/// Dragon's animator tables for the page's transitions and animations (JSON text), which the host runs with the plan.
+	public var anim: String?
 
 	/// Reads the target this host renders, by Dragon target name (`ios`) and the backend it must have been lowered for.
 	public static func decode(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> StyleExport {
@@ -425,13 +427,13 @@ public struct StyleExport: Sendable {
 				try raw(f, "readiness"), try raw(f, "states"), try raw(f, "initial"), ("assignments", .array(assignments)), try raw(f, "next"),
 			]
 			if f.has("bands") { page.append(("bands", try f["bands"].value)) }
-			for key in ["plan", "planNames", "planRepeats"] where f.has(key) { page.append((key, try f[key].value)) }
+			for key in ["plan", "planNames", "planRepeats", "anim"] where f.has(key) { page.append((key, try f[key].value)) }
 			return try decodeTarget(try Reader(.object(page), at: reader.path), perState: true, fonts: fonts, backend: backend)
 		}
 		for route in try targetFields["routes"].array() {
 			let f = try route.object(
 				required: ["pattern", "component", "compiler", "readiness", "states", "initial", "next", "assignments"],
-				optional: ["bands", "sheets", "plan", "planNames", "planRepeats", "slots"])
+				optional: ["bands", "sheets", "plan", "planNames", "planRepeats", "slots", "anim"])
 			let pattern = try f["pattern"].string()
 			_ = (try f["component"].string(), try f["compiler"].string())
 			guard routes[pattern] == nil else { throw route.fail("route \(pattern) is listed twice") }
@@ -518,7 +520,7 @@ public struct StyleExport: Sendable {
 	) throws -> StyleExport {
 		let targetFields = try chosen.object(
 			required: perState ? ["backend", "viewport", "dpr", "states", "initial", "assignments", "next"] : ["backend", "viewport", "dpr", "nodes"],
-			optional: perState ? ["readiness", "bands", "plan", "planNames", "planRepeats"] : [])
+			optional: perState ? ["readiness", "bands", "plan", "planNames", "planRepeats", "anim"] : [])
 		var notReady: String?
 		if targetFields.has("readiness") {
 			let readiness = try targetFields["readiness"]
@@ -640,6 +642,10 @@ public struct StyleExport: Sendable {
 				throw perAssignment.fail("names \(style.planNames.count) assignments; the export has \(assignments.count)")
 			}
 		}
+		if targetFields.has("anim") {
+			guard style.plan != nil else { throw try targetFields["anim"].fail("animator tables need a layout plan") }
+			style.anim = try targetFields["anim"].value.jsonText
+		}
 		if targetFields.has("planRepeats") {
 			style.planRepeats = try targetFields["planRepeats"].array().map { r in
 				let f = try r.object(required: ["id", "parent", "template"], optional: [])
@@ -692,9 +698,12 @@ public struct StyleExport: Sendable {
 				}
 				line += ",\"rows\":\(JSONValue.array(lists).jsonText)"
 			}
-			// The page's own texts whose current string is not the one this assignment was laid out with, by Dragon id.
-			let nodeText = Dictionary(assignments[k].nodes.compactMap { node in node.text.map { (node.id, $0) } }, uniquingKeysWith: { a, _ in a })
+			// The page's own texts whose current string is not the one this assignment was laid out with, by Dragon id; a text an arm
+			// hides there has no box to lay out.
+			let nodeText = Dictionary(assignments[k].nodes.compactMap { node in node.frame == nil ? nil : node.text.map { (node.id, $0) } }, uniquingKeysWith: { a, _ in a })
 			let changed = texts.filter { id, text in nodeText[id].map { $0 != text } ?? false }.sorted { $0.key < $1.key }
+			// The page's texts as this layout lays them out: the changed ones with their current string.
+			let relaidTexts = Dictionary(changed.map { ($0.key, $0.value) }, uniquingKeysWith: { a, _ in a })
 			let live = shown != nil || !changed.isEmpty
 			if !changed.isEmpty {
 				if shown == nil { line += ",\"rows\":[]" }
@@ -841,7 +850,8 @@ public struct StyleExport: Sendable {
 				let ops = f[4].isNull ? nil : try StyleExport.decodeBorderOps(Reader(try planBorderOps(f[4]), at: f[4].path))
 				let range = f[5].isNull ? nil : try StyleExport.decodeRange(Reader(.object(zip(["minX", "maxX", "minY", "maxY"], try f[5].array().map { try bits($0) }).map { ($0, $1) }), at: f[5].path))
 				return StyleNode(
-					id: node.id, parent: node.parent, isText: node.isText, isAnonymous: node.isAnonymous, text: node.text,
+					id: node.id, parent: node.parent, isText: node.isText, isAnonymous: node.isAnonymous,
+					text: node.isText ? (relaidTexts[node.id] ?? node.text) : node.text,
 					frame: Frame(x: frame[0], y: frame[1], width: frame[2], height: frame[3]),
 					borderWidths: widths.map { ($0[0], $0[1], $0[2], $0[3]) }, writes: node.writes, borderOps: ops,
 					scrollRange: range, lines: node.isText ? lines : nil)

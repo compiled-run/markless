@@ -2,20 +2,20 @@ appId: ${APP_ID}
 name: u102-row-slots
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Row numbers
 - assertVisible: Alpha row
 - assertVisible: Beta row
 - assertVisible: Lift beta
 - assertVisible:
-      text: Beta row
-      below: Alpha row
+    text: Beta row
+    below: Alpha row
 - tapOn: Lift beta
 - assertVisible:
-      text: Alpha row
-      below: Beta row
+    text: Alpha row
+    below: Beta row
 - assertVisible: Alpha row
 - assertVisible: Beta row
 - assertVisible:
-      text: Alpha row
-      below: Beta row
+    text: Alpha row
+    below: Beta row

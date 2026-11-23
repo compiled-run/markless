@@ -61,8 +61,25 @@ export type NativeAction =
 	| { readonly event: 'keydown'; readonly host: string; readonly key: string }
 	/** The same key after what it did to the text (or did not, when its keydown was prevented). */
 	| { readonly event: 'keyup'; readonly host: string; readonly key: string }
+	/** The files a person chose in the picker a file input opened; its `input` and `change` handlers run with them. */
+	| {
+			readonly event: 'pick';
+			readonly host: string;
+			readonly files: ReadonlyArray<NativePickedFile>;
+	  }
 	/** A paste into a text field from its edit menu, before the text goes in. */
 	| { readonly event: 'paste'; readonly host: string; readonly text: string }
+	/** A CSS animation's event on a styled page, from the host's run of Dragon's animator: its name and elapsed time in seconds. */
+	| {
+			readonly event:
+				| 'animationstart'
+				| 'animationiteration'
+				| 'animationend'
+				| 'animationcancel';
+			readonly host: string;
+			readonly animationName: string;
+			readonly elapsedTime: number;
+	  }
 	/** A live device value changed (connectivity, permission): the host writes the device cell. */
 	| { readonly event: 'device'; readonly cell: string; readonly value: Value }
 	/** A device call the host started has answered: a task cell takes `{ state: 'value', value }` or the error. */
@@ -218,8 +235,18 @@ type Raised = {
 };
 const RAISE_DEPTH = 32;
 
+/** A file a picker chose, as a page's `File` describes it. */
+export type NativePickedFile = {
+	readonly name: string;
+	readonly size: number;
+	readonly type: string;
+	readonly lastModified: number;
+};
+
 /** What the event running a handler carries, by the field a `{ event }` expression names. */
 export type NativeEventFields = {
+	/** A file input's `input` or `change`: what the picker chose, which its JavaScript reads from `files`. */
+	readonly files?: ReadonlyArray<NativePickedFile>;
 	readonly value?: string;
 	/** A text field's `keydown` or `keyup`: the key as the phone's browser names it. */
 	readonly key?: string;
@@ -227,6 +254,9 @@ export type NativeEventFields = {
 	readonly text?: string;
 	/** A press: how many presses in a row on the element. */
 	readonly detail?: number;
+	/** An animation event: the `@keyframes` name and the elapsed time in seconds. */
+	readonly animationName?: string;
+	readonly elapsedTime?: number;
 	readonly reason?: string;
 	readonly pressTarget?: string | null;
 	readonly target?: string;
@@ -1004,7 +1034,7 @@ export function createNativeRuntime(
 			focused !== null && focused !== NATIVE_DOCUMENT_BODY
 				? { focused, focusElements: elementFacts({}, [focused]) }
 				: {};
-		call('enter', { ...entry, ...focus, ...entryCells() });
+		call('enter', { ...entry, screen, ...focus, ...entryCells() });
 		const result = JSON.parse(call('leave')) as {
 			readonly pending: ReadonlyArray<number>;
 			readonly settled: ReadonlyArray<number>;
@@ -1029,8 +1059,14 @@ export function createNativeRuntime(
 				readonly replace: boolean;
 			};
 			readonly commands?: ReadonlyArray<
-				| readonly [string, 'focus' | 'scrollIntoView' | 'showModal' | 'close', boolean]
+				| readonly [
+						string,
+						'focus' | 'scrollIntoView' | 'showModal' | 'close' | 'showPicker',
+						boolean,
+				  ]
 				| readonly [string, 'setPointerCapture' | 'releasePointerCapture', number]
+				/** The names a handler gave a file input, as a JSON array. */
+				| readonly [string, 'files', string]
 			>;
 			readonly raises?: ReadonlyArray<Raised>;
 			/** A key or paste handler called `preventDefault()` before it first awaited. */
@@ -1117,6 +1153,9 @@ export function createNativeRuntime(
 						else if (touch.capture === node) touch.capture = null;
 						return [];
 					}
+					// A file input shows the names of the files a handler gave it.
+					if (command === 'files')
+						return [{ op: 'property', node, name: 'files', value: String(argument) }];
 					const preventScroll = argument === true;
 					// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
 					if (command === 'showModal' || command === 'close') {
@@ -1138,7 +1177,14 @@ export function createNativeRuntime(
 			),
 			...(result.prevented ? [{ op: 'preventDefault' } as NativeJournalEntry] : []),
 			...(result.value !== undefined && typing !== undefined
-				? [{ op: 'property', node: typing, name: 'value', value: result.value } as NativeJournalEntry]
+				? [
+						{
+							op: 'property',
+							node: typing,
+							name: 'value',
+							value: result.value,
+						} as NativeJournalEntry,
+					]
 				: []),
 			...raised,
 			...(result.navigate
@@ -1255,7 +1301,6 @@ export function createNativeRuntime(
 			out.push(
 				...enter({
 					kind: 'tasks',
-					screen,
 					tasks,
 					...(again.length > 0 ? { retry: again } : {}),
 				}),
@@ -2106,7 +2151,13 @@ export function createNativeRuntime(
 			if (node !== own && bound.handler.includes('@')) continue;
 			const copy = node === own ? undefined : `${bound.handler}@${own}`;
 			if (copy && ownHandler === copy) continue;
-			journal.push(...run(handlers.get(copy && handlers.has(copy) ? copy : bound.handler) ?? [], fields, scope));
+			journal.push(
+				...run(
+					handlers.get(copy && handlers.has(copy) ? copy : bound.handler) ?? [],
+					fields,
+					scope,
+				),
+			);
 			if (propagationStopped || journal.some((entry) => entry.op === 'navigate')) break;
 		}
 		propagationStopped = false;
@@ -2201,7 +2252,7 @@ export function createNativeRuntime(
 		leave: () =>
 			asyncSent === null
 				? []
-				: enter({ kind: 'tasks', screen, tasks: [], leave: true }).filter(
+				: enter({ kind: 'tasks', tasks: [], leave: true }).filter(
 						(entry) => entry.op === 'abort',
 					),
 		dispatch(action) {
@@ -2429,7 +2480,11 @@ export function createNativeRuntime(
 								});
 						}
 						if (documentListening.has(type))
-							runs.push({ handler: '', fields: fieldsOf(type, target, target, related), document: type });
+							runs.push({
+								handler: '',
+								fields: fieldsOf(type, target, target, related),
+								document: type,
+							});
 					};
 					/** `pointerenter` on each element `target` is in that `from` is not, outermost first; `pointerleave` the other way. */
 					const crossing = (
@@ -2452,14 +2507,23 @@ export function createNativeRuntime(
 					const flush = (): NativeJournalEntry[] | undefined => {
 						for (const step of runs.splice(0)) {
 							if (step.document) {
-								const { target: from, relatedTarget, currentTarget: _, ...fields } = step.fields;
+								const {
+									target: from,
+									relatedTarget,
+									currentTarget: _,
+									...fields
+								} = step.fields;
 								calls.push(
 									...enter({
 										kind: 'document',
 										event: {
 											type: step.document,
 											...fields,
-											nodes: { target: from ?? null, currentTarget: null, relatedTarget: relatedTarget ?? null },
+											nodes: {
+												target: from ?? null,
+												currentTarget: null,
+												relatedTarget: relatedTarget ?? null,
+											},
 										},
 										elements: elementFacts({}, [
 											...documentElements,
@@ -2594,8 +2658,9 @@ export function createNativeRuntime(
 			// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
 			const at = action.host.indexOf('@');
 			const host = at < 0 ? action.host : action.host.slice(0, at);
+			const named = action.event === 'pick' ? 'input' : action.event;
 			const event = payload.events.find(
-				(candidate) => candidate.host === host && candidate.event === action.event,
+				(candidate) => candidate.host === host && candidate.event === named,
 			);
 			if (!event) throw new Error(`no ${action.event} handler on ${action.host}`);
 			const instance = payload.nodes
@@ -2610,9 +2675,20 @@ export function createNativeRuntime(
 					? { key: action.key, value: textOf(action.host) }
 					: action.event === 'paste'
 						? { text: action.text, value: textOf(action.host) }
-						: action.event === 'activate'
-							? { detail: action.detail ?? 1 }
-							: edit;
+						: action.event === 'pick'
+							? {
+									files: action.files,
+									target: action.host,
+									currentTarget: action.host,
+								}
+							: action.event === 'activate'
+								? { detail: action.detail ?? 1 }
+								: 'animationName' in action
+									? {
+											animationName: action.animationName,
+											elapsedTime: action.elapsedTime,
+										}
+									: edit;
 			// A press focuses the control it presses, as the browser does.
 			if (action.event === 'activate') focused = action.host;
 			// A number field's handlers read its value, which is empty while its text is no number.
@@ -2834,6 +2910,9 @@ export function createNativeRuntime(
 									: {}),
 								...(typeof eventValue === 'object' && eventValue.text !== undefined
 									? { text: eventValue.text }
+									: {}),
+								...(typeof eventValue === 'object' && eventValue.files !== undefined
+									? { files: eventValue.files }
 									: {}),
 								...Object.fromEntries(touch),
 								...(nodes ? { nodes } : {}),

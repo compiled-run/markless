@@ -1,0 +1,17 @@
+body {
+	margin: 0;
+	font-family: sans-serif;
+}
+
+/* Global, so the keyframes keep their name: an animation event reports it. */
+.notice[ui-closing] {
+	animation: fold 400ms ease-in forwards;
+}
+@keyframes fold {
+	from {
+		background-color: #fff3cd;
+	}
+	to {
+		background-color: #f8f9fa;
+	}
+}

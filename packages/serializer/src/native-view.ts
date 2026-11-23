@@ -133,6 +133,7 @@ export type NativeExpr =
 				| 'key'
 				| 'text'
 				| 'detail'
+				| NativeAnimationField
 				| NativePointerField;
 	  }
 	/** Whether the element `node` has captured the pointer `pointer` (`node.hasPointerCapture(pointer)`). */
@@ -738,8 +739,18 @@ export type NativeEventName =
 	/** A range input let go after its value moved: the web's `change` on it. */
 	| 'commit'
 	| 'contextmenu'
+	| NativeAnimationEventName
 	| NativePointerEventName
 	| NativeMouseEventName;
+
+/**
+ * A CSS animation's events on a styled page, as the host's run of Dragon's animator gives them (css-animations-1 §4.2): it
+ * started, began another iteration, ended, or was removed while it ran.
+ */
+export type NativeAnimationEventName = 'animationstart' | 'animationiteration' | 'animationend' | 'animationcancel';
+
+/** What an animation event carries: the `@keyframes` name and the elapsed time in seconds. */
+export type NativeAnimationField = 'animationName' | 'elapsedTime';
 
 /**
  * The pointer events a touch raises, in a phone browser's order (Safari on iOS, Chrome on Android): `pointerover`, then
@@ -931,8 +942,8 @@ export type NativeOp =
 	| { readonly op: 'reset'; readonly cells: ReadonlyArray<string>; readonly catch?: string };
 
 /** Element commands a host runs. */
-/** `select` selects a text field's whole text, as `field.select()` does. */
-export type NativeCommand = 'focus' | 'scrollIntoView' | 'select';
+/** `select` selects a text field's whole text, as `field.select()` does; `showPicker` opens a file input's picker. */
+export type NativeCommand = 'focus' | 'scrollIntoView' | 'select' | 'showPicker';
 
 /** The non-finite numbers JSON cannot hold: each with its path (object keys and array indices) inside a value. */
 export type NativeNonFinite = ReadonlyArray<
@@ -1473,6 +1484,13 @@ export type NativeJournalEntry =
 			readonly name: 'value';
 			readonly value: string;
 	  }
+	/** The files a handler gave a file input, as a JSON array of their names: the input shows them, as the browser's does. */
+	| {
+			readonly op: 'property';
+			readonly node: string;
+			readonly name: 'files';
+			readonly value: string;
+	  }
 	/** A checkbox's or radio button's checkedness changed: by a tick, by its `checked` binding, or by another radio's tick. */
 	| {
 			readonly op: 'property';
@@ -1759,9 +1777,10 @@ export const NATIVE_SCRIPT_DISMISS_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<st
 /** A submit handler's binding for its form's entries now, which its event's `target` and `currentTarget` carry for FormData. */
 export const NATIVE_SCRIPT_SUBMITTED_FORM = 'submitted form';
 
-/** Members of a page global a phone answers, read straight off it: the focused element, as a proxy. */
+/** Members of a page global a phone answers, read straight off it: the focused element, as a proxy, and the screen's history state. */
 export const NATIVE_SCRIPT_PAGE_MEMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
 	document: ['activeElement', 'addEventListener', 'removeEventListener'],
+	history: ['state', 'replaceState'],
 };
 
 /** What a touch adds to a script pointer handler's event: its plain values. The elements it names reach only data handlers. */

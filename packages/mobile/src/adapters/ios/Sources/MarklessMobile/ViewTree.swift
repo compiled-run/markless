@@ -97,6 +97,11 @@ final class Paragraph {
 /// A `<pre>` paragraph's sideways scroller: its line is never wrapped.
 final class PreformattedScroll: UIScrollView {}
 
+/// The page's scroll view: a drag that starts on a button or field scrolls the page, as it does in Safari; a tap still presses it.
+final class PageScroll: UIScrollView {
+	override func touchesShouldCancel(in view: UIView) -> Bool { true }
+}
+
 /// An inline `<svg>`: draws the shapes compiled when the app was built, then the shapes inside it that come from components,
 /// whose outline the engine gives while the app runs, fitted into its box as the web fits the viewBox.
 final class DrawingView: UIView {
@@ -338,7 +343,7 @@ final class ViewTree {
 	let root = UIView()
 	/// The page's own scroll view, as a browser's viewport: it fills the screen, insets its content by the safe areas and
 	/// scrolls it under the bars.
-	let page = UIScrollView()
+	let page = PageScroll()
 	let keyboard: KeyboardDismisser
 	private let runtime: NativeRuntime
 	private var layout: StyleLayout?
@@ -712,8 +717,12 @@ final class ViewTree {
 				guard let tick = ticks[node], let view = elements[node] else { throw HostError("journal names checkbox \(node), which is not shown") }
 				ticks[node] = (tick.radio, checked)
 				drawTick(node, view)
-			case let .property(node, _, value):
+			case let .property(node, name, value):
 				if elements[node] is AbsentField { continue }
+				if name == "files", let picker = elements[node] as? FileInputView {
+					picker.show(names: value)
+					continue
+				}
 				if let area = elements[node] as? TextArea {
 					area.text = value
 					continue
@@ -751,6 +760,10 @@ final class ViewTree {
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
 				root.layoutIfNeeded()
 				// As on the web: scrollIntoView aligns the element to the start; focus brings it into view unless told not to.
+				if command == "showPicker" {
+					(view as? FileInputView)?.open()
+					break
+				}
 				if command == "scrollIntoView" {
 					bringIntoView(view, block: scrollIntoViewAlign.block, inline: scrollIntoViewAlign.inline)
 					break
@@ -968,6 +981,8 @@ final class ViewTree {
 			if let hint = named("aria-describedby") { view.accessibilityHint = hint }
 			guard let target = current["for"], let control = elements[target] else { continue }
 			let own = attributes[target] ?? [:]
+			// A control hidden from assistive technology takes no name, and its label reads as the text it is.
+			if own["aria-hidden"] == "true" { continue }
 			let unnamed = own["aria-label"] == nil && own["aria-labelledby"] == nil
 			if unnamed { control.accessibilityLabel = text(within: view, skipping: control) }
 			if !control.isDescendant(of: view) { view.accessibilityElementsHidden = true }
@@ -1327,6 +1342,15 @@ final class ViewTree {
 					control.accessibilityTraits = staticAttributes["type"] == "checkbox" ? [.button, .toggleButton] : .button
 					ticks[id] = (staticAttributes["type"] == "radio", try runtime.isChecked(id))
 					view = control
+				} else if element == "input", staticAttributes["type"] == "file" {
+					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
+					let picker = FileInputView(unseen: staticAttributes["aria-hidden"] == "true")
+					picker.presenter = { [weak self] in self?.presenter }
+					picker.accept = staticAttributes["accept"] ?? ""
+					picker.multiple = staticAttributes["multiple"] != nil
+					// Its button and summary sit side by side in its own stack view, which the stacking layout leaves alone.
+					leaves.insert(ObjectIdentifier(picker))
+					view = picker
 				} else if element == "input", staticAttributes["type"] == "range" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					view = RangeSlider()
@@ -1522,6 +1546,8 @@ final class ViewTree {
 				// An element that is not a button (a list row): a tap anywhere in it, its text included, presses it.
 				view.isUserInteractionEnabled = true
 				view.addGestureRecognizer(ActivateGesture { taps in onAction(NativeAction(event: .activate, host: id, detail: taps)) })
+			case let (.input, picker as FileInputView):
+				picker.onPick = { files in onAction(NativeAction(event: .pick, host: id, files: files)) }
 			case let (.input, slider as RangeSlider):
 				slider.onInput = { value in onAction(NativeAction(event: .input, host: id, value: value)) }
 			case let (.commit, slider as RangeSlider):
@@ -1557,8 +1583,8 @@ final class ViewTree {
 			case (.input, _ as SelectButton):
 				// A select's change runs in the runtime when a choice is made (a `choose` action).
 				continue
-			case (.idle, _), (.visible, _), (.dismiss, _), (.close, _), (.keydown, _), (_, _) where event.event.isPointer:
-				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host, close and a keydown off a text field by the runtime.
+			case (.idle, _), (.visible, _), (.dismiss, _), (.close, _), (.keydown, _), (.animationstart, _), (.animationiteration, _), (.animationend, _), (.animationcancel, _), (_, _) where event.event.isPointer:
+				// Raised elsewhere: idle, visible and animation events by the screen's controller, dismiss and pointer events by the overlay host, close and a keydown off a text field by the runtime.
 				continue
 			case (.contextmenu, _):
 				// Safari on iOS raises no contextmenu for a long press, so neither does this host.
