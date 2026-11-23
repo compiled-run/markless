@@ -502,7 +502,7 @@ function walkApp(
 		if (answer) for (const next of appRuntime.dispatch(answer)) stack.at(-1)!.apply(next, -1);
 	}
 	for (const [index, step] of steps.entries()) {
-		const action = step.do;
+		const action = step.do && 'tapAt' in step.do ? { tap: step.do.tapAt.on } : step.do;
 		if (action && 'back' in action) {
 			const journal = appRuntime.dispatch({ event: 'back' });
 			stack.pop();
@@ -1116,7 +1116,8 @@ function walk(
 	}
 	startTasks();
 	for (const [index, step] of steps.entries()) {
-		const action = step.do;
+		// The reference lays nothing out: a tap at a point is a tap on the element the step says is there.
+		const action = step.do && 'tapAt' in step.do ? { tap: step.do.tapAt.on } : step.do;
 		if (action) invalid = undefined;
 		if (action && 'relaunch' in action) {
 			if (action.permissions?.location === 'unset') permission = 'unknown';

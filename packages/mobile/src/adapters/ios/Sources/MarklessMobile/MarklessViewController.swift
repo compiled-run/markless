@@ -202,6 +202,7 @@ public final class MarklessViewController: UIViewController {
 			objectView: { object, kind in try device.view(for: object, device: kind) }, images: images)
 		tree?.presenter = self
 		#if canImport(DragonPlan)
+		tree?.stickyShift = DragonPlan.sticky
 		if let style, style.anim != nil, let tree {
 			animation = AnimationRun(style: style, initial: tree.assignment, run: DragonPlan.animation)
 		}

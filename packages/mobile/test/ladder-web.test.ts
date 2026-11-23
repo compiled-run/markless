@@ -316,6 +316,26 @@ async function act(page: Page, step: LadderStep) {
 	else if ('relaunch' in action) await page.reload();
 	else if ('back' in action) await page.goBack();
 	else if ('escape' in action) await page.keyboard.press('Escape');
+	else if ('tapAt' in action) {
+		const size = page.viewportSize();
+		if (size === null) throw new Error('the page has no viewport size');
+		const x = (size.width * action.tapAt.point[0]) / 100;
+		const y = (size.height * action.tapAt.point[1]) / 100;
+		// The element `on` names (by accessible name or exact text) must hold Chrome's element at the point.
+		const inside = await page.evaluate(
+			([px, py, on]) => {
+				const at = document.elementFromPoint(px as number, py as number);
+				const named = [...document.querySelectorAll('*')].filter(
+					(e) => e.getAttribute('aria-label') === on || e.textContent?.trim() === on,
+				);
+				return at !== null && named.some((e) => e.contains(at));
+			},
+			[x, y, action.tapAt.on] as const,
+		);
+		if (!inside)
+			throw new Error(`Chrome's element at ${x}, ${y} is not inside the element showing "${action.tapAt.on}"`);
+		await page.mouse.click(x, y);
+	}
 	else if ('pressBackdrop' in action) {
 		// Unstyled, the backdrop has no area beside its surface to click, so the press is dispatched on the element itself.
 		const backdrop = await page.locator('[overlay]:not([hidden])').last().elementHandle();

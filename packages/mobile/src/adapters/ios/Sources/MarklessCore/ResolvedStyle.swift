@@ -1,3 +1,5 @@
+import Foundation
+
 /// One box's look in points, ready for a host to assign: the only arithmetic between Dragon's export and the views.
 public struct ResolvedStyle: Equatable, Sendable {
 	public var frame: Frame?
@@ -169,6 +171,8 @@ public struct StyleLayout: Sendable {
 	public let pageScrolls: [ScrollOffsetRange?]
 	/// Why Dragon left the page scroll range undecided, when it says.
 	public let pageScrollUndecided: String?
+	/// Each assignment's sticky boxes, in device px, for Dragon's `runMarklessSticky` on every scroll.
+	public let pageSticky: [[StickyRow]]
 	/// Device pixels per point the frames were laid out for; a screen with another scale is refused.
 	public let dpr: Double
 	public let fontFiles: [(id: String, file: String)]
@@ -292,6 +296,7 @@ extension StyleExport {
 			},
 			start: start, stateCells: stateCells, domains: states.map(\.domain), next: next,
 			viewport: viewport, pageScrolls: try pageScrolls.map { try $0.map(points) }, pageScrollUndecided: pageScrollUndecided,
+			pageSticky: pageSticky.isEmpty ? assignments.map { _ in [] } : pageSticky,
 			dpr: dpr, fontFiles: fonts, systemFaces: systemFaces, bands: bands,
 			extents: assignments.map { assignment in
 				let byId = Dictionary(uniqueKeysWithValues: assignment.nodes.map { ($0.id, $0) })
@@ -680,3 +685,25 @@ extension StyleExport {
 }
 
 func styleError(_ reason: String) -> PayloadError { PayloadError(path: "style", reason: reason) }
+
+extension StyleLayout {
+	/// POSX-s scroll: each sticky box of `assignment` moved for the page scrolled to (`x`, `y`) points, in points from its in-flow
+	/// place, by Dragon's `runMarklessSticky` (`run`); empty when the assignment has no sticky box.
+	public func stickyShifts(assignment: Int, x: Double, y: Double, run: (String) -> String) throws -> [String: (dx: Double, dy: Double)] {
+		let rows = assignment < pageSticky.count ? pageSticky[assignment] : []
+		if rows.isEmpty { return [:] }
+		let line = "{\"sticky\":\(JSONValue.array(rows.map(\.row)).jsonText),\"scroll\":[\(JSONValue.number(x * dpr).jsonText),\(JSONValue.number(y * dpr).jsonText)]}"
+		let answer = run(line)
+		let parts = try Reader(JSONValue.parse(Data(answer.utf8)), at: "sticky shift").array()
+		guard parts.count == 2, try parts[0].string() == "ok" else { throw PayloadError(path: "sticky shift", reason: "Dragon's sticky shift failed: \(answer)") }
+		let items = try parts[1].array()
+		guard items.count == rows.count else { throw parts[1].fail("expected \(rows.count) shifts") }
+		var out: [String: (dx: Double, dy: Double)] = [:]
+		for (row, item) in zip(rows, items) {
+			let t = try item.array()
+			guard t.count == 3 else { throw item.fail("expected an id, dx and dy") }
+			out[row.id] = (try planNumber(t[1].value) / dpr, try planNumber(t[2].value) / dpr)
+		}
+		return out
+	}
+}

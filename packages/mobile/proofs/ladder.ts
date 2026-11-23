@@ -90,6 +90,11 @@ export type LadderAction =
 	/** A press that starts and ends on the topmost overlay element itself, beside what it holds (a modal's backdrop). */
 	| { readonly pressBackdrop: true }
 	/**
+	 * A tap at a point of the screen, `[x, y]` in percent of it, on the element showing `on` there (a box drawn over another, as
+	 * a sticky header over the rows scrolled beneath it); the web test checks Chrome's element at that point is inside it.
+	 */
+	| { readonly tapAt: { readonly point: readonly [number, number]; readonly on: string } }
+	/**
 	 * A finger pressed on the element showing `on`, dragged toward `direction` and lifted. `scrolls` says the drag runs along
 	 * a box that scrolls that way, so the platform takes the touch for the scroll (the web's `pointercancel`); the phones and
 	 * the browser find that out for themselves, the reference ladder, which lays nothing out, is told.
@@ -618,6 +623,8 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 	if ('longPress' in action) return [{ longPressOn: { text: selector(action.longPress) } }];
 	if ('escape' in action) return ['back'];
 	if ('pressBackdrop' in action) return [{ tapOn: { point: BACKDROP_POINT } }];
+	if ('tapAt' in action)
+		return [{ tapOn: { point: `${action.tapAt.point[0]}%,${action.tapAt.point[1]}%` } }];
 	return [
 		{
 			extendedWaitUntil: {

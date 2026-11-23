@@ -63,6 +63,11 @@ import dev.markless.mobile.core.Scope
 import dev.markless.mobile.core.Store
 import dev.markless.mobile.style.AnimationRun
 import dev.markless.mobile.style.Assignment
+import dev.markless.mobile.core.Json
+import dev.markless.mobile.core.arr
+import dev.markless.mobile.core.text
+import dev.markless.mobile.core.jsonNumber
+import dev.markless.mobile.style.StickyRow
 import dev.markless.mobile.style.Edges
 import dev.markless.mobile.style.paddingBox
 import dev.markless.mobile.style.BAND_KEY
@@ -371,6 +376,14 @@ class MarklessHost(
 	private var message: View? = null
 
 	val root: View
+
+	// Declared before init: building the page repaints, which re-sticks.
+	/** Each sticky view's translation as the layout placed it, and Dragon's shift for it at scroll offset 0 (already in that place). */
+	private val stickyRest = HashMap<String, FloatArray>()
+	private var stickyRows: List<StickyRow>? = null
+	private var stickyAt = 0 to 0
+	/** The sticky move this host last added to each view's translation, which a placement does not undo. */
+	private val stickyApplied = HashMap<String, FloatArray>()
 
 	init {
 		val single = (payload.nodes.firstOrNull() as? Node.Element)?.takeIf { it.parent == null && it.arm == null && payload.nodes.count { n -> n.parent == null } == 1 }
@@ -849,6 +862,9 @@ class MarklessHost(
 		root.requestLayout()
 		// A sheet's boxes live in its dialog, outside the page's root.
 		for (view in views.values) if (view is MarklessBox) view.requestLayout()
+		// The boxes are back where the layout put them: sticky ones move again for the page's scroll offset.
+		stickyRows = null
+		stick(stickyAt.first, stickyAt.second)
 	}
 
 	/** After an arm or rows entry: drop instances no longer shown, build the new ones from current values, then put each parent's children in order; [only] narrows a row arm's entry to that row's arm. */
@@ -1302,6 +1318,46 @@ class MarklessHost(
 		val f = rootFrame
 		if (f != null && (f.bottom > h + 1 || f.right > w + 1)) throw MarklessHostError("the page is ${f.bottom} px tall on a $h px screen, and Dragon does not decide its scroll range: ${st.pageScrollUndecided ?: "the style export has no page range"}")
 		return w to h
+	}
+
+	/**
+	 * POSX-s scroll: each sticky view moved for the page scrolled to (x, y) px by Dragon's runMarklessSticky, less the shift its
+	 * laid-out place already holds. Without Dragon's engine, or a sticky box, nothing moves.
+	 */
+	fun stick(x: Int, y: Int) {
+		stickyAt = x to y
+		val st = style ?: return
+		val run = planSticky ?: return
+		val rows = st.assignments[page!!.assignment].sticky
+		if (rows.isEmpty()) return
+		fun shifts(sx: Double, sy: Double): Map<String, Pair<Double, Double>> {
+			val answer = run("{\"sticky\":${Json.Arr(rows.map { it.row }).text()},\"scroll\":[${jsonNumber(sx)},${jsonNumber(sy)}]}")
+			val parts = Json.parse(answer).arr("sticky shift")
+			if (parts.size != 2 || parts[0] != Json.Str("ok")) throw MarklessHostError("Dragon's sticky shift failed: $answer")
+			val items = parts[1].arr("sticky shifts")
+			if (items.size != rows.size) throw MarklessHostError("Dragon's sticky shift gave ${items.size} shifts for ${rows.size} boxes")
+			return rows.zip(items).associate { (row, item) ->
+				val t = item.arr("sticky shift of ${row.id}")
+				row.id to (StyleExport.planNumber(t[1]) to StyleExport.planNumber(t[2]))
+			}
+		}
+		if (stickyRows !== rows) {
+			stickyRows = rows
+			stickyRest.clear()
+			for ((id, d) in shifts(0.0, 0.0)) {
+				val v = views[id] ?: continue
+				val applied = stickyApplied[id] ?: floatArrayOf(0f, 0f)
+				stickyRest[id] = floatArrayOf(v.translationX - applied[0], v.translationY - applied[1], d.first.toFloat(), d.second.toFloat())
+			}
+		}
+		for ((id, d) in shifts(x.toDouble(), y.toDouble())) {
+			val rest = stickyRest[id] ?: continue
+			val v = views[id] ?: continue
+			val move = floatArrayOf(d.first.toFloat() - rest[2], d.second.toFloat() - rest[3])
+			stickyApplied[id] = move
+			v.translationX = rest[0] + move[0]
+			v.translationY = rest[1] + move[1]
+		}
 	}
 
 	/** The text field that has the keyboard, if any. */
@@ -1991,6 +2047,22 @@ class MarklessHost(
 		/** Dragon's translated `runMarklessAnimation`, when the app is built with an engine that has it. */
 		val planAnimation: ((String) -> String)? = try {
 			val run = Class.forName("dev.dragon.layout.HarnessKt").getMethod("harness_runMarklessAnimation", String::class.java)
+			({ line: String ->
+				try {
+					run.invoke(null, line) as String
+				} catch (e: java.lang.reflect.InvocationTargetException) {
+					throw e.cause ?: e
+				}
+			})
+		} catch (_: ClassNotFoundException) {
+			null
+		} catch (_: NoSuchMethodException) {
+			null
+		}
+
+		/** Dragon's translated `runMarklessSticky` (POSX-s scroll), when the app is built with Dragon's engine. */
+		val planSticky: ((String) -> String)? = try {
+			val run = Class.forName("dev.dragon.layout.HarnessKt").getMethod("harness_runMarklessSticky", String::class.java)
 			({ line: String ->
 				try {
 					run.invoke(null, line) as String
