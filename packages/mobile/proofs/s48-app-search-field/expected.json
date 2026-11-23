@@ -1,0 +1,44 @@
+{
+	"rung": "S48",
+	"name": "a styled search field draws its placeholder while empty, takes typing in its editor box, empties on its clear control with an input event, and draws a fixed value, as the web does",
+	"steps": [
+		{
+			"visible": ["Title or tag", "Nothing searched"],
+			"fields": {
+				"Search notes": "",
+				"Saved search": "Groceries"
+			},
+			"title": "Search field"
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Search notes",
+					"text": "milk",
+					"keepKeyboard": true
+				}
+			},
+			"visible": ["Searched"],
+			"absent": ["Nothing searched"],
+			"fields": {
+				"Search notes": "milk",
+				"Saved search": "Groceries"
+			},
+			"visibleOn": {
+				"ios": ["Clear text"],
+				"android": ["Clear text"]
+			}
+		},
+		{
+			"do": {
+				"clear": "Search notes"
+			},
+			"visible": ["Title or tag", "Nothing searched"],
+			"absent": ["Searched"],
+			"fields": {
+				"Search notes": "",
+				"Saved search": "Groceries"
+			}
+		}
+	]
+}

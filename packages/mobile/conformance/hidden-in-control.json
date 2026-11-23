@@ -1,0 +1,363 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "HiddenInControl",
+		"cells": [
+			{
+				"id": "state:count",
+				"name": "count",
+				"initial": 0
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Add"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "span",
+				"parent": "h1",
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"binary": "===",
+							"left": {
+								"cell": "state:count"
+							},
+							"right": {
+								"literal": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								" (",
+								{
+									"cell": "state:count"
+								},
+								")"
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Empty"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "a",
+				"parent": "h0",
+				"attributes": {
+					"href": "/cart"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "span",
+				"parent": "h4",
+				"attributes": {
+					"aria-hidden": "true"
+				},
+				"defaultStyle": {
+					"flow": "inline"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "◫ "
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Cart"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "span",
+				"parent": "h4",
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"binary": "===",
+							"left": {
+								"cell": "state:count"
+							},
+							"right": {
+								"literal": 0
+							}
+						}
+					},
+					{
+						"attribute": "aria-label",
+						"value": {
+							"template": [
+								" ",
+								{
+									"cell": "state:count"
+								},
+								" in cart"
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"cell": "state:count"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:count",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "state:count"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:count",
+						"value": {
+							"literal": 0
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Add"
+		],
+		[
+			"h2:text0",
+			" (0)"
+		],
+		[
+			"h3:text0",
+			"Empty"
+		],
+		[
+			"h5:text0",
+			"◫ "
+		],
+		[
+			"h4:text0",
+			"Cart"
+		],
+		[
+			"h6:text0",
+			"0"
+		]
+	],
+	"initialAttributes": [
+		[
+			"h2",
+			"hidden",
+			""
+		],
+		[
+			"h6",
+			"hidden",
+			""
+		],
+		[
+			"h6",
+			"aria-label",
+			" 0 in cart"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": " (1)"
+				},
+				{
+					"op": "attribute",
+					"node": "h6",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "attribute",
+					"node": "h6",
+					"name": "aria-label",
+					"value": " 1 in cart"
+				},
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "1"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": " (2)"
+				},
+				{
+					"op": "attribute",
+					"node": "h6",
+					"name": "aria-label",
+					"value": " 2 in cart"
+				},
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "2"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": " (0)"
+				},
+				{
+					"op": "attribute",
+					"node": "h6",
+					"name": "hidden",
+					"value": ""
+				},
+				{
+					"op": "attribute",
+					"node": "h6",
+					"name": "aria-label",
+					"value": " 0 in cart"
+				},
+				{
+					"op": "text",
+					"node": "h6:text0",
+					"value": "0"
+				}
+			]
+		}
+	]
+}

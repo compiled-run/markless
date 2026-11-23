@@ -36,8 +36,9 @@ import { spawnRunner } from './spawn-runner.ts';
 const REFUSED = new Set(['y4-sheet-beside-drawer', 'u102-drawer-swipe']);
 const USAGE = `usage: phones <command>
 
-  start [--ios <simulator>]... [--android <avd>@<port>]...
-                         start the machine's runner and boot its phones (default: ios markless-runner, android markless_runner@5570)
+  start [--ios <simulator>]... [--android <avd>@<port>[@<ssh host>]]...
+                         start the machine's runner and boot its phones (default: ios markless-runner, android markless_runner@5570);
+                         @<ssh host> is an emulator on another machine, run through its agent (README: Android on another machine)
   stop [--phones]        stop the runner (and shut its phones down)
   status                 the phones and every job that has not finished
   submit [--platform ios|android] [--chunk <n>] [--wait] [--no-reuse] (--all | --affected [--base <rev>] | --failed <job> | <rung>...)

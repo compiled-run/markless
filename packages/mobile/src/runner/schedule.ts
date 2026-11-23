@@ -1,5 +1,6 @@
 import type { ProofPlatform } from '../harness/proof-app.ts';
 import { jobStarted } from './refresh.ts';
+import { isRemote, type PhoneSpec, type PhoneState } from './pool.ts';
 import type { Chunk } from './store.ts';
 
 /** A job with at most this many chunks left on a platform goes before longer ones: a 1-rung job no longer waits an hour behind a 115-rung one. */
@@ -7,7 +8,10 @@ export const SHORT_JOB_CHUNKS = 2;
 
 export type QueuedJob = {
 	readonly id: string;
-	readonly chunks: ReadonlyArray<{ readonly name: string; readonly chunk: Chunk }>;
+	readonly chunks: ReadonlyArray<{
+		readonly name: string;
+		readonly chunk: Chunk;
+	}>;
 };
 
 /**
@@ -33,3 +37,16 @@ export function pickChunk(
 	}
 	return long;
 }
+
+/** This machine's own phone of a platform stands by while a remote phone of that platform is up, so the machine keeps its capacity for what only it can run. */
+export const standsBy = (
+	spec: PhoneSpec,
+	pool: ReadonlyArray<{ readonly spec: PhoneSpec; readonly state: PhoneState }>,
+): boolean =>
+	!isRemote(spec) &&
+	pool.some(
+		(phone) =>
+			isRemote(phone.spec) &&
+			phone.spec.platform === spec.platform &&
+			(phone.state.state === 'ready' || phone.state.state === 'busy'),
+	);

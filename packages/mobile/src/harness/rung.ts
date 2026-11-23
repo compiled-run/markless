@@ -440,6 +440,11 @@ function styleAssets(
 			);
 		}
 		const face = readFileSync(file);
+		// The face Dragon bundles from its checkout (Ahem) is named, not hashed; the shells key it by that name.
+		if (font.from !== 'input' && !font.id.startsWith('sha256:')) {
+			assets.push([`${PROOF_FONTS_FOLDER}/${font.id}.ttf`, face]);
+			continue;
+		}
 		const digest = `sha256:${createHash('sha256').update(face).digest('hex')}`;
 		if (digest !== font.id)
 			throw new Error(`${name}: ${file} is ${digest}, not the export's ${font.id}`);

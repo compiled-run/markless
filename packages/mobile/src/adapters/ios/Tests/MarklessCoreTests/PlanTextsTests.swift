@@ -31,7 +31,7 @@ private func answer(height: Double) -> String {
 		width: 100, height: 100, scale: 1, layout: { _ in Issue.record("laid out without the texts"); return answer(height: 10) },
 		rowsLayout: { line in live.append(line); return answer(height: 30) }, texts: ["h0:text0": "Home and the garden shed"])
 	#expect(live.count == 1)
-	#expect(live.first?.hasSuffix(#","rows":[],"texts":[["h0:text0","Home and the garden shed"]]}"#) == true)
+	#expect(live.first?.hasSuffix(#","rows":[],"texts":[["h0:text0","Home and the garden shed"]],"sticky":true}"#) == true)
 	#expect(relaid.assignments[0].nodes.first { $0.id == "h0" }?.frame?.height == 30)
 }
 
@@ -49,8 +49,8 @@ private func answer(height: Double) -> String {
 	var live: [String] = []
 	_ = try style.laidOut(
 		width: 100, height: 100, scale: 1, slots: [0], layout: { _ in Issue.record("laid out without the texts"); return "" },
-		rowsLayout: { line in live.append(line); return answer(height: 10).replacingOccurrences(of: "]]]", with: "]],[]]") }, texts: ["h0:text0": "Longer"])
+		rowsLayout: { line in live.append(line); return answer(height: 10).replacingOccurrences(of: "]]]", with: "]],[],[]]") }, texts: ["h0:text0": "Longer"])
 	#expect(live.count == 1)
 	#expect(live.first?.contains(#""slots":["#) == true)
-	#expect(live.first?.hasSuffix(#","rows":[],"texts":[["h0:text0","Longer"]]}"#) == true)
+	#expect(live.first?.hasSuffix(#","rows":[],"texts":[["h0:text0","Longer"]],"sticky":true}"#) == true)
 }

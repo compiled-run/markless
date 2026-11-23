@@ -285,6 +285,20 @@ function mirror(
 					: (node.attributes?.['aria-label'] ?? node.drawing?.label ?? null);
 			return label !== null && shownNode(node.id) ? [[node.id, label] as const] : [];
 		});
+	// A field with no value binding holds its `value` attribute until something is typed into it.
+	const valueAttribute = (host: string) => {
+		const node = nodeOf.get(host);
+		if (node?.kind !== 'element' || node.element !== 'input') return undefined;
+		return attributes.get(`${host}\0value`) ?? node.attributes?.['value'] ?? '';
+	};
+	// An empty field shows its placeholder.
+	const placeholders = () =>
+		payload.nodes.flatMap((node) => {
+			if (node.kind !== 'element' || node.element !== 'input' || !shownNode(node.id) || hiddenWithin(node.id)) return [];
+			const bound = attributes.get(`${node.id}\0placeholder`);
+			const placeholder = bound !== undefined ? bound : (node.attributes?.['placeholder'] ?? null);
+			return placeholder !== null && (properties.get(node.id) ?? valueAttribute(node.id)) === '' ? [placeholder] : [];
+		});
 	// The element a text names: a labelled element, or the element holding that text (a row instance keeps its key).
 	const elementReading = (text: LadderText) => {
 		const labelled = labels().find(([, label]) => readsAs(label, text))?.[0];
@@ -383,7 +397,7 @@ function mirror(
 			for (const [field, value] of Object.entries(step.fields ?? {})) {
 				const reading = elementReading(field);
 				const host = reading && (attributes.get(`${reading}\0for`) ?? reading);
-				expect(host && properties.get(host), `step ${index}: the field "${field}"`).toBe(
+				expect(host && (properties.get(host) ?? valueAttribute(host)), `step ${index}: the field "${field}"`).toBe(
 					value,
 				);
 			}
@@ -392,7 +406,7 @@ function mirror(
 				[...texts].filter(([id]) => !inClosedSheet(id) && !hiddenWithin(id)),
 			);
 			const read = styled ? [...open.values()] : nativeShownTexts(payload, open);
-			const shown = [...read, ...labels().map(([, label]) => label), ...chosenLabels()];
+			const shown = [...read, ...labels().map(([, label]) => label), ...chosenLabels(), ...placeholders()];
 			expect(shown, `step ${index}`).toEqual(
 				expect.arrayContaining(step.visible.map(reading)),
 			);
@@ -488,7 +502,7 @@ function walkApp(
 		if (answer) for (const next of appRuntime.dispatch(answer)) stack.at(-1)!.apply(next, -1);
 	}
 	for (const [index, step] of steps.entries()) {
-		const action = step.do;
+		const action = step.do && 'tapAt' in step.do ? { tap: step.do.tapAt.on } : step.do;
 		if (action && 'back' in action) {
 			const journal = appRuntime.dispatch({ event: 'back' });
 			stack.pop();
@@ -527,18 +541,26 @@ function walkApp(
 		} else if (action) {
 			const top = stack.at(-1)!;
 			const reading = top.elementReading(
-				'tap' in action ? action.tap : 'type' in action ? action.type.field : '',
+				'tap' in action
+					? action.tap
+					: 'type' in action
+						? action.type.field
+						: 'clear' in action
+							? action.clear
+							: '',
 			);
-			const host = reading && 'type' in action ? (top.labelled(reading) ?? reading) : reading;
+			const host =
+				reading && ('type' in action || 'clear' in action) ? (top.labelled(reading) ?? reading) : reading;
 			if (!host) throw new Error(`step ${index}: nothing on the top screen to act on`);
+			// A clear control empties the field and fires input, as typing does.
 			const journal =
 				'tap' in action
 					? appRuntime.dispatch({ event: 'activate', host: top.pressed(host) })
-					: 'type' in action
+					: 'type' in action || 'clear' in action
 						? appRuntime.dispatch({
 								event: 'input',
 								host,
-								value: top.typed(host, action.type.text),
+								value: top.typed(host, 'type' in action ? action.type.text : ''),
 							})
 						: [];
 			// What a journal shows goes to the top screen; a navigation opens the next one, as the hosts push it.
@@ -817,6 +839,37 @@ function walk(
 						.join(' '));
 		return label !== null && shownNode(node.id) ? [[id, label] as const] : [];
 	};
+	// iOS reads a button or a link as one element, named as the web names it from content: shown text and inner labels.
+	const contentName = (parent: string, suffix: string): string =>
+		payload.nodes
+			.filter((child) => child.parent === parent)
+			.map((child) => {
+				const id = `${child.id}${child.row ? suffix : ''}`;
+				if (!shownNode(id)) return '';
+				if (child.kind === 'text') return texts.get(id) ?? '';
+				if (child.kind !== 'element' || hiddenWithin(id)) return '';
+				const ariaHidden = attributes.get(`${id}\0aria-hidden`);
+				if ((ariaHidden !== undefined ? ariaHidden : child.attributes?.['aria-hidden']) === 'true') return '';
+				return labelOf(child, id)[0]?.[1] ?? contentName(child.id, suffix);
+			})
+			.join('');
+	const controlNames = () =>
+		payload.nodes.flatMap((node) => {
+			if (node.kind !== 'element' || !['button', 'a'].includes(node.element)) return [];
+			const ids = node.row
+				? (new Map(runtime.rows()).get(node.row) ?? []).map((key) => `${node.id}@${key}`)
+				: [node.id];
+			return ids
+				.filter((id) => shownNode(id) && !hiddenWithin(id) && labelOf(node, id).length === 0)
+				.map((id) =>
+					[...contentName(node.id, instanceOf(id).suffix)]
+						.map((character) => (character.trim() === '' ? ' ' : character))
+						.join('')
+						.split(' ')
+						.filter((word) => word !== '')
+						.join(' '),
+				);
+		});
 	// A text field by its accessible name, as the web finds a textbox: a control named the same (a preview button) is not one.
 	const fieldReading = (text: LadderText) =>
 		labels().find(([id, label]) => {
@@ -1063,7 +1116,8 @@ function walk(
 	}
 	startTasks();
 	for (const [index, step] of steps.entries()) {
-		const action = step.do;
+		// The reference lays nothing out: a tap at a point is a tap on the element the step says is there.
+		const action = step.do && 'tapAt' in step.do ? { tap: step.do.tapAt.on } : step.do;
 		if (action) invalid = undefined;
 		if (action && 'relaunch' in action) {
 			if (action.permissions?.location === 'unset') permission = 'unknown';
@@ -1531,9 +1585,10 @@ function walk(
 				.map(([, label]) => label),
 			...chosenLabels(),
 		];
-		expect(shown, `step ${index}`).toEqual(expect.arrayContaining(step.visible.map(reading)));
+		const found = [...shown, ...(target === 'ios' ? controlNames() : [])];
+		expect(found, `step ${index}`).toEqual(expect.arrayContaining(step.visible.map(reading)));
 		for (const text of step.absent ?? [])
-			expect(shown, `step ${index}`).not.toEqual(expect.arrayContaining([reading(text)]));
+			expect(found, `step ${index}`).not.toEqual(expect.arrayContaining([reading(text)]));
 		for (const [node, value] of runtime.selections())
 			expect(
 				selected.get(node) ?? false,

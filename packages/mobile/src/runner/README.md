@@ -113,6 +113,33 @@ A rung that fetches (`server: 'echo'` in its `expected.json`) reaches the test's
 `127.0.0.1:28761` while a chunk holding such a rung runs, and closes after, so a web test or the harness can take the port
 between jobs; on Android the chunk forwards that port to the emulator (`adb reverse`).
 
+## Android on another machine
+
+A pool phone written `--android <avd>@<port>@<ssh host>` is an emulator on another machine, the owner's PC, which runs
+Android at about 3 minis' worth (four emulators). The runner reaches it through `<ssh host>` from this machine's ssh
+config, so no address or key appears on a command line:
+
+```sh
+pnpm --filter @markless/mobile phones start --ios markless-runner --ios markless-runner-2 \
+  --android markless_runner@5570 --android markless_pc1@5570@pc-phones --android markless_pc2@5572@pc-phones
+```
+
+- **Who runs what.** While a remote Android phone is ready or busy, this machine's own Android phone stands by and
+  takes no chunk, so the mini keeps its processor for iOS, which only a Mac can run. Results, screenshots, logs,
+  reruns and reused passes are written exactly as for a local phone; the chunk's log starts with the remote side's lines.
+- **Fallback.** A remote phone whose machine does not answer, or answers "not now", is `away`: paused for games,
+  WSL stopped, or a checkout of this runner's commit still being prepared there. A chunk it held goes back to the queue
+  whole, and this machine's own Android phone takes it. The runner asks an away phone again every minute.
+- **Same code on both ends.** The PC's agent (`pc-agent.ts`) runs `run-chunk.ts` from its own checkout of the runner's
+  commit, which must be on a branch of origin, and the job's Dragon at the job's Dragon commit. It prepares both on first
+  use, so the first chunk after a runner update falls back to the mini for a few minutes.
+- **On the PC** (WSL; files in `pc/`): the phones run as `ghphone`, only through a dedicated sshd on WSL's loopback,
+  inside a systemd sandbox (no Windows drives or programs, no other user's files, no LAN; internet for git and pnpm).
+  Each mini's key may only run the agent, on that mini's ports. The PC opens a reverse link to each mini
+  (`pc-phones-link@<mini>`, as `ghlink`), whose key on the mini may only listen on that mini's loopback port. The
+  "Runner pause (game mode)" file `/opt/markless-runner/stop` also pauses the phones: new chunks are refused, and once
+  running ones finish, `pc-phones-pause` stops the emulators.
+
 ## Which rungs `--affected` picks
 
 The choice comes from the yuku project graph (`packages/analyzer/test-support/project-graph.ts`), the same graph the

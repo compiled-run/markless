@@ -7,7 +7,10 @@ import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputConnectionWrapper
+import android.graphics.Rect
+import android.view.View
 import android.widget.EditText
+import android.widget.ImageButton
 
 /**
  * An `<input>` or `<textarea>` whose `keydown` and `paste` handlers run as Chrome on Android runs them for its on-screen
@@ -22,6 +25,27 @@ class MarklessField(context: Context) : EditText(context) {
 	var onPaste: ((String) -> Boolean)? = null
 	private var enterAt = 0L
 	private val editingKeys = keyListener
+
+	/** A search field's clear control, in the field's box at Dragon's cancel box: shown while the field is focused and holds text. */
+	var clear: ImageButton? = null
+		set(value) {
+			field = value
+			showClear()
+		}
+
+	private fun showClear() {
+		clear?.visibility = if (isFocused && !text.isNullOrEmpty()) View.VISIBLE else View.GONE
+	}
+
+	override fun onFocusChanged(focused: Boolean, direction: Int, previouslyFocusedRect: Rect?) {
+		super.onFocusChanged(focused, direction, previouslyFocusedRect)
+		showClear()
+	}
+
+	override fun onTextChanged(text: CharSequence?, start: Int, lengthBefore: Int, lengthAfter: Int) {
+		super.onTextChanged(text, start, lengthBefore, lengthAfter)
+		showClear()
+	}
 
 	/** `readonly`: the field takes focus and selection but no typing, and brings up no keyboard, as Chrome's does. */
 	var readOnly = false

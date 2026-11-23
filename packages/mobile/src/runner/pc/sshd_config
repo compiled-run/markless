@@ -1,0 +1,22 @@
+# The phone user's own sshd: loopback only, reached through the minis' reverse links; every key has a forced command.
+Port 2222
+ListenAddress 127.0.0.1
+HostKey /etc/pc-phones/ssh_host_ed25519_key
+PidFile /run/pc-phones-sshd/sshd.pid
+AuthorizedKeysFile /etc/pc-phones/authorized_keys/%u
+AllowUsers ghphone
+PubkeyAuthentication yes
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+UsePAM no
+PermitRootLogin no
+PermitTTY no
+PermitUserRC no
+PermitUserEnvironment no
+AllowTcpForwarding no
+AllowStreamLocalForwarding no
+AllowAgentForwarding no
+X11Forwarding no
+PermitTunnel no
+PrintLastLog no
+PrintMotd no

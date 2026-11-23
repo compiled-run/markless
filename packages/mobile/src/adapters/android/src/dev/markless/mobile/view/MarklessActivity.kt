@@ -273,8 +273,10 @@ abstract class MarklessActivity : Activity() {
 				if (f == null || size == null) return super.onMeasure(widthMeasureSpec, heightMeasureSpec)
 				host.root.measure(MeasureSpec.makeMeasureSpec(f.width(), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(f.height(), MeasureSpec.EXACTLY))
 				setMeasuredDimension(maxOf(size.first, MeasureSpec.getSize(widthMeasureSpec)), size.second)
+				host.stick(page.scrollX, page.scrollY)
 			}
 		}
+		page.setOnScrollChangeListener { _, x, y, _, _ -> host.stick(x, y) }
 		var bars = Insets.NONE
 		page.setOnApplyWindowInsetsListener { v, insets ->
 			bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())

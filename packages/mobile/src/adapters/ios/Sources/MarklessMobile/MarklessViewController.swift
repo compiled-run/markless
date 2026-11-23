@@ -209,6 +209,7 @@ public final class MarklessViewController: UIViewController {
 			objectView: { object, kind in try device.view(for: object, device: kind) }, images: images)
 		tree?.presenter = self
 		#if canImport(DragonPlan)
+		tree?.stickyShift = DragonPlan.sticky
 		if let style, style.anim != nil, let tree {
 			animation = AnimationRun(style: style, initial: tree.assignment, run: DragonPlan.animation)
 		}
@@ -598,8 +599,9 @@ private func registerFaces(_ files: [(id: String, file: String)], fonts: [String
 	var faces: [String: UIFontDescriptor] = [:]
 	for (id, file) in files {
 		guard let bytes = fonts[id] else { throw HostError("the style export needs font \(id) (\(file)), which was not given") }
+		// Dragon names the face it bundles (Ahem) by name; every other face by its sha256.
 		let digest = "sha256:" + SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
-		guard digest == id else { throw HostError("font bytes given for \(id) hash to \(digest)") }
+		guard digest == id || !id.hasPrefix("sha256:") else { throw HostError("font bytes given for \(id) hash to \(digest)") }
 		guard let descriptor = CTFontManagerCreateFontDescriptorFromData(bytes as CFData) else {
 			throw HostError("font \(id) (\(file)) is not a font file")
 		}
