@@ -2,14 +2,14 @@ import Foundation
 @testable import MarklessCore
 import Testing
 
-// The S36 rung's app style and payload as the harness builds them: an empty search field with a placeholder and one holding a fixed value.
+// The S48 rung's app style and payload as the harness builds them: an empty search field with a placeholder and one holding a fixed value.
 private func fixture(_ name: String) throws -> Data {
 	try Data(contentsOf: try #require(Bundle.module.url(forResource: "Fixtures/\(name)", withExtension: "json")))
 }
 
 private func searching() throws -> [String: ResolvedStyle] {
-	let styles = try #require(try StyleExport.decodeApp(try fixture("s36-app-search-field.native-app-style"))["/"])
-	guard case let .app(app) = try NativePayload.decode(try fixture("s36-app-search-field.payload")) else { throw PayloadError(path: "fixture", reason: "not an app") }
+	let styles = try #require(try StyleExport.decodeApp(try fixture("s48-app-search-field.native-app-style"))["/"])
+	guard case let .app(app) = try NativePayload.decode(try fixture("s48-app-search-field.payload")) else { throw PayloadError(path: "fixture", reason: "not an app") }
 	let page = try #require(app.routes.first { $0.pattern == "/" }).page
 	let runtime = NativeRuntime(payload: page)
 	return try styles.resolve(for: page, initialTexts: try runtime.texts(), value: runtime.value(of:), arm: runtime.styleArm(of:)).styles

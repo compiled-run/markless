@@ -1,5 +1,5 @@
 {
-	"rung": "S36",
+	"rung": "S48",
 	"name": "a styled search field draws its placeholder while empty, takes typing in its editor box, empties on its clear control with an input event, and draws a fixed value, as the web does",
 	"steps": [
 		{

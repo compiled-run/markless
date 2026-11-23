@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: s36-app-search-field
+name: s48-app-search-field
 ---
 - launchApp:
       clearState: true
