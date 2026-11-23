@@ -1,0 +1,37 @@
+{
+	"rung": "N17",
+	"name": "A page's url prop: its pathname and search at mount, and on the page a navigation with a query string opens, as on the web",
+	"steps": [
+		{ "visible": ["Home path /", "Home search []", "Home tab no tab"], "title": "Home" },
+		{
+			"do": { "tap": "Open note 7" },
+			"visible": [
+				"Note 7",
+				"Note path /notes/7",
+				"Note search [?tab=done]",
+				"Note hash []",
+				"Note tab done"
+			],
+			"absent": ["Home path /"],
+			"title": "Note"
+		},
+		{
+			"do": { "back": "button" },
+			"visible": ["Home path /", "Home search []", "Home tab no tab"],
+			"absent": ["Note 7"],
+			"title": "Home"
+		},
+		{
+			"do": { "tap": "Open note 8" },
+			"visible": [
+				"Note 8",
+				"Note path /notes/8",
+				"Note search [?tab=new&sort=old]",
+				"Note hash []",
+				"Note tab new"
+			],
+			"absent": ["Home path /"],
+			"title": "Note"
+		}
+	]
+}

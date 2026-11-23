@@ -554,6 +554,21 @@ type Item =
 			readonly path: ReadonlyArray<number>;
 	  };
 
+/** The members of a page's `url` a phone gives as data; a script reads the rest off a `URL`. */
+const PAGE_URL_DATA_MEMBERS = new Set(['pathname', 'search', 'hash']);
+/** What a script reads off a page's `url` when the app has no `origin`: none of them depends on one. */
+const PAGE_URL_ORIGINLESS_MEMBERS = new Set(['pathname', 'search', 'hash', 'searchParams']);
+
+/** A fixed href as the web's URL parser splits it: the path the router matches, and its query (`?…`, or ''). */
+function splitHref(href: string): { readonly path: string; readonly search: string } {
+	const hash = href.indexOf('#');
+	const beforeHash = hash < 0 ? href : href.slice(0, hash);
+	const query = beforeHash.indexOf('?');
+	if (query < 0) return { path: beforeHash, search: '' };
+	const search = beforeHash.slice(query);
+	return { path: beforeHash.slice(0, query), search: search === '?' ? '' : search };
+}
+
 /** `Number`'s constants: the finite ones as literals, the non-finite ones by name. */
 const NUMBER_CONSTANTS: Readonly<Record<string, NativeExpr>> = {
 	POSITIVE_INFINITY: { nonFinite: 'Infinity' },
@@ -2859,6 +2874,9 @@ export function createNativeViewPayload(
 	>();
 	const scriptServices = new Set<NativeScriptService>();
 	let scriptReadsUrl = false;
+	let scriptBindsPageUrl = false;
+	/** The next name read may be the page's `url` as a whole: a member read's object, or a script's binding. */
+	let pageUrlReadable = false;
 	/** A script adds listeners to the document, so the hosts report every touch for them. */
 	let documentEvents = false;
 	scriptsMakeKeys = () =>
@@ -3187,9 +3205,10 @@ export function createNativeViewPayload(
 				);
 				continue;
 			}
-			const read = attempt(() =>
-				exprOf({ kind: 'read', name }, `${what}'s \`${name}\``, scope),
-			);
+			const read = attempt(() => {
+				pageUrlReadable = true;
+				return exprOf({ kind: 'read', name }, `${what}'s \`${name}\``, scope);
+			});
 			if (read.value && 'cell' in read.value && !read.failed) {
 				bindings[name] = { cell: read.value.cell };
 				continue;
@@ -3210,6 +3229,27 @@ export function createNativeViewPayload(
 						span,
 					);
 				}
+				continue;
+			}
+			if ('route' in read.value && read.value.route === 'url') {
+				const unplaced =
+					options.origin === undefined
+						? membersOnly === undefined
+							? [null]
+							: membersOnly.filter((member) => !PAGE_URL_ORIGINLESS_MEMBERS.has(member))
+						: [];
+				if (unplaced.length > 0) {
+					ok = false;
+					refuseScript(
+						unplaced[0] === null
+							? `${what} uses the page's \`${name}\` whole, whose origin a phone knows only from app.json "origin"`
+							: `${what} reads \`${name}.${unplaced[0]}\` of the page's url, which needs the app's origin; set app.json "origin"`,
+						span,
+					);
+					continue;
+				}
+				scriptBindsPageUrl = true;
+				bindings[name] = { url: true };
 				continue;
 			}
 			// An element handle (or a list of them) reaches the script as proxies the host answers.
@@ -3653,6 +3693,7 @@ export function createNativeViewPayload(
 			options.origin,
 			options.scriptEngine,
 			scriptReadsUrl,
+			scriptBindsPageUrl,
 		);
 	}
 
@@ -4387,6 +4428,8 @@ export function createNativeViewPayload(
 		};
 		switch (expression.kind) {
 			case 'read': {
+				const holdsMember = pageUrlReadable;
+				pageUrlReadable = false;
 				if (scope.locals.has(expression.name)) return { local: expression.name };
 				const bound = scope.args.get(expression.name);
 				if (bound) return bound;
@@ -4435,6 +4478,15 @@ export function createNativeViewPayload(
 				const positioned = scope.indexes?.get(expression.name);
 				if (positioned) return { index: positioned };
 				const prop = propOf(expression.name, scope);
+				if (
+					prop?.kind === 'value' &&
+					'route' in prop.expr &&
+					prop.expr.route === 'url' &&
+					!holdsMember
+				)
+					return refuse(
+						`${what} uses the page's \`${expression.name}\` whole, which a phone reads only in JavaScript`,
+					);
 				if (prop?.kind === 'value') return prop.expr;
 				const text = prop?.kind === 'children' ? projectedText(prop.chunk) : undefined;
 				if (text !== undefined) return { literal: text };
@@ -4787,7 +4839,15 @@ export function createNativeViewPayload(
 									`${what} reads \`${device}\`, which ${DEVICE_MODULE} has no native value for yet`,
 								);
 				}
+				pageUrlReadable = holder.kind === 'read';
 				const object = exprOf(expression.object, what, scope);
+				pageUrlReadable = false;
+				if (object && 'route' in object && object.route === 'url')
+					return PAGE_URL_DATA_MEMBERS.has(expression.property)
+						? { member: object, property: expression.property }
+						: refuse(
+								`${what} reads \`.${expression.property}\` of the page's url; outside JavaScript a phone reads only its pathname, search and hash`,
+							);
 				const message = messageOfError(object);
 				if (message)
 					return expression.property === 'message'
@@ -6480,10 +6540,12 @@ export function createNativeViewPayload(
 								value.literal === true ? '' : String(value.literal);
 					}
 					if (!ownAttributes) continue;
-					const fixedHref =
+					const fixedLiteral =
 						'literal' in hrefValue && typeof hrefValue.literal === 'string'
 							? hrefValue.literal
 							: undefined;
+					const fixed = fixedLiteral === undefined ? undefined : splitHref(fixedLiteral);
+					const fixedHref = fixed?.path;
 					// A route pattern names its route; any other href is a path the router matches as it matches a URL.
 					const matched =
 						fixedHref === undefined
@@ -6511,7 +6573,7 @@ export function createNativeViewPayload(
 					// The anchor's attributes as the router renders them, so styles see a link (`:any-link`) as the web does.
 					if (fixedHref === undefined)
 						bindings.push({ attribute: 'href', value: hrefValue });
-					else attributes['href'] = fixedHref;
+					else attributes['href'] = fixedLiteral!;
 					nodes.push({
 						kind: 'element',
 						id,
@@ -6531,6 +6593,7 @@ export function createNativeViewPayload(
 							{
 								op: 'navigate',
 								...route,
+								...(fixed?.search ? { search: fixed.search } : {}),
 								...(replace?.kind === 'serializable' && replace.value === true
 									? { replace: true as const }
 									: {}),
@@ -9068,9 +9131,10 @@ export function createNativeViewPayload(
 			);
 			return [];
 		}
+		const { path: pathname, search } = splitHref(path);
 		const matched =
-			options.resolvePath?.(path) ??
-			(options.notFound && inApp(path)
+			options.resolvePath?.(pathname) ??
+			(options.notFound && inApp(pathname)
 				? { pattern: options.notFound, params: {} }
 				: undefined);
 		if (!matched) {
@@ -9079,7 +9143,14 @@ export function createNativeViewPayload(
 		}
 		const route = linkRoute(matched.pattern, matched.params, span);
 		return route && route !== NO_ROUTE
-			? [{ op: 'navigate', ...route, ...(replace ? { replace: true as const } : {}) }]
+			? [
+					{
+						op: 'navigate',
+						...route,
+						...(search ? { search } : {}),
+						...(replace ? { replace: true as const } : {}),
+					},
+				]
 			: [];
 	}
 
@@ -9090,7 +9161,12 @@ export function createNativeViewPayload(
 			root.componentName,
 			'',
 			new Map<string, Prop>(
-				options.route ? [['params', { kind: 'value', expr: { route: 'params' } }]] : [],
+				options.route
+					? [
+							['params', { kind: 'value', expr: { route: 'params' } }],
+							['url', { kind: 'value', expr: { route: 'url' } }],
+						]
+					: [],
 			),
 			new Map(),
 			true,
@@ -9747,7 +9823,7 @@ export function createNativeViewPayload(
 	/** The app route an anchor's href opens: a fixed path the router matches, or one built while rendering that `pathRoute` places. */
 	function linkedRoute(
 		node: Extract<NativeNode, { kind: 'element' }>,
-	): { route: string; params: Record<string, string | NativeExpr> } | null {
+	): { route: string; params: Record<string, string | NativeExpr>; search?: string } | null {
 		const bound = node.bindings?.find(
 			(binding) => 'attribute' in binding && binding.attribute === 'href',
 		);
@@ -9762,10 +9838,13 @@ export function createNativeViewPayload(
 		}
 		const href = node.attributes?.['href'];
 		if (href === undefined || !href.startsWith('/') || href.startsWith('//')) return null;
-		// A query or fragment is more than a route; a phone screen opens from the route and its params alone.
-		if (href.includes('?') || href.includes('#')) return null;
-		const matched = options.resolvePath!(href);
-		return matched ? { route: matched.pattern, params: { ...matched.params } } : null;
+		// A fragment may name a place on this page, which a phone does not scroll to; a query opens the page with it.
+		if (href.includes('#')) return null;
+		const { path, search } = splitHref(href);
+		const matched = options.resolvePath!(path);
+		return matched
+			? { route: matched.pattern, params: { ...matched.params }, ...(search ? { search } : {}) }
+			: null;
 	}
 
 	function checkSelects() {
