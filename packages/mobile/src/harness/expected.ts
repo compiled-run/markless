@@ -61,5 +61,21 @@ export function readProofExpected(json: unknown, source: string): LadderRung {
 				fail(`step ${index} "${key}" is neither a text nor { "startsWith": <text> }`);
 		}
 	});
+	const held = (json as { held?: unknown }).held;
+	if (
+		held !== undefined &&
+		!(
+			Array.isArray(held) &&
+			held.every(
+				(h) =>
+					typeof h === 'object' &&
+					h !== null &&
+					Object.keys(h).sort().join() === 'node,text' &&
+					typeof (h as { node: unknown }).node === 'string' &&
+					typeof (h as { text: unknown }).text === 'string',
+			)
+		)
+	)
+		fail('"held" is not a list of { "text": <text>, "node": <id> }');
 	return json as LadderRung;
 }

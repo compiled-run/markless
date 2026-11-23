@@ -195,6 +195,11 @@ public final class MarklessViewController: UIViewController {
 			objectView: { object, kind in try device.view(for: object, device: kind) }, images: images)
 		tree?.presenter = self
 		#if canImport(DragonPlan)
+		tree?.library = DragonPlan.library
+		tree?.onShown = { [weak self] in
+			self?.paintCanvas()
+			self?.writeLayoutDump()
+		}
 		if let style, style.anim != nil, let tree {
 			animation = AnimationRun(style: style, initial: tree.assignment, run: DragonPlan.animation)
 		}
@@ -469,6 +474,8 @@ public final class MarklessViewController: UIViewController {
 			("viewport", .object([("width", number(size.width)), ("height", number(size.height))])),
 			("scale", number(traitCollection.displayScale)),
 			("assignment", .number(Double(tree.assignment))),
+			// The entry shown: the assignment, or the interaction state (:active, :focus) selected in it.
+			("shown", .number(Double(tree.shown))),
 			("layoutMilliseconds", layoutMilliseconds.map { .number($0) } ?? .null),
 			("nodes", .array(tree.shownFrames().map { node in
 				.array([.string(node.id), number(node.frame.minX), number(node.frame.minY), number(node.frame.width), number(node.frame.height)])

@@ -243,6 +243,11 @@ export type LadderRung = {
 	/** A number for the one-screen ladder, `N1`... for the navigation ladder, `D<n>` for the device ladder. */
 	readonly rung: number | string;
 	readonly name: string;
+	/**
+	 * Pressed-state checks of a styled page (`--held-check`): while a finger holds the element with this text, the page shows the
+	 * interaction state whose `:active` matches `node`, and once the finger lifts, its assignment again.
+	 */
+	readonly held?: readonly { readonly text: string; readonly node: string }[];
 	/** The route pattern App.tsrx is the page for, relative to the app root; the index route when absent. */
 	readonly route?: string;
 	/** The path the app opens at; `/` when absent. */

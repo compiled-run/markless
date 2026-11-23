@@ -156,6 +156,8 @@ public struct StyleLayout: Sendable {
 	public let bands: StyleBands?
 	/// Each assignment's document height in points: how far the laid-out content reaches down.
 	public let extents: [Double]
+	/// Per assignment, its interaction states, whose entries follow the assignments in every per-entry list here.
+	public let interaction: [StyleInteractionLevel]
 }
 
 extension StyleLayout {
@@ -247,7 +249,8 @@ extension StyleExport {
 			return NativeValue.number(Double(try bands.band(dark: dark, widthPx: viewport.width * dpr, heightPx: viewport.height * dpr, scale: dpr)))
 		}
 		let matches = { (index: Int) in zip(self.states, current).allSatisfy { state, value in self.assignments[index].values[state.key].map { $0.strictlyEquals(value) } ?? false } }
-		guard let start = matches(initial) ? initial : assignments.indices.first(where: matches) else {
+		// Interaction states come after the assignments and share their values; a page starts in an assignment.
+		guard let start = matches(initial) ? initial : next.indices.first(where: matches) else {
 			throw styleError("no assignment of the style export matches the cells' values \(current.map(\.jsonText))")
 		}
 		let picker = payload.pickerContent
@@ -277,7 +280,8 @@ extension StyleExport {
 					return (node.frame?.y ?? 0) + top(node.parent)
 				}
 				return (assignment.nodes.compactMap { node in node.frame.map { top(node.parent) + $0.y + $0.height } }.max() ?? 0) / dpr
-			})
+			},
+			interaction: interaction)
 	}
 
 	private func resolveNodes(

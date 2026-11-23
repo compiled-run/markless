@@ -34,6 +34,7 @@ import { PROOF_REPORT_VERSION, proofVerdict, type ProofReport } from './report.t
 import { loadRung, type ProofRung } from './rung.ts';
 import { verdictCommand } from './verdict.ts';
 import { androidTools, cacheRoot } from './tools.ts';
+import { heldCheck } from './held-check.ts';
 import { androidLayoutCheck, iosLayoutCheck, LAYOUT_ORIENTATIONS, type LayoutOrientation } from './layout-check.ts';
 
 const USAGE = `usage: markless-proof [options] <rung folder>...
@@ -55,6 +56,7 @@ failure there stops the run. \`host-tests\` runs only those.
   --platform ios|android run one platform only (CI runs iOS on macOS and Android on Linux); not a proof by itself
   --report <dir>         write <dir>/<platform>.json for each platform run
   --keep-devices         leave the devices this run booted running
+  --held-check           after each rung's flow, hold each of its expected.json "held" texts and check the pressed state shows
   --layout-check portrait[,landscape]
                          after each rung's flow, open every styled page again in each orientation and compare every box the
                          phone drew with the phone's own browser at the same width (Dragon markless:native-check); reports in
@@ -150,6 +152,7 @@ async function main(argv: string[]): Promise<number> {
 			'keep-devices': { type: 'boolean', default: false },
 			'host-tests-simulator': { type: 'string' },
 			'layout-check': { type: 'string' },
+			'held-check': { type: 'boolean', default: false },
 			help: { type: 'boolean', default: false },
 		},
 	});
@@ -315,7 +318,19 @@ async function main(argv: string[]): Promise<number> {
 							installSeconds: installed.seconds,
 							flowSeconds: result.seconds,
 						};
-						if (!result.failure && layoutOrientations.length > 0) {
+						if (!result.failure && values['held-check']) {
+							const failed = await heldCheck({
+								platform,
+								device: platform === 'ios' ? simulator!.udid : emulator!.serial,
+								...(tools ? { adb: tools.adb } : {}),
+								rung,
+								work: join(work, 'held-check'),
+							});
+							if (failed.length > 0)
+								outcome = { ...outcome, failure: { step: -1, action: 'held-check', role: 'unknown', message: failed.join('\n') } };
+							else console.log(`  held ${rung.name} ${platform}: every pressed state shown while held, and the assignment after`);
+						}
+						if (!outcome.failure && layoutOrientations.length > 0) {
 							const checks =
 								platform === 'ios'
 									? await iosLayoutCheck(simulator!.udid, rung.dir, layoutOrientations, join(work, 'layout-check'))

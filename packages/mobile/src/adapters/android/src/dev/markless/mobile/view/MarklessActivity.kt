@@ -228,7 +228,7 @@ abstract class MarklessActivity : Activity() {
 		val style = host.style ?: return
 		val density = resources.displayMetrics.density.toDouble()
 		val nodes = host.shownFrames(page).joinToString(",") { (id, box) -> "[${jsonString(id)},${box.joinToString(",") { jsonNumber(it / density) }}]" }
-		val text = "{\"component\":${jsonString(host.payload.component)},\"viewport\":{\"width\":${jsonNumber(style.viewportWidth)},\"height\":${jsonNumber(style.viewportHeight)}},\"scale\":${jsonNumber(density)},\"assignment\":${host.assignment},\"nodes\":[$nodes]}"
+		val text = "{\"component\":${jsonString(host.payload.component)},\"viewport\":{\"width\":${jsonNumber(style.viewportWidth)},\"height\":${jsonNumber(style.viewportHeight)}},\"scale\":${jsonNumber(density)},\"assignment\":${host.assignment},\"shown\":${host.shown},\"nodes\":[$nodes]}"
 		val dir = getExternalFilesDir(null) ?: return
 		val partial = File(dir, "markless-layout.json.partial")
 		partial.writeText(text)
