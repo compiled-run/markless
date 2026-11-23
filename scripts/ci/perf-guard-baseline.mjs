@@ -45,7 +45,7 @@ function runsByCommit(repo, pages = 3) {
 
 /** Whether a run can no longer upload a measurement: it finished, or its perf-guards job did. */
 function settled(repo, run) {
-	if (json(`repos/${repo}/actions/runs/${run}`, '.status') === 'completed') return true;
+	if (json(`repos/${repo}/actions/runs/${run}`, '{status}').status === 'completed') return true;
 	return json(
 		`repos/${repo}/actions/runs/${run}/jobs?per_page=100`,
 		`[.jobs[] | select(.name == "${JOB}") | .status]`,
