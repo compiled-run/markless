@@ -39,6 +39,7 @@ import android.widget.CompoundButton
 import android.widget.RadioButton
 import android.widget.EditText
 import android.widget.HorizontalScrollView
+import android.widget.ImageButton
 import android.widget.ScrollView
 import android.widget.TextView
 import dev.markless.mobile.core.MemoryStore
@@ -1919,6 +1920,7 @@ class MarklessHost(
 			maxOf(0, (fx + field.width).roundToInt() - (ex + box.width).roundToInt()), maxOf(0, (fy + field.height).roundToInt() - (ey + box.height).roundToInt()),
 		)
 		view.gravity = Gravity.CENTER_VERTICAL or Gravity.START
+		clearControl(view, s, styled, absolute)
 		fun look(n: StyledNode): Pair<StyleWrite.Font, Int?> =
 			(n.writes.filterIsInstance<StyleWrite.Font>().lastOrNull() ?: throw MarklessHostError("\"${n.id}\" has no font")) to
 				n.writes.filterIsInstance<StyleWrite.TextColor>().lastOrNull()?.color?.argb
@@ -1943,12 +1945,47 @@ class MarklessHost(
 		hintColor?.let { view.setHintTextColor(it) }
 	}
 
+	/** A search field's clear control at Dragon's cancel box, in the field's own box above it; tapping it empties the field as typing does. */
+	private fun clearControl(view: MarklessField, s: StyledNode, styled: Assignment, absolute: Map<String, Pair<Double, Double>>) {
+		val cancel = styled.byId["${s.id}::cancel"]?.takeIf { it.parent == s.id && it.frame != null }
+		if (cancel == null) {
+			view.clear?.let(::removeFrom)
+			view.clear = null
+			return
+		}
+		val box = view.parent as? MarklessBox ?: throw MarklessHostError("\"${s.id}\": a search field outside a box has no place for its clear control on Android")
+		val button = view.clear ?: ImageButton(context).apply {
+			setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+			scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+			background = null
+			setPadding(0, 0, 0, 0)
+			isFocusable = false
+			contentDescription = CLEAR_LABEL
+			setOnClickListener { view.text?.clear() }
+		}
+		if (button.parent !== box) {
+			removeFrom(button)
+			box.addView(button)
+		}
+		val at = box.frames[view] ?: throw MarklessHostError("\"${s.id}\" has no frame for its clear control to follow")
+		val (fx, fy) = absolute.getValue(s.id)
+		val (cx, cy) = absolute.getValue(cancel.id)
+		val f = cancel.frame!!
+		val left = at.left + cx.roundToInt() - fx.roundToInt()
+		val top = at.top + cy.roundToInt() - fy.roundToInt()
+		box.frames[button] = Rect(left, top, left + (cx + f.width).roundToInt() - cx.roundToInt(), top + (cy + f.height).roundToInt() - cy.roundToInt())
+		box.order(button, OUTLINE_ORDER - 1)
+		view.clear = button
+	}
+
 	/** Whether a style node is a payload node's, or a row's copy of one. */
 	private fun isView(id: String): Boolean = payloadIds.contains(id.substringBefore('@'))
 
 	companion object {
 		/** An outline's order key: above the flow children (0), below the stacking context's later boxes (from 100_001). */
 		private const val OUTLINE_ORDER = 50_000
+		/** A search field's clear control's accessible name: UIKit's for its clear button, so both phones read the same. */
+		private const val CLEAR_LABEL = "Clear text"
 		const val TAG = "MarklessHost"
 
 		/** Dragon's translated `runMarklessAnimation`, when the app is built with an engine that has it. */

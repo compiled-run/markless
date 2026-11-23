@@ -17,3 +17,22 @@ name: s36-app-search-field
 - assertNotVisible: Nothing searched
 - assertVisible: milk
 - assertVisible: Groceries
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - assertVisible: Clear text
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - assertVisible: Clear text
+- tapOn: Clear text
+- assertVisible: Nothing searched
+- assertNotVisible: Searched
+- assertVisible: ''
+- assertVisible: Title or tag
+- assertVisible: Nothing searched
+- assertNotVisible: Searched
+- assertVisible: ''
+- assertVisible: Groceries

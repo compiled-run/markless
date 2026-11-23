@@ -541,18 +541,26 @@ function walkApp(
 		} else if (action) {
 			const top = stack.at(-1)!;
 			const reading = top.elementReading(
-				'tap' in action ? action.tap : 'type' in action ? action.type.field : '',
+				'tap' in action
+					? action.tap
+					: 'type' in action
+						? action.type.field
+						: 'clear' in action
+							? action.clear
+							: '',
 			);
-			const host = reading && 'type' in action ? (top.labelled(reading) ?? reading) : reading;
+			const host =
+				reading && ('type' in action || 'clear' in action) ? (top.labelled(reading) ?? reading) : reading;
 			if (!host) throw new Error(`step ${index}: nothing on the top screen to act on`);
+			// A clear control empties the field and fires input, as typing does.
 			const journal =
 				'tap' in action
 					? appRuntime.dispatch({ event: 'activate', host: top.pressed(host) })
-					: 'type' in action
+					: 'type' in action || 'clear' in action
 						? appRuntime.dispatch({
 								event: 'input',
 								host,
-								value: top.typed(host, action.type.text),
+								value: top.typed(host, 'type' in action ? action.type.text : ''),
 							})
 						: [];
 			// What a journal shows goes to the top screen; a navigation opens the next one, as the hosts push it.

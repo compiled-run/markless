@@ -25,6 +25,7 @@ private func searching() throws -> [String: ResolvedStyle] {
 	#expect(placeholder.text == "Title or tag")
 	#expect(placeholder.frame == Frame(x: 17, y: 13, width: 309, height: 16))
 	#expect(placeholder.color == RGBA(r: 117, g: 117, b: 117, alpha: 255))
+	#expect(field.clear == Frame(x: 327, y: 17.5, width: 7, height: 7))
 }
 
 @Test func aFieldHoldingAValueHasNoPlaceholderAndOtherBoxesNoTextField() throws {

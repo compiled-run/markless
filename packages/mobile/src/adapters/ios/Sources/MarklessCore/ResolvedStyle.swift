@@ -75,13 +75,14 @@ public struct ResolvedStyle: Equatable, Sendable {
 	}
 
 	/// Frames in points from the field's border box; font sizes in points. `editor` is where the host draws the value, in
-	/// `font` and `color`; `placeholder` is laid out only while the value is empty.
+	/// `font` and `color`; `placeholder` is laid out only while the value is empty; `clear` is a search field's cancel button.
 	public struct TextFieldPaint: Equatable, Sendable {
 		public let editor: Frame
 		public let fontFamily: String
 		public let fontSize: Double
 		public let color: RGBA?
 		public let placeholder: Placeholder?
+		public var clear: Frame? = nil
 
 		public struct Placeholder: Equatable, Sendable {
 			public let frame: Frame
@@ -523,8 +524,10 @@ extension StyleExport {
 			let drawn = try look(text)
 			placeholder = .init(frame: points(frame), text: words, fontFamily: drawn.font.family, fontSize: drawn.font.size, color: drawn.color)
 		}
+		let cancel = byId[field.id + "::cancel"].flatMap { $0.parent == field.id ? $0.frame : nil }
 		return ResolvedStyle.TextFieldPaint(
-			editor: points(box), fontFamily: value.font.family, fontSize: value.font.size, color: value.color, placeholder: placeholder)
+			editor: points(box), fontFamily: value.font.family, fontSize: value.font.size, color: value.color, placeholder: placeholder,
+			clear: cancel.map(points))
 	}
 
 	private func reHostOf(_ writes: [StyleWrite]) -> String? {

@@ -592,4 +592,23 @@ private func scrollingCounterExport() throws -> Data {
 	#expect(ink.columns.first.map { (16...18).contains($0) } == true, "\(ink.columns)")
 	#expect(ink.columns.last.map { (79...81).contains($0) } == true, "\(ink.columns)")
 }
+
+/// A styled search field's clear button sits in Dragon's cancel box, shows while editing, and empties the field as typing does.
+@MainActor @Test func aStyledSearchFieldsClearButtonEmptiesItAsTypingDoes() throws {
+	let field = TextField(frame: CGRect(x: 0, y: 0, width: 354, height: 42))
+	let font = UIFont.systemFont(ofSize: 16).fontDescriptor
+	try field.paint(
+		.init(editor: Frame(x: 17, y: 13, width: 309, height: 16), fontFamily: "s", fontSize: 16, color: nil, placeholder: nil, clear: Frame(x: 327, y: 17.5, width: 7, height: 7)),
+		faces: ["s": font])
+	#expect(field.clearButtonMode == .whileEditing)
+	#expect(field.clearButtonRect(forBounds: field.bounds) == CGRect(x: 327, y: 17.5, width: 7, height: 7))
+	var sent: [String] = []
+	field.addAction(UIAction { [weak field] _ in sent.append(field?.text ?? "-") }, for: .editingChanged)
+	field.text = "milk"
+	#expect(field.delegate?.textFieldShouldClear?(field) == false)
+	#expect(field.text == "")
+	#expect(sent == [""])
+	try field.paint(.init(editor: Frame(x: 17, y: 13, width: 309, height: 16), fontFamily: "s", fontSize: 16, color: nil, placeholder: nil), faces: ["s": font])
+	#expect(field.clearButtonMode == .never)
+}
 #endif

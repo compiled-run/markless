@@ -2903,7 +2903,19 @@ final class TextField: UITextField, KeyedInput, UITextFieldDelegate {
 			return NSAttributedString(string: shown.text, attributes: look)
 		}
 		styled = paint
+		clearButtonMode = paint?.clear == nil ? .never : .whileEditing
 		setNeedsLayout()
+	}
+
+	/// The clear button empties the field as typing does, so the page's input handler sees it, as Chrome's cancel button fires input.
+	func textFieldShouldClear(_ textField: UITextField) -> Bool {
+		text = ""
+		sendActions(for: .editingChanged)
+		return false
+	}
+
+	override func clearButtonRect(forBounds bounds: CGRect) -> CGRect {
+		rect(styled?.clear, or: super.clearButtonRect(forBounds: bounds))
 	}
 
 	private func rect(_ frame: Frame?, or fallback: CGRect) -> CGRect {
