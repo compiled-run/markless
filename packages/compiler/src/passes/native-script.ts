@@ -142,11 +142,26 @@ if (!host) {
 			this.name = String(name);
 			this.type = options && options.type !== undefined ? String(options.type).toLowerCase() : '';
 			this.lastModified = options && options.lastModified !== undefined ? Number(options.lastModified) : Date.now();
-			var size = 0;
-			(bits || []).forEach(function (part) { size += typeof part === 'string' ? utf8Length(part) : part && typeof part.size === 'number' ? part.size : 0; });
+			var size = 0, text = '', known = true;
+			(bits || []).forEach(function (part) {
+				size += typeof part === 'string' ? utf8Length(part) : part && typeof part.size === 'number' ? part.size : 0;
+				if (typeof part === 'string') text += part;
+				else if (part && typeof part.__text === 'string') text += part.__text;
+				else known = false;
+			});
 			this.size = size;
+			// What a request sends of it: the text it was made of, or the chosen file the host reads.
+			if (known) Object.defineProperty(this, '__text', { value: text });
 		};
 	}
+	// A file a request can send: its name and type, and its text or the host's reference to the chosen file.
+	host.filePart = function (file) {
+		var part = { name: String(file.name), type: String(file.type) };
+		if (typeof file.__ref === 'string') part.ref = file.__ref;
+		else if (typeof file.__text === 'string') part.text = file.__text;
+		else throw new TypeError('a phone sends only a file a picker chose or one made from text');
+		return part;
+	};
 	host.fileListOf = function (files) {
 		var list = files.slice();
 		list.item = function (index) { return list[index] || null; };
@@ -200,8 +215,16 @@ if (!host) {
 			else if (Array.isArray(given)) for (var index = 0; index < given.length; index++) headers.push([String(given[index][0]), String(given[index][1])]);
 			else if (given) for (var name in given) headers.push([name, String(given[name])]);
 			var body = options.body === undefined || options.body === null ? null : options.body;
-			if (body !== null && typeof body !== 'string') {
-				reject(new TypeError('a phone sends a text body only'));
+			// A FormData goes as multipart/form-data: its text entries, and its files, which the host reads and encodes.
+			if (body !== null && typeof g.FormData === 'function' && body instanceof g.FormData) {
+				try {
+					body = { form: body.list.map(function (entry) { return [entry[0], typeof entry[1] === 'string' ? entry[1] : host.filePart(entry[1])]; }) };
+				} catch (error) {
+					reject(error);
+					return;
+				}
+			} else if (body !== null && typeof body !== 'string') {
+				reject(new TypeError('a phone sends a text body or a FormData only'));
 				return;
 			}
 			var signal = options.signal;
@@ -552,19 +575,29 @@ if (!host) {
 			if (submitter !== undefined && submitter !== null) throw new TypeError("FormData on a phone does not read a submitter yet");
 			if (form !== undefined && !(form instanceof host.Form))
 				throw new TypeError("Failed to construct 'FormData': parameter 1 is not of type 'HTMLFormElement'.");
-			this.list = form ? form.entries.map(function (entry) { return [String(entry[0]), String(entry[1])]; }) : [];
+			this.list = form ? form.entries.map(function (entry) { return [String(entry[0]), entry[1] instanceof g.File ? entry[1] : String(entry[1])]; }) : [];
+		};
+		// A File stays itself (renamed when a name is given); a Blob becomes a File named 'blob'; anything else its text.
+		var valueOf = function (value, filename) {
+			if (!(value instanceof g.File)) return String(value);
+			if (filename === undefined) return value;
+			var renamed = new g.File([], String(filename), { type: value.type, lastModified: value.lastModified });
+			Object.defineProperty(renamed, 'size', { value: value.size });
+			if (typeof value.__ref === 'string') Object.defineProperty(renamed, '__ref', { value: value.__ref });
+			if (typeof value.__text === 'string') Object.defineProperty(renamed, '__text', { value: value.__text });
+			return renamed;
 		};
 		var named = function (data, name) { return data.list.filter(function (entry) { return entry[0] === String(name); }); };
 		FormData.prototype.get = function (name) { var found = named(this, name); return found.length ? found[0][1] : null; };
 		FormData.prototype.getAll = function (name) { return named(this, name).map(function (entry) { return entry[1]; }); };
 		FormData.prototype.has = function (name) { return named(this, name).length > 0; };
-		FormData.prototype.append = function (name, value) { this.list.push([String(name), String(value)]); };
+		FormData.prototype.append = function (name, value, filename) { this.list.push([String(name), valueOf(value, filename)]); };
 		FormData.prototype['delete'] = function (name) { this.list = this.list.filter(function (entry) { return entry[0] !== String(name); }); };
-		FormData.prototype.set = function (name, value) {
+		FormData.prototype.set = function (name, value, filename) {
 			var at = -1;
 			for (var index = 0; index < this.list.length; index++) if (this.list[index][0] === String(name)) { at = index; break; }
-			if (at < 0) return this.append(name, value);
-			this.list[at] = [String(name), String(value)];
+			if (at < 0) return this.append(name, value, filename);
+			this.list[at] = [String(name), valueOf(value, filename)];
 			var kept = this.list.slice(0, at + 1);
 			this.list = kept.concat(this.list.slice(at + 1).filter(function (entry) { return entry[0] !== String(name); }));
 		};
@@ -688,6 +721,8 @@ var elementOf = function (id) {
 	};
 	var own = function (name) { return Object.prototype.hasOwnProperty.call(facts().attributes, String(name).toLowerCase()); };
 	var command = function (name, preventScroll) { host.out.commands.push([id, name, preventScroll]); };
+	var isFileInput = function () { return !!elementFacts[id] && String(elementFacts[id].attributes.type || '').toLowerCase() === 'file'; };
+	var chosen = [];
 	var proxy = {
 		getAttribute: function (name) { return own(name) ? facts().attributes[String(name).toLowerCase()] : null; },
 		hasAttribute: own,
@@ -697,7 +732,14 @@ var elementOf = function (id) {
 			return node === id || (!!elementFacts[node] && elementFacts[node].ancestors.indexOf(id) >= 0);
 		},
 		focus: function (options) { command('focus', !!(options && options.preventScroll)); },
-		click: function () { host.out.raises.push({ node: id, type: 'click', bubbles: true }); },
+		click: function () {
+			host.out.raises.push({ node: id, type: 'click', bubbles: true });
+			if (isFileInput()) command('showPicker', false);
+		},
+		showPicker: function () {
+			if (!isFileInput()) throw new g.DOMException('showPicker() is not supported for this element', 'NotSupportedError');
+			command('showPicker', false);
+		},
 		dispatchEvent: function (event) {
 			var raised = { node: id, type: String(event.type), bubbles: event.bubbles === true };
 			if (event.detail !== null && typeof event.detail === 'object' && typeof event.detail.reason === 'string')
@@ -729,6 +771,26 @@ var elementOf = function (id) {
 	var tag = (typeof classes === 'object' && classes[id.split('@')[0]]) || 'HTMLElement';
 	if (g[tag] && g[tag].__dom) Object.setPrototypeOf(proxy, g[tag].prototype);
 	Object.defineProperty(proxy, '__node', { value: id });
+	// A file input's files are the picker's last choice until a handler assigns a FileList, as the DOM's are.
+	Object.defineProperty(proxy, 'files', {
+		get: function () { return isFileInput() ? host.fileListOf(chosen) : null; },
+		set: function (list) {
+			if (!isFileInput() || !list) return;
+			chosen = Array.prototype.slice.call(list);
+			// The input shows what it now holds, as the browser's does.
+			host.out.commands.push([id, 'files', JSON.stringify(chosen.map(function (file) { return file.name; }))]);
+		},
+	});
+	Object.defineProperty(proxy, '__choose', {
+		value: function (files) {
+			chosen = files.map(function (file) {
+				var made = new g.File([], file.name, { type: file.type, lastModified: file.lastModified });
+				Object.defineProperty(made, 'size', { value: file.size });
+				Object.defineProperty(made, '__ref', { value: file.ref });
+				return made;
+			});
+		},
+	});
 	Object.defineProperty(proxy, '__style', {
 		value: function () {
 			var direction = facts().direction || 'ltr';
@@ -807,9 +869,20 @@ var fail = function (slot, error) {
 			message: error && error.message !== undefined ? String(error.message) : String(error),
 		};
 };
+// A file input's entry (its node) is each file it holds, or an empty one named '' when it holds none, as a browser's form data.
+var formEntries = function (entries) {
+	var list = [];
+	entries.forEach(function (entry) {
+		if (entry[1] === null || typeof entry[1] !== 'object') return list.push(entry);
+		var files = Array.prototype.slice.call(elementOf(entry[1].files).files || []);
+		if (files.length === 0) files = [new g.File([], '', { type: 'application/octet-stream' })];
+		files.forEach(function (file) { list.push([entry[0], file]); });
+	});
+	return list;
+};
 var eventOf = function (given, frame) {
 	var entries = frame[${JSON.stringify(NATIVE_SCRIPT_SUBMITTED_FORM)}];
-	var target = entries ? new host.Form(entries) : { value: given.value === undefined ? '' : given.value, checked: given.checked === true };
+	var target = entries ? new host.Form(formEntries(entries)) : { value: given.value === undefined ? '' : given.value, checked: given.checked === true };
 	var detail;
 	if (given.detail !== null && typeof given.detail === 'object') {
 		detail = { reason: given.detail.reason };
@@ -915,6 +988,7 @@ g.__markless[id] = {
 			var event = null;
 			try {
 				var frame = frameOf(entry.frame);
+				if (entry.event.files && entry.event.nodes && entry.event.nodes.target) elementOf(entry.event.nodes.target).__choose(entry.event.files);
 				event = eventOf(entry.event, frame);
 				var result = fn(entry.fn)(frame)(event);
 				if (result && typeof result.then === 'function') {
@@ -933,6 +1007,9 @@ g.__markless[id] = {
 			if (event && event.propagationStopped && entry.event.type === 'click') host.out.stopped = true;
 			// A handler that sets its text field's value writes the field, as the DOM's value setter does.
 			if (event && typeof entry.event.value === 'string' && event.target && !(event.target instanceof host.Form) && typeof event.target.value === 'string' && event.target.value !== entry.event.value) host.out.value = event.target.value;
+		} else if (entry.kind === 'pick') {
+			// A file input with no handler of its own still holds what was chosen, for a form's FormData to read.
+			elementOf(entry.node).__choose(entry.files);
 		} else if (entry.kind === 'document') {
 			var heard = (host.listeners[entry.event.type] || []).slice();
 			var bubbled = heard.length > 0 ? eventOf(entry.event, {}) : null;

@@ -122,6 +122,7 @@ export function rowAttributeOptions(
 	name: string,
 	expr: NativeExpr,
 	booleanCells: ReadonlySet<string> = new Set(),
+	itemValues: ItemValues = () => undefined,
 ): ReadonlyArray<string | null> | undefined {
 	if (givesBoolean(expr, booleanCells))
 		return [
@@ -129,11 +130,33 @@ export function rowAttributeOptions(
 		];
 	if ('literal' in expr) return [marklessAttributeValue(name, expr.literal)];
 	if ('if' in expr) {
-		const whenTrue = rowAttributeOptions(name, expr.whenTrue, booleanCells);
-		const whenFalse = rowAttributeOptions(name, expr.whenFalse, booleanCells);
+		const whenTrue = rowAttributeOptions(name, expr.whenTrue, booleanCells, itemValues);
+		const whenFalse = rowAttributeOptions(name, expr.whenFalse, booleanCells, itemValues);
 		return whenTrue && whenFalse ? [...new Set([...whenTrue, ...whenFalse])] : undefined;
 	}
-	return undefined;
+	const listed = itemValues(expr);
+	return listed && [...new Set(listed.map((value) => marklessAttributeValue(name, value)))];
+}
+
+/** The values a read of a row's item field can give, when its list's `itemValues` lists them. */
+type ItemValues = (expr: NativeExpr) => ReadonlyArray<string | number | boolean | null> | undefined;
+
+/** Reads each repeat's `itemValues` for `rowAttributeOptions`: a field path read off a row's item. */
+export function itemValuesOf(payload: NativeViewPayload): ItemValues {
+	const lists = new Map(
+		payload.nodes.flatMap((node) =>
+			node.kind === 'repeat' && node.itemValues ? [[node.id, node.itemValues] as const] : [],
+		),
+	);
+	return (expr) => {
+		const path: string[] = [];
+		let at = expr;
+		while ('member' in at && typeof at.property === 'string') {
+			path.unshift(at.property);
+			at = at.member;
+		}
+		return 'item' in at && path.length > 0 ? lists.get(at.item)?.[path.join('.')] : undefined;
+	};
 }
 
 /**
@@ -461,6 +484,7 @@ export function nativeStyleInput(
 				binding.attribute,
 				binding.value,
 				booleanCellsOf(payload),
+				itemValuesOf(payload),
 			);
 			if (options)
 				rowOptions.set(`${node.id}#${binding.attribute}`, {
@@ -543,13 +567,10 @@ export function nativeStyleInput(
 			},
 		];
 	});
+	type TextParts = Extract<NativeViewPayload['nodes'][number], { kind: 'text' }>['parts'];
 	// A node in an arm not shown at mount still gets laid out: its literals and its cells' first values (an expression reads as '').
-	// A text that is only such expressions stands in as a no-break space: Dragon lays out no box for an empty text, and the
-	// host lays the arm's real text out in that box when the arm opens.
-	const unshownText = (
-		parts: Extract<NativeViewPayload['nodes'][number], { kind: 'text' }>['parts'],
-	) => {
-		const text = parts
+	const unshownText = (parts: TextParts) =>
+		parts
 			.map((part) =>
 				'text' in part
 					? part.text
@@ -558,8 +579,10 @@ export function nativeStyleInput(
 						: '',
 			)
 			.join('');
-		return text === '' && parts.some((part) => 'expr' in part) ? '\u00a0' : text;
-	};
+	// A text the build reads as '' from expressions it cannot know (an unshown arm's data, the route's params) stands in as a
+	// no-break space: Dragon lays out no box for an empty text, and the host lays the real text out in that box on the phone.
+	const standIn = (text: string, parts: TextParts) =>
+		text === '' && parts.some((part) => 'expr' in part) ? '\u00a0' : text;
 	return {
 		version: NATIVE_STYLE_INPUT_VERSION,
 		component: payload.component,
@@ -643,7 +666,7 @@ export function nativeStyleInput(
 						parent: sheet && parent === sheet.id ? sheet.parent! : parent,
 						text: node.row
 							? rowText(node.id)
-							: (initial.get(node.id) ?? unshownText(node.parts)),
+							: standIn(initial.get(node.id) ?? unshownText(node.parts), node.parts),
 						...(textByState.some((entry) => entry.value !== textByState[0]!.value)
 							? { textByState }
 							: {}),

@@ -2058,11 +2058,14 @@ function nativeInitializer(initial: AnyNode, state: WalkState): Pick<SemanticGra
 function nativeComputed(
 	fn: AnyNode | undefined,
 	state: WalkState,
-): Pick<SemanticGraphBinding, 'nativeExpression' | 'nativeFunctionSpan'> {
+): Pick<SemanticGraphBinding, 'nativeExpression' | 'nativeFunctionSpan' | 'nativeReturns'> {
 	if (!fn || !state.nativeFacts) return {};
-	const nativeExpression = nativeCollectors(state.nativeFacts).computedValue(fn as never);
+	const collectors = nativeCollectors(state.nativeFacts);
+	const nativeExpression = collectors.computedValue(fn as never);
+	const nativeReturns = collectors.returns(fn as never);
 	return {
 		...(nativeExpression ? { nativeExpression } : {}),
 		nativeFunctionSpan: sourceSpan(fn, state.filename),
+		...(nativeReturns.kind === 'unknown' ? {} : { nativeReturns }),
 	};
 }

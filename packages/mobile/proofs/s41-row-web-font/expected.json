@@ -1,0 +1,37 @@
+{
+	"rung": "S41",
+	"name": "Styled @for rows in a web font (woff2): rows a tap adds are shaped on the phone in the author face and laid out as the web lays them out",
+	"steps": [
+		{
+			"visible": [
+				"Notes",
+				"Groceries",
+				"Call the plumber about the kitchen tap before Friday",
+				"End of list"
+			],
+			"absent": ["No notes yet", "Water the plants"],
+			"title": "Notes"
+		},
+		{
+			"do": {
+				"tap": "Add note"
+			},
+			"visible": ["Groceries", "Water the plants", "End of list"],
+			"absent": ["No notes yet"]
+		},
+		{
+			"do": {
+				"tap": "Clear notes"
+			},
+			"visible": ["No notes yet", "End of list"],
+			"absent": ["Groceries", "Water the plants"]
+		},
+		{
+			"do": {
+				"tap": "Add note"
+			},
+			"visible": ["Water the plants", "End of list"],
+			"absent": ["No notes yet"]
+		}
+	]
+}

@@ -1,0 +1,34 @@
+{
+	"rung": "S45",
+	"name": "Styled text inside inline spans (several interpolations, one interpolation, a span between two texts, a span that wraps) lays out where Chrome puts it and follows taps",
+	"steps": [
+		{
+			"visible": [
+				"Tally",
+				"Header taps 0 · Button taps 0 · Picked none",
+				"0 by button",
+				"none, the colour the last tap on Pick red chose for the rest of this page and every row",
+				"Tap button",
+				"Pick red"
+			]
+		},
+		{
+			"do": { "tap": "Tally" },
+			"visible": ["Header taps 1 · Button taps 0 · Picked none"],
+			"absent": ["Header taps 0 · Button taps 0 · Picked none"]
+		},
+		{
+			"do": { "tap": "Tap button" },
+			"visible": ["Header taps 1 · Button taps 1 · Picked none", "1 by button"],
+			"absent": ["Header taps 1 · Button taps 0 · Picked none", "0 by button"]
+		},
+		{
+			"do": { "tap": "Pick red" },
+			"visible": [
+				"Header taps 1 · Button taps 1 · Picked red",
+				"red, the colour the last tap on Pick red chose for the rest of this page and every row"
+			],
+			"absent": ["Header taps 1 · Button taps 1 · Picked none"]
+		}
+	]
+}

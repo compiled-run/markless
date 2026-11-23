@@ -99,6 +99,8 @@ var elementOf = function (id) {
 	};
 	var own = function (name) { return Object.prototype.hasOwnProperty.call(facts().attributes, String(name).toLowerCase()); };
 	var command = function (name, preventScroll) { host.out.commands.push([id, name, preventScroll]); };
+	var isFileInput = function () { return !!elementFacts[id] && String(elementFacts[id].attributes.type || '').toLowerCase() === 'file'; };
+	var chosen = [];
 	var proxy = {
 		getAttribute: function (name) { return own(name) ? facts().attributes[String(name).toLowerCase()] : null; },
 		hasAttribute: own,
@@ -108,7 +110,14 @@ var elementOf = function (id) {
 			return node === id || (!!elementFacts[node] && elementFacts[node].ancestors.indexOf(id) >= 0);
 		},
 		focus: function (options) { command('focus', !!(options && options.preventScroll)); },
-		click: function () { host.out.raises.push({ node: id, type: 'click', bubbles: true }); },
+		click: function () {
+			host.out.raises.push({ node: id, type: 'click', bubbles: true });
+			if (isFileInput()) command('showPicker', false);
+		},
+		showPicker: function () {
+			if (!isFileInput()) throw new g.DOMException('showPicker() is not supported for this element', 'NotSupportedError');
+			command('showPicker', false);
+		},
 		dispatchEvent: function (event) {
 			var raised = { node: id, type: String(event.type), bubbles: event.bubbles === true };
 			if (event.detail !== null && typeof event.detail === 'object' && typeof event.detail.reason === 'string')
@@ -140,6 +149,26 @@ var elementOf = function (id) {
 	var tag = (typeof classes === 'object' && classes[id.split('@')[0]]) || 'HTMLElement';
 	if (g[tag] && g[tag].__dom) Object.setPrototypeOf(proxy, g[tag].prototype);
 	Object.defineProperty(proxy, '__node', { value: id });
+	// A file input's files are the picker's last choice until a handler assigns a FileList, as the DOM's are.
+	Object.defineProperty(proxy, 'files', {
+		get: function () { return isFileInput() ? host.fileListOf(chosen) : null; },
+		set: function (list) {
+			if (!isFileInput() || !list) return;
+			chosen = Array.prototype.slice.call(list);
+			// The input shows what it now holds, as the browser's does.
+			host.out.commands.push([id, 'files', JSON.stringify(chosen.map(function (file) { return file.name; }))]);
+		},
+	});
+	Object.defineProperty(proxy, '__choose', {
+		value: function (files) {
+			chosen = files.map(function (file) {
+				var made = new g.File([], file.name, { type: file.type, lastModified: file.lastModified });
+				Object.defineProperty(made, 'size', { value: file.size });
+				Object.defineProperty(made, '__ref', { value: file.ref });
+				return made;
+			});
+		},
+	});
 	Object.defineProperty(proxy, '__style', {
 		value: function () {
 			var direction = facts().direction || 'ltr';
@@ -218,9 +247,20 @@ var fail = function (slot, error) {
 			message: error && error.message !== undefined ? String(error.message) : String(error),
 		};
 };
+// A file input's entry (its node) is each file it holds, or an empty one named '' when it holds none, as a browser's form data.
+var formEntries = function (entries) {
+	var list = [];
+	entries.forEach(function (entry) {
+		if (entry[1] === null || typeof entry[1] !== 'object') return list.push(entry);
+		var files = Array.prototype.slice.call(elementOf(entry[1].files).files || []);
+		if (files.length === 0) files = [new g.File([], '', { type: 'application/octet-stream' })];
+		files.forEach(function (file) { list.push([entry[0], file]); });
+	});
+	return list;
+};
 var eventOf = function (given, frame) {
 	var entries = frame["submitted form"];
-	var target = entries ? new host.Form(entries) : { value: given.value === undefined ? '' : given.value, checked: given.checked === true };
+	var target = entries ? new host.Form(formEntries(entries)) : { value: given.value === undefined ? '' : given.value, checked: given.checked === true };
 	var detail;
 	if (given.detail !== null && typeof given.detail === 'object') {
 		detail = { reason: given.detail.reason };
@@ -326,6 +366,7 @@ g.__markless[id] = {
 			var event = null;
 			try {
 				var frame = frameOf(entry.frame);
+				if (entry.event.files && entry.event.nodes && entry.event.nodes.target) elementOf(entry.event.nodes.target).__choose(entry.event.files);
 				event = eventOf(entry.event, frame);
 				var result = fn(entry.fn)(frame)(event);
 				if (result && typeof result.then === 'function') {
@@ -344,6 +385,9 @@ g.__markless[id] = {
 			if (event && event.propagationStopped && entry.event.type === 'click') host.out.stopped = true;
 			// A handler that sets its text field's value writes the field, as the DOM's value setter does.
 			if (event && typeof entry.event.value === 'string' && event.target && !(event.target instanceof host.Form) && typeof event.target.value === 'string' && event.target.value !== entry.event.value) host.out.value = event.target.value;
+		} else if (entry.kind === 'pick') {
+			// A file input with no handler of its own still holds what was chosen, for a form's FormData to read.
+			elementOf(entry.node).__choose(entry.files);
 		} else if (entry.kind === 'document') {
 			var heard = (host.listeners[entry.event.type] || []).slice();
 			var bubbled = heard.length > 0 ? eventOf(entry.event, {}) : null;
