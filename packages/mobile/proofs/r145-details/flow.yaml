@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: r145-details
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Help
 - assertVisible: Shipping
 - assertVisible: Returns, peeked 0

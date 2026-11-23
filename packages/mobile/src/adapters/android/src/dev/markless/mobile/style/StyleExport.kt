@@ -203,6 +203,8 @@ data class SheetHeight(val snapPoint: Double, val style: StyleExport)
 data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val states: List<StyleState>, val initial: Int, val assignments: List<Assignment>, val next: List<List<List<Int>>>, val bands: Bands? = null, val pageScrollUndecided: String? = null, val sheets: Map<String, List<SheetHeight>> = emptyMap(), val systemFaces: Map<String, SystemFace> = emptyMap(),
 	/** Dragon's layout plan ([PLAN_VERSION]) as JSON text: with it the page lays out at the screen's own size. */
 	val plan: String? = null,
+	/** Dragon's animator tables for the page's transitions and animations (JSON text), which the host runs with the plan. */
+	val anim: String? = null,
 	/** Per assignment: each Dragon id the plan's geometry names, with the export's id for it (empty: no ids differ). */
 	val planNames: List<Map<String, String>> = emptyList(),
 	/** The payload slots the plan reads, in the order [laidOut] takes their values. */
@@ -449,7 +451,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 		const val ANDROID_BACKEND = "android-views"
 
 		/** A number of Dragon's plan layout: its IEEE 754 bit pattern as 16 hex digits. */
-		private fun planNumber(v: Json): Double {
+		internal fun planNumber(v: Json): Double {
 			val hex = (v as? Json.Str)?.value?.takeIf { it.length == 16 } ?: throw MarklessDecodeError("plan layout: ${v.text()} is not a number's bit pattern")
 			return Double.fromBits(java.lang.Long.parseUnsignedLong(hex, 16))
 		}
@@ -545,13 +547,18 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				if (template.isEmpty()) throw MarklessDecodeError("$what.planRepeats[$i]: a row has at least one box")
 				PlanRepeat(o.field("id", "$what.planRepeats[$i]").str("id"), o.field("parent", "$what.planRepeats[$i]").str("parent"), template)
 			} ?: emptyList()
+			val anim = t["anim"]?.let { a ->
+				if (plan == null) throw MarklessDecodeError("$what.anim: animator tables need a layout plan")
+				a.obj("$what.anim")
+				a.text()
+			}
 			if (plan == null) style.assignments.firstNotNullOfOrNull { a -> a.nodes.firstOrNull { it.drawsSelectArrow } }?.let {
 				throw MarklessDecodeError("$what: \"${it.id}\" draws a drop-down arrow, whose geometry only Dragon's plan layout gives, and the export has no plan")
 			}
 			if (plan == null) style.assignments.firstNotNullOfOrNull { a -> a.nodes.firstOrNull { it.drawsCheckbox } }?.let {
 				throw MarklessDecodeError("$what: \"${it.id}\" draws a themed checkbox, whose marks only Dragon's plan layout gives, and the export has no plan")
 			}
-			return style.copy(plan = plan, planNames = names, planRepeats = repeats)
+			return style.copy(plan = plan, planNames = names, planRepeats = repeats, anim = anim)
 		}
 
 		fun decode(bytes: ByteArray, target: String = "android"): StyleExport {
@@ -693,7 +700,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val routes = LinkedHashMap<String, StyleExport>()
 			for ((n, r) in t.field("routes", target).arr("routes").withIndex()) {
 				val o = r.obj("routes[$n]")
-				o.only(setOf("pattern", "component", "compiler", "readiness", "states", "initial", "next", "bands", "assignments", "sheets", "plan", "planNames", "planRepeats", "slots"), "routes[$n]")
+				o.only(setOf("pattern", "component", "compiler", "readiness", "states", "initial", "next", "bands", "assignments", "sheets", "plan", "planNames", "planRepeats", "slots", "anim"), "routes[$n]")
 				val pattern = o.field("pattern", "routes[$n]").str("pattern")
 				if (pattern in routes) throw MarklessDecodeError("app style lists route $pattern twice")
 				val listed = { w: Json, what: String ->

@@ -92,6 +92,9 @@ const bindsValue = (nodeOf: ReadonlyMap<string, NativeViewPayload['nodes'][numbe
 };
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
 const REFUSED_RUNGS = new Set(['j7-page-refused']);
+// Rungs whose later steps wait on CSS animation events, which only Dragon's animator on the phones (and the browser) runs: this
+// walk checks their launch screen, and the phones and the web column check every step.
+const ANIMATED_RUNGS = new Set(['s34-animation-end']);
 // The <input> types a host draws as a control a press acts on; every other type is a text field that takes the keyboard.
 const PRESSED_INPUT_TYPES = new Set(['checkbox', 'radio', 'range', 'hidden']);
 
@@ -1502,7 +1505,7 @@ test.each([...navRungFolders(), ...styleRungFolders(), ...sheetStyleRungFolders(
 			).toBe(true);
 		walkApp(
 			build.payload!,
-			rung.steps,
+			ANIMATED_RUNGS.has(folder) ? rung.steps.slice(0, 1) : rung.steps,
 			rung.start ?? '/',
 			new Set(build.styleInputs.map((input) => input.pattern)),
 			rung.location,

@@ -60,6 +60,7 @@ import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.Runtime
 import dev.markless.mobile.core.Scope
 import dev.markless.mobile.core.Store
+import dev.markless.mobile.style.AnimationRun
 import dev.markless.mobile.style.Assignment
 import dev.markless.mobile.style.Edges
 import dev.markless.mobile.style.paddingBox
@@ -287,6 +288,18 @@ class MarklessHost(
 	}
 
 	private val page: Layout? = style?.let { Layout(it, everyCell = true) }
+	/** The page's transitions and animations, run by Dragon's animator while they run, one display frame at a time. */
+	private val animation: AnimationRun? = page?.let { p -> style?.takeIf { it.anim != null }?.let { s -> planAnimation?.let { run -> AnimationRun(s, p.assignment, run) } } }
+	private var lastFrameNanos = 0L
+	private var framing = false
+	private val animationFrame = object : android.view.Choreographer.FrameCallback {
+		override fun doFrame(frameTimeNanos: Long) {
+			framing = false
+			if (lastFrameNanos != 0L) animation?.advanced((frameTimeNanos - lastFrameNanos) / 1_000_000.0)
+			lastFrameNanos = frameTimeNanos
+			runAnimation()
+		}
+	}
 
 	/** The system sheet whose content each payload node is, if any. */
 	private val sheetOf: Map<String, String?> = HashMap<String, String?>().apply {
@@ -675,6 +688,8 @@ class MarklessHost(
 			laidOutFor?.let { (w, h) -> layOutAt(w, h, rowsMoved = true) }
 		}
 		onJournal?.invoke(journal)
+		page?.let { animation?.moved(it.assignment) }
+		runAnimation()
 		scheduleLoadEvents()
 	}
 
@@ -1150,7 +1165,9 @@ class MarklessHost(
 			EventName.Paste -> (view as? MarklessField ?: throw MarklessHostError("paste event on \"${node.id}\", which is not a text field")).onPaste = { text -> prevents(runtime.dispatch(inst.id, EventName.Paste, text)) }
 			EventName.Cancel, EventName.Close, EventName.Submit, EventName.Idle, EventName.Visible, EventName.PointerDown, EventName.PointerMove, EventName.PointerUp, EventName.PointerCancel,
 			EventName.PointerOver, EventName.PointerOut, EventName.PointerEnter, EventName.PointerLeave, EventName.MouseOver, EventName.MouseOut,
-			EventName.MouseEnter, EventName.MouseLeave, EventName.MouseMove, EventName.MouseDown, EventName.MouseUp, EventName.Choose, EventName.ContextMenu -> {}
+			EventName.MouseEnter, EventName.MouseLeave, EventName.MouseMove, EventName.MouseDown, EventName.MouseUp, EventName.Choose, EventName.ContextMenu,
+			// Dispatched by the run of Dragon's animator on a styled page, not wired to a view.
+			EventName.AnimationStart, EventName.AnimationIteration, EventName.AnimationEnd, EventName.AnimationCancel -> {}
 			// The keyboard's action key arrives as its action id; a hardware Enter as IME_NULL with the key down, then up.
 			EventName.Enter -> (view as? EditText ?: throw MarklessHostError("enter event on \"${node.id}\", which is not an input")).setOnEditorActionListener { _, actionId, key ->
 				val now = android.os.SystemClock.uptimeMillis()
@@ -1829,6 +1846,21 @@ class MarklessHost(
 		}
 	}
 
+	/** Runs Dragon's animator up to now: dispatches each animation event a handler listens for, and asks for the next frame while an animation or transition runs. */
+	private fun runAnimation() {
+		val run = animation ?: return
+		val (w, h) = laidOutFor ?: return
+		val (fired, busy) = run.next(dpr, w / dpr, h / dpr)
+		if (busy && !framing) {
+			framing = true
+			android.view.Choreographer.getInstance().postFrameCallback(animationFrame)
+		} else if (!busy) lastFrameNanos = 0L
+		for (e in fired) {
+			if (events[e.node.substringBefore('@')].orEmpty().none { it.event == e.event }) continue
+			apply(runtime.dispatch(e.node, e.event, e.name, elapsedTime = e.elapsedTime))
+		}
+	}
+
 	/** A styled select's label: in the box Dragon lays out inside it for its text, in that text's font and colour. */
 	private fun selectLabel(view: SelectBox, s: StyledNode, styled: Assignment, absolute: Map<String, Pair<Double, Double>>) {
 		// A select that is not visible shows neither its label nor its arrow, as the web hides them with it.
@@ -1855,6 +1887,22 @@ class MarklessHost(
 		/** An outline's order key: above the flow children (0), below the stacking context's later boxes (from 100_001). */
 		private const val OUTLINE_ORDER = 50_000
 		const val TAG = "MarklessHost"
+
+		/** Dragon's translated `runMarklessAnimation`, when the app is built with an engine that has it. */
+		val planAnimation: ((String) -> String)? = try {
+			val run = Class.forName("dev.dragon.layout.HarnessKt").getMethod("harness_runMarklessAnimation", String::class.java)
+			({ line: String ->
+				try {
+					run.invoke(null, line) as String
+				} catch (e: java.lang.reflect.InvocationTargetException) {
+					throw e.cause ?: e
+				}
+			})
+		} catch (_: ClassNotFoundException) {
+			null
+		} catch (_: NoSuchMethodException) {
+			null
+		}
 
 		/** Dragon's translated `runMarklessLayout`, when the app is built with Dragon's engine; without it a page keeps the size it was exported at. */
 		val planLayout: ((String) -> String)? = try {
