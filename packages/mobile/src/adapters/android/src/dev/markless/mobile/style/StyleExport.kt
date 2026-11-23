@@ -317,7 +317,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val result = Json.parse(if (live) rowsLayout!!(line) else layout(line))
 			val parts = result.arr("plan layout")
 			val slotted = slots.isNotEmpty()
-			val fixed = if (!slotted) 3 else if (lists == null) 4 else 5
+			// Dragon's live layout answers a slotted page with each row's write numbers, an empty list when it lays out texts and no rows.
+			val fixed = if (!slotted) 3 else if (live) 5 else 4
 			if (parts.size < fixed || parts.size > fixed + 2 || parts[0] != Json.Str("ok")) throw MarklessDecodeError("Dragon's layout at $width x $height dp and ${scale}x failed: ${result.text()}")
 			// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
 			fun exportId(id: String): String {

@@ -49,7 +49,7 @@ private func answer(height: Double) -> String {
 	var live: [String] = []
 	_ = try style.laidOut(
 		width: 100, height: 100, scale: 1, slots: [0], layout: { _ in Issue.record("laid out without the texts"); return "" },
-		rowsLayout: { line in live.append(line); return answer(height: 10).replacingOccurrences(of: "]]]", with: "]],[]]") }, texts: ["h0:text0": "Longer"])
+		rowsLayout: { line in live.append(line); return answer(height: 10).replacingOccurrences(of: "]]]", with: "]],[],[]]") }, texts: ["h0:text0": "Longer"])
 	#expect(live.count == 1)
 	#expect(live.first?.contains(#""slots":["#) == true)
 	#expect(live.first?.hasSuffix(#","rows":[],"texts":[["h0:text0","Longer"]]}"#) == true)
