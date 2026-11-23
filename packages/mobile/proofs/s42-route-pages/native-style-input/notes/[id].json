@@ -1,0 +1,65 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Note",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "note mk-7999qn"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "title mk-7999qn"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Trip"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "line mk-7999qn"
+			},
+			"row": "repeat:0"
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "x",
+			"row": "repeat:0"
+		}
+	],
+	"css": "@font-face {\n\tfont-family: 'Harbour Lato';\n\tsrc: url('./fonts/Lato-Regular.woff2') format('woff2');\n\tfont-weight: 400;\n}\n\n@font-face {\n\tfont-family: 'Harbour Lato';\n\tsrc: url('./fonts/Lato-Bold.woff2') format('woff2');\n\tfont-weight: 700;\n}\n\nbody {\n\tmargin: 0;\n\tfont-family: 'Nowhere Sans', 'Harbour Lato';\n}\n\n.note.mk-7999qn {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #f8f9fa;\n\t\t\t}\n\t\t\t.title.mk-7999qn {\n\t\t\t\tmargin: 0;\n\t\t\t\tfont-size: 28px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n\t\t\t.line.mk-7999qn {\n\t\t\t\tmargin: 12px 0 0;\n\t\t\t\tfont-size: 17px;\n\t\t\t}",
+	"states": [],
+	"fonts": [
+		{
+			"url": "./fonts/Lato-Regular.woff2",
+			"file": "../../styles/fonts/Lato-Regular.woff2"
+		},
+		{
+			"url": "./fonts/Lato-Bold.woff2",
+			"file": "../../styles/fonts/Lato-Bold.woff2"
+		}
+	],
+	"repeats": [
+		{
+			"id": "repeat:0",
+			"parent": "h0"
+		}
+	]
+}

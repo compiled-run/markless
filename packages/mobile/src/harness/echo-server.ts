@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
+import type { NativeFormPart } from '@markless/serializer';
 import { ECHO_SERVER_PORT } from '../../proofs/ladder.ts';
 
 /** The processes with a TCP socket on a local port, listening or connected, as `lsof` or `ss` names them. */
@@ -27,6 +28,23 @@ export type EchoRequest = {
 	readonly contentType: string | null;
 	readonly body: string;
 };
+
+/**
+ * A FormData body as a host sends it, multipart/form-data with `boundary`: each text entry, and each file with its
+ * filename and type, its text from `read` for a file a picker chose (by the host's reference) or its own text.
+ */
+export function multipartText(
+	form: NativeFormPart[] | ReadonlyArray<NativeFormPart>,
+	boundary: string,
+	read: (ref: string) => string,
+): string {
+	const parts = form.map(([name, value]) =>
+		typeof value === 'string'
+			? `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`
+			: `--${boundary}\r\nContent-Disposition: form-data; name="${name}"; filename="${value.name}"\r\nContent-Type: ${value.type || 'application/octet-stream'}\r\n\r\n${value.ref === undefined ? (value.text ?? '') : read(value.ref)}\r\n`,
+	);
+	return `${parts.join('')}--${boundary}--\r\n`;
+}
 
 /** What the server answers a request with: the request, read back. */
 export const echoText = (request: EchoRequest): string =>
