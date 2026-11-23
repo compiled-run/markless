@@ -212,7 +212,7 @@ class MarklessHost(
 			if (s.integer && integer[s.id] != true) throw MarklessHostError("style export laid slot \"${s.id}\" out at whole numbers only, but the payload's slot may take any number")
 		}
 	}
-	private val scriptServices = ScriptServices()
+	private val scriptServices = ScriptServices(context)
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
 	private val nodeIds = payload.nodes.mapTo(HashSet()) { it.id }
 	private val events = payload.events.groupBy { it.host }
@@ -1109,6 +1109,8 @@ class MarklessHost(
 			"input", "textarea" -> if (node.attributes["type"] == "file") FileInputView(context, node.attributes["aria-hidden"] == "true").apply {
 				accept = node.attributes["accept"].orEmpty()
 				multiple = node.attributes["multiple"] != null
+				// A choice reaches the page whether or not the input has a handler: a form's FormData reads it.
+				onPick = { files -> apply(runtime.pick(inst.id, files)) }
 			} else if (node.attributes["type"] == "range") RangeBar(context).also { named(it, inst.id) } else MarklessField(context).apply {
 				filters = arrayOf(LengthLimit { nativeMaxLength(attrs[inst.id]?.get("maxlength")) })
 				val focusEvents = events[node.id].orEmpty().map { it.event }
@@ -1188,7 +1190,7 @@ class MarklessHost(
 			}
 			EventName.Commit -> (view as? RangeBar ?: throw MarklessHostError("commit event on \"${node.id}\", which is not a range")).onCommit = { value -> apply(runtime.dispatch(inst.id, EventName.Commit, value)) }
 			// A select's input handler runs when a choice lands, from the runtime's choose.
-			EventName.Input -> if (node.element == "select") Unit else if (view is FileInputView) view.onPick = { files -> apply(runtime.pick(inst.id, files)) } else if (view is RangeBar) view.onInput = { value -> apply(runtime.dispatch(inst.id, EventName.Input, value)) } else (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
+			EventName.Input -> if (node.element == "select") Unit else if (view is FileInputView) Unit else if (view is RangeBar) view.onInput = { value -> apply(runtime.dispatch(inst.id, EventName.Input, value)) } else (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
 				override fun afterTextChanged(s: Editable) {

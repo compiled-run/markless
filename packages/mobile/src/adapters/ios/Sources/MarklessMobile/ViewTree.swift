@@ -1347,6 +1347,8 @@ final class ViewTree {
 					picker.presenter = { [weak self] in self?.presenter }
 					picker.accept = staticAttributes["accept"] ?? ""
 					picker.multiple = staticAttributes["multiple"] != nil
+					// A choice reaches the page whether or not the input has a handler: a form's FormData reads it.
+					picker.onPick = { [onAction] files in onAction(NativeAction(event: .pick, host: id, files: files)) }
 					// Its button and summary sit side by side in its own stack view, which the stacking layout leaves alone.
 					leaves.insert(ObjectIdentifier(picker))
 					view = picker
@@ -1545,8 +1547,7 @@ final class ViewTree {
 				// An element that is not a button (a list row): a tap anywhere in it, its text included, presses it.
 				view.isUserInteractionEnabled = true
 				view.addGestureRecognizer(ActivateGesture { taps in onAction(NativeAction(event: .activate, host: id, detail: taps)) })
-			case let (.input, picker as FileInputView):
-				picker.onPick = { files in onAction(NativeAction(event: .pick, host: id, files: files)) }
+			case (.input, is FileInputView): break
 			case let (.input, slider as RangeSlider):
 				slider.onInput = { value in onAction(NativeAction(event: .input, host: id, value: value)) }
 			case let (.commit, slider as RangeSlider):

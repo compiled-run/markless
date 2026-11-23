@@ -235,7 +235,7 @@ private fun runVector(file: File, vector: Map<String, Json>, runtime: Runtime) {
 		if (event == "pick") {
 			val files = (field(action, "files", "action") as? Json.Arr ?: throw IllegalStateException("steps[$n] action.files is not an array")).items.map {
 				val file = it.obj("action.files")
-				PickedFile(field(file, "name", "file").str("name"), (field(file, "size", "file") as Json.Num).value, field(file, "type", "file").str("type"), (field(file, "lastModified", "file") as Json.Num).value)
+				PickedFile(field(file, "ref", "file").str("ref"), field(file, "name", "file").str("name"), (field(file, "size", "file") as Json.Num).value, field(file, "type", "file").str("type"), (field(file, "lastModified", "file") as Json.Num).value)
 			}
 			val actual = runtime.pick(field(action, "host", "action").str("host"), files).joinToString(",", "[", "]") { it.toJson() }
 			val expected = canonical(field(s, "journal", "steps[$n]"))

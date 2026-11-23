@@ -1,0 +1,31 @@
+{
+	"rung": 243,
+	"name": "A submit handler sends its form's FormData with fetch, a chosen file and a file made from text among its entries, as multipart/form-data, as on the web",
+	"server": "echo",
+	"pick": [
+		{
+			"name": "note.txt",
+			"text": "hello",
+			"type": "text/plain"
+		}
+	],
+	"steps": [
+		{
+			"visible": ["Upload", "Choose", "Send", "nothing sent"]
+		},
+		{
+			"do": {
+				"tap": "Choose"
+			},
+			"visible": ["chosen"],
+			"absent": ["nothing sent"]
+		},
+		{
+			"do": {
+				"tap": "Send"
+			},
+			"visible": ["POST multipart title=Trip photo=note.txt:hello note=hi.txt:hi"],
+			"absent": ["chosen"]
+		}
+	]
+}

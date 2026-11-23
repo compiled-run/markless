@@ -77,12 +77,41 @@ public final class MarklessScripting {
 		sending.removeValue(forKey: token)?.cancel()
 	}
 
+	/// A FormData as a browser sends it: each entry a part, a file's with its filename, its type and its bytes, read from the
+	/// file the picker chose (by its URL, the reference the host gave it) or from the text it was made of.
+	private nonisolated static func multipart(_ parts: [NativeFormPart], boundary: String) throws -> Data {
+		var body = Data()
+		let quoted = { (text: String) in text.replacingOccurrences(of: "\"", with: "%22").replacingOccurrences(of: "\r", with: "%0D").replacingOccurrences(of: "\n", with: "%0A") }
+		for part in parts {
+			body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(quoted(part.name))\"".utf8))
+			switch part.value {
+			case let .text(text):
+				body.append(Data("\r\n\r\n\(text)\r\n".utf8))
+			case let .file(name, type, ref, text):
+				body.append(Data("; filename=\"\(quoted(name))\"\r\nContent-Type: \(type.isEmpty ? "application/octet-stream" : type)\r\n\r\n".utf8))
+				if let ref, let url = URL(string: ref) { body.append(try Data(contentsOf: url)) } else { body.append(Data((text ?? "").utf8)) }
+				body.append(Data("\r\n".utf8))
+			}
+		}
+		body.append(Data("--\(boundary)--\r\n".utf8))
+		return body
+	}
+
 	private nonisolated static func send(_ request: NativeFetchRequest, _ session: URLSession) async -> NativeFetchResponse {
 		guard let url = URL(string: request.url) else { return .error("Failed to parse URL from \(request.url)") }
 		var asked = URLRequest(url: url)
 		asked.httpMethod = request.method
 		for header in request.headers { asked.addValue(header.value, forHTTPHeaderField: header.name) }
-		asked.httpBody = request.body.map { Data($0.utf8) }
+		switch request.body {
+		case let .text(text)?: asked.httpBody = Data(text.utf8)
+		case let .form(parts)?:
+			let boundary = "MarklessBoundary\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
+			do { asked.httpBody = try multipart(parts, boundary: boundary) } catch { return .error(error.localizedDescription) }
+			if !request.headers.contains(where: { $0.name.lowercased() == "content-type" }) {
+				asked.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+			}
+		case nil: break
+		}
 		do {
 			let (data, response) = try await session.data(for: asked)
 			guard let http = response as? HTTPURLResponse else { return .error("not an HTTP response") }
