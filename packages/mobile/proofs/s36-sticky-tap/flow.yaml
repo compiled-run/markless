@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: s34-sticky-tap
+name: s36-sticky-tap
 ---
 - launchApp:
       clearState: true

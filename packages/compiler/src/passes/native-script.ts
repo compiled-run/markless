@@ -440,6 +440,8 @@ if (!host) {
 	host.listeners = {};
 	g.document = {
 		get activeElement() { return host.focus(); },
+		// A page whose <html> has no lang, as code guarded by typeof document read it before the page had a document.
+		documentElement: { lang: '' },
 		addEventListener: function (type, listener) {
 			var list = host.listeners[String(type)] || (host.listeners[String(type)] = []);
 			if (typeof listener === 'function' && list.indexOf(listener) < 0) { list.push(listener); host.listened = true; }
@@ -449,6 +451,33 @@ if (!host) {
 			var at = list.indexOf(listener);
 			if (at >= 0) { list.splice(at, 1); host.listened = true; }
 		},
+	};
+	// Each screen is a history entry with its own state; one written after navigate() is the next screen's, as on the web.
+	host.historyStates = {};
+	host.historyNext = undefined;
+	host.screen = null;
+	host.screensSeen = 0;
+	var historyHasNext = function () { return !!(host.out && host.out.navigate); };
+	g.history = {
+		get state() {
+			if (historyHasNext()) return host.historyNext === undefined ? null : host.historyNext;
+			return Object.prototype.hasOwnProperty.call(host.historyStates, host.screen) ? host.historyStates[host.screen] : null;
+		},
+		replaceState: function (data, unused) {
+			if (arguments.length < 2) throw new TypeError("Failed to execute 'replaceState' on 'History': 2 arguments required, but only " + arguments.length + ' present.');
+			var kept = data === undefined ? null : g.structuredClone(data);
+			if (historyHasNext()) host.historyNext = kept;
+			else host.historyStates[host.screen] = kept;
+		},
+	};
+	host.enterScreen = function (screen, leaving) {
+		if (typeof screen !== 'number') return;
+		if (screen > host.screensSeen) {
+			host.screensSeen = screen;
+			if (host.historyNext !== undefined) { host.historyStates[screen] = host.historyNext; host.historyNext = undefined; }
+		}
+		host.screen = screen;
+		if (leaving) delete host.historyStates[screen];
 	};
 	host.Response = Response;
 	// The HTML structured clone, as Chromium runs it, for an engine that has none.
@@ -795,6 +824,8 @@ var eventOf = function (given, frame) {
 		key: given.key,
 		isTrusted: given.isTrusted !== false,
 		isComposing: false,
+		// A phone's browser reports a finger as a touch pointer.
+		pointerType: String(given.type).indexOf('pointer') === 0 ? 'touch' : undefined,
 		defaultPrevented: false,
 		preventDefault: function () { this.defaultPrevented = true; },
 		propagationStopped: false,
@@ -873,6 +904,7 @@ g.__markless[id] = {
 	enter: function (text) {
 		var entry = JSON.parse(text);
 		begin(entry);
+		host.enterScreen(entry.screen, entry.kind === 'tasks' && entry.leave);
 		if (entry.kind === 'compute') {
 			var value = fn(entry.fn)(frameOf(entry.frame))();
 			host.out = null;

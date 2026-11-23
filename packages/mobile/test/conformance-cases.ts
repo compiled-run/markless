@@ -41,6 +41,14 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'animation-events',
+		fixture: 'test/fixtures/AnimationEvents.tsrx',
+		actions: [
+			{ event: 'animationstart', host: 'h1', animationName: 'close', elapsedTime: 0 },
+			{ event: 'animationend', host: 'h1', animationName: 'close', elapsedTime: 0.25 },
+		],
+	},
+	{
 		// A component's `value={prop}` that never changes leaves the typed text in the field.
 		name: 'component-input-value',
 		fixture: 'proofs/u120-component-input-value/App.tsrx',
@@ -1362,6 +1370,21 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// numberbox's step buttons: a press steps and starts the hold's clock, the lift stops it; a press the platform takes
+		// for a scroll steps and is cancelled, which stops it too.
+		name: 'press-cancel',
+		fixture: 'proofs/u40-numberbox/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'pointerdown', host: 'component-edge:4/h5' },
+			{ event: 'pointerup', host: 'component-edge:4/h5' },
+			{ event: 'pointerdown', host: 'component-edge:2/h4' },
+			{ event: 'pointerup', host: 'component-edge:2/h4' },
+			{ event: 'pointerdown', host: 'component-edge:4/h5' },
+			{ event: 'pointercancel', host: 'component-edge:4/h5' },
+		],
+	},
+	{
 		// qr-code: the svg's viewBox and its path's outline follow the code's value; the engine turns each into numbers.
 		name: 'live-drawing',
 		fixture: 'proofs/u42-qr-code/App.tsrx',
@@ -1772,6 +1795,12 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h6' },
 			{ event: 'activate', host: 'h7' },
 		],
+	},
+	{
+		name: 'center',
+		fixture: 'proofs/r171-center/App.tsrx',
+		modules: true,
+		actions: [{ event: 'activate', host: 'h4' }],
 	},
 	{
 		name: 'details',

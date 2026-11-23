@@ -1,0 +1,70 @@
+appId: ${APP_ID}
+name: n16-search-after-back
+---
+- launchApp:
+      clearState: true
+- assertVisible: No notes yet
+- assertVisible: Write your first note
+- assertVisible: All notes
+- tapOn: Write your first note
+- assertNotVisible: No notes yet
+- assertVisible: New note
+- assertVisible: New note
+- assertVisible: Save note
+- assertNotVisible: No notes yet
+- assertVisible: New note
+- tapOn: Title
+- eraseText
+- inputText: Groceries
+- hideKeyboard
+- assertVisible: Groceries
+- assertVisible: Save note
+- assertVisible: Groceries
+- tapOn: Save note
+- assertNotVisible: Save note
+- assertVisible: Note
+- assertVisible: Groceries
+- assertVisible: Edit
+- assertNotVisible: Save note
+- assertVisible: Note
+- tapOn: Notes
+- assertNotVisible: Edit
+- assertVisible: All notes
+- assertVisible: All notes
+- assertVisible: Groceries
+- assertVisible: Search notes
+- assertNotVisible: Edit
+- assertVisible: All notes
+- tapOn: Groceries
+- assertVisible: Edit
+- assertNotVisible: Search notes
+- assertVisible: Note
+- assertVisible: Edit
+- assertNotVisible: Search notes
+- assertVisible: Note
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertVisible: Search notes
+- assertNotVisible: Edit
+- assertVisible: All notes
+- assertVisible: All notes
+- assertVisible: Groceries
+- assertVisible: Search notes
+- assertNotVisible: Edit
+- assertVisible: All notes
+- tapOn: Search notes
+- eraseText
+- inputText: zzz
+- hideKeyboard
+- assertNotVisible: Groceries
+- assertVisible: No notes match “zzz”
+- assertNotVisible: Groceries

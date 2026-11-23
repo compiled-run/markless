@@ -133,6 +133,7 @@ export type NativeExpr =
 				| 'key'
 				| 'text'
 				| 'detail'
+				| NativeAnimationField
 				| NativePointerField;
 	  }
 	/** Whether the element `node` has captured the pointer `pointer` (`node.hasPointerCapture(pointer)`). */
@@ -311,6 +312,8 @@ export type NativeDefaultStyle = {
 	readonly marker?: 'disc' | 'decimal';
 	/** On `<summary>`: a triangle before its content, not read aloud: ▸ while its `aria-expanded` is false, ▾ while true. */
 	readonly disclosure?: true;
+	/** On `<center>`: its blocks in the middle of the line and its text centred (`text-align: -webkit-center`), inherited. */
+	readonly center?: true;
 	/** Table structure: `<td>` and `<th>` cells line up in columns across the rows of their `<table>`. */
 	readonly table?: 'table' | 'row' | 'cell';
 };
@@ -406,6 +409,7 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	dialog: {},
 	details: {},
 	summary: { disclosure: true },
+	center: { center: true },
 	form: {},
 	select: {},
 	option: {},
@@ -735,8 +739,18 @@ export type NativeEventName =
 	/** A range input let go after its value moved: the web's `change` on it. */
 	| 'commit'
 	| 'contextmenu'
+	| NativeAnimationEventName
 	| NativePointerEventName
 	| NativeMouseEventName;
+
+/**
+ * A CSS animation's events on a styled page, as the host's run of Dragon's animator gives them (css-animations-1 §4.2): it
+ * started, began another iteration, ended, or was removed while it ran.
+ */
+export type NativeAnimationEventName = 'animationstart' | 'animationiteration' | 'animationend' | 'animationcancel';
+
+/** What an animation event carries: the `@keyframes` name and the elapsed time in seconds. */
+export type NativeAnimationField = 'animationName' | 'elapsedTime';
 
 /**
  * The pointer events a touch raises, in a phone browser's order (Safari on iOS, Chrome on Android): `pointerover`, then
@@ -1756,9 +1770,10 @@ export const NATIVE_SCRIPT_DISMISS_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<st
 /** A submit handler's binding for its form's entries now, which its event's `target` and `currentTarget` carry for FormData. */
 export const NATIVE_SCRIPT_SUBMITTED_FORM = 'submitted form';
 
-/** Members of a page global a phone answers, read straight off it: the focused element, as a proxy. */
+/** Members of a page global a phone answers, read straight off it: the focused element, as a proxy, and the screen's history state. */
 export const NATIVE_SCRIPT_PAGE_MEMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
 	document: ['activeElement', 'addEventListener', 'removeEventListener'],
+	history: ['state', 'replaceState'],
 };
 
 /** What a touch adds to a script pointer handler's event: its plain values. The elements it names reach only data handlers. */

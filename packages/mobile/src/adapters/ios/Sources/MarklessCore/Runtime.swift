@@ -5,7 +5,8 @@ public struct NativeAction: Equatable, Sendable {
 	public let event: NativeEventName
 	/// The element acted on; "" for a `timer`.
 	public let host: String
-	/// For `input`: the field's whole text after the edit; for `keydown`, the key; for `paste`, the pasted text.
+	/// For `input`: the field's whole text after the edit; for `keydown`, the key; for `paste`, the pasted text; for an animation
+	/// event, the animation's name (its elapsed time in seconds is `time`).
 	public let value: String?
 	/// For `timer`: the journalled timer whose time has come.
 	public let timer: String?
@@ -797,7 +798,7 @@ public final class NativeRuntime {
 			focus = [("focused", .string(focused)), ("focusElements", try elementFacts(.object([]), also: [focused]))]
 		}
 		let text = try scriptHost.unwrap().entry { () throws -> String in
-			_ = try callScript("enter", .object(entry + focus + entryCells()))
+			_ = try callScript("enter", .object(entry + [("screen", .number(Double(screen)))] + focus + entryCells()))
 			return try callScript("leave")
 		}
 		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave")
@@ -995,7 +996,7 @@ public final class NativeRuntime {
 			let sent = JSONValue.array([listed, .array(tasks.map { .array($0.frame.map { readFrame($0.1) }) })]).jsonText
 			if sent == asyncSent && retry.isEmpty { return out }
 			asyncSent = sent
-			var entry: [(String, JSONValue)] = [("kind", .string("tasks")), ("screen", .number(Double(screen))), ("tasks", listed)]
+			var entry: [(String, JSONValue)] = [("kind", .string("tasks")), ("tasks", listed)]
 			if !retry.isEmpty { entry.append(("retry", .array(retry.map { .string($0) }))) }
 			retry = []
 			out += try enter(entry)
@@ -1047,7 +1048,7 @@ public final class NativeRuntime {
 	/// The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel.
 	public func leave() throws -> [NativeJournalEntry] {
 		guard asyncSent != nil else { return [] }
-		return try enter([("kind", .string("tasks")), ("screen", .number(Double(screen))), ("tasks", .array([])), ("leave", .bool(true))])
+		return try enter([("kind", .string("tasks")), ("tasks", .array([])), ("leave", .bool(true))])
 			.filter { if case .abort = $0 { true } else { false } }
 	}
 
@@ -1592,6 +1593,8 @@ public final class NativeRuntime {
 		case .keydown, .keyup: eventFields = [.key: .string(action.value ?? "")]
 		case .paste: eventFields = [.text: .string(action.value ?? "")]
 		case .activate: eventFields = clickFields(trusted: true).merging([.detail: .number(Double(action.detail ?? 1))]) { _, new in new }
+		case .animationstart, .animationiteration, .animationend, .animationcancel:
+			eventFields = [.animationName: .string(action.value ?? ""), .elapsedTime: .number(action.time ?? 0)]
 		default: break
 		}
 		if [.keydown, .keyup, .paste].contains(action.event) { targetText = try textOf(field: action.host) }

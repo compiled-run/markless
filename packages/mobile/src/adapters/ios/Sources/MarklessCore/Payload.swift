@@ -18,6 +18,8 @@ public enum NativeEventField: String, Sendable {
 	case value, reason, pressTarget, key, text, detail
 	/// A pointer event's, as a phone's browser reports a touch.
 	case target, currentTarget, relatedTarget, button, buttons, clientX, clientY, pointerId, pointerType, isPrimary, timeStamp
+	/// An animation event's: its `@keyframes` name and its elapsed time in seconds.
+	case animationName, elapsedTime
 	/// A click's, as a phone's browser fills it for a tap; `isTrusted` is false only for an event a script raised.
 	case shiftKey, ctrlKey, altKey, metaKey, isTrusted
 }
@@ -207,6 +209,8 @@ public struct NativeDefaultStyle: Equatable, Sendable {
 	public var marker: String?
 	/// On a summary: a ▸ (collapsed) or ▾ (expanded) before its content, by its `aria-expanded`.
 	public var disclosure = false
+	/// On a center: its blocks in the middle of the line and its text centred, which what is inside inherits.
+	public var center = false
 	/// `table`, `row` or `cell`.
 	public var table: String?
 	public init() {}
@@ -330,6 +334,8 @@ public enum NativeEventName: String, Sendable {
 	case submit
 	/// A range input let go after its value moved: the web's `change` on it.
 	case commit
+	/// A CSS animation's events on a styled page, from the host's run of Dragon's animator.
+	case animationstart, animationiteration, animationend, animationcancel
 	/// A `timer` journal entry's time has come.
 	case timer
 	/// The host is idle after the element appeared; once for each shown instance.
@@ -1201,7 +1207,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 	private static func decodeDefaultStyle(_ reader: Reader) throws -> NativeDefaultStyle {
 		let field = try reader.object(required: [], optional: [
 			"flow", "bold", "italic", "monospace", "size", "line", "shift", "highlight", "quotes", "preformatted", "indent", "rule",
-			"marker", "disclosure", "table",
+			"marker", "disclosure", "center", "table",
 		])
 		func oneOf(_ key: String, _ allowed: [String]) throws -> String? {
 			guard field.has(key) else { return nil }
@@ -1225,6 +1231,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		style.rule = try flag("rule")
 		style.marker = try oneOf("marker", ["disc", "decimal"])
 		style.disclosure = try flag("disclosure")
+		style.center = try flag("center")
 		style.table = try oneOf("table", ["table", "row", "cell"])
 		return style
 	}

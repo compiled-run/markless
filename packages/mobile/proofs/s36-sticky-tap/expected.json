@@ -1,5 +1,5 @@
 {
-	"rung": "S34",
+	"rung": "S36",
 	"name": "a tap on a sticky header over rows scrolled beneath it reaches the header, and a row tapped below it reaches the row, as the web routes both taps",
 	"steps": [
 		{
