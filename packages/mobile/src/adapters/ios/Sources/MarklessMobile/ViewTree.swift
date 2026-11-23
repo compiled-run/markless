@@ -1078,7 +1078,7 @@ final class ViewTree {
 		try paint(view, style, faces: faces)
 		if let label = view as? UILabel { drawLines(label, style) }
 		if let clip = clipViews[id] { clip.shape(style.childClip, in: view.bounds) }
-		else if style.childClip != nil, !(view is TextField) { throw HostError("\(id) began clipping overflow past its borders after it was built") }
+		else if style.childClip != nil, !(view is TextField), !(view is TextArea) { throw HostError("\(id) began clipping overflow past its borders after it was built") }
 		if let host = view.superview as? ContainerScrollView { view.frame.origin = CGPoint(x: view.frame.minX - host.inset.left, y: view.frame.minY - host.inset.top) }
 		try paintShadow(id, view, style)
 		try paintOutline(id, style)
@@ -1592,7 +1592,7 @@ final class ViewTree {
 						scrollViews[id] = scroll
 					}
 					// A text field clips its value to the editor box itself; a view over it would take its touches.
-					if !(view is TextField), style.childClip != nil || layout?.assignments.contains(where: { ($0[id] ?? $0[template])?.childClip != nil }) == true {
+					if !(view is TextField), !(view is TextArea), style.childClip != nil || layout?.assignments.contains(where: { ($0[id] ?? $0[template])?.childClip != nil }) == true {
 						let clip = PaddingClipView()
 						view.addSubview(clip)
 						clipViews[id] = clip
@@ -2623,6 +2623,10 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 		try field.paint(style.textField, faces: faces)
 		return
 	}
+	if let area = view as? TextArea {
+		try area.paint(style.textField, faces: faces)
+		return
+	}
 	if style.checkbox != nil { throw HostError("\(view.accessibilityIdentifier ?? "a box") draws a themed checkbox but is not a checkbox") }
 	guard let label = view as? UILabel else {
 		if style.font != nil || style.textColor != nil { throw HostError("\(view.accessibilityIdentifier ?? "a box") has text styles but is not text") }
@@ -3227,7 +3231,64 @@ final class TextArea: UITextView, UITextViewDelegate, KeyedInput {
 	}
 
 	func textViewDidChange(_ textView: UITextView) {
+		placeholderLabel.isHidden = !text.isEmpty
 		for change in onChange { change(text) }
+	}
+
+	private var styled: ResolvedStyle.TextFieldPaint?
+	private let placeholderLabel = UILabel()
+
+	/// On a styled page: the text in Dragon's font and colour, inset to the editor box, its lines Dragon's pitch apart with the first
+	/// baseline where Dragon puts it, and Dragon's placeholder in its box while the text is empty.
+	func paint(_ paint: ResolvedStyle.TextFieldPaint?, faces: [String: UIFontDescriptor]) throws {
+		styled = paint
+		guard let paint else { return }
+		let font = { (family: String, size: Double) throws -> UIFont in
+			guard let face = faces[family] else { throw HostError("font \(family) was not registered") }
+			return UIFont(descriptor: face, size: size)
+		}
+		let own = try font(paint.fontFamily, paint.fontSize)
+		var look: [NSAttributedString.Key: Any] = [.font: own]
+		if let color = paint.color { look[.foregroundColor] = uiColor(color) }
+		if let lines = paint.lines {
+			let spacing = NSMutableParagraphStyle()
+			spacing.minimumLineHeight = lines.pitch
+			spacing.maximumLineHeight = lines.pitch
+			look[.paragraphStyle] = spacing
+			// TextKit sets a fixed-height line's baseline at its height plus the face's descender; Dragon's is `above` below the top.
+			look[.baselineOffset] = lines.pitch + own.descender - lines.above
+		}
+		typingAttributes = look
+		attributedText = NSAttributedString(string: text, attributes: look)
+		textContainer.lineFragmentPadding = 0
+		if let shown = paint.placeholder {
+			placeholderLabel.text = shown.text
+			placeholderLabel.font = try font(shown.fontFamily, shown.fontSize)
+			placeholderLabel.textColor = shown.color.map(uiColor) ?? .placeholderText
+			placeholderLabel.isAccessibilityElement = false
+			if placeholderLabel.superview == nil { addSubview(placeholderLabel) }
+		} else {
+			placeholderLabel.removeFromSuperview()
+		}
+		placeholderLabel.isHidden = !text.isEmpty
+		setNeedsLayout()
+	}
+
+	/// While empty, the placeholder is the value read out, as a text field's is.
+	override var accessibilityValue: String? {
+		get { text.isEmpty && placeholderLabel.superview != nil ? placeholderLabel.text : super.accessibilityValue }
+		set { super.accessibilityValue = newValue }
+	}
+
+	override func layoutSubviews() {
+		super.layoutSubviews()
+		guard let paint = styled else { return }
+		let e = paint.editor
+		let bottom = paint.lines.map { $0.insets[2] + e.y - $0.insets[0] } ?? e.y
+		textContainerInset = UIEdgeInsets(top: e.y, left: e.x, bottom: bottom, right: bounds.width - e.x - e.width)
+		if let shown = paint.placeholder {
+			placeholderLabel.frame = CGRect(x: shown.frame.x, y: shown.frame.y, width: shown.frame.width, height: shown.frame.height)
+		}
 	}
 
 	func textViewDidBeginEditing(_ textView: UITextView) {

@@ -288,13 +288,13 @@ function mirror(
 	// A field with no value binding holds its `value` attribute until something is typed into it.
 	const valueAttribute = (host: string) => {
 		const node = nodeOf.get(host);
-		if (node?.kind !== 'element' || node.element !== 'input') return undefined;
+		if (node?.kind !== 'element' || (node.element !== 'input' && node.element !== 'textarea')) return undefined;
 		return attributes.get(`${host}\0value`) ?? node.attributes?.['value'] ?? '';
 	};
 	// An empty field shows its placeholder.
 	const placeholders = () =>
 		payload.nodes.flatMap((node) => {
-			if (node.kind !== 'element' || node.element !== 'input' || !shownNode(node.id) || hiddenWithin(node.id)) return [];
+			if (node.kind !== 'element' || (node.element !== 'input' && node.element !== 'textarea') || !shownNode(node.id) || hiddenWithin(node.id)) return [];
 			const bound = attributes.get(`${node.id}\0placeholder`);
 			const placeholder = bound !== undefined ? bound : (node.attributes?.['placeholder'] ?? null);
 			return placeholder !== null && (properties.get(node.id) ?? valueAttribute(node.id)) === '' ? [placeholder] : [];

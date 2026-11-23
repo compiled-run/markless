@@ -682,6 +682,29 @@ export function nativeStyleInput(
 						attributes[binding.attribute] = byState[0]!.value;
 				} else attributesByState[binding.attribute] = byState;
 			}
+			// Dragon lays a textarea's value out as its text child, kept even while empty so the host's edits have a leaf to land in.
+			const areaText =
+				node.element === 'textarea'
+					? {
+							kind: 'text' as const,
+							id: `${node.id}:text0`,
+							parent: node.id,
+							text: attributes['value'] ?? '',
+							...(attributesByState['value']
+								? {
+										textByState: attributesByState['value'].map((entry) => ({
+											when: entry.when,
+											value: entry.value ?? '',
+										})),
+									}
+								: {}),
+							...place,
+						}
+					: undefined;
+			if (areaText) {
+				delete attributes['value'];
+				delete attributesByState['value'];
+			}
 			return [
 				{
 					kind: 'element',
@@ -706,6 +729,7 @@ export function nativeStyleInput(
 						: {}),
 					...place,
 				},
+				...(areaText ? [areaText] : []),
 			];
 		}),
 		css: [...stylesheets, ...styles].map((style) => style.cssText).join('\n'),
