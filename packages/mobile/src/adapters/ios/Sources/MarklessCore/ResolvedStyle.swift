@@ -315,8 +315,8 @@ extension StyleExport {
 			case .branch, .repeat, .sheet: break
 			case .text:
 				guard styled.isText else { throw styleError("\(node.id) is text in the payload and an element in the style export") }
-				// A text in an arm not shown at mount is read when its arm opens.
-				if let texts, let shown = texts[node.id], styled.text != shown {
+				// A text in an arm not shown at mount is read when its arm opens; one with no box here is laid out where it shows.
+				if let texts, let shown = texts[node.id], styled.frame != nil, styled.text != shown {
 					throw styleError("\(node.id) reads \"\(shown)\" but the style export laid out \(styled.text.map { "\"\($0)\"" } ?? "nothing")")
 				}
 			}

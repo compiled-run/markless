@@ -3985,6 +3985,40 @@ export function Page() @{
 	});
 });
 
+it('lists the values a row field can take when an async value builds its rows from literals chosen by conditions', async () => {
+	const { payload, diagnostics } = await nativeView(`import { computed, state } from '@markless/core';
+type Row = { readonly id: string; readonly title: string; readonly tone: string };
+function taskRows(done: number): Row[] {
+	return ['Milk', 'Bread'].filter(Boolean).map((title, index) => {
+		const id = 't' + index;
+		return { id, title, tone: index < done ? 'done' : ' ' };
+	});
+}
+async function loadTasks(done: number): Promise<{ readonly rows: Row[] }> {
+	return { rows: taskRows(done) };
+}
+export function Tasks() @{
+	let done = state(1);
+	const tasks = computed(async () => loadTasks(done));
+	<main>
+		@try {
+			<ul>
+				@for (const row of tasks.rows; key row.id) {
+					<li class={row.tone}>{row.title}</li>
+				}
+			</ul>
+		} @pending {
+			<p>Loading</p>
+		}
+		<button onClick={() => done++}>Finish one</button>
+	</main>
+}`);
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	const repeat = payload!.nodes.find((node) => node.kind === 'repeat');
+	expect(repeat).toMatchObject({ itemValues: { tone: ['done', ' '] } });
+	expect(repeat && 'itemValues' in repeat ? Object.keys(repeat.itemValues!) : []).toEqual(['tone']);
+});
+
 it('lowers a @try with no @catch: its error shows nothing, and the rest of the page stays, as the web renders it', async () => {
 	const { payload, diagnostics } = await nativeView(`import { computed } from '@markless/core';
 async function load(): Promise<string> { throw new Error('down'); }

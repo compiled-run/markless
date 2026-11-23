@@ -27,6 +27,7 @@ import { uiIconsOptions } from '@markless/ui-tools';
 import { NATIVE_APP_VERSION, NATIVE_NOT_FOUND_ROUTE } from '@markless/serializer/native-view';
 import {
 	booleanCellsOf,
+	itemValuesOf,
 	nativeStyleInputs,
 	nativeStyleRowAttribute,
 	readsRow,
@@ -484,7 +485,12 @@ function unstyledOnly(
 			'attribute' in binding &&
 			nativeStyleRowAttribute(binding.attribute, tested) &&
 			readsRow(payload, binding.value) &&
-			!rowAttributeOptions(binding.attribute, binding.value, booleanCellsOf(payload))
+			!rowAttributeOptions(
+				binding.attribute,
+				binding.value,
+				booleanCellsOf(payload),
+				itemValuesOf(payload),
+			)
 				? [
 						nativeUnsupported(
 							`the \`${binding.attribute}\` of <${node.element}> ${node.id} follows its @for row on a styled page through a value the build cannot list; Dragon styles a row by each value it can give, so write it as literals chosen by conditions`,
