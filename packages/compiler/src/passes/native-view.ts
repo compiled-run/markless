@@ -553,7 +553,6 @@ type Item =
 			readonly path: ReadonlyArray<number>;
 	  };
 
-/** `Number`'s constants: the finite ones as literals, the non-finite ones by name. */
 /** The members of a page's `url` a phone gives as data; a script reads the rest off a `URL`. */
 const PAGE_URL_DATA_MEMBERS = new Set(['pathname', 'search', 'hash']);
 /** What a script reads off a page's `url` when the app has no `origin`: none of them depends on one. */
@@ -569,6 +568,7 @@ function splitHref(href: string): { readonly path: string; readonly search: stri
 	return { path: beforeHash.slice(0, query), search: search === '?' ? '' : search };
 }
 
+/** `Number`'s constants: the finite ones as literals, the non-finite ones by name. */
 const NUMBER_CONSTANTS: Readonly<Record<string, NativeExpr>> = {
 	POSITIVE_INFINITY: { nonFinite: 'Infinity' },
 	NEGATIVE_INFINITY: { nonFinite: '-Infinity' },
