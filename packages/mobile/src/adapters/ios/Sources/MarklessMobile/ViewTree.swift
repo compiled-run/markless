@@ -389,8 +389,10 @@ final class ViewTree {
 	var onShown: (() -> Void)?
 	/// The pointer steps since the page opened, by the node each names, replayed through the current level's tables.
 	private var interactionSteps: [(op: String, node: String?)] = []
-	/// The row copy (`<template>@<key>`) the last touch began in: an interaction state styles that copy, not every copy.
-	private var touchedCopy: String?
+	/// The list row (`@<key>` of its copies) the finger is pressing, and the one the focused element is in: an interaction state
+	/// styles only those rows' copies.
+	private var pressedRow: String?
+	private var focusedRow: String?
 	private var interactionWatcher: InteractionWatcher?
 	private let bodyLayer = CALayer()
 	/// Each styled sheet's layout per resting height, the height it rests at, and each height's current assignment.
@@ -1142,11 +1144,17 @@ final class ViewTree {
 	/// A touch on the page as Dragon's interaction runtime takes it: the element under the finger, then the state it selects.
 	private func interacted(_ phase: InteractionWatcher.Phase, at point: CGPoint) {
 		let node = phase == .cancelled ? nil : touchedNode(at: point)
-		if phase == .began { touchedCopy = node.flatMap { $0.copy } }
 		switch phase {
-		case .began: interactionSteps.append(("touch-down", node?.id))
-		case .ended: interactionSteps.append(("touch-up", node?.id))
-		case .cancelled: interactionSteps.append(("touch-cancel", nil))
+		case .began:
+			pressedRow = node?.row
+			interactionSteps.append(("touch-down", node?.id))
+		case .ended:
+			pressedRow = nil
+			focusedRow = node?.row
+			interactionSteps.append(("touch-up", node?.id))
+		case .cancelled:
+			pressedRow = nil
+			interactionSteps.append(("touch-cancel", nil))
 		}
 		let before = shown
 		reselect()
@@ -1162,13 +1170,13 @@ final class ViewTree {
 	}
 
 	/// The payload node under `point` and, inside a list row, the row copy it is in.
-	private func touchedNode(at point: CGPoint) -> (id: String, copy: String?)? {
+	private func touchedNode(at point: CGPoint) -> (id: String, row: String?)? {
 		guard let screen = page.superview, var view = screen.hitTest(point, with: nil) else { return nil }
 		let ids = Dictionary(elements.map { (ObjectIdentifier($0.value), $0.key) }, uniquingKeysWith: { a, _ in a })
 		while true {
 			if let id = ids[ObjectIdentifier(view)] {
 				let template = templates[id] ?? id
-				return (template, id == template ? nil : id)
+				return (template, id.firstIndex(of: "@").map { String(id[id.index(after: $0)...]) })
 			}
 			guard let parent = view.superview else { return nil }
 			view = parent
@@ -1209,7 +1217,8 @@ final class ViewTree {
 			return styles.heights[styles.height].layout.assignments[styles.assignments[styles.height]][template]
 		}
 		// An interaction state styles the row copy the touch was in; every other copy of that row keeps the assignment's look.
-		let entry = shown != assignment && id != template && id != touchedCopy ? assignment : shown
+		let row = id.firstIndex(of: "@").map { String(id[id.index(after: $0)...]) }
+		let entry = shown != assignment && id != template && row != pressedRow && row != focusedRow ? assignment : shown
 		// A row's copy has its own box once the page's rows are laid out; until then its template's.
 		return layout?.assignments[entry][id] ?? layout?.assignments[entry][template]
 	}
@@ -2804,18 +2813,45 @@ private final class InteractionWatcher: UIGestureRecognizer, UIGestureRecognizer
 		delegate = self
 	}
 
+	/// The finger the runtime follows (the first down; others are ignored), where and when it went down.
+	private var finger: (touch: UITouch, at: CGPoint, time: TimeInterval)?
+	/// Past this the finger scrolls: Chrome cancels the press (pointercancel), and the lift focuses nothing.
+	private let slop: CGFloat = 10
+	/// A finger held this long is a long press, whose lift is not a tap, as in Chrome.
+	private let longPress: TimeInterval = 0.5
+
 	override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
-		if let touch = touches.first, let view { report(.began, touch.location(in: view)) }
+		guard finger == nil, let touch = touches.first, let view else { return }
+		let at = touch.location(in: view)
+		finger = (touch, at, touch.timestamp)
+		report(.began, at)
+	}
+
+	override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
+		guard let finger, touches.contains(finger.touch), let view else { return }
+		let at = finger.touch.location(in: view)
+		if hypot(at.x - finger.at.x, at.y - finger.at.y) > slop { end(.cancelled, .zero) }
 	}
 
 	override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
-		if let touch = touches.first, let view { report(.ended, touch.location(in: view)) }
-		state = .failed
+		guard let finger, touches.contains(finger.touch), let view else { return }
+		if finger.touch.timestamp - finger.time >= longPress { end(.cancelled, .zero) } else { end(.ended, finger.touch.location(in: view)) }
 	}
 
 	override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
-		report(.cancelled, .zero)
+		guard let finger, touches.contains(finger.touch) else { return }
+		end(.cancelled, .zero)
+	}
+
+	private func end(_ phase: Phase, _ at: CGPoint) {
+		finger = nil
+		report(phase, at)
 		state = .failed
+	}
+
+	override func reset() {
+		super.reset()
+		finger = nil
 	}
 
 	func gestureRecognizer(_ a: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith b: UIGestureRecognizer) -> Bool { true }

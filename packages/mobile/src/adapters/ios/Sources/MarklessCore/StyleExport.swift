@@ -735,8 +735,10 @@ public struct StyleExport: Sendable {
 		out.assignments = try assignments.indices.map { k in
 			let names = k < planNames.count ? planNames[k] : [:]
 			let dragonId = Dictionary(names.map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
-			// An interaction state's rows are its assignment's.
+			// An interaction state's rows are its assignment's; laid out in the state, a row of that assignment takes the state's look
+			// (the host shows it on the touched copy only).
 			let shown = !planRepeats.isEmpty ? try rows?(assignmentOf(entry: k)) : nil
+			let rowEntry = { (a: Int) in a == self.assignmentOf(entry: k) ? k : a }
 			var line = "{\"assignment\":\(k),\"dpr\":\(JSONValue.number(scale).jsonText),\"viewport\":{\"width\":\(JSONValue.number(width).jsonText),\"height\":\(JSONValue.number(height).jsonText)},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":\(plan)\(slotLine)"
 			if let shown {
 				let lists = planRepeats.map { r -> JSONValue in
@@ -747,7 +749,7 @@ public struct StyleExport: Sendable {
 						("parent", .string(r.parent)), ("template", .array(r.template.map { .string($0) })),
 						("rows", .array((parentShown ? shown[r.id] ?? [] : []).map { row in
 							.object([
-								("key", .string(row.key)), ("assignment", .number(Double(row.assignment))),
+								("key", .string(row.key)), ("assignment", .number(Double(rowEntry(row.assignment)))),
 								("texts", .array(row.texts.sorted { $0.key < $1.key }.map { .array([.string(dragonId[$0.key] ?? $0.key), .string($0.value)]) })),
 							] + (slotted ? [("slots", hex(zip(slots, values).map { row.slots[$0.id] ?? $1 }))] : []))
 						})),
@@ -873,7 +875,7 @@ public struct StyleExport: Sendable {
 				}
 				withRows.append(node.hidden())
 				for row in shown[list.id] ?? [] {
-					guard let own = assignments[row.assignment].nodes.first(where: { $0.id == node.id }) else {
+					guard let own = assignments[rowEntry(row.assignment)].nodes.first(where: { $0.id == node.id }) else {
 						throw PayloadError(path: "plan layout", reason: "assignment \(row.assignment) has no node \(node.id) for row \(row.key)")
 					}
 					let copy = StyleNode(

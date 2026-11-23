@@ -305,14 +305,16 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 		val laid = assignments.indices.map { k ->
 			val names = planNames.getOrNull(k) ?: emptyMap()
 			val dragonId = names.entries.associate { (d, m) -> m to d }
-			// An interaction state's rows are its assignment's.
+			// An interaction state's rows are its assignment's; laid out in the state, a row of that assignment takes the state's look
+			// (the host shows it on the touched copy only).
 			val shown = if (planRepeats.isEmpty()) null else rows?.invoke(assignmentOf(k))
+			val rowEntry = { a: Int -> if (a == assignmentOf(k)) k else a }
 			val lists = shown?.let { byList ->
 				Json.Arr(planRepeats.map { r ->
 					// A list an arm hides at this assignment has no box to hold rows: its rows are not laid out there.
 					val parentShown = r.parent == "body" || assignments[k].byId[names[r.parent] ?: r.parent]?.frame != null
 					obj("parent" to Json.Str(r.parent), "template" to Json.Arr(r.template.map { Json.Str(it) }), "rows" to Json.Arr((if (parentShown) byList[r.id] ?: emptyList() else emptyList()).map { row ->
-						val fields = mutableListOf<Pair<String, Json>>("key" to Json.Str(row.key), "assignment" to Json.Num(row.assignment.toDouble()), "texts" to Json.Arr(row.texts.entries.sortedBy { it.key }.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }))
+						val fields = mutableListOf<Pair<String, Json>>("key" to Json.Str(row.key), "assignment" to Json.Num(rowEntry(row.assignment).toDouble()), "texts" to Json.Arr(row.texts.entries.sortedBy { it.key }.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }))
 						if (slots.isNotEmpty()) fields.add("slots" to hex(slots.mapIndexed { i, s -> row.slots[s.id] ?: slotValues[i] }))
 						obj(*fields.toTypedArray())
 					}))
@@ -420,7 +422,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				}
 				withRows.add(node.copy(frame = null, borderWidths = null, borderOps = null, scrollRange = null, lines = null))
 				for (row in shown[place.first.id] ?: emptyList()) {
-					val own = assignments[row.assignment].byId[node.id] ?: throw MarklessDecodeError("assignment ${row.assignment} has no node ${node.id} for row ${row.key}")
+					val own = assignments[rowEntry(row.assignment)].byId[node.id] ?: throw MarklessDecodeError("assignment ${row.assignment} has no node ${node.id} for row ${row.key}")
 					val copy = own.copy(id = "${node.id}@${row.key}", parent = if (place.second) node.parent else node.parent?.let { "$it@${row.key}" }, text = if (own.kind == "text") (row.texts[node.id] ?: own.text) else own.text)
 					withRows.add(rowMoved[row.key]?.get(node.id)?.let { copy.copy(writes = slotWrites(copy, it)) } ?: copy)
 				}

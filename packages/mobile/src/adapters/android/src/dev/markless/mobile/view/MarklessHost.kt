@@ -269,8 +269,12 @@ class MarklessHost(
 		/** The entry shown: the assignment, or the interaction state (`:active`, `:focus`) Dragon's runtime selects in it. */
 		var shown = assignment
 
-		/** The entry [id] takes: an interaction state styles the row copy the touch was in, every other copy keeps the assignment's. */
-		fun entryFor(id: String, template: String): Int = if (shown != assignment && id != template && id != touchedCopy) assignment else shown
+		/** The entry [id] takes: in a list row, an interaction state styles only the row the press or the focus is in. */
+		fun entryFor(id: String, template: String): Int {
+			if (shown == assignment || id == template) return shown
+			val key = id.substringAfter('@')
+			return if (key == pressedRow || key == focusedRow) shown else assignment
+		}
 		var absolutes: List<Map<String, Pair<Double, Double>>> = export.assignments.map { a -> absoluteOrigins(a.nodes) }
 			private set
 
@@ -297,6 +301,14 @@ class MarklessHost(
 		/** The bottom edge of its lowest box, in device px from the document's top. */
 		fun contentBottom(): Double = export.assignments[shown].nodes.maxOf { n -> (absolutes[shown][n.id]?.second ?: 0.0) + (n.frame?.height ?: 0.0) }
 	}
+
+	/** The pointer steps since the page opened, by the node each names, replayed through the current level's tables. */
+	private val interactionSteps = mutableListOf<Pair<String, String?>>()
+	/** The list row (`@<key>` of its copies) the finger is pressing, and the one the focused element is in. */
+	private var pressedRow: String? = null
+	private var focusedRow: String? = null
+	/** Where the current touch began, to tell a tap from a scroll. */
+	private var touchStart: Pair<Float, Float>? = null
 
 	private val page: Layout? = style?.let { Layout(it, everyCell = true) }
 	/** The page's transitions and animations, run by Dragon's animator while they run, one display frame at a time. */
@@ -598,41 +610,69 @@ class MarklessHost(
 
 	/** Reports a touch in window coordinates to the runtime as pointer events; call it before the views see the touch. True when a long press took the gesture. */
 	fun touch(event: android.view.MotionEvent): Boolean {
-		interact(event)
-		return overlays.touch(event)
+		val pressedLong = overlays.touch(event)
+		interact(event, pressedLong)
+		return pressedLong
 	}
 
-	/** The pointer steps since the page opened, by the node each names, replayed through the current level's tables. */
-	private val interactionSteps = mutableListOf<Pair<String, String?>>()
-	/** The row copy (`<template>@<key>`) the last touch began in. */
-	private var touchedCopy: String? = null
 
 	/** A touch on the page as Dragon's interaction runtime takes it: the element under the finger, then the state it selects. */
-	private fun interact(e: android.view.MotionEvent) {
+	private fun interact(e: android.view.MotionEvent, pressedLong: Boolean) {
 		val p = page ?: return
 		if (p.export.interaction.isEmpty()) return
 		when (e.actionMasked) {
 			android.view.MotionEvent.ACTION_DOWN -> {
 				val at = touchedNode(e.rawX, e.rawY)
-				touchedCopy = at?.second
+				pressedRow = at?.second
+				touchStart = e.rawX to e.rawY
 				interactionSteps += "touch-down" to at?.first
 			}
-			android.view.MotionEvent.ACTION_UP -> interactionSteps += "touch-up" to touchedNode(e.rawX, e.rawY)?.first
-			android.view.MotionEvent.ACTION_CANCEL -> interactionSteps += "touch-cancel" to null
+			android.view.MotionEvent.ACTION_MOVE -> {
+				// A finger that moves past the touch slop scrolls: Chrome cancels the press (pointercancel), and the lift focuses nothing.
+				val start = touchStart ?: return
+				val slop = android.view.ViewConfiguration.get(context).scaledTouchSlop
+				if (Math.hypot((e.rawX - start.first).toDouble(), (e.rawY - start.second).toDouble()) <= slop) return
+				touchStart = null
+				pressedRow = null
+				interactionSteps += "touch-cancel" to null
+			}
+			android.view.MotionEvent.ACTION_UP -> {
+				if (touchStart == null) return
+				touchStart = null
+				pressedRow = null
+				// After a long press the lift is not a tap, as in Chrome.
+				if (pressedLong) interactionSteps += "touch-cancel" to null
+				else {
+					val at = touchedNode(e.rawX, e.rawY)
+					interactionSteps += "touch-up" to at?.first
+					focusedRow = at?.second
+				}
+			}
+			android.view.MotionEvent.ACTION_CANCEL -> {
+				touchStart = null
+				pressedRow = null
+				interactionSteps += "touch-cancel" to null
+			}
 			else -> return
 		}
 		val before = p.shown
 		reselect(p)
+		// repaint lays the page out again, which takes the shown entry's page range (pageSize).
 		if (p.shown != before) repaint()
 	}
 
 	/** The payload node of the innermost shown view under the screen point, and the row copy it is in. */
 	private fun touchedNode(x: Float, y: Float): Pair<String, String?>? {
-		val rect = android.graphics.Rect()
-		val hit = views.entries.filter { (_, v) -> v.isShown && v.getGlobalVisibleRect(rect) && rect.contains(x.toInt(), y.toInt()) }
-			.maxByOrNull { (_, v) -> generateSequence(v.parent) { it.parent }.count() } ?: return null
+		// Screen coordinates, as MotionEvent.raw* are: a window in split screen is not at the screen's origin.
+		val at = IntArray(2)
+		val hit = views.entries.filter { (_, v) ->
+			v.isShown && v.width > 0 && v.height > 0 && run {
+				v.getLocationOnScreen(at)
+				x >= at[0] && x < at[0] + v.width && y >= at[1] && y < at[1] + v.height
+			}
+		}.maxByOrNull { (_, v) -> generateSequence(v.parent) { it.parent }.count() } ?: return null
 		val template = hit.key.substringBefore('@')
-		return template to hit.key.takeIf { it != template }
+		return template to hit.key.substringAfter('@', "").ifEmpty { null }
 	}
 
 	/** The entry [l] shows: the state `rt-interaction` selects over the steps in its assignment's level, or the assignment. */
@@ -1780,8 +1820,8 @@ class MarklessHost(
 	/** After layout: the largest gap, in device px, between any edge of a view's laid-out box (relative to the root) and its Dragon frame. */
 	fun frameDeviation(): Double {
 		val page = page ?: throw MarklessHostError("no style export to compare frames with")
-		val absolute = page.absolutes[page.assignment]
-		val styled = page.export.assignments[page.assignment]
+		val absolute = page.absolutes[page.shown]
+		val styled = page.export.assignments[page.shown]
 		val origin = absolute.getValue(payload.nodes.first().id)
 		val rootAt = IntArray(2).also { root.getLocationInWindow(it) }
 		var worst = 0.0
