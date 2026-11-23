@@ -164,6 +164,7 @@ var elementOf = function (id) {
 			chosen = files.map(function (file) {
 				var made = new g.File([], file.name, { type: file.type, lastModified: file.lastModified });
 				Object.defineProperty(made, 'size', { value: file.size });
+				Object.defineProperty(made, '__ref', { value: file.ref });
 				return made;
 			});
 		},
@@ -246,9 +247,20 @@ var fail = function (slot, error) {
 			message: error && error.message !== undefined ? String(error.message) : String(error),
 		};
 };
+// A file input's entry (its node) is each file it holds, or an empty one named '' when it holds none, as a browser's form data.
+var formEntries = function (entries) {
+	var list = [];
+	entries.forEach(function (entry) {
+		if (entry[1] === null || typeof entry[1] !== 'object') return list.push(entry);
+		var files = Array.prototype.slice.call(elementOf(entry[1].files).files || []);
+		if (files.length === 0) files = [new g.File([], '', { type: 'application/octet-stream' })];
+		files.forEach(function (file) { list.push([entry[0], file]); });
+	});
+	return list;
+};
 var eventOf = function (given, frame) {
 	var entries = frame["submitted form"];
-	var target = entries ? new host.Form(entries) : { value: given.value === undefined ? '' : given.value, checked: given.checked === true };
+	var target = entries ? new host.Form(formEntries(entries)) : { value: given.value === undefined ? '' : given.value, checked: given.checked === true };
 	var detail;
 	if (given.detail !== null && typeof given.detail === 'object') {
 		detail = { reason: given.detail.reason };
@@ -373,6 +385,9 @@ g.__markless[id] = {
 			if (event && event.propagationStopped && entry.event.type === 'click') host.out.stopped = true;
 			// A handler that sets its text field's value writes the field, as the DOM's value setter does.
 			if (event && typeof entry.event.value === 'string' && event.target && !(event.target instanceof host.Form) && typeof event.target.value === 'string' && event.target.value !== entry.event.value) host.out.value = event.target.value;
+		} else if (entry.kind === 'pick') {
+			// A file input with no handler of its own still holds what was chosen, for a form's FormData to read.
+			elementOf(entry.node).__choose(entry.files);
 		} else if (entry.kind === 'document') {
 			var heard = (host.listeners[entry.event.type] || []).slice();
 			var bubbled = heard.length > 0 ? eventOf(entry.event, {}) : null;

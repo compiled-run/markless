@@ -305,7 +305,7 @@ data class Continuation(val id: String, val local: String, val ops: List<Op>, va
 /** A device object a component makes (`const cam = camera()`); it lives while its [owner] node is shown. */
 data class DeviceObject(val id: String, val device: String, val owner: String)
 
-enum class FieldKind(val wire: String) { Text("text"), Number("number"), Checkbox("checkbox"), Radio("radio"), Hidden("hidden"), Select("select") }
+enum class FieldKind(val wire: String) { Text("text"), Number("number"), Checkbox("checkbox"), Radio("radio"), Hidden("hidden"), Select("select"), File("file") }
 
 /** Why a number field fails before a submit, after a missing value; see [nativeNumberProblem]. */
 sealed interface NumberProblem {

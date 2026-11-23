@@ -192,12 +192,14 @@
 				"host": "h1",
 				"files": [
 					{
+						"ref": "picked:1",
 						"name": "note.txt",
 						"size": 5,
 						"type": "text/plain",
 						"lastModified": 1700000000000
 					},
 					{
+						"ref": "picked:2",
 						"name": "photo.png",
 						"size": 2048,
 						"type": "image/png",

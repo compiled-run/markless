@@ -231,7 +231,9 @@ export const NATIVE_SCRIPT_MEDIA_FEATURES = {
 
 /** The device's answer to each media feature now, which every script entry of a page that reads `matchMedia` carries. */
 export type NativeScriptMedia = {
-	readonly [Feature in keyof typeof NATIVE_SCRIPT_MEDIA_FEATURES]: (typeof NATIVE_SCRIPT_MEDIA_FEATURES)[Feature][number];
+	readonly [
+		Feature in keyof typeof NATIVE_SCRIPT_MEDIA_FEATURES
+	]: (typeof NATIVE_SCRIPT_MEDIA_FEATURES)[Feature][number];
 };
 
 /** The screen a script's `devicePixelRatio` reads as each entry begins: device pixels per CSS px, as the phone's browser reports it. */
@@ -1405,7 +1407,15 @@ export type NativeForm = {
 };
 
 /** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, a hidden input, or a `<select>`. */
-export type NativeFieldKind = 'text' | 'number' | 'checkbox' | 'radio' | 'hidden' | 'select';
+/** `file`: a file input, whose entries are the files its JavaScript holds; only a submit handler's script reads them. */
+export type NativeFieldKind =
+	| 'text'
+	| 'number'
+	| 'checkbox'
+	| 'radio'
+	| 'hidden'
+	| 'select'
+	| 'file';
 
 export {
 	NATIVE_NUMBER_MESSAGES_BY_LOCALE,
@@ -1558,8 +1568,22 @@ export type NativeFetchRequest = {
 	readonly url: string;
 	readonly method: string;
 	readonly headers: ReadonlyArray<readonly [string, string]>;
-	readonly body: string | null;
+	/** Text, or a FormData's entries, which the host sends as multipart/form-data with a boundary of its own. */
+	readonly body: string | { readonly form: ReadonlyArray<NativeFormPart> } | null;
 };
+
+/** A FormData entry: its text, or a file by its text or by the host's reference to a file a picker chose. */
+export type NativeFormPart = readonly [
+	name: string,
+	value:
+		| string
+		| {
+				readonly name: string;
+				readonly type: string;
+				readonly ref?: string;
+				readonly text?: string;
+		  },
+];
 
 /** What a host answers a `fetch` entry with: the response (its body as text), or the network error's message. */
 export type NativeFetchResponse =

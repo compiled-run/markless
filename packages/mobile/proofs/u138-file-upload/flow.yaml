@@ -1,0 +1,19 @@
+appId: ${APP_ID}
+name: u138-file-upload
+---
+- launchApp:
+      clearState: true
+      arguments:
+          pick: '[{"name":"note.txt","text":"hello","type":"text/plain"}]'
+- assertVisible: Upload
+- assertVisible: Choose
+- assertVisible: Send
+- assertVisible: nothing sent
+- tapOn: Choose
+- assertNotVisible: nothing sent
+- assertVisible: chosen
+- assertNotVisible: nothing sent
+- tapOn: Send
+- assertNotVisible: chosen
+- assertVisible: POST multipart title=Trip photo=note\.txt:hello note=hi\.txt:hi
+- assertNotVisible: chosen

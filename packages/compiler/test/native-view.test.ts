@@ -3450,7 +3450,7 @@ export function Upload() @{
 		expect(payload!.handlers[0]!.ops.map((op) => op.op)).toEqual(['script']);
 	});
 
-	it('refuses a file input inside a form, whose files the web sends with it', async () => {
+	it('refuses a file input in a form whose submit handler is data, as only JavaScript reads the files the web sends', async () => {
 		const { payload, diagnostics } = await nativeView(`export function Send() @{
 	<form onSubmit={(event) => event.preventDefault()}>
 		<input type="file" name="photo" aria-label="Photo" />
@@ -3459,7 +3459,7 @@ export function Upload() @{
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toEqual([
-			'the <input> h1 in the <form> h0 sends its chosen files with the form, which a native form does not send yet',
+			'the <input> h1 in the <form> h0 sends its chosen files with the form, which a native form sends only from a submit handler that runs as JavaScript',
 		]);
 	});
 

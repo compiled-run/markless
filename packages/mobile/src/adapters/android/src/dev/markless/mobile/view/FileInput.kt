@@ -88,7 +88,7 @@ class FileInputView(context: Context, unseen: Boolean) : LinearLayout(context) {
 		val byExtension = MimeTypeMap.getSingleton().getMimeTypeFromExtension(name.substringAfterLast('.', "").lowercase()).orEmpty()
 		if (uri.scheme == "file") {
 			val file = File(uri.path!!)
-			return PickedFile(name, file.length().toDouble(), byExtension, file.lastModified().toDouble())
+			return PickedFile(uri.toString(), name, file.length().toDouble(), byExtension, file.lastModified().toDouble())
 		}
 		var size = 0.0
 		var modified = System.currentTimeMillis().toDouble()
@@ -98,7 +98,7 @@ class FileInputView(context: Context, unseen: Boolean) : LinearLayout(context) {
 				if (!it.isNull(1)) modified = it.getLong(1).toDouble()
 			}
 		}
-		return PickedFile(name, size, context.contentResolver.getType(uri) ?: byExtension, modified)
+		return PickedFile(uri.toString(), name, size, context.contentResolver.getType(uri) ?: byExtension, modified)
 	}
 
 	companion object {

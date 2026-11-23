@@ -10050,10 +10050,17 @@ export function createNativeViewPayload(
 					submitters.push(node.id);
 					continue;
 				}
+				// A file input's files reach only a submit handler's JavaScript, its FormData, which a host sends as multipart.
 				if (type === 'file') {
-					refuse(
-						`${field} sends its chosen files with the form, which a native form does not send yet`,
-					);
+					if (!scriptSubmits.has(form.id))
+						refuse(
+							`${field} sends its chosen files with the form, which a native form sends only from a submit handler that runs as JavaScript`,
+						);
+					else if (attribute(node, 'required'))
+						refuse(
+							`${field} has \`required\`, which the web checks before a submit and no native host checks for a file yet`,
+						);
+					else fields.push({ node: node.id, kind: 'file' });
 					continue;
 				}
 				const range = type === 'range';
