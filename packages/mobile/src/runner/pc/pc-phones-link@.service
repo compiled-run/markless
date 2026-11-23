@@ -1,0 +1,26 @@
+[Unit]
+Description=Reverse link to %i: the mini reaches the phone sshd at its own 127.0.0.1
+After=network-online.target
+
+[Service]
+User=ghlink
+Group=ghlink
+ExecStart=/usr/bin/ssh -T -F /etc/pc-phones-link/ssh_config %i
+Restart=always
+RestartSec=15
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectProc=invisible
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+TemporaryFileSystem=/mnt:ro
+BindReadOnlyPaths=/mnt/wsl/resolv.conf
+InaccessiblePaths=/run/WSL /init -/usr/lib/wsl -/etc/markless-runner -/etc/pc-phones
+IPAddressDeny=any
+IPAddressAllow=127.0.0.0/8 192.168.4.0/24
+
+[Install]
+WantedBy=multi-user.target
