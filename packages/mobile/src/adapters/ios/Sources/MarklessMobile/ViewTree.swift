@@ -190,6 +190,7 @@ final class DrawingView: UIView {
 				context.setLineCap(shape.cap == "round" ? .round : shape.cap == "square" ? .square : .butt)
 				context.setLineJoin(shape.join == "round" ? .round : shape.join == "bevel" ? .bevel : .miter)
 				context.setMiterLimit(shape.miterLimit)
+				if let dash = shape.dash { context.setLineDash(phase: shape.dashOffset, lengths: dash.map { CGFloat($0) }) }
 				if case let .gradient(gradient) = stroke {
 					context.saveGState()
 					context.replacePathWithStrokedPath()
@@ -1061,11 +1062,11 @@ final class ViewTree {
 		}
 	}
 
-	/// Draws Dragon's lines over a label in a system face while its text is the one Dragon laid out; otherwise the label draws its own.
+	/// Draws Dragon's lines over a label while its text is the one Dragon laid out; otherwise the label draws its own.
 	private func drawLines(_ label: UILabel, _ given: ResolvedStyle? = nil) {
 		let drawn = label.layer.sublayers?.first { $0 is GlyphLinesLayer } as? GlyphLinesLayer
 		guard let id = label.accessibilityIdentifier, let style = given ?? self.style(of: id), let lines = style.lines,
-			style.linesText == label.text, lines.allSatisfy({ $0.runs.allSatisfy { systemFaces[$0.face] != nil } })
+			style.linesText == label.text, lines.allSatisfy({ $0.runs.allSatisfy { systemFaces[$0.face] != nil || faces[$0.face] != nil } })
 		else {
 			if let drawn {
 				drawn.removeFromSuperlayer()
@@ -1086,6 +1087,7 @@ final class ViewTree {
 		layer.contentsScale = scale
 		layer.lines = lines
 		layer.faces = systemFaces
+		layer.webFaces = faces
 		layer.setNeedsDisplay()
 		label.textColor = .clear
 	}
@@ -2434,6 +2436,8 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 final class GlyphLinesLayer: CALayer {
 	var lines: [TextLine] = []
 	var faces: [String: SystemFace] = [:]
+	/// The app's own font files, whose glyph ids are the ones Dragon shaped them to.
+	var webFaces: [String: UIFontDescriptor] = [:]
 	var textColor: UIColor = .black
 	/// How far the layer reaches past the label on every side, in points.
 	var slack: CGFloat = 0
@@ -2446,8 +2450,12 @@ final class GlyphLinesLayer: CALayer {
 		ctx.setFillColor(textColor.cgColor)
 		for line in lines {
 			for run in line.runs {
-				guard let face = faces[run.face] else { continue }
-				let font = systemFont(face, size: run.size)
+				let font: CTFont
+				if let face = faces[run.face] {
+					font = systemFont(face, size: run.size)
+				} else if let face = webFaces[run.face] {
+					font = CTFontCreateWithFontDescriptor(face as CTFontDescriptor, run.size, nil)
+				} else { continue }
 				let glyphs = run.glyphs.map { CGGlyph($0) }
 				let positions = run.xs.map { CGPoint(x: $0 + slack, y: bounds.height - (line.baseline + slack)) }
 				CTFontDrawGlyphs(font, glyphs, positions, glyphs.count, ctx)

@@ -199,7 +199,7 @@ sealed interface ShapePaint {
 }
 
 /** One shape: verb-coded path (0 move, 1 line, 3 cubic, 4 close), its paint and stroke, and an optional affine map [a,b,c,d,e,f]. */
-data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val text: DrawingText? = null, val clip: List<List<Double>> = emptyList(), val blur: Blur? = null, val clipEvenOdd: List<Boolean> = emptyList()) {
+data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val text: DrawingText? = null, val clip: List<List<Double>> = emptyList(), val blur: Blur? = null, val clipEvenOdd: List<Boolean> = emptyList(), val dash: List<Double>? = null, val dashOffset: Double = 0.0) {
 	data class Blur(val deviation: Double, val region: List<Double>)
 }
 
@@ -985,7 +985,7 @@ data class Payload(
 
 		private fun shape(sv: Json, w: String): Shape {
 			val so = sv.obj(w)
-			so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "text", "clip", "clipRule", "blur"), w)
+			so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "text", "clip", "clipRule", "blur", "dash", "dashOffset"), w)
 			val path = so.field("path", w).arr("$w.path").map { it.num("$w.path[]") }
 			val transform = so["transform"]?.arr("$w.transform")?.map { it.num("$w.transform[]") }
 			if (transform != null && transform.size != 6) throw MarklessDecodeError("$w.transform must hold six numbers")
@@ -1022,6 +1022,10 @@ data class Payload(
 				so["clipRule"]?.arr("$w.clipRule")?.map {
 					when (val rule = it.str("$w.clipRule[]")) { "evenodd" -> true; "nonzero" -> false; else -> throw MarklessDecodeError("$w has unknown clipRule \"$rule\"") }
 				} ?: emptyList(),
+				so["dash"]?.arr("$w.dash")?.map { it.num("$w.dash[]") }?.also { dash ->
+					if (dash.isEmpty() || dash.size % 2 != 0 || dash.any { it < 0 }) throw MarklessDecodeError("$w.dash must hold an even count of lengths")
+				},
+				so["dashOffset"]?.num("$w.dashOffset") ?: 0.0,
 			).also { if (it.clipEvenOdd.isNotEmpty() && it.clipEvenOdd.size != it.clip.size) throw MarklessDecodeError("$w.clipRule must hold a rule for each clip") }
 		}
 
