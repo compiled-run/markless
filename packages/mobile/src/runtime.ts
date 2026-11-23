@@ -63,6 +63,13 @@ export type NativeAction =
 	| { readonly event: 'keyup'; readonly host: string; readonly key: string }
 	/** A paste into a text field from its edit menu, before the text goes in. */
 	| { readonly event: 'paste'; readonly host: string; readonly text: string }
+	/** A CSS animation's event on a styled page, from the host's run of Dragon's animator: its name and elapsed time in seconds. */
+	| {
+			readonly event: 'animationstart' | 'animationiteration' | 'animationend' | 'animationcancel';
+			readonly host: string;
+			readonly animationName: string;
+			readonly elapsedTime: number;
+	  }
 	/** A live device value changed (connectivity, permission): the host writes the device cell. */
 	| { readonly event: 'device'; readonly cell: string; readonly value: Value }
 	/** A device call the host started has answered: a task cell takes `{ state: 'value', value }` or the error. */
@@ -227,6 +234,9 @@ export type NativeEventFields = {
 	readonly text?: string;
 	/** A press: how many presses in a row on the element. */
 	readonly detail?: number;
+	/** An animation event: the `@keyframes` name and the elapsed time in seconds. */
+	readonly animationName?: string;
+	readonly elapsedTime?: number;
 	readonly reason?: string;
 	readonly pressTarget?: string | null;
 	readonly target?: string;
@@ -1004,7 +1014,7 @@ export function createNativeRuntime(
 			focused !== null && focused !== NATIVE_DOCUMENT_BODY
 				? { focused, focusElements: elementFacts({}, [focused]) }
 				: {};
-		call('enter', { ...entry, ...focus, ...entryCells() });
+		call('enter', { ...entry, screen, ...focus, ...entryCells() });
 		const result = JSON.parse(call('leave')) as {
 			readonly pending: ReadonlyArray<number>;
 			readonly settled: ReadonlyArray<number>;
@@ -1255,7 +1265,6 @@ export function createNativeRuntime(
 			out.push(
 				...enter({
 					kind: 'tasks',
-					screen,
 					tasks,
 					...(again.length > 0 ? { retry: again } : {}),
 				}),
@@ -2201,7 +2210,7 @@ export function createNativeRuntime(
 		leave: () =>
 			asyncSent === null
 				? []
-				: enter({ kind: 'tasks', screen, tasks: [], leave: true }).filter(
+				: enter({ kind: 'tasks', tasks: [], leave: true }).filter(
 						(entry) => entry.op === 'abort',
 					),
 		dispatch(action) {
@@ -2612,7 +2621,9 @@ export function createNativeRuntime(
 						? { text: action.text, value: textOf(action.host) }
 						: action.event === 'activate'
 							? { detail: action.detail ?? 1 }
-							: edit;
+							: 'animationName' in action
+								? { animationName: action.animationName, elapsedTime: action.elapsedTime }
+								: edit;
 			// A press focuses the control it presses, as the browser does.
 			if (action.event === 'activate') focused = action.host;
 			// A number field's handlers read its value, which is empty while its text is no number.

@@ -10,6 +10,7 @@ import {
 	writeFileSync,
 } from 'node:fs';
 import { createRequire, findPackageJSON } from 'node:module';
+import { availableParallelism } from 'node:os';
 import type { NativeScriptEngine } from '@markless/compiler/native';
 import { pathToFileURL } from 'node:url';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
@@ -305,9 +306,9 @@ function writeStyleInput(file: string, input: NativeStyleInput, name: string): v
 }
 
 /** Dragon's export for one style input file, or the rung's refusal naming Dragon's reasons. */
-function styleExport(inputPath: string, name: string, plan = false): Uint8Array {
+async function styleExport(inputPath: string, name: string, plan = false): Promise<Uint8Array> {
 	try {
-		return dragonStyleExport(inputPath, dragonDir(), plan);
+		return await dragonStyleExport(inputPath, dragonDir(), plan);
 	} catch (error) {
 		throw new Error(
 			`${name}: the component has styles, and its style export could not be made: ${(error as Error).message}`,
@@ -320,42 +321,77 @@ const STYLE_SIZE = 'style-size.json';
 /** An app rung's style inputs, one per styled page, at the page's path under `pages/`. */
 const APP_STYLE_INPUTS = 'native-style-input';
 
-/** Runs Dragon once per styled page and joins the exports into the app's one style file. */
-function appStyle(dir: string, name: string, inputs: NativeAppBuild['styleInputs']) {
+/** Dragon exports at once: one Dragon process per export, each on one core. */
+const styleExportWorkers = (): number =>
+	Math.max(1, Number.parseInt(process.env.HEAVY_WORKERS ?? '', 10) || availableParallelism());
+
+/** Each job's result in order, at most `workers` jobs running at once. */
+async function inPool<T>(jobs: ReadonlyArray<() => Promise<T>>, workers: number): Promise<T[]> {
+	const results: T[] = Array.from({ length: jobs.length });
+	let next = 0;
+	const run = async () => {
+		while (next < jobs.length) {
+			const at = next++;
+			results[at] = await jobs[at]!();
+		}
+	};
+	await Promise.all(Array.from({ length: Math.min(workers, jobs.length) }, run));
+	return results;
+}
+
+/** Runs Dragon once per styled page, the pages at once, and joins the exports into the app's one style file. */
+async function appStyle(dir: string, name: string, inputs: NativeAppBuild['styleInputs']) {
 	rmSync(join(dir, APP_STYLE_INPUTS), { recursive: true, force: true });
-	const exportOf = (file: string, input: NativeStyleInput, plan: boolean): DragonStyleExport => {
+	const exportOf = (file: string, input: NativeStyleInput, plan: boolean) => {
 		writeStyleInput(file, input, name);
-		const exported = JSON.parse(
-			new TextDecoder().decode(styleExport(file, name, plan)),
-		) as DragonStyleExport;
-		// The inputs sit at different depths; the app style names an input's font file from the rung folder.
-		return {
-			...exported,
-			fonts: exported.fonts.map((font) =>
-				font.from === 'input'
-					? { ...font, file: relative(dir, resolve(dirname(file), font.file)) }
-					: font,
-			),
+		return async (): Promise<DragonStyleExport> => {
+			const exported = JSON.parse(
+				new TextDecoder().decode(await styleExport(file, name, plan)),
+			) as DragonStyleExport;
+			// The inputs sit at different depths; the app style names an input's font file from the rung folder.
+			return {
+				...exported,
+				fonts: exported.fonts.map((font) =>
+					font.from === 'input'
+						? { ...font, file: relative(dir, resolve(dirname(file), font.file)) }
+						: font,
+				),
+			};
 		};
 	};
-	const pages = inputs.map(({ pattern, page, input, sheets }) => {
+	const jobs: Array<() => Promise<DragonStyleExport>> = [];
+	const planned = inputs.map(({ pattern, page, input, sheets }) => {
 		const base = join(dir, APP_STYLE_INPUTS, relative('pages', page).slice(0, -'.tsrx'.length));
 		const sheetNodes = [...new Set(sheets.map((sheet) => sheet.node))];
+		const at = jobs.push(exportOf(`${base}.json`, input, true)) - 1;
 		return {
 			pattern,
-			exported: exportOf(`${base}.json`, input, true),
+			at,
 			sheets: sheets.map((sheet) => ({
 				node: sheet.node,
 				snapPoint: sheet.snapPoint,
 				// One input per sheet and resting height: `index.sheet0-0.5.json`.
-				exported: exportOf(
-					`${base}.sheet${sheetNodes.indexOf(sheet.node)}-${sheet.snapPoint}.json`,
-					sheet.input,
-					false,
-				),
+				at:
+					jobs.push(
+						exportOf(
+							`${base}.sheet${sheetNodes.indexOf(sheet.node)}-${sheet.snapPoint}.json`,
+							sheet.input,
+							false,
+						),
+					) - 1,
 			})),
 		};
 	});
+	const exported = await inPool(jobs, styleExportWorkers());
+	const pages = planned.map(({ pattern, at, sheets }) => ({
+		pattern,
+		exported: exported[at]!,
+		sheets: sheets.map(({ node, snapPoint, at: sheet }) => ({
+			node,
+			snapPoint,
+			exported: exported[sheet]!,
+		})),
+	}));
 	const style = nativeAppStyle(pages);
 	writeFileSync(
 		join(dir, STYLE_SIZE),
@@ -489,7 +525,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				);
 				if (platform === 'android') {
 					const style = checkPageScroll(
-						styleExport(join(dir, STYLE_INPUT), name, true),
+						await styleExport(join(dir, STYLE_INPUT), name, true),
 						build,
 						relative(repoRoot, component),
 						name,
@@ -532,7 +568,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 					throw new Error(
 						`${name}: a styled app whose views differ per phone has no single style export yet`,
 					);
-				const style = appStyle(dir, name, build.styleInputs);
+				const style = await appStyle(dir, name, build.styleInputs);
 				const styled = styleAssets(style.bytes, style.fonts, name, dir);
 				assets.ios.push(...styled);
 				assets.android.push(...styled);

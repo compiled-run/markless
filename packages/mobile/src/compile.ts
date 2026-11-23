@@ -488,6 +488,13 @@ function unstyledOnly(
 					span,
 				),
 			];
+		if (node.element === 'center')
+			return [
+				nativeUnsupported(
+					`the <${node.element}> ${node.id} on a styled page, whose default look Dragon does not have yet`,
+					span,
+				),
+			];
 		if (!node.row) return [];
 		return (node.bindings ?? []).flatMap((binding) =>
 			'attribute' in binding &&

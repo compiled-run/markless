@@ -32,6 +32,8 @@ struct TextLook: Equatable {
 	var shift: String?
 	var highlight = false
 	var preformatted = false
+	/// Inside a `<center>`: blocks sit in the middle of the line and text is centred (`text-align: -webkit-center`).
+	var centered = false
 
 	func applying(_ style: NativeDefaultStyle?) -> TextLook {
 		guard let style else { return self }
@@ -44,6 +46,7 @@ struct TextLook: Equatable {
 		next.shift = style.shift ?? shift
 		next.highlight = highlight || style.highlight
 		next.preformatted = preformatted || style.preformatted
+		next.centered = centered || style.center
 		return next
 	}
 
@@ -93,6 +96,11 @@ final class Paragraph {
 
 /// A `<pre>` paragraph's sideways scroller: its line is never wrapped.
 final class PreformattedScroll: UIScrollView {}
+
+/// The page's scroll view: a drag that starts on a button or field scrolls the page, as it does in Safari; a tap still presses it.
+final class PageScroll: UIScrollView {
+	override func touchesShouldCancel(in view: UIView) -> Bool { true }
+}
 
 /// An inline `<svg>`: draws the shapes compiled when the app was built, then the shapes inside it that come from components,
 /// whose outline the engine gives while the app runs, fitted into its box as the web fits the viewBox.
@@ -335,7 +343,7 @@ final class ViewTree {
 	let root = UIView()
 	/// The page's own scroll view, as a browser's viewport: it fills the screen, insets its content by the safe areas and
 	/// scrolls it under the bars.
-	let page = UIScrollView()
+	let page = PageScroll()
 	let keyboard: KeyboardDismisser
 	private let runtime: NativeRuntime
 	private var layout: StyleLayout?
@@ -398,6 +406,8 @@ final class ViewTree {
 	/// Lists and the marker kind their items show; each item's marker label.
 	private var listMarkers: [ObjectIdentifier: String] = [:]
 	private var itemMarkers: [ObjectIdentifier: UILabel] = [:]
+	/// Containers whose children sit in the middle of the line (inside a `<center>`).
+	private var centered: Set<ObjectIdentifier> = []
 	/// Each summary's disclosure triangle, in its start inset.
 	private var disclosures: [ObjectIdentifier: UILabel] = [:]
 	/// Table structure: tables, their rows and the rows' cells.
@@ -1387,6 +1397,7 @@ final class ViewTree {
 				inner.heading = context.heading || headings.contains(element)
 				inner.look = context.look.applying(node.defaultStyle)
 				if layout == nil, let style = node.defaultStyle { applyBlockStyle(style, to: view) }
+				if layout == nil, inner.look.centered { centered.insert(ObjectIdentifier(view)) }
 				if layout == nil, element == "li", listMarkers[ObjectIdentifier(container)] != nil { addMarker(to: view) }
 				view.accessibilityIdentifier = id
 				elements[id] = view
@@ -1551,8 +1562,8 @@ final class ViewTree {
 			case (.input, _ as SelectButton):
 				// A select's change runs in the runtime when a choice is made (a `choose` action).
 				continue
-			case (.idle, _), (.visible, _), (.dismiss, _), (.close, _), (.keydown, _), (_, _) where event.event.isPointer:
-				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host, close and a keydown off a text field by the runtime.
+			case (.idle, _), (.visible, _), (.dismiss, _), (.close, _), (.keydown, _), (.animationstart, _), (.animationiteration, _), (.animationend, _), (.animationcancel, _), (_, _) where event.event.isPointer:
+				// Raised elsewhere: idle, visible and animation events by the screen's controller, dismiss and pointer events by the overlay host, close and a keydown off a text field by the runtime.
 				continue
 			case (.contextmenu, _):
 				// Safari on iOS raises no contextmenu for a long press, so neither does this host.
@@ -1734,6 +1745,7 @@ final class ViewTree {
 		var constraints: [NSLayoutConstraint] = []
 		var above = container.topAnchor
 		let indent = indents[ObjectIdentifier(container)] ?? 0
+		let middle = centered.contains(ObjectIdentifier(container))
 		var top = container
 		while let parent = top.superview { top = parent }
 		for child in stacked(container) {
@@ -1741,11 +1753,14 @@ final class ViewTree {
 			let wide = fullWidth.contains(ObjectIdentifier(child))
 			constraints += [
 				child.topAnchor.constraint(equalTo: above),
-				child.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: indent),
+				middle && !wide
+					? child.centerXAnchor.constraint(equalTo: container.centerXAnchor, constant: indent / 2)
+					: child.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: indent),
 				wide
 					? child.trailingAnchor.constraint(equalTo: container.trailingAnchor)
 					: child.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor),
 			]
+			if middle && !wide { constraints.append(child.leadingAnchor.constraint(greaterThanOrEqualTo: container.leadingAnchor, constant: indent)) }
 			if wide {
 				// As wide as the page allows: a box with no width of its own (a rule, a code block) takes the line.
 				let page = child.widthAnchor.constraint(equalTo: top.widthAnchor)
@@ -1895,6 +1910,7 @@ final class ViewTree {
 		let label = UILabel()
 		label.isUserInteractionEnabled = false
 		label.numberOfLines = 0
+		if context.look.centered { label.textAlignment = .center }
 		label.accessibilityIdentifier = run[0] + context.suffix
 		if context.button != nil {
 			label.isAccessibilityElement = false

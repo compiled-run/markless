@@ -2,7 +2,7 @@ appId: ${APP_ID}
 name: u122-box-shadow
 ---
 - launchApp:
-      clearState: true
+    clearState: true
 - assertVisible: Box shadow
 - assertVisible: Outer shadow
 - assertVisible: Inset shadow
@@ -10,38 +10,38 @@ name: u122-box-shadow
 - assertVisible: Grow
 - assertVisible: Short
 - assertVisible:
-      text: Inset shadow
-      below: Outer shadow
+    text: Inset shadow
+    below: Outer shadow
 - assertVisible:
-      text: Rounded with spread
-      below: Inset shadow
+    text: Rounded with spread
+    below: Inset shadow
 - assertVisible:
-      text: Grow
-      below: Rounded with spread
+    text: Grow
+    below: Rounded with spread
 - tapOn: Grow
 - assertNotVisible: Short
 - assertVisible: Tall
 - assertNotVisible: Short
 - assertVisible:
-      text: Inset shadow
-      below: Outer shadow
+    text: Inset shadow
+    below: Outer shadow
 - assertVisible:
-      text: Rounded with spread
-      below: Inset shadow
+    text: Rounded with spread
+    below: Inset shadow
 - assertVisible:
-      text: Grow
-      below: Rounded with spread
+    text: Grow
+    below: Rounded with spread
 - tapOn: Grow
 - assertVisible: Short
 - assertNotVisible: Tall
 - assertVisible: Short
 - assertNotVisible: Tall
 - assertVisible:
-      text: Inset shadow
-      below: Outer shadow
+    text: Inset shadow
+    below: Outer shadow
 - assertVisible:
-      text: Rounded with spread
-      below: Inset shadow
+    text: Rounded with spread
+    below: Inset shadow
 - assertVisible:
-      text: Grow
-      below: Rounded with spread
+    text: Grow
+    below: Rounded with spread

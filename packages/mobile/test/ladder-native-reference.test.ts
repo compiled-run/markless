@@ -92,6 +92,9 @@ const bindsValue = (nodeOf: ReadonlyMap<string, NativeViewPayload['nodes'][numbe
 };
 // The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
 const REFUSED_RUNGS = new Set(['j7-page-refused']);
+// Rungs whose later steps wait on CSS animation events, which only Dragon's animator on the phones (and the browser) runs: this
+// walk checks their launch screen, and the phones and the web column check every step.
+const ANIMATED_RUNGS = new Set(['s34-animation-end']);
 // The <input> types a host draws as a control a press acts on; every other type is a text field that takes the keyboard.
 const PRESSED_INPUT_TYPES = new Set(['checkbox', 'radio', 'range', 'hidden']);
 
@@ -318,6 +321,8 @@ function mirror(
 		// A press on a <label> acts on the control its `for` names, as both hosts pass it on.
 		pressed: (host: string) => (nodeOf.get(baseOf(host))?.element === 'label' ? (attributes.get(`${host}\0for`) ?? host) : host),
 		disabled: (host: string) => attributes.get(`${host}\0disabled`) != null,
+		/** The control a <label> names, which a host types into when the label's text is the field's name. */
+		labelled: (host: string) => attributes.get(`${host}\0for`) ?? null,
 		/** Types into the emptied field and returns what it holds. */
 		typed: (host: string, text: string) => {
 			const bound = attributes.get(`${host}\0maxlength`);
@@ -334,7 +339,8 @@ function mirror(
 		},
 		check(step: LadderStep, index: number) {
 			for (const [field, value] of Object.entries(step.fields ?? {})) {
-				const host = elementReading(field);
+				const reading = elementReading(field);
+				const host = reading && (attributes.get(`${reading}\0for`) ?? reading);
 				expect(host && properties.get(host), `step ${index}: the field "${field}"`).toBe(
 					value,
 				);
@@ -463,9 +469,10 @@ function walkApp(
 			for (const entry of appRuntime.dispatch({ event: 'choose', host: choice.option })) top.apply(entry, index);
 		} else if (action) {
 			const top = stack.at(-1)!;
-			const host = top.elementReading(
+			const reading = top.elementReading(
 				'tap' in action ? action.tap : 'type' in action ? action.type.field : '',
 			);
+			const host = reading && 'type' in action ? (top.labelled(reading) ?? reading) : reading;
 			if (!host) throw new Error(`step ${index}: nothing on the top screen to act on`);
 			const journal =
 				'tap' in action
@@ -1498,7 +1505,7 @@ test.each([...navRungFolders(), ...styleRungFolders(), ...sheetStyleRungFolders(
 			).toBe(true);
 		walkApp(
 			build.payload!,
-			rung.steps,
+			ANIMATED_RUNGS.has(folder) ? rung.steps.slice(0, 1) : rung.steps,
 			rung.start ?? '/',
 			new Set(build.styleInputs.map((input) => input.pattern)),
 			rung.location,
