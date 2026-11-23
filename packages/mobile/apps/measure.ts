@@ -113,7 +113,7 @@ export async function measureApp(app: string, styles = false): Promise<ScreenRes
 					JSON.stringify(nativeStyleInputAt(input.input, (font) => relative(scratch, resolve(repoRoot, font)))),
 				);
 				try {
-					dragonStyleExport(file);
+					await dragonStyleExport(file);
 					styledBy.set(input.pattern, true);
 				} catch (error) {
 					const reasons = (error as Error).message.split('\n').slice(1).join(' ').trim();

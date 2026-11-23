@@ -944,8 +944,8 @@ export type NativeOp =
 	| { readonly op: 'reset'; readonly cells: ReadonlyArray<string>; readonly catch?: string };
 
 /** Element commands a host runs. */
-/** `select` selects a text field's whole text, as `field.select()` does. */
-export type NativeCommand = 'focus' | 'scrollIntoView' | 'select';
+/** `select` selects a text field's whole text, as `field.select()` does; `showPicker` opens a file input's picker. */
+export type NativeCommand = 'focus' | 'scrollIntoView' | 'select' | 'showPicker';
 
 /** The non-finite numbers JSON cannot hold: each with its path (object keys and array indices) inside a value. */
 export type NativeNonFinite = ReadonlyArray<
@@ -1484,6 +1484,13 @@ export type NativeJournalEntry =
 			readonly op: 'property';
 			readonly node: string;
 			readonly name: 'value';
+			readonly value: string;
+	  }
+	/** The files a handler gave a file input, as a JSON array of their names: the input shows them, as the browser's does. */
+	| {
+			readonly op: 'property';
+			readonly node: string;
+			readonly name: 'files';
 			readonly value: string;
 	  }
 	/** A checkbox's or radio button's checkedness changed: by a tick, by its `checked` binding, or by another radio's tick. */

@@ -717,8 +717,12 @@ final class ViewTree {
 				guard let tick = ticks[node], let view = elements[node] else { throw HostError("journal names checkbox \(node), which is not shown") }
 				ticks[node] = (tick.radio, checked)
 				drawTick(node, view)
-			case let .property(node, _, value):
+			case let .property(node, name, value):
 				if elements[node] is AbsentField { continue }
+				if name == "files", let picker = elements[node] as? FileInputView {
+					picker.show(names: value)
+					continue
+				}
 				if let area = elements[node] as? TextArea {
 					area.text = value
 					continue
@@ -756,6 +760,10 @@ final class ViewTree {
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
 				root.layoutIfNeeded()
 				// As on the web: scrollIntoView aligns the element to the start; focus brings it into view unless told not to.
+				if command == "showPicker" {
+					(view as? FileInputView)?.open()
+					break
+				}
 				if command == "scrollIntoView" {
 					bringIntoView(view, block: scrollIntoViewAlign.block, inline: scrollIntoViewAlign.inline)
 					break
@@ -973,6 +981,8 @@ final class ViewTree {
 			if let hint = named("aria-describedby") { view.accessibilityHint = hint }
 			guard let target = current["for"], let control = elements[target] else { continue }
 			let own = attributes[target] ?? [:]
+			// A control hidden from assistive technology takes no name, and its label reads as the text it is.
+			if own["aria-hidden"] == "true" { continue }
 			let unnamed = own["aria-label"] == nil && own["aria-labelledby"] == nil
 			if unnamed { control.accessibilityLabel = text(within: view, skipping: control) }
 			if !control.isDescendant(of: view) { view.accessibilityElementsHidden = true }
@@ -1331,6 +1341,15 @@ final class ViewTree {
 					control.accessibilityTraits = staticAttributes["type"] == "checkbox" ? [.button, .toggleButton] : .button
 					ticks[id] = (staticAttributes["type"] == "radio", try runtime.isChecked(id))
 					view = control
+				} else if element == "input", staticAttributes["type"] == "file" {
+					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
+					let picker = FileInputView(unseen: staticAttributes["aria-hidden"] == "true")
+					picker.presenter = { [weak self] in self?.presenter }
+					picker.accept = staticAttributes["accept"] ?? ""
+					picker.multiple = staticAttributes["multiple"] != nil
+					// Its button and summary sit side by side in its own stack view, which the stacking layout leaves alone.
+					leaves.insert(ObjectIdentifier(picker))
+					view = picker
 				} else if element == "input", staticAttributes["type"] == "range" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					view = RangeSlider()
@@ -1526,6 +1545,8 @@ final class ViewTree {
 				// An element that is not a button (a list row): a tap anywhere in it, its text included, presses it.
 				view.isUserInteractionEnabled = true
 				view.addGestureRecognizer(ActivateGesture { taps in onAction(NativeAction(event: .activate, host: id, detail: taps)) })
+			case let (.input, picker as FileInputView):
+				picker.onPick = { files in onAction(NativeAction(event: .pick, host: id, files: files)) }
 			case let (.input, slider as RangeSlider):
 				slider.onInput = { value in onAction(NativeAction(event: .input, host: id, value: value)) }
 			case let (.commit, slider as RangeSlider):
