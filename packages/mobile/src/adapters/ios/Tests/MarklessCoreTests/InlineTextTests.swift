@@ -64,3 +64,47 @@ private func editingRoute(_ edit: @escaping (inout [String: Any], inout [[Any]])
 		})
 	}
 }
+
+// The S47 rung's: a keyed @for whose row is <li><p>text <span>text</span> text</p></li>, with each row's copy of the template
+// ("<id>@<key>") as the live rows layout adds them; `paint` gives the copy of the span its own background.
+private func rowSpans(paint: Bool = false) throws -> StyleLayout {
+	var json = try #require(try JSONSerialization.jsonObject(with: try fixture("s47-row-inline-text.native-app-style")) as? [String: Any])
+	editingRoute { route, writes in
+		var assignments = route["assignments"] as! [[String: Any]]
+		var nodes = assignments[0]["nodes"] as! [[String: Any]]
+		let row = ["h3", "h4", "h4:text0", "h5", "h5:text0", "h4:text1"]
+		for id in row {
+			var copy = nodes.first { $0["id"] as? String == id }!
+			copy["id"] = "\(id)@a"
+			if let parent = copy["parent"] as? String, row.contains(parent) { copy["parent"] = "\(parent)@a" }
+			if paint, id == "h5" {
+				writes.append(writes[copy["writes"] as! Int] + [["kind": "background-color", "color": ["r": 255, "g": 0, "b": 0, "alpha": 255], "key": "backgroundColor"]])
+				copy["writes"] = writes.count - 1
+			}
+			nodes.append(copy)
+		}
+		assignments[0]["nodes"] = nodes
+		route["assignments"] = assignments
+	}(&json)
+	let styles = try StyleExport.decodeApp(try JSONSerialization.data(withJSONObject: json))
+	guard case let .app(app) = try NativePayload.decode(try fixture("s47-row-inline-text.payload")) else { throw PayloadError(path: "fixture", reason: "not an app") }
+	let style = try #require(styles["/"])
+	let page = try #require(app.routes.first { $0.pattern == "/" }).page
+	let runtime = NativeRuntime(payload: page)
+	return try style.resolve(for: page, initialTexts: try runtime.texts(), value: runtime.value(of:), arm: runtime.styleArm(of:))
+}
+
+@Test func aRowsTextInAnInlineSpanIsLaidOutInTheSpansCopyWhereDragonPutsItInTheRowsBlock() throws {
+	let styles = try rowSpans().styles
+	#expect(styles["h5@a"]?.frame == Frame(x: 331.125 / 3, y: 39.0 / 3, width: 208.171875 / 3, height: 60.0 / 3))
+	#expect(styles["h5:text0@a"]?.frame == Frame(x: 0, y: 0, width: 208.171875 / 3, height: 60.0 / 3))
+	// The texts beside the span stay in the row's <p>.
+	#expect(styles["h4:text0@a"]?.frame?.x == 51.0 / 3)
+	#expect(styles["h4:text1@a"]?.frame?.x == 539.296875 / 3)
+}
+
+@Test func aRowsInlineSpanThatPaintsABackgroundIsRefusedByName() throws {
+	#expect(throws: PayloadError(path: "style", reason: "h5:text0@a: its inline box h5@a paints a background, which iOS does not draw on a box Dragon lays out flat in h4@a")) {
+		try rowSpans(paint: true)
+	}
+}

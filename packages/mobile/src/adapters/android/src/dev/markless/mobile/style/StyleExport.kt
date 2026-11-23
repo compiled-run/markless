@@ -962,12 +962,17 @@ fun stackingParent(s: StyledNode, order: StyleWrite.PaintOrder, styled: Assignme
  */
 fun checkFlattenedInline(id: String, parent: String, container: String, styled: Assignment, inline: Set<String>, payloadParent: (String) -> String?) {
 	var cursor: String? = parent
-	while (cursor != null && cursor != container && cursor in inline) {
+	while (cursor != null && cursor != container && cursor.substringBefore('@') in inline) {
 		val box = styled.byId[cursor] ?: return
 		inlinePaint(box)?.let { throw MarklessDecodeError("\"$id\": its inline box $cursor $it, which Android does not draw on a box Dragon lays out flat in $container") }
 		cursor = payloadParent(cursor)
 	}
 }
+
+/** [parent], the payload parent of [id] (a row's copy `<node>@<keys>` or a node), as [styled] names it: its copy in [id]'s row or an outer row, else itself. */
+fun rowCopyOf(id: String, parent: String, styled: Assignment): String =
+	generateSequence(id.substringAfter('@', "").ifEmpty { null }) { keys -> keys.substringBeforeLast('@', "").ifEmpty { null } }
+		.map { "$parent@$it" }.firstOrNull { it in styled.byId } ?: parent
 
 /** What an inline box paints or keeps of its own, in words; null when it is transparent, borderless and in the flow. */
 private fun inlinePaint(box: StyledNode): String? {

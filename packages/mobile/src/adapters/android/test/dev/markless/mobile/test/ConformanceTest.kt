@@ -55,8 +55,10 @@ import dev.markless.mobile.style.rowStates
 import dev.markless.mobile.style.SystemFace
 import dev.markless.mobile.style.TextLine
 import dev.markless.mobile.style.StyleWrite
+import dev.markless.mobile.style.StyledNode
 import dev.markless.mobile.style.stackingParent
 import dev.markless.mobile.style.checkFlattenedInline
+import dev.markless.mobile.style.rowCopyOf
 import dev.markless.mobile.style.SelectArrow
 import java.io.File
 import kotlin.system.exitProcess
@@ -965,6 +967,31 @@ private fun flattenedInline(fixtures: File) {
 	check("a text in a span that paints a background is refused by name", err == "\"h3:text0\": its inline box h3 paints a background, which Android does not draw on a box Dragon lays out flat in h2") { "$err" }
 }
 
+/** The S47 rung's: a keyed @for row <li><p>text <span>text</span> text</p></li>, with one row's copy ("<id>@a") as the live rows layout adds it. */
+private fun rowFlattenedInline(fixtures: File) {
+	val page = StyleExport.decodeApp(File(fixtures, "s47-row-inline-text.native-app-style.json").readBytes()).getValue("/")
+	val template = page.assignments[page.initial]
+	val inline = page.inlineBoxes[page.initial]
+	check("the plan names the row's span as an inline box", inline == setOf("h5")) { "$inline" }
+	val row = listOf("h3", "h4", "h4:text0", "h5", "h5:text0", "h4:text1")
+	fun withRow(span: (StyledNode) -> StyledNode = { it }) = template.copy(nodes = template.nodes + row.map { id ->
+		val n = template.byId.getValue(id)
+		val copy = n.copy(id = "$id@a", parent = n.parent?.let { if (it in row) "$it@a" else it })
+		if (id == "h5") span(copy) else copy
+	})
+	val styled = withRow()
+	val payloadParents = mapOf("h5:text0" to "h5", "h5" to "h4", "h4" to "h3", "h3" to "h2")
+	val parent = { id: String -> payloadParents[id.substringBefore('@')]?.let { rowCopyOf(id, it, styled) } }
+	check("a row copy's payload parent is its parent's copy in the row", parent("h5:text0@a") == "h5@a" && parent("h5@a") == "h4@a") { "${parent("h5:text0@a")} ${parent("h5@a")}" }
+	check("a row's top box keeps the list's parent, which no row copies", parent("h3@a") == "h2") { "${parent("h3@a")}" }
+	check("an inner row's copy finds its parent's copy in the outer row", rowCopyOf("x@a@k", "h4", styled) == "h4@a") { rowCopyOf("x@a@k", "h4", styled) }
+	val placed = runCatching { checkFlattenedInline("h5:text0@a", "h5@a", "h4@a", styled, inline, parent) }
+	check("a row's text in a transparent span Dragon lays out flat is placed", placed.isSuccess) { "${placed.exceptionOrNull()}" }
+	val painted = withRow { it.copy(writes = it.writes + StyleWrite.BackgroundColor(Rgba(255, 0, 0, 255))) }
+	val err = runCatching { checkFlattenedInline("h5:text0@a", "h5@a", "h4@a", painted, inline) { id -> payloadParents[id.substringBefore('@')]?.let { rowCopyOf(id, it, painted) } } }.exceptionOrNull()?.message
+	check("a row's text in a span copy that paints a background is refused by name", err == "\"h5:text0@a\": its inline box h5@a paints a background, which Android does not draw on a box Dragon lays out flat in h4@a") { "$err" }
+}
+
 /** The S24 rung's: a styled select's arrow write, and the arrow geometry Dragon's plan layout gives as a 4th element. */
 private fun selectArrows(fixtures: File) {
 	val bytes = File(fixtures, "s24-styled-select.native-app-style.json").readBytes()
@@ -1090,6 +1117,7 @@ fun main(args: Array<String>) {
 	styleSlots()
 	rehostedStacking(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	flattenedInline(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	rowFlattenedInline(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	planTexts()
 	val dirs = args.map(::File)
 	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)

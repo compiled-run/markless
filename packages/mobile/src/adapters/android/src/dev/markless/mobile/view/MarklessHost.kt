@@ -75,6 +75,7 @@ import dev.markless.mobile.style.StyleWrite
 import dev.markless.mobile.style.StyledNode
 import dev.markless.mobile.style.stackingParent
 import dev.markless.mobile.style.checkFlattenedInline
+import dev.markless.mobile.style.rowCopyOf
 import kotlin.math.roundToInt
 
 class MarklessHostError(message: String) : RuntimeException(message)
@@ -1553,8 +1554,9 @@ class MarklessHost(
 		val (ax, ay) = origin
 		val parentId = parentOf(inst)
 		val exportParent = generateSequence(s.parent) { styled.byId[it]?.parent }.firstOrNull(::isView)
+		val inline = layout.export.inlineBoxes.getOrNull(layout.assignment) ?: emptySet()
 		if (parentId != null && exportParent != null && exportParent != parentId)
-			checkFlattenedInline(inst.id, parentId, exportParent, styled, layout.export.inlineBoxes.getOrNull(layout.assignment) ?: emptySet()) { runtime.node(it).parent }
+			checkFlattenedInline(inst.id, parentId, exportParent, styled, inline) { id -> runtime.node(id.substringBefore('@')).parent?.let { rowCopyOf(id, it, styled) } }
 		val paintOrder = s.writes.filterIsInstance<StyleWrite.PaintOrder>().firstOrNull()
 		// The node's frame origin inside its view: a label's inside its button, other text's inside its outward-rounded view.
 		var inView = (ax - Math.floor(ax)) to (ay - Math.floor(ay))
@@ -1588,7 +1590,7 @@ class MarklessHost(
 			}
 			if (view is MarklessBox) sizeScroller(inst.id, view, s, rect)
 		}
-		paint(view, s, styled, inline = inst.id in (layout.export.inlineBoxes.getOrNull(layout.assignment) ?: emptySet()))
+		paint(view, s, styled, inline = inst.id.substringBefore('@') in inline)
 		paintShadow(view, s, styled)
 		paintOutline(inst.id, s, styled)
 		if (view is SelectBox) selectLabel(view, s, styled, absolute)

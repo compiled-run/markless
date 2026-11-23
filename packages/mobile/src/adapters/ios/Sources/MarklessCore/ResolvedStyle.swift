@@ -331,7 +331,9 @@ extension StyleExport {
 			let payloadParent = node.parent == root ? nil : node.parent
 			if cursor != payloadParent {
 				guard let parent = payloadParent, let container = cursor,
-					let inside = try flattenedInline(node.id, in: parent, container: container, byId: byId, payload: payloadById, inline: inline, isView: payloadIds.contains)
+					let inside = try flattenedInline(
+						node.id, in: parent, container: container, byId: byId, inline: inline, isView: payloadIds.contains,
+						payloadParent: { payloadById[$0]?.parent })
 				else {
 					throw styleError("\(node.id)'s parent is \(node.parent ?? "none") in the payload, \(cursor ?? "none") in the style export")
 				}
@@ -366,6 +368,25 @@ extension StyleExport {
 				offset.x += skipped.frame?.x ?? 0
 				offset.y += skipped.frame?.y ?? 0
 				cursor = skipped.parent
+			}
+			// A copy's payload parent is that parent's copy in the same row, or in an outer row, or the parent itself.
+			let rowParent = { (id: String) -> String? in
+				guard let parent = payloadById[base(id)]?.parent else { return nil }
+				var keys = String(id[id.firstIndex(of: "@")!...])
+				while !keys.isEmpty {
+					if byId[parent + keys] != nil { return parent + keys }
+					keys = keys.lastIndex(of: "@").map { String(keys[..<$0]) } ?? ""
+				}
+				return parent
+			}
+			if let container = cursor, base(container) != payloadById[base(styled.id)]?.parent, let payloadParent = rowParent(styled.id) {
+				guard let inside = try flattenedInline(
+					styled.id, in: payloadParent, container: container, byId: byId, inline: inline, isView: isView, payloadParent: rowParent)
+				else {
+					throw styleError("\(styled.id)'s parent is \(payloadParent) in the payload, \(container) in the style export")
+				}
+				offset.x -= inside.x
+				offset.y -= inside.y
 			}
 			var style = try resolve(styled, styled.writes)
 			style.shadow = try BoxShadow.of(styled, byId: byId, canvas: canvas, body: body, dpr: dpr)
@@ -408,8 +429,8 @@ extension StyleExport {
 	/// is `parent`'s offset in `container` (device px), which `id`'s frame there less that is its frame in `parent`'s view; else nil.
 	/// An inline box in the way that paints anything of its own or keeps a stacking order is refused by name.
 	private func flattenedInline(
-		_ id: String, in parent: String, container: String, byId: [String: StyleNode], payload: [String: NativeNode],
-		inline: Set<String>, isView: (String) -> Bool
+		_ id: String, in parent: String, container: String, byId: [String: StyleNode], inline: Set<String>, isView: (String) -> Bool,
+		payloadParent: (String) -> String?
 	) throws -> (x: Double, y: Double)? {
 		func placed(_ box: StyleNode) -> (container: String?, x: Double, y: Double) {
 			var at = (x: box.frame?.x ?? 0, y: box.frame?.y ?? 0)
@@ -424,14 +445,14 @@ extension StyleExport {
 		var offset: (x: Double, y: Double)?
 		var cursor: String? = parent
 		while let box = cursor, box != container {
-			guard inline.contains(box), let styled = byId[box], !styled.isText, !styled.isAnonymous else { return nil }
+			guard inline.contains(box.firstIndex(of: "@").map { String(box[..<$0]) } ?? box), let styled = byId[box], !styled.isText, !styled.isAnonymous else { return nil }
 			let at = placed(styled)
 			guard at.container == container else { return nil }
 			if let paint = inlinePaint(styled) {
 				throw styleError("\(id): its inline box \(box) \(paint), which iOS does not draw on a box Dragon lays out flat in \(container)")
 			}
 			if offset == nil { offset = (at.x, at.y) }
-			cursor = payload[box]?.parent
+			cursor = payloadParent(box)
 		}
 		return cursor == container ? offset : nil
 	}
