@@ -4019,6 +4019,27 @@ export function Tasks() @{
 	expect(repeat && 'itemValues' in repeat ? Object.keys(repeat.itemValues!) : []).toEqual(['tone']);
 });
 
+it('lists a row field a computed builds from literals chosen by conditions', async () => {
+	const { payload, diagnostics } = await nativeView(`import { computed, state } from '@markless/core';
+function rowsOf(done: number) {
+	return ['Milk', 'Bread'].map((title, index) => ({ id: 't' + index, title, tone: index < done ? 'done' : 'open' }));
+}
+export function Tasks() @{
+	let done = state(1);
+	const tasks = computed(() => ({ rows: rowsOf(done) }));
+	<main>
+		<ul>
+			@for (const row of tasks.rows; key row.id) {
+				<li class={row.tone}>{row.title}</li>
+			}
+		</ul>
+		<button onClick={() => done++}>Finish one</button>
+	</main>
+}`);
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	expect(payload!.nodes.find((node) => node.kind === 'repeat')).toMatchObject({ itemValues: { tone: ['done', 'open'] } });
+});
+
 it('lowers a @try with no @catch: its error shows nothing, and the rest of the page stays, as the web renders it', async () => {
 	const { payload, diagnostics } = await nativeView(`import { computed } from '@markless/core';
 async function load(): Promise<string> { throw new Error('down'); }

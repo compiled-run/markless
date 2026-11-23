@@ -1843,8 +1843,15 @@ export function createNativeViewPayload(
 			};
 		return set;
 	};
-	/** What a list read from an async value's cell can hold, through the members it reads. */
+	/** What each computed gives, by the expression a read of it lowers to. */
+	const computedReturns = new WeakMap<
+		NativeExpr,
+		{ readonly returns: SemanticValueSet; readonly module: ModuleFacts }
+	>();
+	/** What a list read from a computed or an async value's cell can hold, through the members it reads. */
 	const listValueSet = (expr: NativeExpr): SemanticValueSet => {
+		const computed = computedReturns.get(expr);
+		if (computed) return resolvedSet(computed.returns, computed.module);
 		if ('member' in expr && typeof expr.property === 'string') {
 			const inner = expr.member;
 			if ('cell' in inner && expr.property === 'value') {
@@ -3419,7 +3426,11 @@ export function createNativeViewPayload(
 			const label = `the computed \`${computed.name}\``;
 			const fn = scriptFunctionId(fact, scope.module, label, true);
 			const bindings = scriptBindings(fact, scope, label, true);
-			return fn === null || bindings === null ? null : { script: fn, bindings };
+			if (fn === null || bindings === null) return null;
+			const value = { script: fn, bindings };
+			if (computed.nativeReturns)
+				computedReturns.set(value, { returns: computed.nativeReturns, module: scope.module });
+			return value;
 		});
 	}
 
@@ -4537,7 +4548,14 @@ export function createNativeViewPayload(
 								{ ...scope, live: true },
 							),
 						);
-						if (!data.failed || scriptMode === 'never') return data.value;
+						if (!data.failed || scriptMode === 'never') {
+							if (data.value && computed.nativeReturns)
+								computedReturns.set(data.value, {
+									returns: computed.nativeReturns,
+									module: scope.module,
+								});
+							return data.value;
+						}
 						data.rollBack();
 						return scriptComputed(computed, scope, what);
 					} finally {
