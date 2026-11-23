@@ -1,5 +1,5 @@
 {
-	"rung": "S50",
+	"rung": "S53",
 	"name": "a styled textarea draws its placeholder while empty, takes typing in the host's own text view laid out at Dragon's padding, line pitch and baseline, and draws a readonly value, as the web does",
 	"steps": [
 		{

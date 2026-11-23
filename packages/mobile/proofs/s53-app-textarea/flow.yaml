@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: s50-app-textarea
+name: s53-app-textarea
 ---
 - launchApp:
     clearState: true

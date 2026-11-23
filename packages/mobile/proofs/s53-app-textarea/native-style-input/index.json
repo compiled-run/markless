@@ -8,7 +8,7 @@
 			"element": "main",
 			"parent": null,
 			"attributes": {
-				"class": "page mk-a04cu0"
+				"class": "page mk-122hjvl"
 			}
 		},
 		{
@@ -17,7 +17,7 @@
 			"element": "textarea",
 			"parent": "h0",
 			"attributes": {
-				"class": "body mk-a04cu0",
+				"class": "body mk-122hjvl",
 				"aria-label": "Body",
 				"rows": "4",
 				"placeholder": "Write the note"
@@ -35,7 +35,7 @@
 			"element": "p",
 			"parent": "h0",
 			"attributes": {
-				"class": "mk-a04cu0"
+				"class": "mk-122hjvl"
 			},
 			"arm": {
 				"branch": "branch-site:0",
@@ -58,7 +58,7 @@
 			"element": "p",
 			"parent": "h0",
 			"attributes": {
-				"class": "mk-a04cu0"
+				"class": "mk-122hjvl"
 			},
 			"arm": {
 				"branch": "branch-site:0",
@@ -81,7 +81,7 @@
 			"element": "textarea",
 			"parent": "h0",
 			"attributes": {
-				"class": "body mk-a04cu0",
+				"class": "body mk-122hjvl",
 				"aria-label": "Saved body",
 				"rows": "3",
 				"readonly": ""
@@ -94,7 +94,7 @@
 			"text": "Milk and eggs"
 		}
 	],
-	"css": "* {\n\tbox-sizing: border-box;\n}\n\nbody {\n\tmargin: 0;\n\tfont-family: sans-serif;\n\tfont-size: 16px;\n}\n\ntextarea {\n\tfont: inherit;\n\tfont-family: Ahem;\n\tcolor: inherit;\n}\n\n.page.mk-a04cu0 {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #fbf8f1;\n\t\t\t\tcolor: #1f1d1a;\n\t\t\t}\n\t\t\t.body.mk-a04cu0 {\n\t\t\t\tdisplay: block;\n\t\t\t\twidth: 100%;\n\t\t\t\tmargin-bottom: 18px;\n\t\t\t\tpadding: 12px 14px;\n\t\t\t\tborder: 1px solid #e4ddcf;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tline-height: 1.45;\n\t\t\t\tresize: none;\n\t\t\t\tscrollbar-width: none;\n\t\t\t}",
+	"css": "* {\n\tbox-sizing: border-box;\n}\n\nbody {\n\tmargin: 0;\n\tfont-family: sans-serif;\n\tfont-size: 16px;\n}\n\ntextarea {\n\tfont: inherit;\n\tfont-family: Ahem;\n\tcolor: inherit;\n}\n\n.page.mk-122hjvl {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #fbf8f1;\n\t\t\t\tcolor: #1f1d1a;\n\t\t\t}\n\t\t\t.body.mk-122hjvl {\n\t\t\t\tdisplay: block;\n\t\t\t\twidth: 100%;\n\t\t\t\tmargin-bottom: 18px;\n\t\t\t\tpadding: 12px 14px;\n\t\t\t\tborder: 1px solid #e4ddcf;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tline-height: 1.45;\n\t\t\t\tresize: none;\n\t\t\t\tscrollbar-width: none;\n\t\t\t}",
 	"states": [],
 	"branches": [
 		{

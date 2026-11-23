@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { compileRungApp } from '../src/harness/rung.ts';
 
-const app = await compileRungApp(join(import.meta.dirname, '..', 'proofs', 's50-app-textarea'));
+const app = await compileRungApp(join(import.meta.dirname, '..', 'proofs', 's53-app-textarea'));
 const input = app.styleInputs[0]!.input;
 const node = (id: string) => input.nodes.find((one) => one.id === id);
 
