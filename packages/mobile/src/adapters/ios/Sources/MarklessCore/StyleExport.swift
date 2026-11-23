@@ -739,7 +739,8 @@ public struct StyleExport: Sendable {
 			guard shown == nil || rowsLayout != nil else { throw PayloadError(path: "plan layout", reason: "a page with rows needs Dragon's rows layout") }
 			let result = try Reader(JSONValue.parse(Data((live ? rowsLayout!(line) : layout(line)).utf8)), at: "plan layout")
 			let parts = try result.array()
-			let fixed = !slotted ? 3 : (shown == nil ? 4 : 5)
+			// Dragon's live layout answers a slotted page with each row's write numbers, an empty list when it lays out texts and no rows.
+			let fixed = !slotted ? 3 : (live ? 5 : 4)
 			guard parts.count >= fixed, parts.count <= fixed + 2, try parts[0].string() == "ok" else {
 				throw PayloadError(path: "plan layout", reason: "Dragon's layout at \(width) x \(height) points and \(scale)x failed: \(result.value.jsonText)")
 			}
