@@ -587,7 +587,7 @@ final class ViewTree {
 		let watcher = TouchWatcher { [weak self] in self?.dismissMessage() }
 		screen.addGestureRecognizer(watcher)
 		touches = watcher
-		do { try overlays.mount(in: screen) } catch { fatalError("Markless iOS host: \(error)") }
+		do { try overlays.mount(in: screen) } catch { hostFailed("\(error)") }
 		guard layout == nil else { return }
 		root.translatesAutoresizingMaskIntoConstraints = false
 		let content = page.contentLayoutGuide
@@ -1315,7 +1315,7 @@ final class ViewTree {
 									onAction(NativeAction(event: .choose, host: choice.option))
 								}
 							}
-						} catch { fatalError("Markless iOS host: \(error)") }
+						} catch { hostFailed("\(error)") }
 					}
 					if layout == nil {
 						select.layer.borderWidth = 1
@@ -1513,7 +1513,7 @@ final class ViewTree {
 				if sheetStyles[template] != nil {
 					sheet.area = { [weak self] snapPoint in self?.sheetArea(template, at: snapPoint) }
 					sheet.onRest = { [weak self] snapPoint in
-						do { try self?.sheetRested(template, at: snapPoint) } catch { fatalError("Markless iOS host: \(error)") }
+						do { try self?.sheetRested(template, at: snapPoint) } catch { hostFailed("\(error)") }
 					}
 				} else if layout != nil {
 					throw HostError("system sheet \(id) is on a styled page but has no styles of its own")
@@ -1716,7 +1716,7 @@ final class ViewTree {
 			guard let select = view as? SelectButton, let template = templates[id] else { continue }
 			do {
 				select.show(try runtime.choices(of: template).first { $0.selected }?.label ?? "")
-			} catch { fatalError("Markless iOS host: \(error)") }
+			} catch { hostFailed("\(error)") }
 		}
 	}
 

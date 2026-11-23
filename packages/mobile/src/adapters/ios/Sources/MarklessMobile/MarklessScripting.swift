@@ -48,7 +48,7 @@ public final class MarklessScripting {
 				do {
 					try MarklessScripting.shared.host.load(script)
 				} catch {
-					fatalError("Markless iOS host: \(error)")
+					hostFailed("\(error)")
 				}
 			}
 		}
@@ -102,7 +102,7 @@ public final class MarklessScripting {
 	nonisolated static func secureSeed() -> String {
 		var bytes = [UInt8](repeating: 0, count: 32)
 		guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else {
-			fatalError("Markless iOS host: the system gave no secure random bytes")
+			hostFailed("the system gave no secure random bytes")
 		}
 		return bytes.map { String(format: "%02x", $0) }.joined()
 	}
