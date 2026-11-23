@@ -1,0 +1,37 @@
+appId: ${APP_ID}
+name: s51-styled-form-save
+---
+- launchApp:
+    clearState: true
+- assertVisible: All notes
+- assertVisible: Write a note
+- tapOn: Write a note
+- assertNotVisible: All notes
+- assertVisible: Title
+- assertVisible: Save note
+- assertNotVisible: All notes
+- tapOn: Title
+- eraseText
+- inputText: Groceries
+- hideKeyboard
+- assertVisible: Groceries
+- assertVisible: Save note
+- assertVisible: Groceries
+- tapOn: Save note
+- assertNotVisible: Save note
+- assertVisible:
+    text: Groceries
+    below: All notes
+- assertVisible:
+    text: Write a note
+    below: Groceries
+- assertVisible: All notes
+- assertVisible: Groceries
+- assertVisible: Write a note
+- assertNotVisible: Save note
+- assertVisible:
+    text: Groceries
+    below: All notes
+- assertVisible:
+    text: Write a note
+    below: Groceries
