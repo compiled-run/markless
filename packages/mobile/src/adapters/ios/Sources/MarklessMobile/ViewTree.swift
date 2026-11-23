@@ -409,6 +409,19 @@ final class ViewTree {
 	weak var presenter: UIViewController?
 	private var anchors = Set<ObjectIdentifier>()
 	private(set) var assignment: Int
+	/// The entry the page shows: its assignment, or the interaction state (`:active`, `:focus`) Dragon's runtime selects in it.
+	private(set) var shown: Int
+	/// Dragon's translated library cases (`DragonPlan.library`), which run `rt-interaction`; nil without Dragon's plan module.
+	var library: ((String) -> String)?
+	/// Called after a touch shows another entry, so the screen repaints its canvas and the layout dump follows.
+	var onShown: (() -> Void)?
+	/// The pointer steps since the page opened, by the node each names, replayed through the current level's tables.
+	private var interactionSteps: [(op: String, node: String?)] = []
+	/// The list row (`@<key>` of its copies) the finger is pressing, and the one the focused element is in: an interaction state
+	/// styles only those rows' copies.
+	private var pressedRow: String?
+	private var focusedRow: String?
+	private var interactionWatcher: InteractionWatcher?
 	private let bodyLayer = CALayer()
 	/// Each styled sheet's layout per resting height, the height it rests at, and each height's current assignment.
 	private var sheetStyles: [String: (heights: [(snapPoint: Double, layout: StyleLayout)], height: Int, assignments: [Int])] = [:]
@@ -482,6 +495,7 @@ final class ViewTree {
 		self.ask = ask
 		keyboard = KeyboardDismisser(page)
 		assignment = layout?.start ?? 0
+		shown = assignment
 		let payload = runtime.payload
 		let nodes = Dictionary(uniqueKeysWithValues: payload.nodes.map { ($0.id, $0) })
 		self.nodes = nodes
@@ -583,6 +597,7 @@ final class ViewTree {
 	func relayout(_ new: StyleLayout) throws {
 		guard layout != nil else { return }
 		layout = new
+		reselect()
 		try repaint { _ in true }
 		paintBody()
 		try sizePage()
@@ -592,7 +607,7 @@ final class ViewTree {
 	private func sizePage() throws {
 		guard let layout else { return }
 		let viewport = layout.viewport
-		let range = layout.pageScrolls[assignment]
+		let range = layout.pageScrolls[shown]
 		page.contentSize = CGSize(width: viewport.width + (range?.maxX ?? 0), height: viewport.height + (range?.maxY ?? 0))
 		root.frame = CGRect(origin: .zero, size: page.contentSize)
 		try restSticky()
@@ -645,6 +660,11 @@ final class ViewTree {
 		let watcher = TouchWatcher { [weak self] in self?.dismissMessage() }
 		screen.addGestureRecognizer(watcher)
 		touches = watcher
+		if layout?.interaction.isEmpty == false {
+			let interaction = InteractionWatcher { [weak self] phase, point in self?.interacted(phase, at: point) }
+			screen.addGestureRecognizer(interaction)
+			interactionWatcher = interaction
+		}
 		do { try overlays.mount(in: screen) } catch { hostFailed("\(error)") }
 		guard layout == nil else { return }
 		root.translatesAutoresizingMaskIntoConstraints = false
@@ -663,6 +683,8 @@ final class ViewTree {
 		dismissMessage()
 		if let touches { touches.view?.removeGestureRecognizer(touches) }
 		touches = nil
+		if let interactionWatcher { interactionWatcher.view?.removeGestureRecognizer(interactionWatcher) }
+		interactionWatcher = nil
 		overlays.unmount()
 		closeSheets()
 		page.removeFromSuperview()
@@ -700,14 +722,14 @@ final class ViewTree {
 	}
 
 	/// The colour behind the page in the current assignment: the export's canvas, else the web canvas's white.
-	var canvas: UIColor? { layout.map { $0.canvases[assignment].map(uiColor) ?? .white } }
+	var canvas: UIColor? { layout.map { $0.canvases[shown].map(uiColor) ?? .white } }
 
 	/// body's own background, under every view of the page, where the current assignment gives it one.
 	private func paintBody() {
 		CATransaction.begin()
 		CATransaction.setDisableActions(true)
 		defer { CATransaction.commit() }
-		guard let body = layout?.bodies[assignment] else {
+		guard let body = layout?.bodies[shown] else {
 			bodyLayer.isHidden = true
 			return
 		}
@@ -866,6 +888,7 @@ final class ViewTree {
 			case let .state(cell, value):
 				if let layout, cell != StyleBands.state || layout.stateCells.contains(cell) {
 					assignment = try layout.next(from: assignment, cell: cell, value: value)
+					reselect()
 				}
 				for (sheet, styles) in sheetStyles {
 					var moved = styles
@@ -1173,8 +1196,78 @@ final class ViewTree {
 			sheetStyles[sheet] = next
 		}
 		guard moved else { return }
+		reselect()
 		try repaint { _ in true }
 		try sizePage()
+	}
+
+	/// A touch on the page as Dragon's interaction runtime takes it: the element under the finger, then the state it selects.
+	private func interacted(_ phase: InteractionWatcher.Phase, at point: CGPoint) {
+		let node = phase == .cancelled ? nil : touchedNode(at: point)
+		switch phase {
+		case .began:
+			pressedRow = node?.row
+			interactionSteps.append(("touch-down", node?.id))
+		case .ended:
+			pressedRow = nil
+			focusedRow = node?.row
+			interactionSteps.append(("touch-up", node?.id))
+		case .cancelled:
+			pressedRow = nil
+			interactionSteps.append(("touch-cancel", nil))
+		}
+		let before = shown
+		reselect()
+		guard shown != before else { return }
+		do {
+			try repaint { _ in true }
+			paintBody()
+			try sizePage()
+		} catch {
+			fatalError("Markless iOS host: \(error)")
+		}
+		onShown?()
+	}
+
+	/// The payload node under `point` and, inside a list row, the row copy it is in.
+	private func touchedNode(at point: CGPoint) -> (id: String, row: String?)? {
+		guard let screen = page.superview, var view = screen.hitTest(point, with: nil) else { return nil }
+		let ids = Dictionary(elements.map { (ObjectIdentifier($0.value), $0.key) }, uniquingKeysWith: { a, _ in a })
+		while true {
+			if let id = ids[ObjectIdentifier(view)] {
+				let template = templates[id] ?? id
+				return (template, id.firstIndex(of: "@").map { String(id[id.index(after: $0)...]) })
+			}
+			guard let parent = view.superview else { return nil }
+			view = parent
+		}
+	}
+
+	/// The entry to show: the state `rt-interaction` selects over the steps in the assignment's level, or the assignment.
+	private func reselect() {
+		shown = assignment
+		guard let layout, let library, layout.interaction.indices.contains(assignment) else { return }
+		let level = layout.interaction[assignment]
+		guard !level.entries.isEmpty else { return }
+		// A step names the nearest ancestor the level's tables address; one under none of them touches no element (-1).
+		let index = { (node: String?) -> Int in
+			var id = node
+			while let at = id {
+				if let found = level.addresses.firstIndex(of: at) { return found }
+				id = self.nodes[at]?.parent
+			}
+			return -1
+		}
+		let steps = interactionSteps.map { step -> String in
+			step.op == "touch-cancel" ? "[\"touch-cancel\"]" : "[\"\(step.op)\",\(index(step.node))]"
+		}
+		let line = "[\"rt-interaction\",\(level.tables),\(level.entries.count),[\(steps.joined(separator: ","))]]"
+		guard let records = try? JSONValue.parse(Data(library(line).utf8)), case let .array(out) = records, out.count == 2,
+			case .string("ok") = out[0], case let .array(trace) = out[1], case let .array(last)? = trace.last, last.count == 6,
+			case let .string(bits) = last[5], let pattern = UInt64(bits, radix: 16)
+		else { return }
+		let state = Double(bitPattern: pattern)
+		if state >= 0, Int(state) < level.entries.count { shown = level.entries[Int(state)] }
 	}
 
 	private func style(of id: String) -> ResolvedStyle? {
@@ -1183,8 +1276,11 @@ final class ViewTree {
 			guard let styles = sheetStyles[sheet] else { return nil }
 			return styles.heights[styles.height].layout.assignments[styles.assignments[styles.height]][template]
 		}
+		// An interaction state styles the row copy the touch was in; every other copy of that row keeps the assignment's look.
+		let row = id.firstIndex(of: "@").map { String(id[id.index(after: $0)...]) }
+		let entry = shown != assignment && id != template && row != pressedRow && row != focusedRow ? assignment : shown
 		// A row's copy has its own box once the page's rows are laid out; until then its template's.
-		return layout?.assignments[assignment][id] ?? layout?.assignments[assignment][template]
+		return layout?.assignments[entry][id] ?? layout?.assignments[entry][template]
 	}
 
 	private func repaint(where included: (String) -> Bool) throws {
@@ -2820,6 +2916,63 @@ private final class TouchWatcher: UIGestureRecognizer {
 		began()
 		state = .failed
 	}
+}
+
+/// Every touch on the page, observed for Dragon's interaction runtime: it never recognises, so it takes no touch from a control.
+private final class InteractionWatcher: UIGestureRecognizer, UIGestureRecognizerDelegate {
+	enum Phase { case began, ended, cancelled }
+	private let report: (Phase, CGPoint) -> Void
+	init(_ report: @escaping (Phase, CGPoint) -> Void) {
+		self.report = report
+		super.init(target: nil, action: nil)
+		cancelsTouchesInView = false
+		delaysTouchesBegan = false
+		delaysTouchesEnded = false
+		delegate = self
+	}
+
+	/// The finger the runtime follows (the first down; others are ignored), where and when it went down.
+	private var finger: (touch: UITouch, at: CGPoint, time: TimeInterval)?
+	/// Past this the finger scrolls: Chrome cancels the press (pointercancel), and the lift focuses nothing.
+	private let slop: CGFloat = 10
+	/// A finger held this long is a long press, whose lift is not a tap, as in Chrome.
+	private let longPress: TimeInterval = 0.5
+
+	override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+		guard finger == nil, let touch = touches.first, let view else { return }
+		let at = touch.location(in: view)
+		finger = (touch, at, touch.timestamp)
+		report(.began, at)
+	}
+
+	override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
+		guard let finger, touches.contains(finger.touch), let view else { return }
+		let at = finger.touch.location(in: view)
+		if hypot(at.x - finger.at.x, at.y - finger.at.y) > slop { end(.cancelled, .zero) }
+	}
+
+	override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+		guard let finger, touches.contains(finger.touch), let view else { return }
+		if finger.touch.timestamp - finger.time >= longPress { end(.cancelled, .zero) } else { end(.ended, finger.touch.location(in: view)) }
+	}
+
+	override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+		guard let finger, touches.contains(finger.touch) else { return }
+		end(.cancelled, .zero)
+	}
+
+	private func end(_ phase: Phase, _ at: CGPoint) {
+		finger = nil
+		report(phase, at)
+		state = .failed
+	}
+
+	override func reset() {
+		super.reset()
+		finger = nil
+	}
+
+	func gestureRecognizer(_ a: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith b: UIGestureRecognizer) -> Bool { true }
 }
 
 /// A tap that presses an element which is not a button.
