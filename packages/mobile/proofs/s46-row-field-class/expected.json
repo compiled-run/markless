@@ -1,5 +1,5 @@
 {
-	"rung": "S42",
+	"rung": "S46",
 	"name": "A styled @for row's class read from a field an async value builds from literals chosen by conditions: the build lists the field's values, so each row is styled by the class it holds, and a row whose class changes is styled again, on the phone as on the web",
 	"steps": [
 		{
