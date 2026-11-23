@@ -681,12 +681,13 @@ export async function compileNativeApp(input: {
 		if ('built' in one) routes.push(one.built);
 		if ('styleInput' in one && one.styleInput) styleInputs.push(one.styleInput);
 	}
+	const refused = diagnostics.some((diagnostic) => diagnostic.severity === 'error');
 	return {
 		payload:
-			diagnostics.length > 0 && !(input.partial && routes.length > 0)
+			refused && !(input.partial && routes.length > 0)
 				? null
 				: { version: NATIVE_APP_VERSION, routes },
-		styleInputs: diagnostics.length > 0 && !input.partial ? [] : styleInputs,
+		styleInputs: refused && !input.partial ? [] : styleInputs,
 		images,
 		manifest: deviceManifest([...features], input.device).manifest,
 		diagnostics,

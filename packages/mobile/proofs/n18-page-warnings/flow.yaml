@@ -1,0 +1,47 @@
+appId: ${APP_ID}
+name: n18-page-warnings
+---
+- launchApp:
+      clearState: true
+- assertVisible: Home page
+- assertVisible: Working at North yard
+- assertVisible: Settings
+- assertVisible: Home
+- tapOn: Settings
+- assertNotVisible: Home page
+- assertVisible: Settings
+- assertVisible: End-of-day reminder
+- assertVisible: Default site
+- assertVisible: North yard
+- assertVisible: Change site
+- assertNotVisible: Home page
+- assertNotVisible: Pump house
+- assertNotVisible: East fence
+- assertVisible: Settings
+- tapOn: Change site
+- assertVisible: Pump house
+- assertVisible: East fence
+- assertVisible: Pump house
+- assertVisible: East fence
+- tapOn: East fence
+- assertNotVisible: Pump house
+- assertVisible: East fence
+- assertVisible: Change site
+- assertNotVisible: North yard
+- assertNotVisible: Pump house
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertVisible: Home
+- assertVisible: Home page
+- assertVisible: Working at East fence
+- assertNotVisible: Working at North yard
+- assertVisible: Home

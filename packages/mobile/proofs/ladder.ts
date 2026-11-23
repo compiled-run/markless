@@ -12,7 +12,9 @@ export const readsAs = (shown: string, text: LadderText): boolean =>
 
 /** `text` as a message names it: in quotes, or `"Groceries…"` for a text named by how it starts. */
 export const describeText = (text: LadderText): string =>
-	typeof text === 'string' ? JSON.stringify(text) : `${JSON.stringify(text.startsWith).slice(0, -1)}…"`;
+	typeof text === 'string'
+		? JSON.stringify(text)
+		: `${JSON.stringify(text.startsWith).slice(0, -1)}…"`;
 
 /** One person's action between two looks at the screen. Every target is a visible text or an accessible name. */
 export type LadderAction =
@@ -249,6 +251,8 @@ export type LadderRung = {
 	readonly start?: string;
 	/** Pages under `pages/` the phones do not build, each refused by name: the app builds without them, and a link to one opens the not-found page. */
 	readonly refusedPages?: readonly string[];
+	/** Pages under `pages/` that build with warnings only, as handlers a phone never raises left out; every other page builds with none. */
+	readonly warnedPages?: readonly string[];
 	/**
 	 * The text of the first element the screens and the browser leave below the first screen. The reference runtime has no
 	 * layout, so it raises `visible` only for elements before that one in document order.
@@ -265,7 +269,11 @@ export type LadderRung = {
 	 * from the name's extension (a launch argument on phones, the web test's file chooser), as the system picker is not the
 	 * proof's to drive.
 	 */
-	readonly pick?: ReadonlyArray<{ readonly name: string; readonly text: string; readonly type: string }>;
+	readonly pick?: ReadonlyArray<{
+		readonly name: string;
+		readonly text: string;
+		readonly type: string;
+	}>;
 	/**
 	 * The web build, where `@markless/device` is absent: the steps it shows instead (a device action has nothing to
 	 * act on there), and texts that must not appear in any file of the built output (removed at build time).
@@ -360,7 +368,8 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 		),
 	);
 	const order = step.order?.join('\n') !== previous.order?.join('\n') ? step.order : undefined;
-	const placed = step.placed?.join('\n') !== previous.placed?.join('\n') ? step.placed : undefined;
+	const placed =
+		step.placed?.join('\n') !== previous.placed?.join('\n') ? step.placed : undefined;
 	const fields = Object.fromEntries(
 		Object.entries(step.fields ?? {}).filter(
 			([name, value]) => previous.fields?.[name] !== value,

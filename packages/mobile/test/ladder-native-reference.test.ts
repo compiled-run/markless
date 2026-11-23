@@ -357,11 +357,20 @@ function mirror(
 		mount,
 		apply,
 		elementReading,
-		// A press on a <label> acts on the control its `for` names, as both hosts pass it on.
-		pressed: (host: string) =>
-			nodeOf.get(baseOf(host))?.element === 'label'
-				? (attributes.get(`${host}\0for`) ?? host)
-				: host,
+		// A press on a <label> acts on the control its `for` names, as both hosts pass it on; any other press reaches the
+		// nearest element around it that handles one, as on a phone.
+		pressed: (host: string) => {
+			if (nodeOf.get(baseOf(host))?.element === 'label')
+				return attributes.get(`${host}\0for`) ?? host;
+			const key = host.slice(baseOf(host).length);
+			let node: string | null | undefined = baseOf(host);
+			while (
+				node &&
+				!payload.events.some((event) => event.host === node && event.event === 'activate')
+			)
+				node = nodeOf.get(node)?.parent;
+			return node ? (nodeOf.get(node)?.row ? `${node}${key}` : node) : host;
+		},
 		disabled: (host: string) => attributes.get(`${host}\0disabled`) != null,
 		/** The control a <label> names, which a host types into when the label's text is the field's name. */
 		labelled: (host: string) => attributes.get(`${host}\0for`) ?? null,
@@ -1659,13 +1668,23 @@ test.each([...navRungFolders(), ...styleRungFolders(), ...sheetStyleRungFolders(
 			...readAppConfig(join(proofsDir, folder)),
 			...(rung.refusedPages ? { partial: true } : {}),
 		});
-		// Only the pages the rung names are refused, each by name; every other page builds clean.
+		// Only the pages the rung names are refused or warned, each by name; every other page builds clean.
 		const refused = new Set(rung.refusedPages ?? []);
+		const warned = new Set(rung.warnedPages ?? []);
 		expect(
 			build.diagnostics
-				.filter((diagnostic) => !refused.has(diagnostic.page))
+				.filter(
+					(diagnostic) =>
+						!refused.has(diagnostic.page) &&
+						!(warned.has(diagnostic.page) && diagnostic.severity === 'warning'),
+				)
 				.map((diagnostic) => `${diagnostic.page}: ${diagnostic.message}`),
 		).toEqual([]);
+		for (const page of warned)
+			expect(
+				build.diagnostics.some((diagnostic) => diagnostic.page === page),
+				`${page} is warned`,
+			).toBe(true);
 		for (const page of refused)
 			expect(
 				build.diagnostics.some(

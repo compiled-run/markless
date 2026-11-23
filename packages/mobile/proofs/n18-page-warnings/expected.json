@@ -1,0 +1,26 @@
+{
+	"rung": "N18",
+	"name": "An app whose settings page carries only warnings (keydown handlers a phone never raises, left out) still builds: the page opens, its select picks a site, and the home page reads it after Back",
+	"warnedPages": ["pages/settings.tsrx"],
+	"steps": [
+		{ "visible": ["Home page", "Working at North yard", "Settings"], "title": "Home" },
+		{
+			"do": { "tap": "Settings" },
+			"visible": ["End-of-day reminder", "Default site", "North yard", "Change site"],
+			"absent": ["Home page", "Pump house", "East fence"],
+			"title": "Settings"
+		},
+		{ "do": { "tap": "Change site" }, "visible": ["Pump house", "East fence"] },
+		{
+			"do": { "tap": "East fence" },
+			"visible": ["East fence", "Change site"],
+			"absent": ["North yard", "Pump house"]
+		},
+		{
+			"do": { "back": "button" },
+			"visible": ["Home page", "Working at East fence"],
+			"absent": ["Working at North yard"],
+			"title": "Home"
+		}
+	]
+}
