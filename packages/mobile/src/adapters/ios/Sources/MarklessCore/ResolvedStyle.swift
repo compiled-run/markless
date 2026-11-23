@@ -342,7 +342,11 @@ extension StyleExport {
 			if case .branch = node.kind { continue }
 			if case .repeat = node.kind { continue }
 			if case .sheet = node.kind { throw styleError("\(node.id): a system sheet inside another sheet's content is not styled on iOS") }
-			guard let styled = byId[node.id] else { throw styleError("no style export node for \(node.id)") }
+			guard let styled = byId[node.id] else {
+				// Dragon, as the web, lays out no box for an empty text; only a text the build knows is not empty must have one.
+				if case .text = node.kind, (texts?[node.id] ?? "").isEmpty { continue }
+				throw styleError("no style export node for \(node.id)")
+			}
 			switch node.kind {
 			case .element:
 				guard !styled.isText, !styled.isAnonymous else { throw styleError("\(node.id) is an element in the payload but not in the style export") }

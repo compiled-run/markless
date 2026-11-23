@@ -82,6 +82,16 @@ func refusesWhatItCannotDraw(find: String, replace: String, reason: String) thro
 	}
 }
 
+@Test func anEmptyTextNeedsNoExportNodeAndAnyOtherTextDoes() throws {
+	let (decoded, texts) = try payload()
+	let renamed = exportText { $0.replacingOccurrences(of: "\"id\": \"h1:text0\"", with: "\"id\": \"h1:text9\"") }
+	let empty = texts.map { $0.node == "h1:text0" ? (node: $0.node, text: "") : $0 }
+	let layout = try StyleExport.decode(renamed).resolve(for: decoded, initialTexts: empty, value: noCells)
+	#expect(layout.styles["h1:text0"] == nil)
+	#expect(layout.styles["h1"] != nil)
+	#expect(throws: PayloadError.self) { try StyleExport.decode(renamed).resolve(for: decoded, initialTexts: texts, value: noCells) }
+}
+
 @Test func refusesAnonymousBoxesAndSyntheticBold() throws {
 	let (decoded, texts) = try payload()
 	let bold = exportText {

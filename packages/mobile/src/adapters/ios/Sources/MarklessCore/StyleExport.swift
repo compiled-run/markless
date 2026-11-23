@@ -932,7 +932,11 @@ public struct StyleExport: Sendable {
 				try (slotWrites[node.id] ?? []).reduce(node) { try StyleExport.patched($0, kind: $1.kind, path: $1.path, value: $1.value) }
 			}.map { node -> StyleNode in
 				guard node.frame != nil else { return node }
-				guard let g = geometry[node.id] else { throw PayloadError(path: "plan layout", reason: "Dragon's layout has no box for \(node.id)") }
+				guard let g = geometry[node.id] else {
+					// A text whose state emptied it has no box, as on the web.
+					if node.isText, relaidTexts[node.id] == "" { return node.hidden() }
+					throw PayloadError(path: "plan layout", reason: "Dragon's layout has no box for \(node.id)")
+				}
 				let f = try g.array()
 				guard f.count == 6 else { throw g.fail("expected id, frame, border widths, lines, border operations and scroll range") }
 				let frame = try f[1].array().map { try planNumber($0.value) }

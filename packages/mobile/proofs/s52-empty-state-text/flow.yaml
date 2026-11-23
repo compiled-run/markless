@@ -1,0 +1,12 @@
+appId: ${APP_ID}
+name: s52-empty-state-text
+---
+- launchApp:
+      clearState: true
+- assertVisible: Where you are
+- assertVisible: Locate
+- assertNotVisible: Location is off
+- tapOn: Locate
+- assertVisible: Location is off
+- assertVisible: Location is off
+- assertVisible: Where you are
