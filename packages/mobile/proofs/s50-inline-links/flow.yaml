@@ -1,0 +1,38 @@
+appId: ${APP_ID}
+name: s50-inline-links
+---
+- launchApp:
+    clearState: true
+- assertVisible: Notes
+- assertVisible: About these notes
+- assertVisible: Pick one below\.
+- assertVisible: Groceries
+- assertVisible: Garden
+- assertVisible:
+    text: About these notes
+    below: Notes
+- assertVisible:
+    text: Pick one below\.
+    below: About these notes
+- assertVisible:
+    text: Groceries
+    below: Pick one below\.
+- assertVisible:
+    text: Garden
+    below: Groceries
+- tapOn: Garden
+- assertNotVisible: Pick one below\.
+- assertVisible: Note garden
+- assertVisible: Back to notes
+- assertNotVisible: Pick one below\.
+- tapOn: Back to notes
+- assertVisible: Pick one below\.
+- assertNotVisible: Back to notes
+- assertVisible: About these notes
+- assertVisible: Pick one below\.
+- assertVisible: Groceries
+- assertNotVisible: Back to notes
+- tapOn: About these notes
+- assertVisible: Back to notes
+- assertVisible: Note about
+- assertVisible: Back to notes

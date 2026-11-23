@@ -1,0 +1,30 @@
+{
+	"rung": "S50",
+	"name": "Styled links left at their default inline layout, beside block siblings and in a keyed @for row, show where Chrome puts them and open the page they link to",
+	"steps": [
+		{
+			"visible": ["Notes", "About these notes", "Pick one below.", "Groceries", "Garden"],
+			"order": ["Notes", "About these notes", "Pick one below.", "Groceries", "Garden"]
+		},
+		{
+			"do": {
+				"tap": "Garden"
+			},
+			"visible": ["Note garden", "Back to notes"],
+			"absent": ["Pick one below."]
+		},
+		{
+			"do": {
+				"tap": "Back to notes"
+			},
+			"visible": ["About these notes", "Pick one below.", "Groceries"],
+			"absent": ["Back to notes"]
+		},
+		{
+			"do": {
+				"tap": "About these notes"
+			},
+			"visible": ["Note about", "Back to notes"]
+		}
+	]
+}
