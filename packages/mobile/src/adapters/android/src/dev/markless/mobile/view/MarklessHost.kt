@@ -74,6 +74,8 @@ import dev.markless.mobile.style.rowStates
 import dev.markless.mobile.style.StyleWrite
 import dev.markless.mobile.style.StyledNode
 import dev.markless.mobile.style.stackingParent
+import dev.markless.mobile.style.checkFlattenedInline
+import dev.markless.mobile.style.rowCopyOf
 import kotlin.math.roundToInt
 
 class MarklessHostError(message: String) : RuntimeException(message)
@@ -1551,6 +1553,10 @@ class MarklessHost(
 		if (sheet != null) (views.getValue(sheet) as MarklessBox).fixedSize = Math.round(layout.export.viewportWidth * dpr).toInt() to Math.round(maxOf(layout.export.viewportHeight * dpr, layout.contentBottom())).toInt()
 		val (ax, ay) = origin
 		val parentId = parentOf(inst)
+		val exportParent = generateSequence(s.parent) { styled.byId[it]?.parent }.firstOrNull(::isView)
+		val inline = layout.export.inlineBoxes.getOrNull(layout.assignment) ?: emptySet()
+		if (parentId != null && exportParent != null && exportParent != parentId)
+			checkFlattenedInline(inst.id, parentId, exportParent, styled, inline) { id -> runtime.node(id.substringBefore('@')).parent?.let { rowCopyOf(id, it, styled) } }
 		val paintOrder = s.writes.filterIsInstance<StyleWrite.PaintOrder>().firstOrNull()
 		// The node's frame origin inside its view: a label's inside its button, other text's inside its outward-rounded view.
 		var inView = (ax - Math.floor(ax)) to (ay - Math.floor(ay))
@@ -1584,7 +1590,7 @@ class MarklessHost(
 			}
 			if (view is MarklessBox) sizeScroller(inst.id, view, s, rect)
 		}
-		paint(view, s, styled)
+		paint(view, s, styled, inline = inst.id.substringBefore('@') in inline)
 		paintShadow(view, s, styled)
 		paintOutline(inst.id, s, styled)
 		if (view is SelectBox) selectLabel(view, s, styled, absolute)
@@ -1746,7 +1752,7 @@ class MarklessHost(
 		return absolute
 	}
 
-	private fun paint(view: View, s: StyledNode, styled: Assignment) {
+	private fun paint(view: View, s: StyledNode, styled: Assignment, inline: Boolean = false) {
 		fun notVisible(n: StyledNode?) = n?.writes?.any { it is StyleWrite.Visibility && it.value != "visible" } == true
 		// A text takes its element's visibility, which Dragon writes on the element only.
 		val hidden = notVisible(s) || (s.kind == "text" && notVisible(s.parent?.let { styled.byId[it] }))
@@ -1758,7 +1764,8 @@ class MarklessHost(
 		var clip: Rect? = null
 		for (w in s.writes) when (w) {
 			is StyleWrite.BackgroundColor -> fill = w.color.argb
-			StyleWrite.BorderWidths -> if (s.borderWidths == null) throw MarklessHostError("\"${s.id}\" writes border widths but has none")
+			// Dragon's plan layout gives an inline box, which the compiler keeps borderless, no border box.
+			StyleWrite.BorderWidths -> if (s.borderWidths == null && !inline) throw MarklessHostError("\"${s.id}\" writes border widths but has none")
 			is StyleWrite.BorderStyles -> styles = w.styles
 			is StyleWrite.BorderColors -> colors = w.colors.map { it.argb }
 			is StyleWrite.BorderRadius -> radii = w.radii.map { it * dpr }
@@ -1811,7 +1818,7 @@ class MarklessHost(
 			view.background = null
 			return
 		}
-		val bw = s.borderWidths ?: throw MarklessHostError("element \"${s.id}\" has no border widths")
+		val bw = s.borderWidths ?: if (inline) Edges(0.0, 0.0, 0.0, 0.0) else throw MarklessHostError("element \"${s.id}\" has no border widths")
 		val checkbox = s.checkboxMarks?.let { ThemedCheckbox(it, s.writes.filterIsInstance<StyleWrite.Checkbox>().last().colors) }
 		if (checkbox != null) (view as CheckBox).buttonDrawable = null
 		val arrow = s.selectArrow?.let { MenuListArrow(it, s.writes.filterIsInstance<StyleWrite.SelectArrow>().last().color.argb) } ?: checkbox
