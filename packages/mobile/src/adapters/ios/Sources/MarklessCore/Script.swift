@@ -34,6 +34,8 @@ public struct NativeScriptBinding: Equatable, Sendable {
 		case shared([NativeScriptBinding])
 		/// A shared object's method: the script function that returns it, run over its own bindings when called.
 		case method(String, [NativeScriptBinding])
+		/// The page's `url` prop, which the script reads as a `URL`.
+		case url
 	}
 	public let name: String
 	public let kind: Kind
@@ -42,7 +44,7 @@ public struct NativeScriptBinding: Equatable, Sendable {
 		switch kind {
 		case let .cell(cell): return [cell]
 		case let .fields(fields): return fields.map(\.cell)
-		case .device, .callback: return []
+		case .device, .callback, .url: return []
 		case let .value(expr), let .elements(expr): return expr.cells
 		case let .object(members), let .shared(members), let .method(_, members): return members.flatMap(\.cells)
 		}

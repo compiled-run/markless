@@ -348,6 +348,7 @@ if (!host) {
 		if (match.route.indexOf('[...') >= 0)
 			return Promise.reject(new Error('navigate() to ' + given + ' opens ' + match.route + ', a catch-all page, which a phone does not open yet'));
 		host.out.navigate = { route: match.route, params: match.params, replace: !!(options && options.replace) };
+		if (search) host.out.navigate.search = search;
 		return Promise.resolve();
 	};
 	// A device call is a call entry the host makes; one that gives a value waits for the host's answer to its id.
@@ -658,7 +659,8 @@ var frameOf = function (bindings) {
 				enumerable: true,
 				value: function () { return fn(binding.callback)(frameOf(own)).apply(this, arguments); },
 			});
-		} else Object.defineProperty(names, name, { enumerable: true, value: binding.value });
+		} else if ('url' in binding) Object.defineProperty(names, name, { enumerable: true, value: pageUrl(binding.url) });
+		else Object.defineProperty(names, name, { enumerable: true, value: binding.value });
 	});
 	return names;
 };
@@ -887,6 +889,7 @@ var keyOf = function (frame) {
 		var binding = frame[name];
 		if ('slot' in binding) return slotValue(binding.slot);
 		if ('fields' in binding) return Object.keys(binding.fields).sort().map(function (field) { return slotValue(binding.fields[field]); });
+		if ('url' in binding) return binding.url;
 		return binding.value;
 	}));
 };
@@ -1052,6 +1055,12 @@ export const NATIVE_SCRIPT_ENGINE: NativeScriptEngine = { services: HOST_SERVICE
  * The script a payload's `script` ops and computeds run. Every module is a function run once on first use, imports first,
  * as ES modules evaluate; each script function is defined inside its module, so the module's own names reach it.
  */
+// A page's url prop: a URL on the app's origin; with none, the parts of it that need no origin.
+const PAGE_URL_SOURCE = String.raw`var pageUrl = function (place) {
+	if (origin) return new g.URL(place.pathname + place.search, origin);
+	return { pathname: place.pathname, search: place.search, hash: place.hash, searchParams: new g.URLSearchParams(place.search) };
+};`;
+
 export function nativeScriptOf(
 	modules: ReadonlyArray<NativeScriptModuleInput>,
 	services: ReadonlyArray<NativeScriptService>,
@@ -1066,6 +1075,8 @@ export function nativeScriptOf(
 	engine: NativeScriptEngine = NATIVE_SCRIPT_ENGINE,
 	/** The script reads `URL` or `URLSearchParams`: the engine carries the URL Standard's code for engines without them. */
 	url = false,
+	/** A script function reads the page's `url` prop, which it gets as a `URL`. */
+	pageUrl = false,
 ): NativeScript {
 	const owners: Record<string, number> = {};
 	const definitions = modules.map((module, index) => {
@@ -1100,6 +1111,6 @@ export function nativeScriptOf(
 		engine.entries,
 	].join('\n');
 	const id = contentId(body);
-	const source = `(function (g, id) {\n${engine.services}\n${url ? `${NATIVE_SCRIPT_URL}\n` : ''}g.__markless = g.__markless || {};\n${body}\n})(globalThis, ${JSON.stringify(id)});\n`;
+	const source = `(function (g, id) {\n${engine.services}\n${url || pageUrl ? `${NATIVE_SCRIPT_URL}\n` : ''}${pageUrl ? `${PAGE_URL_SOURCE}\n` : ''}g.__markless = g.__markless || {};\n${body}\n})(globalThis, ${JSON.stringify(id)});\n`;
 	return { id, source, services };
 }

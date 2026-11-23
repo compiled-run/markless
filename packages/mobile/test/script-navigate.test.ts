@@ -38,7 +38,7 @@ export default function Note() @{
 const manifest = buildRouteManifestFromFileIds(Object.keys(pages));
 const here = 'https://app.test/notes/7';
 
-/** What the web's router does with `navigate(href)` from /notes/7: keeps the page, or opens a route with its params. */
+/** What the web's router does with `navigate(href)` from /notes/7: keeps the page, or opens a route with its params and query. */
 function onTheWeb(href: string) {
 	const url = new URL(href, here);
 	const now = new URL(here);
@@ -54,7 +54,7 @@ function onTheWeb(href: string) {
 			value.split('/').map(decodeURIComponent).join('/'),
 		]),
 	);
-	return { route: match.route.pattern, params };
+	return { route: match.route.pattern, params, search: url.search };
 }
 
 test('navigate() from JavaScript on a phone resolves a path built while it runs as the web resolves and routes it', async () => {
@@ -107,7 +107,10 @@ test('navigate() from JavaScript on a phone resolves a path built while it runs 
 			expect([href, problem]).toEqual([href, expect.stringContaining('a catch-all page, which a phone does not open yet')]);
 		else if (web === 'missing') expect([href, problem]).toEqual([href, expect.stringContaining('is not a page of this app')]);
 		else
-			expect([href, opened && { route: opened.route, params: opened.params }]).toEqual([href, web]);
+			expect([
+				href,
+				opened && { route: opened.route, params: opened.params, search: opened.search ?? '' },
+			]).toEqual([href, web]);
 	}
 });
 

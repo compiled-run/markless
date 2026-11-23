@@ -160,6 +160,8 @@ class MarklessHost(
 	preferredLanguages: List<String> = LocaleList.getDefault().let { list -> (0 until list.size()).map { list[it].toLanguageTag() } },
 	/** The device's clock, in ms since 1970 (UTC); a conformance run fixes it. */
 	now: () -> Double = { System.currentTimeMillis().toDouble() },
+	/** The query the page opens with (`?tab=done`), or "". */
+	search: String = "",
 ) {
 	constructor(
 		context: Context,
@@ -170,7 +172,8 @@ class MarklessHost(
 		params: Map<String, String> = emptyMap(),
 		device: NativeDevice? = null,
 		preferredLanguages: List<String> = LocaleList.getDefault().let { list -> (0 until list.size()).map { list[it].toLanguageTag() } },
-	) : this(context, Payload.decode(payloadBytes), styleExportBytes?.let { StyleExport.decode(it) }, fonts, store, params, device, preferredLanguages)
+		search: String = "",
+	) : this(context, Payload.decode(payloadBytes), styleExportBytes?.let { StyleExport.decode(it) }, fonts, store, params, device, preferredLanguages, search = search)
 
 	/** This page's styles, laid out at the page's own size once [layOutAt] has run with Dragon's plan. */
 	var style: StyleExport? = style
@@ -184,7 +187,7 @@ class MarklessHost(
 	/** The page size in device px and the slot values (export order) the page was last laid out at. */
 	private var laidOutFor: Triple<Int, Int, Pair<List<Double>, Map<String, String>>>? = null
 	private val fonts: FontSource = if (style?.systemFaces.isNullOrEmpty()) bundledFonts else SystemFonts(style!!.systemFaces, bundledFonts)
-	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine).apply {
+	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine, search = search).apply {
 		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
 		onScriptEntry = AppScriptEngine::entryRan
 		measure = this@MarklessHost::measureBox

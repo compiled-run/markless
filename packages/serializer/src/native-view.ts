@@ -115,6 +115,12 @@ export type NativeExpr =
 	| { readonly index: string }
 	/** The page's route params, an object of strings (the page component's `params` prop). */
 	| { readonly route: 'params' }
+	/**
+	 * The page's address as its `url` prop has it, `{ pathname, search, hash }`: the route pattern with the params it
+	 * opened with, each URL-encoded, and the query it was opened with (`?…`, or ''). The hash is always '', as the web
+	 * renders a page on the server, which never sees one.
+	 */
+	| { readonly route: 'url' }
 	| { readonly call: NativeBuiltin; readonly arguments: ReadonlyArray<NativeExpr> }
 	/** In an `input` handler: the field's text after the edit (`event.currentTarget.value`). */
 	/**
@@ -203,7 +209,9 @@ export type NativeScriptBinding =
 	/** A `shared()` accessor (`selectState`): a function that returns that object. */
 	| { readonly shared: Readonly<Record<string, NativeScriptBinding>> }
 	/** A function a parent passed as a prop: the script function `callback`, its own names bound as `<name>.<its name>`. */
-	| { readonly callback: string };
+	| { readonly callback: string }
+	/** The page's `url` prop: the host passes `{ route: 'url' }`'s value, which the script reads as a `URL`. */
+	| { readonly url: true };
 
 export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>;
 
@@ -913,12 +921,14 @@ export type NativeOp =
 	/**
 	 * Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. A param
 	 * is a string fixed at build time or an expression evaluated when the op runs (a row's item inside a list row).
-	 * `replace` takes the place of the current screen instead of pushing a new one.
+	 * `replace` takes the place of the current screen instead of pushing a new one. `search` is the query the page opens
+	 * with (`?tab=done`), which its `url` prop reads.
 	 */
 	| {
 			readonly op: 'navigate';
 			readonly route: string;
 			readonly params: Readonly<Record<string, string | NativeExpr>>;
+			readonly search?: string;
 			readonly replace?: true;
 	  }
 	/**
@@ -1536,12 +1546,14 @@ export type NativeJournalEntry =
 	| { readonly op: 'release'; readonly object: string }
 	/**
 	 * Leave this page for the page at `route` with `params`, built from scratch. In an app the host pushes it as a new
-	 * screen, keeping this one as it is for Back, or with `replace` puts it in this screen's place.
+	 * screen, keeping this one as it is for Back, or with `replace` puts it in this screen's place. `search` is the query
+	 * the new page opens with (`?tab=done`), absent when it has none.
 	 */
 	| {
 			readonly op: 'navigate';
 			readonly route: string;
 			readonly params: Readonly<Record<string, string>>;
+			readonly search?: string;
 			readonly replace?: true;
 	  }
 	/** The page's `<title>` text changed: the host writes it to the screen's navigation bar. */

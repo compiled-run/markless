@@ -2021,6 +2021,17 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// A page's url: its pathname and query at mount, and the query a <Link> or a script's navigate() opens a page with.
+		name: 'page-url',
+		app: 'proofs/n17-page-url',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0' },
+			{ event: 'back' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
 		name: 'navigation-replace',
 		app: 'proofs/n3-navigate',
 		open: '/',

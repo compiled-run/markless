@@ -69,7 +69,8 @@ var frameOf = function (bindings) {
 				enumerable: true,
 				value: function () { return fn(binding.callback)(frameOf(own)).apply(this, arguments); },
 			});
-		} else Object.defineProperty(names, name, { enumerable: true, value: binding.value });
+		} else if ('url' in binding) Object.defineProperty(names, name, { enumerable: true, value: pageUrl(binding.url) });
+		else Object.defineProperty(names, name, { enumerable: true, value: binding.value });
 	});
 	return names;
 };
@@ -298,6 +299,7 @@ var keyOf = function (frame) {
 		var binding = frame[name];
 		if ('slot' in binding) return slotValue(binding.slot);
 		if ('fields' in binding) return Object.keys(binding.fields).sort().map(function (field) { return slotValue(binding.fields[field]); });
+		if ('url' in binding) return binding.url;
 		return binding.value;
 	}));
 };

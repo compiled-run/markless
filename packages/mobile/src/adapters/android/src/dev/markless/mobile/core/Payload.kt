@@ -79,6 +79,8 @@ sealed interface Expr {
 	data class Drawn(val node: String) : Expr
 	/** The page's route params, an object of strings. */
 	data object RouteParams : Expr
+	/** The page's address as its `url` prop reads it: `{ pathname, search, hash }`, the hash always "". */
+	data object RouteUrl : Expr
 	/** `new FormData(form)`: the form's entries as `[name, value]` string pairs, in tree order. */
 	data class FormData(val form: String) : Expr
 	/** A checkbox's or radio button's checkedness now. */
@@ -106,6 +108,8 @@ sealed interface ScriptBinding {
 	data class Shared(val members: Map<String, ScriptBinding>) : ScriptBinding
 	/** A shared object's method: the script function [fn] returns it, run over its own [members] when called. */
 	data class Method(val fn: String, val members: Map<String, ScriptBinding>) : ScriptBinding
+	/** The page's `url` prop, which the script reads as a `URL`. */
+	data object Url : ScriptBinding
 }
 
 /** The JavaScript a payload's script ops and script computeds run, kept in the engine under [id]; [services] are the host services it uses. */
@@ -240,7 +244,7 @@ sealed interface Op {
 	/** The cell takes the expression's value, evaluated before the write. */
 	data class Assign(val cell: String, val value: Expr) : Op
 	/** Opens the page at [route] with [params], each evaluated when the op runs; ops after it do not run. */
-	data class Navigate(val route: String, val params: Map<String, Expr>, val replace: Boolean = false) : Op
+	data class Navigate(val route: String, val params: Map<String, Expr>, val replace: Boolean = false, val search: String = "") : Op
 	/** A device call (`haptics.tap`); with [result], the call settles that task cell. */
 	/** A device call on [obj] when it names one; [result] settles a task cell; [after] runs once the host resumes it. */
 	data class Call(val call: String, val arguments: List<Expr>, val result: String?, val obj: String? = null, val after: Continuation? = null) : Op
@@ -642,7 +646,7 @@ data class Payload(
 			is Expr.Method -> hasScript(e.target) || e.arguments.any(::hasScript)
 			is Expr.Lambda -> hasScript(e.body)
 			is Expr.Call -> e.arguments.any(::hasScript)
-			is Expr.CellRef, is Expr.Literal, is Expr.Local, is Expr.Item, is Expr.Index, Expr.RouteParams, is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field -> false
+			is Expr.CellRef, is Expr.Literal, is Expr.Local, is Expr.Item, is Expr.Index, Expr.RouteParams, Expr.RouteUrl, is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field -> false
 			is Expr.Contains -> hasScript(e.within) || hasScript(e.node)
 			is Expr.Captures -> hasScript(e.node) || hasScript(e.pointer)
 			is Expr.FocusOrigin -> hasScript(e.overlay)
@@ -681,7 +685,7 @@ data class Payload(
 			is Expr.Merge -> e.parts.flatMap { cellsOf(it) }
 			is Expr.Method -> cellsOf(e.target) + e.arguments.flatMap(::cellsOf)
 			is Expr.Lambda -> cellsOf(e.body)
-			is Expr.Local, is Expr.Item, is Expr.Index, Expr.RouteParams -> emptyList()
+			is Expr.Local, is Expr.Item, is Expr.Index, Expr.RouteParams, Expr.RouteUrl -> emptyList()
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
 			is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field -> emptyList()
 			is Expr.Contains -> cellsOf(e.within) + cellsOf(e.node)
@@ -705,6 +709,7 @@ data class Payload(
 				is ScriptBinding.Object -> cellsOf(b.members)
 				is ScriptBinding.Shared -> cellsOf(b.members)
 				is ScriptBinding.Method -> cellsOf(b.members)
+				ScriptBinding.Url -> emptyList()
 			}
 		}
 
@@ -724,6 +729,11 @@ data class Payload(
 					ScriptBinding.Device(bo.field("device", what).str("$what.$name.device"), bo.field("object", what).str("$what.$name.object"))
 				}
 				bo.containsKey("callback") -> { bo.only(setOf("callback"), "$what.$name"); ScriptBinding.Callback(bo.field("callback", what).str("$what.$name.callback")) }
+				bo.containsKey("url") -> {
+					bo.only(setOf("url"), "$what.$name")
+					if (bo["url"] != Json.Bool(true)) throw MarklessDecodeError("$what.$name.url must be true")
+					ScriptBinding.Url
+				}
 				bo.containsKey("elements") -> { bo.only(setOf("elements"), "$what.$name"); ScriptBinding.Elements(expr(bo.field("elements", what), "$what.$name.elements")) }
 				bo.containsKey("object") -> { bo.only(setOf("object"), "$what.$name"); ScriptBinding.Object(scriptBindings(bo.field("object", what), "$what.$name.object")) }
 				bo.containsKey("shared") -> { bo.only(setOf("shared"), "$what.$name"); ScriptBinding.Shared(scriptBindings(bo.field("shared", what), "$what.$name.shared")) }
@@ -811,7 +821,7 @@ data class Payload(
 					o.only(setOf("call", "arguments"), what)
 					Expr.Call(oneOf(o, "call", BUILTINS, what), o.field("arguments", what).arr("$what.arguments").mapIndexed { n, a -> expr(a, "$what.arguments[$n]") })
 				}
-				o.containsKey("route") -> { o.only(setOf("route"), what); oneOf(o, "route", setOf("params"), what); Expr.RouteParams }
+				o.containsKey("route") -> { o.only(setOf("route"), what); if (oneOf(o, "route", setOf("params", "url"), what) == "url") Expr.RouteUrl else Expr.RouteParams }
 				o.containsKey("event") -> { o.only(setOf("event"), what); Expr.Event(oneOf(o, "event", EVENT_FIELDS, what)) }
 				o.containsKey("focused") -> {
 					o.only(setOf("focused"), what)
@@ -1131,13 +1141,13 @@ data class Payload(
 			val o = v.obj(what)
 			val name = o.field("op", what).str("$what.op")
 			if (name == "navigate") {
-				o.only(setOf("op", "route", "params", "replace"), what)
+				o.only(setOf("op", "route", "params", "search", "replace"), what)
 				val params = o.field("params", what).obj("$what.params").entries.associateTo(LinkedHashMap()) { (k, v) ->
 					k to if (v is Json.Str) Expr.Literal(JsValue.Str(v.value)) else expr(v, "$what.params.$k")
 				}
 				for (e in params.values) for (c in cellsOf(e)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
 				val replace = o["replace"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.replace must be true when present"); true } ?: false
-				return Op.Navigate(o.field("route", what).str("$what.route"), params, replace)
+				return Op.Navigate(o.field("route", what).str("$what.route"), params, replace, o["search"]?.str("$what.search") ?: "")
 			}
 			if (name == "call") {
 				o.only(setOf("op", "call", "arguments", "result", "object", "after"), what)

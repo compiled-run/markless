@@ -52,10 +52,10 @@ sealed interface JournalEntry {
 		override fun toJson() = "{\"op\":\"rows\",\"node\":${jsonString(node)},\"keys\":${keys.joinToString(",", "[", "]", transform = ::jsonString)}}"
 	}
 
-	/** Leave this page for the page at [route] with [params]: pushed as a new screen, or in this one's place when [replace]. */
-	data class Navigate(override val node: String, val params: Map<String, String>, val replace: Boolean = false) : JournalEntry {
+	/** Leave this page for the page at [route] with [params] and the query [search] (or ""): pushed as a new screen, or in this one's place when [replace]. */
+	data class Navigate(override val node: String, val params: Map<String, String>, val replace: Boolean = false, val search: String = "") : JournalEntry {
 		val route get() = node
-		override fun toJson() = "{\"op\":\"navigate\",\"route\":${jsonString(node)},\"params\":${params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}${if (replace) ",\"replace\":true" else ""}}"
+		override fun toJson() = "{\"op\":\"navigate\",\"route\":${jsonString(node)},\"params\":${params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}${if (search.isEmpty()) "" else ",\"search\":${jsonString(search)}"}${if (replace) ",\"replace\":true" else ""}}"
 	}
 
 	/** The page's title text changed; [node] is empty. */
@@ -269,6 +269,8 @@ class Runtime(
 	private val scriptHost: ScriptHost? = null,
 	/** The app's values of its app-wide `shared()` cells, one for every page. */
 	private val session: AppSession = AppSession.shared,
+	/** The query the page opened with (`?tab=done`), or "". */
+	val search: String = "",
 ) {
 	private val opened = now()
 	private val computed = HashMap<String, JsValue>()
@@ -382,6 +384,7 @@ class Runtime(
 		fun eval(x: Expr) = evaluate(x, scope)
 		return when (e) {
 			Expr.RouteParams -> JsValue.Obj(params.entries.associateTo(LinkedHashMap()) { it.key to JsValue.Str(it.value) })
+			Expr.RouteUrl -> pageUrl()
 			is Expr.Event -> fields?.get(e.field) ?: throw MarklessRuntimeError("the event's ${e.field} read where the event has none")
 			is Expr.FormData -> entriesOf(e.form)
 			is Expr.Checked -> JsValue.Bool(checkedOf(e.node))
@@ -549,6 +552,13 @@ class Runtime(
 		data class Object(val members: Map<String, Bound>) : Bound
 		data class Shared(val members: Map<String, Bound>) : Bound
 		data class Method(val fn: String, val members: Map<String, Bound>) : Bound
+		data class Url(val value: JsValue) : Bound
+	}
+
+	/** The page's address as its `url` prop reads it: the route pattern with its params, the query it opened with, no hash. */
+	private fun pageUrl(): JsValue {
+		val route = payload.route ?: throw MarklessRuntimeError("the url read on a component that is not a page")
+		return JsValue.Obj(linkedMapOf<String, JsValue>("pathname" to JsValue.Str(AppPayload.path(route.pattern, params)), "search" to JsValue.Str(search), "hash" to JsValue.Str("")))
 	}
 
 	private fun bind(bindings: Map<String, ScriptBinding>, scope: Scope): Map<String, Bound> = bindings.mapValuesTo(LinkedHashMap()) { (_, b) ->
@@ -562,6 +572,7 @@ class Runtime(
 			is ScriptBinding.Object -> Bound.Object(bind(b.members, scope))
 			is ScriptBinding.Shared -> Bound.Shared(bind(b.members, scope))
 			is ScriptBinding.Method -> Bound.Method(b.fn, bind(b.members, scope))
+			ScriptBinding.Url -> Bound.Url(pageUrl())
 		}
 	}
 
@@ -576,6 +587,7 @@ class Runtime(
 			is Bound.Object -> "{\"object\":${frameJson(b.members)}}"
 			is Bound.Shared -> "{\"shared\":${frameJson(b.members)}}"
 			is Bound.Method -> "{\"method\":${jsonString(b.fn)},\"frame\":${frameJson(b.members)}}"
+			is Bound.Url -> "{\"url\":${jsonValue(b.value)}}"
 		}
 	}
 
@@ -596,6 +608,7 @@ class Runtime(
 			is Bound.Object -> readFrame(b.members)
 			is Bound.Shared -> readFrame(b.members)
 			is Bound.Method -> readFrame(b.members)
+			is Bound.Url -> jsonValue(b.value)
 		}
 	}
 
@@ -769,11 +782,12 @@ class Runtime(
 			raised +
 			listOfNotNull(result["navigate"]?.let { n ->
 				val o = n.obj("leave().navigate")
-				o.only(setOf("route", "params", "replace"), "leave().navigate")
+				o.only(setOf("route", "params", "search", "replace"), "leave().navigate")
 				JournalEntry.Navigate(
 					o.field("route", "leave().navigate").str("leave().navigate.route"),
 					o.field("params", "leave().navigate").obj("leave().navigate.params").mapValues { it.value.str("a route param") },
 					(o.field("replace", "leave().navigate") as? Json.Bool)?.value ?: throw MarklessDecodeError("leave().navigate.replace must be a boolean"),
+					o["search"]?.str("leave().navigate.search") ?: "",
 				)
 			})
 	}
@@ -1718,7 +1732,7 @@ class Runtime(
 				submission?.let { it.pending++ }
 				calls.add(JournalEntry.Timer(id, if (ms is JsValue.Num && ms.value > 0) ms.value else 0.0))
 			}
-			is Op.Navigate -> return listOf(JournalEntry.Navigate(op.route, op.params.mapValues { Js.toStr(evaluate(it.value, scope)) }, op.replace))
+			is Op.Navigate -> return listOf(JournalEntry.Navigate(op.route, op.params.mapValues { Js.toStr(evaluate(it.value, scope)) }, op.replace, op.search))
 			is Op.Call -> calls.add(JournalEntry.Call(op.call, op.arguments.map { evaluate(it, scope) }, op.result, op.obj, op.after?.id))
 			is Op.If -> {
 				val taken = run(if (Js.truthy(evaluate(op.test, scope))) op.then else op.otherwise, scope, submission)
