@@ -70,7 +70,7 @@ final class FileInputView: UIStackView, UIDocumentPickerDelegate {
 		let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
 		let modified = values?.contentModificationDate ?? Date()
 		return NativePickedFile(
-			name: url.lastPathComponent, size: Double(values?.fileSize ?? 0),
+			ref: url.absoluteString, name: url.lastPathComponent, size: Double(values?.fileSize ?? 0),
 			type: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "",
 			lastModified: (modified.timeIntervalSince1970 * 1000).rounded(.down))
 	}

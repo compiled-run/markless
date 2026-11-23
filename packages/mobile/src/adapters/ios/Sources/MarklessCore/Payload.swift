@@ -428,6 +428,8 @@ public struct NativeCapture: Equatable, Sendable {
 
 public enum NativeFieldKind: String, Sendable {
 	case text, number, checkbox, radio, hidden, select
+	/// A file input, whose entries are the files its JavaScript holds; only a submit handler's script reads them.
+	case file
 }
 
 /// Chromium's messages for a number field in one language, with `{min}`, `{max}`, `{low}`, `{high}`, `{value}` for the numbers.

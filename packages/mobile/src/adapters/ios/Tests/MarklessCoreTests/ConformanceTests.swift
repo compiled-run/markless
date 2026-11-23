@@ -212,10 +212,10 @@ func reproducesConformanceVector(file: URL) throws {
 				files = try chosen.map { file in
 					guard case let .object(fields) = file else { throw VectorError("a picked file is not an object") }
 					let member = { (key: String) in fields.first(where: { $0.0 == key })?.1 }
-					guard case let .string(name)? = member("name"), case let .number(size)? = member("size"), case let .string(type)? = member("type"),
-						case let .number(lastModified)? = member("lastModified")
-					else { throw VectorError("a picked file lacks name, size, type or lastModified") }
-					return NativePickedFile(name: name, size: size, type: type, lastModified: lastModified)
+					guard case let .string(ref)? = member("ref"), case let .string(name)? = member("name"), case let .number(size)? = member("size"),
+						case let .string(type)? = member("type"), case let .number(lastModified)? = member("lastModified")
+					else { throw VectorError("a picked file lacks ref, name, size, type or lastModified") }
+					return NativePickedFile(ref: ref, name: name, size: size, type: type, lastModified: lastModified)
 				}
 			}
 			// An animation event carries its name as the action's value and its elapsed time as the action's time.
