@@ -344,6 +344,7 @@ if (!host) {
 		if (match.route.indexOf('[...') >= 0)
 			return Promise.reject(new Error('navigate() to ' + given + ' opens ' + match.route + ', a catch-all page, which a phone does not open yet'));
 		host.out.navigate = { route: match.route, params: match.params, replace: !!(options && options.replace) };
+		if (search) host.out.navigate.search = search;
 		return Promise.resolve();
 	};
 	// A device call is a call entry the host makes; one that gives a value waits for the host's answer to its id.

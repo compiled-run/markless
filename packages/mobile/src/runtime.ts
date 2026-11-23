@@ -307,6 +307,8 @@ export type NativeScope = {
 	readonly locals: ReadonlyMap<string, Value>;
 	/** The page's route params. */
 	readonly params?: Readonly<Record<string, string>>;
+	/** The page's address, as its `url` prop reads it (`{ route: 'url' }`). */
+	readonly url?: { readonly pathname: string; readonly search: string; readonly hash: '' };
 	/** A form's entries now, for `{ formData }`. */
 	readonly formData?: (form: string) => Value;
 	/** A checkbox's or radio button's checkedness now, for `{ checked }`. */
@@ -464,9 +466,13 @@ export function evaluateNativeExpr(
 			typeof within === 'string' && typeof node === 'string' && dom().contains(within, node)
 		);
 	}
-	if ('route' in expr) {
+	if ('route' in expr && expr.route === 'params') {
 		if (!scope.params) throw new Error('route params read on a component that is not a page');
 		return { ...scope.params };
+	}
+	if ('route' in expr && expr.route === 'url') {
+		if (!scope.url) throw new Error('the url read on a component that is not a page');
+		return { ...scope.url };
 	}
 	if ('item' in expr) {
 		if (!scope.items.has(expr.item))
@@ -517,6 +523,7 @@ export function evaluateNativeExpr(
 							{
 								items: scope.items,
 								...(scope.params ? { params: scope.params } : {}),
+								...(scope.url ? { url: scope.url } : {}),
 								...(scope.now ? { now: scope.now } : {}),
 								locals: new Map([
 									...scope.locals,
@@ -664,12 +671,21 @@ export function evaluateWithScript(
 ): (expr: NativeExpr, values: ReadonlyMap<string, Value>) => Value {
 	let engine: NativeScriptEngine | undefined;
 	const script = payload.script;
+	// As the build's first render reads them: each route param '', no query.
+	const params = Object.fromEntries((payload.route?.params ?? []).map((name) => [name, '']));
+	const page: NativeScope = payload.route
+		? {
+				...EMPTY_SCOPE,
+				params,
+				url: { pathname: nativeRoutePath(payload.route.pattern, params), search: '', hash: '' },
+			}
+		: EMPTY_SCOPE;
 	const evaluate = (expr: NativeExpr, values: ReadonlyMap<string, Value>): Value =>
 		evaluateNativeExpr(
 			expr,
 			(cell) => values.get(cell) ?? null,
 			undefined,
-			EMPTY_SCOPE,
+			page,
 			(fn, bindings) => {
 				if (!script)
 					throw new Error(`the script computed ${fn} in a payload with no script`);
@@ -705,7 +721,9 @@ export function evaluateWithScript(
 															}
 														: 'callback' in binding
 															? binding
-															: {
+															: 'url' in binding
+																? { url: evaluate({ route: 'url' }, values) }
+																: {
 																	value: evaluate(
 																		binding.value,
 																		values,
@@ -758,10 +776,15 @@ export function createNativeRuntime(
 	media: () => NativeScriptMedia = () => NATIVE_SCRIPT_MEDIA_DEFAULTS,
 	/** The screen's device pixels per CSS px that a script's `devicePixelRatio` reads, read as each entry begins. */
 	screenFacts: () => NativeScriptScreen = () => ({ devicePixelRatio: 1 }),
+	/** The query the page opened with (`?tab=done`, or ''), which its `url` prop reads. */
+	search = '',
 ): NativeRuntime {
 	const base: NativeScope = {
 		...EMPTY_SCOPE,
 		params,
+		...(payload.route
+			? { url: { pathname: nativeRoutePath(payload.route.pattern, params), search, hash: '' as const } }
+			: {}),
 		formData: (form) => entriesOf(form),
 		checked: (node) => checkedOf(node),
 		fieldText: (node) => textOf(node),
@@ -922,7 +945,9 @@ export function createNativeRuntime(
 												}
 											: 'callback' in binding
 												? binding
-												: {
+												: 'url' in binding
+													? { url: evaluate({ route: 'url' }, eventValue, scope) }
+													: {
 														value: evaluate(
 															binding.value,
 															eventValue,
@@ -1065,6 +1090,7 @@ export function createNativeRuntime(
 			readonly navigate?: {
 				readonly route: string;
 				readonly params: Readonly<Record<string, string>>;
+				readonly search?: string;
 				readonly replace: boolean;
 			};
 			readonly commands?: ReadonlyArray<
@@ -1202,6 +1228,7 @@ export function createNativeRuntime(
 							op: 'navigate',
 							route: result.navigate.route,
 							params: result.navigate.params,
+							...(result.navigate.search ? { search: result.navigate.search } : {}),
 							...(result.navigate.replace ? { replace: true as const } : {}),
 						} satisfies NativeJournalEntry,
 					]
@@ -1336,7 +1363,9 @@ export function createNativeRuntime(
 										? evaluate(binding.elements, undefined, scope)
 										: 'callback' in binding
 											? null
-											: evaluate(binding.value, undefined, scope),
+											: 'url' in binding
+												? evaluate({ route: 'url' }, undefined, scope)
+												: evaluate(binding.value, undefined, scope),
 		);
 	// As on the web, a computed is not run again while nothing it reads has changed.
 	const computed = new Map<string, Value>();
@@ -2812,6 +2841,7 @@ export function createNativeRuntime(
 						op: 'navigate',
 						route: op.route,
 						params,
+						...(op.search ? { search: op.search } : {}),
 						...(op.replace ? { replace: true as const } : {}),
 					},
 				];
@@ -3311,4 +3341,20 @@ export function createNativeRuntime(
 			];
 		}
 	}
+}
+
+/** The path a route pattern names with these params, each param URL-encoded. */
+export function nativeRoutePath(pattern: string, params: Readonly<Record<string, string>>): string {
+	const path = pattern
+		.split('/')
+		.filter((segment) => segment.length > 0)
+		.map((part) => {
+			if (!(part.startsWith('[') && part.endsWith(']'))) return part;
+			const value = params[part.slice(1, -1)];
+			if (value === undefined)
+				throw new Error(`${pattern} needs the param ${part.slice(1, -1)}`);
+			return encodeURIComponent(value);
+		})
+		.join('/');
+	return `/${path}`;
 }

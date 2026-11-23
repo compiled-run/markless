@@ -112,8 +112,9 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case arm(node: String, index: Int?)
 	/// A system sheet's `open` turned truthy (present it) or falsy (dismiss it, unless the platform already has).
 	case sheet(node: String, open: Bool)
-	/// Leave this page for the page at `route`, built from scratch with `params`: pushed, or in this screen's place.
-	case navigate(route: String, params: [NativeRouteParam], replace: Bool)
+	/// Leave this page for the page at `route`, built from scratch with `params` and the query `search` (or ""): pushed, or
+	/// in this screen's place.
+	case navigate(route: String, params: [NativeRouteParam], search: String, replace: Bool)
 	/// The page's title text changed.
 	case title(value: String)
 	/// Run a device call now (on `object` when it names one); with `result`, settle that task cell with what it gives; with
@@ -161,8 +162,9 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("arm")), ("node", .string(node)), ("index", index.map { .number(Double($0)) } ?? .null)])
 		case let .sheet(node, open):
 			return .object([("op", .string("sheet")), ("node", .string(node)), ("open", .bool(open))])
-		case let .navigate(route, params, replace):
+		case let .navigate(route, params, search, replace):
 			return .object([("op", .string("navigate")), ("route", .string(route)), ("params", .object(params.map { ($0.name, .string($0.value)) }))]
+				+ (search.isEmpty ? [] : [("search", .string(search))])
 				+ (replace ? [("replace", .bool(true))] : []))
 		case let .title(value): return .object([("op", .string("title")), ("value", .string(value))])
 		case let .call(call, object, arguments, result, resume):
@@ -269,6 +271,7 @@ public final class NativeRuntime {
 	private let continuations: [String: NativeContinuation]
 	private let nodesById: [String: NativeNode]
 	private let params: [NativeRouteParam]
+	private let search: String
 	/// Row state's list by cell id: its values are kept as `<cell>@<key>`.
 	private let rowOfCell: [String: String]
 	private var eventValue: String?
@@ -360,16 +363,19 @@ public final class NativeRuntime {
 	/// Seeded cells whose arm is hidden: their seed runs again when the arm shows, as its component renders then.
 	private var reseed = Set<String>()
 
-	/// `params`: the route params the page opened with; `now`: the clock (a conformance run fixes it).
-	/// `preferredLanguages`: the device's, most preferred first; the web's messages are shown in the first one the payload has.
+	/// `params`: the route params the page opened with; `search`: the query it opened with, or ""; `now`: the clock (a
+	/// conformance run fixes it). `preferredLanguages`: the device's, most preferred first; the web's messages are shown in
+	/// the first one the payload has.
 	public init(
-		payload: NativeViewPayload, store: NativeStore = MemoryStore(), params: [NativeRouteParam] = [], preferredLanguages: [String] = ["en"],
+		payload: NativeViewPayload, store: NativeStore = MemoryStore(), params: [NativeRouteParam] = [], search: String = "",
+		preferredLanguages: [String] = ["en"],
 		now: @escaping () -> Double = { (Date().timeIntervalSince1970 * 1000).rounded(.down) }, scriptHost: NativeScriptHost? = nil,
 		session: NativeAppSession = .shared
 	) {
 		self.session = session
 		self.payload = payload
 		self.params = params
+		self.search = search
 		self.store = store
 		self.now = now
 		self.scriptHost = scriptHost
@@ -603,6 +609,7 @@ public final class NativeRuntime {
 			}
 			return try callMethod(method, on: targetValue, args)
 		case .routeParams: return .object(params.map { (key: $0.name, value: .string($0.value)) })
+		case .routeURL: return try pageURL()
 		case let .checked(node): return .bool(try isChecked(node))
 		case let .field(node): return .string(try textOf(field: node))
 		case let .formData(form): return .array(try formEntries(of: form).map { .array([.string($0.name), $0.value]) })
@@ -730,6 +737,7 @@ public final class NativeRuntime {
 			case let .object(members): return (binding.name, .object([("object", try frame(of: members, in: scope))]))
 			case let .shared(members): return (binding.name, .object([("shared", try frame(of: members, in: scope))]))
 			case let .method(fn, members): return (binding.name, .object([("method", .string(fn)), ("frame", try frame(of: members, in: scope))]))
+			case .url: return (binding.name, .object([("url", try pageURL().json)]))
 			}
 		})
 	}
@@ -781,6 +789,15 @@ public final class NativeRuntime {
 		try visit(frame)
 		for id in also { try add(.string(id)) }
 		return .object(facts)
+	}
+
+	/// The page's address as its `url` prop reads it: the route pattern with its params, the query it opened with, no hash.
+	private func pageURL() throws -> NativeValue {
+		guard let route = payload.route else { throw RuntimeError(reason: "the url read on a component that is not a page") }
+		return .object([
+			(key: "pathname", value: .string(try NativeAppPayload.path(route.pattern, params))), (key: "search", value: .string(search)),
+			(key: "hash", value: .string("")),
+		])
 	}
 
 	/// Every current value by slot (the page's cells in payload order, then row slots), a seed when `crypto` is used, the
@@ -925,9 +942,11 @@ public final class NativeRuntime {
 		}
 		let entries: [NativeJournalEntry] = aborts + clears + timers + requests
 		guard result.has("navigate") else { return entries + calls + commands + prevented + typed + raised }
-		let opened = try result["navigate"].object(["route", "params", "replace"])
+		let opened = try result["navigate"].object(required: ["route", "params", "replace"], optional: ["search"])
 		let params = try opened["params"].keys().map { NativeRouteParam(name: $0, value: try opened["params"].field($0).string()) }
-		return entries + calls + commands + prevented + typed + raised + [.navigate(route: try opened["route"].string(), params: params, replace: try opened["replace"].bool())]
+		let search = opened.has("search") ? try opened["search"].string() : ""
+		return entries + calls + commands + prevented + typed + raised
+			+ [.navigate(route: try opened["route"].string(), params: params, search: search, replace: try opened["replace"].bool())]
 	}
 
 	/// How deep events raised from JavaScript may nest.
@@ -1965,14 +1984,14 @@ public final class NativeRuntime {
 				submission?.pending += 1
 				let wait: Double = if case let .number(number) = ms, number > 0 { number } else { 0 }
 				calls.append(.timer(timer: id, ms: wait))
-			case let .navigate(route, params, replace):
+			case let .navigate(route, params, search, replace):
 				let resolved = try params.map { param -> NativeRouteParam in
 					switch param.value {
 					case let .string(text): return NativeRouteParam(name: param.name, value: text)
 					case let .expr(expr): return NativeRouteParam(name: param.name, value: try evaluate(expr, in: scope).text)
 					}
 				}
-				return [.navigate(route: route, params: resolved, replace: replace)]
+				return [.navigate(route: route, params: resolved, search: search, replace: replace)]
 			case let .assign(cell, expr):
 				let value = try evaluate(expr, in: scope)
 				values[try slot(of: cell, in: scope)] = value
@@ -2276,6 +2295,8 @@ public struct NativeScreen {
 	public let route: String
 	public let params: [NativeRouteParam]
 	public let path: String
+	/// The query it opened with, or "".
+	public let search: String
 	public let runtime: NativeRuntime
 }
 
@@ -2311,18 +2332,18 @@ public final class NativeAppStack {
 		started = try screens.flatMap { try $0.runtime.start() }
 	}
 
-	public func screen(_ route: String, _ params: [NativeRouteParam]) throws -> NativeScreen {
+	public func screen(_ route: String, _ params: [NativeRouteParam], search: String = "") throws -> NativeScreen {
 		guard let entry = app.routes.first(where: { $0.pattern == route }) else { throw RuntimeError(reason: "no page for \(route)") }
 		return NativeScreen(
-			route: route, params: params, path: try NativeAppPayload.path(route, params),
-			runtime: NativeRuntime(payload: entry.page, store: store, params: params, scriptHost: scriptHost, session: session))
+			route: route, params: params, path: try NativeAppPayload.path(route, params), search: search,
+			runtime: NativeRuntime(payload: entry.page, store: store, params: params, search: search, scriptHost: scriptHost, session: session))
 	}
 
 	/// Runs an action on the top screen; a `navigate` entry pushes the new screen or replaces the top one.
 	public func dispatch(_ action: NativeAction) throws -> [NativeJournalEntry] {
 		let journal = try screens[screens.count - 1].runtime.dispatch(action)
-		if case let .navigate(route, params, replace)? = journal.last {
-			let next = try screen(route, params)
+		if case let .navigate(route, params, search, replace)? = journal.last {
+			let next = try screen(route, params, search: search)
 			let left = replace ? try screens.removeLast().runtime.leave() : []
 			screens.append(next)
 			return journal + left + (try next.runtime.start())

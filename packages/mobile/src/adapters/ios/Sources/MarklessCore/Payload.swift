@@ -88,6 +88,8 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case drawn(String)
 	/// The page's route params, an object of strings.
 	case routeParams
+	/// The page's address as its `url` prop reads it: `{ pathname, search, hash }`, the hash always "".
+	case routeURL
 	/// `new FormData(form)`: the form's entries as `[name, value]` string pairs, in tree order.
 	case formData(String)
 	/// A checkbox's or radio button's checkedness now.
@@ -100,7 +102,7 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .event, .focused, .local, .item, .index, .routeParams, .formData, .checked, .field, .shown, .drawn: return []
+		case .literal, .event, .focused, .local, .item, .index, .routeParams, .routeURL, .formData, .checked, .field, .shown, .drawn: return []
 		case let .unary(_, inner), let .member(inner, _), let .optionalMember(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner), let .byId(inner): return inner.cells
 		case let .contains(within, node): return within.cells + node.cells
 		case let .captures(node, pointer): return node.cells + pointer.cells
@@ -391,8 +393,8 @@ public enum NativeOp: Equatable, Sendable {
 	/// The cell takes the expression's value, evaluated before the write.
 	case assign(cell: String, value: NativeExpr)
 	/// Opens the page at `route` with these params (fixed, or evaluated when the op runs); ops after it do not run.
-	/// `replace` takes the current screen's place instead of pushing.
-	case navigate(route: String, params: [NativeOpParam], replace: Bool)
+	/// `replace` takes the current screen's place instead of pushing; `search` is the query the page opens with, or "".
+	case navigate(route: String, params: [NativeOpParam], search: String, replace: Bool)
 	/// A device call (`haptics.tap`), on `object` when it names one; with `result` it settles that task cell, with `then`
 	/// the host answers with `resume` and those ops run with the answer as a local.
 	case call(call: String, object: String?, arguments: [NativeExpr], result: String?, then: NativeContinuation?)
@@ -1043,7 +1045,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 					let opField = try op.object(["op", "cell", "value"])
 					return .assign(cell: try opField["cell"].string(), value: try decodeExpr(try opField["value"]))
 				case "navigate":
-					let opField = try op.object(required: ["op", "route", "params"], optional: ["replace"])
+					let opField = try op.object(required: ["op", "route", "params"], optional: ["search", "replace"])
 					let params = try opField["params"]
 					return .navigate(
 						route: try opField["route"].string(),
@@ -1051,6 +1053,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 							let value = try params.field(name)
 							return NativeOpParam(name: name, value: value.isString ? .string(try value.string()) : .expr(try decodeExpr(value)))
 						},
+						search: opField.has("search") ? try opField["search"].string() : "",
 						replace: try decodeReplace(opField))
 				case "call":
 					let opField = try op.object(required: ["op", "call", "arguments"], optional: ["result", "object", "after"])
@@ -1392,9 +1395,12 @@ public struct NativeViewPayload: Equatable, Sendable {
 			case ["object"]: return NativeScriptBinding(name: name, kind: .object(try decodeBindings(try binding.field("object"))))
 			case ["shared"]: return NativeScriptBinding(name: name, kind: .shared(try decodeBindings(try binding.field("shared"))))
 			case ["callback"]: return NativeScriptBinding(name: name, kind: .callback(try binding.field("callback").string()))
+			case ["url"]:
+				guard try binding.field("url").bool() else { throw binding.fail("a url binding is { url: true }") }
+				return NativeScriptBinding(name: name, kind: .url)
 			case ["bindings", "method"], ["method", "bindings"]:
 				return NativeScriptBinding(name: name, kind: .method(try binding.field("method").string(), try decodeBindings(try binding.field("bindings"))))
-			default: throw binding.fail("a script binding is { cell }, { fields }, { value }, { device, object }, { elements }, { object }, { shared }, { callback } or { method, bindings }")
+			default: throw binding.fail("a script binding is { cell }, { fields }, { value }, { device, object }, { elements }, { object }, { shared }, { callback }, { url } or { method, bindings }")
 			}
 		}
 	}
@@ -1508,8 +1514,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["local"]: return .local(try field("local").string())
 		case ["route"]:
 			let name = try field("route").string()
-			guard name == "params" else { throw PayloadError(path: reader.path + ".route", reason: "unknown route read \"\(name)\"") }
-			return .routeParams
+			switch name {
+			case "params": return .routeParams
+			case "url": return .routeURL
+			default: throw PayloadError(path: reader.path + ".route", reason: "unknown route read \"\(name)\"")
+			}
 		case ["item"]: return .item(try field("item").string())
 		case ["index"]: return .index(try field("index").string())
 		case ["formData"]: return .formData(try field("formData").string())
