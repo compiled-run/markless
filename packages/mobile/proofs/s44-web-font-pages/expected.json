@@ -1,0 +1,29 @@
+{
+	"rung": "S44",
+	"name": "A styled app in a web font across pages: a link styled as a pill, whose border-radius is far more than half its height, draws its background and border, as CSS shrinks overlapping corner radii to fit the box; a heading with negative letter-spacing shows whole; and a note page's heading, whose text is known only once the page opens, shows whole after the page is laid out again with it, drawn glyph for glyph where Dragon placed it, on the web, iOS and Android",
+	"steps": [
+		{
+			"visible": ["All notes", "New note", "Groceries"],
+			"absent": ["Milk and eggs"],
+			"title": "Home"
+		},
+		{
+			"do": { "tap": "Groceries" },
+			"visible": ["Groceries", "Milk and eggs"],
+			"absent": ["All notes"],
+			"title": "Note"
+		},
+		{
+			"do": { "back": "button" },
+			"visible": ["All notes", "New note", "Groceries"],
+			"absent": ["Milk and eggs"],
+			"title": "Home"
+		},
+		{
+			"do": { "tap": "New note" },
+			"visible": ["Blank note"],
+			"absent": ["All notes"],
+			"title": "New"
+		}
+	]
+}

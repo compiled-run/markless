@@ -33,8 +33,8 @@ private func resolved(_ edit: (String) -> String = { $0 }) throws -> StyleLayout
 	#expect(span.paintOrder?.bucket == 1)
 }
 
-/// u18's export with the clipping span given solid borders (device px, top right bottom left), a 16 px radius and side colours.
-private func bordered(_ widths: [Double], colors: [[String: Int]]? = nil) throws -> StyleLayout {
+/// u18's export with the clipping span given solid borders (device px, top right bottom left), a radius (16 px) and side colours.
+private func bordered(_ widths: [Double], colors: [[String: Int]]? = nil, radius: Double = 16) throws -> StyleLayout {
 	try resolved { text in
 		var root = try! JSONSerialization.jsonObject(with: Data(text.utf8)) as! [String: Any]
 		var targets = root["targets"] as! [String: Any]
@@ -51,7 +51,7 @@ private func bordered(_ widths: [Double], colors: [[String: Int]]? = nil) throws
 					if writes[k]["kind"] as? String == "border-styles" { writes[k]["styles"] = ["solid", "solid", "solid", "solid"] }
 					if writes[k]["kind"] as? String == "border-colors", let colors { writes[k]["colors"] = colors.map { $0.merging(["alpha": 255]) { a, _ in a } } }
 				}
-				writes.append(["kind": "border-radius", "lengths": Array(repeating: ["percent": false, "value": 16], count: 8), "key": "dragonRadius.radiiPx"])
+				writes.append(["kind": "border-radius", "lengths": Array(repeating: ["percent": false, "value": radius], count: 8), "key": "dragonRadius.radiiPx"])
 				node["writes"] = writes
 				return node
 			}
@@ -74,6 +74,12 @@ private func bordered(_ widths: [Double], colors: [[String: Int]]? = nil) throws
 	#expect(uneven.childClip?.corners.allSatisfy { $0 == PaddingBox.Corner(x: 6, y: 14) } == true)
 	#expect(uneven.sides?.map(\.width) == [2, 10, 2, 10])
 	#expect(try resolved().styles["component-edge:0/h0"]?.childClip == nil)
+}
+
+@Test func aPillRadiusShrinksToHalfTheShorterSideAsCSSOverlappingCornersDo() throws {
+	let pill = try #require(try bordered([3, 3, 3, 3], radius: 999).styles["component-edge:0/h0"])
+	#expect(pill.cornerRadius == 25)
+	#expect(pill.childClip == PaddingBox(radius: 25, top: 1, right: 1, bottom: 1, left: 1))
 }
 
 @Test func anInnerCornerNeverGoesBelowZero() {
