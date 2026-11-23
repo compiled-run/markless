@@ -49,6 +49,11 @@ export type LadderAction =
 	| { readonly submit: string }
 	/** The keyboard's delete key in the text field with this accessible name, its text cursor at the end. */
 	| { readonly erase: string }
+	/**
+	 * The clear control of the focused search field with this accessible name: Chrome's cancel button on the web, the hosts'
+	 * clear control (`CLEAR_BUTTON_LABEL`) on the phones.
+	 */
+	| { readonly clear: string }
 	/** Two quick taps on this text or accessible name: the second press's `event.detail` is 2. */
 	| { readonly doubleTap: LadderText }
 	/** Opens the `<select>` with this accessible name and picks the option with this label from its list. */
@@ -109,6 +114,9 @@ export type LadderAction =
 
 /** Where a phone flow presses the backdrop: above a centred surface, below the status bar. */
 export const BACKDROP_POINT = '50%,8%';
+
+/** The accessible name of a search field's clear control: UIKit's for its clear button, which the Android host gives its own. */
+export const CLEAR_BUTTON_LABEL = 'Clear text';
 
 /** Permissions a rung sets or clears, by the name Maestro's `launchApp` takes. */
 export type DevicePermission = 'location' | 'camera' | 'microphone';
@@ -500,6 +508,7 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 		];
 	if ('submit' in action) return [{ tapOn: selector(action.submit) }, { pressKey: 'Enter' }];
 	if ('erase' in action) return [{ tapOn: selector(action.erase) }, { pressKey: 'Backspace' }];
+	if ('clear' in action) return [{ tapOn: selector(CLEAR_BUTTON_LABEL) }];
 	if ('doubleTap' in action) return [{ doubleTapOn: selector(action.doubleTap) }];
 	if ('choose' in action)
 		return [

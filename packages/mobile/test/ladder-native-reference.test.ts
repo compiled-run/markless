@@ -285,6 +285,20 @@ function mirror(
 					: (node.attributes?.['aria-label'] ?? node.drawing?.label ?? null);
 			return label !== null && shownNode(node.id) ? [[node.id, label] as const] : [];
 		});
+	// A field with no value binding holds its `value` attribute until something is typed into it.
+	const valueAttribute = (host: string) => {
+		const node = nodeOf.get(host);
+		if (node?.kind !== 'element' || node.element !== 'input') return undefined;
+		return attributes.get(`${host}\0value`) ?? node.attributes?.['value'] ?? '';
+	};
+	// An empty field shows its placeholder.
+	const placeholders = () =>
+		payload.nodes.flatMap((node) => {
+			if (node.kind !== 'element' || node.element !== 'input' || !shownNode(node.id) || hiddenWithin(node.id)) return [];
+			const bound = attributes.get(`${node.id}\0placeholder`);
+			const placeholder = bound !== undefined ? bound : (node.attributes?.['placeholder'] ?? null);
+			return placeholder !== null && (properties.get(node.id) ?? valueAttribute(node.id)) === '' ? [placeholder] : [];
+		});
 	// The element a text names: a labelled element, or the element holding that text (a row instance keeps its key).
 	const elementReading = (text: LadderText) => {
 		const labelled = labels().find(([, label]) => readsAs(label, text))?.[0];
@@ -383,7 +397,7 @@ function mirror(
 			for (const [field, value] of Object.entries(step.fields ?? {})) {
 				const reading = elementReading(field);
 				const host = reading && (attributes.get(`${reading}\0for`) ?? reading);
-				expect(host && properties.get(host), `step ${index}: the field "${field}"`).toBe(
+				expect(host && (properties.get(host) ?? valueAttribute(host)), `step ${index}: the field "${field}"`).toBe(
 					value,
 				);
 			}
@@ -392,7 +406,7 @@ function mirror(
 				[...texts].filter(([id]) => !inClosedSheet(id) && !hiddenWithin(id)),
 			);
 			const read = styled ? [...open.values()] : nativeShownTexts(payload, open);
-			const shown = [...read, ...labels().map(([, label]) => label), ...chosenLabels()];
+			const shown = [...read, ...labels().map(([, label]) => label), ...chosenLabels(), ...placeholders()];
 			expect(shown, `step ${index}`).toEqual(
 				expect.arrayContaining(step.visible.map(reading)),
 			);
@@ -527,18 +541,26 @@ function walkApp(
 		} else if (action) {
 			const top = stack.at(-1)!;
 			const reading = top.elementReading(
-				'tap' in action ? action.tap : 'type' in action ? action.type.field : '',
+				'tap' in action
+					? action.tap
+					: 'type' in action
+						? action.type.field
+						: 'clear' in action
+							? action.clear
+							: '',
 			);
-			const host = reading && 'type' in action ? (top.labelled(reading) ?? reading) : reading;
+			const host =
+				reading && ('type' in action || 'clear' in action) ? (top.labelled(reading) ?? reading) : reading;
 			if (!host) throw new Error(`step ${index}: nothing on the top screen to act on`);
+			// A clear control empties the field and fires input, as typing does.
 			const journal =
 				'tap' in action
 					? appRuntime.dispatch({ event: 'activate', host: top.pressed(host) })
-					: 'type' in action
+					: 'type' in action || 'clear' in action
 						? appRuntime.dispatch({
 								event: 'input',
 								host,
-								value: top.typed(host, action.type.text),
+								value: top.typed(host, 'type' in action ? action.type.text : ''),
 							})
 						: [];
 			// What a journal shows goes to the top screen; a navigation opens the next one, as the hosts push it.

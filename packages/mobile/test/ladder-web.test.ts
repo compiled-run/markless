@@ -181,6 +181,8 @@ const shown = (page: Page, given: LadderText): Locator => {
 		.or(page.getByRole('img', { name: text, exact: true }))
 		// An image is found by its alt text, its accessible name, as a phone's screen reader names it.
 		.or(page.getByAltText(text, { exact: true }))
+		// A placeholder is on screen only while its field is empty, as a phone's hint is.
+		.or(page.locator(':placeholder-shown').and(page.getByPlaceholder(text, { exact: true })))
 		.or(page.getByRole('combobox').filter({ has: page.locator('option:checked').getByText(text, { exact: true }) }));
 };
 
@@ -306,6 +308,7 @@ async function act(page: Page, step: LadderStep) {
 		await field.press('End');
 		await field.press('Backspace');
 	}
+	else if ('clear' in action) await pressCancelButton(page, action.clear);
 	else if ('choose' in action)
 		await page
 			.getByRole('combobox', { name: action.choose.field, exact: true })
@@ -345,6 +348,42 @@ async function act(page: Page, step: LadderStep) {
 	} else if ('wait' in action) await page.clock.runFor(action.wait);
 }
 
+// A press on Chrome's own cancel button, inside the search field's user-agent shadow tree, which only DevTools reaches.
+async function pressCancelButton(page: Page, name: string) {
+	const field = typedField(page, name);
+	await field.evaluate((element) => element.setAttribute('data-ladder-clear', ''));
+	type DomNode = {
+		nodeId: number;
+		attributes?: string[];
+		children?: DomNode[];
+		shadowRoots?: DomNode[];
+	};
+	const cdp = await page.context().newCDPSession(page);
+	try {
+		const { root } = (await cdp.send('DOM.getDocument', { depth: -1, pierce: true })) as { root: DomNode };
+		const all = (node: DomNode): DomNode[] => [
+			node,
+			...[...(node.children ?? []), ...(node.shadowRoots ?? [])].flatMap(all),
+		];
+		const attribute = (node: DomNode, name: string) => {
+			const at = node.attributes?.indexOf(name) ?? -1;
+			return at >= 0 && at % 2 === 0 ? node.attributes![at + 1] : undefined;
+		};
+		const input = all(root).find((node) => attribute(node, 'data-ladder-clear') !== undefined);
+		const button = input
+			&& all(input).find((node) => attribute(node, 'pseudo') === '-webkit-search-cancel-button');
+		if (!button) throw new Error(`"${name}" has no cancel button`);
+		const { model } = (await cdp.send('DOM.getBoxModel', { nodeId: button.nodeId })) as {
+			model: { content: number[] };
+		};
+		const [x1, y1, , , x3, y3] = model.content;
+		await page.mouse.click((x1! + x3!) / 2, (y1! + y3!) / 2);
+	} finally {
+		await cdp.detach();
+		await field.evaluate((element) => element.removeAttribute('data-ladder-clear'));
+	}
+}
+
 // Every expectation of a step read at one moment, so a screen the action has not reached yet cannot pass.
 async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 	const failed: string[] = [];
@@ -366,7 +405,7 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 		if ((await onScreen(text).count()) === 0 || !(await onScreen(text).first().isDisabled()))
 			failed.push(`"${text}" is not a disabled control on screen`);
 	for (const [name, value] of Object.entries(step.fields ?? {})) {
-		const held = await page.getByRole('textbox', { name, exact: true }).inputValue();
+		const held = await typedField(page, name).inputValue();
 		if (held !== value) failed.push(`field "${name}" holds "${held}"`);
 	}
 	if (step.title !== undefined && (await page.title()) !== step.title)

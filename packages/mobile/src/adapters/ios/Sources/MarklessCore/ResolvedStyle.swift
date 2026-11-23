@@ -38,6 +38,8 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var checkbox: CheckboxPaint?
 	/// A select's label: the box Dragon lays out inside it for its text, and that text's font and colour.
 	public var selectLabel: SelectLabel?
+	/// A text field the host edits: Dragon's editor and placeholder boxes inside it.
+	public var textField: TextFieldPaint?
 	/// `outline`, drawn with Dragon's translated painters in the view of `OutlinePaint.host`.
 	public var outline: OutlinePaint?
 
@@ -47,7 +49,7 @@ public struct ResolvedStyle: Equatable, Sendable {
 			&& a.textColor == b.textColor && a.lines == b.lines && a.linesText == b.linesText && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll && a.hidden == b.hidden
 			&& a.clipsChildren == b.clipsChildren && a.childClip == b.childClip && a.clipRect == b.clipRect
 			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank && a.stackingParent == b.stackingParent && a.shadow == b.shadow
-			&& a.selectArrow == b.selectArrow && a.selectLabel == b.selectLabel && a.checkbox == b.checkbox && a.outline == b.outline
+			&& a.selectArrow == b.selectArrow && a.selectLabel == b.selectLabel && a.textField == b.textField && a.checkbox == b.checkbox && a.outline == b.outline
 	}
 
 	public struct SelectArrowPaint: Equatable, Sendable {
@@ -70,6 +72,25 @@ public struct ResolvedStyle: Equatable, Sendable {
 		public let fontFamily: String
 		public let fontSize: Double
 		public let color: RGBA?
+	}
+
+	/// Frames in points from the field's border box; font sizes in points. `editor` is where the host draws the value, in
+	/// `font` and `color`; `placeholder` is laid out only while the value is empty; `clear` is a search field's cancel button.
+	public struct TextFieldPaint: Equatable, Sendable {
+		public let editor: Frame
+		public let fontFamily: String
+		public let fontSize: Double
+		public let color: RGBA?
+		public let placeholder: Placeholder?
+		public var clear: Frame? = nil
+
+		public struct Placeholder: Equatable, Sendable {
+			public let frame: Frame
+			public let text: String
+			public let fontFamily: String
+			public let fontSize: Double
+			public let color: RGBA?
+		}
 	}
 
 	public struct DashedBorder: Equatable, Sendable {
@@ -298,6 +319,10 @@ extension StyleExport {
 			if case .element("select", _, _)? = payloadById[id]?.kind { return true }
 			return false
 		}
+		let isInput = { (id: String) -> Bool in
+			if case .element("input", _, _)? = payloadById[id]?.kind { return true }
+			return false
+		}
 		let postOrder = StyleExport.postOrder(nodes)
 		let base = { (id: String) -> String in id.firstIndex(of: "@").map { String(id[..<$0]) } ?? id }
 		let isView = { (id: String) in payloadIds.contains(id) || (id.contains("@") && payloadIds.contains(base(id))) }
@@ -357,6 +382,7 @@ extension StyleExport {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
 			}
 			if isSelect(node.id), !style.hidden { style.selectLabel = try selectLabel(styled, nodes, isView: payloadIds.contains) }
+			if isInput(node.id) { style.textField = try textField(styled, byId) }
 			styles[node.id] = style
 		}
 		// Each row's copy of a payload node ("<id>@<key>"), placed in its own copies of the boxes around it.
@@ -396,6 +422,7 @@ extension StyleExport {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
 			}
 			if isSelect(base(styled.id)), !style.hidden { style.selectLabel = try selectLabel(styled, nodes, isView: isView) }
+			if isInput(base(styled.id)) { style.textField = try textField(styled, byId) }
 			styles[styled.id] = style
 		}
 		return styles
@@ -471,6 +498,36 @@ extension StyleExport {
 			}
 		}
 		return nil
+	}
+
+	/// A field the host edits: the editor box Dragon lays out inside it (`<id>::editor`, which no payload node names) with the
+	/// value's font and colour, and the placeholder box and text while the value is empty; nil for an input with no editor.
+	private func textField(_ field: StyleNode, _ byId: [String: StyleNode]) throws -> ResolvedStyle.TextFieldPaint? {
+		guard field.frame != nil, let editor = byId[field.id + "::editor"], editor.parent == field.id else { return nil }
+		guard let box = editor.frame else { throw styleError("\(field.id): its editor box has no frame") }
+		let points = { (f: Frame) in Frame(x: f.x / dpr, y: f.y / dpr, width: f.width / dpr, height: f.height / dpr) }
+		let look = { (node: StyleNode) throws -> (font: (family: String, size: Double), color: RGBA?) in
+			var font: (family: String, size: Double)?
+			var color: RGBA?
+			for write in node.writes {
+				if case let .font(family, size) = write { font = (family, size) }
+				if case let .textColor(c) = write { color = c }
+			}
+			guard let font else { throw styleError("\(node.id) has no font") }
+			return (font, color)
+		}
+		let value = try look(editor)
+		var placeholder: ResolvedStyle.TextFieldPaint.Placeholder?
+		if let shown = byId[field.id + "::placeholder"], shown.parent == field.id, let frame = shown.frame,
+			let text = byId[shown.id + ":text0"], text.parent == shown.id, let words = text.text
+		{
+			let drawn = try look(text)
+			placeholder = .init(frame: points(frame), text: words, fontFamily: drawn.font.family, fontSize: drawn.font.size, color: drawn.color)
+		}
+		let cancel = byId[field.id + "::cancel"].flatMap { $0.parent == field.id ? $0.frame : nil }
+		return ResolvedStyle.TextFieldPaint(
+			editor: points(box), fontFamily: value.font.family, fontSize: value.font.size, color: value.color, placeholder: placeholder,
+			clear: cancel.map(points))
 	}
 
 	private func reHostOf(_ writes: [StyleWrite]) -> String? {
@@ -568,6 +625,8 @@ extension StyleExport {
 			case .outline: break
 			}
 		}
+		// Radii that overlap scale down until they fit (css-backgrounds-3 §5.5); Core Animation draws no background past half the box.
+		if let frame = style.frame { style.cornerRadius = min(style.cornerRadius, frame.width / 2, frame.height / 2) }
 		// A scroll view clips its own content; any other box clips its children.
 		style.clipsChildren = clips && scrollAxes == nil
 		if let axes = scrollAxes {

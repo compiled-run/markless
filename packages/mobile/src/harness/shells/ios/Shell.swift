@@ -268,7 +268,8 @@ final class ShellSceneDelegate: UIResponder, UIWindowSceneDelegate {
 			var fonts: [String: Data] = [:]
 			let fontFolder = bundle.appending(path: "markless-fonts")
 			for file in (try? FileManager.default.contentsOfDirectory(at: fontFolder, includingPropertiesForKeys: nil)) ?? [] {
-				fonts["sha256:" + file.deletingPathExtension().lastPathComponent] = try Data(contentsOf: file)
+				let name = file.deletingPathExtension().lastPathComponent
+				fonts[name.count == 64 && name.allSatisfy(\.isHexDigit) ? "sha256:" + name : name] = try Data(contentsOf: file)
 			}
 			return try MarklessRoot.controller(
 				payload: payload, style: style, fonts: fonts, images: NativeImageAsset.bundled(in: bundle), path: path, device: ProofDevice.shared)
