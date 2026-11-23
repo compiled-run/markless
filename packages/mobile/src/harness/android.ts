@@ -266,7 +266,9 @@ export async function buildAndroidShell(
 			...filesUnder(generated, '.java'),
 		]);
 		const classpath = [tools.androidJar, classes, ...libraries.jars].join(':');
+		// kotlinc's launcher caps its heap at 512 MB unless JAVA_OPTS is set; the app and Dragon's engine together outgrew it.
 		await exec('kotlinc', [
+			'-J-Xmx2g',
 			'-classpath',
 			classpath,
 			'-jvm-target',

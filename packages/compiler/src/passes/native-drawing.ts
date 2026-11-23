@@ -59,6 +59,9 @@ type Inherited = {
 	/** In user units, or in ems of the font size. */
 	readonly letterSpacing: { readonly value: number; readonly em: boolean };
 	readonly preserve: boolean;
+	/** `stroke-dasharray` with an even count (an odd list repeats itself), or null for a solid stroke. */
+	readonly dash: ReadonlyArray<number> | null;
+	readonly dashOffset: number;
 	/** The clip outlines of it and its groups, in the drawing's units, each with the rule that fills it. */
 	readonly clips: ReadonlyArray<Clip>;
 	/** The `filter` blur over it: its deviation and region in the drawing's units, the clips that apply after it, and how many shapes it holds. */
@@ -104,6 +107,8 @@ const INITIAL: Inherited = {
 	baseline: 'alphabetic',
 	letterSpacing: { value: 0, em: false },
 	preserve: false,
+	dash: null,
+	dashOffset: 0,
 	clips: [],
 	markers: {},
 };
@@ -178,6 +183,7 @@ const PRESENTATION = new Set([
 	'stroke-miterlimit',
 	'transform',
 	'stroke-dasharray',
+	'stroke-dashoffset',
 	'color',
 	'font-size',
 	'font-weight',
@@ -408,11 +414,24 @@ export function compileDrawing(
 		const space = attribute('xml:space')?.trim();
 		if (space !== undefined) next.preserve = space === 'preserve';
 		const dashes = attribute('stroke-dasharray')?.trim();
-		if (dashes !== undefined && dashes !== 'none')
-			refuse(
-				element.id,
-				`\`stroke-dasharray\` on <${element.tag}>: dashed strokes are not drawn natively yet`,
-			);
+		if (dashes === 'none') next.dash = null;
+		else if (dashes !== undefined && dashes !== 'inherit') {
+			const lengths = dashes.split(/[\s,]+/).filter((part) => part !== '').map(parseLength);
+			if (lengths.some((length) => length === null))
+				refuse(element.id, `\`stroke-dasharray="${dashes}"\` on <${element.tag}>, which is not a list of lengths in user units`);
+			// A negative length makes the value invalid, which the browser ignores; all zeros draw a solid stroke.
+			else if (lengths.length > 0 && !lengths.some((length) => length! < 0)) {
+				const list = lengths as number[];
+				next.dash = list.every((length) => length === 0) ? null : list.length % 2 === 1 ? [...list, ...list] : list;
+			}
+		}
+		const offset = attribute('stroke-dashoffset')?.trim();
+		if (offset !== undefined && offset !== 'inherit') {
+			const value = parseLength(offset);
+			if (value === null)
+				refuse(element.id, `\`stroke-dashoffset="${offset}"\` on <${element.tag}>, which is not a length in user units`);
+			else next.dashOffset = value;
+		}
 		return next;
 	};
 
@@ -486,6 +505,9 @@ export function compileDrawing(
 			cap: style.cap,
 			join: style.join,
 			miterLimit: style.miterLimit,
+			...(style.dash && style.stroke !== null && style.width > 0
+				? { dash: style.dash, ...(style.dashOffset !== 0 ? { dashOffset: style.dashOffset } : {}) }
+				: {}),
 			...(matrix.every((value, index) => value === IDENTITY[index])
 				? {}
 				: { transform: matrix }),

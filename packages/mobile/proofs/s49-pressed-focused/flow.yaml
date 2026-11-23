@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: s42-pressed-focused
+name: s49-pressed-focused
 ---
 - launchApp:
     clearState: true

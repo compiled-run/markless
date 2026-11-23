@@ -1,5 +1,5 @@
 {
-	"rung": "S42",
+	"rung": "S49",
 	"name": "Pressed and focused states on a styled page: a box with :active takes its pressed colours while a finger holds it and loses them on release, and a checkbox a tap focuses takes its :focus outline and keeps it, as Chrome draws each state, on the web, iOS and Android",
 	"held": [{ "text": "Press and hold", "node": "h3" }],
 	"steps": [

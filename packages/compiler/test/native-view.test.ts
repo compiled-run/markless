@@ -3450,7 +3450,7 @@ export function Upload() @{
 		expect(payload!.handlers[0]!.ops.map((op) => op.op)).toEqual(['script']);
 	});
 
-	it('refuses a file input inside a form, whose files the web sends with it', async () => {
+	it('refuses a file input in a form whose submit handler is data, as only JavaScript reads the files the web sends', async () => {
 		const { payload, diagnostics } = await nativeView(`export function Send() @{
 	<form onSubmit={(event) => event.preventDefault()}>
 		<input type="file" name="photo" aria-label="Photo" />
@@ -3459,7 +3459,7 @@ export function Upload() @{
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toEqual([
-			'the <input> h1 in the <form> h0 sends its chosen files with the form, which a native form does not send yet',
+			'the <input> h1 in the <form> h0 sends its chosen files with the form, which a native form sends only from a submit handler that runs as JavaScript',
 		]);
 	});
 
@@ -3985,6 +3985,61 @@ export function Page() @{
 	});
 });
 
+it('lists the values a row field can take when an async value builds its rows from literals chosen by conditions', async () => {
+	const { payload, diagnostics } = await nativeView(`import { computed, state } from '@markless/core';
+type Row = { readonly id: string; readonly title: string; readonly tone: string };
+function taskRows(done: number): Row[] {
+	return ['Milk', 'Bread'].filter(Boolean).map((title, index) => {
+		const id = 't' + index;
+		return { id, title, tone: index < done ? 'done' : ' ' };
+	});
+}
+async function loadTasks(done: number): Promise<{ readonly rows: Row[] }> {
+	return { rows: taskRows(done) };
+}
+export function Tasks() @{
+	let done = state(1);
+	const tasks = computed(async () => loadTasks(done));
+	<main>
+		@try {
+			<ul>
+				@for (const row of tasks.rows; key row.id) {
+					<li class={row.tone}>{row.title}</li>
+				}
+			</ul>
+		} @pending {
+			<p>Loading</p>
+		}
+		<button onClick={() => done++}>Finish one</button>
+	</main>
+}`);
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	const repeat = payload!.nodes.find((node) => node.kind === 'repeat');
+	expect(repeat).toMatchObject({ itemValues: { tone: ['done', ' '] } });
+	expect(repeat && 'itemValues' in repeat ? Object.keys(repeat.itemValues!) : []).toEqual(['tone']);
+});
+
+it('lists a row field a computed builds from literals chosen by conditions', async () => {
+	const { payload, diagnostics } = await nativeView(`import { computed, state } from '@markless/core';
+function rowsOf(done: number) {
+	return ['Milk', 'Bread'].map((title, index) => ({ id: 't' + index, title, tone: index < done ? 'done' : 'open' }));
+}
+export function Tasks() @{
+	let done = state(1);
+	const tasks = computed(() => ({ rows: rowsOf(done) }));
+	<main>
+		<ul>
+			@for (const row of tasks.rows; key row.id) {
+				<li class={row.tone}>{row.title}</li>
+			}
+		</ul>
+		<button onClick={() => done++}>Finish one</button>
+	</main>
+}`);
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	expect(payload!.nodes.find((node) => node.kind === 'repeat')).toMatchObject({ itemValues: { tone: ['done', 'open'] } });
+});
+
 it('lowers a @try with no @catch: its error shows nothing, and the rest of the page stays, as the web renders it', async () => {
 	const { payload, diagnostics } = await nativeView(`import { computed } from '@markless/core';
 async function load(): Promise<string> { throw new Error('down'); }
@@ -4253,6 +4308,26 @@ export function Mark() @{
 		);
 	});
 
+	it('dashes strokes as the browser does: odd lists repeat, groups pass them down, zeros and invalid values draw solid', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Lines() @{
+	<svg viewBox="0 0 10 10" stroke="red">
+		<g stroke-dasharray="1 2 3" stroke-dashoffset="1"><path d="M0 0h10" /><path d="M0 2h10" stroke-dasharray="none" /></g>
+		<path d="M0 4h10" stroke-dasharray="0 0" />
+		<path d="M0 6h10" stroke-dasharray="2 -1" />
+		<path d="M0 8h10" stroke-dasharray="2" fill="none" stroke="none" />
+	</svg>
+}`);
+		expect(diagnostics).toEqual([]);
+		const shapes = (payload!.nodes.find((node) => 'drawing' in node && node.drawing) as { drawing: { shapes: { dash?: number[]; dashOffset?: number }[] } }).drawing.shapes;
+		expect(shapes.map((shape) => [shape.dash, shape.dashOffset])).toEqual([
+			[[1, 2, 3, 1, 2, 3], 1],
+			[undefined, undefined],
+			[undefined, undefined],
+			[undefined, undefined],
+			[undefined, undefined],
+		]);
+	});
+
 	it("compiles an svg's shapes into a drawing, with its <title> as its name", async () => {
 		const { payload, diagnostics } = await nativeView(`export function Icon() @{
 	<svg viewBox="0 0 20 10" width="40" height="20" fill="currentColor">
@@ -4363,7 +4438,7 @@ export function Mark() @{
 export function Chart() @{
 	let w = state(4);
 	<svg viewBox="0 0 10 10">
-		<path d="M0 0h10" stroke-dasharray="2 2" />
+		<path d="M0 0h10" stroke-dasharray="2 x" />
 		<rect width={w} height="2" />
 		<path d="M0 0h10v10z" fill="url(#g)" />
 		<text x="0 4" y="5">label</text>
@@ -4378,7 +4453,7 @@ export function Chart() @{
 				text.slice(0, d.primarySpan!.start).split('\n').length,
 			]),
 		).toEqual([
-			['`stroke-dasharray` on <path>: dashed strokes are not drawn natively yet', 5],
+			['`stroke-dasharray="2 x"` on <path>, which is not a list of lengths in user units', 5],
 			[
 				'`width` on <rect> follows state; a native drawing is compiled when the app is built',
 				6,

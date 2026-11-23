@@ -1079,11 +1079,45 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 				event: 'pick',
 				host: 'h1',
 				files: [
-					{ name: 'note.txt', size: 5, type: 'text/plain', lastModified: 1700000000000 },
-					{ name: 'photo.png', size: 2048, type: 'image/png', lastModified: 1700000001000 },
+					{
+						ref: 'picked:1',
+						name: 'note.txt',
+						size: 5,
+						type: 'text/plain',
+						lastModified: 1700000000000,
+					},
+					{
+						ref: 'picked:2',
+						name: 'photo.png',
+						size: 2048,
+						type: 'image/png',
+						lastModified: 1700000001000,
+					},
 				],
 			},
 			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
+		// A submit handler sends the form's FormData, a chosen file and a file made from text, as multipart.
+		name: 'file-upload',
+		fixture: 'test/fixtures/FileUpload.tsrx',
+		actions: [
+			{ event: 'input', host: 'h2', value: 'Trip' },
+			{
+				event: 'pick',
+				host: 'h3',
+				files: [
+					{
+						ref: 'picked:1',
+						name: 'note.txt',
+						size: 5,
+						type: 'text/plain',
+						lastModified: 1700000000000,
+					},
+				],
+			},
+			{ event: 'activate', host: 'h4' },
 		],
 	},
 	{
@@ -1406,9 +1440,7 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		name: 'live-drawing',
 		fixture: 'proofs/u42-qr-code/App.tsrx',
 		modules: true,
-		actions: [
-			{ event: 'activate', host: 'h3' },
-		],
+		actions: [{ event: 'activate', host: 'h3' }],
 	},
 	{
 		name: 'element-measure',
@@ -1820,6 +1852,13 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h4' }],
 	},
 	{
+		// Dashed strokes reach the hosts as even dash lists with their offset.
+		name: 'svg-dashes',
+		fixture: 'proofs/r172-svg-dashes/App.tsrx',
+		modules: true,
+		actions: [],
+	},
+	{
 		name: 'details',
 		fixture: 'proofs/r145-details/App.tsrx',
 		modules: true,
@@ -2018,6 +2057,17 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'component-edge:0' },
 			{ event: 'activate', host: 'h4' },
 			{ event: 'back' },
+		],
+	},
+	{
+		// A page's url: its pathname and query at mount, and the query a <Link> or a script's navigate() opens a page with.
+		name: 'page-url',
+		app: 'proofs/n17-page-url',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0' },
+			{ event: 'back' },
+			{ event: 'activate', host: 'h5' },
 		],
 	},
 	{

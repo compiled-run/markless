@@ -55,7 +55,10 @@ import dev.markless.mobile.style.rowStates
 import dev.markless.mobile.style.SystemFace
 import dev.markless.mobile.style.TextLine
 import dev.markless.mobile.style.StyleWrite
+import dev.markless.mobile.style.StyledNode
 import dev.markless.mobile.style.stackingParent
+import dev.markless.mobile.style.checkFlattenedInline
+import dev.markless.mobile.style.rowCopyOf
 import dev.markless.mobile.style.SelectArrow
 import java.io.File
 import kotlin.system.exitProcess
@@ -235,7 +238,7 @@ private fun runVector(file: File, vector: Map<String, Json>, runtime: Runtime) {
 		if (event == "pick") {
 			val files = (field(action, "files", "action") as? Json.Arr ?: throw IllegalStateException("steps[$n] action.files is not an array")).items.map {
 				val file = it.obj("action.files")
-				PickedFile(field(file, "name", "file").str("name"), (field(file, "size", "file") as Json.Num).value, field(file, "type", "file").str("type"), (field(file, "lastModified", "file") as Json.Num).value)
+				PickedFile(field(file, "ref", "file").str("ref"), field(file, "name", "file").str("name"), (field(file, "size", "file") as Json.Num).value, field(file, "type", "file").str("type"), (field(file, "lastModified", "file") as Json.Num).value)
 			}
 			val actual = runtime.pick(field(action, "host", "action").str("host"), files).joinToString(",", "[", "]") { it.toJson() }
 			val expected = canonical(field(s, "journal", "steps[$n]"))
@@ -829,6 +832,8 @@ private fun planTexts() {
 	val laid = style.laidOut(100.0, 100.0, 2.0, { answer(10.0) }, rowsLayout = { line -> live = line; answer(30.0) }, texts = mapOf("h0:text0" to "Home and the garden shed"))
 	check("a changed page text goes to the live layout beside no rows", live?.endsWith(""","rows":[],"texts":[["h0:text0","Home and the garden shed"]]}""") == true) { "$live" }
 	check("the live layout's boxes are the page's", laid.assignments[0].byId.getValue("h0").frame?.height == 30.0) { "${laid.assignments[0].byId.getValue("h0").frame}" }
+	// The host draws a text's lines only while its string is the one they were laid out for; the re-laid box carries it (checkpoint H9).
+	check("a re-laid text carries the string its lines are for", laid.assignments[0].byId.getValue("h0:text0").text == "Home and the garden shed") { "${laid.assignments[0].byId.getValue("h0:text0").text}" }
 	var replayed: String? = null
 	style.laidOut(100.0, 100.0, 2.0, { line -> replayed = line; answer(10.0) }, rowsLayout = { throw AssertionError("used the live layout") }, texts = mapOf("h0:text0" to "Home"))
 	check("a page text at its laid-out string keeps the recorded layout", replayed != null && "texts" !in replayed!!) { "$replayed" }
@@ -934,6 +939,57 @@ private fun rehostedStacking(fixtures: File) {
 	val c = clippedPage.assignments[clippedPage.initial]
 	val err = runCatching { c.byId.getValue("h5").let { s -> stackingParent(s, s.writes.filterIsInstance<StyleWrite.PaintOrder>().first(), c, views::contains, "h4") } }.exceptionOrNull()?.message
 	check("a box painted past an ancestor that clips is refused by name", err == "\"h5\" paints in html's stacking order past h4, which clips or scrolls; not implemented on Android") { "$err" }
+}
+
+/** The S45 rung's: texts in inline spans, which Dragon parents to the span's block container, a <p>. */
+private fun flattenedInline(fixtures: File) {
+	val text = File(fixtures, "s45-text-interpolations.native-app-style.json").readText()
+	val page = StyleExport.decodeApp(text.toByteArray()).getValue("/")
+	val styled = page.assignments[page.initial]
+	val inline = page.inlineBoxes[page.initial]
+	check("the plan names the spans as inline boxes and the <p>s as none", inline == setOf("h3", "h5", "h7", "h9")) { "$inline" }
+	check("a span's text is a child of the span's block in the export", styled.byId.getValue("h3:text0").parent == "h2") { "${styled.byId.getValue("h3:text0").parent}" }
+	val parents = mapOf("h3" to "h2", "h2" to "h0")
+	val placed = runCatching { checkFlattenedInline("h3:text0", "h3", "h2", styled, inline) { parents[it] } }
+	check("a text in a transparent span Dragon lays out flat is placed", placed.isSuccess) { "${placed.exceptionOrNull()}" }
+	val app = Json.parse(text).obj("app")
+	val android = app.getValue("targets").obj("targets").getValue("android").obj("android")
+	val h3 = android.getValue("routes").arr("routes")[0].obj("route").getValue("assignments").arr("assignments")[0].obj("a").getValue("nodes").arr("nodes").first { it.obj("n")["id"] == Json.Str("h3") }.obj("n").getValue("writes").num("writes").toInt()
+	val painted = Json.Obj(LinkedHashMap(app).also { a ->
+		val targets = LinkedHashMap(a.getValue("targets").obj("targets"))
+		val target = LinkedHashMap(android)
+		target["writes"] = Json.Arr(android.getValue("writes").arr("writes").mapIndexed { i, l -> if (i == h3) Json.Arr(l.arr("w") + Json.parse("""{"kind":"background-color","color":{"r":255,"g":0,"b":0,"alpha":255},"key":"backgroundColor"}""")) else l })
+		targets["android"] = Json.Obj(target)
+		a["targets"] = Json.Obj(targets)
+	}).text()
+	val paintedPage = StyleExport.decodeApp(painted.toByteArray()).getValue("/")
+	val err = runCatching { checkFlattenedInline("h3:text0", "h3", "h2", paintedPage.assignments[paintedPage.initial], inline) { parents[it] } }.exceptionOrNull()?.message
+	check("a text in a span that paints a background is refused by name", err == "\"h3:text0\": its inline box h3 paints a background, which Android does not draw on a box Dragon lays out flat in h2") { "$err" }
+}
+
+/** The S47 rung's: a keyed @for row <li><p>text <span>text</span> text</p></li>, with one row's copy ("<id>@a") as the live rows layout adds it. */
+private fun rowFlattenedInline(fixtures: File) {
+	val page = StyleExport.decodeApp(File(fixtures, "s47-row-inline-text.native-app-style.json").readBytes()).getValue("/")
+	val template = page.assignments[page.initial]
+	val inline = page.inlineBoxes[page.initial]
+	check("the plan names the row's span as an inline box", inline == setOf("h5")) { "$inline" }
+	val row = listOf("h3", "h4", "h4:text0", "h5", "h5:text0", "h4:text1")
+	fun withRow(span: (StyledNode) -> StyledNode = { it }) = template.copy(nodes = template.nodes + row.map { id ->
+		val n = template.byId.getValue(id)
+		val copy = n.copy(id = "$id@a", parent = n.parent?.let { if (it in row) "$it@a" else it })
+		if (id == "h5") span(copy) else copy
+	})
+	val styled = withRow()
+	val payloadParents = mapOf("h5:text0" to "h5", "h5" to "h4", "h4" to "h3", "h3" to "h2")
+	val parent = { id: String -> payloadParents[id.substringBefore('@')]?.let { rowCopyOf(id, it, styled) } }
+	check("a row copy's payload parent is its parent's copy in the row", parent("h5:text0@a") == "h5@a" && parent("h5@a") == "h4@a") { "${parent("h5:text0@a")} ${parent("h5@a")}" }
+	check("a row's top box keeps the list's parent, which no row copies", parent("h3@a") == "h2") { "${parent("h3@a")}" }
+	check("an inner row's copy finds its parent's copy in the outer row", rowCopyOf("x@a@k", "h4", styled) == "h4@a") { rowCopyOf("x@a@k", "h4", styled) }
+	val placed = runCatching { checkFlattenedInline("h5:text0@a", "h5@a", "h4@a", styled, inline, parent) }
+	check("a row's text in a transparent span Dragon lays out flat is placed", placed.isSuccess) { "${placed.exceptionOrNull()}" }
+	val painted = withRow { it.copy(writes = it.writes + StyleWrite.BackgroundColor(Rgba(255, 0, 0, 255))) }
+	val err = runCatching { checkFlattenedInline("h5:text0@a", "h5@a", "h4@a", painted, inline) { id -> payloadParents[id.substringBefore('@')]?.let { rowCopyOf(id, it, painted) } } }.exceptionOrNull()?.message
+	check("a row's text in a span copy that paints a background is refused by name", err == "\"h5:text0@a\": its inline box h5@a paints a background, which Android does not draw on a box Dragon lays out flat in h4@a") { "$err" }
 }
 
 /** The S24 rung's: a styled select's arrow write, and the arrow geometry Dragon's plan layout gives as a 4th element. */
@@ -1060,6 +1116,8 @@ fun main(args: Array<String>) {
 	decoderStrictness()
 	styleSlots()
 	rehostedStacking(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	flattenedInline(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	rowFlattenedInline(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	planTexts()
 	val dirs = args.map(::File)
 	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)

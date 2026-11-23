@@ -6,16 +6,21 @@ import type {
 } from '@markless/serializer';
 import {
 	createNativeRuntime,
+	nativeRoutePath,
 	type NativeAction,
 	type NativeRuntime,
 	type NativeScriptHost,
 } from './runtime.ts';
+
+export { nativeRoutePath };
 
 /** One screen on the stack: the route it shows, the path it opened at and its page's live runtime. */
 export type NativeScreen = {
 	readonly route: string;
 	readonly params: Readonly<Record<string, string>>;
 	readonly path: string;
+	/** The query it opened with (`?tab=done`, or ''). */
+	readonly search: string;
 	readonly runtime: NativeRuntime;
 };
 
@@ -76,20 +81,6 @@ export function matchNativeRoute(
 	return undefined;
 }
 
-/** The path a route pattern names with these params, each param URL-encoded. */
-export function nativeRoutePath(pattern: string, params: Readonly<Record<string, string>>): string {
-	const path = segmentsOf(pattern)
-		.map((part) => {
-			if (!(part.startsWith('[') && part.endsWith(']'))) return part;
-			const value = params[part.slice(1, -1)];
-			if (value === undefined)
-				throw new Error(`${pattern} needs the param ${part.slice(1, -1)}`);
-			return encodeURIComponent(value);
-		})
-		.join('/');
-	return `/${path}`;
-}
-
 /**
  * The back stack an app opens with at `path`: every leading part of the path that is itself a route, shortest first,
  * ending with the path. `/orders/42` in an app with `/`, `/orders` and `/orders/[id]` opens three screens deep.
@@ -115,13 +106,18 @@ export function createNativeAppRuntime(
 	scriptHost?: NativeScriptHost,
 ): NativeAppRuntime {
 	const session = new Map<string, NativeValue>();
-	const open = (route: string, params: Readonly<Record<string, string>>): NativeScreen => {
+	const open = (
+		route: string,
+		params: Readonly<Record<string, string>>,
+		search = '',
+	): NativeScreen => {
 		const entry = app.routes.find((candidate) => candidate.pattern === route);
 		if (!entry) throw new Error(`no page for ${route}`);
 		return {
 			route,
 			params,
 			path: nativeRoutePath(route, params),
+			search,
 			runtime: createNativeRuntime(
 				entry.page as NativeViewPayload,
 				store,
@@ -130,6 +126,10 @@ export function createNativeAppRuntime(
 				undefined,
 				scriptHost,
 				session,
+				undefined,
+				undefined,
+				undefined,
+				search,
 			),
 		};
 	};
@@ -150,7 +150,7 @@ export function createNativeAppRuntime(
 			const journal = screens.at(-1)!.runtime.dispatch(action);
 			const last = journal.at(-1);
 			if (last?.op === 'navigate') {
-				const next = open(last.route, last.params);
+				const next = open(last.route, last.params, last.search);
 				const left = last.replace ? screens.pop()!.runtime.leave() : [];
 				screens.push(next);
 				return [...journal, ...left, ...next.runtime.start()];

@@ -151,6 +151,7 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		169,
 		170,
 		171,
+		172,
 		'T1',
 		'T2',
 		101,
@@ -249,6 +250,7 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		237,
 		241,
 		242,
+		243,
 		101,
 		102,
 		103,
@@ -308,6 +310,7 @@ test('the navigation ladder has one app folder per rung, in rung order', () => {
 		'N14',
 		'N15',
 		'N16',
+		'N17',
 		138,
 		139,
 		140,
@@ -352,6 +355,12 @@ test('the styles ladder has one app folder per rung, in rung order', () => {
 		'S40',
 		'S41',
 		'S42',
+		'S43',
+		'S44',
+		'S45',
+		'S46',
+		'S47',
+		'S49',
 	]);
 	for (const folder of styleRungFolders())
 		expect(existsSync(join(proofsDir, folder, 'pages'))).toBe(true);

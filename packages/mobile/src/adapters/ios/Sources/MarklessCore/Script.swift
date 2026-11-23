@@ -34,6 +34,8 @@ public struct NativeScriptBinding: Equatable, Sendable {
 		case shared([NativeScriptBinding])
 		/// A shared object's method: the script function that returns it, run over its own bindings when called.
 		case method(String, [NativeScriptBinding])
+		/// The page's `url` prop, which the script reads as a `URL`.
+		case url
 	}
 	public let name: String
 	public let kind: Kind
@@ -42,7 +44,7 @@ public struct NativeScriptBinding: Equatable, Sendable {
 		switch kind {
 		case let .cell(cell): return [cell]
 		case let .fields(fields): return fields.map(\.cell)
-		case .device, .callback: return []
+		case .device, .callback, .url: return []
 		case let .value(expr), let .elements(expr): return expr.cells
 		case let .object(members), let .shared(members), let .method(_, members): return members.flatMap(\.cells)
 		}
@@ -63,19 +65,79 @@ public struct NativeHeader: Equatable, Sendable {
 	}
 }
 
-/// A request as the script made it: an absolute URL and a text body.
+/// A request as the script made it: an absolute URL and a text body, or a FormData's entries.
 public struct NativeFetchRequest: Equatable, Sendable {
 	public let url: String
 	public let method: String
 	public let headers: [NativeHeader]
-	public let body: String?
+	public let body: NativeFetchBody?
 
 	var json: JSONValue {
 		.object([
 			("url", .string(url)), ("method", .string(method)),
 			("headers", .array(headers.map { .array([.string($0.name), .string($0.value)]) })),
-			("body", body.map(JSONValue.string) ?? .null),
+			("body", body?.json ?? .null),
 		])
+	}
+}
+
+/// A request's body: text, or a FormData's entries, which the host sends as multipart/form-data with a boundary of its own.
+public enum NativeFetchBody: Equatable, Sendable {
+	case text(String)
+	case form([NativeFormPart])
+
+	var json: JSONValue {
+		switch self {
+		case let .text(text): .string(text)
+		case let .form(parts): .object([("form", .array(parts.map(\.json)))])
+		}
+	}
+
+	static func decode(_ value: JSONValue) throws -> NativeFetchBody? {
+		switch value {
+		case .null: return nil
+		case let .string(text): return .text(text)
+		case let .object(fields):
+			guard case let .array(parts)? = fields.first(where: { $0.0 == "form" })?.1 else { break }
+			return .form(try parts.map(NativeFormPart.decode))
+		default: break
+		}
+		throw RuntimeError(reason: "a request body is text or a FormData's entries")
+	}
+}
+
+/// A FormData entry: its text, or a file by its text or by the host's reference to a file a picker chose.
+public struct NativeFormPart: Equatable, Sendable {
+	public enum Value: Equatable, Sendable {
+		case text(String)
+		case file(name: String, type: String, ref: String?, text: String?)
+	}
+	public let name: String
+	public let value: Value
+
+	var json: JSONValue {
+		switch value {
+		case let .text(text): return .array([.string(name), .string(text)])
+		case let .file(file, type, ref, text):
+			var fields: [(String, JSONValue)] = [("name", .string(file)), ("type", .string(type))]
+			if let ref { fields.append(("ref", .string(ref))) }
+			if let text { fields.append(("text", .string(text))) }
+			return .array([.string(name), .object(fields)])
+		}
+	}
+
+	static func decode(_ value: JSONValue) throws -> NativeFormPart {
+		guard case let .array(pair) = value, pair.count == 2, case let .string(name) = pair[0] else {
+			throw RuntimeError(reason: "a FormData entry is [name, value]")
+		}
+		switch pair[1] {
+		case let .string(text): return NativeFormPart(name: name, value: .text(text))
+		case let .object(fields):
+			let field = { (key: String) -> String? in if case let .string(text)? = fields.first(where: { $0.0 == key })?.1 { text } else { nil } }
+			guard let file = field("name"), let type = field("type") else { throw RuntimeError(reason: "a FormData file has a name and a type") }
+			return NativeFormPart(name: name, value: .file(name: file, type: type, ref: field("ref"), text: field("text")))
+		default: throw RuntimeError(reason: "a FormData entry's value is text or a file")
+		}
 	}
 }
 

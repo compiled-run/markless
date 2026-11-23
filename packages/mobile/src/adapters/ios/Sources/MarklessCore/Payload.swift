@@ -88,6 +88,8 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case drawn(String)
 	/// The page's route params, an object of strings.
 	case routeParams
+	/// The page's address as its `url` prop reads it: `{ pathname, search, hash }`, the hash always "".
+	case routeURL
 	/// `new FormData(form)`: the form's entries as `[name, value]` string pairs, in tree order.
 	case formData(String)
 	/// A checkbox's or radio button's checkedness now.
@@ -100,7 +102,7 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .event, .focused, .local, .item, .index, .routeParams, .formData, .checked, .field, .shown, .drawn: return []
+		case .literal, .event, .focused, .local, .item, .index, .routeParams, .routeURL, .formData, .checked, .field, .shown, .drawn: return []
 		case let .unary(_, inner), let .member(inner, _), let .optionalMember(inner, _), let .lambda(_, inner), let .focusOrigin(inner), let .isElement(inner), let .byId(inner): return inner.cells
 		case let .contains(within, node): return within.cells + node.cells
 		case let .captures(node, pointer): return node.cells + pointer.cells
@@ -159,7 +161,7 @@ public struct NativeNode: Equatable, Sendable {
 		case branch(tests: [NativeExpr?])
 		/// A keyed `@for`: one row per item of `list`, keyed by `String()` of the item at `key`.
 		/// `key` nil: each row's key is its position (`byIndex`).
-		case `repeat`(list: NativeExpr, key: [String]?, keyParts: [NativeKeyPart]? = nil)
+		case `repeat`(list: NativeExpr, key: [String]?, keyParts: [NativeKeyPart]? = nil, itemValues: [String: [NativeValue]]? = nil)
 		/// The platform's own sheet: its content (the nodes whose parent it is) is built at mount and kept while closed.
 		case sheet(open: NativeExpr, snapPoints: [Double], dismissible: Bool, modal: Bool)
 	}
@@ -242,6 +244,10 @@ public struct NativeShape: Equatable, Sendable {
 	public var clip: [[Double]] = []
 	/// Whether each `clip` outline is filled even-odd (a luminance mask's black shapes cut out) rather than nonzero.
 	public var clipEvenOdd: [Bool] = []
+	/// `stroke-dasharray`: dash and gap lengths in turn, an even count; nil for a solid stroke.
+	public var dash: [Double]?
+	/// `stroke-dashoffset`: how far into the dash pattern the stroke starts.
+	public var dashOffset: Double = 0
 	/// An SVG `feGaussianBlur` of the shape alone: its standard deviation and the filter region (verb-coded), in the drawing's units.
 	public var blur: Blur?
 	public struct Blur: Equatable, Sendable {
@@ -387,8 +393,8 @@ public enum NativeOp: Equatable, Sendable {
 	/// The cell takes the expression's value, evaluated before the write.
 	case assign(cell: String, value: NativeExpr)
 	/// Opens the page at `route` with these params (fixed, or evaluated when the op runs); ops after it do not run.
-	/// `replace` takes the current screen's place instead of pushing.
-	case navigate(route: String, params: [NativeOpParam], replace: Bool)
+	/// `replace` takes the current screen's place instead of pushing; `search` is the query the page opens with, or "".
+	case navigate(route: String, params: [NativeOpParam], search: String, replace: Bool)
 	/// A device call (`haptics.tap`), on `object` when it names one; with `result` it settles that task cell, with `then`
 	/// the host answers with `resume` and those ops run with the answer as a local.
 	case call(call: String, object: String?, arguments: [NativeExpr], result: String?, then: NativeContinuation?)
@@ -428,6 +434,8 @@ public struct NativeCapture: Equatable, Sendable {
 
 public enum NativeFieldKind: String, Sendable {
 	case text, number, checkbox, radio, hidden, select
+	/// A file input, whose entries are the files its JavaScript holds; only a submit handler's script reads them.
+	case file
 }
 
 /// Chromium's messages for a number field in one language, with `{min}`, `{max}`, `{low}`, `{high}`, `{value}` for the numbers.
@@ -985,7 +993,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: try decodeArm(field),
 					row: try decodeRow(field), kind: .branch(tests: tests))
 			case "repeat":
-				let field = try node.object(required: ["kind", "id", "parent", "list", "key"], optional: place + ["byIndex", "keyParts"])
+				let field = try node.object(required: ["kind", "id", "parent", "list", "key"], optional: place + ["byIndex", "keyParts", "itemValues"])
 				let key = try field["key"].array().map { try $0.string() }
 				let byIndex = field.has("byIndex") ? try field["byIndex"].bool() : false
 				if byIndex && !key.isEmpty { throw try field["key"].fail("a list keyed by its index has no key path") }
@@ -993,7 +1001,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: try decodeArm(field),
 					row: try decodeRow(field),
 					kind: .repeat(list: try decodeExpr(try field["list"]), key: byIndex ? nil : key,
-						keyParts: try field.has("keyParts") ? decodeKeyParts(field["keyParts"]) : nil))
+						keyParts: try field.has("keyParts") ? decodeKeyParts(field["keyParts"]) : nil,
+						itemValues: try field.has("itemValues") ? decodeItemValues(field["itemValues"]) : nil))
 			case "sheet":
 				let field = try node.object(required: ["kind", "id", "parent", "open", "snapPoints", "dismissible", "modal"], optional: ["arm"])
 				let snapPoints = try field["snapPoints"].array().map { try $0.number() }
@@ -1036,7 +1045,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 					let opField = try op.object(["op", "cell", "value"])
 					return .assign(cell: try opField["cell"].string(), value: try decodeExpr(try opField["value"]))
 				case "navigate":
-					let opField = try op.object(required: ["op", "route", "params"], optional: ["replace"])
+					let opField = try op.object(required: ["op", "route", "params"], optional: ["search", "replace"])
 					let params = try opField["params"]
 					return .navigate(
 						route: try opField["route"].string(),
@@ -1044,6 +1053,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 							let value = try params.field(name)
 							return NativeOpParam(name: name, value: value.isString ? .string(try value.string()) : .expr(try decodeExpr(value)))
 						},
+						search: opField.has("search") ? try opField["search"].string() : "",
 						replace: try decodeReplace(opField))
 				case "call":
 					let opField = try op.object(required: ["op", "call", "arguments"], optional: ["result", "object", "after"])
@@ -1283,7 +1293,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			else { throw reader.fail("a gradient's stops run in order from 0 to 1") }
 			return .gradient(NativeGradient(linear: linear, radial: radial, stops: stops, transform: transform))
 		}
-		let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "text", "clip", "clipRule", "blur"])
+		let s = try shape.object(required: ["path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit"], optional: ["transform", "text", "clip", "clipRule", "blur", "dash", "dashOffset"])
 		let transform = s.has("transform") ? try s["transform"].array().map { try $0.number() } : nil
 		if let transform, transform.count != 6 { throw shape.fail("a transform has six numbers") }
 		let rule = try s["fillRule"].string()
@@ -1301,6 +1311,12 @@ public struct NativeViewPayload: Equatable, Sendable {
 			}
 			guard decoded.clipEvenOdd.count == decoded.clip.count else { throw shape.fail("a clipRule for each clip") }
 		}
+		if s.has("dash") {
+			let dash = try s["dash"].array().map { try $0.number() }
+			guard !dash.isEmpty, dash.count % 2 == 0, dash.allSatisfy({ $0 >= 0 }) else { throw shape.fail("a dash holds an even count of lengths") }
+			decoded.dash = dash
+		}
+		if s.has("dashOffset") { decoded.dashOffset = try s["dashOffset"].number() }
 		if s.has("blur") {
 			let b = try s["blur"].object(["deviation", "region"])
 			decoded.blur = NativeShape.Blur(deviation: try b["deviation"].number(), region: try b["region"].array().map { try $0.number() })
@@ -1379,9 +1395,12 @@ public struct NativeViewPayload: Equatable, Sendable {
 			case ["object"]: return NativeScriptBinding(name: name, kind: .object(try decodeBindings(try binding.field("object"))))
 			case ["shared"]: return NativeScriptBinding(name: name, kind: .shared(try decodeBindings(try binding.field("shared"))))
 			case ["callback"]: return NativeScriptBinding(name: name, kind: .callback(try binding.field("callback").string()))
+			case ["url"]:
+				guard try binding.field("url").bool() else { throw binding.fail("a url binding is { url: true }") }
+				return NativeScriptBinding(name: name, kind: .url)
 			case ["bindings", "method"], ["method", "bindings"]:
 				return NativeScriptBinding(name: name, kind: .method(try binding.field("method").string(), try decodeBindings(try binding.field("bindings"))))
-			default: throw binding.fail("a script binding is { cell }, { fields }, { value }, { device, object }, { elements }, { object }, { shared }, { callback } or { method, bindings }")
+			default: throw binding.fail("a script binding is { cell }, { fields }, { value }, { device, object }, { elements }, { object }, { shared }, { callback }, { url } or { method, bindings }")
 			}
 		}
 	}
@@ -1495,8 +1514,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["local"]: return .local(try field("local").string())
 		case ["route"]:
 			let name = try field("route").string()
-			guard name == "params" else { throw PayloadError(path: reader.path + ".route", reason: "unknown route read \"\(name)\"") }
-			return .routeParams
+			switch name {
+			case "params": return .routeParams
+			case "url": return .routeURL
+			default: throw PayloadError(path: reader.path + ".route", reason: "unknown route read \"\(name)\"")
+			}
 		case ["item"]: return .item(try field("item").string())
 		case ["index"]: return .index(try field("index").string())
 		case ["formData"]: return .formData(try field("formData").string())
@@ -1558,7 +1580,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			case let .branch(tests):
 				branchArms[node.id] = tests.count
 				try checkCells(node, tests.compactMap { $0 })
-			case let .repeat(list, _, _):
+			case let .repeat(list, _, _, _):
 				repeats.insert(node.id)
 				try checkCells(node, [list])
 			case let .sheet(open, _, _, _):
@@ -1619,6 +1641,13 @@ public struct PayloadError: Error, CustomStringConvertible, Equatable {
 }
 
 /// Typed, path-tracking access to a JSON value; every unexpected shape is a `PayloadError`.
+/// A repeat's `itemValues`: each field path its items' values are listed for, with those values.
+private func decodeItemValues(_ reader: Reader) throws -> [String: [NativeValue]] {
+	var out: [String: [NativeValue]] = [:]
+	for key in try reader.keys() { out[key] = try reader.field(key).array().map { try $0.scalar() } }
+	return out
+}
+
 struct Reader {
 	let value: JSONValue
 	let path: String
