@@ -743,6 +743,7 @@ final class ViewTree {
 				}
 				if flowing.contains(node) {
 					attributes[node, default: [:]][name] = value
+					if let button = contexts[node]?.button { refreshLabel(of: button) }
 					continue
 				}
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
@@ -1631,6 +1632,8 @@ final class ViewTree {
 	/// Static and bound attributes as platform state; `class` reaches views only through the style export.
 	private func applyAttributes(_ id: String, _ view: UIView) {
 		let current = attributes[id] ?? [:]
+		// A control's name is read from its content, so an attribute inside it (hidden, aria-label) renames it.
+		defer { if let button = contexts[id]?.button, button !== view { refreshLabel(of: button) } }
 		if view is AbsentField { return }
 		if let slider = view as? RangeSlider {
 			slider.show(current)
@@ -1697,8 +1700,31 @@ final class ViewTree {
 			let hidden = current["hidden"] != nil || view.superview is SelectButton
 			if view.isHidden != hidden {
 				view.isHidden = hidden
-				if let parent = view.superview, !(parent is UIButton || parent is OverlayCard) { stack(parent) }
+				if contexts[id]?.button != nil {
+					let labels = hideLabels(in: view, hidden)
+					stackTree(view)
+					if hidden {
+						for label in labels {
+							label.translatesAutoresizingMaskIntoConstraints = true
+							label.frame = .zero
+						}
+					}
+				}
+				if let parent = view.superview, !(parent is SelectButton || parent is OverlayCard) { stack(parent) }
 			}
+		}
+	}
+
+	/// A hidden element inside a control has no layout, as `display: none`: UIKit's automation tree lists a control's labels
+	/// at their frames whatever their `isHidden`, so each label under it is hidden and unplaced. One under a still-hidden
+	/// element stays so.
+	private func hideLabels(in view: UIView, _ hidden: Bool) -> [UILabel] {
+		view.subviews.filter { !decorations.contains(ObjectIdentifier($0)) && !leaves.contains(ObjectIdentifier($0)) }.flatMap { child -> [UILabel] in
+			if let label = child as? UILabel {
+				label.isHidden = hidden
+				return [label]
+			}
+			return child.isHidden ? [] : hideLabels(in: child, hidden)
 		}
 	}
 
@@ -1733,19 +1759,40 @@ final class ViewTree {
 			button.accessibilityLabel = label
 			return
 		}
-		// As the web names a button from its content: its text, and the label of an image or svg inside it.
+		// As the web names a button from its content: its shown text, and the label of an element, image or svg inside it.
 		func texts(_ view: UIView) -> [String] {
 			view.subviews.flatMap { child -> [String] in
-				if let label = child as? UILabel { return decorations.contains(ObjectIdentifier(label)) ? [] : [label.text ?? ""] }
+				if let label = child as? UILabel {
+					if decorations.contains(ObjectIdentifier(label)) { return [] }
+					if let id = label.accessibilityIdentifier, let paragraph = paragraphs[id], paragraph.label === label { return [spokenName(of: paragraph)] }
+					return [label.text ?? ""]
+				}
+				let own = child.accessibilityIdentifier.flatMap { attributes[$0] }
+				if child.isHidden || own?["hidden"] != nil || own?["aria-hidden"] == "true" { return [] }
 				if child is DrawingView || child is UIImageView {
-					let own = child.accessibilityIdentifier.flatMap { attributes[$0] }
-					if own?["aria-hidden"] == "true" { return [] }
 					return [own?["aria-label"] ?? (child is UIImageView ? own?["alt"] : nil) ?? ""]
 				}
+				if let label = own?["aria-label"] { return [label] }
 				return texts(child)
 			}
 		}
-		button.accessibilityLabel = texts(button).joined()
+		button.accessibilityLabel = texts(button).joined().split(whereSeparator: \.isWhitespace).joined(separator: " ")
+	}
+
+	/// A paragraph's part of a control's name, as the web reads it: without hidden or aria-hidden phrase elements, and an
+	/// element's aria-label in place of its text.
+	private func spokenName(of paragraph: Paragraph) -> String {
+		func walk(_ template: String) -> String {
+			guard let node = nodes[template] else { return "" }
+			if node.isText { return paragraphTexts[template + paragraph.suffix] ?? "" }
+			if node.defaultStyle?.flow == .break { return " " }
+			let own = attributes[template + paragraph.suffix] ?? [:]
+			if own["hidden"] != nil || own["aria-hidden"] == "true" { return "" }
+			if let label = own["aria-label"] { return label }
+			let inner = (slots[template] ?? []).map(walk).joined()
+			return node.defaultStyle?.quotes == true ? "\u{201C}\(inner)\u{201D}" : inner
+		}
+		return paragraph.nodes.map(walk).joined()
 	}
 
 	private func stackTree(_ view: UIView) {
