@@ -9,7 +9,7 @@ import { LOAD_PLATFORM } from '../benchmarks/perf-guards/evaluate.mjs';
 
 const ARTIFACT = 'perf-guards-measurement';
 const JOB = 'perf-guards';
-// Past this many commits looked up, a page falls back to its anchor rather than spending minutes of API calls.
+// Past this many commits with runs, a page falls back to its anchor rather than spending minutes of API calls.
 const MAX_LOOKUPS = 40;
 const POLL_MS = 20_000;
 const USAGE =
@@ -28,12 +28,20 @@ const gh = (...args) =>
 	});
 const json = (path, jq) => JSON.parse(gh('api', path, '--jq', jq));
 
-/** ci.yml runs of one commit from the merge queue or a push to main, newest first, however long ago it ran. */
-const runsOfCommit = (repo, sha) =>
-	json(
+/**
+ * A commit's ci.yml runs from the merge queue, then from pushes to main, newest first. Asked by commit: a list of the
+ * newest runs loses an anchor commit's merge-queue run once enough later runs push it out.
+ */
+function runsOfCommit(repo, sha) {
+	const runs = json(
 		`repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${sha}&per_page=100`,
-		'[.workflow_runs[] | select(.event == "merge_group" or .event == "push") | .id]',
+		'[.workflow_runs[] | select(.event == "merge_group" or .event == "push") | {id, event}]',
 	);
+	return [
+		...runs.filter((run) => run.event === 'merge_group'),
+		...runs.filter((run) => run.event === 'push'),
+	].map((run) => run.id);
+}
 
 /** Whether a run can no longer upload a measurement: it finished, or its perf-guards job did. */
 function settled(repo, run) {
@@ -88,12 +96,13 @@ function main(argv) {
 		const measurementAt = (i) => {
 			if (!measurements.has(i)) {
 				try {
-					const sha = history.chain[i].sha;
-					const commitRuns = lookups++ < MAX_LOOKUPS ? runsOfCommit(repo, sha) : [];
+					const commitRuns =
+						lookups++ < MAX_LOOKUPS ? runsOfCommit(repo, history.chain[i].sha) : [];
 					measurements.set(i, {
-						value: commitRuns.length > 0
-							? measurementOf(repo, commitRuns, scratch, deadline, console.log)
-							: undefined,
+						value:
+							commitRuns.length > 0
+								? measurementOf(repo, commitRuns, scratch, deadline, console.log)
+								: undefined,
 					});
 				} catch (error) {
 					measurements.set(i, { error });

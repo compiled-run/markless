@@ -19,6 +19,7 @@ import {
 	NATIVE_SCRIPT_CLICK_FIELDS,
 	NATIVE_SCRIPT_KEY_FIELDS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
+	NATIVE_SCRIPT_SUBMITTED_FORM,
 	nativeLocale,
 	nativeNumberMessage,
 	nativeNumberProblem,
@@ -237,6 +238,8 @@ const RAISE_DEPTH = 32;
 
 /** A file a picker chose, as a page's `File` describes it. */
 export type NativePickedFile = {
+	/** The host's own name for the file, which it reads the bytes back by when a request sends it. */
+	readonly ref: string;
 	readonly name: string;
 	readonly size: number;
 	readonly type: string;
@@ -1034,6 +1037,12 @@ export function createNativeRuntime(
 			}
 		};
 		visit(frame);
+		// A submitted form's file inputs: its JavaScript reads the files each holds.
+		const submitted = (frame[NATIVE_SCRIPT_SUBMITTED_FORM] as { value?: unknown } | undefined)
+			?.value;
+		if (Array.isArray(submitted))
+			for (const [, value] of submitted as [string, unknown][])
+				if (value && typeof value === 'object' && 'files' in value) add(value.files);
 		also.forEach(add);
 		return facts;
 	};
@@ -1986,6 +1995,8 @@ export function createNativeRuntime(
 				return chosen ? [[name, optionValue(chosen)]] : [];
 			}
 			if (kind === 'number') return [[name, nativeNumberValue(textOf(node))]];
+			// The files are its JavaScript's: the entry names the input, and the engine reads what it holds.
+			if (kind === 'file') return [[name, { files: node }]];
 			return [
 				[name, kind === 'hidden' ? (attributeNow(node, 'value') ?? '') : valueOf(node)],
 			];
@@ -1993,7 +2004,7 @@ export function createNativeRuntime(
 	}
 	/** Why a field stops a submit, as the web says it, or undefined when it does not. */
 	const invalidity = (node: string, kind: NativeFieldKind): string | undefined => {
-		if (kind === 'hidden' || !shown(elementOf(node))) return undefined;
+		if (kind === 'hidden' || kind === 'file' || !shown(elementOf(node))) return undefined;
 		if (attributeNow(node, 'disabled') !== null) return undefined;
 		// A readonly text field is barred from constraint validation.
 		if (kind === 'text' && attributeNow(node, 'readonly') !== null) return undefined;
@@ -2691,6 +2702,17 @@ export function createNativeRuntime(
 			const event = payload.events.find(
 				(candidate) => candidate.host === host && candidate.event === named,
 			);
+			if (!event && action.event === 'pick')
+				return script
+					? change(action.host, undefined, () =>
+							enter({
+								kind: 'pick',
+								node: action.host,
+								files: action.files,
+								elements: elementFacts({}, [action.host]),
+							}),
+						)
+					: [];
 			if (!event) throw new Error(`no ${action.event} handler on ${action.host}`);
 			const instance = payload.nodes
 				.flatMap((node) => (node.id === host ? instances(node) : []))

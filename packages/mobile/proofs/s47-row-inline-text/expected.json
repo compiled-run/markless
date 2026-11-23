@@ -1,0 +1,60 @@
+{
+	"rung": "S47",
+	"name": "Styled text inside inline spans in keyed @for rows (a span between two texts, a span that wraps) lays out where Chrome puts it and follows adding, removing and changing rows",
+	"steps": [
+		{
+			"visible": [
+				"Stock",
+				"12 crates",
+				"4 sacks",
+				"30 boxes of the large ceramic dinner plates kept on the top shelf of the back storeroom",
+				"Add row",
+				"Remove first row",
+				"Sell a sack of flour"
+			],
+			"absent": ["7 trays", "3 sacks"],
+			"order": [
+				"12 crates",
+				"4 sacks",
+				"30 boxes of the large ceramic dinner plates kept on the top shelf of the back storeroom"
+			]
+		},
+		{
+			"do": {
+				"tap": "Add row"
+			},
+			"visible": [
+				"12 crates",
+				"4 sacks",
+				"30 boxes of the large ceramic dinner plates kept on the top shelf of the back storeroom",
+				"7 trays"
+			],
+			"order": [
+				"12 crates",
+				"4 sacks",
+				"30 boxes of the large ceramic dinner plates kept on the top shelf of the back storeroom",
+				"7 trays"
+			],
+			"absent": ["3 sacks"]
+		},
+		{
+			"do": {
+				"tap": "Sell a sack of flour"
+			},
+			"visible": ["3 sacks"],
+			"absent": ["4 sacks"]
+		},
+		{
+			"do": {
+				"tap": "Remove first row"
+			},
+			"visible": ["3 sacks", "7 trays"],
+			"absent": ["12 crates"],
+			"order": [
+				"3 sacks",
+				"30 boxes of the large ceramic dinner plates kept on the top shelf of the back storeroom",
+				"7 trays"
+			]
+		}
+	]
+}

@@ -1,6 +1,9 @@
 /// The values a row's `class` or `ui-*` binding can give, as the style input lists them (style-input.ts `rowAttributeOptions`):
-/// literals chosen by conditions, in first-seen order; nil for any other binding.
-public func rowAttributeOptions(_ name: String, _ expr: NativeExpr, booleanCells: Set<String> = []) -> [String?]? {
+/// literals chosen by conditions, or a field of the row's item whose values its list lists, in first-seen order; nil for any
+/// other binding.
+public func rowAttributeOptions(
+	_ name: String, _ expr: NativeExpr, booleanCells: Set<String> = [], itemValues: (NativeExpr) -> [NativeValue]? = { _ in nil }
+) -> [String?]? {
 	if givesBoolean(expr, booleanCells) {
 		let options = [marklessAttributeValue(name, .bool(true)), marklessAttributeValue(name, .bool(false))]
 		return options[0] == options[1] ? [options[0]] : options
@@ -9,12 +12,32 @@ public func rowAttributeOptions(_ name: String, _ expr: NativeExpr, booleanCells
 	case let .literal(value):
 		return [marklessAttributeValue(name, value)]
 	case let .conditional(_, whenTrue, whenFalse):
-		guard let a = rowAttributeOptions(name, whenTrue, booleanCells: booleanCells), let b = rowAttributeOptions(name, whenFalse, booleanCells: booleanCells) else { return nil }
+		guard let a = rowAttributeOptions(name, whenTrue, booleanCells: booleanCells, itemValues: itemValues),
+			let b = rowAttributeOptions(name, whenFalse, booleanCells: booleanCells, itemValues: itemValues) else { return nil }
 		var out: [String?] = []
 		for value in a + b where !out.contains(where: { $0 == value }) { out.append(value) }
 		return out
 	default:
-		return nil
+		guard let listed = itemValues(expr) else { return nil }
+		var out: [String?] = []
+		for value in listed.map({ marklessAttributeValue(name, $0) }) where !out.contains(where: { $0 == value }) { out.append(value) }
+		return out
+	}
+}
+
+/// Reads each repeat's `itemValues` for `rowAttributeOptions`: a field path read off a row's item.
+public func itemValues(of payload: NativeViewPayload) -> (NativeExpr) -> [NativeValue]? {
+	var lists: [String: [String: [NativeValue]]] = [:]
+	for node in payload.nodes { if case let .repeat(_, _, _, values?) = node.kind { lists[node.id] = values } }
+	return { expr in
+		var path: [String] = []
+		var at = expr
+		while case let .member(object, property) = at {
+			path.insert(property, at: 0)
+			at = object
+		}
+		guard case let .item(list) = at, !path.isEmpty else { return nil }
+		return lists[list]?[path.joined(separator: ".")]
 	}
 }
 
@@ -64,7 +87,7 @@ extension StyleExport {
 			guard let node = payload.nodes.first(where: { $0.id == nodeId }), let list = node.row,
 				case let .element(_, _, bindings) = node.kind,
 				let binding = bindings.first(where: { !$0.isProperty && $0.name == attribute }),
-				let options = rowAttributeOptions(attribute, binding.value, booleanCells: booleanCells(of: payload))
+				let options = rowAttributeOptions(attribute, binding.value, booleanCells: booleanCells(of: payload), itemValues: itemValues(of: payload))
 			else { continue }
 			rowStates.append((index, nodeId, attribute, options, list))
 		}

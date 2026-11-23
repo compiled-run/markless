@@ -74,6 +74,8 @@ import dev.markless.mobile.style.rowStates
 import dev.markless.mobile.style.StyleWrite
 import dev.markless.mobile.style.StyledNode
 import dev.markless.mobile.style.stackingParent
+import dev.markless.mobile.style.checkFlattenedInline
+import dev.markless.mobile.style.rowCopyOf
 import kotlin.math.roundToInt
 
 class MarklessHostError(message: String) : RuntimeException(message)
@@ -215,7 +217,7 @@ class MarklessHost(
 			if (s.integer && integer[s.id] != true) throw MarklessHostError("style export laid slot \"${s.id}\" out at whole numbers only, but the payload's slot may take any number")
 		}
 	}
-	private val scriptServices = ScriptServices()
+	private val scriptServices = ScriptServices(context)
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
 	private val nodeIds = payload.nodes.mapTo(HashSet()) { it.id }
 	private val events = payload.events.groupBy { it.host }
@@ -1112,6 +1114,8 @@ class MarklessHost(
 			"input", "textarea" -> if (node.attributes["type"] == "file") FileInputView(context, node.attributes["aria-hidden"] == "true").apply {
 				accept = node.attributes["accept"].orEmpty()
 				multiple = node.attributes["multiple"] != null
+				// A choice reaches the page whether or not the input has a handler: a form's FormData reads it.
+				onPick = { files -> apply(runtime.pick(inst.id, files)) }
 			} else if (node.attributes["type"] == "range") RangeBar(context).also { named(it, inst.id) } else MarklessField(context).apply {
 				filters = arrayOf(LengthLimit { nativeMaxLength(attrs[inst.id]?.get("maxlength")) })
 				val focusEvents = events[node.id].orEmpty().map { it.event }
@@ -1191,7 +1195,7 @@ class MarklessHost(
 			}
 			EventName.Commit -> (view as? RangeBar ?: throw MarklessHostError("commit event on \"${node.id}\", which is not a range")).onCommit = { value -> apply(runtime.dispatch(inst.id, EventName.Commit, value)) }
 			// A select's input handler runs when a choice lands, from the runtime's choose.
-			EventName.Input -> if (node.element == "select") Unit else if (view is FileInputView) view.onPick = { files -> apply(runtime.pick(inst.id, files)) } else if (view is RangeBar) view.onInput = { value -> apply(runtime.dispatch(inst.id, EventName.Input, value)) } else (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
+			EventName.Input -> if (node.element == "select") Unit else if (view is FileInputView) Unit else if (view is RangeBar) view.onInput = { value -> apply(runtime.dispatch(inst.id, EventName.Input, value)) } else (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
 				override fun afterTextChanged(s: Editable) {
@@ -1552,6 +1556,10 @@ class MarklessHost(
 		if (sheet != null) (views.getValue(sheet) as MarklessBox).fixedSize = Math.round(layout.export.viewportWidth * dpr).toInt() to Math.round(maxOf(layout.export.viewportHeight * dpr, layout.contentBottom())).toInt()
 		val (ax, ay) = origin
 		val parentId = parentOf(inst)
+		val exportParent = generateSequence(s.parent) { styled.byId[it]?.parent }.firstOrNull(::isView)
+		val inline = layout.export.inlineBoxes.getOrNull(layout.assignment) ?: emptySet()
+		if (parentId != null && exportParent != null && exportParent != parentId)
+			checkFlattenedInline(inst.id, parentId, exportParent, styled, inline) { id -> runtime.node(id.substringBefore('@')).parent?.let { rowCopyOf(id, it, styled) } }
 		val paintOrder = s.writes.filterIsInstance<StyleWrite.PaintOrder>().firstOrNull()
 		// The node's frame origin inside its view: a label's inside its button, other text's inside its outward-rounded view.
 		var inView = (ax - Math.floor(ax)) to (ay - Math.floor(ay))
@@ -1585,7 +1593,7 @@ class MarklessHost(
 			}
 			if (view is MarklessBox) sizeScroller(inst.id, view, s, rect)
 		}
-		paint(view, s, styled)
+		paint(view, s, styled, inline = inst.id.substringBefore('@') in inline)
 		paintShadow(view, s, styled)
 		paintOutline(inst.id, s, styled)
 		if (view is SelectBox) selectLabel(view, s, styled, absolute)
@@ -1747,7 +1755,7 @@ class MarklessHost(
 		return absolute
 	}
 
-	private fun paint(view: View, s: StyledNode, styled: Assignment) {
+	private fun paint(view: View, s: StyledNode, styled: Assignment, inline: Boolean = false) {
 		fun notVisible(n: StyledNode?) = n?.writes?.any { it is StyleWrite.Visibility && it.value != "visible" } == true
 		// A text takes its element's visibility, which Dragon writes on the element only.
 		val hidden = notVisible(s) || (s.kind == "text" && notVisible(s.parent?.let { styled.byId[it] }))
@@ -1759,7 +1767,8 @@ class MarklessHost(
 		var clip: Rect? = null
 		for (w in s.writes) when (w) {
 			is StyleWrite.BackgroundColor -> fill = w.color.argb
-			StyleWrite.BorderWidths -> if (s.borderWidths == null) throw MarklessHostError("\"${s.id}\" writes border widths but has none")
+			// Dragon's plan layout gives an inline box, which the compiler keeps borderless, no border box.
+			StyleWrite.BorderWidths -> if (s.borderWidths == null && !inline) throw MarklessHostError("\"${s.id}\" writes border widths but has none")
 			is StyleWrite.BorderStyles -> styles = w.styles
 			is StyleWrite.BorderColors -> colors = w.colors.map { it.argb }
 			is StyleWrite.BorderRadius -> radii = w.radii.map { it * dpr }
@@ -1812,7 +1821,7 @@ class MarklessHost(
 			view.background = null
 			return
 		}
-		val bw = s.borderWidths ?: throw MarklessHostError("element \"${s.id}\" has no border widths")
+		val bw = s.borderWidths ?: if (inline) Edges(0.0, 0.0, 0.0, 0.0) else throw MarklessHostError("element \"${s.id}\" has no border widths")
 		val checkbox = s.checkboxMarks?.let { ThemedCheckbox(it, s.writes.filterIsInstance<StyleWrite.Checkbox>().last().colors) }
 		if (checkbox != null) (view as CheckBox).buttonDrawable = null
 		val arrow = s.selectArrow?.let { MenuListArrow(it, s.writes.filterIsInstance<StyleWrite.SelectArrow>().last().color.argb) } ?: checkbox

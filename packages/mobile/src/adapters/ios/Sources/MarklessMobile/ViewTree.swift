@@ -190,6 +190,7 @@ final class DrawingView: UIView {
 				context.setLineCap(shape.cap == "round" ? .round : shape.cap == "square" ? .square : .butt)
 				context.setLineJoin(shape.join == "round" ? .round : shape.join == "bevel" ? .bevel : .miter)
 				context.setMiterLimit(shape.miterLimit)
+				if let dash = shape.dash { context.setLineDash(phase: shape.dashOffset, lengths: dash.map { CGFloat($0) }) }
 				if case let .gradient(gradient) = stroke {
 					context.saveGState()
 					context.replacePathWithStrokedPath()
@@ -587,7 +588,7 @@ final class ViewTree {
 		let watcher = TouchWatcher { [weak self] in self?.dismissMessage() }
 		screen.addGestureRecognizer(watcher)
 		touches = watcher
-		do { try overlays.mount(in: screen) } catch { fatalError("Markless iOS host: \(error)") }
+		do { try overlays.mount(in: screen) } catch { hostFailed("\(error)") }
 		guard layout == nil else { return }
 		root.translatesAutoresizingMaskIntoConstraints = false
 		let content = page.contentLayoutGuide
@@ -1061,11 +1062,11 @@ final class ViewTree {
 		}
 	}
 
-	/// Draws Dragon's lines over a label in a system face while its text is the one Dragon laid out; otherwise the label draws its own.
+	/// Draws Dragon's lines over a label while its text is the one Dragon laid out; otherwise the label draws its own.
 	private func drawLines(_ label: UILabel, _ given: ResolvedStyle? = nil) {
 		let drawn = label.layer.sublayers?.first { $0 is GlyphLinesLayer } as? GlyphLinesLayer
 		guard let id = label.accessibilityIdentifier, let style = given ?? self.style(of: id), let lines = style.lines,
-			style.linesText == label.text, lines.allSatisfy({ $0.runs.allSatisfy { systemFaces[$0.face] != nil } })
+			style.linesText == label.text, lines.allSatisfy({ $0.runs.allSatisfy { systemFaces[$0.face] != nil || faces[$0.face] != nil } })
 		else {
 			if let drawn {
 				drawn.removeFromSuperlayer()
@@ -1086,6 +1087,7 @@ final class ViewTree {
 		layer.contentsScale = scale
 		layer.lines = lines
 		layer.faces = systemFaces
+		layer.webFaces = faces
 		layer.setNeedsDisplay()
 		label.textColor = .clear
 	}
@@ -1315,7 +1317,7 @@ final class ViewTree {
 									onAction(NativeAction(event: .choose, host: choice.option))
 								}
 							}
-						} catch { fatalError("Markless iOS host: \(error)") }
+						} catch { hostFailed("\(error)") }
 					}
 					if layout == nil {
 						select.layer.borderWidth = 1
@@ -1347,6 +1349,8 @@ final class ViewTree {
 					picker.presenter = { [weak self] in self?.presenter }
 					picker.accept = staticAttributes["accept"] ?? ""
 					picker.multiple = staticAttributes["multiple"] != nil
+					// A choice reaches the page whether or not the input has a handler: a form's FormData reads it.
+					picker.onPick = { [onAction] files in onAction(NativeAction(event: .pick, host: id, files: files)) }
 					// Its button and summary sit side by side in its own stack view, which the stacking layout leaves alone.
 					leaves.insert(ObjectIdentifier(picker))
 					view = picker
@@ -1513,7 +1517,7 @@ final class ViewTree {
 				if sheetStyles[template] != nil {
 					sheet.area = { [weak self] snapPoint in self?.sheetArea(template, at: snapPoint) }
 					sheet.onRest = { [weak self] snapPoint in
-						do { try self?.sheetRested(template, at: snapPoint) } catch { fatalError("Markless iOS host: \(error)") }
+						do { try self?.sheetRested(template, at: snapPoint) } catch { hostFailed("\(error)") }
 					}
 				} else if layout != nil {
 					throw HostError("system sheet \(id) is on a styled page but has no styles of its own")
@@ -1545,8 +1549,7 @@ final class ViewTree {
 				// An element that is not a button (a list row): a tap anywhere in it, its text included, presses it.
 				view.isUserInteractionEnabled = true
 				view.addGestureRecognizer(ActivateGesture { taps in onAction(NativeAction(event: .activate, host: id, detail: taps)) })
-			case let (.input, picker as FileInputView):
-				picker.onPick = { files in onAction(NativeAction(event: .pick, host: id, files: files)) }
+			case (.input, is FileInputView): break
 			case let (.input, slider as RangeSlider):
 				slider.onInput = { value in onAction(NativeAction(event: .input, host: id, value: value)) }
 			case let (.commit, slider as RangeSlider):
@@ -1716,7 +1719,7 @@ final class ViewTree {
 			guard let select = view as? SelectButton, let template = templates[id] else { continue }
 			do {
 				select.show(try runtime.choices(of: template).first { $0.selected }?.label ?? "")
-			} catch { fatalError("Markless iOS host: \(error)") }
+			} catch { hostFailed("\(error)") }
 		}
 	}
 
@@ -2433,6 +2436,8 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 final class GlyphLinesLayer: CALayer {
 	var lines: [TextLine] = []
 	var faces: [String: SystemFace] = [:]
+	/// The app's own font files, whose glyph ids are the ones Dragon shaped them to.
+	var webFaces: [String: UIFontDescriptor] = [:]
 	var textColor: UIColor = .black
 	/// How far the layer reaches past the label on every side, in points.
 	var slack: CGFloat = 0
@@ -2445,8 +2450,12 @@ final class GlyphLinesLayer: CALayer {
 		ctx.setFillColor(textColor.cgColor)
 		for line in lines {
 			for run in line.runs {
-				guard let face = faces[run.face] else { continue }
-				let font = systemFont(face, size: run.size)
+				let font: CTFont
+				if let face = faces[run.face] {
+					font = systemFont(face, size: run.size)
+				} else if let face = webFaces[run.face] {
+					font = CTFontCreateWithFontDescriptor(face as CTFontDescriptor, run.size, nil)
+				} else { continue }
 				let glyphs = run.glyphs.map { CGGlyph($0) }
 				let positions = run.xs.map { CGPoint(x: $0 + slack, y: bounds.height - (line.baseline + slack)) }
 				CTFontDrawGlyphs(font, glyphs, positions, glyphs.count, ctx)

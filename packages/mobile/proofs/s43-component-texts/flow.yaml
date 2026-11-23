@@ -1,0 +1,23 @@
+appId: ${APP_ID}
+name: s43-component-texts
+---
+- launchApp:
+    clearState: true
+- assertVisible: Pantry
+- assertVisible: Open groceries
+- assertNotVisible: Delete this note\?
+- tapOn: Open groceries
+- assertNotVisible: Open groceries
+- assertVisible: Note Groceries
+- assertVisible: Delete
+- assertNotVisible: Open groceries
+- assertNotVisible: Delete this note\?
+- tapOn: Delete
+- assertVisible: Delete this note\?
+- assertVisible: Delete this note\?
+- assertVisible: “Groceries” will be gone for good\.
+- assertVisible: Keep it
+- tapOn: Keep it
+- assertNotVisible: Delete this note\?
+- assertVisible: Note Groceries
+- assertNotVisible: Delete this note\?

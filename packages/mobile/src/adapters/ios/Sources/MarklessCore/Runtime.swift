@@ -58,12 +58,15 @@ public struct NativeAction: Equatable, Sendable {
 
 /// A file a picker chose, as a page's `File` describes it.
 public struct NativePickedFile: Equatable, Sendable {
+	/// The host's own name for the file, which it reads the bytes back by when a request sends it.
+	public let ref: String
 	public let name: String
 	public let size: Double
 	public let type: String
 	public let lastModified: Double
 
-	public init(name: String, size: Double, type: String, lastModified: Double) {
+	public init(ref: String, name: String, size: Double, type: String, lastModified: Double) {
+		self.ref = ref
 		self.name = name
 		self.size = size
 		self.type = type
@@ -71,7 +74,7 @@ public struct NativePickedFile: Equatable, Sendable {
 	}
 
 	var value: NativeValue {
-		.object([("name", .string(name)), ("size", .number(size)), ("type", .string(type)), ("lastModified", .number(lastModified))])
+		.object([("ref", .string(ref)), ("name", .string(name)), ("size", .number(size)), ("type", .string(type)), ("lastModified", .number(lastModified))])
 	}
 }
 
@@ -609,7 +612,7 @@ public final class NativeRuntime {
 		case .routeURL: return try pageURL()
 		case let .checked(node): return .bool(try isChecked(node))
 		case let .field(node): return .string(try textOf(field: node))
-		case let .formData(form): return .array(try entries(of: form).map { .array($0.map(NativeValue.string)) })
+		case let .formData(form): return .array(try formEntries(of: form).map { .array([.string($0.name), $0.value]) })
 		case .event(.value):
 			guard let eventValue else { throw RuntimeError(reason: "the event's value read where the event has none") }
 			return .string(eventValue)
@@ -773,6 +776,12 @@ public final class NativeRuntime {
 			for (_, binding) in names {
 				guard case let .object(fields) = binding else { continue }
 				for (key, inner) in fields where key == "object" || key == "shared" || key == "frame" { try visit(inner) }
+				// A submitted form's file inputs: its JavaScript reads the files each holds.
+				if case let .array(entries)? = fields.first(where: { $0.0 == "value" })?.1 {
+					for case let .array(pair) in entries where pair.count == 2 {
+						if case let .object(file) = pair[1], let node = file.first(where: { $0.0 == "files" })?.1 { try add(node) }
+					}
+				}
 				guard let given = fields.first(where: { $0.0 == "elements" })?.1 else { continue }
 				if case let .array(items) = given { for item in items { try add(item) } } else { try add(given) }
 			}
@@ -884,7 +893,7 @@ public final class NativeRuntime {
 			let asked = try fields["request"].object(["url", "method", "headers", "body"])
 			return .fetch(id: try wholeNumber(fields["id"]), request: NativeFetchRequest(
 				url: try asked["url"].string(), method: try asked["method"].string(), headers: try decodeHeaders(asked["headers"]),
-				body: try asked["body"].optionalString()))
+				body: try NativeFetchBody.decode(asked["body"].value)))
 		}
 		let calls = try (result.has("calls") ? result["calls"].array() : []).map { asked -> NativeJournalEntry in
 			let fields = try asked.object(required: ["call", "arguments"], optional: ["id", "object"])
@@ -1119,7 +1128,7 @@ public final class NativeRuntime {
 
 	/// A list's rows now: each item with its key, `String()` of the item at the key path.
 	public func rows(of repeatId: String, in scope: NativeScope = .empty) throws -> [(key: String, item: NativeValue)] {
-		guard let node = nodesById[repeatId], case let .repeat(list, keyPath, keyParts) = node.kind else { throw RuntimeError(reason: "unknown list \(repeatId)") }
+		guard let node = nodesById[repeatId], case let .repeat(list, keyPath, keyParts, _) = node.kind else { throw RuntimeError(reason: "unknown list \(repeatId)") }
 		guard case let .array(array) = try evaluate(list, in: scope) else { throw RuntimeError(reason: "\(repeatId) lists a value that is not an array") }
 		guard let keyPath else { return array.items.enumerated().map { (String($0.offset), $0.element) } }
 		let valueAt = { (item: NativeValue, path: [String]) throws -> NativeValue in
@@ -1389,21 +1398,27 @@ public final class NativeRuntime {
 
 	private func isShownField(_ id: String) throws -> Bool { try isShown(try element(id).node.arm) }
 
-	/// A form's entry list as the web builds it: `[name, value]` pairs in tree order.
+	/// A form's entry list as the web builds it: `[name, value]` pairs in tree order; a file input's files are its JavaScript's.
 	public func entries(of id: String) throws -> [[String]] {
+		try formEntries(of: id).compactMap { entry in if case let .string(value) = entry.value { [entry.name, value] } else { nil } }
+	}
+
+	/// The entries a submit handler's FormData reads: a file input's entry names the input, whose files the engine holds.
+	private func formEntries(of id: String) throws -> [(name: String, value: NativeValue)] {
 		guard let form = forms[id] else { throw RuntimeError(reason: "\(id) is not a form") }
-		return try form.fields.compactMap { field -> [String]? in
+		return try form.fields.compactMap { field -> (name: String, value: NativeValue)? in
 			guard try isShownField(field.node), try attributeNow(field.node, "disabled") == nil,
 				let name = try attributeNow(field.node, "name"), !name.isEmpty
 			else { return nil }
 			switch field.kind {
-			case .checkbox, .radio: return try isChecked(field.node) ? [name, try attributeNow(field.node, "value") ?? "on"] : nil
-			case .hidden: return [name, try attributeNow(field.node, "value") ?? ""]
-			case .text: return [name, try valueOf(field: field.node)]
-			case .number: return [name, nativeNumberValue(try textOf(field: field.node))]
+			case .checkbox, .radio: return try isChecked(field.node) ? (name, .string(try attributeNow(field.node, "value") ?? "on")) : nil
+			case .hidden: return (name, .string(try attributeNow(field.node, "value") ?? ""))
+			case .text: return (name, .string(try valueOf(field: field.node)))
+			case .number: return (name, .string(nativeNumberValue(try textOf(field: field.node))))
 			case .select:
 				guard let chosen = try options(of: field.node).first(where: { selectedness[$0.id] == true }) else { return nil }
-				return [name, try value(of: chosen)]
+				return (name, .string(try value(of: chosen)))
+			case .file: return (name, .object([(key: "files", value: .string(field.node))]))
 			}
 		}
 	}
@@ -1426,7 +1441,7 @@ public final class NativeRuntime {
 
 	/// Why a field stops a submit, as the web says it, or nil when it does not.
 	private func invalidity(_ field: NativeForm.Field) throws -> String? {
-		guard field.kind != .hidden, field.kind != .select, try isShownField(field.node) else { return nil }
+		guard field.kind != .hidden, field.kind != .select, field.kind != .file, try isShownField(field.node) else { return nil }
 		guard try attributeNow(field.node, "disabled") == nil else { return nil }
 		// A readonly text field is barred from constraint validation.
 		if field.kind == .text, try attributeNow(field.node, "readonly") != nil { return nil }
@@ -1623,6 +1638,17 @@ public final class NativeRuntime {
 		// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
 		let host = action.host.firstIndex(of: "@").map { String(action.host[..<$0]) } ?? action.host
 		let named: NativeEventName = action.event == .pick ? .input : action.event
+		// A file input with no handler of its own still holds what was chosen, for a form's FormData to read.
+		if action.event == .pick, !payload.events.contains(where: { $0.host == host && $0.event == .input }) {
+			guard payload.script != nil else { return [] }
+			let files = JSONValue.array((action.files ?? []).map(\.value.json))
+			return try change(host: action.host) {
+				try self.enter([
+					("kind", .string("pick")), ("node", .string(action.host)), ("files", files),
+					("elements", try self.elementFacts(.object([]), also: [action.host])),
+				])
+			}
+		}
 		guard let bound = payload.events.first(where: { $0.host == host && $0.event == named }), let node = nodesById[host] else {
 			throw RuntimeError(reason: "no \(action.event.rawValue) handler on \(action.host)")
 		}

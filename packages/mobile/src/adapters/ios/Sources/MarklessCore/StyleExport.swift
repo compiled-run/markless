@@ -336,6 +336,9 @@ public struct StyleExport: Sendable {
 	public var plan: String?
 	/// Per assignment: each Dragon id the plan's geometry names, with the export's id for it (empty: no ids differ).
 	public var planNames: [[String: String]] = []
+	/// Per assignment: the Dragon ids of the inline boxes in the plan's layout tree, whose texts and boxes the export parents to
+	/// their block container (empty without a plan).
+	public var inlineBoxes: [Set<String>] = []
 	/// The slots `laidOut` takes values for, in the order it takes them; empty when no style follows a slot.
 	public var slots: [StyleSlot] = []
 	/// Each list whose rows the phone lays out: the box its rows hang from and the Dragon ids of one row's top boxes, in order.
@@ -620,6 +623,7 @@ public struct StyleExport: Sendable {
 				throw PayloadError(path: plan.path + ".version", reason: "this host reads \(dragonMarklessPlanVersion)")
 			}
 			style.plan = plan.value.jsonText
+			style.inlineBoxes = try inlineBoxes(ofPlan: plan)
 		} else if let node = assignments.lazy.flatMap(\.nodes).first(where: \.drawsSelectArrow) {
 			throw PayloadError(
 				path: chosen.path, reason: "\(node.id) draws a drop-down arrow, whose geometry only Dragon's plan layout gives, and the export has no plan")
@@ -655,6 +659,27 @@ public struct StyleExport: Sendable {
 			}
 		}
 		return style
+	}
+
+	/// Each plan assignment's variant's layout tree, read for the boxes whose kind is `inline`.
+	private static func inlineBoxes(ofPlan plan: Reader) throws -> [Set<String>] {
+		func collect(_ box: Reader, into ids: inout Set<String>) throws {
+			let fields = try box.keys()
+			if try box.field("kind").string() == "inline" { ids.insert(try box.field("id").string()) }
+			guard fields.contains("children") else { return }
+			for child in try box.field("children").array() { try collect(child, into: &ids) }
+		}
+		guard try plan.keys().contains("variants") else { return [] }
+		let variants = try plan.field("variants").array().map { variant in
+			var ids = Set<String>()
+			try collect(try variant.field("root"), into: &ids)
+			return ids
+		}
+		return try plan.field("assignments").array().map { assignment in
+			let index = Int(try assignment.field("variant").number())
+			guard variants.indices.contains(index) else { throw assignment.fail("names variant \(index); the plan has \(variants.count)") }
+			return variants[index]
+		}
 	}
 
 	/// This export laid out again by Dragon's plan for a page `width` x `height` points at `scale`: every assignment's frames,

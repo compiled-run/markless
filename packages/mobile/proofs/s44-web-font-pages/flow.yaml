@@ -1,0 +1,43 @@
+appId: ${APP_ID}
+name: s44-web-font-pages
+---
+- launchApp:
+      clearState: true
+- assertVisible: All notes
+- assertVisible: New note
+- assertVisible: Groceries
+- assertNotVisible: Milk and eggs
+- assertVisible: Home
+- tapOn: Groceries
+- assertVisible: Milk and eggs
+- assertNotVisible: All notes
+- assertVisible: Note
+- assertVisible: Groceries
+- assertVisible: Milk and eggs
+- assertNotVisible: All notes
+- assertVisible: Note
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertVisible: All notes
+- assertNotVisible: Milk and eggs
+- assertVisible: Home
+- assertVisible: All notes
+- assertVisible: New note
+- assertVisible: Groceries
+- assertNotVisible: Milk and eggs
+- assertVisible: Home
+- tapOn: New note
+- assertNotVisible: All notes
+- assertVisible: New
+- assertVisible: Blank note
+- assertNotVisible: All notes
+- assertVisible: New
