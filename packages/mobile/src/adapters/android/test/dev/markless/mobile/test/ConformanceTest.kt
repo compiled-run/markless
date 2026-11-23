@@ -55,6 +55,7 @@ import dev.markless.mobile.style.SystemFace
 import dev.markless.mobile.style.TextLine
 import dev.markless.mobile.style.StyleWrite
 import dev.markless.mobile.style.stackingParent
+import dev.markless.mobile.style.checkFlattenedInline
 import dev.markless.mobile.style.SelectArrow
 import java.io.File
 import kotlin.system.exitProcess
@@ -925,6 +926,32 @@ private fun rehostedStacking(fixtures: File) {
 	check("a box painted past an ancestor that clips is refused by name", err == "\"h5\" paints in html's stacking order past h4, which clips or scrolls; not implemented on Android") { "$err" }
 }
 
+/** The S42 rung's: texts in inline spans, which Dragon parents to the span's block container, a <p>. */
+private fun flattenedInline(fixtures: File) {
+	val text = File(fixtures, "s42-text-interpolations.native-app-style.json").readText()
+	val page = StyleExport.decodeApp(text.toByteArray()).getValue("/")
+	val styled = page.assignments[page.initial]
+	val inline = page.inlineBoxes[page.initial]
+	check("the plan names the spans as inline boxes and the <p>s as none", inline == setOf("h3", "h5", "h7", "h9")) { "$inline" }
+	check("a span's text is a child of the span's block in the export", styled.byId.getValue("h3:text0").parent == "h2") { "${styled.byId.getValue("h3:text0").parent}" }
+	val parents = mapOf("h3" to "h2", "h2" to "h0")
+	val placed = runCatching { checkFlattenedInline("h3:text0", "h3", "h2", styled, inline) { parents[it] } }
+	check("a text in a transparent span Dragon lays out flat is placed", placed.isSuccess) { "${placed.exceptionOrNull()}" }
+	val app = Json.parse(text).obj("app")
+	val android = app.getValue("targets").obj("targets").getValue("android").obj("android")
+	val h3 = android.getValue("routes").arr("routes")[0].obj("route").getValue("assignments").arr("assignments")[0].obj("a").getValue("nodes").arr("nodes").first { it.obj("n")["id"] == Json.Str("h3") }.obj("n").getValue("writes").num("writes").toInt()
+	val painted = Json.Obj(LinkedHashMap(app).also { a ->
+		val targets = LinkedHashMap(a.getValue("targets").obj("targets"))
+		val target = LinkedHashMap(android)
+		target["writes"] = Json.Arr(android.getValue("writes").arr("writes").mapIndexed { i, l -> if (i == h3) Json.Arr(l.arr("w") + Json.parse("""{"kind":"background-color","color":{"r":255,"g":0,"b":0,"alpha":255},"key":"backgroundColor"}""")) else l })
+		targets["android"] = Json.Obj(target)
+		a["targets"] = Json.Obj(targets)
+	}).text()
+	val paintedPage = StyleExport.decodeApp(painted.toByteArray()).getValue("/")
+	val err = runCatching { checkFlattenedInline("h3:text0", "h3", "h2", paintedPage.assignments[paintedPage.initial], inline) { parents[it] } }.exceptionOrNull()?.message
+	check("a text in a span that paints a background is refused by name", err == "\"h3:text0\": its inline box h3 paints a background, which Android does not draw on a box Dragon lays out flat in h2") { "$err" }
+}
+
 /** The S24 rung's: a styled select's arrow write, and the arrow geometry Dragon's plan layout gives as a 4th element. */
 private fun selectArrows(fixtures: File) {
 	val bytes = File(fixtures, "s24-styled-select.native-app-style.json").readBytes()
@@ -1049,6 +1076,7 @@ fun main(args: Array<String>) {
 	decoderStrictness()
 	styleSlots()
 	rehostedStacking(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	flattenedInline(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	planTexts()
 	val dirs = args.map(::File)
 	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)

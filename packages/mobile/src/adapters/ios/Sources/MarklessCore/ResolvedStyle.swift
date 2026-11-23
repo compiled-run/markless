@@ -255,7 +255,9 @@ extension StyleExport {
 			assignments: try assignments.indices.map { index in
 				try resolveNodes(
 					assignments[index].nodes, for: nodes, picker: picker, root: root, initialTexts: index == start ? initialTexts : nil,
-					canvas: assignments[index].canvas, body: assignments[index].body)
+					canvas: assignments[index].canvas, body: assignments[index].body,
+					inline: index < inlineBoxes.count
+						? Set(inlineBoxes[index].map { (index < planNames.count ? planNames[index][$0] : nil) ?? $0 }) : [])
 			},
 			canvases: assignments.map(\.canvas),
 			bodies: try assignments.map { assignment in
@@ -282,7 +284,7 @@ extension StyleExport {
 
 	private func resolveNodes(
 		_ nodes: [StyleNode], for payloadNodes: [NativeNode], picker: Set<String>, root: String?, initialTexts: [(node: String, text: String)]?,
-		canvas: RGBA?, body: RGBA?
+		canvas: RGBA?, body: RGBA?, inline: Set<String>
 	) throws -> [String: ResolvedStyle] {
 		let byId = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
 		// Boxes whose visibility is not visible: their text, which Dragon writes no visibility for, is hidden with them.
@@ -326,8 +328,16 @@ extension StyleExport {
 				offset.y += skipped.frame?.y ?? 0
 				cursor = skipped.parent
 			}
-			guard cursor == (node.parent == root ? nil : node.parent) else {
-				throw styleError("\(node.id)'s parent is \(node.parent ?? "none") in the payload, \(cursor ?? "none") in the style export")
+			let payloadParent = node.parent == root ? nil : node.parent
+			if cursor != payloadParent {
+				guard let parent = payloadParent, let container = cursor,
+					let inside = try flattenedInline(node.id, in: parent, container: container, byId: byId, payload: payloadById, inline: inline, isView: payloadIds.contains)
+				else {
+					throw styleError("\(node.id)'s parent is \(node.parent ?? "none") in the payload, \(cursor ?? "none") in the style export")
+				}
+				offset.x -= inside.x
+				offset.y -= inside.y
+				cursor = parent
 			}
 			var style = try resolve(styled, styled.writes)
 			style.shadow = try BoxShadow.of(styled, byId: byId, canvas: canvas, body: body, dpr: dpr)
@@ -392,6 +402,55 @@ extension StyleExport {
 	}
 
 
+
+	/// Dragon lays an inline formatting context out flat: each text and inline box in it is a child of its block container.
+	/// When `parent`, `id`'s payload parent, is an inline box flattened into `container` (as is every inline box up to it), this
+	/// is `parent`'s offset in `container` (device px), which `id`'s frame there less that is its frame in `parent`'s view; else nil.
+	/// An inline box in the way that paints anything of its own or keeps a stacking order is refused by name.
+	private func flattenedInline(
+		_ id: String, in parent: String, container: String, byId: [String: StyleNode], payload: [String: NativeNode],
+		inline: Set<String>, isView: (String) -> Bool
+	) throws -> (x: Double, y: Double)? {
+		func placed(_ box: StyleNode) -> (container: String?, x: Double, y: Double) {
+			var at = (x: box.frame?.x ?? 0, y: box.frame?.y ?? 0)
+			var cursor = box.parent
+			while let up = cursor, !isView(up), let skipped = byId[up] {
+				at.x += skipped.frame?.x ?? 0
+				at.y += skipped.frame?.y ?? 0
+				cursor = skipped.parent
+			}
+			return (cursor, at.x, at.y)
+		}
+		var offset: (x: Double, y: Double)?
+		var cursor: String? = parent
+		while let box = cursor, box != container {
+			guard inline.contains(box), let styled = byId[box], !styled.isText, !styled.isAnonymous else { return nil }
+			let at = placed(styled)
+			guard at.container == container else { return nil }
+			if let paint = inlinePaint(styled) {
+				throw styleError("\(id): its inline box \(box) \(paint), which iOS does not draw on a box Dragon lays out flat in \(container)")
+			}
+			if offset == nil { offset = (at.x, at.y) }
+			cursor = payload[box]?.parent
+		}
+		return cursor == container ? offset : nil
+	}
+
+	/// What an inline box paints or keeps of its own, in words; nil when it is transparent, borderless and in the flow.
+	private func inlinePaint(_ box: StyleNode) -> String? {
+		if let widths = box.borderWidths, [widths.top, widths.right, widths.bottom, widths.left].contains(where: { $0 != 0 }) { return "has a border" }
+		for write in box.writes {
+			switch write {
+			case let .borderStyles(styles) where styles.contains(where: { $0 != "none" && $0 != "hidden" }): return "has a border"
+			case let .backgroundColor(color) where color.alpha != 0: return "paints a background"
+			case .outline: return "draws an outline"
+			case .boxShadow: return "casts a shadow"
+			case .paintOrder: return "paints in a stacking order"
+			default: continue
+			}
+		}
+		return nil
+	}
 
 	private func reHostOf(_ writes: [StyleWrite]) -> String? {
 		for case let .paintOrder(host, _, _) in writes { return host }
