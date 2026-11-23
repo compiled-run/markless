@@ -2088,6 +2088,14 @@ class MarklessHost(
 			maxOf(0, (fx + field.width).roundToInt() - (ex + box.width).roundToInt()), maxOf(0, (fy + field.height).roundToInt() - (ey + box.height).roundToInt()),
 		)
 		view.gravity = Gravity.CENTER_VERTICAL or Gravity.START
+		// A textarea's lines start at the editor's top, Dragon's pitch apart, its first baseline where Dragon puts it; its bottom inset is its padding.
+		styled.textAreas[s.id]?.let { lines ->
+			val top = ey.roundToInt() - fy.roundToInt()
+			view.gravity = Gravity.TOP or Gravity.START
+			view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, (lines.insets[2] + (ey - fy) - lines.insets[0]).roundToInt())
+			view.firstBaselineToTopHeight = top + lines.above.roundToInt()
+			view.setLineHeight(lines.pitch.roundToInt())
+		}
 		clearControl(view, s, styled, absolute)
 		fun look(n: StyledNode): Pair<StyleWrite.Font, Int?> =
 			(n.writes.filterIsInstance<StyleWrite.Font>().lastOrNull() ?: throw MarklessHostError("\"${n.id}\" has no font")) to

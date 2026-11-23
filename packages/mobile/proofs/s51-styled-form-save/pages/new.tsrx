@@ -5,6 +5,7 @@ import { addNote } from '../lib/notes.ts';
 export default function NewNote() @{
 	let saved = storage('s51-notes', '[]');
 	let title = state('');
+	let body = state('');
 	<main class="page">
 		<style>
 			.page {
@@ -25,7 +26,9 @@ export default function NewNote() @{
 				gap: 6px;
 				font-weight: 600;
 			}
-			.field input {
+			.field input,
+			.field textarea {
+				box-sizing: border-box;
 				width: 100%;
 				padding: 12px 14px;
 				border: 1px solid #e4ddcf;
@@ -33,6 +36,11 @@ export default function NewNote() @{
 				font: inherit;
 				font-family: Ahem;
 				font-weight: 400;
+			}
+			.field textarea {
+				display: block;
+				resize: none;
+				scrollbar-width: none;
 			}
 			.save {
 				display: block;
@@ -48,7 +56,7 @@ export default function NewNote() @{
 			class="form"
 			onSubmit={async (event) => {
 				event.preventDefault();
-				saved = addNote(saved, title);
+				saved = addNote(saved, title, body);
 				await new Promise((done) => setTimeout(done));
 				await navigate('/');
 			}}
@@ -61,6 +69,15 @@ export default function NewNote() @{
 					value={title}
 					onInput={(event) => (title = event.currentTarget.value)}
 				/>
+			</label>
+			<label class="field">
+				Note
+				<textarea
+					name="body"
+					rows="3"
+					value={body}
+					onInput={(event) => (body = event.currentTarget.value)}
+				></textarea>
 			</label>
 			<button type="submit" class="save">
 				Save note
