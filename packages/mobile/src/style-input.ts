@@ -524,13 +524,10 @@ export function nativeStyleInput(
 			},
 		];
 	});
+	type TextParts = Extract<NativeViewPayload['nodes'][number], { kind: 'text' }>['parts'];
 	// A node in an arm not shown at mount still gets laid out: its literals and its cells' first values (an expression reads as '').
-	// A text that is only such expressions stands in as a no-break space: Dragon lays out no box for an empty text, and the
-	// host lays the arm's real text out in that box when the arm opens.
-	const unshownText = (
-		parts: Extract<NativeViewPayload['nodes'][number], { kind: 'text' }>['parts'],
-	) => {
-		const text = parts
+	const unshownText = (parts: TextParts) =>
+		parts
 			.map((part) =>
 				'text' in part
 					? part.text
@@ -539,8 +536,10 @@ export function nativeStyleInput(
 						: '',
 			)
 			.join('');
-		return text === '' && parts.some((part) => 'expr' in part) ? '\u00a0' : text;
-	};
+	// A text the build reads as '' from expressions it cannot know (an unshown arm's data, the route's params) stands in as a
+	// no-break space: Dragon lays out no box for an empty text, and the host lays the real text out in that box on the phone.
+	const standIn = (text: string, parts: TextParts) =>
+		text === '' && parts.some((part) => 'expr' in part) ? '\u00a0' : text;
 	return {
 		version: NATIVE_STYLE_INPUT_VERSION,
 		component: payload.component,
@@ -624,7 +623,7 @@ export function nativeStyleInput(
 						parent: sheet && parent === sheet.id ? sheet.parent! : parent,
 						text: node.row
 							? rowText(node.id)
-							: (initial.get(node.id) ?? unshownText(node.parts)),
+							: standIn(initial.get(node.id) ?? unshownText(node.parts), node.parts),
 						...(textByState.some((entry) => entry.value !== textByState[0]!.value)
 							? { textByState }
 							: {}),

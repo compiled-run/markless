@@ -126,7 +126,7 @@ public final class MarklessViewController: UIViewController {
 			self.band = now
 			paintCanvas()
 		} catch {
-			fatalError("Markless iOS host: \(error)")
+			hostFailed("\(error)")
 		}
 	}
 
@@ -178,7 +178,14 @@ public final class MarklessViewController: UIViewController {
 		let dark = traitCollection.userInterfaceStyle == .dark
 		let texts = try runtime.texts()
 		mountTexts = texts
-		layout = try style.map { try $0.resolve(for: payload, initialTexts: texts, value: runtime.value(of:), arm: runtime.styleArm(of:), dark: dark) }
+		// With Dragon's plan the page's first layout lays out the texts it shows now, which the build could not know (stored data,
+		// the route's params); without one each text must be the one the build laid out.
+		#if canImport(DragonPlan)
+		let checked = style?.plan == nil ? texts : []
+		#else
+		let checked = texts
+		#endif
+		layout = try style.map { try $0.resolve(for: payload, initialTexts: checked, value: runtime.value(of:), arm: runtime.styleArm(of:), dark: dark) }
 		var sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:]
 		for sheet in style?.sheets ?? [] {
 			sheetLayouts[sheet.node] = try style!.resolveSheet(sheet.node, for: payload, initialTexts: texts, value: runtime.value(of:), arm: runtime.styleArm(of:), dark: dark)
@@ -209,7 +216,7 @@ public final class MarklessViewController: UIViewController {
 		do {
 			try runCalls(try runtime.leave())
 		} catch {
-			fatalError("Markless iOS host: \(error)")
+			hostFailed("\(error)")
 		}
 	}
 
@@ -273,7 +280,7 @@ public final class MarklessViewController: UIViewController {
 			try runCalls(journal)
 			if let tree { animation?.moved(to: tree.assignment) }
 		} catch {
-			fatalError("Markless iOS host: \(error)")
+			hostFailed("\(error)")
 		}
 		runAnimation()
 		writeLayoutDump()
@@ -291,7 +298,7 @@ public final class MarklessViewController: UIViewController {
 		do {
 			next = try animation.next(dpr: Double(traitCollection.displayScale), width: Double(size.width), height: Double(size.height))
 		} catch {
-			fatalError("Markless iOS host: \(error)")
+			hostFailed("\(error)")
 		}
 		if next.busy, animationLink == nil {
 			let link = CADisplayLink(target: self, selector: #selector(animationFrame(_:)))
@@ -435,7 +442,7 @@ public final class MarklessViewController: UIViewController {
 			applyBand()
 			layoutMilliseconds = (CFAbsoluteTimeGetCurrent() - started) * 1000
 		} catch {
-			fatalError("Markless iOS host: \(error)")
+			hostFailed("\(error)")
 		}
 		#endif
 		writeLayoutDump()
@@ -509,7 +516,7 @@ public final class MarklessViewController: UIViewController {
 	public override func viewIsAppearing(_ animated: Bool) {
 		super.viewIsAppearing(animated)
 		if let layout, style?.plan == nil, abs(traitCollection.displayScale - layout.dpr) > 0.001 {
-			fatalError("Markless iOS host: the style export was laid out at \(layout.dpr)x, this screen is \(traitCollection.displayScale)x")
+			hostFailed("the style export was laid out at \(layout.dpr)x, this screen is \(traitCollection.displayScale)x")
 		}
 		applyBand()
 		var pops = [navigationController?.interactivePopGestureRecognizer]
@@ -556,7 +563,7 @@ public final class MarklessViewController: UIViewController {
 			paintCanvas()
 			if let tree { animation?.moved(to: tree.assignment) }
 		} catch {
-			fatalError("Markless iOS host: \(error)")
+			hostFailed("\(error)")
 		}
 		runAnimation()
 		scheduleLoadEvents()
