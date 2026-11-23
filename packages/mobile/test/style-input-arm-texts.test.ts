@@ -13,3 +13,14 @@ test('a text in an arm not shown at mount that is only expressions reaches Drago
 test('a text in an arm not shown at mount keeps its literals as they are', () => {
 	expect(text('h4:text0')).toMatchObject({ kind: 'text', text: 'No note open' });
 });
+
+test("a mounted text that is only the route's params, which the build reads as '', also reaches Dragon as a no-break space", async () => {
+	const routed = await compileRungApp(
+		join(import.meta.dirname, '..', 'proofs', 's42-route-pages'),
+	);
+	const page = routed.styleInputs.find((one) => one.pattern === '/tags/[tag]')!.input;
+	expect(page.nodes.find((node) => node.id === 'h1:text0')).toMatchObject({
+		kind: 'text',
+		text: '\u00a0',
+	});
+});

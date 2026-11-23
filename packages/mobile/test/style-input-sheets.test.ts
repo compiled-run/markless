@@ -80,7 +80,7 @@ test("a sheet's markup ancestors come along without boxes, for selectors and inh
 	expect(build.styleInputs[0]!.input.nodes.some((node) => 'boxless' in node)).toBe(false);
 });
 
-test("a styled page whose text reads a route param lays that text out as '', as Dragon cannot know it at build time", async () => {
+test("a styled page's text that is only a route param, which the build cannot know, reaches Dragon as a no-break space the phone lays the param out in", async () => {
 	const build = await compileNativeApp({
 		pages: [
 			{
@@ -104,7 +104,7 @@ export default function Tag({ params }: PageProps<{ tag: string }>) @{
 	const texts = build.styleInputs[0]!.input.nodes.flatMap((node) =>
 		node.kind === 'text' ? [node.text] : [],
 	);
-	expect(texts).toEqual(['', 'Tagged ']);
+	expect(texts).toEqual(['\u00a0', 'Tagged ']);
 });
 
 test("a styled page refuses a row's aria-* that follows its row only where a selector reads it, and leaves it out of Dragon's input otherwise", async () => {
