@@ -374,6 +374,14 @@ class MarklessHost(
 
 	val root: View
 
+	// Declared before init: building the page repaints, which re-sticks.
+	/** Each sticky view's translation as the layout placed it, and Dragon's shift for it at scroll offset 0 (already in that place). */
+	private val stickyRest = HashMap<String, FloatArray>()
+	private var stickyRows: List<StickyRow>? = null
+	private var stickyAt = 0 to 0
+	/** The sticky move this host last added to each view's translation, which a placement does not undo. */
+	private val stickyApplied = HashMap<String, FloatArray>()
+
 	init {
 		val single = (payload.nodes.firstOrNull() as? Node.Element)?.takeIf { it.parent == null && it.arm == null && payload.nodes.count { n -> n.parent == null } == 1 }
 		if (single == null && style != null) throw MarklessHostError("a styled payload must start with its one root element")
@@ -1303,13 +1311,6 @@ class MarklessHost(
 		if (f != null && (f.bottom > h + 1 || f.right > w + 1)) throw MarklessHostError("the page is ${f.bottom} px tall on a $h px screen, and Dragon does not decide its scroll range: ${st.pageScrollUndecided ?: "the style export has no page range"}")
 		return w to h
 	}
-
-	/** Each sticky view's translation as the layout placed it, and Dragon's shift for it at scroll offset 0 (already in that place). */
-	private val stickyRest = HashMap<String, FloatArray>()
-	private var stickyRows: List<StickyRow>? = null
-	private var stickyAt = 0 to 0
-	/** The sticky move this host last added to each view's translation, which a placement does not undo. */
-	private val stickyApplied = HashMap<String, FloatArray>()
 
 	/**
 	 * POSX-s scroll: each sticky view moved for the page scrolled to (x, y) px by Dragon's runMarklessSticky, less the shift its
