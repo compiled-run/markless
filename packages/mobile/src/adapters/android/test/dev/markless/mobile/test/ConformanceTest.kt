@@ -937,9 +937,9 @@ private fun rehostedStacking(fixtures: File) {
 	check("a box painted past an ancestor that clips is refused by name", err == "\"h5\" paints in html's stacking order past h4, which clips or scrolls; not implemented on Android") { "$err" }
 }
 
-/** The S42 rung's: texts in inline spans, which Dragon parents to the span's block container, a <p>. */
+/** The S45 rung's: texts in inline spans, which Dragon parents to the span's block container, a <p>. */
 private fun flattenedInline(fixtures: File) {
-	val text = File(fixtures, "s42-text-interpolations.native-app-style.json").readText()
+	val text = File(fixtures, "s45-text-interpolations.native-app-style.json").readText()
 	val page = StyleExport.decodeApp(text.toByteArray()).getValue("/")
 	val styled = page.assignments[page.initial]
 	val inline = page.inlineBoxes[page.initial]

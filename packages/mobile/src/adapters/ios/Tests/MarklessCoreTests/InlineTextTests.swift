@@ -2,17 +2,17 @@ import Foundation
 @testable import MarklessCore
 import Testing
 
-// The S42 rung's app style and payload as the harness builds them (proofs/s42-text-interpolations): texts inside inline spans,
+// The S45 rung's app style and payload as the harness builds them (proofs/s45-text-interpolations): texts inside inline spans,
 // which Dragon parents to the span's block container (a <p>), with frames in that block.
 private func fixture(_ name: String) throws -> Data {
 	try Data(contentsOf: try #require(Bundle.module.url(forResource: "Fixtures/\(name)", withExtension: "json")))
 }
 
 private func spans(_ edit: (inout [String: Any]) -> Void = { _ in }) throws -> StyleLayout {
-	var json = try #require(try JSONSerialization.jsonObject(with: try fixture("s42-text-interpolations.native-app-style")) as? [String: Any])
+	var json = try #require(try JSONSerialization.jsonObject(with: try fixture("s45-text-interpolations.native-app-style")) as? [String: Any])
 	edit(&json)
 	let styles = try StyleExport.decodeApp(try JSONSerialization.data(withJSONObject: json))
-	guard case let .app(app) = try NativePayload.decode(try fixture("s42-text-interpolations.payload")) else { throw PayloadError(path: "fixture", reason: "not an app") }
+	guard case let .app(app) = try NativePayload.decode(try fixture("s45-text-interpolations.payload")) else { throw PayloadError(path: "fixture", reason: "not an app") }
 	let style = try #require(styles["/"])
 	let page = try #require(app.routes.first { $0.pattern == "/" }).page
 	let runtime = NativeRuntime(payload: page)

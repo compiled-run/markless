@@ -1,5 +1,5 @@
 {
-	"rung": "S42",
+	"rung": "S45",
 	"name": "Styled text inside inline spans (several interpolations, one interpolation, a span between two texts, a span that wraps) lays out where Chrome puts it and follows taps",
 	"steps": [
 		{
