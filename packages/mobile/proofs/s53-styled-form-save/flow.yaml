@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: s51-styled-form-save
+name: s53-styled-form-save
 ---
 - launchApp:
     clearState: true

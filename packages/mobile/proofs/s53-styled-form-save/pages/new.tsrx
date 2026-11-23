@@ -3,7 +3,7 @@ import { navigate } from '@markless/router';
 import { addNote } from '../lib/notes.ts';
 
 export default function NewNote() @{
-	let saved = storage('s51-notes', '[]');
+	let saved = storage('s53-notes', '[]');
 	let title = state('');
 	<main class="page">
 		<style>

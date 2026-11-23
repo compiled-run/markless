@@ -8,7 +8,7 @@
 			"element": "main",
 			"parent": null,
 			"attributes": {
-				"class": "page mk-1436yx1"
+				"class": "page mk-rj8ha7"
 			}
 		},
 		{
@@ -17,7 +17,7 @@
 			"element": "h1",
 			"parent": "h0",
 			"attributes": {
-				"class": "heading mk-1436yx1"
+				"class": "heading mk-rj8ha7"
 			}
 		},
 		{
@@ -32,7 +32,7 @@
 			"element": "ul",
 			"parent": "h0",
 			"attributes": {
-				"class": "rows mk-1436yx1"
+				"class": "rows mk-rj8ha7"
 			}
 		},
 		{
@@ -41,7 +41,7 @@
 			"element": "li",
 			"parent": "h2",
 			"attributes": {
-				"class": "row mk-1436yx1"
+				"class": "row mk-rj8ha7"
 			},
 			"row": "repeat:0"
 		},
@@ -51,7 +51,7 @@
 			"element": "span",
 			"parent": "h3",
 			"attributes": {
-				"class": "title mk-1436yx1"
+				"class": "title mk-rj8ha7"
 			},
 			"row": "repeat:0"
 		},
@@ -68,7 +68,7 @@
 			"element": "a",
 			"parent": "h0",
 			"attributes": {
-				"class": "new mk-1436yx1",
+				"class": "new mk-rj8ha7",
 				"href": "/new"
 			}
 		},
@@ -79,7 +79,7 @@
 			"text": "Write a note"
 		}
 	],
-	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.page.mk-1436yx1 {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #fbf8f1;\n\t\t\t\tcolor: #1f1d1a;\n\t\t\t}\n\t\t\t.heading.mk-1436yx1 {\n\t\t\t\tmargin: 0 0 16px;\n\t\t\t\tfont-size: 26px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n\t\t\t.rows.mk-1436yx1 {\n\t\t\t\tmargin: 0 0 16px;\n\t\t\t\tpadding: 0;\n\t\t\t\tlist-style: none;\n\t\t\t}\n\t\t\t.row.mk-1436yx1 {\n\t\t\t\tmargin: 8px 0 0;\n\t\t\t\tpadding: 12px 16px;\n\t\t\t\tborder: 1px solid #e4ddcf;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t}\n\t\t\t.title.mk-1436yx1 {\n\t\t\t\tdisplay: block;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n\t\t\t.new.mk-1436yx1 {\n\t\t\t\tdisplay: block;\n\t\t\t\tpadding: 12px 16px;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #2f6f5e;\n\t\t\t\tcolor: #ffffff;\n\t\t\t\ttext-decoration: none;\n\t\t\t}",
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.page.mk-rj8ha7 {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #fbf8f1;\n\t\t\t\tcolor: #1f1d1a;\n\t\t\t}\n\t\t\t.heading.mk-rj8ha7 {\n\t\t\t\tmargin: 0 0 16px;\n\t\t\t\tfont-size: 26px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n\t\t\t.rows.mk-rj8ha7 {\n\t\t\t\tmargin: 0 0 16px;\n\t\t\t\tpadding: 0;\n\t\t\t\tlist-style: none;\n\t\t\t}\n\t\t\t.row.mk-rj8ha7 {\n\t\t\t\tmargin: 8px 0 0;\n\t\t\t\tpadding: 12px 16px;\n\t\t\t\tborder: 1px solid #e4ddcf;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t}\n\t\t\t.title.mk-rj8ha7 {\n\t\t\t\tdisplay: block;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n\t\t\t.new.mk-rj8ha7 {\n\t\t\t\tdisplay: block;\n\t\t\t\tpadding: 12px 16px;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #2f6f5e;\n\t\t\t\tcolor: #ffffff;\n\t\t\t\ttext-decoration: none;\n\t\t\t}",
 	"states": [],
 	"repeats": [
 		{

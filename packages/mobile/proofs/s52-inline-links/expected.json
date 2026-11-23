@@ -1,5 +1,5 @@
 {
-	"rung": "S50",
+	"rung": "S52",
 	"name": "Styled links left at their default inline layout, beside block siblings and in a keyed @for row, show where Chrome puts them and open the page they link to",
 	"steps": [
 		{

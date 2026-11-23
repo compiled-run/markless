@@ -8,7 +8,7 @@
 			"element": "main",
 			"parent": null,
 			"attributes": {
-				"class": "note mk-hp6d4s"
+				"class": "note mk-b34pg2"
 			}
 		},
 		{
@@ -17,7 +17,7 @@
 			"element": "h1",
 			"parent": "h0",
 			"attributes": {
-				"class": "title mk-hp6d4s"
+				"class": "title mk-b34pg2"
 			}
 		},
 		{
@@ -42,6 +42,6 @@
 			"text": "Back to notes"
 		}
 	],
-	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\na {\n\tcolor: #1d4ed8;\n\ttext-decoration: none;\n}\n\n.note.mk-hp6d4s {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #1d1b16;\n\t\t\t\tfont-size: 18px;\n\t\t\t}\n\t\t\t.title.mk-hp6d4s {\n\t\t\t\tmargin: 0 0 12px;\n\t\t\t\tfont-size: 26px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}",
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\na {\n\tcolor: #1d4ed8;\n\ttext-decoration: none;\n}\n\n.note.mk-b34pg2 {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #1d1b16;\n\t\t\t\tfont-size: 18px;\n\t\t\t}\n\t\t\t.title.mk-b34pg2 {\n\t\t\t\tmargin: 0 0 12px;\n\t\t\t\tfont-size: 26px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}",
 	"states": []
 }

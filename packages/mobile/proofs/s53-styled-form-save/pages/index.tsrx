@@ -3,7 +3,7 @@ import { Link } from '@markless/router';
 import { readNotes } from '../lib/notes.ts';
 
 export default function AllNotes() @{
-	let saved = storage('s51-notes', '[]');
+	let saved = storage('s53-notes', '[]');
 	<main class="page">
 		<style>
 			.page {

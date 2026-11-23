@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: s50-inline-links
+name: s52-inline-links
 ---
 - launchApp:
     clearState: true
