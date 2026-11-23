@@ -1582,8 +1582,8 @@ final class ViewTree {
 			case (.input, _ as SelectButton):
 				// A select's change runs in the runtime when a choice is made (a `choose` action).
 				continue
-			case (.idle, _), (.visible, _), (.dismiss, _), (.close, _), (.keydown, _), (_, _) where event.event.isPointer:
-				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host, close and a keydown off a text field by the runtime.
+			case (.idle, _), (.visible, _), (.dismiss, _), (.close, _), (.keydown, _), (.animationstart, _), (.animationiteration, _), (.animationend, _), (.animationcancel, _), (_, _) where event.event.isPointer:
+				// Raised elsewhere: idle, visible and animation events by the screen's controller, dismiss and pointer events by the overlay host, close and a keydown off a text field by the runtime.
 				continue
 			case (.contextmenu, _):
 				// Safari on iOS raises no contextmenu for a long press, so neither does this host.

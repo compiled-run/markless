@@ -14,8 +14,9 @@ const val CLOSE_DEPTH = 16
 const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
 const val OVERLAY_MODAL_VALUE = "true"
 
-/** The events that carry a string: an `input` or `commit` the field's text, a `keydown` or `keyup` its key, a `paste` the pasted text. */
-private val VALUED = setOf(EventName.Input, EventName.Commit, EventName.Keydown, EventName.Keyup, EventName.Paste)
+private val ANIMATION_EVENTS = setOf(EventName.AnimationStart, EventName.AnimationIteration, EventName.AnimationEnd, EventName.AnimationCancel)
+/** The events that carry a string: an `input` or `commit` the field's text, a `keydown` or `keyup` its key, a `paste` the pasted text, an animation event the animation's name. */
+private val VALUED = setOf(EventName.Input, EventName.Commit, EventName.Keydown, EventName.Keyup, EventName.Paste, EventName.AnimationStart, EventName.AnimationIteration, EventName.AnimationEnd, EventName.AnimationCancel)
 
 sealed interface JournalEntry {
 	val node: String
@@ -1305,7 +1306,7 @@ class Runtime(
 	 * ([EventName.touch], at [point]) raises the browser's pointer events, after a `dismiss` of the topmost overlay when a
 	 * `pointerdown` lands outside it.
 	 */
-	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null, detail: Int? = null, point: TouchPoint? = null): List<JournalEntry> {
+	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null, detail: Int? = null, point: TouchPoint? = null, elapsedTime: Double? = null): List<JournalEntry> {
 		if (event == EventName.Choose) {
 			val option = byId[host.substringBefore('@')] as? Node.Element
 			val select = option?.parent
@@ -1326,6 +1327,7 @@ class Runtime(
 		if ((event in VALUED) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
 		if (reason != null && event != EventName.Dismiss) throw MarklessRuntimeError("a ${event.wire} event carries no reason")
 		if (point != null && !event.touch && event != EventName.ContextMenu) throw MarklessRuntimeError("a ${event.wire} event carries no touch")
+		if (elapsedTime != null && event !in ANIMATION_EVENTS) throw MarklessRuntimeError("a ${event.wire} event carries no elapsed time")
 		if (event == EventName.Dismiss && reason != null) {
 			if (stack.lastOrNull() != host) throw MarklessRuntimeError("\"$host\" is not the topmost overlay")
 			val dismiss = handlerFor(host, event)?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
@@ -1364,6 +1366,9 @@ class Runtime(
 			EventName.Keydown, EventName.Keyup -> mapOf("key" to JsValue.Str(value!!), "value" to JsValue.Str(textOf(host)))
 			EventName.Paste -> mapOf("text" to JsValue.Str(value!!), "value" to JsValue.Str(textOf(host)))
 			EventName.Activate -> clickFields(trusted = true) + ("detail" to JsValue.Num((detail ?: 1).toDouble()))
+			// An animation event: `value` is the animation's name.
+			EventName.AnimationStart, EventName.AnimationIteration, EventName.AnimationEnd, EventName.AnimationCancel ->
+				mapOf("animationName" to JsValue.Str(value ?: ""), "elapsedTime" to JsValue.Num(elapsedTime ?: 0.0))
 			else -> null
 		}
 		return change(host, if (event == EventName.Input || event == EventName.Commit) value else null) {

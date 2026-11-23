@@ -1053,6 +1053,21 @@ export function Page() @{
 		]);
 	});
 
+	it('lowers an animation event handler, which reads the event\'s animation name and elapsed time', async () => {
+		const built = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let ended = state('');
+	<main>
+		<div class="panel" onAnimationEnd={(event) => (ended = \`\${event.animationName} \${event.elapsedTime}\`)}>Panel</div>
+		<p>{ended}</p>
+	</main>
+}`);
+		expect(built.diagnostics.map((d) => d.message)).toEqual([]);
+		expect(built.payload!.events.map((e) => e.event)).toEqual(['animationend']);
+		expect(JSON.stringify(built.payload!.handlers)).toContain('{"event":"animationName"}');
+		expect(JSON.stringify(built.payload!.handlers)).toContain('{"event":"elapsedTime"}');
+	});
+
 	it("reads where a part stands among its family's parts as its place in the tree, and refuses it for parts a @for row shows", async () => {
 		const source = (
 			parts: string,
