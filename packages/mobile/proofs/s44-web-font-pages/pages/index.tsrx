@@ -2,7 +2,7 @@ import { state } from '@markless/core';
 import { Link } from '@markless/router';
 
 export default function Home() @{
-	let notes = state<ReadonlyArray<{ readonly id: string; readonly title: string }>>([{ id: 'n1', title: 'Groceries' }]);
+	let notes = state<ReadonlyArray<string>>(['n1']);
 	<main class="home">
 		<style>
 			.home {
@@ -31,10 +31,10 @@ export default function Home() @{
 				text-decoration: none;
 				font-weight: 600;
 			}
-			.list {
-				margin: 0;
-				padding: 0;
-				list-style: none;
+			.row {
+				display: block;
+				color: inherit;
+				text-decoration: none;
 			}
 			h1 {
 				margin: 0 0 16px;
@@ -53,14 +53,10 @@ export default function Home() @{
 				<h1>No notes yet</h1>
 			</section>
 		} @else {
-			<>
-				<h1>All notes</h1>
-				<ul class="list">
-					@for (const note of notes; key note.id) {
-						<li>{note.title}</li>
-					}
-				</ul>
-			</>
+			<h1>All notes</h1>
 		}
+		<Link href="/notes/[id]" params={{ id: 'n1' }} class="row">
+			Groceries
+		</Link>
 	</main>
 }
