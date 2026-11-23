@@ -9,15 +9,25 @@ private let featureStride = 4
 /// Dragon's glyph records: glyph, cluster, x advance, y advance, x offset, y offset, flags (GLYPH_STRIDE).
 private let glyphStride = 7
 
-/// Shapes a row's text as Dragon's build shapes an iOS system face (parity/src/system-fonts/coretext-helper.swift and provider.ts):
-/// Core Text at the CSS size, every advance and offset in 16.16 and scaled to device px. A face the export does not draw with
-/// Core Text, font fallback and right-to-left runs are refused by name.
-func coreTextRowShaper(faces: [String: SystemFace], dpr: Double) -> (String, Double, String, Int, Int, String, [Double]) throws -> [Double] {
+/// Shapes a row's text as Dragon's build shapes an iOS face (parity/src/system-fonts/coretext-helper.swift and provider.ts):
+/// Core Text at the CSS size, every advance and offset in 16.16 and scaled to device px. A system face, and an author face from
+/// its file's bytes (`authored`, by id), which Safari draws with Core Text too. Any other face, font fallback and right-to-left
+/// runs are refused by name.
+func coreTextRowShaper(faces: [String: SystemFace], authored: [String: Data] = [:], dpr: Double) -> (String, Double, String, Int, Int, String, [Double]) throws -> [Double] {
+	var descriptors: [String: CTFontDescriptor] = [:]
 	return { faceId, size, text, start, end, language, features in
-		guard let face = faces[faceId] else {
+		let base: CTFont
+		if let face = faces[faceId] {
+			base = systemFont(face, size: size / dpr)
+		} else if let bytes = authored[faceId] {
+			guard let descriptor = descriptors[faceId] ?? CTFontManagerCreateFontDescriptorFromData(bytes as CFData) else {
+				throw RowShapingRefusal(description: "the author face \(faceId) is not a font file Core Text reads")
+			}
+			descriptors[faceId] = descriptor
+			base = CTFontCreateWithFontDescriptor(descriptor, size / dpr, nil)
+		} else {
 			throw RowShapingRefusal(description: "a row's text in \(faceId), which this host does not shape on the phone yet")
 		}
-		let base = systemFont(face, size: size / dpr)
 		var settings: [[String: Any]] = []
 		var at = 0
 		while at + featureStride <= features.count {

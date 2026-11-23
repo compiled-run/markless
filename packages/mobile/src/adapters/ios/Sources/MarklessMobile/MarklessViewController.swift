@@ -407,10 +407,10 @@ public final class MarklessViewController: UIViewController {
 			let texts = Dictionary(try runtime.texts().filter { pageRows[$0.node] != nil && pageRows[$0.node]! == nil }.map { ($0.node, $0.text) }, uniquingKeysWith: { a, _ in a })
 			guard size.width > 0, size.height > 0, rowsMoved || size != laidOutFor?.size || slots.map(\.bitPattern) != laidOutFor?.slots.map(\.bitPattern) || texts != laidOutFor?.texts else { return }
 			let scale = Double(traitCollection.displayScale)
-			let shaper = coreTextRowShaper(faces: style.systemFaces, dpr: scale)
+			let shaper = coreTextRowShaper(faces: style.systemFaces, authored: fonts, dpr: scale)
 			var unshaped = false
 			let shape: (String, Double, String, Int, Int, String, [Double]) throws -> [Double] = { face, size, text, start, end, language, features in
-				if style.systemFaces[face] == nil { unshaped = true }
+				if style.systemFaces[face] == nil && self.fonts[face] == nil { unshaped = true }
 				return try shaper(face, size, text, start, end, language, features)
 			}
 			let rows = style.planRepeats.isEmpty ? nil : try style.shownRows(payload, runtime: runtime)
