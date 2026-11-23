@@ -1270,7 +1270,9 @@ export function Page() @{
 	</ul>
 }`);
 		expect(rows.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
-		const row = rows.payload!.nodes.find((node) => node.kind === 'element' && node.element === 'li');
+		const row = rows.payload!.nodes.find(
+			(node) => node.kind === 'element' && node.element === 'li',
+		);
 		expect(row).toMatchObject({
 			row: expect.any(String),
 			liveFollows: { politeness: expect.any(Object), atomic: expect.any(Object) },
@@ -3416,7 +3418,7 @@ export function Forms() @{
 	it('refuses an input type no phone draws by name outside a form too, instead of drawing it as a text field, and draws a password field', async () => {
 		const { payload, diagnostics } = await nativeView(`export function Profile() @{
 	<main>
-		<input type="file" aria-label="Photo" />
+		<input type="week" aria-label="Photo" />
 		<input type="DATE" aria-label="Day" />
 		<input type="password" aria-label="Secret" />
 		<input type="search" aria-label="Find" />
@@ -3425,8 +3427,39 @@ export function Forms() @{
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toEqual([
-			'the <input type="file"> h1, which no native host draws or checks yet',
+			'the <input type="week"> h1, which no native host draws or checks yet',
 			'the <input type="date"> h2, which no native host draws or checks yet',
+		]);
+	});
+
+	it('draws a file input, and runs its change handler as JavaScript, which holds the chosen files', async () => {
+		const { payload, diagnostics } =
+			await nativeView(`import { element, state } from '@markless/core';
+export function Upload() @{
+	let shown = state('none');
+	const field = element<HTMLInputElement>();
+	<main>
+		<input el={field} type="file" multiple onChange={() => { if (field) shown = String(field.files?.length); }} />
+		<p>{shown}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.events).toEqual([
+			{ host: 'h1', event: 'input', handler: 'handler:event:0' },
+		]);
+		expect(payload!.handlers[0]!.ops.map((op) => op.op)).toEqual(['script']);
+	});
+
+	it('refuses a file input inside a form, whose files the web sends with it', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Send() @{
+	<form onSubmit={(event) => event.preventDefault()}>
+		<input type="file" name="photo" aria-label="Photo" />
+		<button type="submit">Send</button>
+	</form>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'the <input> h1 in the <form> h0 sends its chosen files with the form, which a native form does not send yet',
 		]);
 	});
 
@@ -4003,13 +4036,20 @@ export function Header() @{
 		<button onClick={() => console.log(logo)}>Log</button>
 	</main>
 }`,
-		{ assetImport: (specifier) => (asked.push(specifier), `/@markless-asset/${specifier.slice(2)}`) },
+		{
+			assetImport: (specifier) => (
+				asked.push(specifier),
+				`/@markless-asset/${specifier.slice(2)}`
+			),
+		},
 	);
 	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
 	expect(asked).toContain('./logo.png');
 	const img = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'img');
 	if (img?.kind !== 'element') throw new Error('no img');
-	expect(img.bindings).toEqual([{ attribute: 'src', value: { literal: '/@markless-asset/logo.png' } }]);
+	expect(img.bindings).toEqual([
+		{ attribute: 'src', value: { literal: '/@markless-asset/logo.png' } },
+	]);
 	expect(payload!.script?.source).toContain('{ "default": "/@markless-asset/logo.png" }');
 });
 
@@ -4099,24 +4139,32 @@ export function App() @{
 
 	it("lowers a class's getters and setters to definitions on its prototype and on itself", async () => {
 		const { payload, diagnostics } = await nativeView(
-			source('class Bits {\n\tget size() { return this.bits.length; }\n\tset size(n: number) { this.bits.length = n; }\n\tstatic get kind() { return 1; }'),
+			source(
+				'class Bits {\n\tget size() { return this.bits.length; }\n\tset size(n: number) { this.bits.length = n; }\n\tstatic get kind() { return 1; }',
+			),
 		);
 		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
 		const code = payload!.script!.source;
 		expect(code).not.toMatch(/\bclass\s+Bits/);
 		expect(code).toContain('Object["defineProperty"](Bits.prototype, "size", { get: function');
-		expect(code).toContain('}, enumerable: false, configurable: true });\n Object["defineProperty"](Bits, "kind", { get: function');
+		expect(code).toContain(
+			'}, enumerable: false, configurable: true });\n Object["defineProperty"](Bits, "kind", { get: function',
+		);
 	});
 
 	it('refuses a getter or setter with a computed name', async () => {
-		const { diagnostics } = await nativeView(source("class Bits {\n\tget ['size']() { return this.bits.length; }"));
+		const { diagnostics } = await nativeView(
+			source("class Bits {\n\tget ['size']() { return this.bits.length; }"),
+		);
 		expect(diagnostics.map((diagnostic) => diagnostic.message).join('\n')).toContain(
 			'a class getter or setter with a computed name, which Hermes cannot run',
 		);
 	});
 
 	it('refuses a class it cannot lower, naming why', async () => {
-		const { diagnostics } = await nativeView(source('class Base {}\nclass Bits extends Base {'));
+		const { diagnostics } = await nativeView(
+			source('class Base {}\nclass Bits extends Base {'),
+		);
 		expect(diagnostics.map((diagnostic) => diagnostic.message).join('\n')).toContain(
 			'a class that extends another, which Hermes cannot run',
 		);
@@ -4141,11 +4189,17 @@ export function Code() @{
 	it("draws a component's path inside an svg while the app runs: paint read at build time, outline and viewBox from the engine", async () => {
 		const { payload, diagnostics } = await nativeView(live);
 		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
-		const svg = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'svg')!;
-		const path = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'path')!;
+		const svg = payload!.nodes.find(
+			(node) => node.kind === 'element' && node.element === 'svg',
+		)!;
+		const path = payload!.nodes.find(
+			(node) => node.kind === 'element' && node.element === 'path',
+		)!;
 		if (svg.kind !== 'element' || path.kind !== 'element') throw new Error('not elements');
 		expect(svg.drawing).toMatchObject({ viewBox: null, width: 10, height: 10, shapes: [] });
-		expect(svg.bindings).toMatchObject([{ attribute: 'viewBox', value: { script: expect.any(String) } }]);
+		expect(svg.bindings).toMatchObject([
+			{ attribute: 'viewBox', value: { script: expect.any(String) } },
+		]);
 		expect(path.parent).toBe(svg.id);
 		expect(path.shape).toEqual({
 			path: [],
@@ -4157,7 +4211,9 @@ export function Code() @{
 			join: 'miter',
 			miterLimit: 4,
 		});
-		expect(path.bindings).toMatchObject([{ attribute: 'd', value: { script: expect.any(String) } }]);
+		expect(path.bindings).toMatchObject([
+			{ attribute: 'd', value: { script: expect.any(String) } },
+		]);
 		expect(path.attributes?.d).toBeUndefined();
 		expect(payload!.script?.source).toContain('var __svgPath');
 	});
@@ -4381,14 +4437,29 @@ export function Chart() @{
 		);
 		expect(luminance.shapes?.[0]?.clip).toEqual(alpha.shapes?.[0]?.clip);
 		expect(
-			(await shapesOf('<mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="8" height="10"><rect width="5" height="10" fill="grey" /></mask>')).messages,
-		).toContain('a <rect> inside a luminance <mask> that is not one opaque white fill with no stroke: a mask of partial coverage is not drawn natively yet');
-		expect((await shapesOf('<mask id="m"><rect width="5" height="10" fill="white" /></mask>')).messages).toContain(
+			(
+				await shapesOf(
+					'<mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="8" height="10"><rect width="5" height="10" fill="grey" /></mask>',
+				)
+			).messages,
+		).toContain(
+			'a <rect> inside a luminance <mask> that is not one opaque white fill with no stroke: a mask of partial coverage is not drawn natively yet',
+		);
+		expect(
+			(await shapesOf('<mask id="m"><rect width="5" height="10" fill="white" /></mask>'))
+				.messages,
+		).toContain(
 			'`maskUnits="objectBoundingBox"` on <mask>: a mask\'s region is drawn in user space only',
 		);
 		expect(
-			(await shapesOf('<mask id="m" maskUnits="userSpaceOnUse"><rect width="5" height="10" fill="white" /></mask>')).messages,
-		).toContain('<mask> without `x`, `y`, `width` and `height`: its default region depends on the box of what it masks');
+			(
+				await shapesOf(
+					'<mask id="m" maskUnits="userSpaceOnUse"><rect width="5" height="10" fill="white" /></mask>',
+				)
+			).messages,
+		).toContain(
+			'<mask> without `x`, `y`, `width` and `height`: its default region depends on the box of what it masks',
+		);
 	});
 
 	it('cuts the black shapes over a white region out of a luminance <mask> as even-odd clips; refuses a crossing nonzero cut', async () => {
@@ -4405,14 +4476,26 @@ export function Chart() @{
 		const region = [0, 0, 0, 1, 10, 0, 1, 10, 10, 1, 0, 10, 4];
 		const simple = await shapesOf('<path d="M2 2L8 2L8 8Z" />');
 		expect(simple.messages).toEqual([]);
-		expect(simple.shape?.clip).toEqual([region, region, [...region, 0, 2, 2, 1, 8, 2, 1, 8, 8, 4]]);
+		expect(simple.shape?.clip).toEqual([
+			region,
+			region,
+			[...region, 0, 2, 2, 1, 8, 2, 1, 8, 8, 4],
+		]);
 		expect(simple.shape?.clipRule).toEqual(['nonzero', 'nonzero', 'evenodd']);
-		expect((await shapesOf('<path fill-rule="evenodd" d="M2 2L8 8L8 2L2 8Z" />')).messages).toEqual([]);
+		expect(
+			(await shapesOf('<path fill-rule="evenodd" d="M2 2L8 8L8 2L2 8Z" />')).messages,
+		).toEqual([]);
 		expect((await shapesOf('<path d="M2 2L8 8L8 2L2 8Z" />')).messages).toContain(
 			'a black <path> filled nonzero that crosses itself or has several parts, inside a luminance <mask>: only an even-odd fill or one simple outline cuts a mask natively yet',
 		);
 		expect((await shapesOf('<path d="M1 1H3V3ZM5 5H7V7Z" />')).messages).toHaveLength(1);
-		expect((await shapesOf('<rect x="2" y="2" width="2" height="2" /><rect fill="white" width="5" height="5" />')).messages).toContain(
+		expect(
+			(
+				await shapesOf(
+					'<rect x="2" y="2" width="2" height="2" /><rect fill="white" width="5" height="5" />',
+				)
+			).messages,
+		).toContain(
 			'a white <rect> after a black shape inside a luminance <mask>, which would show through the cut again',
 		);
 	});
@@ -4428,30 +4511,55 @@ export function Chart() @{
 				messages: diagnostics.map((d) => d.message),
 			};
 		};
-		const region = 'filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB" x="0" y="0" width="4" height="5"';
+		const region =
+			'filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB" x="0" y="0" width="4" height="5"';
 		const flooded = await shapesOf(
 			`<filter id="f" ${region}><feFlood flood-opacity="0" result="bg" /><feBlend mode="normal" in="SourceGraphic" in2="bg" result="shape" /><feGaussianBlur stdDeviation="1.5" /></filter>`,
 		);
 		expect(flooded.messages).toEqual([]);
-		expect(flooded.shapes?.[0]?.blur).toEqual({ deviation: 3, region: [0, 2, 0, 1, 10, 0, 1, 10, 10, 1, 2, 10, 4] });
-		expect((await shapesOf(`<filter id="f" ${region}><feGaussianBlur stdDeviation="1.5" /></filter>`)).shapes?.[0]?.blur).toEqual(
-			flooded.shapes?.[0]?.blur,
-		);
+		expect(flooded.shapes?.[0]?.blur).toEqual({
+			deviation: 3,
+			region: [0, 2, 0, 1, 10, 0, 1, 10, 10, 1, 2, 10, 4],
+		});
+		expect(
+			(
+				await shapesOf(
+					`<filter id="f" ${region}><feGaussianBlur stdDeviation="1.5" /></filter>`,
+				)
+			).shapes?.[0]?.blur,
+		).toEqual(flooded.shapes?.[0]?.blur);
 		const refused = 'a native drawing draws a filter that only blurs its source graphic';
-		expect((await shapesOf(`<filter id="f" ${region}><feOffset dx="1" /></filter>`)).messages).toContain(
-			`a <filter> that does not end in one <feGaussianBlur>: ${refused}`,
-		);
-		expect((await shapesOf(`<filter id="f" ${region}><feGaussianBlur stdDeviation="1 2" /></filter>`)).messages).toContain(
+		expect(
+			(await shapesOf(`<filter id="f" ${region}><feOffset dx="1" /></filter>`)).messages,
+		).toContain(`a <filter> that does not end in one <feGaussianBlur>: ${refused}`);
+		expect(
+			(
+				await shapesOf(
+					`<filter id="f" ${region}><feGaussianBlur stdDeviation="1 2" /></filter>`,
+				)
+			).messages,
+		).toContain(
 			`an <feGaussianBlur> whose deviation is not one non-negative number: ${refused}`,
 		);
 		expect(
-			(await shapesOf('<filter id="f" filterUnits="userSpaceOnUse" x="0" y="0" width="4" height="5"><feGaussianBlur stdDeviation="1" /></filter>'))
-				.messages,
-		).toContain(`a <filter> that blurs in linearRGB (no \`color-interpolation-filters="sRGB"\`): ${refused}`);
+			(
+				await shapesOf(
+					'<filter id="f" filterUnits="userSpaceOnUse" x="0" y="0" width="4" height="5"><feGaussianBlur stdDeviation="1" /></filter>',
+				)
+			).messages,
+		).toContain(
+			`a <filter> that blurs in linearRGB (no \`color-interpolation-filters="sRGB"\`): ${refused}`,
+		);
 		expect(
-			(await shapesOf(`<filter id="f" ${region}><feGaussianBlur stdDeviation="1" /></filter>`, '<rect width="1" height="1" /><rect width="2" height="2" />'))
-				.messages,
-		).toContain('a `filter` over more than one shape: a native drawing blurs one shape at a time');
+			(
+				await shapesOf(
+					`<filter id="f" ${region}><feGaussianBlur stdDeviation="1" /></filter>`,
+					'<rect width="1" height="1" /><rect width="2" height="2" />',
+				)
+			).messages,
+		).toContain(
+			'a `filter` over more than one shape: a native drawing blurs one shape at a time',
+		);
 	});
 
 	it('clips a group by the <clipPath> its clip-path names, mapped into the drawing; refuses one in bounding-box units', async () => {
@@ -4718,7 +4826,7 @@ export function Page() @{
 		expect(plain.payload!.script).toBeUndefined();
 	});
 
-	it('opens a <details> from a press on its <summary>, after the summary\'s own handler; refuses what it cannot keep', async () => {
+	it("opens a <details> from a press on its <summary>, after the summary's own handler; refuses what it cannot keep", async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Page() @{
 	let peeks = state(0);
@@ -4729,14 +4837,28 @@ export function Page() @{
 }`);
 		expect(diagnostics).toEqual([]);
 		expect(payload!.cells).toContainEqual({ id: 'details:h0', name: 'open', initial: true });
-		const toggle = { op: 'assign', cell: 'details:h0', value: { unary: '!', value: { cell: 'details:h0' } } };
+		const toggle = {
+			op: 'assign',
+			cell: 'details:h0',
+			value: { unary: '!', value: { cell: 'details:h0' } },
+		};
 		expect(payload!.handlers[0]!.ops.at(-1)).toEqual(toggle);
-		const node = (id: string) => payload!.nodes.find((one) => one.id === id) as { attributes?: object; bindings?: unknown[] };
+		const node = (id: string) =>
+			payload!.nodes.find((one) => one.id === id) as {
+				attributes?: object;
+				bindings?: unknown[];
+			};
 		expect(node('h0').attributes).toBeUndefined();
-		expect(node('h2').bindings).toEqual([{ attribute: 'hidden', value: { unary: '!', value: { cell: 'details:h0' } } }]);
+		expect(node('h2').bindings).toEqual([
+			{ attribute: 'hidden', value: { unary: '!', value: { cell: 'details:h0' } } },
+		]);
 		const refused = async (source: string) =>
-			(await nativeView(`import { state } from '@markless/core';\n${source}`)).diagnostics.map((diagnostic) => diagnostic.message);
-		expect(await refused(`export function Page() @{ <details><p>No legend</p></details> }`)).toEqual([
+			(
+				await nativeView(`import { state } from '@markless/core';\n${source}`)
+			).diagnostics.map((diagnostic) => diagnostic.message);
+		expect(
+			await refused(`export function Page() @{ <details><p>No legend</p></details> }`),
+		).toEqual([
 			'the <details> h0 has no <summary>, so the browser writes its label, which a native build does not yet',
 		]);
 		expect(
@@ -4744,8 +4866,14 @@ export function Page() @{
 	let shown = state(false);
 	<details open={shown}><summary>S</summary><p>B</p></details>
 }`),
-		).toEqual(['the <details> h0 binds `open`; a native build opens it from a press on its <summary>']);
-		expect(await refused(`export function Page() @{ <details name="faq"><summary>S</summary><p>B</p></details> }`)).toEqual([
+		).toEqual([
+			'the <details> h0 binds `open`; a native build opens it from a press on its <summary>',
+		]);
+		expect(
+			await refused(
+				`export function Page() @{ <details name="faq"><summary>S</summary><p>B</p></details> }`,
+			),
+		).toEqual([
 			'the <details> h0 has `name`, an exclusive group a native build does not keep yet',
 		]);
 		expect(

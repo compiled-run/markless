@@ -7,6 +7,7 @@ import dev.markless.mobile.core.ElementBox
 import dev.markless.mobile.core.EventName
 import dev.markless.mobile.core.Js
 import dev.markless.mobile.core.MemoryStore
+import dev.markless.mobile.core.PickedFile
 import dev.markless.mobile.core.JsValue
 import dev.markless.mobile.core.Json
 import dev.markless.mobile.core.JsString
@@ -228,6 +229,16 @@ private fun runVector(file: File, vector: Map<String, Json>, runtime: Runtime) {
 			val journal = runtime.timer(field(action, "timer", "action").str("timer"))
 			val expected = canonical(field(s, "journal", "steps[$n]"))
 			val actual = journal.joinToString(",", "[", "]") { it.toJson() }
+			check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
+			continue
+		}
+		if (event == "pick") {
+			val files = (field(action, "files", "action") as? Json.Arr ?: throw IllegalStateException("steps[$n] action.files is not an array")).items.map {
+				val file = it.obj("action.files")
+				PickedFile(field(file, "name", "file").str("name"), (field(file, "size", "file") as Json.Num).value, field(file, "type", "file").str("type"), (field(file, "lastModified", "file") as Json.Num).value)
+			}
+			val actual = runtime.pick(field(action, "host", "action").str("host"), files).joinToString(",", "[", "]") { it.toJson() }
+			val expected = canonical(field(s, "journal", "steps[$n]"))
 			check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
 			continue
 		}

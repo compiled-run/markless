@@ -464,6 +464,12 @@ describe.each(allRungFolders())('%s', (folder) => {
 			page.on('console', (message) => {
 				if (message.type() === 'error') errors.push(message.text());
 			});
+			const picked = rung.pick?.map((file) => ({
+				name: file.name,
+				mimeType: file.type,
+				buffer: Buffer.from(file.text),
+			}));
+			if (picked) page.on('filechooser', (chooser) => void chooser.setFiles(picked));
 			if (rung.steps.some((step) => step.do && 'wait' in step.do)) await page.clock.install();
 			await page.goto(`${origin}${start}`);
 			if (rung.steps.some((step) => step.do && 'wait' in step.do))

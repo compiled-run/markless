@@ -21,13 +21,16 @@ public struct NativeAction: Equatable, Sendable {
 	public let x: Double?
 	public let y: Double?
 	public let time: Double?
+	/// For `pick`: the files chosen, each `{ name, size, type, lastModified }`.
+	public let files: [NativePickedFile]?
 
 	public init(
 		event: NativeEventName, host: String, value: String? = nil, reason: String? = nil, detail: Int? = nil, pointerId: Double? = nil,
-		x: Double? = nil, y: Double? = nil, time: Double? = nil
+		x: Double? = nil, y: Double? = nil, time: Double? = nil, files: [NativePickedFile]? = nil
 	) {
 		self.event = event
 		self.host = host
+		self.files = files
 		self.value = value
 		self.detail = detail
 		timer = nil
@@ -45,10 +48,30 @@ public struct NativeAction: Equatable, Sendable {
 		detail = nil
 		self.timer = timer
 		reason = nil
+		files = nil
 		pointerId = nil
 		x = nil
 		y = nil
 		time = nil
+	}
+}
+
+/// A file a picker chose, as a page's `File` describes it.
+public struct NativePickedFile: Equatable, Sendable {
+	public let name: String
+	public let size: Double
+	public let type: String
+	public let lastModified: Double
+
+	public init(name: String, size: Double, type: String, lastModified: Double) {
+		self.name = name
+		self.size = size
+		self.type = type
+		self.lastModified = lastModified
+	}
+
+	var value: NativeValue {
+		.object([("name", .string(name)), ("size", .number(size)), ("type", .string(type)), ("lastModified", .number(lastModified))])
 	}
 }
 
@@ -869,6 +892,8 @@ public final class NativeRuntime {
 				setDialog(node, name == "showModal")
 				return nil
 			}
+			// A file input shows the names of the files a handler gave it.
+			if name == "files" { return .property(node: node, name: "files", value: try parts[2].string()) }
 			if name == "focus" { focused = node }
 			return .command(node: node, command: name, preventScroll: try parts[2].bool())
 		}
@@ -1578,7 +1603,8 @@ public final class NativeRuntime {
 		}
 		// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
 		let host = action.host.firstIndex(of: "@").map { String(action.host[..<$0]) } ?? action.host
-		guard let bound = payload.events.first(where: { $0.host == host && $0.event == action.event }), let node = nodesById[host] else {
+		let named: NativeEventName = action.event == .pick ? .input : action.event
+		guard let bound = payload.events.first(where: { $0.host == host && $0.event == named }), let node = nodesById[host] else {
 			throw RuntimeError(reason: "no \(action.event.rawValue) handler on \(action.host)")
 		}
 		guard let instance = try instances(of: node).first(where: { $0.id == action.host }) else {
@@ -1592,6 +1618,10 @@ public final class NativeRuntime {
 		switch action.event {
 		case .keydown, .keyup: eventFields = [.key: .string(action.value ?? "")]
 		case .paste: eventFields = [.text: .string(action.value ?? "")]
+		case .pick:
+			eventFields = [
+				.files: .array((action.files ?? []).map(\.value)), .target: .string(action.host), .currentTarget: .string(action.host),
+			]
 		case .activate: eventFields = clickFields(trusted: true).merging([.detail: .number(Double(action.detail ?? 1))]) { _, new in new }
 		case .animationstart, .animationiteration, .animationend, .animationcancel:
 			eventFields = [.animationName: .string(action.value ?? ""), .elapsedTime: .number(action.time ?? 0)]
@@ -1955,7 +1985,7 @@ public final class NativeRuntime {
 				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
 			case let .script(fn, type, bindings, catchCell):
 				let touch = touchFields.compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
-				let typed = [NativeEventField.key, .text].compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
+				let typed = [NativeEventField.key, .text, .files].compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
 				var fields: [(String, JSONValue)] = [("type", .string(type))] + ((eventValue ?? targetText).map { [("value", JSONValue.string($0))] } ?? []) + typed + touch
 				var named: [String] = []
 				if case .string? = eventFields?[.currentTarget] {

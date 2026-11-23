@@ -261,6 +261,12 @@ export type LadderRung = {
 	/** Permissions at the first launch; `unset` leaves the system to ask (Maestro grants every permission otherwise). */
 	readonly permissions?: Readonly<Partial<Record<DevicePermission, 'allow' | 'deny' | 'unset'>>>;
 	/**
+	 * What every file picker answers at once: each file's name, its text saved as UTF-8, and the MIME type the phones derive
+	 * from the name's extension (a launch argument on phones, the web test's file chooser), as the system picker is not the
+	 * proof's to drive.
+	 */
+	readonly pick?: ReadonlyArray<{ readonly name: string; readonly text: string; readonly type: string }>;
+	/**
 	 * The web build, where `@markless/device` is absent: the steps it shows instead (a device action has nothing to
 	 * act on there), and texts that must not appear in any file of the built output (removed at build time).
 	 */
@@ -628,7 +634,12 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 					{
 						launchApp: {
 							clearState: true,
-							...(rung.start && { arguments: { route: rung.start } }),
+							...((rung.start || rung.pick) && {
+								arguments: {
+									...(rung.start && { route: rung.start }),
+									...(rung.pick && { pick: JSON.stringify(rung.pick) }),
+								},
+							}),
 							...(rung.permissions && { permissions: rung.permissions }),
 						},
 					},
