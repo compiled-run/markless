@@ -43,7 +43,9 @@
 				"list": {
 					"cell": "state:rows"
 				},
-				"key": ["id"]
+				"key": [
+					"id"
+				]
 			},
 			{
 				"kind": "element",
@@ -258,13 +260,36 @@
 		]
 	},
 	"initial": [
-		["h2:text0@a", "a"],
-		["h2:text0@b", "b"],
-		["h3:text0", "Widen"],
-		["h4:text0", "Add"],
-		["h5:text0", "Drop"]
+		[
+			"h2:text0@a",
+			"a"
+		],
+		[
+			"h2:text0@b",
+			"b"
+		],
+		[
+			"h3:text0",
+			"Widen"
+		],
+		[
+			"h4:text0",
+			"Add"
+		],
+		[
+			"h5:text0",
+			"Drop"
+		]
 	],
-	"initialRows": [["repeat:0", ["a", "b"]]],
+	"initialRows": [
+		[
+			"repeat:0",
+			[
+				"a",
+				"b"
+			]
+		]
+	],
 	"steps": [
 		{
 			"action": {
@@ -293,7 +318,11 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["a", "b", "c"]
+					"keys": [
+						"a",
+						"b",
+						"c"
+					]
 				}
 			]
 		},
@@ -306,7 +335,9 @@
 				{
 					"op": "rows",
 					"node": "repeat:0",
-					"keys": ["b"]
+					"keys": [
+						"b"
+					]
 				}
 			]
 		}
