@@ -91,6 +91,7 @@ import type {
 	SemanticSyncPolicy,
 	SourceSpan,
 } from '../artifacts.ts';
+import type { SemanticValueSet } from '../artifacts.ts';
 import { isEventAttribute, normalizeEventName } from '../ast/events.ts';
 import { compileDrawing, compileLiveShape, SHAPES, type DrawingElement } from './native-drawing.ts';
 import { nativeScriptOf, type NativeScriptEngine, type NativeScriptModuleInput } from './native-script.ts';
@@ -1804,6 +1805,53 @@ export function createNativeViewPayload(
 		return source && exportedFunction(source, entry.importedName ?? name);
 	};
 
+	/** What each async value's cell settles to, with the module its function is written in. */
+	const cellReturns = new Map<string, { readonly returns: SemanticValueSet; readonly module: ModuleFacts }>();
+	/** A value set with each call by name replaced by what that function returns, as far as the modules tell. */
+	const resolvedSet = (set: SemanticValueSet, module: ModuleFacts, depth = 0): SemanticValueSet => {
+		if (depth > 16) return { kind: 'unknown' };
+		if (set.kind === 'call') {
+			const found = functionAt(module, set.callee);
+			return found?.fn.returns ? resolvedSet(found.fn.returns, found.module, depth + 1) : { kind: 'unknown' };
+		}
+		if (set.kind === 'array') return { kind: 'array', elements: resolvedSet(set.elements, module, depth + 1) };
+		if (set.kind === 'object')
+			return {
+				kind: 'object',
+				fields: Object.fromEntries(
+					Object.entries(set.fields).map(([name, field]) => [name, resolvedSet(field, module, depth + 1)]),
+				),
+			};
+		return set;
+	};
+	/** What a list read from an async value's cell can hold, through the members it reads. */
+	const listValueSet = (expr: NativeExpr): SemanticValueSet => {
+		if ('member' in expr && typeof expr.property === 'string') {
+			const inner = expr.member;
+			if ('cell' in inner && expr.property === 'value') {
+				const source = cellReturns.get(inner.cell);
+				return source ? resolvedSet(source.returns, source.module) : { kind: 'unknown' };
+			}
+			const object = listValueSet(inner);
+			return object.kind === 'object' && Object.hasOwn(object.fields, expr.property)
+				? object.fields[expr.property]!
+				: { kind: 'unknown' };
+		}
+		return { kind: 'unknown' };
+	};
+	/** Each field of a list's items whose values are all literals, by its path joined with `.`. */
+	const itemValuesOf = (list: NativeExpr) => {
+		const set = listValueSet(list);
+		const values: Record<string, ReadonlyArray<string | number | boolean | null>> = {};
+		const visit = (item: SemanticValueSet, path: ReadonlyArray<string>) => {
+			if (item.kind === 'literals' && path.length > 0) values[path.join('.')] = item.values;
+			else if (item.kind === 'object')
+				for (const [name, field] of Object.entries(item.fields)) visit(field, [...path, name]);
+		};
+		if (set.kind === 'array') visit(set.elements, []);
+		return Object.keys(values).length > 0 ? values : undefined;
+	};
+
 	const cells: NativeViewPayload['cells'][number][] = [];
 	const cellIndex = new Map<string, number>();
 	/** Cells whose first value is `undefined` on the web; a native cell holds null there. */
@@ -2682,6 +2730,7 @@ export function createNativeViewPayload(
 			if (!cells.some((cell) => cell.id === id)) {
 				const script = scriptAsync(computed, { ...scope, boundary: undefined }, what);
 				if (script === null) return null;
+				if (computed.nativeReturns) cellReturns.set(id, { returns: computed.nativeReturns, module: scope.module });
 				addCell({
 					id,
 					name: computed.name,
@@ -6708,6 +6757,7 @@ export function createNativeViewPayload(
 					continue;
 				}
 				const repeatId = scope.prefix + item.id;
+				const itemValues = itemValuesOf(list);
 				nodes.push({
 					kind: 'repeat',
 					id: repeatId,
@@ -6716,6 +6766,7 @@ export function createNativeViewPayload(
 					key: repeat.indexKey ? [] : repeat.keyPath,
 					...(repeat.indexKey ? { byIndex: true as const } : {}),
 					...(repeat.keyParts ? { keyParts: repeat.keyParts } : {}),
+					...(itemValues ? { itemValues } : {}),
 					...place,
 				});
 				const itemAt = (path: ReadonlyArray<string>) =>

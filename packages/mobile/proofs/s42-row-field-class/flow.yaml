@@ -1,0 +1,21 @@
+appId: ${APP_ID}
+name: s42-row-field-class
+---
+- launchApp:
+      clearState: true
+- assertVisible: Tasks
+- assertVisible: 1 finished
+- assertVisible: Buy milk
+- assertVisible: Call the plumber
+- assertVisible: Water the plants
+- assertVisible: End of tasks
+- assertNotVisible: Loading tasks
+- assertVisible: Tasks
+- tapOn: Finish one
+- assertNotVisible: 1 finished
+- assertVisible: 2 finished
+- assertVisible: Buy milk
+- assertVisible: Call the plumber
+- assertVisible: Water the plants
+- assertNotVisible: 1 finished
+- assertVisible: Tasks

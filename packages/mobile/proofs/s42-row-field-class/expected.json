@@ -1,0 +1,26 @@
+{
+	"rung": "S42",
+	"name": "A styled @for row's class read from a field an async value builds from literals chosen by conditions: the build lists the field's values, so each row is styled by the class it holds, and a row whose class changes is styled again, on the phone as on the web",
+	"steps": [
+		{
+			"visible": [
+				"Tasks",
+				"1 finished",
+				"Buy milk",
+				"Call the plumber",
+				"Water the plants",
+				"End of tasks"
+			],
+			"absent": ["Loading tasks"],
+			"title": "Tasks"
+		},
+		{
+			"do": {
+				"tap": "Finish one"
+			},
+			"visible": ["2 finished", "Buy milk", "Call the plumber", "Water the plants"],
+			"absent": ["1 finished"],
+			"title": "Tasks"
+		}
+	]
+}
