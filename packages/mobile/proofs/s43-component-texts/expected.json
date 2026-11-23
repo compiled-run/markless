@@ -1,0 +1,30 @@
+{
+	"rung": "S43",
+	"name": "A styled page opened from another, whose texts the build cannot know sit inside components: a heading component showing the route's param, and a modal hidden at mount whose description is the param, as the web shows them",
+	"steps": [
+		{
+			"visible": ["Pantry", "Open groceries"],
+			"absent": ["Delete this note?"]
+		},
+		{
+			"do": {
+				"tap": "Open groceries"
+			},
+			"visible": ["Note Groceries", "Delete"],
+			"absent": ["Open groceries", "Delete this note?"]
+		},
+		{
+			"do": {
+				"tap": "Delete"
+			},
+			"visible": ["Delete this note?", "“Groceries” will be gone for good.", "Keep it"]
+		},
+		{
+			"do": {
+				"tap": "Keep it"
+			},
+			"visible": ["Note Groceries"],
+			"absent": ["Delete this note?"]
+		}
+	]
+}

@@ -115,6 +115,12 @@ export type NativeExpr =
 	| { readonly index: string }
 	/** The page's route params, an object of strings (the page component's `params` prop). */
 	| { readonly route: 'params' }
+	/**
+	 * The page's address as its `url` prop has it, `{ pathname, search, hash }`: the route pattern with the params it
+	 * opened with, each URL-encoded, and the query it was opened with (`?…`, or ''). The hash is always '', as the web
+	 * renders a page on the server, which never sees one.
+	 */
+	| { readonly route: 'url' }
 	| { readonly call: NativeBuiltin; readonly arguments: ReadonlyArray<NativeExpr> }
 	/** In an `input` handler: the field's text after the edit (`event.currentTarget.value`). */
 	/**
@@ -203,7 +209,9 @@ export type NativeScriptBinding =
 	/** A `shared()` accessor (`selectState`): a function that returns that object. */
 	| { readonly shared: Readonly<Record<string, NativeScriptBinding>> }
 	/** A function a parent passed as a prop: the script function `callback`, its own names bound as `<name>.<its name>`. */
-	| { readonly callback: string };
+	| { readonly callback: string }
+	/** The page's `url` prop: the host passes `{ route: 'url' }`'s value, which the script reads as a `URL`. */
+	| { readonly url: true };
 
 export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>;
 
@@ -231,7 +239,9 @@ export const NATIVE_SCRIPT_MEDIA_FEATURES = {
 
 /** The device's answer to each media feature now, which every script entry of a page that reads `matchMedia` carries. */
 export type NativeScriptMedia = {
-	readonly [Feature in keyof typeof NATIVE_SCRIPT_MEDIA_FEATURES]: (typeof NATIVE_SCRIPT_MEDIA_FEATURES)[Feature][number];
+	readonly [
+		Feature in keyof typeof NATIVE_SCRIPT_MEDIA_FEATURES
+	]: (typeof NATIVE_SCRIPT_MEDIA_FEATURES)[Feature][number];
 };
 
 /** The screen a script's `devicePixelRatio` reads as each entry begins: device pixels per CSS px, as the phone's browser reports it. */
@@ -508,6 +518,10 @@ export type NativeShape = {
 	readonly cap: 'butt' | 'round' | 'square';
 	readonly join: 'miter' | 'round' | 'bevel';
 	readonly miterLimit: number;
+	/** `stroke-dasharray`: dash and gap lengths in turn, an even count; absent for a solid stroke. */
+	readonly dash?: ReadonlyArray<number>;
+	/** `stroke-dashoffset`: how far into the dash pattern the stroke starts; absent when 0. */
+	readonly dashOffset?: number;
 	/** The affine map from the shape's units to the drawing's (`[a, b, c, d, e, f]`), from `transform` on it and its groups. */
 	readonly transform?: readonly [number, number, number, number, number, number];
 	/** A `<text>` element: its `path` is empty, and the host lays out and fills these runs instead. */
@@ -676,6 +690,8 @@ export type NativeNode = NativePlace &
 				readonly byIndex?: true;
 				/** A key joined from the item's fields, as the web joins it; `key` is then empty and is not the key. */
 				readonly keyParts?: ProtocolRepeatKeyParts;
+				/** The only values an item's field can hold, by its path joined with `.`, where the build can list them. */
+				readonly itemValues?: Readonly<Record<string, ReadonlyArray<string | number | boolean | null>>>;
 		  }
 		| {
 				/**
@@ -913,12 +929,14 @@ export type NativeOp =
 	/**
 	 * Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. A param
 	 * is a string fixed at build time or an expression evaluated when the op runs (a row's item inside a list row).
-	 * `replace` takes the place of the current screen instead of pushing a new one.
+	 * `replace` takes the place of the current screen instead of pushing a new one. `search` is the query the page opens
+	 * with (`?tab=done`), which its `url` prop reads.
 	 */
 	| {
 			readonly op: 'navigate';
 			readonly route: string;
 			readonly params: Readonly<Record<string, string | NativeExpr>>;
+			readonly search?: string;
 			readonly replace?: true;
 	  }
 	/**
@@ -942,8 +960,8 @@ export type NativeOp =
 	| { readonly op: 'reset'; readonly cells: ReadonlyArray<string>; readonly catch?: string };
 
 /** Element commands a host runs. */
-/** `select` selects a text field's whole text, as `field.select()` does. */
-export type NativeCommand = 'focus' | 'scrollIntoView' | 'select';
+/** `select` selects a text field's whole text, as `field.select()` does; `showPicker` opens a file input's picker. */
+export type NativeCommand = 'focus' | 'scrollIntoView' | 'select' | 'showPicker';
 
 /** The non-finite numbers JSON cannot hold: each with its path (object keys and array indices) inside a value. */
 export type NativeNonFinite = ReadonlyArray<
@@ -1405,7 +1423,15 @@ export type NativeForm = {
 };
 
 /** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, a hidden input, or a `<select>`. */
-export type NativeFieldKind = 'text' | 'number' | 'checkbox' | 'radio' | 'hidden' | 'select';
+/** `file`: a file input, whose entries are the files its JavaScript holds; only a submit handler's script reads them. */
+export type NativeFieldKind =
+	| 'text'
+	| 'number'
+	| 'checkbox'
+	| 'radio'
+	| 'hidden'
+	| 'select'
+	| 'file';
 
 export {
 	NATIVE_NUMBER_MESSAGES_BY_LOCALE,
@@ -1484,6 +1510,13 @@ export type NativeJournalEntry =
 			readonly name: 'value';
 			readonly value: string;
 	  }
+	/** The files a handler gave a file input, as a JSON array of their names: the input shows them, as the browser's does. */
+	| {
+			readonly op: 'property';
+			readonly node: string;
+			readonly name: 'files';
+			readonly value: string;
+	  }
 	/** A checkbox's or radio button's checkedness changed: by a tick, by its `checked` binding, or by another radio's tick. */
 	| {
 			readonly op: 'property';
@@ -1529,12 +1562,14 @@ export type NativeJournalEntry =
 	| { readonly op: 'release'; readonly object: string }
 	/**
 	 * Leave this page for the page at `route` with `params`, built from scratch. In an app the host pushes it as a new
-	 * screen, keeping this one as it is for Back, or with `replace` puts it in this screen's place.
+	 * screen, keeping this one as it is for Back, or with `replace` puts it in this screen's place. `search` is the query
+	 * the new page opens with (`?tab=done`), absent when it has none.
 	 */
 	| {
 			readonly op: 'navigate';
 			readonly route: string;
 			readonly params: Readonly<Record<string, string>>;
+			readonly search?: string;
 			readonly replace?: true;
 	  }
 	/** The page's `<title>` text changed: the host writes it to the screen's navigation bar. */
@@ -1551,8 +1586,22 @@ export type NativeFetchRequest = {
 	readonly url: string;
 	readonly method: string;
 	readonly headers: ReadonlyArray<readonly [string, string]>;
-	readonly body: string | null;
+	/** Text, or a FormData's entries, which the host sends as multipart/form-data with a boundary of its own. */
+	readonly body: string | { readonly form: ReadonlyArray<NativeFormPart> } | null;
 };
+
+/** A FormData entry: its text, or a file by its text or by the host's reference to a file a picker chose. */
+export type NativeFormPart = readonly [
+	name: string,
+	value:
+		| string
+		| {
+				readonly name: string;
+				readonly type: string;
+				readonly ref?: string;
+				readonly text?: string;
+		  },
+];
 
 /** What a host answers a `fetch` entry with: the response (its body as text), or the network error's message. */
 export type NativeFetchResponse =

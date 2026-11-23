@@ -1,0 +1,14 @@
+{
+	"rung": 242,
+	"name": "A file upload builds on phones, as @markless/ui's fileupload runs on the web: Browse opens the picker, the chosen file gets a row, and Remove takes it off",
+	"pick": [{ "name": "note.txt", "text": "hello", "type": "text/plain" }],
+	"steps": [
+		{ "visible": ["Upload", "Attachments", "Browse", "0 chosen"] },
+		{
+			"do": { "tap": "Browse" },
+			"visible": ["1 chosen", "note.txt", "Remove"],
+			"absent": ["0 chosen"]
+		},
+		{ "do": { "tap": "Remove" }, "visible": ["0 chosen"], "absent": ["1 chosen", "note.txt"] }
+	]
+}

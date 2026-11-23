@@ -79,6 +79,8 @@ sealed interface Expr {
 	data class Drawn(val node: String) : Expr
 	/** The page's route params, an object of strings. */
 	data object RouteParams : Expr
+	/** The page's address as its `url` prop reads it: `{ pathname, search, hash }`, the hash always "". */
+	data object RouteUrl : Expr
 	/** `new FormData(form)`: the form's entries as `[name, value]` string pairs, in tree order. */
 	data class FormData(val form: String) : Expr
 	/** A checkbox's or radio button's checkedness now. */
@@ -106,6 +108,8 @@ sealed interface ScriptBinding {
 	data class Shared(val members: Map<String, ScriptBinding>) : ScriptBinding
 	/** A shared object's method: the script function [fn] returns it, run over its own [members] when called. */
 	data class Method(val fn: String, val members: Map<String, ScriptBinding>) : ScriptBinding
+	/** The page's `url` prop, which the script reads as a `URL`. */
+	data object Url : ScriptBinding
 }
 
 /** The JavaScript a payload's script ops and script computeds run, kept in the engine under [id]; [services] are the host services it uses. */
@@ -151,7 +155,7 @@ sealed interface Node {
 	data class Branch(override val id: String, override val parent: String?, val test: Expr?, val arms: Int, override val arm: ArmPlace? = null, override val row: String? = null, val tests: List<Expr?>? = null) : Node
 	/** A keyed list: one row per item of [list], keyed by `String()` of the item at the [key] path, or by [keyParts] joined. */
 	/** [key] null: each row's key is its position (`byIndex`). */
-	data class Repeat(override val id: String, override val parent: String?, val list: Expr, val key: List<String>?, override val arm: ArmPlace? = null, override val row: String? = null, val keyParts: List<Any>? = null) : Node
+	data class Repeat(override val id: String, override val parent: String?, val list: Expr, val key: List<String>?, override val arm: ArmPlace? = null, override val row: String? = null, val keyParts: List<Any>? = null, val itemValues: Map<String, List<JsValue>>? = null) : Node
 	/** The platform's own sheet: its content is the nodes whose parent is this id, built at mount and kept; shown while [open] is truthy. */
 	data class Sheet(override val id: String, override val parent: String, val open: Expr, val snapPoints: List<Double>, val dismissible: Boolean, val modal: Boolean, override val arm: ArmPlace? = null) : Node {
 		override val row: String? get() = null
@@ -199,7 +203,7 @@ sealed interface ShapePaint {
 }
 
 /** One shape: verb-coded path (0 move, 1 line, 3 cubic, 4 close), its paint and stroke, and an optional affine map [a,b,c,d,e,f]. */
-data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val text: DrawingText? = null, val clip: List<List<Double>> = emptyList(), val blur: Blur? = null, val clipEvenOdd: List<Boolean> = emptyList()) {
+data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boolean, val stroke: ShapePaint?, val width: Double, val cap: String, val join: String, val miterLimit: Double, val transform: List<Double>?, val text: DrawingText? = null, val clip: List<List<Double>> = emptyList(), val blur: Blur? = null, val clipEvenOdd: List<Boolean> = emptyList(), val dash: List<Double>? = null, val dashOffset: Double = 0.0) {
 	data class Blur(val deviation: Double, val region: List<Double>)
 }
 
@@ -240,7 +244,7 @@ sealed interface Op {
 	/** The cell takes the expression's value, evaluated before the write. */
 	data class Assign(val cell: String, val value: Expr) : Op
 	/** Opens the page at [route] with [params], each evaluated when the op runs; ops after it do not run. */
-	data class Navigate(val route: String, val params: Map<String, Expr>, val replace: Boolean = false) : Op
+	data class Navigate(val route: String, val params: Map<String, Expr>, val replace: Boolean = false, val search: String = "") : Op
 	/** A device call (`haptics.tap`); with [result], the call settles that task cell. */
 	/** A device call on [obj] when it names one; [result] settles a task cell; [after] runs once the host resumes it. */
 	data class Call(val call: String, val arguments: List<Expr>, val result: String?, val obj: String? = null, val after: Continuation? = null) : Op
@@ -305,7 +309,7 @@ data class Continuation(val id: String, val local: String, val ops: List<Op>, va
 /** A device object a component makes (`const cam = camera()`); it lives while its [owner] node is shown. */
 data class DeviceObject(val id: String, val device: String, val owner: String)
 
-enum class FieldKind(val wire: String) { Text("text"), Number("number"), Checkbox("checkbox"), Radio("radio"), Hidden("hidden"), Select("select") }
+enum class FieldKind(val wire: String) { Text("text"), Number("number"), Checkbox("checkbox"), Radio("radio"), Hidden("hidden"), Select("select"), File("file") }
 
 /** Why a number field fails before a submit, after a missing value; see [nativeNumberProblem]. */
 sealed interface NumberProblem {
@@ -642,7 +646,7 @@ data class Payload(
 			is Expr.Method -> hasScript(e.target) || e.arguments.any(::hasScript)
 			is Expr.Lambda -> hasScript(e.body)
 			is Expr.Call -> e.arguments.any(::hasScript)
-			is Expr.CellRef, is Expr.Literal, is Expr.Local, is Expr.Item, is Expr.Index, Expr.RouteParams, is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field -> false
+			is Expr.CellRef, is Expr.Literal, is Expr.Local, is Expr.Item, is Expr.Index, Expr.RouteParams, Expr.RouteUrl, is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field -> false
 			is Expr.Contains -> hasScript(e.within) || hasScript(e.node)
 			is Expr.Captures -> hasScript(e.node) || hasScript(e.pointer)
 			is Expr.FocusOrigin -> hasScript(e.overlay)
@@ -681,7 +685,7 @@ data class Payload(
 			is Expr.Merge -> e.parts.flatMap { cellsOf(it) }
 			is Expr.Method -> cellsOf(e.target) + e.arguments.flatMap(::cellsOf)
 			is Expr.Lambda -> cellsOf(e.body)
-			is Expr.Local, is Expr.Item, is Expr.Index, Expr.RouteParams -> emptyList()
+			is Expr.Local, is Expr.Item, is Expr.Index, Expr.RouteParams, Expr.RouteUrl -> emptyList()
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
 			is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked, is Expr.Field -> emptyList()
 			is Expr.Contains -> cellsOf(e.within) + cellsOf(e.node)
@@ -705,6 +709,7 @@ data class Payload(
 				is ScriptBinding.Object -> cellsOf(b.members)
 				is ScriptBinding.Shared -> cellsOf(b.members)
 				is ScriptBinding.Method -> cellsOf(b.members)
+				ScriptBinding.Url -> emptyList()
 			}
 		}
 
@@ -724,6 +729,11 @@ data class Payload(
 					ScriptBinding.Device(bo.field("device", what).str("$what.$name.device"), bo.field("object", what).str("$what.$name.object"))
 				}
 				bo.containsKey("callback") -> { bo.only(setOf("callback"), "$what.$name"); ScriptBinding.Callback(bo.field("callback", what).str("$what.$name.callback")) }
+				bo.containsKey("url") -> {
+					bo.only(setOf("url"), "$what.$name")
+					if (bo["url"] != Json.Bool(true)) throw MarklessDecodeError("$what.$name.url must be true")
+					ScriptBinding.Url
+				}
 				bo.containsKey("elements") -> { bo.only(setOf("elements"), "$what.$name"); ScriptBinding.Elements(expr(bo.field("elements", what), "$what.$name.elements")) }
 				bo.containsKey("object") -> { bo.only(setOf("object"), "$what.$name"); ScriptBinding.Object(scriptBindings(bo.field("object", what), "$what.$name.object")) }
 				bo.containsKey("shared") -> { bo.only(setOf("shared"), "$what.$name"); ScriptBinding.Shared(scriptBindings(bo.field("shared", what), "$what.$name.shared")) }
@@ -811,7 +821,7 @@ data class Payload(
 					o.only(setOf("call", "arguments"), what)
 					Expr.Call(oneOf(o, "call", BUILTINS, what), o.field("arguments", what).arr("$what.arguments").mapIndexed { n, a -> expr(a, "$what.arguments[$n]") })
 				}
-				o.containsKey("route") -> { o.only(setOf("route"), what); oneOf(o, "route", setOf("params"), what); Expr.RouteParams }
+				o.containsKey("route") -> { o.only(setOf("route"), what); if (oneOf(o, "route", setOf("params", "url"), what) == "url") Expr.RouteUrl else Expr.RouteParams }
 				o.containsKey("event") -> { o.only(setOf("event"), what); Expr.Event(oneOf(o, "event", EVENT_FIELDS, what)) }
 				o.containsKey("focused") -> {
 					o.only(setOf("focused"), what)
@@ -985,7 +995,7 @@ data class Payload(
 
 		private fun shape(sv: Json, w: String): Shape {
 			val so = sv.obj(w)
-			so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "text", "clip", "clipRule", "blur"), w)
+			so.only(setOf("path", "fill", "fillRule", "stroke", "width", "cap", "join", "miterLimit", "transform", "text", "clip", "clipRule", "blur", "dash", "dashOffset"), w)
 			val path = so.field("path", w).arr("$w.path").map { it.num("$w.path[]") }
 			val transform = so["transform"]?.arr("$w.transform")?.map { it.num("$w.transform[]") }
 			if (transform != null && transform.size != 6) throw MarklessDecodeError("$w.transform must hold six numbers")
@@ -1022,6 +1032,10 @@ data class Payload(
 				so["clipRule"]?.arr("$w.clipRule")?.map {
 					when (val rule = it.str("$w.clipRule[]")) { "evenodd" -> true; "nonzero" -> false; else -> throw MarklessDecodeError("$w has unknown clipRule \"$rule\"") }
 				} ?: emptyList(),
+				so["dash"]?.arr("$w.dash")?.map { it.num("$w.dash[]") }?.also { dash ->
+					if (dash.isEmpty() || dash.size % 2 != 0 || dash.any { it < 0 }) throw MarklessDecodeError("$w.dash must hold an even count of lengths")
+				},
+				so["dashOffset"]?.num("$w.dashOffset") ?: 0.0,
 			).also { if (it.clipEvenOdd.isNotEmpty() && it.clipEvenOdd.size != it.clip.size) throw MarklessDecodeError("$w.clipRule must hold a rule for each clip") }
 		}
 
@@ -1064,14 +1078,19 @@ data class Payload(
 					Node.Branch(id, if (parent == Json.Null) null else parent.str("$what.parent"), test, arms, armPlace(o, what), rowPlace(o, what), tests)
 				}
 				"repeat" -> {
-					o.only(setOf("kind", "id", "parent", "list", "key", "byIndex", "keyParts", "arm", "row"), what)
+					o.only(setOf("kind", "id", "parent", "list", "key", "byIndex", "keyParts", "itemValues", "arm", "row"), what)
 					val parent = o.field("parent", what)
 					val key = o.field("key", what).arr("$what.key").map { it.str("$what.key[]") }
 					val byIndex = o["byIndex"]?.let { (it as? Json.Bool)?.value ?: throw MarklessDecodeError("$what.byIndex must be a boolean") } ?: false
 					if (byIndex && key.isNotEmpty()) throw MarklessDecodeError("$what is keyed by its index and has a key path")
 					// Each key part is fixed text (a String) or a path on the item (a List<String>).
 					val keyParts = o["keyParts"]?.arr("$what.keyParts")?.map { p -> if (p is Json.Str) p.value else p.arr("$what.keyParts[]").map { it.str("$what.keyParts[][]") } }
-					Node.Repeat(id, if (parent == Json.Null) null else parent.str("$what.parent"), expr(o.field("list", what), "$what.list"), if (byIndex) null else key, armPlace(o, what), rowPlace(o, what), keyParts)
+					val itemValues = o["itemValues"]?.let { values ->
+						(values as? Json.Obj ?: throw MarklessDecodeError("$what.itemValues must be an object")).fields.mapValues { (path, list) ->
+							list.arr("$what.itemValues.$path").map { if (it == Json.Null) JsValue.Null else scalar(it, "$what.itemValues.$path[]") }
+						}
+					}
+					Node.Repeat(id, if (parent == Json.Null) null else parent.str("$what.parent"), expr(o.field("list", what), "$what.list"), if (byIndex) null else key, armPlace(o, what), rowPlace(o, what), keyParts, itemValues)
 				}
 				"sheet" -> {
 					o.only(setOf("kind", "id", "parent", "open", "snapPoints", "dismissible", "modal", "arm"), what)
@@ -1131,13 +1150,13 @@ data class Payload(
 			val o = v.obj(what)
 			val name = o.field("op", what).str("$what.op")
 			if (name == "navigate") {
-				o.only(setOf("op", "route", "params", "replace"), what)
+				o.only(setOf("op", "route", "params", "search", "replace"), what)
 				val params = o.field("params", what).obj("$what.params").entries.associateTo(LinkedHashMap()) { (k, v) ->
 					k to if (v is Json.Str) Expr.Literal(JsValue.Str(v.value)) else expr(v, "$what.params.$k")
 				}
 				for (e in params.values) for (c in cellsOf(e)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
 				val replace = o["replace"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.replace must be true when present"); true } ?: false
-				return Op.Navigate(o.field("route", what).str("$what.route"), params, replace)
+				return Op.Navigate(o.field("route", what).str("$what.route"), params, replace, o["search"]?.str("$what.search") ?: "")
 			}
 			if (name == "call") {
 				o.only(setOf("op", "call", "arguments", "result", "object", "after"), what)

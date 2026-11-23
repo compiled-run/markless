@@ -27,6 +27,7 @@ import { uiIconsOptions } from '@markless/ui-tools';
 import { NATIVE_APP_VERSION, NATIVE_NOT_FOUND_ROUTE } from '@markless/serializer/native-view';
 import {
 	booleanCellsOf,
+	itemValuesOf,
 	nativeStyleInputs,
 	nativeStyleRowAttribute,
 	readsRow,
@@ -484,7 +485,12 @@ function unstyledOnly(
 			'attribute' in binding &&
 			nativeStyleRowAttribute(binding.attribute, tested) &&
 			readsRow(payload, binding.value) &&
-			!rowAttributeOptions(binding.attribute, binding.value, booleanCellsOf(payload))
+			!rowAttributeOptions(
+				binding.attribute,
+				binding.value,
+				booleanCellsOf(payload),
+				itemValuesOf(payload),
+			)
 				? [
 						nativeUnsupported(
 							`the \`${binding.attribute}\` of <${node.element}> ${node.id} follows its @for row on a styled page through a value the build cannot list; Dragon styles a row by each value it can give, so write it as literals chosen by conditions`,
@@ -675,12 +681,14 @@ export async function compileNativeApp(input: {
 		if ('built' in one) routes.push(one.built);
 		if ('styleInput' in one && one.styleInput) styleInputs.push(one.styleInput);
 	}
+	// A warning names something left out of a page that still builds (a keyboard-only handler); only an error refuses the app.
+	const refused = diagnostics.some((diagnostic) => diagnostic.severity === 'error');
 	return {
 		payload:
-			diagnostics.length > 0 && !(input.partial && routes.length > 0)
+			refused && !(input.partial && routes.length > 0)
 				? null
 				: { version: NATIVE_APP_VERSION, routes },
-		styleInputs: diagnostics.length > 0 && !input.partial ? [] : styleInputs,
+		styleInputs: refused && !input.partial ? [] : styleInputs,
 		images,
 		manifest: deviceManifest([...features], input.device).manifest,
 		diagnostics,

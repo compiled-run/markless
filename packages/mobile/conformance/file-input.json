@@ -1,0 +1,238 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "FileInput",
+		"cells": [
+			{
+				"id": "state:shown",
+				"name": "shown",
+				"initial": "none"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "input",
+				"parent": "h0",
+				"attributes": {
+					"type": "file",
+					"multiple": ""
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Choose"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Clear"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"cell": "state:shown"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "input",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "change",
+						"bindings": {
+							"field": {
+								"elements": {
+									"literal": "h1"
+								}
+							},
+							"shown": {
+								"cell": "state:shown"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:1",
+						"type": "click",
+						"bindings": {
+							"field": {
+								"elements": {
+									"literal": "h1"
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:2",
+						"type": "click",
+						"bindings": {
+							"field": {
+								"elements": {
+									"literal": "h1"
+								}
+							},
+							"shown": {
+								"cell": "state:shown"
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "9a45f8784e2a983a",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0,\"fn:2\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => {\n if (__s.field) __s.shown = [...(__s.field.files ?? [])].map((file) => `${file.name} ${file.size} ${file.type}`).join(', ');\n});\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => {\n __s.field?.showPicker();\n});\n};\nfunctions[\"fn:2\"] = function (__s) {\nreturn (() => {\n if (__s.field) {\n  __s.field.files = new DataTransfer().files;\n  __s.shown = `${__s.field.files.length} files`;\n }\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"9a45f8784e2a983a\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h2:text0",
+			"Choose"
+		],
+		[
+			"h3:text0",
+			"Clear"
+		],
+		[
+			"h4:text0",
+			"none"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "command",
+					"node": "h1",
+					"command": "showPicker"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pick",
+				"host": "h1",
+				"files": [
+					{
+						"ref": "picked:1",
+						"name": "note.txt",
+						"size": 5,
+						"type": "text/plain",
+						"lastModified": 1700000000000
+					},
+					{
+						"ref": "picked:2",
+						"name": "photo.png",
+						"size": 2048,
+						"type": "image/png",
+						"lastModified": 1700000001000
+					}
+				]
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "note.txt 5 text/plain, photo.png 2048 image/png"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "0 files"
+				},
+				{
+					"op": "property",
+					"node": "h1",
+					"name": "files",
+					"value": "[]"
+				}
+			]
+		}
+	]
+}

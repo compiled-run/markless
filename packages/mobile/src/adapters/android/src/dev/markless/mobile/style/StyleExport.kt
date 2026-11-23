@@ -211,6 +211,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 	val slots: List<ExportSlot> = emptyList(),
 	/** Each list whose rows the phone lays out: the box its rows hang from and the Dragon ids of one row's top boxes, in order. */
 	val planRepeats: List<PlanRepeat> = emptyList(),
+	/** Per assignment: the export ids of the inline boxes in the plan's layout tree, whose texts and boxes the export parents to their block container. */
+	val inlineBoxes: List<Set<String>> = emptyList(),
 ) {
 
 	/** The index of [BAND_KEY] among [states], or -1 for an export without @media. */
@@ -306,6 +308,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			}
 			// The page's own texts whose current string is not the one this assignment was laid out with, by Dragon id; a text an arm hides there has no box to lay out.
 			val changed = texts.entries.filter { (id, text) -> assignments[k].byId[id]?.takeIf { it.frame != null }?.text?.let { it != text } ?: false }.sortedBy { it.key }
+			// The page's texts as this layout lays them out: the changed ones with their current string, which its lines draw.
+			val relaidTexts = changed.associate { it.key to it.value }
 			val live = lists != null || changed.isNotEmpty()
 			val textsText = if (changed.isEmpty()) "" else (if (lists == null) ",\"rows\":[]" else "") + ",\"texts\":" + Json.Arr(changed.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }).text()
 			val line = "{\"assignment\":$k,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":$plan$slotsText${if (lists != null) ",\"rows\":$lists" else ""}$textsText,\"sticky\":true}"
@@ -313,7 +317,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val result = Json.parse(if (live) rowsLayout!!(line) else layout(line))
 			val parts = result.arr("plan layout")
 			val slotted = slots.isNotEmpty()
-			val fixed = if (!slotted) 3 else if (lists == null) 4 else 5
+			// Dragon's live layout answers a slotted page with each row's write numbers, an empty list when it lays out texts and no rows.
+			val fixed = if (!slotted) 3 else if (live) 5 else 4
 			if (parts.size < fixed || parts.size > fixed + 3 || parts[0] != Json.Str("ok")) throw MarklessDecodeError("Dragon's layout at $width x $height dp and ${scale}x failed: ${result.text()}")
 			// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
 			fun exportId(id: String): String {
@@ -447,6 +452,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				node.copy(
 					frame = Frame(frame[0], frame[1], frame[2], frame[3]), borderWidths = widths?.let { Edges(it[0], it[1], it[2], it[3]) },
 					borderOps = ops, scrollRange = scroll, lines = if (node.kind == "text") lines else null, selectArrow = arrow, checkboxMarks = mark,
+					text = if (node.kind == "text") (relaidTexts[node.id] ?: node.text) else node.text,
 				)
 			}).also {
 				if (arrows.isNotEmpty()) throw MarklessDecodeError("Dragon's layout gives an arrow for ${arrows.keys.sorted().first()}, which it shows no box for")
@@ -567,7 +573,29 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			if (plan == null) style.assignments.firstNotNullOfOrNull { a -> a.nodes.firstOrNull { it.drawsCheckbox } }?.let {
 				throw MarklessDecodeError("$what: \"${it.id}\" draws a themed checkbox, whose marks only Dragon's plan layout gives, and the export has no plan")
 			}
-			return style.copy(plan = plan, planNames = names, planRepeats = repeats, anim = anim)
+			val inline = t["plan"]?.let { inlineBoxes(it, "$what.plan") }?.mapIndexed { a, ids ->
+				val renamed = names.getOrNull(a) ?: emptyMap()
+				ids.map { renamed[it] ?: it }.toSet()
+			} ?: emptyList()
+			return style.copy(plan = plan, planNames = names, planRepeats = repeats, anim = anim, inlineBoxes = inline)
+		}
+
+		/** Each plan assignment's variant's layout tree, read for the boxes whose kind is `inline` (Dragon ids). */
+		private fun inlineBoxes(plan: Json, what: String): List<Set<String>> {
+			fun collect(box: Json, at: String, into: MutableSet<String>) {
+				val o = box.obj(at)
+				if (o.field("kind", at).str("$at.kind") == "inline") into.add(o.field("id", at).str("$at.id"))
+				o["children"]?.arr("$at.children")?.forEachIndexed { i, child -> collect(child, "$at.children[$i]", into) }
+			}
+			val p = plan.obj(what)
+			if ("variants" !in p) return emptyList()
+			val variants = p.field("variants", what).arr("$what.variants").mapIndexed { v, variant ->
+				mutableSetOf<String>().also { collect(variant.obj("$what.variants[$v]").field("root", "$what.variants[$v]"), "$what.variants[$v].root", it) }
+			}
+			return p.field("assignments", what).arr("$what.assignments").mapIndexed { a, assignment ->
+				val index = assignment.obj("$what.assignments[$a]").field("variant", "$what.assignments[$a]").num("$what.assignments[$a].variant").toInt()
+				variants.getOrNull(index) ?: throw MarklessDecodeError("$what.assignments[$a] names variant $index; the plan has ${variants.size}")
+			}
 		}
 
 		fun decode(bytes: ByteArray, target: String = "android"): StyleExport {
@@ -935,6 +963,38 @@ fun stackingParent(s: StyledNode, order: StyleWrite.PaintOrder, styled: Assignme
 	if (target == null || target == viewParent) return null
 	if (order.bucket < 0) throw MarklessDecodeError("\"${s.id}\" paints below the flow of ${order.host} past ${viewParent ?: "the page"}; not implemented on Android")
 	return target
+}
+
+/**
+ * Dragon lays an inline formatting context out flat: each text and inline box in it is a child of its block container. [id]'s view
+ * sits in its payload parent's, framed from the export's absolute origins, so its place needs nothing more; but an inline box
+ * between [id] and [container] (from [parent] up its payload parents) that paints anything of its own is refused by name.
+ */
+fun checkFlattenedInline(id: String, parent: String, container: String, styled: Assignment, inline: Set<String>, payloadParent: (String) -> String?) {
+	var cursor: String? = parent
+	while (cursor != null && cursor != container && cursor.substringBefore('@') in inline) {
+		val box = styled.byId[cursor] ?: return
+		inlinePaint(box)?.let { throw MarklessDecodeError("\"$id\": its inline box $cursor $it, which Android does not draw on a box Dragon lays out flat in $container") }
+		cursor = payloadParent(cursor)
+	}
+}
+
+/** [parent], the payload parent of [id] (a row's copy `<node>@<keys>` or a node), as [styled] names it: its copy in [id]'s row or an outer row, else itself. */
+fun rowCopyOf(id: String, parent: String, styled: Assignment): String =
+	generateSequence(id.substringAfter('@', "").ifEmpty { null }) { keys -> keys.substringBeforeLast('@', "").ifEmpty { null } }
+		.map { "$parent@$it" }.firstOrNull { it in styled.byId } ?: parent
+
+/** What an inline box paints or keeps of its own, in words; null when it is transparent, borderless and in the flow. */
+private fun inlinePaint(box: StyledNode): String? {
+	if (box.borderWidths?.let { listOf(it.top, it.right, it.bottom, it.left).any { w -> w != 0.0 } } == true) return "has a border"
+	for (w in box.writes) when {
+		w is StyleWrite.BorderStyles && w.styles.any { it != "none" && it != "hidden" } -> return "has a border"
+		w is StyleWrite.BackgroundColor && w.color.alpha != 0 -> return "paints a background"
+		w is StyleWrite.Outline -> return "draws an outline"
+		w is StyleWrite.BoxShadow -> return "casts a shadow"
+		w is StyleWrite.PaintOrder -> return "paints in a stacking order"
+	}
+	return null
 }
 
 /** A list whose rows a phone lays out (Dragon's `planRepeats`): the box its rows hang from and one row's top boxes, by Dragon id. */

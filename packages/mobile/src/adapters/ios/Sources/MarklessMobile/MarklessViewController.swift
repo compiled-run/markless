@@ -51,7 +51,7 @@ public final class MarklessViewController: UIViewController {
 	/// This screen's in-flight script requests: the request id the script gave, to the token that cancels it.
 	private var requests: [Int: Int] = [:]
 	/// In an app: opens the page a `navigate` entry names, pushed or in this screen's place.
-	var navigator: ((_ route: String, _ params: [NativeRouteParam], _ replace: Bool) throws -> Void)?
+	var navigator: ((_ route: String, _ params: [NativeRouteParam], _ search: String, _ replace: Bool) throws -> Void)?
 
 	/// `route`: the path a page opens at, matched against the payload's route; by default the `-route` launch argument.
 	public init(
@@ -90,10 +90,10 @@ public final class MarklessViewController: UIViewController {
 		#endif
 	}
 
-	/// One screen of an app: the page for a route, opened with its params and its route's styles.
+	/// One screen of an app: the page for a route, opened with its params, its query and its route's styles.
 	init(
-		page: NativeViewPayload, params: [NativeRouteParam], store: NativeStore, style: StyleExport?, fonts: [String: Data], images: [String: NativeImageAsset] = [:],
-		device: NativeDevice
+		page: NativeViewPayload, params: [NativeRouteParam], search: String = "", store: NativeStore, style: StyleExport?, fonts: [String: Data],
+		images: [String: NativeImageAsset] = [:], device: NativeDevice
 	) throws {
 		FirstFrame.controllerCreated()
 		self.device = device
@@ -102,7 +102,7 @@ public final class MarklessViewController: UIViewController {
 		self.fonts = fonts
 		self.images = images
 		self.store = store
-		runtime = NativeRuntime(payload: page, store: store, params: params, scriptHost: MarklessScripting.shared.host)
+		runtime = NativeRuntime(payload: page, store: store, params: params, search: search, scriptHost: MarklessScripting.shared.host)
 		super.init(nibName: nil, bundle: nil)
 		Self.linkDragon()
 		try buildPage()
@@ -126,7 +126,7 @@ public final class MarklessViewController: UIViewController {
 			self.band = now
 			paintCanvas()
 		} catch {
-			fatalError("Markless iOS host: \(error)")
+			hostFailed("\(error)")
 		}
 	}
 
@@ -178,7 +178,14 @@ public final class MarklessViewController: UIViewController {
 		let dark = traitCollection.userInterfaceStyle == .dark
 		let texts = try runtime.texts()
 		mountTexts = texts
-		layout = try style.map { try $0.resolve(for: payload, initialTexts: texts, value: runtime.value(of:), arm: runtime.styleArm(of:), dark: dark) }
+		// With Dragon's plan the page's first layout lays out the texts it shows now, which the build could not know (stored data,
+		// the route's params); without one each text must be the one the build laid out.
+		#if canImport(DragonPlan)
+		let checked = style?.plan == nil ? texts : []
+		#else
+		let checked = texts
+		#endif
+		layout = try style.map { try $0.resolve(for: payload, initialTexts: checked, value: runtime.value(of:), arm: runtime.styleArm(of:), dark: dark) }
 		var sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:]
 		for sheet in style?.sheets ?? [] {
 			sheetLayouts[sheet.node] = try style!.resolveSheet(sheet.node, for: payload, initialTexts: texts, value: runtime.value(of:), arm: runtime.styleArm(of:), dark: dark)
@@ -210,7 +217,7 @@ public final class MarklessViewController: UIViewController {
 		do {
 			try runCalls(try runtime.leave())
 		} catch {
-			fatalError("Markless iOS host: \(error)")
+			hostFailed("\(error)")
 		}
 	}
 
@@ -274,7 +281,7 @@ public final class MarklessViewController: UIViewController {
 			try runCalls(journal)
 			if let tree { animation?.moved(to: tree.assignment) }
 		} catch {
-			fatalError("Markless iOS host: \(error)")
+			hostFailed("\(error)")
 		}
 		runAnimation()
 		writeLayoutDump()
@@ -292,7 +299,7 @@ public final class MarklessViewController: UIViewController {
 		do {
 			next = try animation.next(dpr: Double(traitCollection.displayScale), width: Double(size.width), height: Double(size.height))
 		} catch {
-			fatalError("Markless iOS host: \(error)")
+			hostFailed("\(error)")
 		}
 		if next.busy, animationLink == nil {
 			let link = CADisplayLink(target: self, selector: #selector(animationFrame(_:)))
@@ -408,10 +415,10 @@ public final class MarklessViewController: UIViewController {
 			let texts = Dictionary(try runtime.texts().filter { pageRows[$0.node] != nil && pageRows[$0.node]! == nil }.map { ($0.node, $0.text) }, uniquingKeysWith: { a, _ in a })
 			guard size.width > 0, size.height > 0, rowsMoved || size != laidOutFor?.size || slots.map(\.bitPattern) != laidOutFor?.slots.map(\.bitPattern) || texts != laidOutFor?.texts else { return }
 			let scale = Double(traitCollection.displayScale)
-			let shaper = coreTextRowShaper(faces: style.systemFaces, dpr: scale)
+			let shaper = coreTextRowShaper(faces: style.systemFaces, authored: fonts, dpr: scale)
 			var unshaped = false
 			let shape: (String, Double, String, Int, Int, String, [Double]) throws -> [Double] = { face, size, text, start, end, language, features in
-				if style.systemFaces[face] == nil { unshaped = true }
+				if style.systemFaces[face] == nil && self.fonts[face] == nil { unshaped = true }
 				return try shaper(face, size, text, start, end, language, features)
 			}
 			let rows = style.planRepeats.isEmpty ? nil : try style.shownRows(payload, runtime: runtime)
@@ -436,7 +443,7 @@ public final class MarklessViewController: UIViewController {
 			applyBand()
 			layoutMilliseconds = (CFAbsoluteTimeGetCurrent() - started) * 1000
 		} catch {
-			fatalError("Markless iOS host: \(error)")
+			hostFailed("\(error)")
 		}
 		#endif
 		writeLayoutDump()
@@ -510,7 +517,7 @@ public final class MarklessViewController: UIViewController {
 	public override func viewIsAppearing(_ animated: Bool) {
 		super.viewIsAppearing(animated)
 		if let layout, style?.plan == nil, abs(traitCollection.displayScale - layout.dpr) > 0.001 {
-			fatalError("Markless iOS host: the style export was laid out at \(layout.dpr)x, this screen is \(traitCollection.displayScale)x")
+			hostFailed("the style export was laid out at \(layout.dpr)x, this screen is \(traitCollection.displayScale)x")
 		}
 		applyBand()
 		var pops = [navigationController?.interactivePopGestureRecognizer]
@@ -543,9 +550,9 @@ public final class MarklessViewController: UIViewController {
 		var prevented = false
 		do {
 			let journal = try runtime.dispatch(action)
-			if case let .navigate(route, params, replace)? = journal.last {
+			if case let .navigate(route, params, search, replace)? = journal.last {
 				if replace || navigator == nil { leave() }
-				if let navigator { try navigator(route, params, replace) } else { try navigate(route, params) }
+				if let navigator { try navigator(route, params, search, replace) } else { try navigate(route, params, search) }
 				return false
 			}
 			prevented = journal.contains(.preventDefault)
@@ -557,19 +564,20 @@ public final class MarklessViewController: UIViewController {
 			paintCanvas()
 			if let tree { animation?.moved(to: tree.assignment) }
 		} catch {
-			fatalError("Markless iOS host: \(error)")
+			hostFailed("\(error)")
 		}
 		runAnimation()
 		scheduleLoadEvents()
 		return prevented
 	}
 
-	/// Builds the page at `route` from scratch with `params`; its state starts over.
-	private func navigate(_ route: String, _ params: [NativeRouteParam]) throws {
+	/// Builds the page at `route` from scratch with `params` and `search`; its state starts over.
+	private func navigate(_ route: String, _ params: [NativeRouteParam], _ search: String) throws {
 		guard payload.route?.pattern == route else { throw HostError("no page for \(route): this payload is \(payload.route?.pattern ?? "not a page")") }
 		for object in payload.objects { device.release(object.id) }
 		runtime = NativeRuntime(
-			payload: payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages, scriptHost: MarklessScripting.shared.host)
+			payload: payload, store: store, params: params, search: search, preferredLanguages: Locale.preferredLanguages,
+			scriptHost: MarklessScripting.shared.host)
 		scrollWatches = [:]
 		tree?.unmount()
 		try buildPage()

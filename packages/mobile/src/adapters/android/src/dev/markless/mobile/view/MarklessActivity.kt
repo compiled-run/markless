@@ -99,8 +99,16 @@ abstract class MarklessActivity : Activity() {
 		if (::host.isInitialized) host.apply(host.runtime.resume())
 	}
 
+	/** The file input whose picker is open. */
+	internal var picking: FileInputView? = null
+
 	override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
 		super.onActivityResult(requestCode, resultCode, data)
+		if (requestCode == FileInputView.PICK_REQUEST) {
+			picking?.answered(resultCode, data)
+			picking = null
+			return
+		}
 		device.activityResult(requestCode)
 	}
 
@@ -147,11 +155,11 @@ abstract class MarklessActivity : Activity() {
 		val (route, params) = app.match(path) ?: throw MarklessHostError("$path is not a route of this app")
 		val styles = styleExportBytes()?.let { StyleExport.decodeApp(it) } ?: emptyMap()
 		for (pattern in styles.keys) if (app.routes.none { it.route.pattern == pattern }) throw MarklessHostError("the app style has styles for $pattern, which is not a route of this app")
-		show(MarklessHost(this, route.page, styles[route.route.pattern], params = params, device = device))
+		show(MarklessHost(this, route.page, styles[route.route.pattern], params = params, device = device, search = intent.getStringExtra(SEARCH) ?: ""))
 		title = host.runtime.title() ?: ""
 		host.onTitle = { title = it }
 		host.onNavigate = { entry ->
-			startActivity(screen(AppPayload.path(entry.route, entry.params), if (entry.replace) depth else depth + 1))
+			startActivity(screen(AppPayload.path(entry.route, entry.params), if (entry.replace) depth else depth + 1).putExtra(SEARCH, entry.search))
 			if (entry.replace) finish()
 		}
 		actionBar?.setDisplayHomeAsUpEnabled(depth > 0)
@@ -227,13 +235,13 @@ abstract class MarklessActivity : Activity() {
 		partial.renameTo(File(dir, "markless-layout.json"))
 	}
 
-	/** Builds the page from scratch with [params]: one page per payload, so a link names this page's own route. */
-	private fun open(params: Map<String, String>) {
+	/** Builds the page from scratch with [params] and [search]: one page per payload, so a link names this page's own route. */
+	private fun open(params: Map<String, String>, search: String = "") {
 		if (::host.isInitialized) host.release()
-		show(MarklessHost(this, payloadBytes(), styleExportBytes(), params = params, device = device))
+		show(MarklessHost(this, payloadBytes(), styleExportBytes(), params = params, device = device, search = search))
 		host.onNavigate = { entry ->
 			if (entry.route != host.payload.route?.pattern) throw MarklessHostError("navigate to ${entry.route}; this app holds only ${host.payload.route?.pattern}")
-			open(entry.params)
+			open(entry.params, entry.search)
 		}
 	}
 
@@ -336,6 +344,8 @@ abstract class MarklessActivity : Activity() {
 		const val ROUTE = "route"
 		const val LAYOUT_DUMP = "markless-layout-dump"
 		const val DEPTH = "markless.depth"
+		/** The query an app screen opens with, from the navigation that opened it. */
+		const val SEARCH = "markless.search"
 		/** A deep link's host: `markless-proof://app/<path>`; a test build's device links use another. */
 		const val APP_LINK_HOST = "app"
 	}

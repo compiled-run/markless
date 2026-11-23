@@ -1,0 +1,24 @@
+{
+	"rung": "S42",
+	"name": "A styled app in a web font, opened page by page: a heading whose text is the route's param, and a note whose rows are laid out on the phone in the web font, as the web shows them",
+	"steps": [
+		{
+			"visible": ["Shelf", "Personal tag", "Trip note"],
+			"absent": ["Notes tagged here"]
+		},
+		{
+			"do": {
+				"tap": "Personal tag"
+			},
+			"visible": ["Personal", "Notes tagged here", "Open trip", "Filed under Personal"],
+			"absent": ["Trip note"]
+		},
+		{
+			"do": {
+				"tap": "Open trip"
+			},
+			"visible": ["Trip", "Pack the warm coat.", "Book the ferry to Bergen before Friday."],
+			"absent": ["Notes tagged here"]
+		}
+	]
+}

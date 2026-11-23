@@ -45,12 +45,13 @@ public final class MarklessNavigationController: UINavigationController {
 			}, animated: false)
 	}
 
-	private func screen(_ route: String, _ params: [NativeRouteParam]) throws -> MarklessViewController {
+	private func screen(_ route: String, _ params: [NativeRouteParam], _ search: String = "") throws -> MarklessViewController {
 		guard let entry = app.routes.first(where: { $0.pattern == route }) else { throw HostError("no page for \(route)") }
-		let controller = try MarklessViewController(page: entry.page, params: params, store: store, style: styles[route], fonts: fonts, images: images, device: device)
-		controller.navigator = { [weak self] route, params, replace in
+		let controller = try MarklessViewController(
+			page: entry.page, params: params, search: search, store: store, style: styles[route], fonts: fonts, images: images, device: device)
+		controller.navigator = { [weak self] route, params, search, replace in
 			guard let self else { return }
-			let next = try self.screen(route, params)
+			let next = try self.screen(route, params, search)
 			if replace {
 				self.setViewControllers(Array(self.viewControllers.dropLast()) + [next], animated: true)
 			} else {

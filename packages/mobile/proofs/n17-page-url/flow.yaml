@@ -1,0 +1,48 @@
+appId: ${APP_ID}
+name: n17-page-url
+---
+- launchApp:
+      clearState: true
+- assertVisible: Home path /
+- assertVisible: Home search \[\]
+- assertVisible: Home tab no tab
+- assertVisible: Home
+- tapOn: Open note 7
+- assertNotVisible: Home path /
+- assertVisible: Note
+- assertVisible: Note 7
+- assertVisible: Note path /notes/7
+- assertVisible: Note search \[\?tab=done\]
+- assertVisible: Note hash \[\]
+- assertVisible: Note tab done
+- assertNotVisible: Home path /
+- assertVisible: Note
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertVisible: Home path /
+- assertNotVisible: Note 7
+- assertVisible: Home
+- assertVisible: Home path /
+- assertVisible: Home search \[\]
+- assertVisible: Home tab no tab
+- assertNotVisible: Note 7
+- assertVisible: Home
+- tapOn: Open note 8
+- assertNotVisible: Home path /
+- assertVisible: Note
+- assertVisible: Note 8
+- assertVisible: Note path /notes/8
+- assertVisible: Note search \[\?tab=new&sort=old\]
+- assertVisible: Note hash \[\]
+- assertVisible: Note tab new
+- assertNotVisible: Home path /
+- assertVisible: Note
