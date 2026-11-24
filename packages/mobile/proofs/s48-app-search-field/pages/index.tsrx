@@ -18,6 +18,9 @@ export default function Search() @{
 				border-radius: 999px;
 				background: #ffffff;
 			}
+			.tall {
+				line-height: 1.45;
+			}
 		</style>
 		<title>Search field</title>
 		<input
@@ -34,5 +37,6 @@ export default function Search() @{
 			<p>Searched</p>
 		}
 		<input class="search" type="search" aria-label="Saved search" value="Groceries" />
+		<input class="search tall" type="search" aria-label="Tall search" placeholder="Name or date" />
 	</main>
 }

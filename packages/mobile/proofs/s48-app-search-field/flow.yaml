@@ -9,8 +9,10 @@ name: s48-app-search-field
 - launchApp
 - assertVisible: Title or tag
 - assertVisible: Nothing searched
+- assertVisible: Name or date
 - assertVisible: ""
 - assertVisible: Groceries
+- assertVisible: ""
 - assertVisible: Search field
 - tapOn: Search notes
 - eraseText

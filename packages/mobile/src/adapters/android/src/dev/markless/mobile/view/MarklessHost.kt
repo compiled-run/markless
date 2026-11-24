@@ -2260,8 +2260,11 @@ class MarklessHost(
 			view.hint = null
 			return
 		}
-		if (shown.frame != box || absolute[shown.id] != absolute[editor.id])
-			throw MarklessHostError("\"${s.id}\": a placeholder box other than the editor box is not implemented on Android")
+		// The hint is drawn where the value is: a single-line field centres it in the editor box, so a placeholder line Dragon centres there matches.
+		val (px, py) = absolute.getValue(shown.id)
+		val hinted = shown.frame == box && absolute[shown.id] == absolute[editor.id] ||
+			styled.textAreas[s.id] == null && px == ex && shown.frame!!.width == box.width && Math.abs((py + shown.frame!!.height / 2) - (ey + box.height / 2)) <= 1.0
+		if (!hinted) throw MarklessHostError("\"${s.id}\": a placeholder box other than the editor box is not implemented on Android")
 		val (hintFont, hintColor) = look(words)
 		if (hintFont.family != font.family || hintFont.size != font.size)
 			throw MarklessHostError("\"${s.id}\": a placeholder in another font than the value's is not implemented on Android")
