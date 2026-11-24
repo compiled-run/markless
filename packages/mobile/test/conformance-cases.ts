@@ -41,6 +41,14 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'animation-events',
+		fixture: 'test/fixtures/AnimationEvents.tsrx',
+		actions: [
+			{ event: 'animationstart', host: 'h1', animationName: 'close', elapsedTime: 0 },
+			{ event: 'animationend', host: 'h1', animationName: 'close', elapsedTime: 0.25 },
+		],
+	},
+	{
 		// A component's `value={prop}` that never changes leaves the typed text in the field.
 		name: 'component-input-value',
 		fixture: 'proofs/u120-component-input-value/App.tsrx',
@@ -53,6 +61,12 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		// A handler's matchMedia answers from the device's settings, which a conformance run fixes at the web's defaults.
 		name: 'match-media',
 		fixture: 'proofs/u125-match-media/App.tsrx',
+		actions: [{ event: 'activate', host: 'h2' }],
+	},
+	{
+		// A handler's devicePixelRatio reads the screen, which a conformance run fixes at 1.
+		name: 'device-pixel-ratio',
+		fixture: 'proofs/u132-device-pixel-ratio/App.tsrx',
 		actions: [{ event: 'activate', host: 'h2' }],
 	},
 	{
@@ -90,6 +104,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h2' },
 			{ event: 'activate', host: 'h3' },
 			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'row-slots',
+		fixture: 'test/fixtures/RowSlots.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
 		],
 	},
 	{
@@ -479,6 +502,14 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h2' }],
 	},
 	{
+		name: 'svg-gradients',
+		fixture: 'proofs/u128-svg-gradients/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h20' },
+			{ event: 'activate', host: 'h20' },
+		],
+	},
+	{
 		name: 'types',
 		fixture: 'test/fixtures/Types.tsrx',
 		actions: [
@@ -818,6 +849,23 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'press-bubbles',
+		fixture: 'proofs/r165-press-bubbles/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h2' },
+		],
+	},
+	{
+		name: 'row-live',
+		fixture: 'proofs/r166-row-live/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
 		name: 'radio-follows',
 		fixture: 'proofs/r163-radio-follows/App.tsrx',
 		modules: true,
@@ -920,6 +968,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'hidden-in-control',
+		fixture: 'test/fixtures/HiddenInControl.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
 		name: 'field-focus',
 		fixture: 'test/fixtures/FieldFocus.tsrx',
 		actions: [
@@ -1009,6 +1066,67 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'pointermove', host: 'h1', pointerId: 1, x: 20, y: 90, time: 1032 },
 			{ event: 'pointerup', host: 'h1', pointerId: 1, x: 20, y: 90, time: 1048 },
 			{ event: 'pointerdown', host: 'h1', pointerId: 2, x: 20, y: 40, time: 2000 },
+		],
+	},
+	{
+		// A DataTransfer built in a handler and kept in a WeakMap keyed by an element, across two presses.
+		name: 'file-store',
+		fixture: 'test/fixtures/FileStore.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h2' },
+		],
+	},
+	{
+		// A file input's picker opened from a button, the files it chose read in its change handler, then cleared.
+		name: 'file-input',
+		fixture: 'test/fixtures/FileInput.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{
+				event: 'pick',
+				host: 'h1',
+				files: [
+					{
+						ref: 'picked:1',
+						name: 'note.txt',
+						size: 5,
+						type: 'text/plain',
+						lastModified: 1700000000000,
+					},
+					{
+						ref: 'picked:2',
+						name: 'photo.png',
+						size: 2048,
+						type: 'image/png',
+						lastModified: 1700000001000,
+					},
+				],
+			},
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
+		// A submit handler sends the form's FormData, a chosen file and a file made from text, as multipart.
+		name: 'file-upload',
+		fixture: 'test/fixtures/FileUpload.tsrx',
+		actions: [
+			{ event: 'input', host: 'h2', value: 'Trip' },
+			{
+				event: 'pick',
+				host: 'h3',
+				files: [
+					{
+						ref: 'picked:1',
+						name: 'note.txt',
+						size: 5,
+						type: 'text/plain',
+						lastModified: 1700000000000,
+					},
+				],
+			},
+			{ event: 'activate', host: 'h4' },
 		],
 	},
 	{
@@ -1312,13 +1430,26 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		// numberbox's step buttons: a press steps and starts the hold's clock, the lift stops it; a press the platform takes
+		// for a scroll steps and is cancelled, which stops it too.
+		name: 'press-cancel',
+		fixture: 'proofs/u40-numberbox/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'pointerdown', host: 'component-edge:4/h5' },
+			{ event: 'pointerup', host: 'component-edge:4/h5' },
+			{ event: 'pointerdown', host: 'component-edge:2/h4' },
+			{ event: 'pointerup', host: 'component-edge:2/h4' },
+			{ event: 'pointerdown', host: 'component-edge:4/h5' },
+			{ event: 'pointercancel', host: 'component-edge:4/h5' },
+		],
+	},
+	{
 		// qr-code: the svg's viewBox and its path's outline follow the code's value; the engine turns each into numbers.
 		name: 'live-drawing',
 		fixture: 'proofs/u42-qr-code/App.tsrx',
 		modules: true,
-		actions: [
-			{ event: 'activate', host: 'h3' },
-		],
+		actions: [{ event: 'activate', host: 'h3' }],
 	},
 	{
 		name: 'element-measure',
@@ -1714,6 +1845,40 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		actions: [{ event: 'activate', host: 'h4' }],
 	},
 	{
+		name: 'script-url',
+		fixture: 'proofs/j52-url/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h7' },
+		],
+	},
+	{
+		name: 'center',
+		fixture: 'proofs/r171-center/App.tsrx',
+		modules: true,
+		actions: [{ event: 'activate', host: 'h4' }],
+	},
+	{
+		// Dashed strokes reach the hosts as even dash lists with their offset.
+		name: 'svg-dashes',
+		fixture: 'proofs/r172-svg-dashes/App.tsrx',
+		modules: true,
+		actions: [],
+	},
+	{
+		name: 'details',
+		fixture: 'proofs/r145-details/App.tsrx',
+		modules: true,
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h3' },
+		],
+	},
+	{
 		// The real modal family: trigger, a press inside the dialog, a press on its backdrop, an alert that refuses one, Escape.
 		name: 'overlay',
 		fixture: 'proofs/u20-modal/App.tsrx',
@@ -1901,6 +2066,17 @@ export const APP_CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'component-edge:0' },
 			{ event: 'activate', host: 'h4' },
 			{ event: 'back' },
+		],
+	},
+	{
+		// A page's url: its pathname and query at mount, and the query a <Link> or a script's navigate() opens a page with.
+		name: 'page-url',
+		app: 'proofs/n17-page-url',
+		open: '/',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0' },
+			{ event: 'back' },
+			{ event: 'activate', host: 'h5' },
 		],
 	},
 	{

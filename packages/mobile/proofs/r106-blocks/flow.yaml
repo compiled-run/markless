@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r106-blocks
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Blocks
 - assertVisible: Quotes, figures and rules
 - assertVisible: Second level

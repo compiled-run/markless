@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u83-row-element-facts
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Ada
 - assertVisible: Bo
 - assertNotVisible: pressed Ada

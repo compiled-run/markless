@@ -18,6 +18,7 @@ import {
 	withAdmission,
 } from './phones.ts';
 import { parsePhone, phoneId, type PhoneSpec, type PhoneState, transitionPhone } from './pool.ts';
+import { RemoteAway, remoteBoot, runRemoteChunk } from './remote.ts';
 import {
 	checkoutFacts,
 	jobStarted,
@@ -55,7 +56,7 @@ import {
 	writeJson,
 } from './store.ts';
 import { hostFingerprint, recordPass, rungFingerprint } from './reuse.ts';
-import { pickChunk } from './schedule.ts';
+import { pickChunk, standsBy } from './schedule.ts';
 import { spawnRunner } from './spawn-runner.ts';
 
 /** Machine-queue reservations: a chunk with host tests peaked at 0.9 GB (heavy-history, 2026-11-18); a boot holds a phone's memory. */
@@ -66,6 +67,7 @@ const BOOT_GB = { ios: 3, android: 4 } as const;
 const BOOT_ATTEMPTS = 3;
 const HEALTH_EVERY_MS = 30_000;
 const REFRESH_EVERY_MS = 60_000;
+const AWAY_RETRY_MS = 60_000;
 
 type Phone = {
 	readonly spec: PhoneSpec;
@@ -96,7 +98,10 @@ log(
 // A chunk with a rung that fetches holds the test's echo server, open only while such a chunk runs, so a web test or the
 // harness can take the port between jobs; a server already there answers alike.
 let echo:
-	| { users: number; server: Promise<{ close: () => Promise<void> } | undefined> }
+	| {
+			users: number;
+			server: Promise<{ close: () => Promise<void> } | undefined>;
+	  }
 	| undefined;
 const holdEcho = () => {
 	echo ??= {
@@ -123,7 +128,13 @@ const releaseEcho = async () => {
 // A chunk with an app rung (alone in its chunk) holds that app's own web server on APP_SERVER_PORT, shared by the same rung's
 // chunks on other phones; another app waits for the port.
 let app:
-	| { key: string; users: number; server: Promise<BuiltServer | undefined>; released: Promise<void>; release: () => void }
+	| {
+			key: string;
+			users: number;
+			server: Promise<BuiltServer | undefined>;
+			released: Promise<void>;
+			release: () => void;
+	  }
 	| undefined;
 const holdApp = async (job: string, rung: string) => {
 	const key = `${job}/${rung}`;
@@ -142,7 +153,9 @@ const holdApp = async (job: string, rung: string) => {
 			}).then(
 				(server) => (log(`${rung}'s web server on ${server.origin}`), server),
 				(error: unknown) => {
-					log(`${rung}'s web server not started: ${error instanceof Error ? error.message : String(error)}`);
+					log(
+						`${rung}'s web server not started: ${error instanceof Error ? error.message : String(error)}`,
+					);
 					return undefined;
 				},
 			),
@@ -159,7 +172,9 @@ const releaseApp = async () => {
 	held.release();
 };
 const servedApp = (job: string, chunk: Chunk) =>
-	chunk.rungs.find((rung) => readJson<BundledRung>(join(bundleRung(job, rung), 'rung.json'))?.server === 'app');
+	chunk.rungs.find(
+		(rung) => readJson<BundledRung>(join(bundleRung(job, rung), 'rung.json'))?.server === 'app',
+	);
 const fetches = (job: string, chunk: Chunk) =>
 	chunk.rungs.some(
 		(rung) =>
@@ -189,28 +204,46 @@ const move = (phone: Phone, event: Parameters<typeof transitionPhone>[1]) => {
 
 async function boot(phone: Phone, restart: boolean): Promise<void> {
 	const id = phoneId(phone.spec);
+	const { spec } = phone;
 	for (let attempt = 1; attempt <= BOOT_ATTEMPTS; attempt++) {
 		try {
 			const fresh = restart || attempt > 1;
 			// A phone that already runs costs the machine nothing new, so only a real boot waits for the machine queue.
 			const address =
-				!fresh && (await phoneRunning(phone.spec, tools))
-					? await bootPhone(phone.spec, tools)
-					: await withAdmission(BOOT_GB[phone.spec.platform], `boot ${id}`, async () => {
-							if (fresh) await stopPhone(phone.spec, tools);
-							return bootPhone(phone.spec, tools);
-						});
+				spec.platform === 'android' && spec.remote !== undefined
+					? {
+							device: await remoteBoot({ ...spec, remote: spec.remote }, fresh),
+						}
+					: !fresh && (await phoneRunning(phone.spec, tools))
+						? await bootPhone(phone.spec, tools)
+						: await withAdmission(
+								BOOT_GB[phone.spec.platform],
+								`boot ${id}`,
+								async () => {
+									if (fresh) await stopPhone(phone.spec, tools);
+									return bootPhone(phone.spec, tools);
+								},
+							);
 			phone.checkedAt = Date.now();
 			move(phone, { type: 'booted', device: address.device });
 			log(`${id} ready (${address.device})`);
 			return;
 		} catch (error) {
+			if (error instanceof RemoteAway) {
+				phone.checkedAt = Date.now();
+				if (phone.state.state !== 'away') log(`${id} is away: ${error.message}`);
+				move(phone, { type: 'away', reason: error.message });
+				return;
+			}
 			log(
 				`${id} boot ${attempt} of ${BOOT_ATTEMPTS} failed: ${error instanceof Error ? error.message : String(error)}`,
 			);
 		}
 	}
-	move(phone, { type: 'give-up', reason: `${BOOT_ATTEMPTS} boots failed; see ${daemonLog()}` });
+	move(phone, {
+		type: 'give-up',
+		reason: `${BOOT_ATTEMPTS} boots failed; see ${daemonLog()}`,
+	});
 }
 
 async function restart(phone: Phone, reason: string): Promise<void> {
@@ -238,14 +271,20 @@ const chunkNames = (job: string) =>
 		: [];
 
 const chunksOf = (job: string) =>
-	chunkNames(job).map((name) => ({ name, chunk: readJson<Chunk>(chunkFile(job, name))! }));
+	chunkNames(job).map((name) => ({
+		name,
+		chunk: readJson<Chunk>(chunkFile(job, name))!,
+	}));
 
 /** The next chunk for a free phone of this platform; while the runner waits to restart on origin/main, no new job starts. */
 function nextChunk(
 	platform: PhoneSpec['platform'],
 ): { job: string; name: string; chunk: Chunk } | undefined {
 	const holding = refresh.state === 'pending' || refresh.state === 'moving';
-	const jobs = jobIds().map((id) => ({ id: jobDir(id), chunks: chunksOf(jobDir(id)) }));
+	const jobs = jobIds().map((id) => ({
+		id: jobDir(id),
+		chunks: chunksOf(jobDir(id)),
+	}));
 	return pickChunk(jobs, platform, !holding);
 }
 
@@ -310,36 +349,67 @@ async function run(phone: Phone, job: string, name: string, queued: Chunk): Prom
 		transitionChunk(queued, { type: 'claim', phone: id, at: Date.now() }),
 	);
 	move(phone, { type: 'take', chunk: `${job}/${name}` });
-	const echoed = fetches(job, queued);
+	const { spec } = phone;
+	const remote =
+		spec.platform === 'android' && spec.remote !== undefined
+			? { ...spec, remote: spec.remote }
+			: undefined;
+	// A remote phone's machine serves a fetching rung's servers itself.
+	const echoed = !remote && fetches(job, queued);
 	if (echoed) await holdEcho();
-	const served = servedApp(job, queued);
+	const served = remote ? undefined : servedApp(job, queued);
 	if (served) await holdApp(job, served);
 	try {
 		log(`${id} runs ${job} ${name} (${queued.rungs.length} rungs)`);
 		mkdirSync(join(job, 'logs'), { recursive: true });
 		const out = openSync(chunkLog(job, name), 'a');
-		const command = [
-			process.execPath,
-			join(import.meta.dirname, 'run-chunk.ts'),
-			job,
-			name,
-			device,
-			driverInstalled ? 'keep-driver' : 'reinstall-driver',
-		];
-		const heavy = heavyCommand();
-		const child = spawn(heavy ?? command[0]!, heavy ? command : command.slice(1), {
-			// Never give up: a chunk that the queue refuses to admit would end without a result.
-			env: {
-				...process.env,
-				HEAVY_GB: String(CHUNK_GB),
-				HEAVY_CORES: String(CHUNK_CORES),
-				HEAVY_MAX_WAIT: '0',
-			},
-			stdio: ['ignore', out, out],
-		});
-		children.add(child);
-		await new Promise<void>((resolve) => child.on('exit', () => resolve()));
-		children.delete(child);
+		if (remote) {
+			try {
+				await runRemoteChunk(
+					remote,
+					job,
+					name,
+					JSON.stringify(queued),
+					driverInstalled ? 'keep-driver' : 'reinstall-driver',
+					out,
+				);
+			} catch (error) {
+				if (!(error instanceof RemoteAway)) throw error;
+				writeJson(
+					chunkFile(job, name),
+					transitionChunk(readJson<Chunk>(chunkFile(job, name))!, {
+						type: 'abandon',
+					}),
+				);
+				log(`${id} gave ${job} ${name} back to the queue: ${error.message}`);
+				phone.checkedAt = Date.now();
+				move(phone, { type: 'away', reason: error.message });
+				return;
+			}
+		} else {
+			const command = [
+				process.execPath,
+				join(import.meta.dirname, 'run-chunk.ts'),
+				job,
+				name,
+				device,
+				driverInstalled ? 'keep-driver' : 'reinstall-driver',
+			];
+			const heavy = heavyCommand();
+			const child = spawn(heavy ?? command[0]!, heavy ? command : command.slice(1), {
+				// Never give up: a chunk that the queue refuses to admit would end without a result.
+				env: {
+					...process.env,
+					HEAVY_GB: String(CHUNK_GB),
+					HEAVY_CORES: String(CHUNK_CORES),
+					HEAVY_MAX_WAIT: '0',
+				},
+				stdio: ['ignore', out, out],
+			});
+			children.add(child);
+			await new Promise<void>((resolve) => child.on('exit', () => resolve()));
+			children.delete(child);
+		}
 		if (stopping) return;
 		const running = readJson<Chunk>(chunkFile(job, name))!;
 		const written = readJson<RungResult[]>(chunkResultFile(job, name)) ?? [];
@@ -497,12 +567,17 @@ async function takeNext(phone: Phone): Promise<void> {
 		return;
 	}
 	phone.checkedAt = Date.now();
+	if (standsBy(phone.spec, phones)) return;
 	// Read again after the check: another phone of this platform may have taken the chunk meanwhile.
 	const next = nextChunk(phone.spec.platform);
 	if (next) await run(phone, next.job, next.name, next.chunk);
 }
 
 async function health(phone: Phone): Promise<void> {
+	if (phone.state.state === 'away') {
+		if (Date.now() - phone.checkedAt >= AWAY_RETRY_MS) await boot(phone, false);
+		return;
+	}
 	if (phone.state.state !== 'ready' || Date.now() - phone.checkedAt < HEALTH_EVERY_MS) return;
 	phone.checkedAt = Date.now();
 	if (!(await phoneAnswers(phone.spec, { device: phone.state.device }, tools)))
@@ -559,7 +634,9 @@ for (;;) {
 	for (const phone of phones) {
 		if (busy.has(phone)) continue;
 		const work =
-			phone.state.state === 'ready' && nextChunk(phone.spec.platform)
+			phone.state.state === 'ready' &&
+			!standsBy(phone.spec, phones) &&
+			nextChunk(phone.spec.platform)
 				? takeNext(phone)
 				: health(phone);
 		busy.add(phone);

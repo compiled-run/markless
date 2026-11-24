@@ -1,0 +1,15 @@
+appId: ${APP_ID}
+name: r171-center
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Poll
+- assertVisible: "Votes: 0"
+- tapOn: Vote
+- assertNotVisible: "Votes: 0"
+- assertVisible: "Votes: 1"
+- assertNotVisible: "Votes: 0"

@@ -1,0 +1,17 @@
+{
+	"rung": "S33",
+	"name": "A box with borders, a border radius and overflow: hidden clips its children to its padding box, the border box inset by each side's border with each inner corner the radius less the borders beside it, so a full-width coloured band shows round corners inside an even and an uneven border on the web, iOS and Android",
+	"steps": [
+		{
+			"visible": ["Bordered cards", "Basil, inside the border", "Thyme, uneven sides", "Opened 0"],
+			"absent": ["Opened 1"],
+			"title": "Cards"
+		},
+		{
+			"do": { "tap": "Open card" },
+			"visible": ["Opened 1", "Basil, inside the border", "Thyme, uneven sides"],
+			"absent": ["Opened 0"],
+			"title": "Cards"
+		}
+	]
+}

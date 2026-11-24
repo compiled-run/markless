@@ -529,16 +529,35 @@ export function createEventWiring(input: {
 		const pressed = submittedForm(event);
 		if (pressed) pressRecords.set(event, submitRecord(pressed));
 		const handled = marklessEventReceived(input.root, event);
-		return dispatchArrived(event, handled, dispatchOptions).finally(() => {
+		const turn = pressTurn();
+		return dispatchArrived(event, handled, turn, dispatchOptions).finally(() => {
+			turn.start();
 			handled();
 			releaseArrivingEdits();
 		});
 	}
+	// Presses that let the dispatch queue go while their arm registered, in arrival order, until each one's handler starts.
+	const releasedPresses = new Set<PressTurn>();
+	function pressTurn(): PressTurn {
+		let start!: () => void;
+		const started = new Promise<void>((resolve) => (start = resolve));
+		const turn: PressTurn = {
+			entries: new Set(),
+			started,
+			start: () => {
+				releasedPresses.delete(turn);
+				start();
+			},
+		};
+		return turn;
+	}
 	async function dispatchArrived(
 		event: ResumeDomEvent,
 		handled: () => void,
+		turn: PressTurn,
 		dispatchOptions?: ResumeDispatchOptions,
 	): Promise<void> {
+		const ahead = [...releasedPresses];
 		const queueRelease = input.root.__marklessReleaseDispatch;
 		const moved = keyTargetAfterHandlerFocus(event, input.root);
 		if (moved) Object.defineProperty(event, 'target', { value: moved });
@@ -550,6 +569,7 @@ export function createEventWiring(input: {
 			// An authored await also ends what a navigation waits for.
 			releaseQueue: () => {
 				queueRelease?.();
+				turn.start();
 				handled();
 			},
 		};
@@ -580,10 +600,15 @@ export function createEventWiring(input: {
 				entry.holds(pressAnchor ?? target),
 			);
 		for (let waits = registeringAt(); waits.length; waits = registeringAt()) {
+			for (const entry of waits) turn.entries.add(entry);
+			releasedPresses.add(turn);
 			queueRelease?.();
 			if ((await Promise.all(waits.map((entry) => entry.settled))).includes(false)) return;
 			path = collect();
 		}
+		// Letting the queue go must not let a later press on the same content overtake, as a submit reading the field an input writes.
+		for (const earlier of ahead)
+			if ([...earlier.entries].some((entry) => entry.holds(pressAnchor ?? target))) await earlier.started;
 		// A broad forward of markup no record owns may find it already removed by a script (a copy fallback's textarea).
 		if (
 			!attached &&
@@ -1040,6 +1065,11 @@ async function marklessLogInteraction(input: {
 }
 
 type ArmRegisteringRoot = { readonly __marklessArmRegistering?: ReadonlySet<ResumeArmRegistration> };
+type PressTurn = {
+	readonly entries: Set<ResumeArmRegistration>;
+	readonly started: Promise<void>;
+	readonly start: () => void;
+};
 
 type ResumeDispatchMatch =
 	| { readonly element: ResumeDomElement; readonly rowMatch: ResumeRowEventMatch }

@@ -1,0 +1,29 @@
+appId: ${APP_ID}
+name: s49-pressed-focused
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Pressed and focused
+- assertVisible: Press and hold
+- assertVisible: Pressed 0
+- assertVisible: Not agreed
+- assertNotVisible: Pressed 1
+- assertNotVisible: Agreed
+- assertVisible: Pressed
+- tapOn: Press and hold
+- assertVisible: Pressed 1
+- assertNotVisible: Pressed 0
+- assertVisible: Pressed 1
+- assertVisible: Not agreed
+- assertNotVisible: Pressed 0
+- assertVisible: Pressed
+- tapOn: Agree
+- assertNotVisible: Not agreed
+- assertVisible: Pressed 1
+- assertVisible: Agreed
+- assertNotVisible: Not agreed
+- assertVisible: Pressed

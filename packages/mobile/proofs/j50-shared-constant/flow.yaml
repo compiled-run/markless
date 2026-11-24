@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j50-shared-constant
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Sizes
 - assertVisible: Sizes Small and Large
 - assertVisible: Chosen Small

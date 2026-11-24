@@ -115,6 +115,12 @@ export type NativeExpr =
 	| { readonly index: string }
 	/** The page's route params, an object of strings (the page component's `params` prop). */
 	| { readonly route: 'params' }
+	/**
+	 * The page's address as its `url` prop has it, `{ pathname, search, hash }`: the route pattern with the params it
+	 * opened with, each URL-encoded, and the query it was opened with (`?…`, or ''). The hash is always '', as the web
+	 * renders a page on the server, which never sees one.
+	 */
+	| { readonly route: 'url' }
 	| { readonly call: NativeBuiltin; readonly arguments: ReadonlyArray<NativeExpr> }
 	/** In an `input` handler: the field's text after the edit (`event.currentTarget.value`). */
 	/**
@@ -133,6 +139,7 @@ export type NativeExpr =
 				| 'key'
 				| 'text'
 				| 'detail'
+				| NativeAnimationField
 				| NativePointerField;
 	  }
 	/** Whether the element `node` has captured the pointer `pointer` (`node.hasPointerCapture(pointer)`). */
@@ -202,7 +209,9 @@ export type NativeScriptBinding =
 	/** A `shared()` accessor (`selectState`): a function that returns that object. */
 	| { readonly shared: Readonly<Record<string, NativeScriptBinding>> }
 	/** A function a parent passed as a prop: the script function `callback`, its own names bound as `<name>.<its name>`. */
-	| { readonly callback: string };
+	| { readonly callback: string }
+	/** The page's `url` prop: the host passes `{ route: 'url' }`'s value, which the script reads as a `URL`. */
+	| { readonly url: true };
 
 export type NativeScriptBindings = Readonly<Record<string, NativeScriptBinding>>;
 
@@ -219,7 +228,8 @@ export type NativeScriptService =
 	| 'crypto'
 	| 'navigate'
 	| 'device'
-	| 'media';
+	| 'media'
+	| 'screen';
 
 /** The media features a script's `matchMedia` reads, each with the values a phone answers from its settings, first the web's default. */
 export const NATIVE_SCRIPT_MEDIA_FEATURES = {
@@ -229,8 +239,13 @@ export const NATIVE_SCRIPT_MEDIA_FEATURES = {
 
 /** The device's answer to each media feature now, which every script entry of a page that reads `matchMedia` carries. */
 export type NativeScriptMedia = {
-	readonly [Feature in keyof typeof NATIVE_SCRIPT_MEDIA_FEATURES]: (typeof NATIVE_SCRIPT_MEDIA_FEATURES)[Feature][number];
+	readonly [
+		Feature in keyof typeof NATIVE_SCRIPT_MEDIA_FEATURES
+	]: (typeof NATIVE_SCRIPT_MEDIA_FEATURES)[Feature][number];
 };
+
+/** The screen a script's `devicePixelRatio` reads as each entry begins: device pixels per CSS px, as the phone's browser reports it. */
+export type NativeScriptScreen = { readonly devicePixelRatio: number };
 
 /** The web's answers with no setting changed, which a host without a value for a feature reports. */
 export const NATIVE_SCRIPT_MEDIA_DEFAULTS: NativeScriptMedia = {
@@ -305,6 +320,10 @@ export type NativeDefaultStyle = {
 	readonly rule?: true;
 	/** On `<ul>` and `<ol>`: the marker each item shows before its content. */
 	readonly marker?: 'disc' | 'decimal';
+	/** On `<summary>`: a triangle before its content, not read aloud: ▸ while its `aria-expanded` is false, ▾ while true. */
+	readonly disclosure?: true;
+	/** On `<center>`: its blocks in the middle of the line and its text centred (`text-align: -webkit-center`), inherited. */
+	readonly center?: true;
 	/** Table structure: `<td>` and `<th>` cells line up in columns across the rows of their `<table>`. */
 	readonly table?: 'table' | 'row' | 'cell';
 };
@@ -398,6 +417,9 @@ export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
 	audio: {},
 	label: {},
 	dialog: {},
+	details: {},
+	summary: { disclosure: true },
+	center: { center: true },
 	form: {},
 	select: {},
 	option: {},
@@ -462,6 +484,25 @@ export type NativeColor = {
 	readonly alpha: number;
 };
 
+/** A gradient's colour at `offset` (0 to 1, never less than the stop before it). */
+export type NativeGradientStop = { readonly offset: number; readonly color: NativeColor };
+
+/**
+ * An SVG `<linearGradient>` or `<radialGradient>` paint (SVG 2 §14.2), padded: the first stop's colour before it, the last
+ * one's after it. The first stop is at 0 and the last at 1. Colours blend unpremultiplied in sRGB, as the browser blends
+ * them; where two stops differ in both colour and alpha the compiler adds stops between them, so a host that blends
+ * premultiplied draws the same colours.
+ */
+export type NativeGradient = (
+	| { readonly linear: readonly [x1: number, y1: number, x2: number, y2: number] }
+	/** From the focal circle (fx, fy, fr) to the circle (cx, cy, r), which holds it. */
+	| { readonly radial: readonly [fx: number, fy: number, fr: number, cx: number, cy: number, r: number] }
+) & {
+	readonly stops: ReadonlyArray<NativeGradientStop>;
+	/** The affine map from the gradient's units to the shape's: its bounding box, then `gradientTransform`. */
+	readonly transform?: readonly [number, number, number, number, number, number];
+};
+
 /** One shape of a drawing; numbers are in the drawing's user units. */
 export type NativeShape = {
 	/**
@@ -470,13 +511,17 @@ export type NativeShape = {
 	 */
 	readonly path: ReadonlyArray<number>;
 	/** `currentColor` is the svg's text colour: its style export's, else the page's default black. */
-	readonly fill: NativeColor | 'currentColor' | null;
+	readonly fill: NativeColor | 'currentColor' | NativeGradient | null;
 	readonly fillRule: 'nonzero' | 'evenodd';
-	readonly stroke: NativeColor | 'currentColor' | null;
+	readonly stroke: NativeColor | 'currentColor' | NativeGradient | null;
 	readonly width: number;
 	readonly cap: 'butt' | 'round' | 'square';
 	readonly join: 'miter' | 'round' | 'bevel';
 	readonly miterLimit: number;
+	/** `stroke-dasharray`: dash and gap lengths in turn, an even count; absent for a solid stroke. */
+	readonly dash?: ReadonlyArray<number>;
+	/** `stroke-dashoffset`: how far into the dash pattern the stroke starts; absent when 0. */
+	readonly dashOffset?: number;
 	/** The affine map from the shape's units to the drawing's (`[a, b, c, d, e, f]`), from `transform` on it and its groups. */
 	readonly transform?: readonly [number, number, number, number, number, number];
 	/** A `<text>` element: its `path` is empty, and the host lays out and fills these runs instead. */
@@ -486,6 +531,14 @@ export type NativeShape = {
 	 * drawn only where every one of them covers, as the browser clips it.
 	 */
 	readonly clip?: ReadonlyArray<ReadonlyArray<number>>;
+	/** The rule that fills each `clip` outline, present only when one is `evenodd` (a luminance mask with black shapes cut out). */
+	readonly clipRule?: ReadonlyArray<'nonzero' | 'evenodd'>;
+	/**
+	 * An SVG `filter` that blurs the shape alone (`feGaussianBlur` of its source graphic, in sRGB): the blur's standard
+	 * deviation in the drawing's units, and the filter region the blurred shape is drawn inside (verb-coded, in the drawing's
+	 * units). Its `clip`s apply to the blurred result, as they do on the web.
+	 */
+	readonly blur?: { readonly deviation: number; readonly region: ReadonlyArray<number> };
 };
 
 /**
@@ -637,6 +690,8 @@ export type NativeNode = NativePlace &
 				readonly byIndex?: true;
 				/** A key joined from the item's fields, as the web joins it; `key` is then empty and is not the key. */
 				readonly keyParts?: ProtocolRepeatKeyParts;
+				/** The only values an item's field can hold, by its path joined with `.`, where the build can list them. */
+				readonly itemValues?: Readonly<Record<string, ReadonlyArray<string | number | boolean | null>>>;
 		  }
 		| {
 				/**
@@ -700,8 +755,18 @@ export type NativeEventName =
 	/** A range input let go after its value moved: the web's `change` on it. */
 	| 'commit'
 	| 'contextmenu'
+	| NativeAnimationEventName
 	| NativePointerEventName
 	| NativeMouseEventName;
+
+/**
+ * A CSS animation's events on a styled page, as the host's run of Dragon's animator gives them (css-animations-1 §4.2): it
+ * started, began another iteration, ended, or was removed while it ran.
+ */
+export type NativeAnimationEventName = 'animationstart' | 'animationiteration' | 'animationend' | 'animationcancel';
+
+/** What an animation event carries: the `@keyframes` name and the elapsed time in seconds. */
+export type NativeAnimationField = 'animationName' | 'elapsedTime';
 
 /**
  * The pointer events a touch raises, in a phone browser's order (Safari on iOS, Chrome on Android): `pointerover`, then
@@ -830,6 +895,8 @@ export type NativeOp =
 	  }
 	/** `event.preventDefault()` in a text field's `keydown` or `paste` handler: the host leaves out what the key or paste does. */
 	| { readonly op: 'preventDefault' }
+	/** `event.stopPropagation()` in a click handler: the press runs no handler of the elements around this one. */
+	| { readonly op: 'stopPropagation' }
 	/**
 	 * `field.value = text` on a text field: its text becomes `value` (as a string), as if typed but with no input event; the
 	 * journal's `property` entry carries it to the field. `node` is a fixed id or an expression giving one (null: nothing).
@@ -862,12 +929,14 @@ export type NativeOp =
 	/**
 	 * Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. A param
 	 * is a string fixed at build time or an expression evaluated when the op runs (a row's item inside a list row).
-	 * `replace` takes the place of the current screen instead of pushing a new one.
+	 * `replace` takes the place of the current screen instead of pushing a new one. `search` is the query the page opens
+	 * with (`?tab=done`), which its `url` prop reads.
 	 */
 	| {
 			readonly op: 'navigate';
 			readonly route: string;
 			readonly params: Readonly<Record<string, string | NativeExpr>>;
+			readonly search?: string;
 			readonly replace?: true;
 	  }
 	/**
@@ -891,8 +960,8 @@ export type NativeOp =
 	| { readonly op: 'reset'; readonly cells: ReadonlyArray<string>; readonly catch?: string };
 
 /** Element commands a host runs. */
-/** `select` selects a text field's whole text, as `field.select()` does. */
-export type NativeCommand = 'focus' | 'scrollIntoView' | 'select';
+/** `select` selects a text field's whole text, as `field.select()` does; `showPicker` opens a file input's picker. */
+export type NativeCommand = 'focus' | 'scrollIntoView' | 'select' | 'showPicker';
 
 /** The non-finite numbers JSON cannot hold: each with its path (object keys and array indices) inside a value. */
 export type NativeNonFinite = ReadonlyArray<
@@ -1070,6 +1139,8 @@ export type NativeViewPayload = {
 		readonly integer?: true;
 		/** Evaluated only while this style case has `value`; otherwise the slot keeps its last value (0 before the first). */
 		readonly when?: { readonly case: string; readonly value: boolean };
+		/** Inside a @for row: one value per row, `<slot>@<row key>`, evaluated with that row's item. */
+		readonly row?: string;
 	}>;
 	/**
 	 * Conditions a style follows (an element's `styleWhen`): each is whether its test is truthy now, journalled as `state`
@@ -1352,7 +1423,15 @@ export type NativeForm = {
 };
 
 /** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, a hidden input, or a `<select>`. */
-export type NativeFieldKind = 'text' | 'number' | 'checkbox' | 'radio' | 'hidden' | 'select';
+/** `file`: a file input, whose entries are the files its JavaScript holds; only a submit handler's script reads them. */
+export type NativeFieldKind =
+	| 'text'
+	| 'number'
+	| 'checkbox'
+	| 'radio'
+	| 'hidden'
+	| 'select'
+	| 'file';
 
 export {
 	NATIVE_NUMBER_MESSAGES_BY_LOCALE,
@@ -1431,6 +1510,13 @@ export type NativeJournalEntry =
 			readonly name: 'value';
 			readonly value: string;
 	  }
+	/** The files a handler gave a file input, as a JSON array of their names: the input shows them, as the browser's does. */
+	| {
+			readonly op: 'property';
+			readonly node: string;
+			readonly name: 'files';
+			readonly value: string;
+	  }
 	/** A checkbox's or radio button's checkedness changed: by a tick, by its `checked` binding, or by another radio's tick. */
 	| {
 			readonly op: 'property';
@@ -1476,12 +1562,14 @@ export type NativeJournalEntry =
 	| { readonly op: 'release'; readonly object: string }
 	/**
 	 * Leave this page for the page at `route` with `params`, built from scratch. In an app the host pushes it as a new
-	 * screen, keeping this one as it is for Back, or with `replace` puts it in this screen's place.
+	 * screen, keeping this one as it is for Back, or with `replace` puts it in this screen's place. `search` is the query
+	 * the new page opens with (`?tab=done`), absent when it has none.
 	 */
 	| {
 			readonly op: 'navigate';
 			readonly route: string;
 			readonly params: Readonly<Record<string, string>>;
+			readonly search?: string;
 			readonly replace?: true;
 	  }
 	/** The page's `<title>` text changed: the host writes it to the screen's navigation bar. */
@@ -1498,8 +1586,22 @@ export type NativeFetchRequest = {
 	readonly url: string;
 	readonly method: string;
 	readonly headers: ReadonlyArray<readonly [string, string]>;
-	readonly body: string | null;
+	/** Text, or a FormData's entries, which the host sends as multipart/form-data with a boundary of its own. */
+	readonly body: string | { readonly form: ReadonlyArray<NativeFormPart> } | null;
 };
+
+/** A FormData entry: its text, or a file by its text or by the host's reference to a file a picker chose. */
+export type NativeFormPart = readonly [
+	name: string,
+	value:
+		| string
+		| {
+				readonly name: string;
+				readonly type: string;
+				readonly ref?: string;
+				readonly text?: string;
+		  },
+];
 
 /** What a host answers a `fetch` entry with: the response (its body as text), or the network error's message. */
 export type NativeFetchResponse =
@@ -1654,32 +1756,38 @@ export const NATIVE_SCRIPT_DOM_CLASSES: Readonly<Record<string, string | null>> 
 	),
 };
 
-/** Globals a host provides to scripts, by the service that backs each. */
-export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<Record<string, NativeScriptService | 'engine'>> =
-	{
-		setTimeout: 'timers',
-		clearTimeout: 'timers',
-		setInterval: 'timers',
-		clearInterval: 'timers',
-		queueMicrotask: 'engine',
-		structuredClone: 'engine',
-		performance: 'engine',
-		DOMException: 'engine',
-		// Answers an element's `direction` only, from the host's facts.
-		getComputedStyle: 'engine',
-		console: 'console',
-		fetch: 'fetch',
-		crypto: 'crypto',
-		matchMedia: 'media',
-		Event: 'engine',
-		CustomEvent: 'engine',
-		MouseEvent: 'engine',
-		PointerEvent: 'engine',
-		KeyboardEvent: 'engine',
-		...Object.fromEntries(
-			Object.keys(NATIVE_SCRIPT_DOM_CLASSES).map((name) => [name, 'engine' as const]),
-		),
-	};
+/** Globals a host provides to scripts, by the service behind each; for `url` the build adds the URL Standard's code. */
+export const NATIVE_SCRIPT_HOST_GLOBALS: Readonly<
+	Record<string, NativeScriptService | 'engine' | 'url'>
+> = {
+	setTimeout: 'timers',
+	clearTimeout: 'timers',
+	setInterval: 'timers',
+	clearInterval: 'timers',
+	queueMicrotask: 'engine',
+	structuredClone: 'engine',
+	performance: 'engine',
+	DOMException: 'engine',
+	File: 'engine',
+	DataTransfer: 'engine',
+	// Answers an element's `direction` only, from the host's facts.
+	getComputedStyle: 'engine',
+	URL: 'url',
+	URLSearchParams: 'url',
+	console: 'console',
+	fetch: 'fetch',
+	crypto: 'crypto',
+	matchMedia: 'media',
+	devicePixelRatio: 'screen',
+	Event: 'engine',
+	CustomEvent: 'engine',
+	MouseEvent: 'engine',
+	PointerEvent: 'engine',
+	KeyboardEvent: 'engine',
+	...Object.fromEntries(
+		Object.keys(NATIVE_SCRIPT_DOM_CLASSES).map((name) => [name, 'engine' as const]),
+	),
+};
 
 /**
  * What a script handler's event has on a phone, as member paths: a deeper read below `target.value` is a string's. Any
@@ -1711,9 +1819,10 @@ export const NATIVE_SCRIPT_DISMISS_EVENT_MEMBERS: ReadonlyArray<ReadonlyArray<st
 /** A submit handler's binding for its form's entries now, which its event's `target` and `currentTarget` carry for FormData. */
 export const NATIVE_SCRIPT_SUBMITTED_FORM = 'submitted form';
 
-/** Members of a page global a phone answers, read straight off it: the focused element, as a proxy. */
+/** Members of a page global a phone answers, read straight off it: the focused element, as a proxy, and the screen's history state. */
 export const NATIVE_SCRIPT_PAGE_MEMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
 	document: ['activeElement', 'addEventListener', 'removeEventListener'],
+	history: ['state', 'replaceState'],
 };
 
 /** What a touch adds to a script pointer handler's event: its plain values. The elements it names reach only data handlers. */
@@ -1796,8 +1905,6 @@ export const NATIVE_SCRIPT_PAGE_GLOBALS: Readonly<Record<string, string>> = {
 	IntersectionObserver: 'the DOM, which a phone does not have',
 	customElements: 'the DOM, which a phone does not have',
 	FormData: 'an HTML form, which a phone does not have',
-	devicePixelRatio:
-		'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
 	innerWidth:
 		'the browser window, which a phone does not have; styles adapt to the screen through Dragon',
 	innerHeight:

@@ -10,6 +10,7 @@ import {
 	NATIVE_SCRIPT_SUBMITTED_FORM,
 	NATIVE_UNBOUND_HANDLE,
 } from '@markless/serializer/native-view';
+import { NATIVE_SCRIPT_URL } from './native-script-url.ts';
 import { SVG_GEOMETRY_SOURCE } from './native-svg-geometry.ts';
 
 /** One module of a payload's script: its own code, the modules its `__i` slots name, and the functions defined in it. */
@@ -134,6 +135,50 @@ if (!host) {
 		};
 		g.DOMException.prototype = Object.create(Error.prototype, { constructor: { value: g.DOMException, writable: true, configurable: true } });
 	}
+	// Files as a page holds them: a File's name, size, type and lastModified, a FileList, and a DataTransfer to build one.
+	var utf8Length = function (text) { return unescape(encodeURIComponent(text)).length; };
+	if (typeof g.File !== 'function') {
+		g.File = function File(bits, name, options) {
+			this.name = String(name);
+			this.type = options && options.type !== undefined ? String(options.type).toLowerCase() : '';
+			this.lastModified = options && options.lastModified !== undefined ? Number(options.lastModified) : Date.now();
+			var size = 0, text = '', known = true;
+			(bits || []).forEach(function (part) {
+				size += typeof part === 'string' ? utf8Length(part) : part && typeof part.size === 'number' ? part.size : 0;
+				if (typeof part === 'string') text += part;
+				else if (part && typeof part.__text === 'string') text += part.__text;
+				else known = false;
+			});
+			this.size = size;
+			// What a request sends of it: the text it was made of, or the chosen file the host reads.
+			if (known) Object.defineProperty(this, '__text', { value: text });
+		};
+	}
+	// A file a request can send: its name and type, and its text or the host's reference to the chosen file.
+	host.filePart = function (file) {
+		var part = { name: String(file.name), type: String(file.type) };
+		if (typeof file.__ref === 'string') part.ref = file.__ref;
+		else if (typeof file.__text === 'string') part.text = file.__text;
+		else throw new TypeError('a phone sends only a file a picker chose or one made from text');
+		return part;
+	};
+	host.fileListOf = function (files) {
+		var list = files.slice();
+		list.item = function (index) { return list[index] || null; };
+		return list;
+	};
+	if (typeof g.DataTransfer !== 'function') {
+		g.DataTransfer = function DataTransfer() {
+			var held = [];
+			this.items = {
+				add: function (file) { held.push(file); return { kind: 'file', type: file.type }; },
+				remove: function (index) { held.splice(index, 1); },
+				clear: function () { held.length = 0; },
+			};
+			Object.defineProperty(this.items, 'length', { get: function () { return held.length; } });
+			Object.defineProperty(this, 'files', { get: function () { return host.fileListOf(held); } });
+		};
+	}
 	var Headers = function (pairs) {
 		this.get = function (name) {
 			var key = String(name).toLowerCase(), found = [];
@@ -170,8 +215,16 @@ if (!host) {
 			else if (Array.isArray(given)) for (var index = 0; index < given.length; index++) headers.push([String(given[index][0]), String(given[index][1])]);
 			else if (given) for (var name in given) headers.push([name, String(given[name])]);
 			var body = options.body === undefined || options.body === null ? null : options.body;
-			if (body !== null && typeof body !== 'string') {
-				reject(new TypeError('a phone sends a text body only'));
+			// A FormData goes as multipart/form-data: its text entries, and its files, which the host reads and encodes.
+			if (body !== null && typeof g.FormData === 'function' && body instanceof g.FormData) {
+				try {
+					body = { form: body.list.map(function (entry) { return [entry[0], typeof entry[1] === 'string' ? entry[1] : host.filePart(entry[1])]; }) };
+				} catch (error) {
+					reject(error);
+					return;
+				}
+			} else if (body !== null && typeof body !== 'string') {
+				reject(new TypeError('a phone sends a text body or a FormData only'));
 				return;
 			}
 			var signal = options.signal;
@@ -318,6 +371,7 @@ if (!host) {
 		if (match.route.indexOf('[...') >= 0)
 			return Promise.reject(new Error('navigate() to ' + given + ' opens ' + match.route + ', a catch-all page, which a phone does not open yet'));
 		host.out.navigate = { route: match.route, params: match.params, replace: !!(options && options.replace) };
+		if (search) host.out.navigate.search = search;
 		return Promise.resolve();
 	};
 	// A device call is a call entry the host makes; one that gives a value waits for the host's answer to its id.
@@ -398,12 +452,20 @@ if (!host) {
 			addListener: changes,
 		};
 	};
+	Object.defineProperty(g, 'devicePixelRatio', {
+		get: function () {
+			if (!host.screen) throw new TypeError('devicePixelRatio is read in a handler on a phone');
+			return host.screen.devicePixelRatio;
+		},
+	});
 	g.window = g.self = g;
 	// The page answers its focused element (the body when none is) and keeps listeners a handler adds; the host passes each
 	// pointer event to them after the element's own handlers, as the browser bubbles it to the document.
 	host.listeners = {};
 	g.document = {
 		get activeElement() { return host.focus(); },
+		// A page whose <html> has no lang, as code guarded by typeof document read it before the page had a document.
+		documentElement: { lang: '' },
 		addEventListener: function (type, listener) {
 			var list = host.listeners[String(type)] || (host.listeners[String(type)] = []);
 			if (typeof listener === 'function' && list.indexOf(listener) < 0) { list.push(listener); host.listened = true; }
@@ -413,6 +475,33 @@ if (!host) {
 			var at = list.indexOf(listener);
 			if (at >= 0) { list.splice(at, 1); host.listened = true; }
 		},
+	};
+	// Each screen is a history entry with its own state; one written after navigate() is the next screen's, as on the web.
+	host.historyStates = {};
+	host.historyNext = undefined;
+	host.screen = null;
+	host.screensSeen = 0;
+	var historyHasNext = function () { return !!(host.out && host.out.navigate); };
+	g.history = {
+		get state() {
+			if (historyHasNext()) return host.historyNext === undefined ? null : host.historyNext;
+			return Object.prototype.hasOwnProperty.call(host.historyStates, host.screen) ? host.historyStates[host.screen] : null;
+		},
+		replaceState: function (data, unused) {
+			if (arguments.length < 2) throw new TypeError("Failed to execute 'replaceState' on 'History': 2 arguments required, but only " + arguments.length + ' present.');
+			var kept = data === undefined ? null : g.structuredClone(data);
+			if (historyHasNext()) host.historyNext = kept;
+			else host.historyStates[host.screen] = kept;
+		},
+	};
+	host.enterScreen = function (screen, leaving) {
+		if (typeof screen !== 'number') return;
+		if (screen > host.screensSeen) {
+			host.screensSeen = screen;
+			if (host.historyNext !== undefined) { host.historyStates[screen] = host.historyNext; host.historyNext = undefined; }
+		}
+		host.screen = screen;
+		if (leaving) delete host.historyStates[screen];
 	};
 	host.Response = Response;
 	// The HTML structured clone, as Chromium runs it, for an engine that has none.
@@ -487,19 +576,29 @@ if (!host) {
 			if (submitter !== undefined && submitter !== null) throw new TypeError("FormData on a phone does not read a submitter yet");
 			if (form !== undefined && !(form instanceof host.Form))
 				throw new TypeError("Failed to construct 'FormData': parameter 1 is not of type 'HTMLFormElement'.");
-			this.list = form ? form.entries.map(function (entry) { return [String(entry[0]), String(entry[1])]; }) : [];
+			this.list = form ? form.entries.map(function (entry) { return [String(entry[0]), entry[1] instanceof g.File ? entry[1] : String(entry[1])]; }) : [];
+		};
+		// A File stays itself (renamed when a name is given); a Blob becomes a File named 'blob'; anything else its text.
+		var valueOf = function (value, filename) {
+			if (!(value instanceof g.File)) return String(value);
+			if (filename === undefined) return value;
+			var renamed = new g.File([], String(filename), { type: value.type, lastModified: value.lastModified });
+			Object.defineProperty(renamed, 'size', { value: value.size });
+			if (typeof value.__ref === 'string') Object.defineProperty(renamed, '__ref', { value: value.__ref });
+			if (typeof value.__text === 'string') Object.defineProperty(renamed, '__text', { value: value.__text });
+			return renamed;
 		};
 		var named = function (data, name) { return data.list.filter(function (entry) { return entry[0] === String(name); }); };
 		FormData.prototype.get = function (name) { var found = named(this, name); return found.length ? found[0][1] : null; };
 		FormData.prototype.getAll = function (name) { return named(this, name).map(function (entry) { return entry[1]; }); };
 		FormData.prototype.has = function (name) { return named(this, name).length > 0; };
-		FormData.prototype.append = function (name, value) { this.list.push([String(name), String(value)]); };
+		FormData.prototype.append = function (name, value, filename) { this.list.push([String(name), valueOf(value, filename)]); };
 		FormData.prototype['delete'] = function (name) { this.list = this.list.filter(function (entry) { return entry[0] !== String(name); }); };
-		FormData.prototype.set = function (name, value) {
+		FormData.prototype.set = function (name, value, filename) {
 			var at = -1;
 			for (var index = 0; index < this.list.length; index++) if (this.list[index][0] === String(name)) { at = index; break; }
-			if (at < 0) return this.append(name, value);
-			this.list[at] = [String(name), String(value)];
+			if (at < 0) return this.append(name, value, filename);
+			this.list[at] = [String(name), valueOf(value, filename)];
 			var kept = this.list.slice(0, at + 1);
 			this.list = kept.concat(this.list.slice(at + 1).filter(function (entry) { return entry[0] !== String(name); }));
 		};
@@ -593,7 +692,8 @@ var frameOf = function (bindings) {
 				enumerable: true,
 				value: function () { return fn(binding.callback)(frameOf(own)).apply(this, arguments); },
 			});
-		} else Object.defineProperty(names, name, { enumerable: true, value: binding.value });
+		} else if ('url' in binding) Object.defineProperty(names, name, { enumerable: true, value: pageUrl(binding.url) });
+		else Object.defineProperty(names, name, { enumerable: true, value: binding.value });
 	});
 	return names;
 };
@@ -623,6 +723,8 @@ var elementOf = function (id) {
 	};
 	var own = function (name) { return Object.prototype.hasOwnProperty.call(facts().attributes, String(name).toLowerCase()); };
 	var command = function (name, preventScroll) { host.out.commands.push([id, name, preventScroll]); };
+	var isFileInput = function () { return !!elementFacts[id] && String(elementFacts[id].attributes.type || '').toLowerCase() === 'file'; };
+	var chosen = [];
 	var proxy = {
 		getAttribute: function (name) { return own(name) ? facts().attributes[String(name).toLowerCase()] : null; },
 		hasAttribute: own,
@@ -632,7 +734,14 @@ var elementOf = function (id) {
 			return node === id || (!!elementFacts[node] && elementFacts[node].ancestors.indexOf(id) >= 0);
 		},
 		focus: function (options) { command('focus', !!(options && options.preventScroll)); },
-		click: function () { host.out.raises.push({ node: id, type: 'click', bubbles: true }); },
+		click: function () {
+			host.out.raises.push({ node: id, type: 'click', bubbles: true });
+			if (isFileInput()) command('showPicker', false);
+		},
+		showPicker: function () {
+			if (!isFileInput()) throw new g.DOMException('showPicker() is not supported for this element', 'NotSupportedError');
+			command('showPicker', false);
+		},
 		dispatchEvent: function (event) {
 			var raised = { node: id, type: String(event.type), bubbles: event.bubbles === true };
 			if (event.detail !== null && typeof event.detail === 'object' && typeof event.detail.reason === 'string')
@@ -664,6 +773,26 @@ var elementOf = function (id) {
 	var tag = (typeof classes === 'object' && classes[id.split('@')[0]]) || 'HTMLElement';
 	if (g[tag] && g[tag].__dom) Object.setPrototypeOf(proxy, g[tag].prototype);
 	Object.defineProperty(proxy, '__node', { value: id });
+	// A file input's files are the picker's last choice until a handler assigns a FileList, as the DOM's are.
+	Object.defineProperty(proxy, 'files', {
+		get: function () { return isFileInput() ? host.fileListOf(chosen) : null; },
+		set: function (list) {
+			if (!isFileInput() || !list) return;
+			chosen = Array.prototype.slice.call(list);
+			// The input shows what it now holds, as the browser's does.
+			host.out.commands.push([id, 'files', JSON.stringify(chosen.map(function (file) { return file.name; }))]);
+		},
+	});
+	Object.defineProperty(proxy, '__choose', {
+		value: function (files) {
+			chosen = files.map(function (file) {
+				var made = new g.File([], file.name, { type: file.type, lastModified: file.lastModified });
+				Object.defineProperty(made, 'size', { value: file.size });
+				Object.defineProperty(made, '__ref', { value: file.ref });
+				return made;
+			});
+		},
+	});
 	Object.defineProperty(proxy, '__style', {
 		value: function () {
 			var direction = facts().direction || 'ltr';
@@ -717,7 +846,6 @@ var stable = function (value) {
 var begin = function (entry) {
 	host.origin = origin;
 	elementFacts = entry.elements || {};
-	proxies = {};
 	captured = {};
 	cells = join(entry.cells, entry.nonFinite);
 	unset = {};
@@ -730,6 +858,7 @@ var begin = function (entry) {
 	host.seed = entry.seed || null;
 	host.focused = entry.focused || null;
 	host.media = entry.media || null;
+	host.screen = entry.screen || null;
 	for (var known in entry.focusElements || {}) if (!elementFacts[known]) elementFacts[known] = entry.focusElements[known];
 	host.focus = function () { return elementOf(host.focused || BODY); };
 	host.counter = 0;
@@ -742,9 +871,20 @@ var fail = function (slot, error) {
 			message: error && error.message !== undefined ? String(error.message) : String(error),
 		};
 };
+// A file input's entry (its node) is each file it holds, or an empty one named '' when it holds none, as a browser's form data.
+var formEntries = function (entries) {
+	var list = [];
+	entries.forEach(function (entry) {
+		if (entry[1] === null || typeof entry[1] !== 'object') return list.push(entry);
+		var files = Array.prototype.slice.call(elementOf(entry[1].files).files || []);
+		if (files.length === 0) files = [new g.File([], '', { type: 'application/octet-stream' })];
+		files.forEach(function (file) { list.push([entry[0], file]); });
+	});
+	return list;
+};
 var eventOf = function (given, frame) {
 	var entries = frame[${JSON.stringify(NATIVE_SCRIPT_SUBMITTED_FORM)}];
-	var target = entries ? new host.Form(entries) : { value: given.value === undefined ? '' : given.value, checked: given.checked === true };
+	var target = entries ? new host.Form(formEntries(entries)) : { value: given.value === undefined ? '' : given.value, checked: given.checked === true };
 	var detail;
 	if (given.detail !== null && typeof given.detail === 'object') {
 		detail = { reason: given.detail.reason };
@@ -759,9 +899,12 @@ var eventOf = function (given, frame) {
 		key: given.key,
 		isTrusted: given.isTrusted !== false,
 		isComposing: false,
+		// A phone's browser reports a finger as a touch pointer.
+		pointerType: String(given.type).indexOf('pointer') === 0 ? 'touch' : undefined,
 		defaultPrevented: false,
 		preventDefault: function () { this.defaultPrevented = true; },
-		stopPropagation: function () {},
+		propagationStopped: false,
+		stopPropagation: function () { this.propagationStopped = true; },
 	};
 	${JSON.stringify([...new Set([...NATIVE_SCRIPT_POINTER_FIELDS, ...NATIVE_SCRIPT_CLICK_FIELDS, ...NATIVE_SCRIPT_KEY_FIELDS])])}.forEach(function (field) { if (field in given) event[field] = given[field]; });
 	// A dismiss's detail is an object whose pressTarget is an element; a click's detail is its press count.
@@ -791,8 +934,31 @@ var keyOf = function (frame) {
 		var binding = frame[name];
 		if ('slot' in binding) return slotValue(binding.slot);
 		if ('fields' in binding) return Object.keys(binding.fields).sort().map(function (field) { return slotValue(binding.fields[field]); });
+		if ('url' in binding) return binding.url;
 		return binding.value;
 	}));
+};
+// An async value another one reads: its settled value, its latest error thrown again (a failed refresh too), or, while it
+// is pending, a wait the run leaves unsettled until the value it reads changes, as the web's reader waits for it.
+var PENDING = {};
+var __settled = function (frame, names) {
+	var out = Object.create(frame);
+	names.forEach(function (name) {
+		Object.defineProperty(out, name, {
+			enumerable: true,
+			get: function () {
+				var shown = frame[name];
+				if (!shown || shown.state === 'pending') throw PENDING;
+				if (shown.error) {
+					var error = new Error(shown.error.message);
+					error.name = shown.error.name;
+					throw error;
+				}
+				return shown.value;
+			},
+		});
+	});
+	return out;
 };
 var startRun = function (at, task, key) {
 	var signal = host.signal();
@@ -804,6 +970,7 @@ var startRun = function (at, task, key) {
 		cells[task.slot] = value;
 	};
 	var failed = function (error) {
+		if (error === PENDING) return;
 		var shown = slotValue(task.slot);
 		var caught = errorOf(error);
 		settle(shown && shown.state === 'value' ? { state: 'value', value: shown.value, error: caught } : { state: 'error', error: caught });
@@ -836,6 +1003,7 @@ g.__markless[id] = {
 	enter: function (text) {
 		var entry = JSON.parse(text);
 		begin(entry);
+		host.enterScreen(entry.screen, entry.kind === 'tasks' && entry.leave);
 		if (entry.kind === 'compute') {
 			var value = fn(entry.fn)(frameOf(entry.frame))();
 			host.out = null;
@@ -846,6 +1014,7 @@ g.__markless[id] = {
 			var event = null;
 			try {
 				var frame = frameOf(entry.frame);
+				if (entry.event.files && entry.event.nodes && entry.event.nodes.target) elementOf(entry.event.nodes.target).__choose(entry.event.files);
 				event = eventOf(entry.event, frame);
 				var result = fn(entry.fn)(frame)(event);
 				if (result && typeof result.then === 'function') {
@@ -860,8 +1029,13 @@ g.__markless[id] = {
 			}
 			// A key's or paste's cancel reaches the host, as a browser reads defaultPrevented before the handler first awaits.
 			if (event && event.defaultPrevented && (entry.event.type === 'keydown' || entry.event.type === 'paste')) host.out.prevented = true;
+			// A click's stopPropagation() before it first awaits keeps the press from the handlers around it, as a browser's.
+			if (event && event.propagationStopped && entry.event.type === 'click') host.out.stopped = true;
 			// A handler that sets its text field's value writes the field, as the DOM's value setter does.
 			if (event && typeof entry.event.value === 'string' && event.target && !(event.target instanceof host.Form) && typeof event.target.value === 'string' && event.target.value !== entry.event.value) host.out.value = event.target.value;
+		} else if (entry.kind === 'pick') {
+			// A file input with no handler of its own still holds what was chosen, for a form's FormData to read.
+			elementOf(entry.node).__choose(entry.files);
 		} else if (entry.kind === 'document') {
 			var heard = (host.listeners[entry.event.type] || []).slice();
 			var bubbled = heard.length > 0 ? eventOf(entry.event, {}) : null;
@@ -919,6 +1093,7 @@ g.__markless[id] = {
 		var left = { writes: writes, timers: out.timers, clears: out.clears, requests: out.requests, aborts: out.aborts, logs: out.logs, commands: out.commands, pending: out.pending, settled: out.settled, raises: out.raises };
 		if (out.calls.length > 0) left.calls = out.calls;
 		if (out.prevented) left.prevented = true;
+		if (out.stopped) left.stopped = true;
 		if (out.value !== undefined) left.value = out.value;
 		if (out.navigate) left.navigate = out.navigate;
 		// The document's listener types now, and the elements the entry that changed them held, whose facts later entries need.
@@ -943,10 +1118,20 @@ function contentId(text: string): string {
 	return a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0');
 }
 
+/** The engine text every payload's script carries around its own modules: the host services, then the entry points. */
+export type NativeScriptEngine = { readonly services: string; readonly entries: string };
+export const NATIVE_SCRIPT_ENGINE: NativeScriptEngine = { services: HOST_SERVICES, entries: ENTRIES };
+
 /**
  * The script a payload's `script` ops and computeds run. Every module is a function run once on first use, imports first,
  * as ES modules evaluate; each script function is defined inside its module, so the module's own names reach it.
  */
+// A page's url prop: a URL on the app's origin; with none, the parts of it that need no origin.
+const PAGE_URL_SOURCE = String.raw`var pageUrl = function (place) {
+	if (origin) return new g.URL(place.pathname + place.search, origin);
+	return { pathname: place.pathname, search: place.search, hash: place.hash, searchParams: new g.URLSearchParams(place.search) };
+};`;
+
 export function nativeScriptOf(
 	modules: ReadonlyArray<NativeScriptModuleInput>,
 	services: ReadonlyArray<NativeScriptService>,
@@ -958,6 +1143,11 @@ export function nativeScriptOf(
 	svg = false,
 	/** The app's origin (app.json `origin`), which a URL from the root resolves against. */
 	origin?: string,
+	engine: NativeScriptEngine = NATIVE_SCRIPT_ENGINE,
+	/** The script reads `URL` or `URLSearchParams`: the engine carries the URL Standard's code for engines without them. */
+	url = false,
+	/** A script function reads the page's `url` prop, which it gets as a `URL`. */
+	pageUrl = false,
 ): NativeScript {
 	const owners: Record<string, number> = {};
 	const definitions = modules.map((module, index) => {
@@ -989,9 +1179,9 @@ export function nativeScriptOf(
 		`var navigation = ${JSON.stringify(navigation ?? null)};`,
 		...definitions,
 		...(svg ? [SVG_GEOMETRY_SOURCE] : []),
-		ENTRIES,
+		engine.entries,
 	].join('\n');
 	const id = contentId(body);
-	const source = `(function (g, id) {\n${HOST_SERVICES}\ng.__markless = g.__markless || {};\n${body}\n})(globalThis, ${JSON.stringify(id)});\n`;
+	const source = `(function (g, id) {\n${engine.services}\n${url || pageUrl ? `${NATIVE_SCRIPT_URL}\n` : ''}${pageUrl ? `${PAGE_URL_SOURCE}\n` : ''}g.__markless = g.__markless || {};\n${body}\n})(globalThis, ${JSON.stringify(id)});\n`;
 	return { id, source, services };
 }

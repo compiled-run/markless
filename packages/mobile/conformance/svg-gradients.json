@@ -1,0 +1,625 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:shown",
+				"name": "shown",
+				"initial": true
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Gradients"
+					}
+				]
+			},
+			{
+				"kind": "branch",
+				"id": "branch-site:0",
+				"parent": "h0",
+				"test": {
+					"cell": "state:shown"
+				},
+				"arms": 2
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "svg",
+				"parent": "h0",
+				"attributes": {
+					"viewBox": "0 0 200 110",
+					"width": "300",
+					"height": "165",
+					"role": "img",
+					"aria-label": "Gradient swatches"
+				},
+				"drawing": {
+					"viewBox": [
+						0,
+						0,
+						200,
+						110
+					],
+					"width": 300,
+					"height": 165,
+					"shapes": [
+						{
+							"path": [
+								0,
+								14,
+								8,
+								1,
+								86,
+								8,
+								3,
+								89.31370849898477,
+								8,
+								92,
+								10.686291501015239,
+								92,
+								14,
+								1,
+								92,
+								66,
+								3,
+								92,
+								69.31370849898477,
+								89.31370849898477,
+								72,
+								86,
+								72,
+								1,
+								14,
+								72,
+								3,
+								10.686291501015239,
+								72,
+								8,
+								69.31370849898477,
+								8,
+								66,
+								1,
+								8,
+								14,
+								3,
+								8,
+								10.686291501015239,
+								10.686291501015239,
+								8,
+								14,
+								8,
+								4
+							],
+							"fill": {
+								"linear": [
+									0,
+									0,
+									1,
+									0
+								],
+								"stops": [
+									{
+										"offset": 0,
+										"color": {
+											"r": 255,
+											"g": 159,
+											"b": 28,
+											"alpha": 255
+										}
+									},
+									{
+										"offset": 0.6,
+										"color": {
+											"r": 231,
+											"g": 29,
+											"b": 54,
+											"alpha": 255
+										}
+									},
+									{
+										"offset": 1,
+										"color": {
+											"r": 95,
+											"g": 15,
+											"b": 153,
+											"alpha": 255
+										}
+									}
+								],
+								"transform": [
+									72.74613391789285,
+									31.999999999999996,
+									-41.99999999999999,
+									55.42562584220408,
+									8,
+									8
+								]
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						},
+						{
+							"path": [
+								0,
+								182,
+								40,
+								3,
+								182,
+								57.67311199458539,
+								167.67311199458538,
+								72,
+								150,
+								72,
+								3,
+								132.32688800541462,
+								72,
+								118,
+								57.67311199458539,
+								118,
+								40,
+								3,
+								118,
+								22.32688800541461,
+								132.32688800541462,
+								8,
+								150,
+								8,
+								3,
+								167.67311199458538,
+								8,
+								182,
+								22.32688800541461,
+								182,
+								40,
+								4
+							],
+							"fill": {
+								"radial": [
+									140,
+									30,
+									2,
+									150,
+									40,
+									32
+								],
+								"stops": [
+									{
+										"offset": 0,
+										"color": {
+											"r": 255,
+											"g": 255,
+											"b": 255,
+											"alpha": 255
+										}
+									},
+									{
+										"offset": 0.1,
+										"color": {
+											"r": 255,
+											"g": 255,
+											"b": 255,
+											"alpha": 255
+										}
+									},
+									{
+										"offset": 0.7,
+										"color": {
+											"r": 46,
+											"g": 196,
+											"b": 182,
+											"alpha": 255
+										}
+									},
+									{
+										"offset": 0.71875,
+										"color": {
+											"r": 43,
+											"g": 185,
+											"b": 173,
+											"alpha": 239
+										}
+									},
+									{
+										"offset": 0.7374999999999999,
+										"color": {
+											"r": 40,
+											"g": 174,
+											"b": 164,
+											"alpha": 223
+										}
+									},
+									{
+										"offset": 0.75625,
+										"color": {
+											"r": 38,
+											"g": 163,
+											"b": 155,
+											"alpha": 207
+										}
+									},
+									{
+										"offset": 0.7749999999999999,
+										"color": {
+											"r": 35,
+											"g": 153,
+											"b": 146,
+											"alpha": 191
+										}
+									},
+									{
+										"offset": 0.79375,
+										"color": {
+											"r": 32,
+											"g": 142,
+											"b": 137,
+											"alpha": 175
+										}
+									},
+									{
+										"offset": 0.8125,
+										"color": {
+											"r": 29,
+											"g": 131,
+											"b": 128,
+											"alpha": 159
+										}
+									},
+									{
+										"offset": 0.83125,
+										"color": {
+											"r": 26,
+											"g": 120,
+											"b": 119,
+											"alpha": 143
+										}
+									},
+									{
+										"offset": 0.85,
+										"color": {
+											"r": 24,
+											"g": 109,
+											"b": 111,
+											"alpha": 128
+										}
+									},
+									{
+										"offset": 0.8687499999999999,
+										"color": {
+											"r": 21,
+											"g": 98,
+											"b": 102,
+											"alpha": 112
+										}
+									},
+									{
+										"offset": 0.8875,
+										"color": {
+											"r": 18,
+											"g": 87,
+											"b": 93,
+											"alpha": 96
+										}
+									},
+									{
+										"offset": 0.90625,
+										"color": {
+											"r": 15,
+											"g": 76,
+											"b": 84,
+											"alpha": 80
+										}
+									},
+									{
+										"offset": 0.925,
+										"color": {
+											"r": 12,
+											"g": 66,
+											"b": 75,
+											"alpha": 64
+										}
+									},
+									{
+										"offset": 0.94375,
+										"color": {
+											"r": 9,
+											"g": 55,
+											"b": 66,
+											"alpha": 48
+										}
+									},
+									{
+										"offset": 0.9625,
+										"color": {
+											"r": 7,
+											"g": 44,
+											"b": 57,
+											"alpha": 32
+										}
+									},
+									{
+										"offset": 0.98125,
+										"color": {
+											"r": 4,
+											"g": 33,
+											"b": 48,
+											"alpha": 16
+										}
+									},
+									{
+										"offset": 1,
+										"color": {
+											"r": 1,
+											"g": 22,
+											"b": 39,
+											"alpha": 0
+										}
+									}
+								]
+							},
+							"fillRule": "nonzero",
+							"stroke": null,
+							"width": 1,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						},
+						{
+							"path": [
+								0,
+								19,
+								86,
+								1,
+								181,
+								86,
+								3,
+								184.86599324881556,
+								86,
+								188,
+								89.13400675118444,
+								188,
+								93,
+								1,
+								188,
+								93,
+								3,
+								188,
+								96.86599324881556,
+								184.86599324881556,
+								100,
+								181,
+								100,
+								1,
+								19,
+								100,
+								3,
+								15.134006751184446,
+								100,
+								12,
+								96.86599324881556,
+								12,
+								93,
+								1,
+								12,
+								93,
+								3,
+								12,
+								89.13400675118444,
+								15.134006751184446,
+								86,
+								19,
+								86,
+								4
+							],
+							"fill": {
+								"linear": [
+									0,
+									0,
+									0,
+									1
+								],
+								"stops": [
+									{
+										"offset": 0,
+										"color": {
+											"r": 255,
+											"g": 159,
+											"b": 28,
+											"alpha": 255
+										}
+									},
+									{
+										"offset": 0.6,
+										"color": {
+											"r": 231,
+											"g": 29,
+											"b": 54,
+											"alpha": 255
+										}
+									},
+									{
+										"offset": 1,
+										"color": {
+											"r": 95,
+											"g": 15,
+											"b": 153,
+											"alpha": 255
+										}
+									}
+								],
+								"transform": [
+									152.42047106606122,
+									6.999999999999999,
+									-87.99999999999999,
+									12.124355652982143,
+									12,
+									86
+								]
+							},
+							"fillRule": "nonzero",
+							"stroke": {
+								"linear": [
+									10,
+									0,
+									190,
+									0
+								],
+								"stops": [
+									{
+										"offset": 0,
+										"color": {
+											"r": 58,
+											"g": 134,
+											"b": 255,
+											"alpha": 255
+										}
+									},
+									{
+										"offset": 1,
+										"color": {
+											"r": 255,
+											"g": 190,
+											"b": 11,
+											"alpha": 255
+										}
+									}
+								]
+							},
+							"width": 4,
+							"cap": "butt",
+							"join": "miter",
+							"miterLimit": 4
+						}
+					]
+				},
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h19",
+				"element": "img",
+				"parent": "h0",
+				"attributes": {
+					"src": "/static/vite.svg",
+					"alt": "Vite logo",
+					"width": "120"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h20",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h20:text0",
+				"parent": "h20",
+				"parts": [
+					{
+						"text": "Toggle swatches"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h20",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:shown",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:shown"
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Gradients"
+		],
+		[
+			"h20:text0",
+			"Toggle swatches"
+		]
+	],
+	"initialArms": [
+		[
+			"branch-site:0",
+			0
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h20"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 1
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h20"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 0
+				}
+			]
+		}
+	]
+}

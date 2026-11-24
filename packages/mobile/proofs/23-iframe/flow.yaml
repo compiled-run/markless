@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 23-iframe
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Embedded page
 - assertVisible: Below the frame
 - runFlow:

@@ -99,6 +99,8 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		'J49',
 		'J50',
 		'J51',
+		'J52',
+		'J54',
 		'P1',
 		'R101',
 		'R102',
@@ -129,6 +131,7 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		141,
 		143,
 		144,
+		145,
 		147,
 		150,
 		151,
@@ -142,6 +145,15 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		162,
 		163,
 		164,
+		165,
+		166,
+		167,
+		168,
+		169,
+		170,
+		171,
+		172,
+		173,
 		'T1',
 		'T2',
 		101,
@@ -179,6 +191,7 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		146,
 		147,
 		148,
+		149,
 		205,
 		151,
 		170,
@@ -221,13 +234,25 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		199,
 		200,
 		201,
+		233,
+		202,
 		203,
 		210,
 		220,
 		221,
+		222,
 		231,
 		225,
 		226,
+		232,
+		233,
+		234,
+		235,
+		236,
+		237,
+		241,
+		242,
+		243,
 		101,
 		102,
 		103,
@@ -247,24 +272,28 @@ test.each(allRungFolders())('%s: flow.yaml is the flow its expected.json describ
 	);
 	const [header, commands] = committed;
 	expect(header).toEqual({ appId: '${APP_ID}', name: folder });
-	// Before the launch only the device's place and a cold Settings app are set; the launch always clears the app's state.
+	// Before the launch only the device's place and a cold Settings app are set; Android clears the app's state right before it, iOS runs a fresh install.
 	const launch = commands.findIndex(
 		(command: unknown) =>
-			typeof command === 'object' && command !== null && 'launchApp' in command,
+			command === 'launchApp' ||
+			(typeof command === 'object' && command !== null && 'launchApp' in command),
 	);
 	const coldSettings = {
 		runFlow: { when: { platform: 'iOS' }, commands: [{ stopApp: 'com.apple.Preferences' }] },
 	};
 	expect(
 		commands
-			.slice(0, launch)
+			.slice(0, launch - 1)
 			.every(
 				(command: object) =>
 					'setLocation' in command ||
 					JSON.stringify(command) === JSON.stringify(coldSettings),
 			),
 	).toBe(true);
-	expect(commands[launch]).toMatchObject({ launchApp: { clearState: true } });
+	expect(commands[launch - 1]).toEqual({
+		runFlow: { when: { platform: 'Android' }, commands: ['clearState'] },
+	});
+	expect(JSON.stringify(commands[launch])).not.toContain('clearState');
 });
 
 test('the navigation ladder has one app folder per rung, in rung order', () => {
@@ -272,6 +301,7 @@ test('the navigation ladder has one app folder per rung, in rung order', () => {
 		'J6',
 		'J10',
 		'J16',
+		'J53',
 		'N1',
 		'N2',
 		'N3',
@@ -285,6 +315,8 @@ test('the navigation ladder has one app folder per rung, in rung order', () => {
 		'N13',
 		'N14',
 		'N15',
+		'N16',
+		'N17',
 		138,
 		139,
 		140,
@@ -315,8 +347,35 @@ test('the styles ladder has one app folder per rung, in rung order', () => {
 		'S20',
 		'S21',
 		'S23',
+		'S24',
 		'S25',
+		'S26',
 		'S27',
+		'S28',
+		'S29',
+		'S31',
+		'S32',
+		'S33',
+		'S34',
+		'S35',
+		'S36',
+		'S40',
+		'S41',
+		'S42',
+		'S43',
+		'S44',
+		'S45',
+		'S46',
+		'S47',
+		'S48',
+		'S49',
+		'S50',
+		'S51',
+		'S52',
+		'S53',
+		'S55',
+		'S56',
+		'S57',
 	]);
 	for (const folder of styleRungFolders())
 		expect(existsSync(join(proofsDir, folder, 'pages'))).toBe(true);

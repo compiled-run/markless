@@ -1053,6 +1053,21 @@ export function Page() @{
 		]);
 	});
 
+	it('lowers an animation event handler, which reads the event\'s animation name and elapsed time', async () => {
+		const built = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let ended = state('');
+	<main>
+		<div class="panel" onAnimationEnd={(event) => (ended = \`\${event.animationName} \${event.elapsedTime}\`)}>Panel</div>
+		<p>{ended}</p>
+	</main>
+}`);
+		expect(built.diagnostics.map((d) => d.message)).toEqual([]);
+		expect(built.payload!.events.map((e) => e.event)).toEqual(['animationend']);
+		expect(JSON.stringify(built.payload!.handlers)).toContain('{"event":"animationName"}');
+		expect(JSON.stringify(built.payload!.handlers)).toContain('{"event":"elapsedTime"}');
+	});
+
 	it("reads where a part stands among its family's parts as its place in the tree, and refuses it for parts a @for row shows", async () => {
 		const source = (
 			parts: string,
@@ -1228,7 +1243,7 @@ export function Page() @{
 		);
 	});
 
-	it('makes a live region whose aria-live or role follows state, outside a row, with its politeness as an expression', async () => {
+	it('makes a live region whose aria-live or role follows state, with its politeness as an expression, in a @for row as outside one', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Page() @{
 	let paused = state(false);
@@ -1254,9 +1269,14 @@ export function Page() @{
 		}
 	</ul>
 }`);
-		expect(rows.diagnostics.map((d) => d.message).join('\n')).toContain(
-			'in a @for row whose `role`, `aria-live` or `aria-atomic` follows state',
+		expect(rows.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+		const row = rows.payload!.nodes.find(
+			(node) => node.kind === 'element' && node.element === 'li',
 		);
+		expect(row).toMatchObject({
+			row: expect.any(String),
+			liveFollows: { politeness: expect.any(Object), atomic: expect.any(Object) },
+		});
 	});
 
 	it("folds a shared state's first value that reads module constants", async () => {
@@ -3398,7 +3418,7 @@ export function Forms() @{
 	it('refuses an input type no phone draws by name outside a form too, instead of drawing it as a text field, and draws a password field', async () => {
 		const { payload, diagnostics } = await nativeView(`export function Profile() @{
 	<main>
-		<input type="file" aria-label="Photo" />
+		<input type="week" aria-label="Photo" />
 		<input type="DATE" aria-label="Day" />
 		<input type="password" aria-label="Secret" />
 		<input type="search" aria-label="Find" />
@@ -3407,8 +3427,39 @@ export function Forms() @{
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => d.message)).toEqual([
-			'the <input type="file"> h1, which no native host draws or checks yet',
+			'the <input type="week"> h1, which no native host draws or checks yet',
 			'the <input type="date"> h2, which no native host draws or checks yet',
+		]);
+	});
+
+	it('draws a file input, and runs its change handler as JavaScript, which holds the chosen files', async () => {
+		const { payload, diagnostics } =
+			await nativeView(`import { element, state } from '@markless/core';
+export function Upload() @{
+	let shown = state('none');
+	const field = element<HTMLInputElement>();
+	<main>
+		<input el={field} type="file" multiple onChange={() => { if (field) shown = String(field.files?.length); }} />
+		<p>{shown}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.events).toEqual([
+			{ host: 'h1', event: 'input', handler: 'handler:event:0' },
+		]);
+		expect(payload!.handlers[0]!.ops.map((op) => op.op)).toEqual(['script']);
+	});
+
+	it('refuses a file input in a form whose submit handler is data, as only JavaScript reads the files the web sends', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Send() @{
+	<form onSubmit={(event) => event.preventDefault()}>
+		<input type="file" name="photo" aria-label="Photo" />
+		<button type="submit">Send</button>
+	</form>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'the <input> h1 in the <form> h0 sends its chosen files with the form, which a native form sends only from a submit handler that runs as JavaScript',
 		]);
 	});
 
@@ -3934,6 +3985,61 @@ export function Page() @{
 	});
 });
 
+it('lists the values a row field can take when an async value builds its rows from literals chosen by conditions', async () => {
+	const { payload, diagnostics } = await nativeView(`import { computed, state } from '@markless/core';
+type Row = { readonly id: string; readonly title: string; readonly tone: string };
+function taskRows(done: number): Row[] {
+	return ['Milk', 'Bread'].filter(Boolean).map((title, index) => {
+		const id = 't' + index;
+		return { id, title, tone: index < done ? 'done' : ' ' };
+	});
+}
+async function loadTasks(done: number): Promise<{ readonly rows: Row[] }> {
+	return { rows: taskRows(done) };
+}
+export function Tasks() @{
+	let done = state(1);
+	const tasks = computed(async () => loadTasks(done));
+	<main>
+		@try {
+			<ul>
+				@for (const row of tasks.rows; key row.id) {
+					<li class={row.tone}>{row.title}</li>
+				}
+			</ul>
+		} @pending {
+			<p>Loading</p>
+		}
+		<button onClick={() => done++}>Finish one</button>
+	</main>
+}`);
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	const repeat = payload!.nodes.find((node) => node.kind === 'repeat');
+	expect(repeat).toMatchObject({ itemValues: { tone: ['done', ' '] } });
+	expect(repeat && 'itemValues' in repeat ? Object.keys(repeat.itemValues!) : []).toEqual(['tone']);
+});
+
+it('lists a row field a computed builds from literals chosen by conditions', async () => {
+	const { payload, diagnostics } = await nativeView(`import { computed, state } from '@markless/core';
+function rowsOf(done: number) {
+	return ['Milk', 'Bread'].map((title, index) => ({ id: 't' + index, title, tone: index < done ? 'done' : 'open' }));
+}
+export function Tasks() @{
+	let done = state(1);
+	const tasks = computed(() => ({ rows: rowsOf(done) }));
+	<main>
+		<ul>
+			@for (const row of tasks.rows; key row.id) {
+				<li class={row.tone}>{row.title}</li>
+			}
+		</ul>
+		<button onClick={() => done++}>Finish one</button>
+	</main>
+}`);
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	expect(payload!.nodes.find((node) => node.kind === 'repeat')).toMatchObject({ itemValues: { tone: ['done', 'open'] } });
+});
+
 it('lowers a @try with no @catch: its error shows nothing, and the rest of the page stays, as the web renders it', async () => {
 	const { payload, diagnostics } = await nativeView(`import { computed } from '@markless/core';
 async function load(): Promise<string> { throw new Error('down'); }
@@ -3985,13 +4091,20 @@ export function Header() @{
 		<button onClick={() => console.log(logo)}>Log</button>
 	</main>
 }`,
-		{ assetImport: (specifier) => (asked.push(specifier), `/@markless-asset/${specifier.slice(2)}`) },
+		{
+			assetImport: (specifier) => (
+				asked.push(specifier),
+				`/@markless-asset/${specifier.slice(2)}`
+			),
+		},
 	);
 	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
 	expect(asked).toContain('./logo.png');
 	const img = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'img');
 	if (img?.kind !== 'element') throw new Error('no img');
-	expect(img.bindings).toEqual([{ attribute: 'src', value: { literal: '/@markless-asset/logo.png' } }]);
+	expect(img.bindings).toEqual([
+		{ attribute: 'src', value: { literal: '/@markless-asset/logo.png' } },
+	]);
 	expect(payload!.script?.source).toContain('{ "default": "/@markless-asset/logo.png" }');
 });
 
@@ -4081,24 +4194,32 @@ export function App() @{
 
 	it("lowers a class's getters and setters to definitions on its prototype and on itself", async () => {
 		const { payload, diagnostics } = await nativeView(
-			source('class Bits {\n\tget size() { return this.bits.length; }\n\tset size(n: number) { this.bits.length = n; }\n\tstatic get kind() { return 1; }'),
+			source(
+				'class Bits {\n\tget size() { return this.bits.length; }\n\tset size(n: number) { this.bits.length = n; }\n\tstatic get kind() { return 1; }',
+			),
 		);
 		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
 		const code = payload!.script!.source;
 		expect(code).not.toMatch(/\bclass\s+Bits/);
 		expect(code).toContain('Object["defineProperty"](Bits.prototype, "size", { get: function');
-		expect(code).toContain('}, enumerable: false, configurable: true });\n Object["defineProperty"](Bits, "kind", { get: function');
+		expect(code).toContain(
+			'}, enumerable: false, configurable: true });\n Object["defineProperty"](Bits, "kind", { get: function',
+		);
 	});
 
 	it('refuses a getter or setter with a computed name', async () => {
-		const { diagnostics } = await nativeView(source("class Bits {\n\tget ['size']() { return this.bits.length; }"));
+		const { diagnostics } = await nativeView(
+			source("class Bits {\n\tget ['size']() { return this.bits.length; }"),
+		);
 		expect(diagnostics.map((diagnostic) => diagnostic.message).join('\n')).toContain(
 			'a class getter or setter with a computed name, which Hermes cannot run',
 		);
 	});
 
 	it('refuses a class it cannot lower, naming why', async () => {
-		const { diagnostics } = await nativeView(source('class Base {}\nclass Bits extends Base {'));
+		const { diagnostics } = await nativeView(
+			source('class Base {}\nclass Bits extends Base {'),
+		);
 		expect(diagnostics.map((diagnostic) => diagnostic.message).join('\n')).toContain(
 			'a class that extends another, which Hermes cannot run',
 		);
@@ -4123,11 +4244,17 @@ export function Code() @{
 	it("draws a component's path inside an svg while the app runs: paint read at build time, outline and viewBox from the engine", async () => {
 		const { payload, diagnostics } = await nativeView(live);
 		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
-		const svg = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'svg')!;
-		const path = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'path')!;
+		const svg = payload!.nodes.find(
+			(node) => node.kind === 'element' && node.element === 'svg',
+		)!;
+		const path = payload!.nodes.find(
+			(node) => node.kind === 'element' && node.element === 'path',
+		)!;
 		if (svg.kind !== 'element' || path.kind !== 'element') throw new Error('not elements');
 		expect(svg.drawing).toMatchObject({ viewBox: null, width: 10, height: 10, shapes: [] });
-		expect(svg.bindings).toMatchObject([{ attribute: 'viewBox', value: { script: expect.any(String) } }]);
+		expect(svg.bindings).toMatchObject([
+			{ attribute: 'viewBox', value: { script: expect.any(String) } },
+		]);
 		expect(path.parent).toBe(svg.id);
 		expect(path.shape).toEqual({
 			path: [],
@@ -4139,7 +4266,9 @@ export function Code() @{
 			join: 'miter',
 			miterLimit: 4,
 		});
-		expect(path.bindings).toMatchObject([{ attribute: 'd', value: { script: expect.any(String) } }]);
+		expect(path.bindings).toMatchObject([
+			{ attribute: 'd', value: { script: expect.any(String) } },
+		]);
 		expect(path.attributes?.d).toBeUndefined();
 		expect(payload!.script?.source).toContain('var __svgPath');
 	});
@@ -4156,6 +4285,47 @@ export function Code() @{
 				'`stroke` on <path> follows state; a native drawing is compiled when the app is built',
 			]),
 		);
+	});
+
+	it('draws a <path> written in the svg whose d follows state while the app runs, over the shapes before it; refuses a shape after it', async () => {
+		const source = (after: string) => `import { state } from '@markless/core';
+export function Mark() @{
+	let turned = state(false);
+	<main>
+		<svg viewBox="0 0 16 16"><rect width="16" height="16" fill="#eee" /><path d={turned ? 'M0 0H16V16Z' : 'M0 0H16L0 16Z'} fill="#264653" />${after}</svg>
+		<button onClick={() => (turned = !turned)}>Turn</button>
+	</main>
+}`;
+		const { payload, diagnostics } = await nativeView(source(''));
+		expect(diagnostics).toEqual([]);
+		const svg = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'svg');
+		const path = payload!.nodes.find((node) => node.kind === 'element' && node.element === 'path');
+		expect(svg?.kind === 'element' ? svg.drawing?.shapes : undefined).toHaveLength(1);
+		expect(path).toMatchObject({ parent: svg!.id, shape: { path: [], fill: { r: 38, g: 70, b: 83, alpha: 255 } } });
+		expect(path?.kind === 'element' ? path.bindings.map((binding) => 'attribute' in binding && binding.attribute) : []).toEqual(['d']);
+		expect((await nativeView(source('<circle r="2" />'))).diagnostics.map((d) => d.message)).toContain(
+			'a shape after a component or `{children}` inside an <svg>, which a native drawing would paint under them',
+		);
+	});
+
+	it('dashes strokes as the browser does: odd lists repeat, groups pass them down, zeros and invalid values draw solid', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Lines() @{
+	<svg viewBox="0 0 10 10" stroke="red">
+		<g stroke-dasharray="1 2 3" stroke-dashoffset="1"><path d="M0 0h10" /><path d="M0 2h10" stroke-dasharray="none" /></g>
+		<path d="M0 4h10" stroke-dasharray="0 0" />
+		<path d="M0 6h10" stroke-dasharray="2 -1" />
+		<path d="M0 8h10" stroke-dasharray="2" fill="none" stroke="none" />
+	</svg>
+}`);
+		expect(diagnostics).toEqual([]);
+		const shapes = (payload!.nodes.find((node) => 'drawing' in node && node.drawing) as { drawing: { shapes: { dash?: number[]; dashOffset?: number }[] } }).drawing.shapes;
+		expect(shapes.map((shape) => [shape.dash, shape.dashOffset])).toEqual([
+			[[1, 2, 3, 1, 2, 3], 1],
+			[undefined, undefined],
+			[undefined, undefined],
+			[undefined, undefined],
+			[undefined, undefined],
+		]);
 	});
 
 	it("compiles an svg's shapes into a drawing, with its <title> as its name", async () => {
@@ -4268,8 +4438,9 @@ export function Code() @{
 export function Chart() @{
 	let w = state(4);
 	<svg viewBox="0 0 10 10">
-		<path d="M0 0h10" stroke-dasharray="2 2" />
-		<rect width={w} height="2" fill="url(#g)" />
+		<path d="M0 0h10" stroke-dasharray="2 x" />
+		<rect width={w} height="2" />
+		<path d="M0 0h10v10z" fill="url(#g)" />
 		<text x="0 4" y="5">label</text>
 	</svg>
 }`;
@@ -4282,16 +4453,16 @@ export function Chart() @{
 				text.slice(0, d.primarySpan!.start).split('\n').length,
 			]),
 		).toEqual([
-			['`stroke-dasharray` on <path>: dashed strokes are not drawn natively yet', 5],
+			['`stroke-dasharray="2 x"` on <path>, which is not a list of lengths in user units', 5],
 			[
 				'`width` on <rect> follows state; a native drawing is compiled when the app is built',
 				6,
 			],
 			[
-				'`fill="url(#g)"` on <rect>, a paint a native drawing does not have (gradients and patterns are not drawn yet)',
-				6,
+				'`fill="url(#g)"` on <path>, which names no <linearGradient> or <radialGradient> inside this <svg>',
+				7,
 			],
-			['`x="0 4"` on <text>: one length per text is drawn, not a list', 7],
+			['`x="0 4"` on <text>: one length per text is drawn, not a list', 8],
 		]);
 	});
 
@@ -4315,6 +4486,155 @@ export function Chart() @{
 		expect(tip).toEqual([10, 60]);
 		expect(corner).toEqual([15, 50]);
 		expect(shapes[1]!.clip).toHaveLength(1);
+	});
+
+	it('masks a group by a <mask> of opaque fills as a clip by them inside its region; refuses partial coverage and the default units', async () => {
+		const shapesOf = async (mask: string) => {
+			const { payload, diagnostics } = await nativeView(`export function Mark() @{
+	<svg viewBox="0 0 10 10"><defs>${mask}</defs><g mask="url(#m)" transform="translate(2 0)"><rect width="10" height="10" /></g></svg>
+}`);
+			const svg = payload?.nodes.find((node) => node.kind === 'element' && node.drawing);
+			return {
+				shapes: svg?.kind === 'element' ? svg.drawing?.shapes : undefined,
+				messages: diagnostics.map((d) => d.message),
+			};
+		};
+		const alpha = await shapesOf(
+			'<mask id="m" mask-type="alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="8" height="10"><rect width="5" height="10" fill="black" /></mask>',
+		);
+		expect(alpha.messages).toEqual([]);
+		expect(alpha.shapes?.[0]?.clip).toEqual([
+			[0, 2, 0, 1, 10, 0, 1, 10, 10, 1, 2, 10, 4],
+			[0, 2, 0, 1, 7, 0, 1, 7, 10, 1, 2, 10, 4],
+		]);
+		const luminance = await shapesOf(
+			'<mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="8" height="10"><rect width="5" height="10" fill="white" /></mask>',
+		);
+		expect(luminance.shapes?.[0]?.clip).toEqual(alpha.shapes?.[0]?.clip);
+		expect(
+			(
+				await shapesOf(
+					'<mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="8" height="10"><rect width="5" height="10" fill="grey" /></mask>',
+				)
+			).messages,
+		).toContain(
+			'a <rect> inside a luminance <mask> that is not one opaque white fill with no stroke: a mask of partial coverage is not drawn natively yet',
+		);
+		expect(
+			(await shapesOf('<mask id="m"><rect width="5" height="10" fill="white" /></mask>'))
+				.messages,
+		).toContain(
+			'`maskUnits="objectBoundingBox"` on <mask>: a mask\'s region is drawn in user space only',
+		);
+		expect(
+			(
+				await shapesOf(
+					'<mask id="m" maskUnits="userSpaceOnUse"><rect width="5" height="10" fill="white" /></mask>',
+				)
+			).messages,
+		).toContain(
+			'<mask> without `x`, `y`, `width` and `height`: its default region depends on the box of what it masks',
+		);
+	});
+
+	it('cuts the black shapes over a white region out of a luminance <mask> as even-odd clips; refuses a crossing nonzero cut', async () => {
+		const shapesOf = async (cut: string) => {
+			const { payload, diagnostics } = await nativeView(`export function Card() @{
+	<svg viewBox="0 0 10 10"><defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="10" height="10" fill="black"><rect fill="white" width="10" height="10" />${cut}</mask></defs><rect width="10" height="10" mask="url(#m)" /></svg>
+}`);
+			const svg = payload?.nodes.find((node) => node.kind === 'element' && node.drawing);
+			return {
+				shape: svg?.kind === 'element' ? svg.drawing?.shapes[0] : undefined,
+				messages: diagnostics.map((d) => d.message),
+			};
+		};
+		const region = [0, 0, 0, 1, 10, 0, 1, 10, 10, 1, 0, 10, 4];
+		const simple = await shapesOf('<path d="M2 2L8 2L8 8Z" />');
+		expect(simple.messages).toEqual([]);
+		expect(simple.shape?.clip).toEqual([
+			region,
+			region,
+			[...region, 0, 2, 2, 1, 8, 2, 1, 8, 8, 4],
+		]);
+		expect(simple.shape?.clipRule).toEqual(['nonzero', 'nonzero', 'evenodd']);
+		expect(
+			(await shapesOf('<path fill-rule="evenodd" d="M2 2L8 8L8 2L2 8Z" />')).messages,
+		).toEqual([]);
+		expect((await shapesOf('<path d="M2 2L8 8L8 2L2 8Z" />')).messages).toContain(
+			'a black <path> filled nonzero that crosses itself or has several parts, inside a luminance <mask>: only an even-odd fill or one simple outline cuts a mask natively yet',
+		);
+		expect((await shapesOf('<path d="M1 1H3V3ZM5 5H7V7Z" />')).messages).toHaveLength(1);
+		expect(
+			(
+				await shapesOf(
+					'<rect x="2" y="2" width="2" height="2" /><rect fill="white" width="5" height="5" />',
+				)
+			).messages,
+		).toContain(
+			'a white <rect> after a black shape inside a luminance <mask>, which would show through the cut again',
+		);
+	});
+
+	it('blurs the one shape under a <filter> of one feGaussianBlur inside its region, after a flood and blend; refuses other filters', async () => {
+		const shapesOf = async (filter: string, inside = '<rect width="4" height="4" />') => {
+			const { payload, diagnostics } = await nativeView(`export function Glow() @{
+	<svg viewBox="0 0 10 10"><defs>${filter}</defs><g filter="url(#f)" transform="translate(2 0) scale(2)">${inside}</g></svg>
+}`);
+			const svg = payload?.nodes.find((node) => node.kind === 'element' && node.drawing);
+			return {
+				shapes: svg?.kind === 'element' ? svg.drawing?.shapes : undefined,
+				messages: diagnostics.map((d) => d.message),
+			};
+		};
+		const region =
+			'filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB" x="0" y="0" width="4" height="5"';
+		const flooded = await shapesOf(
+			`<filter id="f" ${region}><feFlood flood-opacity="0" result="bg" /><feBlend mode="normal" in="SourceGraphic" in2="bg" result="shape" /><feGaussianBlur stdDeviation="1.5" /></filter>`,
+		);
+		expect(flooded.messages).toEqual([]);
+		expect(flooded.shapes?.[0]?.blur).toEqual({
+			deviation: 3,
+			region: [0, 2, 0, 1, 10, 0, 1, 10, 10, 1, 2, 10, 4],
+		});
+		expect(
+			(
+				await shapesOf(
+					`<filter id="f" ${region}><feGaussianBlur stdDeviation="1.5" /></filter>`,
+				)
+			).shapes?.[0]?.blur,
+		).toEqual(flooded.shapes?.[0]?.blur);
+		const refused = 'a native drawing draws a filter that only blurs its source graphic';
+		expect(
+			(await shapesOf(`<filter id="f" ${region}><feOffset dx="1" /></filter>`)).messages,
+		).toContain(`a <filter> that does not end in one <feGaussianBlur>: ${refused}`);
+		expect(
+			(
+				await shapesOf(
+					`<filter id="f" ${region}><feGaussianBlur stdDeviation="1 2" /></filter>`,
+				)
+			).messages,
+		).toContain(
+			`an <feGaussianBlur> whose deviation is not one non-negative number: ${refused}`,
+		);
+		expect(
+			(
+				await shapesOf(
+					'<filter id="f" filterUnits="userSpaceOnUse" x="0" y="0" width="4" height="5"><feGaussianBlur stdDeviation="1" /></filter>',
+				)
+			).messages,
+		).toContain(
+			`a <filter> that blurs in linearRGB (no \`color-interpolation-filters="sRGB"\`): ${refused}`,
+		);
+		expect(
+			(
+				await shapesOf(
+					`<filter id="f" ${region}><feGaussianBlur stdDeviation="1" /></filter>`,
+					'<rect width="1" height="1" /><rect width="2" height="2" />',
+				)
+			).messages,
+		).toContain(
+			'a `filter` over more than one shape: a native drawing blurs one shape at a time',
+		);
 	});
 
 	it('clips a group by the <clipPath> its clip-path names, mapped into the drawing; refuses one in bounding-box units', async () => {
@@ -4341,6 +4661,143 @@ export function Chart() @{
 		).toContain(
 			'`clipPathUnits="objectBoundingBox"` on <clipPath>: a clip is drawn in user space only',
 		);
+	});
+
+	describe('svg gradients', () => {
+		const drawn = async (defs: string, shapes: string, svgAttributes = 'viewBox="0 0 10 10"') => {
+			const { payload, diagnostics } = await nativeView(`export function Mark() @{
+	<svg ${svgAttributes}><defs>${defs}</defs>${shapes}</svg>
+}`);
+			const svg = payload?.nodes.find((node) => node.kind === 'element' && node.drawing);
+			return {
+				shapes: svg?.kind === 'element' ? (svg.drawing?.shapes ?? []) : [],
+				messages: diagnostics.map((d) => d.message),
+			};
+		};
+		const red = { r: 255, g: 0, b: 0, alpha: 255 };
+		const blue = { r: 0, g: 0, b: 255, alpha: 255 };
+		const yellow = { r: 255, g: 255, b: 0, alpha: 255 };
+		const green = { r: 0, g: 128, b: 0, alpha: 255 };
+
+		it('paints a shape with a gradient in user space as its coordinates say', async () => {
+			const { shapes, messages } = await drawn(
+				'<linearGradient id="g" x1="1" y1="2" x2="9" y2="8" gradientUnits="userSpaceOnUse"><stop stop-color="red" /><stop offset="1" stop-color="blue" /></linearGradient>',
+				'<rect width="10" height="10" fill="url(#g)" />',
+			);
+			expect(messages).toEqual([]);
+			expect(shapes[0]!.fill).toEqual({
+				linear: [1, 2, 9, 8],
+				stops: [
+					{ offset: 0, color: red },
+					{ offset: 1, color: blue },
+				],
+			});
+		});
+
+		it('maps a bounding-box gradient onto the shape, clamps its offsets in order and pads its ends', async () => {
+			const { shapes, messages } = await drawn(
+				'<linearGradient id="g" gradientTransform="matrix(0 1 -1 0 0 0)"><stop offset="50%" stop-color="yellow" /><stop offset="0.2" stop-color="green" /><stop offset="1.5" stop-color="blue" /></linearGradient>',
+				'<rect x="2" y="4" width="6" height="2" fill="url(\'#g\')" />',
+			);
+			expect(messages).toEqual([]);
+			expect(shapes[0]!.fill).toEqual({
+				linear: [0, 0, 1, 0],
+				stops: [
+					{ offset: 0, color: yellow },
+					{ offset: 0.5, color: yellow },
+					{ offset: 0.5, color: green },
+					{ offset: 1, color: blue },
+				],
+				// The box (6 by 2 at 2, 4), then the quarter turn.
+				transform: [0, 2, -6, 0, 2, 4],
+			});
+		});
+
+		it("takes what a radial gradient leaves out from the gradient its href names, and strokes with one", async () => {
+			const { shapes, messages } = await drawn(
+				'<linearGradient id="base" gradientUnits="userSpaceOnUse"><stop stop-color="red" /><stop offset="1" stop-color="blue" /></linearGradient><radialGradient id="g" href="#base" cx="5" cy="5" r="4" fx="4" />',
+				'<circle cx="5" cy="5" r="3" fill="none" stroke="url(#g)" stroke-width="2" />',
+			);
+			expect(messages).toEqual([]);
+			expect(shapes[0]!.fill).toBeNull();
+			expect(shapes[0]!.stroke).toEqual({
+				radial: [4, 5, 0, 5, 5, 4],
+				stops: [
+					{ offset: 0, color: red },
+					{ offset: 1, color: blue },
+				],
+			});
+		});
+
+		it('draws nothing for a bounding-box gradient on a shape with no height, as the browser ignores it', async () => {
+			const { shapes, messages } = await drawn(
+				'<linearGradient id="g"><stop stop-color="red" /><stop offset="1" stop-color="blue" /></linearGradient>',
+				'<line x1="1" y1="5" x2="9" y2="5" stroke="url(#g)" /><line x1="1" y1="1" x2="9" y2="9" stroke="url(#g)" />',
+			);
+			expect(messages).toEqual([]);
+			expect(shapes[0]!.stroke).toBeNull();
+			expect(shapes[1]!.stroke).toMatchObject({ linear: [0, 0, 1, 0], transform: [8, 0, 0, 8, 1, 1] });
+		});
+
+		it('measures the bounding box of a curve by where it turns, not by its control points', async () => {
+			const { shapes } = await drawn(
+				'<linearGradient id="g"><stop stop-color="red" /><stop offset="1" stop-color="blue" /></linearGradient>',
+				'<path d="M0 5 C0 0 10 0 10 5 Z" fill="url(#g)" />',
+			);
+			const [width, , , height, x, y] = (shapes[0]!.fill as { transform: number[] }).transform;
+			expect([width, height, x, y].map((n) => Math.round(n * 1e6) / 1e6)).toEqual([10, 3.75, 0, 1.25]);
+		});
+
+		it('takes fill-opacity into its stops, and adds stops between two that differ in colour and alpha', async () => {
+			const { shapes } = await drawn(
+				'<linearGradient id="g"><stop stop-color="red" /><stop offset="1" stop-color="blue" stop-opacity="0" /></linearGradient><linearGradient id="h"><stop stop-color="red" stop-opacity="0.5" /><stop offset="1" stop-color="blue" stop-opacity="0.5" /></linearGradient>',
+				'<rect width="10" height="10" fill="url(#g)" /><rect width="10" height="10" fill="url(#h)" fill-opacity="0.5" />',
+			);
+			const fade = shapes[0]!.fill as { stops: { offset: number; color: { r: number; b: number; alpha: number } }[] };
+			expect(fade.stops).toHaveLength(17);
+			// Halfway the browser blends unpremultiplied: half red, half blue, half alpha.
+			expect(fade.stops[8]).toEqual({ offset: 0.5, color: { r: 128, g: 0, b: 128, alpha: 128 } });
+			expect((shapes[1]!.fill as { stops: unknown[] }).stops).toEqual([
+				{ offset: 0, color: { ...red, alpha: 64 } },
+				{ offset: 1, color: { ...blue, alpha: 64 } },
+			]);
+		});
+
+		it('paints one colour for a gradient of one stop or no length, nothing for one without stops, and the fallback for a name that is not there', async () => {
+			const { shapes, messages } = await drawn(
+				'<linearGradient id="one"><stop stop-color="red" /></linearGradient><linearGradient id="none" /><linearGradient id="point" x2="0"><stop stop-color="red" /><stop offset="1" stop-color="blue" /></linearGradient>',
+				'<rect width="1" height="1" fill="url(#one)" /><rect width="1" height="1" fill="url(#none)" /><rect width="1" height="1" fill="url(#point)" /><rect width="1" height="1" fill="url(#missing) green" />',
+			);
+			expect(messages).toEqual([]);
+			expect(shapes.map((shape) => shape.fill)).toEqual([red, null, blue, green]);
+		});
+
+		it('refuses what it does not draw by the attribute that says it', async () => {
+			const refused = async (defs: string, shapes = '<rect width="10" height="10" fill="url(#g)" />', svg?: string) =>
+				(await drawn(defs, shapes, svg)).messages;
+			const stops = '<stop stop-color="red" /><stop offset="1" stop-color="blue" />';
+			expect(await refused(`<linearGradient id="g" spreadMethod="reflect" x2="0.5">${stops}</linearGradient>`)).toEqual([
+				'`spreadMethod="reflect"` on <linearGradient>: a gradient is drawn padded only natively yet',
+			]);
+			expect(await refused(`<radialGradient id="g" fx="0.95" fy="0.5" r="0.2">${stops}</radialGradient>`)).toEqual([
+				'`fx`, `fy` and `fr` on <radialGradient> put its focal circle outside its circle, which the browser draws as a cone: not drawn natively yet',
+			]);
+			expect(await refused(`<linearGradient id="g" color-interpolation="linearRGB">${stops}</linearGradient>`)).toEqual([
+				'`color-interpolation="linearRGB"` on <linearGradient>: a gradient blends in sRGB only natively yet',
+			]);
+			expect(await refused('<pattern id="g" />')).toEqual([
+				'`fill="url(#g)"` on <rect> names a <pattern>, which a native drawing does not paint with yet',
+			]);
+			expect(await refused(`<linearGradient id="g" gradientUnits="userSpaceOnUse">${stops}</linearGradient>`, undefined, '')).toEqual([
+				'`x2`, 100% when it is not written, on <linearGradient> in user space: a percentage is drawn natively only for a shape the outer <svg> draws, which has a viewBox or a size',
+			]);
+			expect(await refused('<linearGradient id="g"><stop style="stop-color: red" /><stop offset="1" /></linearGradient>')).toEqual([
+				'`style` on <stop>, which a native drawing does not draw yet',
+			]);
+			expect(await refused(`<linearGradient id="g">${stops}</linearGradient>`, '<text fill="url(#g)">Hi</text>')).toEqual([
+				'`fill="url(#g)"` on <text>: text is filled with one colour natively yet',
+			]);
+		});
 	});
 
 	it('places the viewBox by preserveAspectRatio, and refuses a value that is not one', async () => {
@@ -4442,6 +4899,121 @@ export function Page() @{
 	<p aria-label={name.toUpperCase()}>{name.toUpperCase()}</p>
 }`);
 		expect(plain.payload!.script).toBeUndefined();
+	});
+
+	it("opens a <details> from a press on its <summary>, after the summary's own handler; refuses what it cannot keep", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let peeks = state(0);
+	<details open>
+		<summary onClick={() => peeks++}>More {peeks}</summary>
+		<p>Body</p>
+	</details>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.cells).toContainEqual({ id: 'details:h0', name: 'open', initial: true });
+		const toggle = {
+			op: 'assign',
+			cell: 'details:h0',
+			value: { unary: '!', value: { cell: 'details:h0' } },
+		};
+		expect(payload!.handlers[0]!.ops.at(-1)).toEqual(toggle);
+		const node = (id: string) =>
+			payload!.nodes.find((one) => one.id === id) as {
+				attributes?: object;
+				bindings?: unknown[];
+			};
+		expect(node('h0').attributes).toBeUndefined();
+		expect(node('h2').bindings).toEqual([
+			{ attribute: 'hidden', value: { unary: '!', value: { cell: 'details:h0' } } },
+		]);
+		const refused = async (source: string) =>
+			(
+				await nativeView(`import { state } from '@markless/core';\n${source}`)
+			).diagnostics.map((diagnostic) => diagnostic.message);
+		expect(
+			await refused(`export function Page() @{ <details><p>No legend</p></details> }`),
+		).toEqual([
+			'the <details> h0 has no <summary>, so the browser writes its label, which a native build does not yet',
+		]);
+		expect(
+			await refused(`export function Page() @{
+	let shown = state(false);
+	<details open={shown}><summary>S</summary><p>B</p></details>
+}`),
+		).toEqual([
+			'the <details> h0 binds `open`; a native build opens it from a press on its <summary>',
+		]);
+		expect(
+			await refused(
+				`export function Page() @{ <details name="faq"><summary>S</summary><p>B</p></details> }`,
+			),
+		).toEqual([
+			'the <details> h0 has `name`, an exclusive group a native build does not keep yet',
+		]);
+		expect(
+			await refused(`export function Page() @{
+	let n = state(0);
+	<details><summary onClick={(event) => { n++; if (n > 1) event.preventDefault(); }}>S</summary><p>B</p></details>
+}`),
+		).toEqual([
+			'the click handler on the <summary> h1 may call `event.preventDefault()` in JavaScript, which a phone cannot report before the toggle yet',
+		]);
+	});
+
+	it('runs URL and URLSearchParams in the script, adding their code only to a script that reads them', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function nextPage(query: string): string {
+	const params = new URLSearchParams(query);
+	params.set('page', String(Number(params.get('page')) + 1));
+	return new URL('?' + params, 'https://shop.example/list').href;
+}
+export function Page() @{
+	let query = state('page=1');
+	let link = state('');
+	<button onClick={() => (link = nextPage(query))}>{link}</button>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.script!.services).toEqual([]);
+		expect(payload!.script!.source).toContain('g.URLSearchParams = URLSearchParams');
+		const timers = await nativeView(`import { state } from '@markless/core';
+function later(fn: () => void): void {
+	for (const ms of [1]) setTimeout(fn, ms);
+}
+export function Page() @{
+	let count = state(0);
+	<button onClick={() => later(() => (count += 1))}>{count}</button>
+}`);
+		expect(timers.diagnostics).toEqual([]);
+		expect(timers.payload!.script!.source).not.toContain('g.URLSearchParams');
+	});
+
+	it('runs history.replaceState and reads history.state in a handler, and still refuses pushState', async () => {
+		const kept = await nativeView(`import { state } from '@markless/core';
+export function Page() @{
+	let shown = state('');
+	<button onClick={() => { history.replaceState({ n: 1 }, '', '/elsewhere'); shown = JSON.stringify(history.state); }}>{shown}</button>
+}`);
+		expect(kept.diagnostics).toEqual([]);
+		expect(kept.payload!.script!.source).toContain('g.history = {');
+		const pushed = await nativeView(`export function Page() @{
+	<button onClick={() => history.pushState(null, '', '/next')}>Next</button>
+}`);
+		expect(pushed.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+			expect.stringContaining("uses `history`: the browser's history"),
+		]);
+	});
+
+	it('draws <center> with its default look: its blocks in the middle of the line, its text centred', async () => {
+		const { payload, diagnostics } = await nativeView(`export function Page() @{
+	<center><h1>Poll</h1><p>Once</p></center>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.nodes.flatMap((node) => (node.kind === 'element' ? [[node.element, node.defaultStyle]] : []))).toEqual([
+			['center', { center: true }],
+			['h1', { bold: true, size: 2 }],
+			['p', undefined],
+		]);
 	});
 
 	it('passes a component a prop that calls app code through the script', async () => {
@@ -4937,6 +5509,72 @@ export function Track() @{
 }`);
 		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
 		expect(payload!.handlers[0]?.ops.map((op) => op.op)).toEqual(['script']);
+	});
+});
+
+it('compares `x ?? null` with null as data, whatever x first held', async () => {
+	const { diagnostics } = await nativeView(
+		`import { state } from '@markless/core';
+export function App() @{
+	const s = state({ low: undefined as number | undefined, out: '' });
+	<button onClick={() => { if ((s.low ?? null) === null) s.out = 'none'; }}>{s.out}</button>
+}`,
+		dataOnly,
+	);
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+});
+
+describe('a field steppers press', () => {
+	const source = `import { shared, state } from '@markless/core';
+function pageLanguage(): string | undefined {
+	if (typeof document === 'undefined') return undefined;
+	return document.documentElement.lang || undefined;
+}
+function shown(value: number | null): string {
+	if (value === null) return '';
+	return value.toLocaleString(pageLanguage());
+}
+const stepperState = shared(
+	() => {
+		const stepper = state({ value: 1, low: undefined as number | undefined, text: '1' });
+		return {
+			...stepper,
+			settle(next: number | null) {
+				stepper.value = next ?? 0;
+				stepper.text = shown(next);
+			},
+		};
+	},
+	{ scope: 'subtree' },
+);
+export function Stepper() @{
+	const stepper = stepperState();
+	<main>
+		<p>{stepper.text}</p>
+		<input
+			type="text"
+			value={stepper.text}
+			onKeydown={(event) => {
+				if (event.key === 'Home') event.preventDefault();
+				if (event.key === 'Home') stepper.settle(stepper.low ?? null);
+			}}
+		/>
+	</main>
+}`;
+
+	it('runs a key handler its data cannot spell as JavaScript, with the method reading a page global only past a typeof test', async () => {
+		const { payload, diagnostics } = await nativeView(source);
+		expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		const keydown = payload!.events.find((event) => event.event === 'keydown');
+		const ops = payload!.handlers.find((handler) => handler.id === keydown?.handler)?.ops;
+		expect(ops).toMatchObject([{ op: 'script', type: 'keydown' }]);
+		expect(JSON.stringify(ops)).toMatch(/"settle":\{"method":"fn:/);
+	});
+
+	it('still refuses the method without the typeof test, as its JavaScript would read a page global', async () => {
+		const { payload, diagnostics } = await nativeView(source.replace("if (typeof document === 'undefined') return undefined;\n", ''));
+		expect(payload).toBeNull();
+		expect(diagnostics.some((diagnostic) => diagnostic.severity === 'error')).toBe(true);
 	});
 });
 

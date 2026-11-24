@@ -1,0 +1,17 @@
+appId: ${APP_ID}
+name: u132-device-pixel-ratio
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Screen check
+- assertVisible: Check screen
+- assertVisible: Ratio unknown
+- tapOn: Check screen
+- assertNotVisible: Ratio unknown
+- assertVisible: Ratio read
+- assertNotVisible: Ratio unknown
+- assertNotVisible: No ratio

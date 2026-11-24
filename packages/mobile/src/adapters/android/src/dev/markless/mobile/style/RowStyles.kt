@@ -10,24 +10,39 @@ import dev.markless.mobile.core.Runtime
 
 /**
  * The values a row's `class` or `ui-*` binding can give, as the style input lists them (style-input.ts `rowAttributeOptions`):
- * literals chosen by conditions, in first-seen order; null for any other binding.
+ * literals chosen by conditions, or a field of the row's item whose values its list lists, in first-seen order; null for any
+ * other binding.
  */
-fun rowAttributeOptions(name: String, expr: Expr, booleanCells: Set<String> = emptySet()): List<String?>? = when {
+fun rowAttributeOptions(name: String, expr: Expr, booleanCells: Set<String> = emptySet(), itemValues: (Expr) -> List<JsValue>? = { null }): List<String?>? = when {
 	givesBoolean(expr, booleanCells) -> listOf(AttributeValue.of(name, JsValue.Bool(true)), AttributeValue.of(name, JsValue.Bool(false))).distinct()
-	else -> literalOptions(name, expr, booleanCells)
+	else -> literalOptions(name, expr, booleanCells, itemValues)
+}
+
+/** Reads each repeat's `itemValues` for [rowAttributeOptions]: a field path read off a row's item. */
+fun itemValuesOf(payload: Payload): (Expr) -> List<JsValue>? {
+	val lists = payload.nodes.filterIsInstance<Node.Repeat>().mapNotNull { node -> node.itemValues?.let { node.id to it } }.toMap()
+	return { expr ->
+		val path = ArrayList<String>()
+		var at = expr
+		while (at is Expr.Member) {
+			path.add(0, at.property)
+			at = at.value
+		}
+		if (at is Expr.Item && path.isNotEmpty()) lists[at.repeat]?.get(path.joinToString(".")) else null
+	}
 }
 
 /** The payload's cells whose first value is true or false. */
 fun booleanCellsOf(payload: Payload): Set<String> = payload.cells.filter { it.initial is JsValue.Bool }.map { it.id }.toSet()
 
-private fun literalOptions(name: String, expr: Expr, booleanCells: Set<String>): List<String?>? = when (expr) {
+private fun literalOptions(name: String, expr: Expr, booleanCells: Set<String>, itemValues: (Expr) -> List<JsValue>?): List<String?>? = when (expr) {
 	is Expr.Literal -> listOf(AttributeValue.of(name, expr.value))
 	is Expr.If -> {
-		val a = rowAttributeOptions(name, expr.whenTrue, booleanCells)
-		val b = rowAttributeOptions(name, expr.whenFalse, booleanCells)
+		val a = rowAttributeOptions(name, expr.whenTrue, booleanCells, itemValues)
+		val b = rowAttributeOptions(name, expr.whenFalse, booleanCells, itemValues)
 		if (a == null || b == null) null else (a + b).distinct()
 	}
-	else -> null
+	else -> itemValues(expr)?.map { AttributeValue.of(name, it) }?.distinct()
 }
 
 /** The export's states of each row: a row's class or ui-* values (`<node>#<attribute>`) and each @if or @try inside a row. */
@@ -55,6 +70,7 @@ fun StyleExport.shownRows(payload: Payload, runtime: Runtime): (Int) -> Map<Stri
 	val texts = runtime.texts().toMap()
 	val attributes = runtime.attributes().associate { (node, name, value) -> "$node\u0000$name" to value }
 	val lists = runtime.rows().toMap()
+	val slotValues = runtime.slots().toMap()
 	data class RowState(val state: Int, val node: String, val attribute: String, val options: List<String?>, val list: String)
 	val rowStates = states.mapIndexedNotNull { index, state ->
 		val hash = state.key.lastIndexOf('#')
@@ -64,7 +80,7 @@ fun StyleExport.shownRows(payload: Payload, runtime: Runtime): (Int) -> Map<Stri
 		val node = payload.nodes.firstOrNull { it.id == nodeId } as? Node.Element ?: return@mapIndexedNotNull null
 		val list = node.row ?: return@mapIndexedNotNull null
 		val binding = node.bindings.firstOrNull { !it.property && it.name == attribute } ?: return@mapIndexedNotNull null
-		val options = rowAttributeOptions(attribute, binding.value, booleanCellsOf(payload)) ?: return@mapIndexedNotNull null
+		val options = rowAttributeOptions(attribute, binding.value, booleanCellsOf(payload), itemValuesOf(payload)) ?: return@mapIndexedNotNull null
 		RowState(index, nodeId, attribute, options, list)
 	}
 	val rowTexts = payload.nodes.filterIsInstance<Node.Text>().filter { it.row != null }
@@ -78,7 +94,8 @@ fun StyleExport.shownRows(payload: Payload, runtime: Runtime): (Int) -> Map<Stri
 					if (option < 0) throw MarklessDecodeError("${row.node}@$key has ${row.attribute} ${value ?: "absent"}, which its style lists no state for")
 					reached = next(reached, row.state, JsValue.Str(option.toString()))
 				}
-				LaidOutRow(key, reached, rowTexts.filter { it.row == list.id }.associate { it.id to (texts["${it.id}@$key"] ?: "") })
+				val ownSlots = payload.slots.filter { it.row == list.id }.mapNotNull { s -> slotValues["${s.id}@$key"]?.let { s.id to it } }.toMap()
+				LaidOutRow(key, reached, rowTexts.filter { it.row == list.id }.associate { it.id to (texts["${it.id}@$key"] ?: "") }, ownSlots)
 			}
 		}
 	}

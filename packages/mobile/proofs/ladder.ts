@@ -3,9 +3,20 @@ import { join } from 'node:path';
 import { stringify } from 'yaml';
 import { PROOF_URL_SCHEME } from '../src/harness/proof-app.ts';
 
+/** A visible text or accessible name, whole or by how it starts (`{ "startsWith": "Groceries" }`, for a text ending in a run's date). */
+export type LadderText = string | { readonly startsWith: string };
+
+/** Whether a text a screen shows is the one `text` names. */
+export const readsAs = (shown: string, text: LadderText): boolean =>
+	typeof text === 'string' ? shown === text : shown.startsWith(text.startsWith);
+
+/** `text` as a message names it: in quotes, or `"Groceries…"` for a text named by how it starts. */
+export const describeText = (text: LadderText): string =>
+	typeof text === 'string' ? JSON.stringify(text) : `${JSON.stringify(text.startsWith).slice(0, -1)}…"`;
+
 /** One person's action between two looks at the screen. Every target is a visible text or an accessible name. */
 export type LadderAction =
-	| { readonly tap: string }
+	| { readonly tap: LadderText }
 	| {
 			readonly type: {
 				readonly field: string;
@@ -38,8 +49,13 @@ export type LadderAction =
 	| { readonly submit: string }
 	/** The keyboard's delete key in the text field with this accessible name, its text cursor at the end. */
 	| { readonly erase: string }
+	/**
+	 * The clear control of the focused search field with this accessible name: Chrome's cancel button on the web, the hosts'
+	 * clear control (`CLEAR_BUTTON_LABEL`) on the phones.
+	 */
+	| { readonly clear: string }
 	/** Two quick taps on this text or accessible name: the second press's `event.detail` is 2. */
-	| { readonly doubleTap: string }
+	| { readonly doubleTap: LadderText }
 	/** Opens the `<select>` with this accessible name and picks the option with this label from its list. */
 	| { readonly choose: { readonly field: string; readonly option: string } }
 	/** Scroll until this text is on screen. */
@@ -74,6 +90,11 @@ export type LadderAction =
 	/** A press that starts and ends on the topmost overlay element itself, beside what it holds (a modal's backdrop). */
 	| { readonly pressBackdrop: true }
 	/**
+	 * A tap at a point of the screen, `[x, y]` in percent of it, on the element showing `on` there (a box drawn over another, as
+	 * a sticky header over the rows scrolled beneath it); the web test checks Chrome's element at that point is inside it.
+	 */
+	| { readonly tapAt: { readonly point: readonly [number, number]; readonly on: string } }
+	/**
 	 * A finger pressed on the element showing `on`, dragged toward `direction` and lifted. `scrolls` says the drag runs along
 	 * a box that scrolls that way, so the platform takes the touch for the scroll (the web's `pointercancel`); the phones and
 	 * the browser find that out for themselves, the reference ladder, which lays nothing out, is told.
@@ -99,6 +120,9 @@ export type LadderAction =
 /** Where a phone flow presses the backdrop: above a centred surface, below the status bar. */
 export const BACKDROP_POINT = '50%,8%';
 
+/** The accessible name of a search field's clear control: UIKit's for its clear button, which the Android host gives its own. */
+export const CLEAR_BUTTON_LABEL = 'Clear text';
+
 /** Permissions a rung sets or clears, by the name Maestro's `launchApp` takes. */
 export type DevicePermission = 'location' | 'camera' | 'microphone';
 
@@ -119,9 +143,9 @@ export const SWIPES_UNTIL = 80;
 export type LadderStep = {
 	readonly do?: LadderAction;
 	/** Texts or accessible names that are on screen. */
-	readonly visible: readonly string[];
+	readonly visible: readonly LadderText[];
 	/** Texts or accessible names that are not on screen. */
-	readonly absent?: readonly string[];
+	readonly absent?: readonly LadderText[];
 	/** Texts or accessible names the page holds but that are scrolled out of sight. */
 	readonly offScreen?: readonly string[];
 	/** Texts the page holds but its styles do not show at this size (`display: none` in this band). */
@@ -232,6 +256,11 @@ export type LadderRung = {
 	/** A number for the one-screen ladder, `N1`... for the navigation ladder, `D<n>` for the device ladder. */
 	readonly rung: number | string;
 	readonly name: string;
+	/**
+	 * Pressed-state checks of a styled page (`--held-check`): while a finger holds the element with this text, the page shows the
+	 * interaction state whose `:active` matches `node`, and once the finger lifts, its assignment again.
+	 */
+	readonly held?: readonly { readonly text: string; readonly node: string }[];
 	/** The route pattern App.tsrx is the page for, relative to the app root; the index route when absent. */
 	readonly route?: string;
 	/** The path the app opens at; `/` when absent. */
@@ -249,6 +278,12 @@ export type LadderRung = {
 	readonly location?: { readonly latitude: number; readonly longitude: number };
 	/** Permissions at the first launch; `unset` leaves the system to ask (Maestro grants every permission otherwise). */
 	readonly permissions?: Readonly<Partial<Record<DevicePermission, 'allow' | 'deny' | 'unset'>>>;
+	/**
+	 * What every file picker answers at once: each file's name, its text saved as UTF-8, and the MIME type the phones derive
+	 * from the name's extension (a launch argument on phones, the web test's file chooser), as the system picker is not the
+	 * proof's to drive.
+	 */
+	readonly pick?: ReadonlyArray<{ readonly name: string; readonly text: string; readonly type: string }>;
 	/**
 	 * The web build, where `@markless/device` is absent: the steps it shows instead (a device action has nothing to
 	 * act on there), and texts that must not appear in any file of the built output (removed at build time).
@@ -268,6 +303,13 @@ export type LadderRung = {
 };
 
 export const proofsDir = import.meta.dirname;
+
+/** Rungs no phone runs: the compiler refuses the page on purpose (`compiler`), or Dragon refuses its styles (`dragon`). */
+export const PHONE_REFUSED_RUNGS: Readonly<Record<string, 'compiler' | 'dragon'>> = {
+	'j7-page-refused': 'compiler',
+	'y4-sheet-beside-drawer': 'dragon',
+	'u102-drawer-swipe': 'dragon',
+};
 
 export const rungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
@@ -322,8 +364,13 @@ export const looksOnly = (action: LadderAction | undefined): boolean =>
 export const readRung = (folder: string): LadderRung =>
 	JSON.parse(readFileSync(join(proofsDir, folder, 'expected.json'), 'utf8')) as LadderRung;
 
-// Maestro reads a selector's text as a regular expression over the whole label.
-const selector = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeSelector = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** `text` as a regular expression over a whole label, the way Maestro (with DOT_MATCHES_ALL) reads a selector. */
+export const selector = (text: LadderText): string =>
+	typeof text === 'string' ? escapeSelector(text) : `^${escapeSelector(text.startsWith)}.*`;
+
+const textKey = (text: LadderText): string => JSON.stringify(text);
 
 /**
  * The expectations of `step` that the previous step's screen contradicts. An action step needs at
@@ -331,12 +378,12 @@ const selector = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * it ends only once the app is back.
  */
 export function changeWitness(previous: LadderStep, step: LadderStep): LadderStep {
-	const wasShown = new Set(previous.visible);
-	const wasAbsent = new Set([
-		...(previous.absent ?? []),
-		...(previous.offScreen ?? []),
-		...(previous.hidden ?? []),
-	]);
+	const wasShown = new Set(previous.visible.map(textKey));
+	const wasAbsent = new Set(
+		[...(previous.absent ?? []), ...(previous.offScreen ?? []), ...(previous.hidden ?? [])].map(
+			textKey,
+		),
+	);
 	const order = step.order?.join('\n') !== previous.order?.join('\n') ? step.order : undefined;
 	const placed = step.placed?.join('\n') !== previous.placed?.join('\n') ? step.placed : undefined;
 	const fields = Object.fromEntries(
@@ -347,13 +394,13 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 	const calls =
 		step.calls && step.calls.join('\n') !== previous.calls?.join('\n') ? step.calls : undefined;
 	return {
-		visible: step.visible.filter((text) => wasAbsent.has(text)),
-		absent: (step.absent ?? []).filter((text) => wasShown.has(text)),
-		...((step.hidden ?? []).some((text) => wasShown.has(text)) && {
-			hidden: (step.hidden ?? []).filter((text) => wasShown.has(text)),
+		visible: step.visible.filter((text) => wasAbsent.has(textKey(text))),
+		absent: (step.absent ?? []).filter((text) => wasShown.has(textKey(text))),
+		...((step.hidden ?? []).some((text) => wasShown.has(textKey(text))) && {
+			hidden: (step.hidden ?? []).filter((text) => wasShown.has(textKey(text))),
 		}),
-		...((step.offScreen ?? []).some((text) => wasShown.has(text)) && {
-			offScreen: (step.offScreen ?? []).filter((text) => wasShown.has(text)),
+		...((step.offScreen ?? []).some((text) => wasShown.has(textKey(text))) && {
+			offScreen: (step.offScreen ?? []).filter((text) => wasShown.has(textKey(text))),
 		}),
 		...(order && { order }),
 		...(placed && { placed }),
@@ -478,6 +525,7 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 		];
 	if ('submit' in action) return [{ tapOn: selector(action.submit) }, { pressKey: 'Enter' }];
 	if ('erase' in action) return [{ tapOn: selector(action.erase) }, { pressKey: 'Backspace' }];
+	if ('clear' in action) return [{ tapOn: selector(CLEAR_BUTTON_LABEL) }];
 	if ('doubleTap' in action) return [{ doubleTapOn: selector(action.doubleTap) }];
 	if ('choose' in action)
 		return [
@@ -587,6 +635,8 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 	if ('longPress' in action) return [{ longPressOn: { text: selector(action.longPress) } }];
 	if ('escape' in action) return ['back'];
 	if ('pressBackdrop' in action) return [{ tapOn: { point: BACKDROP_POINT } }];
+	if ('tapAt' in action)
+		return [{ tapOn: { point: `${action.tapAt.point[0]}%,${action.tapAt.point[1]}%` } }];
 	return [
 		{
 			extendedWaitUntil: {
@@ -599,23 +649,30 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 
 /** The Maestro commands of each step in order: step 0 launches the app, every later step is its action then its checks. */
 export function flowSteps(rung: LadderRung): unknown[][] {
+	// iOS's clearState reinstalls the app and launches it before FrontBoard knows it; the runner installs each rung's app fresh.
+	const cleared = onPlatform('Android', ['clearState']);
+	const options = {
+		...((rung.start || rung.pick) && {
+			arguments: {
+				...(rung.start && { route: rung.start }),
+				...(rung.pick && { pick: JSON.stringify(rung.pick) }),
+			},
+		}),
+		...(rung.permissions && { permissions: rung.permissions }),
+	};
 	const launch =
 		rung.open === 'link'
 			? [
-					{ launchApp: { clearState: true } },
+					cleared,
+					'launchApp',
 					'stopApp',
 					{ openLink: `${PROOF_URL_SCHEME}://app${rung.start ?? '/'}` },
 					// iOS asks before an outside caller opens an app by its URL scheme, until the simulator remembers the answer.
 					onPlatform('iOS', [{ tapOn: { text: 'Open', optional: true } }]),
 				]
 			: [
-					{
-						launchApp: {
-							clearState: true,
-							...(rung.start && { arguments: { route: rung.start } }),
-							...(rung.permissions && { permissions: rung.permissions }),
-						},
-					},
+					cleared,
+					Object.keys(options).length > 0 ? { launchApp: options } : 'launchApp',
 				];
 	// A rung that switches the appearance starts in light, whatever the device was left in.
 	const appearance = rung.steps.some((step) => looksOnly(step.do))

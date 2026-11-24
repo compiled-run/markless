@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j8-render-values
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Render
 - assertVisible: "Initials: AL"
 - assertVisible: "Vowels: 6"

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u84-absent-default
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Upload waiting
 - assertVisible: Upload \+10
 - assertNotVisible: Upload at 10

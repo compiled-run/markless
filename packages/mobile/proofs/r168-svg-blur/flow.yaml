@@ -1,0 +1,19 @@
+appId: ${APP_ID}
+name: r168-svg-blur
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Glowing mark
+- assertVisible: Soft glow
+- assertVisible: Toggle glow
+- tapOn: Toggle glow
+- assertNotVisible: Soft glow
+- assertVisible: Glowing mark
+- assertNotVisible: Soft glow
+- tapOn: Toggle glow
+- assertVisible: Soft glow
+- assertVisible: Soft glow

@@ -1,0 +1,20 @@
+appId: ${APP_ID}
+name: s27-styled-checkbox
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Pin to the top
+- assertVisible: "Pinned: no"
+- assertNotVisible: "Pinned: yes"
+- assertVisible: Pinning
+- tapOn: Pin to the top
+- assertVisible: "Pinned: yes"
+- assertNotVisible: "Pinned: no"
+- assertVisible: Pin to the top
+- assertVisible: "Pinned: yes"
+- assertNotVisible: "Pinned: no"
+- assertVisible: Pinning

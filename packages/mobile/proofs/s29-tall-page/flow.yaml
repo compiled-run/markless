@@ -1,0 +1,32 @@
+appId: ${APP_ID}
+name: s29-tall-page
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Notes
+- assertVisible: Groceries
+- assertVisible: Add ten notes
+- assertVisible: End of list
+- assertNotVisible: Note 3
+- assertVisible: Notes
+- tapOn: Add ten notes
+- assertVisible: Note 3
+- assertNotVisible: End of list
+- assertVisible: Groceries
+- assertVisible: Note 3
+- assertNotVisible: End of list
+- repeat:
+    times: 80
+    while:
+      notVisible: End of list
+    commands:
+      - swipe:
+          start: 50%, 80%
+          end: 50%, 25%
+- assertVisible: End of list
+- assertVisible: Note 12
+- assertVisible: End of list

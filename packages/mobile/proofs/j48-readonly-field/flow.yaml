@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j48-readonly-field
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Coupon
 - assertVisible: Nothing sent
 - assertVisible: Unlock code

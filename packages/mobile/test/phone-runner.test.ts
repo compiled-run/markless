@@ -24,7 +24,7 @@ import {
 	recordPass,
 	rungFingerprint,
 } from '../src/runner/reuse.ts';
-import { pickChunk, type QueuedJob } from '../src/runner/schedule.ts';
+import { pickChunk, standsBy, type QueuedJob } from '../src/runner/schedule.ts';
 import {
 	JOB_VERSION,
 	type JobSpec,
@@ -216,6 +216,61 @@ describe('a phone', () => {
 			"console port 5620 is outside adb's range",
 		);
 		expect(() => parsePhone('android', 'markless_runner@5584')).not.toThrow();
+	});
+
+	it('reads an emulator on another machine as <avd>@<port>@<ssh host>', () => {
+		expect(parsePhone('android', 'markless_pc1@5570@pc-phones')).toEqual({
+			platform: 'android',
+			avd: 'markless_pc1',
+			port: 5570,
+			remote: 'pc-phones',
+		});
+		expect(() => parsePhone('android', 'markless_pc1@5570@')).toThrow();
+		expect(() => parsePhone('android', 'markless_pc1@5570@pc@x')).toThrow();
+	});
+
+	it('is away while its machine does not take work, from any state but broken, and comes back by booting', () => {
+		const away = transitionPhone(booting, { type: 'away', reason: 'paused' }, 1);
+		expect(away).toEqual({ state: 'away', since: 1, reason: 'paused' });
+		// Asked again a minute later and still away: it has been away since the first time.
+		expect(transitionPhone(away, { type: 'away', reason: 'unreachable' }, 9)).toEqual({
+			state: 'away',
+			since: 1,
+			reason: 'unreachable',
+		});
+		const busy = transitionPhone(
+			transitionPhone(away, { type: 'booted', device: 'emulator-5570' }, 2),
+			{ type: 'take', chunk: 'job/android-000' },
+			3,
+		);
+		expect(transitionPhone(busy, { type: 'away', reason: 'gone mid-chunk' }, 4)).toMatchObject({
+			state: 'away',
+		});
+		const broken = transitionPhone(booting, { type: 'give-up', reason: 'x' });
+		expect(() => transitionPhone(broken, { type: 'away', reason: 'y' })).toThrow();
+	});
+});
+
+describe("this machine's own phone", () => {
+	const local = parsePhone('android', 'markless_runner@5570');
+	const remote = parsePhone('android', 'markless_pc1@5570@pc-phones');
+	const ios = parsePhone('ios', 'markless-runner');
+	const ready: PhoneState = { state: 'ready', device: 'd', since: 0, driverInstalled: true };
+	const away: PhoneState = { state: 'away', since: 0, reason: 'paused' };
+
+	it('stands by while a remote phone of its platform is ready or busy', () => {
+		expect(standsBy(local, [{ spec: remote, state: ready }])).toBe(true);
+		expect(
+			standsBy(local, [
+				{ spec: remote, state: { ...ready, state: 'busy', chunk: 'job/android-000' } },
+			]),
+		).toBe(true);
+	});
+
+	it('takes the work while every remote phone is away, and never stands by for another platform or itself', () => {
+		expect(standsBy(local, [{ spec: remote, state: away }])).toBe(false);
+		expect(standsBy(ios, [{ spec: remote, state: ready }])).toBe(false);
+		expect(standsBy(remote, [{ spec: remote, state: ready }])).toBe(false);
 	});
 });
 

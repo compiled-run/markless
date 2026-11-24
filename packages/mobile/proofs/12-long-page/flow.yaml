@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 12-long-page
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Long page
 - assertVisible: Section 1
 - assertNotVisible: Pressed 1

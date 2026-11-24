@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: s55-root-focus-ring
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Focus ring
+- assertVisible: Open the note
+- assertNotVisible: The ring note
+- tapOn: Open the note
+- assertVisible: The ring note
+- assertNotVisible: Focus ring
+- assertVisible: The ring note
+- assertVisible: Back home
+- assertNotVisible: Focus ring
+- tapOn: Back home
+- assertVisible: Focus ring
+- assertNotVisible: The ring note
+- assertVisible: Focus ring
+- assertVisible: Open the note
+- assertNotVisible: The ring note

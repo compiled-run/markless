@@ -1,0 +1,100 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "NewNote",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page mk-1twsu9x"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "form",
+			"parent": "h0",
+			"attributes": {
+				"class": "form mk-1twsu9x"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "label",
+			"parent": "h1",
+			"attributes": {
+				"class": "field mk-1twsu9x"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Title"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "input",
+			"parent": "h2",
+			"attributes": {
+				"name": "title",
+				"autocomplete": "off",
+				"class": "mk-1twsu9x"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "label",
+			"parent": "h1",
+			"attributes": {
+				"class": "field mk-1twsu9x"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Note"
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "textarea",
+			"parent": "h4",
+			"attributes": {
+				"name": "body",
+				"rows": "3",
+				"class": "mk-1twsu9x"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": ""
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "button",
+			"parent": "h1",
+			"attributes": {
+				"type": "submit",
+				"class": "save mk-1twsu9x"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h6:text0",
+			"parent": "h6",
+			"text": "Save note"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.page.mk-1twsu9x {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #fbf8f1;\n\t\t\t\tcolor: #1f1d1a;\n\t\t\t}\n\t\t\t.form.mk-1twsu9x {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgap: 16px;\n\t\t\t\tpadding: 20px;\n\t\t\t\tborder: 1px solid #e4ddcf;\n\t\t\t\tborder-radius: 14px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t}\n\t\t\t.field.mk-1twsu9x {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgap: 6px;\n\t\t\t\tfont-weight: 600;\n\t\t\t}\n\t\t\t.field input.mk-1twsu9x,\n\t\t\t.field textarea.mk-1twsu9x {\n\t\t\t\tbox-sizing: border-box;\n\t\t\t\twidth: 100%;\n\t\t\t\tpadding: 12px 14px;\n\t\t\t\tborder: 1px solid #e4ddcf;\n\t\t\t\tbackground: #fbf8f1;\n\t\t\t\tfont: inherit;\n\t\t\t\tfont-family: Ahem;\n\t\t\t\tfont-weight: 400;\n\t\t\t}\n\t\t\t.field textarea.mk-1twsu9x {\n\t\t\t\tdisplay: block;\n\t\t\t\tresize: none;\n\t\t\t\tscrollbar-width: none;\n\t\t\t}\n\t\t\t.save.mk-1twsu9x {\n\t\t\t\tdisplay: block;\n\t\t\t\tpadding: 12px 16px;\n\t\t\t\tborder: 0;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #2f6f5e;\n\t\t\t\tcolor: #ffffff;\n\t\t\t\tfont: inherit;\n\t\t\t}",
+	"states": []
+}

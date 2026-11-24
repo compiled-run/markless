@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j2-app-and-library
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Library
 - assertVisible: "Heading: none"
 - assertVisible: "Price: none"

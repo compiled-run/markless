@@ -38,12 +38,24 @@ public enum StyleWrite: Sendable {
 	case clipText
 	/// The box paints in another stacking context's order (Dragon's re-hosting); `host` is that context's node.
 	case paintOrder(host: String, bucket: Int, rank: Int)
+	/// box-shadow: the computed shadows in list order.
+	case boxShadow([BoxShadow.Shadow])
 	/// `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own.
 	case visibility(String)
+	/// A select whose appearance devolves to menulist-button: its drop-down arrow is stroked in this colour, along the path
+	/// Dragon's plan layout gives (`StyleNode.selectArrow`).
+	case selectArrow(RGBA)
+	/// A themed checkbox (`appearance: auto`): drawn in these colours over the marks Dragon's plan layout gives
+	/// (`StyleNode.checkboxMarks`), checked or not as the input's live checkedness says.
+	case checkbox(CheckboxColors)
+	/// `outline`: drawn after its stacking context's flow content, in the view of its paint layer (`Outline.layer`).
+	case outline(Outline)
 	/// `transform`: the functions and origin as Dragon wrote them, lengths in CSS px; Dragon's translated paint math resolves them at the box size.
 	case transform(StyleTransform)
 	/// `opacity` below 1 that Dragon pre-composites: the box keeps alpha 1 and shows the group composited over what paints before it.
 	case opacityGroup(OpacityGroup)
+	/// `opacity` below 1 that the platform composites: the view's alpha is Chrome's alpha byte / 255, its subtree drawn as one group.
+	case opacity(Double)
 }
 
 /// A transform length: CSS px (`px`), a percentage of the border box (`percent`), or both (`calc`).
@@ -80,6 +92,63 @@ public struct OpacityGroup: Equatable, Sendable {
 	public var unstable: [String] = []
 }
 
+/// An outline as Dragon lowers it: its style, width and offset in CSS px, its colour, a 3D style's lighter and darker colours,
+/// the box's corner radius lengths (nil: square), and the node whose paint layer paints it.
+public struct Outline: Equatable, Sendable {
+	public static let styles = ["solid", "double", "dotted", "dashed", "groove", "ridge", "inset", "outset"]
+	public let style: String
+	public let width: Double
+	public let offset: Double
+	public let color: RGBA
+	public let tones: (light: RGBA, dark: RGBA)?
+	public let radii: [(percent: Bool, value: Double)]?
+	public let layer: String
+
+	public static func == (a: Outline, b: Outline) -> Bool {
+		a.style == b.style && a.width == b.width && a.offset == b.offset && a.color == b.color && a.layer == b.layer
+			&& a.tones?.light == b.tones?.light && a.tones?.dark == b.tones?.dark
+			&& a.radii?.map(\.percent) == b.radii?.map(\.percent) && a.radii?.map(\.value) == b.radii?.map(\.value)
+	}
+}
+
+/// A themed checkbox's colours, as Chrome's theme gives them for its accent-color.
+public struct CheckboxColors: Equatable, Sendable {
+	public let uncheckedBackground: RGBA
+	public let uncheckedBorder: RGBA
+	public let checkedBackground: RGBA
+	public let fill: RGBA
+	public let check: RGBA
+}
+
+/// A themed checkbox's marks as Dragon's plan layout gives them, in device px from the snapped border box, which sits at
+/// `origin` relative to the node's frame: the square (`x`, `y`, `side`), drawn as one fill when `plain`; otherwise its background
+/// inset by `backgroundInset` and, unchecked, its border stroked `borderWidth` wide inset by `borderInset`, both rounded by
+/// `radius`; checked, the square filled and the open path `check` (three x, y pairs) stroked `checkWidth` wide.
+public struct CheckboxMarks: Equatable, Sendable {
+	public let originX: Double
+	public let originY: Double
+	public let x: Double
+	public let y: Double
+	public let side: Double
+	public let plain: Bool
+	public let radius: Double
+	public let backgroundInset: Double
+	public let borderInset: Double
+	public let borderWidth: Double
+	public let check: [Double]
+	public let checkWidth: Double
+}
+
+/// A select's drop-down arrow as Dragon's plan layout gives it: an open path of `points` (x, y pairs, the first moved to),
+/// stroked `strokeWidth` wide with butt caps and miter joins (limit 4), all in device px from the snapped border box, which
+/// sits at `origin` relative to the node's frame.
+public struct SelectArrow: Equatable, Sendable {
+	public let originX: Double
+	public let originY: Double
+	public let strokeWidth: Double
+	public let points: [Double]
+}
+
 /// A dashed or dotted border as Dragon's own native paint draws it (its port of Blink's side painter): operations in device px,
 /// with the box's snapped border box at `origin` (relative to the node's frame); `side` names the side whose colour an operation takes.
 public struct BorderOps: Equatable, Sendable {
@@ -89,6 +158,14 @@ public struct BorderOps: Equatable, Sendable {
 		public let alpha: Double
 		public let antialias: Bool
 		public let points: [Double]
+
+		public init(op: String, side: Int, alpha: Double, antialias: Bool, points: [Double]) {
+			self.op = op
+			self.side = side
+			self.alpha = alpha
+			self.antialias = antialias
+			self.points = points
+		}
 	}
 	public let originX: Double
 	public let originY: Double
@@ -134,6 +211,15 @@ public struct StyleNode: Sendable {
 	public let scrollRange: ScrollOffsetRange?
 	/// Only on a framed text node: its lines as Dragon laid them out, glyph for glyph.
 	public let lines: [TextLine]?
+	/// Only on a select with a `selectArrow` write, once Dragon's plan has laid the page out.
+	public var selectArrow: SelectArrow? = nil
+	/// Only on a checkbox with a `checkbox` write, once Dragon's plan has laid the page out.
+	public var checkboxMarks: CheckboxMarks? = nil
+	/// Only on a textarea, once Dragon's plan has laid the page out: the lines its host view lays typed text out by.
+	public var textAreaLines: TextAreaLines? = nil
+
+	var drawsSelectArrow: Bool { writes.contains { if case .selectArrow = $0 { return true } else { return false } } }
+	var drawsCheckbox: Bool { writes.contains { if case .checkbox = $0 { return true } else { return false } } }
 
 	/// The node with no box: a list's template, which only its rows' copies show.
 	func hidden() -> StyleNode {
@@ -167,7 +253,7 @@ extension String {
 	fileprivate func leftPadded(_ count: Int) -> String { String(repeating: "0", count: max(0, count - self.count)) + self }
 }
 
-private func planNumber(_ value: JSONValue) throws -> Double {
+func planNumber(_ value: JSONValue) throws -> Double {
 	guard case let .string(hex) = value, hex.utf8.count == 16, let bits = UInt64(hex, radix: 16) else {
 		throw PayloadError(path: "plan layout", reason: "\(value.jsonText) is not a number's bit pattern")
 	}
@@ -262,6 +348,16 @@ public struct StyleSlot: Equatable, Sendable {
 	public let integer: Bool
 }
 
+/// One assignment's interaction level: Dragon's interaction runtime tables (JSON text for `rt-interaction`), the node each table
+/// index names, each address inside a list row with its list (the row template; the state applies to the touched copy), and the
+/// entry of each state in the export's assignments.
+public struct StyleInteractionLevel: Sendable {
+	public let tables: String
+	public let addresses: [String]
+	public let rows: [String: String]
+	public let entries: [Int]
+}
+
 public struct SheetStyle: Sendable {
 	public let node: String
 	public let heights: [(snapPoint: Double, style: StyleExport)]
@@ -284,8 +380,10 @@ public struct StyleExport: Sendable {
 	public let bands: StyleBands?
 	/// Each assignment's page scroll range in device px; nil when Dragon does not decide it (see `pageScrollUndecided`).
 	public private(set) var pageScrolls: [ScrollOffsetRange?]
+	/// POSX-s scroll: each assignment's sticky boxes as Dragon's plan layout wrote them (device px), which `runMarklessSticky` reads back.
+	public private(set) var pageSticky: [[StickyRow]] = []
 	/// Dragon's reason, for this target, when it leaves a page scroll range undecided.
-	public let pageScrollUndecided: String?
+	public private(set) var pageScrollUndecided: String?
 	/// Each system sheet's content, laid out as its own document at every resting height (app style files only).
 	public var sheets: [SheetStyle] = []
 	/// Each system face the export names, by id: the platform font this host draws it with.
@@ -294,10 +392,23 @@ public struct StyleExport: Sendable {
 	public var plan: String?
 	/// Per assignment: each Dragon id the plan's geometry names, with the export's id for it (empty: no ids differ).
 	public var planNames: [[String: String]] = []
+	/// Per assignment: the Dragon ids of the inline boxes in the plan's layout tree, whose texts and boxes the export parents to
+	/// their block container (empty without a plan).
+	public var inlineBoxes: [Set<String>] = []
 	/// The slots `laidOut` takes values for, in the order it takes them; empty when no style follows a slot.
 	public var slots: [StyleSlot] = []
 	/// Each list whose rows the phone lays out: the box its rows hang from and the Dragon ids of one row's top boxes, in order.
 	public var planRepeats: [PlanRepeat] = []
+	/// Dragon's animator tables for the page's transitions and animations (JSON text), which the host runs with the plan.
+	public var anim: String?
+	/// Per assignment, its interaction states (`:hover`, `:active`, `:focus`): the runtime tables and the entries the states are,
+	/// after the assignments in `assignments`, `pageScrolls` and the plan. Empty when the page has none.
+	public var interaction: [StyleInteractionLevel] = []
+
+	/// The assignment an entry belongs to: itself, or for an interaction state the assignment whose level holds it.
+	public func assignmentOf(entry: Int) -> Int {
+		interaction.firstIndex { $0.entries.contains(entry) } ?? entry
+	}
 
 	/// Reads the target this host renders, by Dragon target name (`ios`) and the backend it must have been lowered for.
 	public static func decode(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> StyleExport {
@@ -362,34 +473,50 @@ public struct StyleExport: Sendable {
 		}
 		let fonts = try decodeFonts(fields["fonts"])
 		let chosen = try fields["targets"].field(target)
-		let targetFields = try chosen.object(["backend", "viewport", "dpr", "writes", "routes"])
+		let targetFields = try chosen.object(required: ["backend", "viewport", "dpr", "writes", "routes"], optional: ["nodes"])
 		let writes = try targetFields["writes"].array().map { list in _ = try list.array(); return list.value }
+		let withWrites = { (node: Reader) throws -> JSONValue in
+			guard case let .object(entries) = node.value else { throw node.fail("expected an object") }
+			let index = Int(try node.field("writes").number())
+			guard writes.indices.contains(index) else { throw node.fail("writes \(index) is not in the target's writes") }
+			return .object(entries.map { $0.0 == "writes" ? ("writes", writes[index]) : $0 })
+		}
+		let pool: [JSONValue] = targetFields.has("nodes") ? try targetFields["nodes"].array().map(withWrites) : []
 		var routes: [String: StyleExport] = [:]
 		let raw = { (fields: Fields, key: String) throws -> (String, JSONValue) in (key, try fields[key].value) }
 		let expanded = { (reader: Reader, f: Fields, viewport: (String, JSONValue)) throws -> StyleExport in
-			let assignments: [JSONValue] = try f["assignments"].array().map { assignment in
+			let expandAssignment = { (assignment: Reader) throws -> JSONValue in
 				let a = try assignment.object(required: ["values", "nodes", "canvas"], optional: ["bodyBackground"])
 				let nodes: [JSONValue] = try a["nodes"].array().map { node in
-					guard case let .object(entries) = node.value else { throw node.fail("expected an object") }
-					let index = Int(try node.field("writes").number())
-					guard writes.indices.contains(index) else { throw node.fail("writes \(index) is not in the target's writes") }
-					return .object(entries.map { $0.0 == "writes" ? ("writes", writes[index]) : $0 })
+					guard case .number = node.value else { return try withWrites(node) }
+					let index = Int(try node.number())
+					guard pool.indices.contains(index) else { throw node.fail("node \(index) is not in the target's nodes") }
+					return pool[index]
 				}
 				let body: [(String, JSONValue)] = a.has("bodyBackground") ? [("bodyBackground", try a["bodyBackground"].value)] : []
 				return .object([("values", try a["values"].value), ("nodes", .array(nodes)), ("canvas", try a["canvas"].value)] + body)
 			}
+			let assignments: [JSONValue] = try f["assignments"].array().map(expandAssignment)
 			var page: [(String, JSONValue)] = [
 				try raw(targetFields, "backend"), viewport, try raw(targetFields, "dpr"),
 				try raw(f, "readiness"), try raw(f, "states"), try raw(f, "initial"), ("assignments", .array(assignments)), try raw(f, "next"),
 			]
 			if f.has("bands") { page.append(("bands", try f["bands"].value)) }
-			for key in ["plan", "planNames", "planRepeats"] where f.has(key) { page.append((key, try f[key].value)) }
+			for key in ["plan", "planNames", "planRepeats", "anim"] where f.has(key) { page.append((key, try f[key].value)) }
+			if f.has("interaction") {
+				let levels: [JSONValue] = try f["interaction"].object(["levels"])["levels"].array().map { level in
+					guard case let .object(entries) = level.value else { throw level.fail("expected an object") }
+					let states = try level.field("states").array().map(expandAssignment)
+					return .object(entries.map { $0.0 == "states" ? ("states", .array(states)) : $0 })
+				}
+				page.append(("interaction", .object([("levels", .array(levels))])))
+			}
 			return try decodeTarget(try Reader(.object(page), at: reader.path), perState: true, fonts: fonts, backend: backend)
 		}
 		for route in try targetFields["routes"].array() {
 			let f = try route.object(
 				required: ["pattern", "component", "compiler", "readiness", "states", "initial", "next", "assignments"],
-				optional: ["bands", "sheets", "plan", "planNames", "planRepeats", "slots"])
+				optional: ["bands", "sheets", "plan", "planNames", "planRepeats", "slots", "anim", "interaction"])
 			let pattern = try f["pattern"].string()
 			_ = (try f["component"].string(), try f["compiler"].string())
 			guard routes[pattern] == nil else { throw route.fail("route \(pattern) is listed twice") }
@@ -476,7 +603,7 @@ public struct StyleExport: Sendable {
 	) throws -> StyleExport {
 		let targetFields = try chosen.object(
 			required: perState ? ["backend", "viewport", "dpr", "states", "initial", "assignments", "next"] : ["backend", "viewport", "dpr", "nodes"],
-			optional: perState ? ["readiness", "bands", "plan", "planNames", "planRepeats"] : [])
+			optional: perState ? ["readiness", "bands", "plan", "planNames", "planRepeats", "anim", "interaction"] : [])
 		var notReady: String?
 		if targetFields.has("readiness") {
 			let readiness = try targetFields["readiness"]
@@ -507,12 +634,13 @@ public struct StyleExport: Sendable {
 		var assignments: [(values: [String: NativeValue], nodes: [StyleNode], canvas: RGBA?, body: RGBA?)]
 		var next: [[[Int]]] = [[]]
 		var pageScrolls: [ScrollOffsetRange?] = []
+		var interaction: [StyleInteractionLevel] = []
 		if perState {
 			states = try targetFields["states"].array().map { state in
 				let f = try state.object(["key", "domain"])
 				return StyleState(key: try f["key"].string(), domain: try f["domain"].array().map { NativeValue(json: $0.value) })
 			}
-			assignments = try targetFields["assignments"].array().map { assignment in
+			let decodeAssignment = { (assignment: Reader) throws -> (values: [String: NativeValue], nodes: [StyleNode], canvas: RGBA?, body: RGBA?) in
 				let f = try assignment.object(required: ["values", "nodes"], optional: ["canvas", "bodyBackground", "pageScroll", "colorScheme"])
 				if f.has("colorScheme") {
 					let scheme = try f["colorScheme"].string()
@@ -531,6 +659,7 @@ public struct StyleExport: Sendable {
 				if let body, body.alpha != 255 { throw PayloadError(path: assignment.path + ".bodyBackground", reason: "body's background is not opaque") }
 				return (values, try checkedNodes(try f["nodes"]), canvas, body)
 			}
+			assignments = try targetFields["assignments"].array().map(decodeAssignment)
 			initial = Int(try targetFields["initial"].number())
 			next = try targetFields["next"].array().map { row in try row.array().map { column in try column.array().map { Int(try $0.number()) } } }
 			let shapeIsRight = next.count == assignments.count && next.allSatisfy { row in
@@ -540,6 +669,32 @@ public struct StyleExport: Sendable {
 			}
 			guard shapeIsRight, assignments.indices.contains(initial) else {
 				throw PayloadError(path: chosen.path, reason: "the next table and initial do not match the assignments and states")
+			}
+			// Each assignment's interaction states are entries after the assignments, in level then state order, as the plan's are.
+			if targetFields.has("interaction") {
+				let reader = try targetFields["interaction"]
+				let levelReaders = try reader.object(["levels"])["levels"].array()
+				guard levelReaders.count == assignments.count else {
+					throw PayloadError(path: reader.path, reason: "\(levelReaders.count) interaction levels for \(assignments.count) assignments")
+				}
+				interaction = try levelReaders.map { level in
+					let l = try level.object(required: ["tables", "addresses", "states", "matches"], optional: ["rows", "planAssignments"])
+					let addresses = try l["addresses"].array().map { try $0.string() }
+					var rows: [String: String] = [:]
+					if l.has("rows") { let r = try l["rows"]; for key in try r.keys() { rows[key] = try r.field(key).string() } }
+					let states = try l["states"].array()
+					guard try l["matches"].array().count == states.count else { throw level.fail("each state needs its matches") }
+					var entries: [Int] = []
+					for state in states {
+						entries.append(assignments.count)
+						assignments.append(try decodeAssignment(state))
+					}
+					if l.has("planAssignments") {
+						let planned = try l["planAssignments"].array().map { Int(try $0.number()) }
+						guard planned == entries else { throw level.fail("the states' plan assignments are not the entries after the assignments") }
+					}
+					return StyleInteractionLevel(tables: try l["tables"].value.jsonText, addresses: addresses, rows: rows, entries: entries)
+				}
 			}
 		} else {
 			assignments = [([:], try checkedNodes(try targetFields["nodes"]), nil, nil)]
@@ -570,12 +725,20 @@ public struct StyleExport: Sendable {
 			fonts: fonts, viewport: (try viewport["width"].number(), try viewport["height"].number()),
 			dpr: try targetFields["dpr"].number(), states: states, initial: initial, assignments: assignments, next: next, notReady: notReady,
 			bands: bands, pageScrolls: pageScrolls, pageScrollUndecided: pageScrollUndecided)
+		style.interaction = interaction
 		if targetFields.has("plan") {
 			let plan = try targetFields["plan"]
 			guard try plan.field("version").string() == dragonMarklessPlanVersion else {
 				throw PayloadError(path: plan.path + ".version", reason: "this host reads \(dragonMarklessPlanVersion)")
 			}
 			style.plan = plan.value.jsonText
+			style.inlineBoxes = try inlineBoxes(ofPlan: plan)
+		} else if let node = assignments.lazy.flatMap(\.nodes).first(where: \.drawsSelectArrow) {
+			throw PayloadError(
+				path: chosen.path, reason: "\(node.id) draws a drop-down arrow, whose geometry only Dragon's plan layout gives, and the export has no plan")
+		} else if let node = assignments.lazy.flatMap(\.nodes).first(where: \.drawsCheckbox) {
+			throw PayloadError(
+				path: chosen.path, reason: "\(node.id) draws a themed checkbox, whose marks only Dragon's plan layout gives, and the export has no plan")
 		}
 		if targetFields.has("planNames") {
 			let perAssignment = try targetFields["planNames"]
@@ -592,6 +755,10 @@ public struct StyleExport: Sendable {
 				throw perAssignment.fail("names \(style.planNames.count) assignments; the export has \(assignments.count)")
 			}
 		}
+		if targetFields.has("anim") {
+			guard style.plan != nil else { throw try targetFields["anim"].fail("animator tables need a layout plan") }
+			style.anim = try targetFields["anim"].value.jsonText
+		}
 		if targetFields.has("planRepeats") {
 			style.planRepeats = try targetFields["planRepeats"].array().map { r in
 				let f = try r.object(required: ["id", "parent", "template"], optional: [])
@@ -603,26 +770,62 @@ public struct StyleExport: Sendable {
 		return style
 	}
 
+	/// Each plan assignment's variant's layout tree, read for the boxes whose kind is `inline`.
+	private static func inlineBoxes(ofPlan plan: Reader) throws -> [Set<String>] {
+		func collect(_ box: Reader, into ids: inout Set<String>) throws {
+			let fields = try box.keys()
+			if try box.field("kind").string() == "inline" { ids.insert(try box.field("id").string()) }
+			guard fields.contains("children") else { return }
+			for child in try box.field("children").array() { try collect(child, into: &ids) }
+		}
+		guard try plan.keys().contains("variants") else { return [] }
+		let variants = try plan.field("variants").array().map { variant in
+			var ids = Set<String>()
+			try collect(try variant.field("root"), into: &ids)
+			return ids
+		}
+		return try plan.field("assignments").array().map { assignment in
+			let index = Int(try assignment.field("variant").number())
+			guard variants.indices.contains(index) else { throw assignment.fail("names variant \(index); the plan has \(variants.count)") }
+			return variants[index]
+		}
+	}
+
 	/// This export laid out again by Dragon's plan for a page `width` x `height` points at `scale`: every assignment's frames,
 	/// border widths, text lines, dashed borders and scroll ranges, in this screen's device pixels. `layout` is Dragon's
 	/// translated `runMarklessLayout`. `slots` holds a value for each of the export's `slots`, in that order; the colours
 	/// that follow them are written into each assignment's nodes. Without a plan the export is returned as it is.
 	public func laidOut(
 		width: Double, height: Double, scale: Double, slots values: [Double] = [], layout: (String) -> String,
-		rows: ((Int) throws -> [String: [LaidOutRow]])? = nil, rowsLayout: ((String) -> String)? = nil
+		rows: ((Int) throws -> [String: [LaidOutRow]])? = nil, rowsLayout: ((String) -> String)? = nil,
+		texts: [String: String] = [:], entries: Set<Int>? = nil, previous: StyleExport? = nil
 	) throws -> StyleExport {
 		guard let plan else { return self }
 		guard values.count == slots.count else {
 			throw PayloadError(path: "plan layout", reason: "the export has \(slots.count) slots and the layout was given \(values.count) values")
 		}
 		let slotted = !slots.isEmpty
-		let slotLine = slotted ? ",\"slots\":[" + values.map { "\"" + String($0.bitPattern, radix: 16).leftPadded(16) + "\"" }.joined(separator: ",") + "]" : ""
+		let hex = { (list: [Double]) -> JSONValue in .array(list.map { .string(String($0.bitPattern, radix: 16).leftPadded(16)) }) }
+		let slotLine = slotted ? ",\"slots\":\(hex(values).jsonText)" : ""
 		var out = self
 		var pages: [ScrollOffsetRange?] = []
+		var stickies: [[StickyRow]] = []
+		var undecided: String?
 		out.assignments = try assignments.indices.map { k in
+			// An entry the page does not show yet keeps the boxes it had; the host lays it out when a state first shows it.
+			if let entries, !entries.contains(k) {
+				let kept = previous ?? self
+				pages.append(k < kept.pageScrolls.count ? kept.pageScrolls[k] : nil)
+				stickies.append(k < kept.pageSticky.count ? kept.pageSticky[k] : [])
+				let a = kept.assignments[k]
+				return (a.values, a.nodes, a.canvas, a.body)
+			}
 			let names = k < planNames.count ? planNames[k] : [:]
 			let dragonId = Dictionary(names.map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
-			let shown = !planRepeats.isEmpty ? try rows?(k) : nil
+			// An interaction state's rows are its assignment's; laid out in the state, a row of that assignment takes the state's look
+			// (the host shows it on the touched copy only).
+			let shown = !planRepeats.isEmpty ? try rows?(assignmentOf(entry: k)) : nil
+			let rowEntry = { (a: Int) in a == self.assignmentOf(entry: k) ? k : a }
 			var line = "{\"assignment\":\(k),\"dpr\":\(JSONValue.number(scale).jsonText),\"viewport\":{\"width\":\(JSONValue.number(width).jsonText),\"height\":\(JSONValue.number(height).jsonText)},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":\(plan)\(slotLine)"
 			if let shown {
 				let lists = planRepeats.map { r -> JSONValue in
@@ -633,42 +836,131 @@ public struct StyleExport: Sendable {
 						("parent", .string(r.parent)), ("template", .array(r.template.map { .string($0) })),
 						("rows", .array((parentShown ? shown[r.id] ?? [] : []).map { row in
 							.object([
-								("key", .string(row.key)), ("assignment", .number(Double(row.assignment))),
+								("key", .string(row.key)), ("assignment", .number(Double(rowEntry(row.assignment)))),
 								("texts", .array(row.texts.sorted { $0.key < $1.key }.map { .array([.string(dragonId[$0.key] ?? $0.key), .string($0.value)]) })),
-							])
+							] + (slotted ? [("slots", hex(zip(slots, values).map { row.slots[$0.id] ?? $1 }))] : []))
 						})),
 					])
 				}
 				line += ",\"rows\":\(JSONValue.array(lists).jsonText)"
 			}
-			line += "}"
-			guard shown == nil || !slotted else { throw PayloadError(path: "plan layout", reason: "a page with rows and style values that follow state, which Dragon's rows layout does not take yet") }
+			// The page's own texts whose current string is not the one this assignment was laid out with, by Dragon id; a text an arm
+			// hides there has no box to lay out.
+			let nodeText = Dictionary(assignments[k].nodes.compactMap { node in node.frame == nil ? nil : node.text.map { (node.id, $0) } }, uniquingKeysWith: { a, _ in a })
+			let changed = texts.filter { id, text in nodeText[id].map { $0 != text } ?? false }.sorted { $0.key < $1.key }
+			// The page's texts as this layout lays them out: the changed ones with their current string.
+			let relaidTexts = Dictionary(changed.map { ($0.key, $0.value) }, uniquingKeysWith: { a, _ in a })
+			let live = shown != nil || !changed.isEmpty
+			if !changed.isEmpty {
+				if shown == nil { line += ",\"rows\":[]" }
+				line += ",\"texts\":" + JSONValue.array(changed.map { .array([.string(dragonId[$0.key] ?? $0.key), .string($0.value)]) }).jsonText
+			}
+			line += ",\"sticky\":true,\"textAreas\":true}"
+			guard !live || rowsLayout != nil else { throw PayloadError(path: "plan layout", reason: "a page whose texts follow state needs Dragon's live layout") }
 			guard shown == nil || rowsLayout != nil else { throw PayloadError(path: "plan layout", reason: "a page with rows needs Dragon's rows layout") }
-			let result = try Reader(JSONValue.parse(Data((shown == nil ? layout(line) : rowsLayout!(line)).utf8)), at: "plan layout")
+			let result = try Reader(JSONValue.parse(Data((live ? rowsLayout!(line) : layout(line)).utf8)), at: "plan layout")
 			let parts = try result.array()
-			guard parts.count == (slotted ? 4 : 3), try parts[0].string() == "ok" else {
+			// Dragon's live layout answers a slotted page with each row's write numbers, an empty list when it lays out texts and no rows.
+			let fixed = !slotted ? 3 : (live ? 5 : 4)
+			guard parts.count >= fixed, parts.count <= fixed + 4, try parts[0].string() == "ok" else {
 				throw PayloadError(path: "plan layout", reason: "Dragon's layout at \(width) x \(height) points and \(scale)x failed: \(result.value.jsonText)")
 			}
-			let bits = { (reader: Reader) throws -> JSONValue in try planNumbers(reader.value) }
-			let page = try parts[1].array()
-			pages.append(page.count == 3 ? nil : try StyleExport.decodeRange(Reader(.object(zip(["minX", "maxX", "minY", "maxY"], try page.map { try bits($0) }).map { ($0, $1) }), at: parts[1].path)))
-			var geometry: [String: Reader] = [:]
-			for node in try parts[2].array() {
-				let id = try node.array()[0].string()
-				// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
-				if let at = id.firstIndex(of: "@") {
-					let base = String(id[..<at])
-					geometry["\(names[base] ?? base)\(id[at...])"] = node
-				} else {
-					geometry[names[id] ?? id] = node
+			// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
+			let exportId = { (id: String) -> String in
+				guard let at = id.firstIndex(of: "@") else { return names[id] ?? id }
+				let base = String(id[..<at])
+				return "\(names[base] ?? base)\(id[at...])"
+			}
+			var arrows: [String: (strokeWidth: Double, points: [Double])] = [:]
+			var marks: [String: CheckboxMarks] = [:]
+			var sticky: [StickyRow] = []
+			var areas: [String: TextAreaLines] = [:]
+			var tags: Set<String> = []
+			for tagged in parts[fixed...] {
+				let suffix = try tagged.array()
+				guard suffix.count == 2 else { throw tagged.fail("expected [tag, entries]") }
+				let tag = try suffix[0].string()
+				guard tags.insert(tag).inserted else { throw tagged.fail("\(tag) is given twice") }
+				if tag == "sticky" {
+					for entry in try suffix[1].array() {
+						let s = try entry.array()
+						guard s.count == 15 else { throw entry.fail("expected an id and 14 numbers") }
+						sticky.append(StickyRow(id: exportId(try s[0].string()), row: entry.value))
+					}
+					continue
+				}
+				if tag == "text-areas" {
+					for entry in try suffix[1].array() {
+						let t = try entry.array()
+						guard t.count == 4 else { throw entry.fail("expected id, pitch, above and insets") }
+						let insets = try t[3].array().map { try planNumber($0.value) }
+						guard insets.count == 4 else { throw t[3].fail("insets are top, right, bottom and left") }
+						areas[exportId(try t[0].string())] = TextAreaLines(pitch: try planNumber(t[1].value), above: try planNumber(t[2].value), insets: insets)
+					}
+					continue
+				}
+				if tag == "checkbox-marks" {
+					for entry in try suffix[1].array() {
+						let m = try entry.array()
+						guard m.count == 11 else { throw entry.fail("expected id, square, plain, radius, insets, border width, check and check width") }
+						let id = exportId(try m[0].string())
+						guard marks[id] == nil else { throw entry.fail("\(id) has two checkbox marks") }
+						let n = { (k: Int) throws -> Double in try planNumber(m[k].value) }
+						let check = try m[9].array().map { try planNumber($0.value) }
+						guard check.count == 6 else { throw m[9].fail("a check is three points") }
+						marks[id] = CheckboxMarks(
+							originX: 0, originY: 0, x: try n(1), y: try n(2), side: try n(3), plain: try m[4].bool(), radius: try n(5),
+							backgroundInset: try n(6), borderInset: try n(7), borderWidth: try n(8), check: check, checkWidth: try n(10))
+					}
+					continue
+				}
+				guard tag == "menulist-arrows" else { throw tagged.fail("unknown tag \(tag)") }
+				for arrow in try suffix[1].array() {
+					let a = try arrow.array()
+					guard a.count == 3 else { throw arrow.fail("expected id, stroke width and path") }
+					let id = exportId(try a[0].string())
+					guard arrows[id] == nil else { throw arrow.fail("\(id) has two arrows") }
+					var points: [Double] = []
+					for (k, segment) in try a[2].array().enumerated() {
+						let g = try segment.array()
+						guard g.count == 3, try g[0].string() == (k == 0 ? "move" : "line") else {
+							throw segment.fail("an arrow's path is a move and then lines")
+						}
+						points += [try planNumber(g[1].value), try planNumber(g[2].value)]
+					}
+					guard points.count >= 4 else { throw arrow.fail("an arrow's path needs a move and a line") }
+					arrows[id] = (try planNumber(a[1].value), points)
 				}
 			}
+			stickies.append(sticky)
+			let bits = { (reader: Reader) throws -> JSONValue in try planNumbers(reader.value) }
+			let page = try parts[1].array()
+			// Dragon's ["undecided", node, reason] when it could not decide the page's range at this size.
+			if page.count == 3 { undecided = "\(try page[1].string()): \(try page[2].string())" }
+			pages.append(page.count == 3 ? nil : try StyleExport.decodeRange(Reader(.object(zip(["minX", "maxX", "minY", "maxY"], try page.map { try bits($0) }).map { ($0, $1) }), at: parts[1].path)))
+			var geometry: [String: Reader] = [:]
+			for node in try parts[2].array() { geometry[exportId(try node.array()[0].string())] = node }
 			var slotWrites: [String: [(kind: String, path: Reader, value: Double)]] = [:]
 			if slotted {
 				for write in try parts[3].array() {
 					let w = try write.array()
 					guard w.count == 4 else { throw write.fail("expected node, write kind, path and value") }
 					slotWrites[try w[0].string(), default: []].append((try w[1].string(), w[2], try planNumber(w[3].value)))
+				}
+			}
+			// Each row's own write numbers, by row key and the template node they write: the row's copy takes them.
+			var rowWrites: [String: [String: [(kind: String, path: Reader, value: Double)]]] = [:]
+			if slotted, shown != nil {
+				for entry in try parts[4].array() {
+					let e = try entry.array()
+					guard e.count == 2 else { throw entry.fail("expected a row key and its writes") }
+					var own: [String: [(kind: String, path: Reader, value: Double)]] = [:]
+					for write in try e[1].array() {
+						let w = try write.array()
+						guard w.count == 4 else { throw write.fail("expected node, write kind, path and value") }
+						own[try w[0].string(), default: []].append((try w[1].string(), w[2], try planNumber(w[3].value)))
+					}
+					rowWrites[try e[0].string()] = own
 				}
 			}
 			let assignment = assignments[k]
@@ -692,24 +984,29 @@ public struct StyleExport: Sendable {
 				}
 				withRows.append(node.hidden())
 				for row in shown[list.id] ?? [] {
-					guard let own = assignments[row.assignment].nodes.first(where: { $0.id == node.id }) else {
+					guard let own = assignments[rowEntry(row.assignment)].nodes.first(where: { $0.id == node.id }) else {
 						throw PayloadError(path: "plan layout", reason: "assignment \(row.assignment) has no node \(node.id) for row \(row.key)")
 					}
-					withRows.append(StyleNode(
+					let copy = StyleNode(
 						id: "\(node.id)@\(row.key)", parent: top ? node.parent : node.parent.map { "\($0)@\(row.key)" },
 						isText: own.isText, isAnonymous: own.isAnonymous, text: own.isText ? (row.texts[node.id] ?? own.text) : own.text,
 						frame: own.frame, borderWidths: own.borderWidths, writes: own.writes, borderOps: own.borderOps, scrollRange: own.scrollRange,
-						lines: own.lines))
+						lines: own.lines)
+					withRows.append(try (rowWrites[row.key]?[node.id] ?? []).reduce(copy) { try StyleExport.patched($0, kind: $1.kind, path: $1.path, value: $1.value) })
 				}
 			}
 			if let missing = slotWrites.keys.first(where: { id in !assignment.nodes.contains { $0.id == id } }) {
 				throw PayloadError(path: "plan layout", reason: "Dragon's layout writes a slot into \(missing), which assignment \(k) does not have")
 			}
-			let nodes = try withRows.map { node in
+			var nodes = try withRows.map { node in
 				try (slotWrites[node.id] ?? []).reduce(node) { try StyleExport.patched($0, kind: $1.kind, path: $1.path, value: $1.value) }
 			}.map { node -> StyleNode in
 				guard node.frame != nil else { return node }
-				guard let g = geometry[node.id] else { throw PayloadError(path: "plan layout", reason: "Dragon's layout has no box for \(node.id)") }
+				guard let g = geometry[node.id] else {
+					// A text whose state emptied it has no box, as on the web.
+					if node.isText, relaidTexts[node.id] == "" { return node.hidden() }
+					throw PayloadError(path: "plan layout", reason: "Dragon's layout has no box for \(node.id)")
+				}
 				let f = try g.array()
 				guard f.count == 6 else { throw g.fail("expected id, frame, border widths, lines, border operations and scroll range") }
 				let frame = try f[1].array().map { try planNumber($0.value) }
@@ -725,14 +1022,53 @@ public struct StyleExport: Sendable {
 				let ops = f[4].isNull ? nil : try StyleExport.decodeBorderOps(Reader(try planBorderOps(f[4]), at: f[4].path))
 				let range = f[5].isNull ? nil : try StyleExport.decodeRange(Reader(.object(zip(["minX", "maxX", "minY", "maxY"], try f[5].array().map { try bits($0) }).map { ($0, $1) }), at: f[5].path))
 				return StyleNode(
-					id: node.id, parent: node.parent, isText: node.isText, isAnonymous: node.isAnonymous, text: node.text,
+					id: node.id, parent: node.parent, isText: node.isText, isAnonymous: node.isAnonymous,
+					text: node.isText ? (relaidTexts[node.id] ?? node.text) : node.text,
 					frame: Frame(x: frame[0], y: frame[1], width: frame[2], height: frame[3]),
 					borderWidths: widths.map { ($0[0], $0[1], $0[2], $0[3]) }, writes: node.writes, borderOps: ops,
 					scrollRange: range, lines: node.isText ? lines : nil)
 			}
+			var absolute: [String: (x: Double, y: Double)] = [:]
+			for (index, node) in nodes.enumerated() {
+				guard let frame = node.frame else { continue }
+				var parent = (x: 0.0, y: 0.0)
+				if let id = node.parent {
+					guard let at = absolute[id] else { continue }
+					parent = at
+				}
+				let at = (x: parent.x + frame.x, y: parent.y + frame.y)
+				absolute[node.id] = at
+				if let arrow = arrows.removeValue(forKey: node.id) {
+					guard node.drawsSelectArrow else { throw PayloadError(path: "plan layout", reason: "Dragon's layout gives \(node.id) an arrow, but it draws none") }
+					// Dragon snaps each edge from its absolute device px position, halves upward (Blink LayoutUnit::Round).
+					nodes[index].selectArrow = SelectArrow(
+						originX: (at.x + 0.5).rounded(.down) - at.x, originY: (at.y + 0.5).rounded(.down) - at.y,
+						strokeWidth: arrow.strokeWidth, points: arrow.points)
+				} else if node.drawsSelectArrow {
+					throw PayloadError(path: "plan layout", reason: "\(node.id) draws a drop-down arrow, but Dragon's layout gives it no arrow geometry")
+				}
+				if let lines = areas.removeValue(forKey: node.id) { nodes[index].textAreaLines = lines }
+				if let m = marks.removeValue(forKey: node.id) {
+					guard node.drawsCheckbox else { throw PayloadError(path: "plan layout", reason: "Dragon's layout gives \(node.id) checkbox marks, but it draws no checkbox") }
+					nodes[index].checkboxMarks = CheckboxMarks(
+						originX: (at.x + 0.5).rounded(.down) - at.x, originY: (at.y + 0.5).rounded(.down) - at.y, x: m.x, y: m.y, side: m.side,
+						plain: m.plain, radius: m.radius, backgroundInset: m.backgroundInset, borderInset: m.borderInset, borderWidth: m.borderWidth,
+						check: m.check, checkWidth: m.checkWidth)
+				} else if node.drawsCheckbox {
+					throw PayloadError(path: "plan layout", reason: "\(node.id) draws a themed checkbox, but Dragon's layout gives it no marks")
+				}
+			}
+			if let stray = arrows.keys.sorted().first {
+				throw PayloadError(path: "plan layout", reason: "Dragon's layout gives an arrow for \(stray), which it shows no box for")
+			}
+			if let stray = marks.keys.sorted().first {
+				throw PayloadError(path: "plan layout", reason: "Dragon's layout gives checkbox marks for \(stray), which it shows no box for")
+			}
 			return (assignment.values, nodes, assignment.canvas, assignment.body)
 		}
 		out.pageScrolls = pages
+		out.pageSticky = stickies
+		if let undecided { out.pageScrollUndecided = undecided }
 		out.viewport = (width, height)
 		out.dpr = scale
 		return out
@@ -924,6 +1260,26 @@ public struct StyleExport: Sendable {
 			try expectKey(f, "dragonStacking.order")
 			_ = try f["index"].number()
 			return .paintOrder(host: try f["host"].string(), bucket: Int(try f["bucket"].number()), rank: Int(try f["rank"].number()))
+		case "box-shadow":
+			let f = try write.object(["kind", "shadows", "key"])
+			try expectKey(f, "dragonShadow.shadows")
+			return .boxShadow(try f["shadows"].array().map { shadow in
+				let s = try shadow.object(["inset", "x", "y", "blur", "spread", "color"])
+				return BoxShadow.Shadow(
+					inset: try s["inset"].bool(), x: try s["x"].number(), y: try s["y"].number(), blur: try s["blur"].number(),
+					spread: try s["spread"].number(), color: try decodeColor(try s["color"]))
+			})
+		case "checkbox":
+			let f = try write.object(["kind", "checked", "colors", "key"])
+			try expectKey(f, "dragonCheckbox")
+			// The initial checkedness; the runtime keeps the live one, which a tap changes and a re-render does not reset.
+			_ = try f["checked"].bool()
+			let colors = try f["colors"].object(["unchecked", "checked"])
+			let off = try colors["unchecked"].object(["background", "border"])
+			let on = try colors["checked"].object(["background", "fill", "check"])
+			return .checkbox(CheckboxColors(
+				uncheckedBackground: try decodeColor(off["background"]), uncheckedBorder: try decodeColor(off["border"]),
+				checkedBackground: try decodeColor(on["background"]), fill: try decodeColor(on["fill"]), check: try decodeColor(on["check"])))
 		case "visibility":
 			let f = try write.object(["kind", "value", "canvas", "key"])
 			try expectKey(f, "visibility")
@@ -931,6 +1287,37 @@ public struct StyleExport: Sendable {
 			guard ["visible", "hidden", "collapse"].contains(value) else { throw PayloadError(path: write.path + ".value", reason: "visibility \(value) is not visible, hidden or collapse") }
 			_ = try f["canvas"].bool()
 			return .visibility(value)
+		case "select-arrow":
+			let f = try write.object(["kind", "color", "key"])
+			try expectKey(f, "dragonSelectArrow")
+			return .selectArrow(try decodeColor(try f["color"]))
+		case "outline":
+			let f = try write.object(["kind", "style", "width", "offset", "color", "tones", "radii", "layer", "key"])
+			try expectKey(f, "dragonOutline.rings")
+			let style = try f["style"].string()
+			guard Outline.styles.contains(style) else { throw PayloadError(path: write.path + ".style", reason: "outline style \(style) has no native paint") }
+			let width = try f["width"].number(), offset = try f["offset"].number()
+			guard width > 0, width.isFinite, offset.isFinite else { throw PayloadError(path: write.path, reason: "outline width \(width) or offset \(offset) is out of range") }
+			let threeD = ["groove", "ridge", "inset", "outset"].contains(style)
+			var tones: (light: RGBA, dark: RGBA)?
+			if try !f["tones"].isNull {
+				let pair = try f["tones"].array()
+				guard pair.count == 2 else { throw PayloadError(path: write.path + ".tones", reason: "expected a lighter and a darker colour") }
+				tones = (try decodeColor(pair[0]), try decodeColor(pair[1]))
+			}
+			guard (tones != nil) == threeD else { throw PayloadError(path: write.path + ".tones", reason: "a \(style) outline \(threeD ? "needs" : "has no") lighter and darker colours") }
+			var radii: [(percent: Bool, value: Double)]?
+			if try !f["radii"].isNull {
+				let lengths = try f["radii"].array()
+				guard lengths.count == 8 else { throw PayloadError(path: write.path + ".radii", reason: "an outline's radii are 8 lengths") }
+				radii = try lengths.map { length in
+					let l = try length.object(["percent", "value"])
+					return (percent: try l["percent"].bool(), value: try l["value"].number())
+				}
+			}
+			return .outline(Outline(
+				style: style, width: width, offset: offset, color: try decodeColor(try f["color"]), tones: tones, radii: radii,
+				layer: try f["layer"].string()))
 		case "transform":
 			let f = try write.object(["kind", "ops", "origin", "key"])
 			try expectKey(f, "dragonTransform")
@@ -944,6 +1331,12 @@ public struct StyleExport: Sendable {
 			}
 			let origin = try f["origin"].object(["x", "y"])
 			return .transform(StyleTransform(functions: functions, originX: try decodeLength(try origin["x"]), originY: try decodeLength(try origin["y"])))
+		case "opacity":
+			let f = try write.object(["kind", "opacity", "key"])
+			try expectKey(f, "alpha")
+			let opacity = try f["opacity"].number()
+			guard opacity >= 0, opacity < 1 else { throw PayloadError(path: write.path + ".opacity", reason: "opacity \(opacity) is not in [0, 1)") }
+			return .opacity(opacity)
 		case "opacity-group":
 			let f = try write.object(required: ["kind", "opacity", "backdrop", "painters", "key"], optional: ["after", "unstable"])
 			try expectKey(f, "dragonGroup")
@@ -988,10 +1381,26 @@ public struct LaidOutRow: Sendable, Equatable {
 	public let key: String
 	public let assignment: Int
 	public let texts: [String: String]
+	/// The row's own values of the slots its template's style reads, by slot id.
+	public var slots: [String: Double] = [:]
 
-	public init(key: String, assignment: Int, texts: [String: String]) {
+	public init(key: String, assignment: Int, texts: [String: String], slots: [String: Double] = [:]) {
 		self.key = key
 		self.assignment = assignment
 		self.texts = texts
+		self.slots = slots
 	}
+}
+
+/// A textarea's line pitch, its first baseline below a line's top, and its padding (top, right, bottom, left), in device px.
+public struct TextAreaLines: Equatable, Sendable {
+	public let pitch: Double
+	public let above: Double
+	public let insets: [Double]
+}
+
+/// A sticky box of a laid-out assignment: its export id, and its row as Dragon's plan layout wrote it (with Dragon's own id).
+public struct StickyRow: Equatable, Sendable {
+	public let id: String
+	public let row: JSONValue
 }

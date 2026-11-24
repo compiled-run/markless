@@ -1,0 +1,15 @@
+{
+	"rung": 202,
+	"name": "A style number inside a @for row: each row's copy takes its own value, laid out by Dragon's rows layout with that row's number",
+	"steps": [
+		{
+			"visible": ["Row numbers", "Alpha row", "Beta row", "Lift beta"],
+			"placed": ["Alpha row", "Beta row"]
+		},
+		{
+			"do": { "tap": "Lift beta" },
+			"visible": ["Alpha row", "Beta row"],
+			"placed": ["Beta row", "Alpha row"]
+		}
+	]
+}

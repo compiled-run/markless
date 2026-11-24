@@ -82,6 +82,16 @@ func refusesWhatItCannotDraw(find: String, replace: String, reason: String) thro
 	}
 }
 
+@Test func anEmptyTextNeedsNoExportNodeAndAnyOtherTextDoes() throws {
+	let (decoded, texts) = try payload()
+	let renamed = exportText { $0.replacingOccurrences(of: "\"id\": \"h1:text0\"", with: "\"id\": \"h1:text9\"") }
+	let empty = texts.map { $0.node == "h1:text0" ? (node: $0.node, text: "") : $0 }
+	let layout = try StyleExport.decode(renamed).resolve(for: decoded, initialTexts: empty, value: noCells)
+	#expect(layout.styles["h1:text0"] == nil)
+	#expect(layout.styles["h1"] != nil)
+	#expect(throws: PayloadError.self) { try StyleExport.decode(renamed).resolve(for: decoded, initialTexts: texts, value: noCells) }
+}
+
 @Test func refusesAnonymousBoxesAndSyntheticBold() throws {
 	let (decoded, texts) = try payload()
 	let bold = exportText {
@@ -115,7 +125,7 @@ private func noCells(_ cell: String) throws -> NativeValue { throw PayloadError(
 private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) {
 	var url = URL(fileURLWithPath: #filePath)
 	for _ in 0..<6 { url.deleteLastPathComponent() }
-	guard case let .object(fields) = try JSONValue.parse(Data(contentsOf: url.appendingPathComponent("conformance/attributes.json"))),
+	guard case let .object(fields) = try JSONValue.parse(ConformanceEngine.vectorData(url.appendingPathComponent("conformance/attributes.json"))),
 		let json = fields.first(where: { $0.0 == "payload" })?.1
 	else { throw PayloadError(path: "vector", reason: "no payload") }
 	let payload = try NativeViewPayload.decode(json)
@@ -176,6 +186,30 @@ private let pressedWrites = #"""
 private func pressed(_ edit: (String) -> String = { $0 }) -> Data {
 	let red = "\"writes\": [\n      {\n       \"kind\": \"background-color\",\n       \"color\": {\n        \"r\": 37,"
 	return exportText { $0.replacingOccurrences(of: red, with: red.replacingOccurrences(of: "\"writes\": [\n", with: "\"writes\": [\n\(edit(pressedWrites))\n")) }
+}
+
+private let groupWrite = #"{ "kind": "opacity-group", "opacity": 0.85, "backdrop": null, "painters": ["h1"], "after": "h0", "key": "dragonGroup" }"#
+private let alphaWrite = #"{ "kind": "opacity", "opacity": 0.85, "key": "alpha" }"#
+
+@Test func aPressedButtonsPlainOpacityResolves() throws {
+	let (decoded, texts) = try payload()
+	let edited = pressed { $0.replacingOccurrences(of: groupWrite, with: alphaWrite) }
+	#expect(edited != pressed())
+	let button = try #require(try StyleExport.decode(edited).resolve(for: decoded, initialTexts: texts, value: noCells).styles["h2"])
+	#expect(button.opacity == 0.85)
+	#expect(button.group == nil)
+	#expect(try StyleExport.decode(counterExport).resolve(for: decoded, initialTexts: texts, value: noCells).styles["h2"]?.opacity == nil)
+	for (find, replace, reason) in [
+		("\"opacity\": 0.85, \"key\": \"alpha\"", "\"opacity\": 1, \"key\": \"alpha\"", "opacity 1.0 is not in [0, 1)"),
+		("\"key\": \"alpha\"", "\"key\": \"opacity\"", "expected alpha"),
+	] {
+		do {
+			_ = try StyleExport.decode(pressed { $0.replacingOccurrences(of: groupWrite, with: alphaWrite).replacingOccurrences(of: find, with: replace) }).resolve(for: decoded, initialTexts: texts, value: noCells)
+			Issue.record("accepted an opacity write with \(replace)")
+		} catch {
+			#expect("\(error)".contains(reason), "\(error)")
+		}
+	}
 }
 
 @Test func aPressedButtonsTransformAndOpacityGroupResolve() throws {

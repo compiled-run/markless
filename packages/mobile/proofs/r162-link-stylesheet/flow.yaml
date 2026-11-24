@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r162-link-stylesheet
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Linked styles
 - assertVisible: Visits 0
 - assertVisible: Visit

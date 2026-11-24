@@ -1,24 +1,28 @@
 appId: ${APP_ID}
 name: u101-slot-in-arm
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Slot in an arm
 - assertVisible: Middle row
 - assertVisible: Marker
 - assertVisible: Lower
 - assertVisible: Toggle
 - assertVisible:
-      text: Middle row
-      below: Marker
+    text: Middle row
+    below: Marker
 - tapOn: Lower
 - assertVisible:
-      text: Marker
-      below: Middle row
+    text: Marker
+    below: Middle row
 - assertVisible: Marker
 - assertVisible:
-      text: Marker
-      below: Middle row
+    text: Marker
+    below: Middle row
 - tapOn: Toggle
 - assertNotVisible: Marker
 - assertVisible: Middle row
@@ -26,9 +30,9 @@ name: u101-slot-in-arm
 - tapOn: Toggle
 - assertVisible: Marker
 - assertVisible:
-      text: Marker
-      below: Middle row
+    text: Marker
+    below: Middle row
 - assertVisible: Marker
 - assertVisible:
-      text: Marker
-      below: Middle row
+    text: Marker
+    below: Middle row

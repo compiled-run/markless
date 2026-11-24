@@ -14,8 +14,9 @@ const val CLOSE_DEPTH = 16
 const val OVERLAY_MODAL_ATTRIBUTE = "aria-modal"
 const val OVERLAY_MODAL_VALUE = "true"
 
-/** The events that carry a string: an `input` or `commit` the field's text, a `keydown` or `keyup` its key, a `paste` the pasted text. */
-private val VALUED = setOf(EventName.Input, EventName.Commit, EventName.Keydown, EventName.Keyup, EventName.Paste)
+private val ANIMATION_EVENTS = setOf(EventName.AnimationStart, EventName.AnimationIteration, EventName.AnimationEnd, EventName.AnimationCancel)
+/** The events that carry a string: an `input` or `commit` the field's text, a `keydown` or `keyup` its key, a `paste` the pasted text, an animation event the animation's name. */
+private val VALUED = setOf(EventName.Input, EventName.Commit, EventName.Keydown, EventName.Keyup, EventName.Paste, EventName.AnimationStart, EventName.AnimationIteration, EventName.AnimationEnd, EventName.AnimationCancel)
 
 sealed interface JournalEntry {
 	val node: String
@@ -51,10 +52,10 @@ sealed interface JournalEntry {
 		override fun toJson() = "{\"op\":\"rows\",\"node\":${jsonString(node)},\"keys\":${keys.joinToString(",", "[", "]", transform = ::jsonString)}}"
 	}
 
-	/** Leave this page for the page at [route] with [params]: pushed as a new screen, or in this one's place when [replace]. */
-	data class Navigate(override val node: String, val params: Map<String, String>, val replace: Boolean = false) : JournalEntry {
+	/** Leave this page for the page at [route] with [params] and the query [search] (or ""): pushed as a new screen, or in this one's place when [replace]. */
+	data class Navigate(override val node: String, val params: Map<String, String>, val replace: Boolean = false, val search: String = "") : JournalEntry {
 		val route get() = node
-		override fun toJson() = "{\"op\":\"navigate\",\"route\":${jsonString(node)},\"params\":${params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}${if (replace) ",\"replace\":true" else ""}}"
+		override fun toJson() = "{\"op\":\"navigate\",\"route\":${jsonString(node)},\"params\":${params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}${if (search.isEmpty()) "" else ",\"search\":${jsonString(search)}"}${if (replace) ",\"replace\":true" else ""}}"
 	}
 
 	/** The page's title text changed; [node] is empty. */
@@ -143,8 +144,45 @@ sealed interface JournalEntry {
 }
 
 /** A request as the script made it: an absolute [url], and a text [body] or none. */
-data class FetchRequest(val url: String, val method: String, val headers: List<Pair<String, String>>, val body: String?) {
-	fun toJson() = "{\"url\":${jsonString(url)},\"method\":${jsonString(method)},\"headers\":${headers.joinToString(",", "[", "]") { "[${jsonString(it.first)},${jsonString(it.second)}]" }},\"body\":${body?.let(::jsonString) ?: "null"}}"
+data class FetchRequest(val url: String, val method: String, val headers: List<Pair<String, String>>, val body: FetchBody?) {
+	fun toJson() = "{\"url\":${jsonString(url)},\"method\":${jsonString(method)},\"headers\":${headers.joinToString(",", "[", "]") { "[${jsonString(it.first)},${jsonString(it.second)}]" }},\"body\":${body?.toJson() ?: "null"}}"
+}
+
+/** A request's body: text, or a FormData's entries, which the host sends as multipart/form-data with a boundary of its own. */
+sealed interface FetchBody {
+	fun toJson(): String
+	data class Text(val text: String) : FetchBody {
+		override fun toJson() = jsonString(text)
+	}
+	data class Form(val parts: List<FormPart>) : FetchBody {
+		override fun toJson() = "{\"form\":${parts.joinToString(",", "[", "]") { it.toJson() }}}"
+	}
+
+	companion object {
+		fun decode(body: Json): FetchBody? = when (body) {
+			Json.Null -> null
+			is Json.Str -> Text(body.value)
+			else -> Form(body.obj("request.body").field("form", "request.body").arr("request.body.form").map { entry ->
+				val pair = entry.arr("a FormData entry")
+				val name = pair[0].str("a FormData entry's name")
+				when (val value = pair[1]) {
+					is Json.Str -> FormPart(name, value.value, null)
+					else -> value.obj("a FormData file").let { f ->
+						FormPart(name, null, FormFile(f.field("name", "a FormData file").str("its name"), f.field("type", "a FormData file").str("its type"), (f["ref"] as? Json.Str)?.value, (f["text"] as? Json.Str)?.value))
+					}
+				}
+			})
+		}
+	}
+}
+
+/** A FormData entry: its [text], or a [file] by its text or by the host's reference to a file a picker chose. */
+data class FormPart(val name: String, val text: String?, val file: FormFile?) {
+	fun toJson(): String = "[${jsonString(name)},${text?.let(::jsonString) ?: file!!.toJson()}]"
+}
+
+data class FormFile(val name: String, val type: String, val ref: String?, val text: String?) {
+	fun toJson(): String = "{\"name\":${jsonString(name)},\"type\":${jsonString(type)}${ref?.let { ",\"ref\":${jsonString(it)}" } ?: ""}${text?.let { ",\"text\":${jsonString(it)}" } ?: ""}}"
 }
 
 /** An element's box in CSS pixels from the screen's top left, and its text direction, as its view has them now. */
@@ -268,6 +306,8 @@ class Runtime(
 	private val scriptHost: ScriptHost? = null,
 	/** The app's values of its app-wide `shared()` cells, one for every page. */
 	private val session: AppSession = AppSession.shared,
+	/** The query the page opened with (`?tab=done`), or "". */
+	val search: String = "",
 ) {
 	private val opened = now()
 	private val computed = HashMap<String, JsValue>()
@@ -279,6 +319,9 @@ class Runtime(
 	private val fired = HashSet<String>()
 	private val storageKeys = payload.cells.mapNotNull { c -> c.storageKey?.let { c.id to it } }.toMap()
 	private val handlers = payload.handlers.associateBy { it.id }
+
+	/** A click handler called stopPropagation(): the press goes no further out. */
+	private var propagationStopped = false
 	private val continuations = HashMap<String, Continuation>().also { found ->
 		fun collect(ops: List<Op>) {
 			for (op in ops) if (op is Op.Call && op.after != null) {
@@ -378,6 +421,7 @@ class Runtime(
 		fun eval(x: Expr) = evaluate(x, scope)
 		return when (e) {
 			Expr.RouteParams -> JsValue.Obj(params.entries.associateTo(LinkedHashMap()) { it.key to JsValue.Str(it.value) })
+			Expr.RouteUrl -> pageUrl()
 			is Expr.Event -> fields?.get(e.field) ?: throw MarklessRuntimeError("the event's ${e.field} read where the event has none")
 			is Expr.FormData -> entriesOf(e.form)
 			is Expr.Checked -> JsValue.Bool(checkedOf(e.node))
@@ -504,6 +548,8 @@ class Runtime(
 	var measure: ((id: String) -> ElementBox?)? = null
 	/** The device's answers to the media features a script's `matchMedia` reads, read as each entry begins; the web's defaults when the host gives none. */
 	var media: () -> List<Pair<String, String>> = { listOf("prefers-reduced-motion" to "no-preference", "prefers-color-scheme" to "light") }
+	/** The screen's device pixels per CSS px, which a script's `devicePixelRatio` reads as each entry begins. */
+	var devicePixelRatio: () -> Double = { 1.0 }
 
 	/** Called with each engine entry's duration in nanoseconds, including starting the engine when the entry had to. */
 	var onScriptEntry: ((nanos: Long) -> Unit)? = null
@@ -543,6 +589,13 @@ class Runtime(
 		data class Object(val members: Map<String, Bound>) : Bound
 		data class Shared(val members: Map<String, Bound>) : Bound
 		data class Method(val fn: String, val members: Map<String, Bound>) : Bound
+		data class Url(val value: JsValue) : Bound
+	}
+
+	/** The page's address as its `url` prop reads it: the route pattern with its params, the query it opened with, no hash. */
+	private fun pageUrl(): JsValue {
+		val route = payload.route ?: throw MarklessRuntimeError("the url read on a component that is not a page")
+		return JsValue.Obj(linkedMapOf<String, JsValue>("pathname" to JsValue.Str(AppPayload.path(route.pattern, params)), "search" to JsValue.Str(search), "hash" to JsValue.Str("")))
 	}
 
 	private fun bind(bindings: Map<String, ScriptBinding>, scope: Scope): Map<String, Bound> = bindings.mapValuesTo(LinkedHashMap()) { (_, b) ->
@@ -556,6 +609,7 @@ class Runtime(
 			is ScriptBinding.Object -> Bound.Object(bind(b.members, scope))
 			is ScriptBinding.Shared -> Bound.Shared(bind(b.members, scope))
 			is ScriptBinding.Method -> Bound.Method(b.fn, bind(b.members, scope))
+			ScriptBinding.Url -> Bound.Url(pageUrl())
 		}
 	}
 
@@ -570,6 +624,7 @@ class Runtime(
 			is Bound.Object -> "{\"object\":${frameJson(b.members)}}"
 			is Bound.Shared -> "{\"shared\":${frameJson(b.members)}}"
 			is Bound.Method -> "{\"method\":${jsonString(b.fn)},\"frame\":${frameJson(b.members)}}"
+			is Bound.Url -> "{\"url\":${jsonValue(b.value)}}"
 		}
 	}
 
@@ -590,6 +645,7 @@ class Runtime(
 			is Bound.Object -> readFrame(b.members)
 			is Bound.Shared -> readFrame(b.members)
 			is Bound.Method -> readFrame(b.members)
+			is Bound.Url -> jsonValue(b.value)
 		}
 	}
 
@@ -628,6 +684,9 @@ class Runtime(
 				is ScriptBinding.Object -> visit(b.members)
 				is ScriptBinding.Shared -> visit(b.members)
 				is ScriptBinding.Method -> visit(b.members)
+				// A submitted form's file inputs: its JavaScript reads the files each holds.
+				is ScriptBinding.Value -> if (b.value is Expr.FormData) for (entry in (evaluate(b.value, scope) as JsValue.Arr).items)
+					((entry as JsValue.Arr).items[1] as? JsValue.Obj)?.fields?.get("files")?.let(::add)
 				else -> {}
 			}
 		}
@@ -649,6 +708,8 @@ class Runtime(
 			append(",\"params\":" + params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" })
 		if (payload.script?.services?.contains("media") == true)
 			append(",\"media\":" + media().joinToString(",", "{", "}") { "${jsonString(it.first)}:${jsonString(it.second)}" })
+		if (payload.script?.services?.contains("screen") == true)
+			append(",\"screen\":{\"devicePixelRatio\":${jsonValue(JsValue.Num(devicePixelRatio()))}}")
 	}
 
 	/** Submissions held by a script promise not settled yet, by the engine's run number. */
@@ -669,7 +730,7 @@ class Runtime(
 	private fun enter(fields: String, submission: Submission? = null): List<JournalEntry> {
 		// A handler may read the focused element; a computed, which renders, never does, so only entries carry it.
 		val focus = focused?.takeIf { it != NATIVE_DOCUMENT_BODY }?.let { ",\"focused\":${jsonString(it)},\"focusElements\":${elementFacts(emptyMap(), Scope.EMPTY, listOf(it))}" } ?: ""
-		val entry = "{$fields$focus${entryCells()}}"
+		val entry = "{$fields,\"screen\":$screen$focus${entryCells()}}"
 		val started = System.nanoTime()
 		scriptCall("enter", entry)
 		val result = Json.parse(scriptCall("leave", null)).obj("leave()")
@@ -717,7 +778,7 @@ class Runtime(
 					q.field("url", "request").str("request.url"),
 					q.field("method", "request").str("request.method"),
 					q.field("headers", "request").arr("request.headers").map { h -> h.arr("request.headers[]").let { it[0].str("a header name") to it[1].str("a header value") } },
-					q.field("body", "request").let { if (it == Json.Null) null else it.str("request.body") },
+					FetchBody.decode(q.field("body", "request")),
 				)
 				JournalEntry.Fetch(id(o.field("id", "leave().requests[]")), request)
 			} +
@@ -747,9 +808,13 @@ class Runtime(
 					setDialog(node, command == "showModal")
 					return@mapNotNull null
 				}
+				// A file input shows the names of the files a handler gave it.
+				if (command == "files") return@mapNotNull JournalEntry.Property(node, "files", parts[2].str("leave().commands[][2]"))
 				if (command == "focus") focused = node
 				JournalEntry.Command(node, command, (parts[2] as? Json.Bool)?.value == true)
 			} +
+			// A click handler called stopPropagation() before it first awaited.
+			(if ((result["stopped"] as? Json.Bool)?.value == true) { propagationStopped = true; emptyList() } else emptyList<JournalEntry>()) +
 			// A key or paste handler called preventDefault() before it first awaited.
 			(if ((result["prevented"] as? Json.Bool)?.value == true) listOf(JournalEntry.PreventDefault) else emptyList()) +
 			// An input handler that set its field's value (`event.target.value = …`) writes the field, as the DOM's setter does.
@@ -757,11 +822,12 @@ class Runtime(
 			raised +
 			listOfNotNull(result["navigate"]?.let { n ->
 				val o = n.obj("leave().navigate")
-				o.only(setOf("route", "params", "replace"), "leave().navigate")
+				o.only(setOf("route", "params", "search", "replace"), "leave().navigate")
 				JournalEntry.Navigate(
 					o.field("route", "leave().navigate").str("leave().navigate.route"),
 					o.field("params", "leave().navigate").obj("leave().navigate.params").mapValues { it.value.str("a route param") },
 					(o.field("replace", "leave().navigate") as? Json.Bool)?.value ?: throw MarklessDecodeError("leave().navigate.replace must be a boolean"),
+					o["search"]?.str("leave().navigate.search") ?: "",
 				)
 			})
 	}
@@ -789,8 +855,7 @@ class Runtime(
 			fun scopeOf(id: String): Scope? = byId[id.substringBefore('@')]?.let { node -> instances(node).firstOrNull { it.id == id }?.scope }
 			if (type == "click") {
 				val pressed = chain.firstOrNull { handlerFor(it.substringBefore('@'), EventName.Activate) != null } ?: return emptyList()
-				val scope = scopeOf(pressed) ?: return emptyList()
-				return withFields(clickFields(trusted = false)) { run(handlers[handlerFor(pressed.substringBefore('@'), EventName.Activate)]?.ops.orEmpty(), scope) }
+				return withFields(clickFields(trusted = false)) { press(pressed) }
 			}
 			val name = EventName.entries.firstOrNull { it.wire == type } ?: return emptyList()
 			fun optional(key: String, fallback: JsValue): JsValue = event[key]?.let { JsValue.fromJson(it) } ?: fallback
@@ -844,7 +909,7 @@ class Runtime(
 			asyncSent = sent
 			val again = if (retry.isEmpty()) "" else retry.joinToString(",", ",\"retry\":[", "]", transform = ::jsonString)
 			retry.clear()
-			out.addAll(enter("\"kind\":\"tasks\",\"screen\":$screen,\"tasks\":$tasks$again"))
+			out.addAll(enter("\"kind\":\"tasks\",\"tasks\":$tasks$again"))
 		}
 		throw MarklessRuntimeError("async values that keep starting each other")
 	}
@@ -865,7 +930,7 @@ class Runtime(
 	/** The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel. */
 	fun leave(): List<JournalEntry> =
 		if (asyncSent == null) emptyList()
-		else enter("\"kind\":\"tasks\",\"screen\":$screen,\"tasks\":[],\"leave\":true").filter { it is JournalEntry.Abort }
+		else enter("\"kind\":\"tasks\",\"tasks\":[],\"leave\":true").filter { it is JournalEntry.Abort }
 
 	/** The host's answer to a `fetch` entry: `{ status, statusText, headers, body }`, or `{ error }` for a network failure. */
 	fun response(id: Int, response: JsValue): List<JournalEntry> =
@@ -1144,6 +1209,11 @@ class Runtime(
 				FieldKind.Text -> valueOf(node)
 				FieldKind.Number -> nativeNumberValue(textOf(node))
 				FieldKind.Select -> optionsOf(node).firstOrNull { selectedness[it.id] == true }?.let(::optionValue) ?: continue
+				// The files are its JavaScript's: the entry names the input, and the engine reads what it holds.
+				FieldKind.File -> {
+					out.add(JsValue.Arr(mutableListOf(JsValue.Str(name), JsValue.Obj(linkedMapOf("files" to JsValue.Str(node))))))
+					continue
+				}
 			}
 			out.add(JsValue.Arr(mutableListOf(JsValue.Str(name), JsValue.Str(value))))
 		}
@@ -1160,7 +1230,7 @@ class Runtime(
 	/** Why a field stops a submit, as the web says it, or null when it does not. */
 	private fun invalidity(field: Field): String? {
 		val (node, kind) = field
-		if (kind == FieldKind.Hidden || kind == FieldKind.Select || !isShown(elementOf(node)) || attributeNow(node, "disabled") != null) return null
+		if (kind == FieldKind.Hidden || kind == FieldKind.Select || kind == FieldKind.File || !isShown(elementOf(node)) || attributeNow(node, "disabled") != null) return null
 		// A readonly text field is barred from constraint validation.
 		if (kind == FieldKind.Text && attributeNow(node, "readonly") != null) return null
 		// A radio button is missing its value when any button of its group is required and none is checked.
@@ -1295,7 +1365,7 @@ class Runtime(
 	 * ([EventName.touch], at [point]) raises the browser's pointer events, after a `dismiss` of the topmost overlay when a
 	 * `pointerdown` lands outside it.
 	 */
-	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null, detail: Int? = null, point: TouchPoint? = null): List<JournalEntry> {
+	fun dispatch(host: String, event: EventName, value: String? = null, reason: String? = null, detail: Int? = null, point: TouchPoint? = null, elapsedTime: Double? = null): List<JournalEntry> {
 		if (event == EventName.Choose) {
 			val option = byId[host.substringBefore('@')] as? Node.Element
 			val select = option?.parent
@@ -1316,6 +1386,7 @@ class Runtime(
 		if ((event in VALUED) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
 		if (reason != null && event != EventName.Dismiss) throw MarklessRuntimeError("a ${event.wire} event carries no reason")
 		if (point != null && !event.touch && event != EventName.ContextMenu) throw MarklessRuntimeError("a ${event.wire} event carries no touch")
+		if (elapsedTime != null && event !in ANIMATION_EVENTS) throw MarklessRuntimeError("a ${event.wire} event carries no elapsed time")
 		if (event == EventName.Dismiss && reason != null) {
 			if (stack.lastOrNull() != host) throw MarklessRuntimeError("\"$host\" is not the topmost overlay")
 			val dismiss = handlerFor(host, event)?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
@@ -1354,10 +1425,58 @@ class Runtime(
 			EventName.Keydown, EventName.Keyup -> mapOf("key" to JsValue.Str(value!!), "value" to JsValue.Str(textOf(host)))
 			EventName.Paste -> mapOf("text" to JsValue.Str(value!!), "value" to JsValue.Str(textOf(host)))
 			EventName.Activate -> clickFields(trusted = true) + ("detail" to JsValue.Num((detail ?: 1).toDouble()))
+			// An animation event: `value` is the animation's name.
+			EventName.AnimationStart, EventName.AnimationIteration, EventName.AnimationEnd, EventName.AnimationCancel ->
+				mapOf("animationName" to JsValue.Str(value ?: ""), "elapsedTime" to JsValue.Num(elapsedTime ?: 0.0))
 			else -> null
 		}
 		return change(host, if (event == EventName.Input || event == EventName.Commit) value else null) {
-			withFields(carried) { run(handler.ops, scope) }
+			withFields(carried) { if (event == EventName.Activate) press(host) else run(handler.ops, scope) }
+		}
+	}
+
+	/** The files a person chose in the picker the file input [host] opened: its `input` and `change` handlers run with them. */
+	fun pick(host: String, files: List<PickedFile>): List<JournalEntry> {
+		val template = host.substringBefore('@')
+		val chosenJson = files.joinToString(",", "[", "]") { jsonValue(it.value) }
+		// A file input with no handler of its own still holds what was chosen, for a form's FormData to read.
+		val handlerId = handlerFor(template, EventName.Input) ?: return if (payload.script == null) emptyList() else change(host, null) {
+			enter("\"kind\":\"pick\",\"node\":${jsonString(host)},\"files\":$chosenJson,\"elements\":${elementFacts(emptyMap(), Scope.EMPTY, listOf(host))}")
+		}
+		val scope = (instances(node(template)).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")).scope
+		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
+		val chosen = JsValue.Arr(files.mapTo(ArrayList()) { it.value })
+		return change(host, null) {
+			withFields(mapOf("files" to chosen, "target" to JsValue.Str(host), "currentTarget" to JsValue.Str(host))) { run(handler.ops, scope) }
+		}
+	}
+
+	/**
+	 * A press on [pressed], as a browser's click: its own handler, then the handler of each element around it, innermost first,
+	 * until one stops propagation. An element around it whose handler reads where the press landed runs its copy for the
+	 * pressed element (`<handler>@<node>`), which a pressed element with no handler of its own holds as its own.
+	 */
+	private fun press(pressed: String): List<JournalEntry> {
+		propagationStopped = false
+		try {
+			val own = pressed.substringBefore('@')
+			val ownHandler = handlerFor(own, EventName.Activate)
+			val journal = ArrayList<JournalEntry>()
+			for (id in chain(pressed)) {
+				val node = id.substringBefore('@')
+				val bound = handlerFor(node, EventName.Activate) ?: continue
+				val scope = byId[node]?.let { element -> instances(element).firstOrNull { it.id == id }?.scope } ?: continue
+				// A copy stands for the handler around it, and runs only as the pressed element's own.
+				if (node != own && '@' in bound) continue
+				val copy = if (node == own) null else "$bound@$own"
+				if (copy != null && ownHandler == copy) continue
+				val chosen = copy?.takeIf { it in handlers } ?: bound
+				journal.addAll(run(handlers[chosen]?.ops.orEmpty(), scope))
+				if (propagationStopped || journal.any { it is JournalEntry.Navigate }) break
+			}
+			return journal
+		} finally {
+			propagationStopped = false
 		}
 	}
 
@@ -1662,7 +1781,7 @@ class Runtime(
 				submission?.let { it.pending++ }
 				calls.add(JournalEntry.Timer(id, if (ms is JsValue.Num && ms.value > 0) ms.value else 0.0))
 			}
-			is Op.Navigate -> return listOf(JournalEntry.Navigate(op.route, op.params.mapValues { Js.toStr(evaluate(it.value, scope)) }, op.replace))
+			is Op.Navigate -> return listOf(JournalEntry.Navigate(op.route, op.params.mapValues { Js.toStr(evaluate(it.value, scope)) }, op.replace, op.search))
 			is Op.Call -> calls.add(JournalEntry.Call(op.call, op.arguments.map { evaluate(it, scope) }, op.result, op.obj, op.after?.id))
 			is Op.If -> {
 				val taken = run(if (Js.truthy(evaluate(op.test, scope))) op.then else op.otherwise, scope, submission)
@@ -1693,7 +1812,8 @@ class Runtime(
 					",\"detail\":{\"reason\":${jsonString(it.value)},\"pressTarget\":${pressed?.let(::jsonString) ?: "null"}}"
 				} ?: ""
 				val touch = TOUCH_FIELDS.mapNotNull { f -> fields?.get(f)?.let { ",${jsonString(f)}:${jsonValue(it)}" } }.joinToString("")
-				val typed = listOf("key", "text").mapNotNull { f -> (fields?.get(f) as? JsValue.Str)?.let { ",${jsonString(f)}:${jsonString(it.value)}" } }.joinToString("")
+				val typed = listOf("key", "text").mapNotNull { f -> (fields?.get(f) as? JsValue.Str)?.let { ",${jsonString(f)}:${jsonString(it.value)}" } }.joinToString("") +
+					(fields?.get("files")?.let { ",\"files\":${jsonValue(it)}" } ?: "")
 				val named = if (fields?.get("currentTarget") is JsValue.Str) listOf("target", "currentTarget", "relatedTarget").associateWith { (fields?.get(it) as? JsValue.Str)?.value } else null
 				val nodes = named?.let { n -> ",\"nodes\":" + n.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${it.value?.let(::jsonString) ?: "null"}" } } ?: ""
 				val event = "{\"type\":${jsonString(op.type)}${(fields?.get("value") as? JsValue.Str)?.let { ",\"value\":${jsonString(it.value)}" } ?: ""}$typed$touch$nodes$detail}"
@@ -1701,6 +1821,7 @@ class Runtime(
 				calls.addAll(enter("\"kind\":\"dispatch\",\"fn\":${jsonString(op.fn)},\"frame\":${frameOf(op.bindings, scope)},\"elements\":${elementFacts(op.bindings, scope, named?.values?.filterNotNull().orEmpty() + listOfNotNull(pressed))},\"event\":$event$catch", submission))
 			}
 			Op.PreventDefault -> calls.add(JournalEntry.PreventDefault)
+			Op.StopPropagation -> propagationStopped = true
 			is Op.FieldText -> {
 				val node = evaluate(op.node, scope)
 				if (node == JsValue.Null) continue
@@ -1752,16 +1873,25 @@ class Runtime(
 	/** Each style slot's current value, in payload order; a slot that is not a finite number (or not whole when integer) is an error, as no layout of it was proven. */
 	fun slots(): List<Pair<String, Double>> {
 		val cases = styleCases().toMap()
-		return payload.slots.map { slot ->
+		return payload.slots.flatMap { slot ->
 			// Its expression may not hold while its style case hides the text (`point.x`), so it keeps its last value.
 			val w = slot.whenCase
-			if (w != null && cases[w.case] != w.value) return@map slot.id to (keptSlots[slot.id] ?: 0.0)
-			val v = evaluate(slot.value)
-			if (v !is JsValue.Num || !v.value.isFinite()) throw MarklessRuntimeError("style slot ${slot.id} is ${jsonValue(v)}, not a finite number")
-			if (slot.integer && v.value != Math.rint(v.value)) throw MarklessRuntimeError("style slot ${slot.id} is ${JsString.number(v.value)}, not a whole number")
-			keptSlots[slot.id] = v.value
-			slot.id to v.value
+			if (w != null && cases[w.case] != w.value) return@flatMap listOf(slot.id to (keptSlots[slot.id] ?: 0.0))
+			val owner = if (slot.row == null) null else slotOwners[slot.id]
+			val copies = owner?.let { o -> instances(o).map { "${slot.id}${it.id.substring(o.id.length)}" to it.scope } } ?: listOf(slot.id to Scope.EMPTY)
+			copies.map { (id, scope) ->
+				val v = evaluate(slot.value, scope)
+				if (v !is JsValue.Num || !v.value.isFinite()) throw MarklessRuntimeError("style slot $id is ${jsonValue(v)}, not a finite number")
+				if (slot.integer && v.value != Math.rint(v.value)) throw MarklessRuntimeError("style slot $id is ${JsString.number(v.value)}, not a whole number")
+				keptSlots[id] = v.value
+				id to v.value
+			}
 		}
+	}
+
+	/** The element whose style holds each slot: a slot inside a row has one value per row copy, `<slot>@<key>`. */
+	private val slotOwners: Map<String, Node.Element> by lazy {
+		payload.nodes.filterIsInstance<Node.Element>().flatMap { n -> n.style.orEmpty().filterIsInstance<StylePiece.Hole>().map { it.slot to n } }.toMap()
 	}
 
 	/** Whether each style case's test holds now, in payload order: which of Dragon's assignments the style is in. */
@@ -1927,4 +2057,10 @@ class Runtime(
 		settled(submission)
 		return taken
 	}
+}
+
+/** A file a picker chose, as a page's `File` describes it. */
+data class PickedFile(val ref: String, val name: String, val size: Double, val type: String, val lastModified: Double) {
+	internal val value: JsValue
+		get() = JsValue.Obj(linkedMapOf("ref" to JsValue.Str(ref), "name" to JsValue.Str(name), "size" to JsValue.Num(size), "type" to JsValue.Str(type), "lastModified" to JsValue.Num(lastModified)))
 }

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
 import { startBuiltServer } from '../../../scripts/test-utils/built-server.ts';
 import { appsDir } from '../apps/measure.ts';
+import { takeBuildSlot } from '../../router/test/support/build-slots.ts';
 import { buildAppServer } from '../src/harness/app-server.ts';
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -14,7 +15,12 @@ afterAll(async () => {
 test("an app rung's web build serves its api/ routes, which the runner holds at the origin its app.json names", async () => {
 	const out = await mkdtemp(join(tmpdir(), 'markless-app-server-'));
 	cleanups.push(() => rm(out, { recursive: true, force: true }));
-	await buildAppServer(join(appsDir, 'shop'), out);
+	const release = await takeBuildSlot();
+	try {
+		await buildAppServer(join(appsDir, 'shop'), out);
+	} finally {
+		await release();
+	}
 	const server = await startBuiltServer(join(out, 'server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});

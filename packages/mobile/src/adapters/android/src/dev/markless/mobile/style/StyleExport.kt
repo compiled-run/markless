@@ -55,8 +55,21 @@ sealed interface StyleWrite {
 	data object ClipText : StyleWrite
 	/** The box paints in another stacking context's order (Dragon's re-hosting); [host] is that context's node. */
 	data class PaintOrder(val host: String, val bucket: Int, val rank: Int) : StyleWrite
+	/** box-shadow: the computed shadows in list order. */
+	data class BoxShadow(val shadows: List<Shadow>) : StyleWrite
+	/** A themed checkbox (`appearance: auto`): drawn in [colors] over [StyledNode.checkboxMarks], checked or not as the input's live checkedness says. */
+	data class Checkbox(val colors: CheckboxColors) : StyleWrite
 	/** `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own. */
 	data class Visibility(val value: String) : StyleWrite
+	/** A select whose appearance devolves to menulist-button: its drop-down arrow is stroked in [color], along [StyledNode.selectArrow]. */
+	data class SelectArrow(val color: Rgba) : StyleWrite
+	/**
+	 * `outline`: [style], [width] and [offset] in CSS px, [color], a 3D style's lighter and darker [tones], the box's corner radius
+	 * lengths (percent, value; null: square) and the node whose paint layer paints it, after that layer's flow content.
+	 */
+	data class Outline(val style: String, val width: Double, val offset: Double, val color: Rgba, val tones: Pair<Rgba, Rgba>?, val radii: List<Pair<Boolean, Double>>?, val layer: String) : StyleWrite
+	/** `opacity` below 1 that the platform composites: the view's alpha is Chrome's alpha byte / 255, its subtree drawn as one group. */
+	data class Opacity(val opacity: Double) : StyleWrite
 	/** `transform`: the functions and origin as Dragon wrote them, lengths in CSS px; Dragon's translated paint math resolves them at the box size. */
 	data class Transform(val functions: List<TransformFunction>, val originX: TransformLength, val originY: TransformLength) : StyleWrite
 	/**
@@ -75,6 +88,26 @@ data class TransformFunction(val fn: String, val x: TransformLength, val y: Tran
 
 private val TRANSFORM_FUNCTIONS = listOf("translate", "translateX", "translateY", "rotate", "scale", "scaleX", "scaleY")
 
+/** The outline styles Dragon draws natively: solid and double rings, the others with Blink's side painter. */
+val OUTLINE_STYLES = listOf("solid", "double", "dotted", "dashed", "groove", "ridge", "inset", "outset")
+
+/**
+ * A select's drop-down arrow as Dragon's plan layout gives it: an open path of [points] (x, y pairs, the first moved to), stroked
+ * [strokeWidth] wide with butt caps and miter joins (limit 4), all in device px from the select's snapped border box.
+ */
+data class SelectArrow(val strokeWidth: Double, val points: List<Double>)
+
+/** A themed checkbox's colours, as Chrome's theme gives them for its accent-color. */
+data class CheckboxColors(val uncheckedBackground: Rgba, val uncheckedBorder: Rgba, val checkedBackground: Rgba, val fill: Rgba, val check: Rgba)
+
+/**
+ * A themed checkbox's marks as Dragon's plan layout gives them, in device px from the snapped border box: the square ([x], [y],
+ * [side]), one fill when [plain]; otherwise its background inset by [backgroundInset] and, unchecked, its border stroked [borderWidth]
+ * wide inset by [borderInset], both rounded by [radius]; checked, the square filled and the open path [check] (three x, y pairs)
+ * stroked [checkWidth] wide.
+ */
+data class CheckboxMarks(val x: Double, val y: Double, val side: Double, val plain: Boolean, val radius: Double, val backgroundInset: Double, val borderInset: Double, val borderWidth: Double, val check: List<Double>, val checkWidth: Double)
+
 /** One drawing operation of a dashed or dotted border, in device px; [side] names the side whose colour it takes (-1: none). */
 data class BorderOp(val op: String, val side: Int, val alpha: Double, val antialias: Boolean, val points: List<Double>)
 
@@ -88,14 +121,17 @@ data class GlyphRun(val face: String, val size: Double, val glyphs: List<Int>, v
 data class TextLine(val top: Double, val baseline: Double, val runs: List<GlyphRun>)
 
 /** [scrollRange], device px, only on a scroll container; [lines], only on a framed text node, the glyphs Dragon draws for its [text]. */
-data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val scrollRange: ScrollRange? = null, val borderOps: BorderOps? = null, val lines: List<TextLine>? = null, val text: String? = null)
+data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val scrollRange: ScrollRange? = null, val borderOps: BorderOps? = null, val lines: List<TextLine>? = null, val text: String? = null, val selectArrow: SelectArrow? = null, val checkboxMarks: CheckboxMarks? = null) {
+	val drawsSelectArrow: Boolean get() = writes.any { it is StyleWrite.SelectArrow }
+	val drawsCheckbox: Boolean get() = writes.any { it is StyleWrite.Checkbox }
+}
 
 /**
  * One reachable combination of style states: every node's frame and writes, complete, the canvas behind the page (null: white),
  * body's own background in its box when html's background is the canvas (null: body paints none), and [pageScroll] in device px,
  * null when Dragon leaves it undecided.
  */
-data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNode>, val canvas: Rgba? = null, val body: Rgba? = null, val pageScroll: ScrollRange? = null) {
+data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNode>, val canvas: Rgba? = null, val body: Rgba? = null, val pageScroll: ScrollRange? = null, val sticky: List<StickyRow> = emptyList(), val textAreas: Map<String, TextAreaLines> = emptyMap()) {
 	val byId: Map<String, StyledNode> = nodes.associateBy { it.id }
 }
 
@@ -182,16 +218,32 @@ data class SystemFace(val file: String, val index: Int, val axes: Map<String, Do
 /** A system sheet's content at one resting height: its own document, laid out in the sheet's content area. */
 data class SheetHeight(val snapPoint: Double, val style: StyleExport)
 
+/**
+ * One assignment's interaction level: Dragon's interaction runtime tables (JSON text for `rt-interaction`), the node each table
+ * index names, each address inside a list row with its list (the state applies to the touched row copy), and each state's entry.
+ */
+data class InteractionLevel(val tables: String, val addresses: List<String>, val rows: Map<String, String>, val entries: List<Int>)
+
 data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val states: List<StyleState>, val initial: Int, val assignments: List<Assignment>, val next: List<List<List<Int>>>, val bands: Bands? = null, val pageScrollUndecided: String? = null, val sheets: Map<String, List<SheetHeight>> = emptyMap(), val systemFaces: Map<String, SystemFace> = emptyMap(),
 	/** Dragon's layout plan ([PLAN_VERSION]) as JSON text: with it the page lays out at the screen's own size. */
 	val plan: String? = null,
+	/** Dragon's animator tables for the page's transitions and animations (JSON text), which the host runs with the plan. */
+	val anim: String? = null,
 	/** Per assignment: each Dragon id the plan's geometry names, with the export's id for it (empty: no ids differ). */
 	val planNames: List<Map<String, String>> = emptyList(),
 	/** The payload slots the plan reads, in the order [laidOut] takes their values. */
 	val slots: List<ExportSlot> = emptyList(),
 	/** Each list whose rows the phone lays out: the box its rows hang from and the Dragon ids of one row's top boxes, in order. */
 	val planRepeats: List<PlanRepeat> = emptyList(),
+	/** Per assignment, its interaction states (`:hover`, `:active`, `:focus`), whose entries follow the assignments. */
+	val interaction: List<InteractionLevel> = emptyList(),
+	/** Per assignment: the export ids of the inline boxes in the plan's layout tree, whose texts and boxes the export parents to their block container. */
+	val inlineBoxes: List<Set<String>> = emptyList(),
 ) {
+
+	/** The assignment an entry belongs to: itself, or for an interaction state the assignment whose level holds it. */
+	fun assignmentOf(entry: Int): Int = interaction.indexOfFirst { entry in it.entries }.takeIf { it >= 0 } ?: entry
+
 
 	/** The index of [BAND_KEY] among [states], or -1 for an export without @media. */
 	val bandState: Int = states.indexOfFirst { it.key == BAND_KEY }
@@ -222,7 +274,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 		if (everyCell) for (c in cells) stateFor(c)
 		fun matches(a: Int) = states.withIndex().all { (s, st) -> assignments[a].values[st.key]?.let { Js.strictEquals(it, wanted[s]) } == true }
 		if (matches(initial)) return initial
-		return assignments.indices.firstOrNull(::matches) ?: throw MarklessDecodeError("no style assignment matches the values ${states.map { it.key }.zip(wanted)}")
+		// Interaction states come after the assignments and share their values; a page starts in an assignment.
+		return next.indices.firstOrNull(::matches) ?: throw MarklessDecodeError("no style assignment matches the values ${states.map { it.key }.zip(wanted)}")
 	}
 
 	private fun cellOf(state: StyleState, cells: List<String>): String {
@@ -263,38 +316,115 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 	 * `runMarklessLayout`; [slotValues] are the current values of [slots], in their order, and the writes they move are written
 	 * in. Without a plan the export is returned as it is.
 	 */
-	fun laidOut(width: Double, height: Double, scale: Double, layout: (String) -> String, slotValues: List<Double> = emptyList(), rows: ((Int) -> Map<String, List<LaidOutRow>>)? = null, rowsLayout: ((String) -> String)? = null): StyleExport {
+	fun laidOut(width: Double, height: Double, scale: Double, layout: (String) -> String, slotValues: List<Double> = emptyList(), rows: ((Int) -> Map<String, List<LaidOutRow>>)? = null, rowsLayout: ((String) -> String)? = null, texts: Map<String, String> = emptyMap(), entries: Set<Int>? = null, previous: StyleExport? = null): StyleExport {
 		val plan = plan ?: return this
 		if (slotValues.size != slots.size) throw MarklessDecodeError("the style export reads ${slots.size} slots; the layout was given ${slotValues.size} values")
-		val slotsText = if (slots.isEmpty()) "" else slotValues.joinToString(",", ",\"slots\":[", "]") { "\"${java.lang.Long.toHexString(it.toRawBits()).padStart(16, '0')}\"" }
+		val hex = { list: List<Double> -> Json.Arr(list.map { Json.Str(java.lang.Long.toHexString(it.toRawBits()).padStart(16, '0')) }) }
+		val slotsText = if (slots.isEmpty()) "" else ",\"slots\":${hex(slotValues).text()}"
+		var undecided: String? = null
 		val laid = assignments.indices.map { k ->
+			// An entry the page does not show yet keeps the boxes it had; the host lays it out when a state first shows it.
+			if (entries != null && k !in entries) return@map (previous ?: this).assignments[k]
 			val names = planNames.getOrNull(k) ?: emptyMap()
 			val dragonId = names.entries.associate { (d, m) -> m to d }
-			val shown = if (planRepeats.isEmpty()) null else rows?.invoke(k)
+			// An interaction state's rows are its assignment's; laid out in the state, a row of that assignment takes the state's look
+			// (the host shows it on the touched copy only).
+			val shown = if (planRepeats.isEmpty()) null else rows?.invoke(assignmentOf(k))
+			val rowEntry = { a: Int -> if (a == assignmentOf(k)) k else a }
 			val lists = shown?.let { byList ->
 				Json.Arr(planRepeats.map { r ->
 					// A list an arm hides at this assignment has no box to hold rows: its rows are not laid out there.
 					val parentShown = r.parent == "body" || assignments[k].byId[names[r.parent] ?: r.parent]?.frame != null
 					obj("parent" to Json.Str(r.parent), "template" to Json.Arr(r.template.map { Json.Str(it) }), "rows" to Json.Arr((if (parentShown) byList[r.id] ?: emptyList() else emptyList()).map { row ->
-						obj("key" to Json.Str(row.key), "assignment" to Json.Num(row.assignment.toDouble()), "texts" to Json.Arr(row.texts.entries.sortedBy { it.key }.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }))
+						val fields = mutableListOf<Pair<String, Json>>("key" to Json.Str(row.key), "assignment" to Json.Num(rowEntry(row.assignment).toDouble()), "texts" to Json.Arr(row.texts.entries.sortedBy { it.key }.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }))
+						if (slots.isNotEmpty()) fields.add("slots" to hex(slots.mapIndexed { i, s -> row.slots[s.id] ?: slotValues[i] }))
+						obj(*fields.toTypedArray())
 					}))
 				}).text()
 			}
-			val line = "{\"assignment\":$k,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":$plan$slotsText${if (lists != null) ",\"rows\":$lists" else ""}}"
-			if (lists != null && slots.isNotEmpty()) throw MarklessDecodeError("a page with rows and style values that follow state, which Dragon's rows layout does not take yet")
-			if (lists != null && rowsLayout == null) throw MarklessDecodeError("a page with rows needs Dragon's rows layout")
-			val result = Json.parse(if (lists == null) layout(line) else rowsLayout!!(line))
+			// The page's own texts whose current string is not the one this assignment was laid out with, by Dragon id; a text an arm hides there has no box to lay out.
+			val changed = texts.entries.filter { (id, text) -> assignments[k].byId[id]?.takeIf { it.frame != null }?.text?.let { it != text } ?: false }.sortedBy { it.key }
+			// The page's texts as this layout lays them out: the changed ones with their current string, which its lines draw.
+			val relaidTexts = changed.associate { it.key to it.value }
+			val live = lists != null || changed.isNotEmpty()
+			val textsText = if (changed.isEmpty()) "" else (if (lists == null) ",\"rows\":[]" else "") + ",\"texts\":" + Json.Arr(changed.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }).text()
+			val line = "{\"assignment\":$k,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":$plan$slotsText${if (lists != null) ",\"rows\":$lists" else ""}$textsText,\"sticky\":true,\"textAreas\":true}"
+			if (live && rowsLayout == null) throw MarklessDecodeError("a page whose rows or texts follow state needs Dragon's live layout")
+			val result = Json.parse(if (live) rowsLayout!!(line) else layout(line))
 			val parts = result.arr("plan layout")
-			if (parts.size != (if (slots.isEmpty()) 3 else 4) || parts[0] != Json.Str("ok")) throw MarklessDecodeError("Dragon's layout at $width x $height dp and ${scale}x failed: ${result.text()}")
+			val slotted = slots.isNotEmpty()
+			// Dragon's live layout answers a slotted page with each row's write numbers, an empty list when it lays out texts and no rows.
+			val fixed = if (!slotted) 3 else if (live) 5 else 4
+			if (parts.size < fixed || parts.size > fixed + 4 || parts[0] != Json.Str("ok")) throw MarklessDecodeError("Dragon's layout at $width x $height dp and ${scale}x failed: ${result.text()}")
+			// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
+			fun exportId(id: String): String {
+				val at = id.indexOf('@')
+				return if (at < 0) names[id] ?: id else (names[id.substring(0, at)] ?: id.substring(0, at)) + id.substring(at)
+			}
+			val arrows = HashMap<String, SelectArrow>()
+			val marks = HashMap<String, CheckboxMarks>()
+			val sticky = ArrayList<StickyRow>()
+			val areas = HashMap<String, TextAreaLines>()
+			val tags = HashSet<String>()
+			for (tagged in parts.drop(fixed)) {
+				val suffix = tagged.arr("plan layout suffix")
+				if (suffix.size != 2) throw MarklessDecodeError("plan layout: expected [tag, entries], found ${tagged.text()}")
+				val tag = suffix[0].str("plan layout suffix tag")
+				if (!tags.add(tag)) throw MarklessDecodeError("plan layout: $tag is given twice")
+				if (tag == "sticky") {
+					for (e in suffix[1].arr("plan layout sticky")) {
+						val f = e.arr("plan layout sticky box")
+						if (f.size != 15) throw MarklessDecodeError("plan layout sticky box: expected an id and 14 numbers")
+						sticky.add(StickyRow(exportId(f[0].str("plan layout sticky id")), e))
+					}
+					continue
+				}
+				if (tag == "text-areas") {
+					for (e in suffix[1].arr("plan layout text areas")) {
+						val t = e.arr("plan layout text area")
+						if (t.size != 4) throw MarklessDecodeError("plan layout text area: expected id, pitch, above and insets")
+						val insets = t[3].arr("plan layout text area insets").map { planNumber(it) }
+						if (insets.size != 4) throw MarklessDecodeError("plan layout text area insets: expected top, right, bottom and left")
+						areas[exportId(t[0].str("plan layout text area id"))] = TextAreaLines(planNumber(t[1]), planNumber(t[2]), insets)
+					}
+					continue
+				}
+				if (tag == "checkbox-marks") {
+					for (e in suffix[1].arr("plan layout checkbox marks")) {
+						val m = e.arr("plan layout checkbox marks")
+						if (m.size != 11) throw MarklessDecodeError("plan layout checkbox marks: expected id, square, plain, radius, insets, border width, check and check width")
+						val id = exportId(m[0].str("plan layout checkbox marks id"))
+						if (id in marks) throw MarklessDecodeError("plan layout: $id has two checkbox marks")
+						val check = m[9].arr("plan layout checkbox check of $id").map { planNumber(it) }
+						if (check.size != 6) throw MarklessDecodeError("plan layout checkbox check of $id: a check is three points")
+						val plain = (m[4] as? Json.Bool ?: throw MarklessDecodeError("plan layout checkbox marks of $id: plain must be a boolean")).value
+						marks[id] = CheckboxMarks(planNumber(m[1]), planNumber(m[2]), planNumber(m[3]), plain, planNumber(m[5]), planNumber(m[6]), planNumber(m[7]), planNumber(m[8]), check, planNumber(m[10]))
+					}
+					continue
+				}
+				if (tag != "menulist-arrows") throw MarklessDecodeError("plan layout: unknown tag $tag")
+				for (a in suffix[1].arr("plan layout arrows")) {
+					val f = a.arr("plan layout arrow")
+					if (f.size != 3) throw MarklessDecodeError("plan layout arrow: expected id, stroke width and path")
+					val id = exportId(f[0].str("plan layout arrow id"))
+					if (id in arrows) throw MarklessDecodeError("plan layout: $id has two arrows")
+					val points = f[2].arr("plan layout arrow of $id").flatMapIndexed { k, g ->
+						val segment = g.arr("plan layout arrow of $id")
+						if (segment.size != 3 || segment[0] != Json.Str(if (k == 0) "move" else "line")) throw MarklessDecodeError("plan layout arrow of $id: its path is a move and then lines")
+						listOf(planNumber(segment[1]), planNumber(segment[2]))
+					}
+					if (points.size < 4) throw MarklessDecodeError("plan layout arrow of $id: its path needs a move and a line")
+					arrows[id] = SelectArrow(planNumber(f[1]), points)
+				}
+			}
 			val page = parts[1].arr("plan layout page scroll")
+			// Dragon's ["undecided", node, reason] when it could not decide the page's range at this size.
+			if (page.size == 3) undecided = "${page[1].str("plan layout page scroll node")}: ${page[2].str("plan layout page scroll reason")}"
 			val pageScroll = if (page.size == 3) null else range(rangeJson(page, "plan layout page scroll"), "plan layout page scroll")
 			val geometry = HashMap<String, List<Json>>()
 			for (g in parts[2].arr("plan layout nodes")) {
 				val f = g.arr("plan layout node")
-				val id = f.firstOrNull()?.str("plan layout node id") ?: throw MarklessDecodeError("plan layout node has no id")
-				// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
-				val at = id.indexOf('@')
-				if (at < 0) geometry[names[id] ?: id] = f else geometry[(names[id.substring(0, at)] ?: id.substring(0, at)) + id.substring(at)] = f
+				geometry[exportId(f.firstOrNull()?.str("plan layout node id") ?: throw MarklessDecodeError("plan layout node has no id"))] = f
 			}
 			val assignment = assignments[k]
 			val moved = HashMap<String, MutableList<List<Json>>>()
@@ -304,6 +434,19 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				val id = f[0].str("plan layout write node")
 				if (assignment.byId[id] == null) throw MarklessDecodeError("Dragon's layout moves a write of $id, which assignment $k has no node for")
 				moved.getOrPut(id) { ArrayList() }.add(f)
+			}
+			// Each row's own write numbers, by row key and the template node they write: the row's copy takes them.
+			val rowMoved = HashMap<String, HashMap<String, MutableList<List<Json>>>>()
+			if (slots.isNotEmpty() && lists != null) for (e in parts[4].arr("plan layout row writes")) {
+				val entry = e.arr("plan layout row writes[]")
+				if (entry.size != 2) throw MarklessDecodeError("plan layout row writes ${e.text()}: expected a row key and its writes")
+				val own = HashMap<String, MutableList<List<Json>>>()
+				for (w in entry[1].arr("plan layout row writes[].writes")) {
+					val f = w.arr("plan layout write")
+					if (f.size != 4) throw MarklessDecodeError("plan layout write ${w.text()}: expected node, write kind, path and value")
+					own.getOrPut(f[0].str("plan layout write node")) { ArrayList() }.add(f)
+				}
+				rowMoved[entry[0].str("plan layout row key")] = own
 			}
 			// The template of each list: one row's nodes, which no view shows; each row is a copy of them laid out here.
 			val template = HashMap<String, Pair<PlanRepeat, Boolean>>()
@@ -324,14 +467,16 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				}
 				withRows.add(node.copy(frame = null, borderWidths = null, borderOps = null, scrollRange = null, lines = null))
 				for (row in shown[place.first.id] ?: emptyList()) {
-					val own = assignments[row.assignment].byId[node.id] ?: throw MarklessDecodeError("assignment ${row.assignment} has no node ${node.id} for row ${row.key}")
-					withRows.add(own.copy(id = "${node.id}@${row.key}", parent = if (place.second) node.parent else node.parent?.let { "$it@${row.key}" }, text = if (own.kind == "text") (row.texts[node.id] ?: own.text) else own.text))
+					val own = assignments[rowEntry(row.assignment)].byId[node.id] ?: throw MarklessDecodeError("assignment ${row.assignment} has no node ${node.id} for row ${row.key}")
+					val copy = own.copy(id = "${node.id}@${row.key}", parent = if (place.second) node.parent else node.parent?.let { "$it@${row.key}" }, text = if (own.kind == "text") (row.texts[node.id] ?: own.text) else own.text)
+					withRows.add(rowMoved[row.key]?.get(node.id)?.let { copy.copy(writes = slotWrites(copy, it)) } ?: copy)
 				}
 			}
-			assignment.copy(pageScroll = pageScroll, nodes = withRows.map { slotted ->
+			assignment.copy(pageScroll = pageScroll, sticky = sticky, textAreas = areas, nodes = withRows.map { slotted ->
 				val node = moved[slotted.id]?.let { slotted.copy(writes = slotWrites(slotted, it)) } ?: slotted
 				if (node.frame == null) return@map node
-				val f = geometry[node.id] ?: throw MarklessDecodeError("Dragon's layout has no box for ${node.id}")
+				// A text whose state emptied it has no box, as on the web.
+				val f = geometry[node.id] ?: if (node.kind == "text" && relaidTexts[node.id] == "") return@map node.copy(frame = null, borderWidths = null, borderOps = null, scrollRange = null, lines = null) else throw MarklessDecodeError("Dragon's layout has no box for ${node.id}")
 				val what = "plan layout of ${node.id}"
 				if (f.size != 6) throw MarklessDecodeError("$what: expected id, frame, border widths, lines, border operations and scroll range")
 				val frame = f[1].arr(what).map { planNumber(it) }
@@ -346,20 +491,30 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				}), "$what.lines")
 				val ops = if (f[4] == Json.Null) null else borderOps(planBorderOps(f[4], what), "$what.borderOps")
 				val scroll = if (f[5] == Json.Null) null else range(rangeJson(f[5].arr(what), what), what)
+				val arrow = arrows.remove(node.id)
+				if (arrow != null && !node.drawsSelectArrow) throw MarklessDecodeError("Dragon's layout gives ${node.id} an arrow, but it draws none")
+				if (arrow == null && node.drawsSelectArrow) throw MarklessDecodeError("\"${node.id}\" draws a drop-down arrow, but Dragon's layout gives it no arrow geometry")
+				val mark = marks.remove(node.id)
+				if (mark != null && !node.drawsCheckbox) throw MarklessDecodeError("Dragon's layout gives ${node.id} checkbox marks, but it draws no checkbox")
+				if (mark == null && node.drawsCheckbox) throw MarklessDecodeError("\"${node.id}\" draws a themed checkbox, but Dragon's layout gives it no marks")
 				node.copy(
 					frame = Frame(frame[0], frame[1], frame[2], frame[3]), borderWidths = widths?.let { Edges(it[0], it[1], it[2], it[3]) },
-					borderOps = ops, scrollRange = scroll, lines = if (node.kind == "text") lines else null,
+					borderOps = ops, scrollRange = scroll, lines = if (node.kind == "text") lines else null, selectArrow = arrow, checkboxMarks = mark,
+					text = if (node.kind == "text") (relaidTexts[node.id] ?: node.text) else node.text,
 				)
-			})
+			}).also {
+				if (arrows.isNotEmpty()) throw MarklessDecodeError("Dragon's layout gives an arrow for ${arrows.keys.sorted().first()}, which it shows no box for")
+				if (marks.isNotEmpty()) throw MarklessDecodeError("Dragon's layout gives checkbox marks for ${marks.keys.sorted().first()}, which it shows no box for")
+			}
 		}
-		return copy(dpr = scale, viewportWidth = width, viewportHeight = height, assignments = laid)
+		return copy(dpr = scale, viewportWidth = width, viewportHeight = height, assignments = laid, pageScrollUndecided = undecided ?: pageScrollUndecided)
 	}
 
 	companion object {
 		const val ANDROID_BACKEND = "android-views"
 
 		/** A number of Dragon's plan layout: its IEEE 754 bit pattern as 16 hex digits. */
-		private fun planNumber(v: Json): Double {
+		internal fun planNumber(v: Json): Double {
 			val hex = (v as? Json.Str)?.value?.takeIf { it.length == 16 } ?: throw MarklessDecodeError("plan layout: ${v.text()} is not a number's bit pattern")
 			return Double.fromBits(java.lang.Long.parseUnsignedLong(hex, 16))
 		}
@@ -455,7 +610,40 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				if (template.isEmpty()) throw MarklessDecodeError("$what.planRepeats[$i]: a row has at least one box")
 				PlanRepeat(o.field("id", "$what.planRepeats[$i]").str("id"), o.field("parent", "$what.planRepeats[$i]").str("parent"), template)
 			} ?: emptyList()
-			return style.copy(plan = plan, planNames = names, planRepeats = repeats)
+			val anim = t["anim"]?.let { a ->
+				if (plan == null) throw MarklessDecodeError("$what.anim: animator tables need a layout plan")
+				a.obj("$what.anim")
+				a.text()
+			}
+			if (plan == null) style.assignments.firstNotNullOfOrNull { a -> a.nodes.firstOrNull { it.drawsSelectArrow } }?.let {
+				throw MarklessDecodeError("$what: \"${it.id}\" draws a drop-down arrow, whose geometry only Dragon's plan layout gives, and the export has no plan")
+			}
+			if (plan == null) style.assignments.firstNotNullOfOrNull { a -> a.nodes.firstOrNull { it.drawsCheckbox } }?.let {
+				throw MarklessDecodeError("$what: \"${it.id}\" draws a themed checkbox, whose marks only Dragon's plan layout gives, and the export has no plan")
+			}
+			val inline = t["plan"]?.let { inlineBoxes(it, "$what.plan") }?.mapIndexed { a, ids ->
+				val renamed = names.getOrNull(a) ?: emptyMap()
+				ids.map { renamed[it] ?: it }.toSet()
+			} ?: emptyList()
+			return style.copy(plan = plan, planNames = names, planRepeats = repeats, anim = anim, inlineBoxes = inline)
+		}
+
+		/** Each plan assignment's variant's layout tree, read for the boxes whose kind is `inline` (Dragon ids). */
+		private fun inlineBoxes(plan: Json, what: String): List<Set<String>> {
+			fun collect(box: Json, at: String, into: MutableSet<String>) {
+				val o = box.obj(at)
+				if (o.field("kind", at).str("$at.kind") == "inline") into.add(o.field("id", at).str("$at.id"))
+				o["children"]?.arr("$at.children")?.forEachIndexed { i, child -> collect(child, "$at.children[$i]", into) }
+			}
+			val p = plan.obj(what)
+			if ("variants" !in p) return emptyList()
+			val variants = p.field("variants", what).arr("$what.variants").mapIndexed { v, variant ->
+				mutableSetOf<String>().also { collect(variant.obj("$what.variants[$v]").field("root", "$what.variants[$v]"), "$what.variants[$v].root", it) }
+			}
+			return p.field("assignments", what).arr("$what.assignments").mapIndexed { a, assignment ->
+				val index = assignment.obj("$what.assignments[$a]").field("variant", "$what.assignments[$a]").num("$what.assignments[$a].variant").toInt()
+				variants.getOrNull(index) ?: throw MarklessDecodeError("$what.assignments[$a] names variant $index; the plan has ${variants.size}")
+			}
 		}
 
 		fun decode(bytes: ByteArray, target: String = "android"): StyleExport {
@@ -477,7 +665,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val undecided = root["warnings"]?.arr("warnings")?.map { it.obj("warnings[]") }?.firstOrNull { w ->
 				w.field("code", "warning").str("code") == "DRAGON_PAGE_SCROLL_UNDECIDED" && w.field("message", "warning").str("message").startsWith("$target: ")
 			}?.let { it.getValue("message").str("message").removePrefix("$target: ") }
-			val style = withPlan(program(t, target, dpr, width, height, undecided) { w, what -> writes(w, what) }.copy(systemFaces = root["systemFonts"]?.let { systemFaces(it, target) } ?: emptyMap()), t, target)
+			val style = withPlan(program(t, target, dpr, width, height, undecided) { v, what -> node(v, what) { w, at -> writes(w, at) } }.copy(systemFaces = root["systemFonts"]?.let { systemFaces(it, target) } ?: emptyMap()), t, target)
 			val slots = root["slots"]?.let { exportSlots(it) } ?: return style
 			if (slots.isNotEmpty() && style.plan == null) throw MarklessDecodeError("style export has slots but $target has no layout plan to apply them")
 			return style.copy(slots = slots)
@@ -525,26 +713,47 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			return out
 		}
 
-		/** One target's states, assignments and next table; [writesOf] reads a node's `writes` field. */
-		private fun program(t: Map<String, Json>, target: String, dpr: Double, width: Double, height: Double, undecided: String?, writesOf: (Json, String) -> List<StyleWrite>): StyleExport {
+		/** One target's states, assignments and next table; [nodeOf] reads an assignment's node entry. */
+		private fun program(t: Map<String, Json>, target: String, dpr: Double, width: Double, height: Double, undecided: String?, nodeOf: (Json, String) -> StyledNode): StyleExport {
 			val states = t.field("states", target).arr("states").mapIndexed { n, v ->
 				val o = v.obj("states[$n]")
 				StyleState(o.field("key", "states[$n]").str("key"), o.field("domain", "states[$n]").arr("domain").map { scalar(it, "states[$n].domain[]") })
 			}
-			val assignments = t.field("assignments", target).arr("assignments").mapIndexed { a, v ->
+			val decode = { a: Int, v: Json ->
 				val o = v.obj("assignments[$a]")
 				val values = o.field("values", "assignments[$a]").obj("values").mapValues { (k, x) -> scalar(x, "assignments[$a].values.$k") }
 				val canvas = o["canvas"]?.let { color(it, "assignments[$a].canvas") }
 				if (canvas != null && canvas.alpha != 255) throw MarklessDecodeError("assignments[$a].canvas is not opaque")
 				val body = o["bodyBackground"]?.takeIf { it != Json.Null }?.let { color(it, "assignments[$a].bodyBackground") }
 				if (body != null && body.alpha != 255) throw MarklessDecodeError("assignments[$a].bodyBackground is not opaque")
-				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> node(x, "assignments[$a].nodes[$n]", writesOf) }, canvas, body, o["pageScroll"]?.let { range(it, "assignments[$a].pageScroll") })
+				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> nodeOf(x, "assignments[$a].nodes[$n]") }, canvas, body, o["pageScroll"]?.let { range(it, "assignments[$a].pageScroll") })
 			}
+			val assignments = t.field("assignments", target).arr("assignments").mapIndexed(decode).toMutableList()
 			val initial = t.field("initial", target).num("initial").toInt()
 			val next = t.field("next", target).arr("next").map { row -> row.arr("next[]").map { col -> col.arr("next[][]").map { it.num("next[][][]").toInt() } } }
 			if (initial !in assignments.indices) throw MarklessDecodeError("style export initial $initial names no assignment")
 			if (next.size != assignments.size || next.any { r -> r.size != states.size || r.withIndex().any { (si, c) -> c.size != states[si].domain.size || c.any { it != -1 && it !in assignments.indices } } }) throw MarklessDecodeError("style export next table does not match its assignments and states")
-			return StyleExport(dpr, width, height, states, initial, assignments, next, t["bands"]?.let { bands(it, "$target.bands") }, undecided)
+			// Each assignment's interaction states are entries after the assignments, in level then state order, as the plan's are.
+			val interaction = t["interaction"]?.let { v ->
+				val levels = v.obj("$target.interaction").also { it.only(setOf("levels"), "$target.interaction") }.field("levels", target).arr("$target.interaction.levels")
+				if (levels.size != next.size) throw MarklessDecodeError("$target.interaction has ${levels.size} levels for ${next.size} assignments")
+				levels.mapIndexed { i, l ->
+					val at = "$target.interaction.levels[$i]"
+					val o = l.obj(at)
+					o.only(setOf("tables", "addresses", "states", "matches", "rows", "planAssignments"), at)
+					val states = o.field("states", at).arr("$at.states")
+					if (o.field("matches", at).arr("$at.matches").size != states.size) throw MarklessDecodeError("$at: each state needs its matches")
+					val entries = states.map { st -> assignments.size.also { assignments.add(decode(it, st)) } }
+					o["planAssignments"]?.let { p -> if (p.arr("$at.planAssignments").map { it.num("$at.planAssignments[]").toInt() } != entries) throw MarklessDecodeError("$at: the states' plan assignments are not the entries after the assignments") }
+					InteractionLevel(
+						o.field("tables", at).text(),
+						o.field("addresses", at).arr("$at.addresses").map { it.str("$at.addresses[]") },
+						o["rows"]?.obj("$at.rows")?.mapValues { (_, r) -> r.str("$at.rows[]") } ?: emptyMap(),
+						entries,
+					)
+				}
+			} ?: emptyList()
+			return StyleExport(dpr, width, height, states, initial, assignments, next, t["bands"]?.let { bands(it, "$target.bands") }, undecided, interaction = interaction)
 		}
 
 		private fun bands(v: Json, what: String): Bands {
@@ -586,7 +795,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val version = root.field("version", "app style").str("version")
 			if (version != APP_STYLE_VERSION) throw MarklessDecodeError("unknown app style version \"$version\" (this host reads $APP_STYLE_VERSION)")
 			val t = root.field("targets", "app style").obj("targets").field(target, "targets").obj("targets.$target")
-			t.only(setOf("backend", "viewport", "dpr", "writes", "routes"), "targets.$target")
+			t.only(setOf("backend", "viewport", "dpr", "writes", "nodes", "routes"), "targets.$target")
 			val backend = t.field("backend", target).str("backend")
 			if (backend != ANDROID_BACKEND) throw MarklessDecodeError("app style backend is \"$backend\", not $ANDROID_BACKEND")
 			val viewport = t.field("viewport", target).obj("viewport")
@@ -594,17 +803,26 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val width = viewport.field("width", "viewport").num("width")
 			val height = viewport.field("height", "viewport").num("height")
 			val lists = t.field("writes", target).arr("writes").mapIndexed { n, w -> writes(w, "writes[$n]") }
+			val listedNode = { v: Json, what: String ->
+				node(v, what) { w, at ->
+					val i = w.num("$at.writes")
+					if (i != Math.floor(i) || i.toInt() !in lists.indices) throw MarklessDecodeError("$at.writes is $i, not an index of the app's write lists")
+					lists[i.toInt()]
+				}
+			}
+			val pool = t["nodes"]?.arr("targets.$target.nodes")?.mapIndexed { n, v -> listedNode(v, "nodes[$n]") } ?: emptyList()
+			val pooled = { v: Json, what: String ->
+				val i = v.num(what)
+				if (i != Math.floor(i) || i.toInt() !in pool.indices) throw MarklessDecodeError("$what is $i, not an index of the app's nodes")
+				pool[i.toInt()]
+			}
 			val routes = LinkedHashMap<String, StyleExport>()
 			for ((n, r) in t.field("routes", target).arr("routes").withIndex()) {
 				val o = r.obj("routes[$n]")
-				o.only(setOf("pattern", "component", "compiler", "readiness", "states", "initial", "next", "bands", "assignments", "sheets", "plan", "planNames", "planRepeats", "slots"), "routes[$n]")
+				o.only(setOf("pattern", "component", "compiler", "readiness", "states", "initial", "next", "bands", "assignments", "sheets", "plan", "planNames", "planRepeats", "slots", "anim", "interaction"), "routes[$n]")
 				val pattern = o.field("pattern", "routes[$n]").str("pattern")
 				if (pattern in routes) throw MarklessDecodeError("app style lists route $pattern twice")
-				val listed = { w: Json, what: String ->
-					val i = w.num("$what.writes")
-					if (i != Math.floor(i) || i.toInt() !in lists.indices) throw MarklessDecodeError("$what.writes is $i, not an index of the app's write lists")
-					lists[i.toInt()]
-				}
+				val listed = { v: Json, what: String -> if (v is Json.Num) pooled(v, what) else listedNode(v, what) }
 				val sheets = LinkedHashMap<String, List<SheetHeight>>()
 				for ((k, sv) in (o["sheets"]?.arr("routes[$n].sheets") ?: emptyList()).withIndex()) {
 					val where = "routes[$n].sheets[$k]"
@@ -618,7 +836,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 						ho.only(setOf("snapPoint", "viewport", "readiness", "states", "initial", "next", "bands", "assignments"), at)
 						val hp = ho.field("viewport", at).obj("$at.viewport")
 						hp.only(setOf("width", "height"), "$at.viewport")
-						SheetHeight(ho.field("snapPoint", at).num("$at.snapPoint"), program(ho, at, dpr, hp.field("width", at).num("width"), hp.field("height", at).num("height"), null, listed))
+						SheetHeight(ho.field("snapPoint", at).num("$at.snapPoint"), withPlan(program(ho, at, dpr, hp.field("width", at).num("width"), hp.field("height", at).num("height"), null, listed), ho, at))
 					}.also { if (it.isEmpty() || it.map { h -> h.snapPoint }.distinct().size != it.size) throw MarklessDecodeError("$where needs one layout per resting height") }
 				}
 				val planned = withPlan(program(o, "routes[$n] ($pattern)", dpr, width, height, null, listed).copy(sheets = sheets, systemFaces = faces), o, "routes[$n]")
@@ -760,11 +978,52 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				}.also { if (it.size != 4) throw MarklessDecodeError("$what has ${it.size} inset edges, not 4") })
 				"clip-text" -> StyleWrite.ClipText.also { o.field("texts", what).arr("texts").forEach { t -> t.str("$what.texts[]") } }
 				"paint-order" -> StyleWrite.PaintOrder(o.field("host", what).str("host"), o.field("bucket", what).num("bucket").toInt(), o.field("rank", what).num("rank").toInt())
+				"box-shadow" -> {
+					if (o.field("key", what) != Json.Str("dragonShadow.shadows")) throw MarklessDecodeError("$what: a box-shadow write's key is dragonShadow.shadows")
+					StyleWrite.BoxShadow(o.field("shadows", what).arr("$what.shadows").mapIndexed { n, x ->
+						val at = "$what.shadows[$n]"
+						val sh = x.obj(at)
+						fun length(k: String) = sh.field(k, at).num("$at.$k")
+						Shadow((sh.field("inset", at) as? Json.Bool ?: throw MarklessDecodeError("$at.inset must be a boolean")).value, length("x"), length("y"), length("blur"), length("spread"), color(sh.field("color", at), "$at.color"))
+					})
+				}
+				"checkbox" -> {
+					// The initial checkedness; the runtime keeps the live one, which a tap changes and a re-render does not reset.
+					if (o.field("checked", what) !is Json.Bool) throw MarklessDecodeError("$what.checked must be a boolean")
+					val colors = o.field("colors", what).obj("$what.colors")
+					val off = colors.field("unchecked", what).obj("$what.colors.unchecked")
+					val on = colors.field("checked", what).obj("$what.colors.checked")
+					StyleWrite.Checkbox(CheckboxColors(
+						color(off.field("background", what), "$what.colors.unchecked.background"), color(off.field("border", what), "$what.colors.unchecked.border"),
+						color(on.field("background", what), "$what.colors.checked.background"), color(on.field("fill", what), "$what.colors.checked.fill"), color(on.field("check", what), "$what.colors.checked.check"),
+					))
+				}
 				"visibility" -> {
 					val value = o.field("value", what).str("$what.value")
 					if (value != "visible" && value != "hidden" && value != "collapse") throw MarklessDecodeError("$what: visibility $value is not visible, hidden or collapse")
 					if (o.field("canvas", what) !is Json.Bool) throw MarklessDecodeError("$what.canvas must be a boolean")
 					StyleWrite.Visibility(value)
+				}
+				"select-arrow" -> StyleWrite.SelectArrow(color(o.field("color", what), "$what.color"))
+				"outline" -> {
+					if (o.field("key", what) != Json.Str("dragonOutline.rings")) throw MarklessDecodeError("$what: an outline write's key is dragonOutline.rings")
+					val style = o.field("style", what).str("$what.style")
+					if (style !in OUTLINE_STYLES) throw MarklessDecodeError("$what: outline style $style has no native paint")
+					val width = o.field("width", what).num("$what.width")
+					val offset = o.field("offset", what).num("$what.offset")
+					if (!(width > 0.0) || width.isInfinite() || !offset.isFinite()) throw MarklessDecodeError("$what: outline width $width or offset $offset is out of range")
+					val threeD = style in listOf("groove", "ridge", "inset", "outset")
+					val tones = o.field("tones", what).takeIf { it != Json.Null }?.arr("$what.tones")?.let { pair ->
+						if (pair.size != 2) throw MarklessDecodeError("$what.tones: expected a lighter and a darker colour")
+						color(pair[0], "$what.tones[0]") to color(pair[1], "$what.tones[1]")
+					}
+					if ((tones != null) != threeD) throw MarklessDecodeError("$what: a $style outline ${if (threeD) "needs" else "has no"} lighter and darker colours")
+					val radii = o.field("radii", what).takeIf { it != Json.Null }?.arr("$what.radii")?.map {
+						val l = it.obj("$what.radii[]")
+						val percent = l.field("percent", what) as? Json.Bool ?: throw MarklessDecodeError("$what.radii[].percent must be a boolean")
+						percent.value to l.field("value", what).num("$what.radii[].value")
+					}?.also { if (it.size != 8) throw MarklessDecodeError("$what: an outline's radii are 8 lengths, not ${it.size}") }
+					StyleWrite.Outline(style, width, offset, color(o.field("color", what), "$what.color"), tones, radii, o.field("layer", what).str("$what.layer"))
 				}
 				"transform" -> {
 					o.only(setOf("kind", "ops", "origin", "key"), what)
@@ -781,6 +1040,13 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					origin.only(setOf("x", "y"), "$what.origin")
 					StyleWrite.Transform(functions, length(origin.field("x", what), "$what.origin.x"), length(origin.field("y", what), "$what.origin.y"))
 				}
+				"opacity" -> {
+					o.only(setOf("kind", "opacity", "key"), what)
+					key(o, "alpha", what)
+					val opacity = o.field("opacity", what).num("$what.opacity")
+					if (!(opacity >= 0 && opacity < 1)) throw MarklessDecodeError("$what: opacity $opacity is not in [0, 1)")
+					StyleWrite.Opacity(opacity)
+				}
 				"opacity-group" -> {
 					o.only(setOf("kind", "opacity", "backdrop", "painters", "after", "unstable", "key"), what)
 					key(o, "dragonGroup", what)
@@ -795,8 +1061,71 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 	}
 }
 
+/**
+ * Where a box Dragon paints in its stacking context's order ([order]'s host) is placed so its view's siblings are that order: the
+ * host when it is a view's node ([isView]), else the page's top node; null when that is [viewParent], its view's parent already.
+ * A box in between that clips, scrolls or keeps an order of its own would have to carry the box with it, and is refused by name,
+ * as is a box below the flow (a negative z-index) placed past its parent.
+ */
+fun stackingParent(s: StyledNode, order: StyleWrite.PaintOrder, styled: Assignment, isView: (String) -> Boolean, viewParent: String?): String? {
+	val chain = ArrayList<StyledNode>()
+	var cursor = s.parent
+	while (cursor != null && cursor != order.host) {
+		val between = styled.byId[cursor] ?: throw MarklessDecodeError("\"${s.id}\"'s stacking context ${order.host} is not an ancestor")
+		chain.add(between)
+		cursor = between.parent
+	}
+	if (cursor == null) throw MarklessDecodeError("\"${s.id}\"'s stacking context ${order.host} is not an ancestor")
+	val target = if (isView(order.host)) order.host else chain.lastOrNull { isView(it.id) }?.id
+	for (box in chain.takeWhile { it.id != target }) {
+		if (box.writes.any { it == StyleWrite.PaddingBoxClip || it is StyleWrite.ClipPathInset || it is StyleWrite.ScrollContainer }) throw MarklessDecodeError("\"${s.id}\" paints in ${order.host}'s stacking order past ${box.id}, which clips or scrolls; not implemented on Android")
+		if (box.writes.any { it is StyleWrite.PaintOrder }) throw MarklessDecodeError("\"${s.id}\" paints in ${order.host}'s stacking order past ${box.id}, which keeps an order of its own; not implemented on Android")
+	}
+	if (target == null || target == viewParent) return null
+	if (order.bucket < 0) throw MarklessDecodeError("\"${s.id}\" paints below the flow of ${order.host} past ${viewParent ?: "the page"}; not implemented on Android")
+	return target
+}
+
+/**
+ * Dragon lays an inline formatting context out flat: each text and inline box in it is a child of its block container. [id]'s view
+ * sits in its payload parent's, framed from the export's absolute origins, so its place needs nothing more; but an inline box
+ * between [id] and [container] (from [parent] up its payload parents) that paints anything of its own is refused by name.
+ */
+fun checkFlattenedInline(id: String, parent: String, container: String, styled: Assignment, inline: Set<String>, payloadParent: (String) -> String?) {
+	var cursor: String? = parent
+	while (cursor != null && cursor != container && cursor.substringBefore('@') in inline) {
+		val box = styled.byId[cursor] ?: return
+		inlinePaint(box)?.let { throw MarklessDecodeError("\"$id\": its inline box $cursor $it, which Android does not draw on a box Dragon lays out flat in $container") }
+		cursor = payloadParent(cursor)
+	}
+}
+
+/** [parent], the payload parent of [id] (a row's copy `<node>@<keys>` or a node), as [styled] names it: its copy in [id]'s row or an outer row, else itself. */
+fun rowCopyOf(id: String, parent: String, styled: Assignment): String =
+	generateSequence(id.substringAfter('@', "").ifEmpty { null }) { keys -> keys.substringBeforeLast('@', "").ifEmpty { null } }
+		.map { "$parent@$it" }.firstOrNull { it in styled.byId } ?: parent
+
+/** What an inline box paints or keeps of its own, in words; null when it is transparent, borderless and in the flow. */
+private fun inlinePaint(box: StyledNode): String? {
+	if (box.borderWidths?.let { listOf(it.top, it.right, it.bottom, it.left).any { w -> w != 0.0 } } == true) return "has a border"
+	for (w in box.writes) when {
+		w is StyleWrite.BorderStyles && w.styles.any { it != "none" && it != "hidden" } -> return "has a border"
+		w is StyleWrite.BackgroundColor && w.color.alpha != 0 -> return "paints a background"
+		w is StyleWrite.Outline -> return "draws an outline"
+		w is StyleWrite.BoxShadow -> return "casts a shadow"
+		w is StyleWrite.PaintOrder -> return "paints in a stacking order"
+	}
+	return null
+}
+
 /** A list whose rows a phone lays out (Dragon's `planRepeats`): the box its rows hang from and one row's top boxes, by Dragon id. */
 data class PlanRepeat(val id: String, val parent: String, val template: List<String>)
 
 /** A row a page shows now: its key, the assignment its own states reach from the page's, and its texts by text node id. */
-data class LaidOutRow(val key: String, val assignment: Int, val texts: Map<String, String>)
+data class LaidOutRow(val key: String, val assignment: Int, val texts: Map<String, String>, val slots: Map<String, Double> = emptyMap())
+
+/** A textarea's line pitch, its first baseline below a line's top, and its padding (top, right, bottom, left), in device px. */
+data class TextAreaLines(val pitch: Double, val above: Double, val insets: List<Double>)
+
+/** A sticky box of a laid-out assignment: its export id, and its row as Dragon's plan layout wrote it (with Dragon's own id). */
+data class StickyRow(val id: String, val row: Json)

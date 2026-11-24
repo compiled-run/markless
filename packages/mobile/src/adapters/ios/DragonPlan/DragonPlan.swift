@@ -43,6 +43,24 @@ public enum DragonPlan {
 		return out
 	}
 
+	/// `runMarklessAnimation`: a page's animation events and frame from its export's animator tables, over every step so far.
+	public static func animation(_ line: String) -> String {
+		do {
+			return try harness_runMarklessAnimation(JsString(line)).description
+		} catch {
+			return "[\"threw\"]"
+		}
+	}
+
+	/// POSX-s scroll: `runMarklessSticky`, each sticky box's shift at the page's scroll offset.
+	public static func sticky(_ line: String) -> String {
+		do {
+			return try harness_runMarklessSticky(JsString(line)).description
+		} catch {
+			return "[\"threw\"]"
+		}
+	}
+
 	/// Dragon's translated library cases; `rt-band` looks a page's `@media` band up by its size.
 	public static func library(_ line: String) -> String {
 		do {
@@ -69,13 +87,6 @@ extension DragonPlan {
 		let m = try paintTransform_paintTransformMatrix(JsArray(ops), TransformOrigin(length(originX), length(originY)), width, height, trig)
 		let about = try paintTransform_transformAboutPoint(m, width / 2, height / 2)
 		return [about.a, about.b, about.c, about.d, about.e, about.f]
-	}
-
-	/// The eight corner radii in device px of a border box `width` x `height` device px, from its authored radii (percent, value
-	/// in CSS px): paint-radius.ts resolveCornerRadii, then constrainCornerRadii's one scale factor where adjacent radii overlap.
-	public static func cornerRadii(_ lengths: [(percent: Bool, value: Double)], width: Double, height: Double, dpr: Double) throws -> [Double] {
-		let resolved = try paintRadius_resolveCornerRadii(JsArray(lengths.map { RadiusLength($0.percent, $0.value) }), width, height, dpr)
-		return try paintRadius_constrainCornerRadii(resolved, width, height, RadiusFaults(false, false)).items
 	}
 
 	/// Chrome's paint alpha byte of an opacity (paint.ts).

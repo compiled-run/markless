@@ -80,7 +80,7 @@ test("a sheet's markup ancestors come along without boxes, for selectors and inh
 	expect(build.styleInputs[0]!.input.nodes.some((node) => 'boxless' in node)).toBe(false);
 });
 
-test("a styled page whose text reads a route param lays that text out as '', as Dragon cannot know it at build time", async () => {
+test("a styled page's text that is only a route param, which the build cannot know, reaches Dragon as a no-break space the phone lays the param out in", async () => {
 	const build = await compileNativeApp({
 		pages: [
 			{
@@ -104,7 +104,7 @@ export default function Tag({ params }: PageProps<{ tag: string }>) @{
 	const texts = build.styleInputs[0]!.input.nodes.flatMap((node) =>
 		node.kind === 'text' ? [node.text] : [],
 	);
-	expect(texts).toEqual(['', 'Tagged ']);
+	expect(texts).toEqual(['\u00a0', 'Tagged ']);
 });
 
 test("a styled page refuses a row's aria-* that follows its row only where a selector reads it, and leaves it out of Dragon's input otherwise", async () => {
@@ -241,4 +241,106 @@ export default function Sites() @{
 	expect(build.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([]);
 	const rowState = build.styleInputs[0]!.input.states.find((state) => state.row !== undefined)!;
 	expect(rowState.domain).toEqual(['0', '1']);
+});
+
+test('a styled page builds its <select>, and refuses one inside a system sheet, whose content has no plan layout to give its arrow', async () => {
+	const build = (where: 'page' | 'sheet') =>
+		compileNativeComponent({
+			filename: 'packages/mobile/test/fixtures/StyledSelect.tsrx',
+			source: `import { state } from '@markless/core';
+import { native, platform } from '@markless/device';
+
+export default function App() @{
+	let open = state(false);
+	<main>
+		<style>
+			select { padding: 8px; border-radius: 6px; }
+		</style>
+		${where === 'page' ? '<select aria-label="Size"><option>Small</option></select>' : ''}
+		@if (!platform.web) {
+			<native.sheet open={open} onChange={(next) => (open = next)} snapPoints={[0.5]}>
+				${where === 'sheet' ? '<select aria-label="Size"><option>Small</option></select>' : '<p>Inside</p>'}
+			</native.sheet>
+		}
+	</main>
+}`,
+			target: 'ios',
+		});
+	const page = await build('page');
+	expect(page.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	expect(page.payload).not.toBeNull();
+	const sheet = await build('sheet');
+	expect(sheet.payload).toBeNull();
+	expect(sheet.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+		expect.stringMatching(
+			/^the <select> \S+ inside the system sheet \S+ on a styled page: a sheet's content is exported without Dragon's plan layout, so no geometry for its drop-down arrow reaches the phone$/,
+		),
+	]);
+});
+
+test("a styled <select>'s @for over a constant list reaches Dragon as every option, and one over state keeps its template row", async () => {
+	const page = (list: string) =>
+		compileNativeApp({
+			pages: [
+				{
+					page: 'pages/index.tsrx',
+					filename: 'packages/mobile/test/fixtures/pages/index.tsrx',
+					source: `import { state } from '@markless/core';
+
+const TAGS = ['Work', 'Home', 'Ideas'];
+
+export default function Tags() @{
+	let tags = state(['Work', 'Home']);
+	<main>
+		<style>
+			select { padding: 4px; border: 1px solid; }
+		</style>
+		<select aria-label="Tag">
+			@for (const option of ${list}; key option) {
+				<option value={option}>{option}</option>
+			}
+		</select>
+		<button type="button" onClick={() => (tags = [...tags, 'More'])}>Add</button>
+	</main>
+}`,
+				},
+			],
+		});
+	const constant = await page('TAGS');
+	expect(constant.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([]);
+	const input = constant.styleInputs[0]!.input;
+	const options = input.nodes.filter((node) => node.kind === 'element' && node.element === 'option');
+	expect(options.map((node) => node.row)).toEqual([undefined, undefined, undefined]);
+	expect(
+		input.nodes.filter((node) => node.kind === 'text' && options.some((option) => option.id === node.parent)).map((node) => node.kind === 'text' && node.text),
+	).toEqual(['Work', 'Home', 'Ideas']);
+	expect(input.repeats ?? []).toEqual([]);
+	const listed = await page('tags');
+	const rows = listed.styleInputs[0]!.input.nodes.filter((node) => node.kind === 'element' && node.element === 'option');
+	expect(rows.length).toBe(1);
+	expect(rows[0]!.row).toBeDefined();
+});
+
+test("a styled page refuses <summary> and <center> by name, since Dragon has no default look for them yet", async () => {
+	const build = await compileNativeApp({
+		pages: [
+			{
+				page: 'pages/index.tsrx',
+				filename: 'packages/mobile/test/fixtures/pages/index.tsrx',
+				source: `export default function Help() @{
+	<main>
+		<style>
+			p { padding: 4px; }
+		</style>
+		<details><summary>Shipping</summary><p>Two days.</p></details>
+		<center><p>Vote</p></center>
+	</main>
+}`,
+			},
+		],
+	});
+	expect(build.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+		'the <summary> h2 on a styled page, whose disclosure triangle Dragon does not draw yet',
+		'the <center> h4 on a styled page, whose default look Dragon does not have yet',
+	]);
 });

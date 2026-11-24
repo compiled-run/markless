@@ -141,7 +141,8 @@ function cloneWith(node: AnyNode, replace: (node: AnyNode) => AnyNode | undefine
 			? cloneWith(branch.taken, replace)
 			: ({ type: 'EmptyStatement' } as AnyNode);
 	const env = clientEnvValue(node);
-	if (env !== undefined) return { type: 'Literal', value: env, raw: JSON.stringify(env) } as AnyNode;
+	if (env !== undefined)
+		return { type: 'Literal', value: env, raw: JSON.stringify(env) } as AnyNode;
 	const copy: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(node)) {
 		if (Array.isArray(value))
@@ -343,11 +344,15 @@ function deviceCallOf(
 	node: AnyNode,
 	entry: { readonly kind: string; readonly specifier: string; readonly name?: string | null },
 ): readonly [call: string, standIn: AnyNode] | undefined {
-	if (entry.kind !== 'named' || entry.specifier !== DEVICE_MODULE || !entry.name) return undefined;
+	if (entry.kind !== 'named' || entry.specifier !== DEVICE_MODULE || !entry.name)
+		return undefined;
 	const method = methodCalledOn(semantic, node);
 	if (method === undefined) return undefined;
 	const call = `${entry.name}.${method}`;
-	if (!Object.hasOwn(DEVICE_CALLS, call) || 'object' in DEVICE_CALLS[call as keyof typeof DEVICE_CALLS])
+	if (
+		!Object.hasOwn(DEVICE_CALLS, call) ||
+		'object' in DEVICE_CALLS[call as keyof typeof DEVICE_CALLS]
+	)
 		return undefined;
 	return [
 		call,
@@ -472,6 +477,72 @@ function importSlots(semantic: ModuleSemantics) {
 	return { specifiers, spans, reach, slot, record };
 }
 
+/** `typeof name === 'undefined'` gives true, `typeof name !== 'undefined'` false (either side, strict or loose); else null. */
+function absentTest(test: AnyNode | null | undefined, name: string): boolean | null {
+	if (test?.type !== 'BinaryExpression') return null;
+	const equal = test.operator === '===' || test.operator === '==';
+	if (!equal && test.operator !== '!==' && test.operator !== '!=') return null;
+	const isTypeof = (side: AnyNode) =>
+		side.type === 'UnaryExpression' &&
+		side.operator === 'typeof' &&
+		(side.argument as AnyNode).type === 'Identifier' &&
+		(side.argument as AnyNode).name === name;
+	const isUndefined = (side: AnyNode) => side.type === 'Literal' && side.value === 'undefined';
+	const left = test.left as AnyNode;
+	const right = test.right as AnyNode;
+	return (isTypeof(left) && isUndefined(right)) || (isTypeof(right) && isUndefined(left))
+		? equal
+		: null;
+}
+
+/** A statement control never falls out of: a `return` or `throw`, or a block ending in one. */
+function exits(statement: AnyNode | null | undefined): boolean {
+	if (!statement) return false;
+	if (statement.type === 'ReturnStatement' || statement.type === 'ThrowStatement') return true;
+	return statement.type === 'BlockStatement' && exits((statement.body as AnyNode[]).at(-1));
+}
+
+/** Whether a read of the global `name` runs only past a `typeof name` test that found it defined. */
+function guardedByTypeof(semantic: ModuleSemantics, node: AnyNode, name: string): boolean {
+	const parentOf = (at: AnyNode) => semantic.parentOf(at as never) as AnyNode | null;
+	for (
+		let child = node, parent = parentOf(node);
+		parent;
+		child = parent, parent = parentOf(parent)
+	) {
+		if (parent.type === 'IfStatement' || parent.type === 'ConditionalExpression') {
+			const absent = absentTest(parent.test as AnyNode, name);
+			if (
+				(absent === false && child === parent.consequent) ||
+				(absent === true && child === parent.alternate)
+			)
+				return true;
+		} else if (parent.type === 'LogicalExpression' && child === parent.right) {
+			const absent = absentTest(parent.left as AnyNode, name);
+			if (
+				(parent.operator === '&&' && absent === false) ||
+				(parent.operator === '||' && absent === true)
+			)
+				return true;
+		} else if (parent.type === 'BlockStatement' || parent.type === 'Program') {
+			const body = parent.body as AnyNode[];
+			if (
+				body
+					.slice(0, body.indexOf(child))
+					.some(
+						(statement) =>
+							statement.type === 'IfStatement' &&
+							!statement.alternate &&
+							absentTest(statement.test as AnyNode, name) === true &&
+							exits(statement.consequent as AnyNode),
+					)
+			)
+				return true;
+		}
+	}
+	return false;
+}
+
 const FUNCTIONS = new Set([
 	'FunctionDeclaration',
 	'FunctionExpression',
@@ -494,7 +565,12 @@ function globalOf(
 ): SemanticScriptGlobal {
 	const node = reference.node as unknown as AnyNode;
 	const parent = semantic.parentOf(node as never) as AnyNode | null;
-	const typeofOnly = parent?.type === 'UnaryExpression' && parent.operator === 'typeof';
+	const reach =
+		parent?.type === 'UnaryExpression' && parent.operator === 'typeof'
+			? 'typeof'
+			: guardedByTypeof(semantic, node, reference.name)
+				? 'ifPresent'
+				: 'read';
 	const member =
 		parent?.type === 'MemberExpression' &&
 		parent.object === node &&
@@ -506,7 +582,7 @@ function globalOf(
 	return {
 		name: reference.name,
 		span: spanOf(node as never, filename),
-		typeofOnly,
+		reach,
 		...(property ? { property } : {}),
 		...(member ? { member } : {}),
 	};
@@ -736,7 +812,9 @@ export function scriptFunctionOf(
 	return {
 		code: [
 			...declarations,
-			asValue ? `return function () {\nreturn (${print(root)});\n};` : `return (${print(root)});`,
+			asValue
+				? `return function () {\nreturn (${print(root)});\n};`
+				: `return (${print(root)});`,
 		].join('\n'),
 		names: [...names.values()],
 		module: [...moduleNames],
@@ -962,12 +1040,20 @@ export const scriptValueOf = (node: AnyNode, semantic: ModuleSemantics, filename
 	scriptFunctionOf(node, semantic, filename, true);
 
 /** The outermost node written exactly over `span`. */
-function nodeOver(semantic: ModuleSemantics, span: { readonly start: number; readonly end: number }): AnyNode | undefined {
+function nodeOver(
+	semantic: ModuleSemantics,
+	span: { readonly start: number; readonly end: number },
+): AnyNode | undefined {
 	const at = semantic.nodeAt(span.start);
 	let found: AnyNode | undefined;
 	if (!at) return undefined;
 	for (const node of semantic.ancestors(at) as Iterable<AnyNode>) {
-		if (node.start === span.start && node.end === span.end && node.type !== 'JSXExpressionContainer') found = node;
+		if (
+			node.start === span.start &&
+			node.end === span.end &&
+			node.type !== 'JSXExpressionContainer'
+		)
+			found = node;
 		if ((node.start as number) < span.start || (node.end as number) > span.end) break;
 	}
 	return found;
@@ -981,11 +1067,18 @@ export function scriptFactsOf(source: string, filename: string) {
 	const semantic = moduleSemantics(source, filename);
 	let module: SemanticScriptModule | undefined;
 	/** The first argument of the framework call (`computed(...)`, `state(...)`) bound to `name` in `component`. */
-	const frameworkArgument = (component: string | undefined, name: string): AnyNode | undefined => {
+	const frameworkArgument = (
+		component: string | undefined,
+		name: string,
+	): AnyNode | undefined => {
 		for (const binding of semantic.bindings) {
 			if (binding.name !== name) continue;
 			const declaring = declaringNode(semantic, binding);
-			if (declaring?.type !== 'VariableDeclarator' || !isFrameworkCall(semantic, declaring.init as AnyNode)) continue;
+			if (
+				declaring?.type !== 'VariableDeclarator' ||
+				!isFrameworkCall(semantic, declaring.init as AnyNode)
+			)
+				continue;
 			let owner: string | undefined;
 			for (const node of semantic.ancestors(declaring as never) as Iterable<AnyNode>)
 				if (isComponent(node)) {
@@ -1019,7 +1112,8 @@ export function scriptFactsOf(source: string, filename: string) {
 			const at = semantic.nodeAt(rowSpan.start);
 			if (!at) return undefined;
 			for (const node of semantic.ancestors(at) as Iterable<AnyNode>)
-				if (node.type === 'JSXForExpression') return scriptFunctionOf(node.right as AnyNode, semantic, filename, true);
+				if (node.type === 'JSXForExpression')
+					return scriptFunctionOf(node.right as AnyNode, semantic, filename, true);
 			return undefined;
 		},
 		/** The function a `computed(...)` is given, written at `span` (a shared factory's returned `path: computed(...)`). */
@@ -1028,12 +1122,18 @@ export function scriptFactsOf(source: string, filename: string) {
 			return node && scriptFunctionOf(node, semantic, filename);
 		},
 		/** The function of `computed(...)` bound to `name` in `component` (module level when there is none). */
-		computed: (component: string | undefined, name: string): SemanticScriptFunction | undefined => {
+		computed: (
+			component: string | undefined,
+			name: string,
+		): SemanticScriptFunction | undefined => {
 			const fn = frameworkArgument(component, name);
 			return fn && scriptFunctionOf(fn, semantic, filename);
 		},
 		/** The first value of `state(...)` bound to `name` in `component` (module level when there is none), as a value. */
-		stateSeed: (component: string | undefined, name: string): SemanticScriptFunction | undefined => {
+		stateSeed: (
+			component: string | undefined,
+			name: string,
+		): SemanticScriptFunction | undefined => {
 			const seed = frameworkArgument(component, name);
 			return seed && scriptFunctionOf(seed, semantic, filename, true);
 		},
@@ -1043,7 +1143,8 @@ export function scriptFactsOf(source: string, filename: string) {
 		 */
 		moduleCall: (name: string): SemanticScriptFunction | undefined => {
 			const binding = semantic.bindings.find(
-				(candidate) => candidate.name === name && candidate.scope.id === semantic.rootScope.id,
+				(candidate) =>
+					candidate.name === name && candidate.scope.id === semantic.rootScope.id,
 			);
 			if (!binding) return undefined;
 			const imports = importSlots(semantic);
@@ -1058,7 +1159,9 @@ export function scriptFactsOf(source: string, filename: string) {
 					isFrameworkCall(semantic, declaring.init as AnyNode))
 			)
 				return undefined;
-			const callee = imported ? generate(imports.reach(binding) as never, PRINT).code.trim() : name;
+			const callee = imported
+				? generate(imports.reach(binding) as never, PRINT).code.trim()
+				: name;
 			const span = spanOf(declaring as never, filename);
 			return {
 				code: `return function () {\nreturn ${callee}.apply(undefined, __s.args);\n};`,

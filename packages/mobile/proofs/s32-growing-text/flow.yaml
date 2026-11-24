@@ -1,0 +1,23 @@
+appId: ${APP_ID}
+name: s32-growing-text
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Tagged Home
+- assertVisible: Below the tag
+- assertVisible: Grow tag
+- assertVisible: Growing text
+- tapOn: Grow tag
+- assertNotVisible: Tagged Home
+- assertVisible: Tagged Home and the garden shed out back
+- assertVisible: Below the tag
+- assertNotVisible: Tagged Home
+- tapOn: Grow tag
+- assertNotVisible: Tagged Home and the garden shed out back
+- assertVisible: Tagged Home and the garden shed out back and the garden shed out back
+- assertVisible: Below the tag
+- assertNotVisible: Tagged Home and the garden shed out back

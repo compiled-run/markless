@@ -221,7 +221,7 @@ const infoPlist = (minimumOs: string) => `<?xml version="1.0" encoding="UTF-8"?>
 </dict></plist>
 `;
 
-/** Copies the shell, adds the rung's payload (and style export and fonts), signs it ad hoc and installs it. */
+/** Copies the shell, adds the rung's payload (and style export and fonts), signs it ad hoc and installs it with no data left from an earlier run. */
 export async function installProofApp(
 	simulator: BootedSimulator,
 	shellApp: string,
@@ -242,5 +242,6 @@ export async function installProofApp(
 		writeFileSync(join(app, path), bytes);
 	}
 	await exec('codesign', ['--force', '--sign', '-', app]);
+	await exec('xcrun', ['simctl', 'uninstall', simulator.udid, PROOF_APP_ID]);
 	await exec('xcrun', ['simctl', 'install', simulator.udid, app], { timeoutMs: 300_000 });
 }

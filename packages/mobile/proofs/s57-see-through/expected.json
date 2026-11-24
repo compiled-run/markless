@@ -1,0 +1,25 @@
+{
+	"rung": "S57",
+	"name": "a pressed button (opacity 0.85, scale 0.97, a rounded fill and border with text) in a sticky header and after it in the page draws as Chrome composites it, and drawn again when released and pressed again; a page whose buttons take opacity and transform only while pressed opens",
+	"steps": [
+		{
+			"visible": ["New note", "Edit note", "Release", "Pill taps 0"],
+			"absent": ["Press"],
+			"title": "See-through"
+		},
+		{
+			"do": {
+				"tap": "Release"
+			},
+			"visible": ["New note", "Edit note", "Press"],
+			"absent": ["Release"]
+		},
+		{
+			"do": {
+				"tap": "Press"
+			},
+			"visible": ["New note", "Edit note", "Release"],
+			"absent": ["Press"]
+		}
+	]
+}

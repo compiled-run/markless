@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { consoleOwnerUid, consoleSessionProblem } from './console-session.mjs';
 import { recordPass, workingTree } from './pass-record.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -46,7 +47,7 @@ const JOB_POLICY = {
 		typecheck: { mode: 'fast' },
 		'typecheck-ts7': { mode: 'fast' },
 		// MARKLESS_CI_JSON_REPORT_DIR adds a JSON reporter beside the default one; the tests that run are unchanged.
-		unit: { mode: 'fast', vitestJsonReport: true, testSelection: true },
+		unit: { mode: 'fast', vitestJsonReport: true, testSelection: true, opensWindows: true },
 		'unit-budget': {
 			mode: 'ci-only',
 			reason: 'checks the Linux CPU and memory the unit shards measured in this CI run; a Mac run has no comparable numbers',
@@ -417,6 +418,7 @@ const runJobs = (workflow, options) => {
 	}
 
 	const browserReady = chromiumInstalled();
+	const noScreen = consoleSessionProblem(process.platform, consoleOwnerUid());
 	for (const job of selected) {
 		const missingTools = (job.policy.tools ?? []).filter((tool) => !which(tool));
 		if (missingTools.length) {
@@ -446,6 +448,12 @@ const runJobs = (workflow, options) => {
 				status: 'skipped',
 				note: 'the change selects no unit test',
 			});
+			continue;
+		}
+		if (noScreen && (job.policy.needsBrowser || job.policy.opensWindows) && !options.dryRun) {
+			console.error(`\n=== ${job.id}\n${noScreen}`);
+			results.push({ id: job.id, status: 'failed', note: 'nobody is logged in at the screen' });
+			if (options.bail) break;
 			continue;
 		}
 		const started = Date.now();

@@ -1,0 +1,8 @@
+[Unit]
+Description=Free the phones when the PC is paused for games
+
+[Path]
+PathExists=/opt/markless-runner/stop
+
+[Install]
+WantedBy=multi-user.target

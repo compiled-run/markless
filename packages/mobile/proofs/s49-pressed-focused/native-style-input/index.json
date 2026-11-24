@@ -1,0 +1,131 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Pressed",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page mk-s2yet6"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-s2yet6"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Pressed and focused"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "press mk-s2yet6"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Press and hold"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-s2yet6"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Pressed 0"
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "label",
+			"parent": "h0",
+			"attributes": {
+				"class": "row mk-s2yet6"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "input",
+			"parent": "h5",
+			"attributes": {
+				"type": "checkbox",
+				"class": "agree mk-s2yet6"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Agree"
+		},
+		{
+			"kind": "element",
+			"id": "h7",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-s2yet6"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h7:text0",
+			"parent": "h7",
+			"text": "Not agreed",
+			"textByState": [
+				{
+					"when": {
+						"state:agreed": false
+					},
+					"value": "Not agreed"
+				},
+				{
+					"when": {
+						"state:agreed": true
+					},
+					"value": "Agreed"
+				}
+			]
+		}
+	],
+	"css": "@font-face {\n\tfont-family: 'Harbour Lato';\n\tsrc: url('./fonts/Lato-Regular.woff2') format('woff2');\n\tfont-weight: 400;\n}\n\nbody {\n\tmargin: 0;\n\tfont-family: 'Harbour Lato';\n\tcolor: #1d2a24;\n\tbackground: #f6f3ea;\n}\n\n.page.mk-s2yet6 {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\th1.mk-s2yet6 {\n\t\t\t\tfont-size: 28px;\n\t\t\t\tfont-weight: 400;\n\t\t\t}\n\t\t\t.press.mk-s2yet6 {\n\t\t\t\twidth: 200px;\n\t\t\t\tpadding: 12px 16px;\n\t\t\t\tborder: 2px solid #2f6b4f;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #2f6b4f;\n\t\t\t}\n\t\t\t.press.mk-s2yet6:active {\n\t\t\t\tbackground: #2f6b4f;\n\t\t\t\tcolor: #ffffff;\n\t\t\t}\n\t\t\t.row.mk-s2yet6 {\n\t\t\t\tdisplay: flex;\n\t\t\t\talign-items: center;\n\t\t\t\tgap: 12px;\n\t\t\t\tmargin-top: 24px;\n\t\t\t}\n\t\t\t.agree.mk-s2yet6:focus {\n\t\t\t\toutline: 3px solid #c9a227;\n\t\t\t\toutline-offset: 2px;\n\t\t\t}",
+	"states": [
+		{
+			"cell": "state:agreed",
+			"domain": [
+				false,
+				true
+			],
+			"initial": false
+		}
+	],
+	"fonts": [
+		{
+			"url": "./fonts/Lato-Regular.woff2",
+			"file": "../styles/fonts/Lato-Regular.woff2"
+		}
+	]
+}

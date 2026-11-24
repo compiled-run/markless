@@ -1,0 +1,48 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Home",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "home mk-1jbncfw"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "heading mk-1jbncfw"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Pantry"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0",
+			"element": "a",
+			"parent": "h0",
+			"attributes": {
+				"class": "next mk-1jbncfw",
+				"href": "/notes/[id]"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:0:text0",
+			"parent": "component-edge:0",
+			"text": "Open groceries"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.home.mk-1jbncfw {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #f4f1ea;\n\t\t\t}\n\t\t\t.heading.mk-1jbncfw {\n\t\t\t\tfont-size: 28px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n\t\t\t.next.mk-1jbncfw {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 12px 18px;\n\t\t\t\tborder: 2px solid #1d1b16;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffd166;\n\t\t\t\tcolor: #1d1b16;\n\t\t\t\tfont-size: 18px;\n\t\t\t\ttext-decoration: none;\n\t\t\t}",
+	"states": []
+}

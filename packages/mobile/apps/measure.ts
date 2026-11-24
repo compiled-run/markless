@@ -10,6 +10,7 @@ import type { CompilerDiagnostic } from '@markless/compiler';
 import { buildRouteManifestFromFileIds } from '@markless/router';
 import { compileNativeApp } from '../src/compile.ts';
 import { dragonStyleExport } from '../src/style-export.ts';
+import { nativeStyleInputAt } from '../src/style-input.ts';
 import { readAppConfig, readRelativeStylesheet, readWorkspaceModule } from '../src/harness/rung.ts';
 
 export const APPS = ['notes', 'shop', 'checkin'] as const;
@@ -107,9 +108,12 @@ export async function measureApp(app: string, styles = false): Promise<ScreenRes
 		try {
 			for (const input of build.styleInputs) {
 				const file = join(scratch, `${styledBy.size}.json`);
-				writeFileSync(file, JSON.stringify(input.input));
+				writeFileSync(
+					file,
+					JSON.stringify(nativeStyleInputAt(input.input, (font) => relative(scratch, resolve(repoRoot, font)))),
+				);
 				try {
-					dragonStyleExport(file);
+					await dragonStyleExport(file);
 					styledBy.set(input.pattern, true);
 				} catch (error) {
 					const reasons = (error as Error).message.split('\n').slice(1).join(' ').trim();

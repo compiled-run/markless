@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: f3-families
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Preferences
 - assertVisible: Wi-Fi
 - assertVisible: Bluetooth

@@ -262,6 +262,7 @@ export type ResumeArmBranchRecord = {
 	readonly takenArm?: number;
 	readonly symbolId?: string;
 	readonly armTests?: ReadonlyArray<unknown>;
+	readonly armSeeds?: ResumeBranchRecord['armSeeds'];
 	readonly armComponents?: ReadonlyArray<ReadonlyArray<string>>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
 	// A composed child's branch keeps the `dom-order-comment` anchors its own

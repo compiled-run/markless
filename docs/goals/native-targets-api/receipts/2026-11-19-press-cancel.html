@@ -1,0 +1,9 @@
+<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>press</title>
+<style>body{font:16px system-ui;margin:12px;height:300vh}#wrap{padding:20px;background:#eee}button{font-size:22px;padding:24px 40px}#out{font-size:9px;white-space:pre-wrap;position:fixed;bottom:0;left:0;right:0;height:40vh;overflow:hidden;background:#fff}</style></head>
+<body><div id="wrap"><button id="b">Press</button></div><pre id="out"></pre>
+<script>
+const out=document.getElementById('out'); let seq=0; const log=[];
+function send(r){ r.n=seq++; log.push(r); fetch('/log',{method:'POST',body:JSON.stringify(r)}).catch(()=>{}); out.textContent=log.slice(-30).map(x=>JSON.stringify(x)).join('\n'); }
+for (const id of ['b','wrap']) { const el=document.getElementById(id); for (const type of ['pointerdown','pointerup','pointercancel','pointerover','pointerout','pointerenter','pointerleave','click','contextmenu']) el.addEventListener(type,(e)=>{ if (e.currentTarget!==e.target && !type.endsWith('enter') && !type.endsWith('leave')) return; send({el:id,type,target:e.target.id,pointerType:e.pointerType,t:Math.round(e.timeStamp)}); }); }
+send({type:'ready',ua:navigator.userAgent});
+</script></body></html>

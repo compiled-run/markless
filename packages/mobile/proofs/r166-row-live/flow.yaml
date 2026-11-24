@@ -1,0 +1,25 @@
+appId: ${APP_ID}
+name: r166-row-live
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Uploads
+- assertVisible: Photo saved
+- assertVisible: Report saved
+- assertNotVisible: Report failed
+- tapOn: Fail report
+- assertVisible: Report failed
+- assertNotVisible: Report saved
+- assertVisible: Photo saved
+- assertVisible: Report failed
+- assertNotVisible: Report saved
+- tapOn: Fail report
+- assertVisible: Report saved
+- assertNotVisible: Report failed
+- assertVisible: Photo saved
+- assertVisible: Report saved
+- assertNotVisible: Report failed

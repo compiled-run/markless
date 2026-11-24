@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j19-client-build
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Client build
 - assertVisible: "Build: not asked"
 - assertVisible: "Greeting: none"

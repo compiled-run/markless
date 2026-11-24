@@ -2,7 +2,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { allRungFolders } from '../../proofs/ladder.ts';
+import { allRungFolders, PHONE_REFUSED_RUNGS } from '../../proofs/ladder.ts';
 import { PROOF_PLATFORMS, type ProofPlatform } from '../harness/proof-app.ts';
 import type { ProofReport } from '../harness/report.ts';
 import { affectedRungs, changedPaths, defaultBase } from './affected.ts';
@@ -32,10 +32,12 @@ import {
 import { checkoutFacts, commitsBehind, describeCheckout } from './refresh.ts';
 import { spawnRunner } from './spawn-runner.ts';
 
+const REFUSED = new Set(Object.keys(PHONE_REFUSED_RUNGS));
 const USAGE = `usage: phones <command>
 
-  start [--ios <simulator>]... [--android <avd>@<port>]...
-                         start the machine's runner and boot its phones (default: ios markless-runner, android markless_runner@5570)
+  start [--ios <simulator>]... [--android <avd>@<port>[@<ssh host>]]...
+                         start the machine's runner and boot its phones (default: ios markless-runner, android markless_runner@5570);
+                         @<ssh host> is an emulator on another machine, run through its agent (README: Android on another machine)
   stop [--phones]        stop the runner (and shut its phones down)
   status                 the phones and every job that has not finished
   submit [--platform ios|android] [--chunk <n>] [--wait] [--no-reuse] (--all | --affected [--base <rev>] | --failed <job> | <rung>...)
@@ -48,10 +50,7 @@ const USAGE = `usage: phones <command>
   affected [--base <rev> | --files <repo path>...]
                          the rungs a change since <rev> (default origin/cw/native-integration) can affect, and why
 
-Runner files: ${runnerHome()} (MARKLESS_PHONES_HOME). Ladder rungs refused by name never run: ${'y4-sheet-beside-drawer'}.`;
-
-/** Rungs the ladder lists that no phone build exists for yet (named in the conformance report). */
-const REFUSED = new Set(['y4-sheet-beside-drawer']);
+Runner files: ${runnerHome()} (MARKLESS_PHONES_HOME). Ladder rungs refused by name never run: ${[...REFUSED].join(', ')}.`;
 const ladder = () => allRungFolders().filter((name) => !REFUSED.has(name));
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

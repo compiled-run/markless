@@ -8,8 +8,8 @@ import WebKit
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"canvas", "details", "embed", "object",
-	"picture", "summary", "video",
+	"canvas", "embed", "object",
+	"picture", "video",
 ]
 
 /// Where an instance is built: its row (`@key`, empty outside lists), the names its expressions see, and what encloses it.
@@ -32,6 +32,8 @@ struct TextLook: Equatable {
 	var shift: String?
 	var highlight = false
 	var preformatted = false
+	/// Inside a `<center>`: blocks sit in the middle of the line and text is centred (`text-align: -webkit-center`).
+	var centered = false
 
 	func applying(_ style: NativeDefaultStyle?) -> TextLook {
 		guard let style else { return self }
@@ -44,6 +46,7 @@ struct TextLook: Equatable {
 		next.shift = style.shift ?? shift
 		next.highlight = highlight || style.highlight
 		next.preformatted = preformatted || style.preformatted
+		next.centered = centered || style.center
 		return next
 	}
 
@@ -94,6 +97,33 @@ final class Paragraph {
 /// A `<pre>` paragraph's sideways scroller: its line is never wrapped.
 final class PreformattedScroll: UIScrollView {}
 
+/// The page's scroll view: a drag that starts on a button or field scrolls the page, as it does in Safari; a tap still presses it.
+final class PageScroll: UIScrollView {
+	override func touchesShouldCancel(in view: UIView) -> Bool { true }
+
+	/// A touch goes to the box drawn on top, as a browser's does: siblings by zPosition (a positioned or sticky box over the flow
+	/// after it), later ones first, where UIKit's own walk goes by subview order alone.
+	override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+		guard isUserInteractionEnabled, !isHidden, alpha > 0.01, self.point(inside: point, with: event) else { return nil }
+		return PageScroll.topmost(in: self, at: point, with: event) ?? self
+	}
+
+	private static func topmost(in view: UIView, at point: CGPoint, with event: UIEvent?) -> UIView? {
+		let order = view.subviews.enumerated().sorted { ($0.element.layer.zPosition, $0.offset) > ($1.element.layer.zPosition, $1.offset) }
+		for (_, child) in order {
+			let p = child.convert(point, from: view)
+			if type(of: child) == UIView.self {
+				guard child.isUserInteractionEnabled, !child.isHidden, child.alpha > 0.01 else { continue }
+				if let hit = topmost(in: child, at: p, with: event) { return hit }
+				if child.point(inside: p, with: event) { return child }
+			} else if let hit = child.hitTest(p, with: event) {
+				return hit
+			}
+		}
+		return nil
+	}
+}
+
 /// An inline `<svg>`: draws the shapes compiled when the app was built, then the shapes inside it that come from components,
 /// whose outline the engine gives while the app runs, fitted into its box as the web fits the viewBox.
 final class DrawingView: UIView {
@@ -139,9 +169,24 @@ final class DrawingView: UIView {
 		for (shape, p) in drawing.shapes.map({ ($0, $0.path) }) + live.map({ ($0.shape, $0.path) }) {
 			let path = Self.path(p)
 			context.saveGState()
-			for clip in shape.clip {
+			for (index, clip) in shape.clip.enumerated() {
 				context.addPath(Self.path(clip))
+				context.clip(using: shape.clipEvenOdd.indices.contains(index) && shape.clipEvenOdd[index] ? .evenOdd : .winding)
+			}
+			// A blur draws the shape far off to the side and only its shadow, offset back, inside the filter region.
+			var shadow: ((UIColor) -> UIColor)? = nil
+			if let blur = shape.blur {
+				context.addPath(Self.path(blur.region))
 				context.clip(using: .winding)
+				let ctm = context.ctm, scale = contentScaleFactor, far: CGFloat = 100_000
+				let linear = CGAffineTransform(a: ctm.a, b: ctm.b, c: ctm.c, d: ctm.d, tx: 0, ty: 0)
+				let shift = CGPoint(x: far, y: 0).applying(linear.inverted())
+				let sigma = blur.deviation * sqrt(abs(ctm.a * ctm.d - ctm.b * ctm.c))
+				context.translateBy(x: shift.x, y: shift.y)
+				shadow = { paint in
+					context.setShadow(offset: CGSize(width: -far / scale, height: 0), blur: 2 * sigma / scale, color: paint.cgColor)
+					return .black
+				}
 			}
 			if let t = shape.transform { context.concatenate(CGAffineTransform(a: t[0], b: t[1], c: t[2], d: t[3], tx: t[4], ty: t[5])) }
 			if let text = shape.text {
@@ -151,17 +196,33 @@ final class DrawingView: UIView {
 			}
 			if let fill = shape.fill {
 				context.addPath(path)
-				context.setFillColor(color(fill).cgColor)
-				context.fillPath(using: shape.evenOdd ? .evenOdd : .winding)
+				if case let .gradient(gradient) = fill {
+					context.saveGState()
+					context.clip(using: shape.evenOdd ? .evenOdd : .winding)
+					Self.draw(gradient, in: context)
+					context.restoreGState()
+				} else {
+					context.setFillColor((shadow?(color(fill)) ?? color(fill)).cgColor)
+					context.fillPath(using: shape.evenOdd ? .evenOdd : .winding)
+				}
 			}
 			if let stroke = shape.stroke, shape.width > 0 {
 				context.addPath(path)
-				context.setStrokeColor(color(stroke).cgColor)
 				context.setLineWidth(shape.width)
 				context.setLineCap(shape.cap == "round" ? .round : shape.cap == "square" ? .square : .butt)
 				context.setLineJoin(shape.join == "round" ? .round : shape.join == "bevel" ? .bevel : .miter)
 				context.setMiterLimit(shape.miterLimit)
-				context.strokePath()
+				if let dash = shape.dash { context.setLineDash(phase: shape.dashOffset, lengths: dash.map { CGFloat($0) }) }
+				if case let .gradient(gradient) = stroke {
+					context.saveGState()
+					context.replacePathWithStrokedPath()
+					context.clip()
+					Self.draw(gradient, in: context)
+					context.restoreGState()
+				} else {
+					context.setStrokeColor((shadow?(color(stroke)) ?? color(stroke)).cgColor)
+					context.strokePath()
+				}
 			}
 			context.restoreGState()
 		}
@@ -277,6 +338,24 @@ final class DrawingView: UIView {
 		switch paint {
 		case .currentColor: currentColor
 		case let .color(c): UIColor(red: c.r / 255, green: c.g / 255, blue: c.b / 255, alpha: c.alpha / 255)
+		case .gradient: .clear
+		}
+	}
+
+	/// Fills the clip with a gradient, padded past its ends, its colours blended in sRGB as the browser blends them.
+	private static func draw(_ g: NativeGradient, in context: CGContext) {
+		let components = g.stops.flatMap { [$0.color.r / 255, $0.color.g / 255, $0.color.b / 255, $0.color.alpha / 255].map { CGFloat($0) } }
+		guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+			let gradient = CGGradient(colorSpace: space, colorComponents: components, locations: g.stops.map { CGFloat($0.offset) }, count: g.stops.count)
+		else { return }
+		if let t = g.transform { context.concatenate(CGAffineTransform(a: t[0], b: t[1], c: t[2], d: t[3], tx: t[4], ty: t[5])) }
+		let pad: CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+		if let l = g.linear {
+			context.drawLinearGradient(gradient, start: CGPoint(x: l[0], y: l[1]), end: CGPoint(x: l[2], y: l[3]), options: pad)
+		} else if let r = g.radial {
+			context.drawRadialGradient(
+				gradient, startCenter: CGPoint(x: r[0], y: r[1]), startRadius: r[2], endCenter: CGPoint(x: r[3], y: r[4]), endRadius: r[5],
+				options: pad)
 		}
 	}
 }
@@ -287,7 +366,7 @@ final class ViewTree {
 	let root = UIView()
 	/// The page's own scroll view, as a browser's viewport: it fills the screen, insets its content by the safe areas and
 	/// scrolls it under the bars.
-	let page = UIScrollView()
+	let page = PageScroll()
 	let keyboard: KeyboardDismisser
 	private let runtime: NativeRuntime
 	private var layout: StyleLayout?
@@ -321,10 +400,30 @@ final class ViewTree {
 	private(set) var sheets: [String: SystemSheet] = [:]
 	/// Sheets built since the last stacking pass, whose content an unstyled page still has to stack.
 	private var unstacked: Set<String> = []
+	/// POSX-s scroll: Dragon's `runMarklessSticky`, set by the controller; without it sticky boxes stay where the layout put them.
+	var stickyShift: ((String) -> String)?
+	private var stickyWatch: NSKeyValueObservation?
+	/// Each sticky view's center as the layout placed it, and Dragon's shift for it at scroll offset 0 (already in that place).
+	private var stickyRest: [String: (center: CGPoint, dx: Double, dy: Double)] = [:]
 	/// The controller that presents the page's system sheets.
 	weak var presenter: UIViewController?
 	private var anchors = Set<ObjectIdentifier>()
 	private(set) var assignment: Int
+	/// The entry the page shows: its assignment, or the interaction state (`:active`, `:focus`) Dragon's runtime selects in it.
+	private(set) var shown: Int
+	/// Dragon's translated library cases (`DragonPlan.library`), which run `rt-interaction`; nil without Dragon's plan module.
+	var library: ((String) -> String)?
+	/// Called after a touch shows another entry, so the screen repaints its canvas and the layout dump follows.
+	var onShown: (() -> Void)?
+	/// Called after the page moves to another assignment or entry, so the host lays it out if it has not yet.
+	var onEntries: (() -> Void)?
+	/// The pointer steps since the page opened, by the node each names, replayed through the current level's tables.
+	private var interactionSteps: [(op: String, node: String?)] = []
+	/// The list row (`@<key>` of its copies) the finger is pressing, and the one the focused element is in: an interaction state
+	/// styles only those rows' copies.
+	private var pressedRow: String?
+	private var focusedRow: String?
+	private var interactionWatcher: InteractionWatcher?
 	private let bodyLayer = CALayer()
 	/// Each styled sheet's layout per resting height, the height it rests at, and each height's current assignment.
 	private var sheetStyles: [String: (heights: [(snapPoint: Double, layout: StyleLayout)], height: Int, assignments: [Int])] = [:]
@@ -350,6 +449,10 @@ final class ViewTree {
 	/// Lists and the marker kind their items show; each item's marker label.
 	private var listMarkers: [ObjectIdentifier: String] = [:]
 	private var itemMarkers: [ObjectIdentifier: UILabel] = [:]
+	/// Containers whose children sit in the middle of the line (inside a `<center>`).
+	private var centered: Set<ObjectIdentifier> = []
+	/// Each summary's disclosure triangle, in its start inset.
+	private var disclosures: [ObjectIdentifier: UILabel] = [:]
 	/// Table structure: tables, their rows and the rows' cells.
 	private var tables = Set<ObjectIdentifier>()
 	private var tableRows = Set<ObjectIdentifier>()
@@ -362,6 +465,12 @@ final class ViewTree {
 	private var topLayer: (layer: TopLayerView, home: UIView, index: Int)?
 	/// The scroll view each scroll container hosts its children in.
 	private var scrollViews: [String: ContainerScrollView] = [:]
+	/// Each box's shadow layers, while it has a shadow.
+	private var shadows: [String: ShadowLayers] = [:]
+	/// Each outlined box's outline view, in the view of its outline's host.
+	private var outlines: [String: OutlineView] = [:]
+	/// The view each box that clips overflow past its borders hosts its children in.
+	private var clipViews: [String: PaddingClipView] = [:]
 	/// What a stopped submit says, shown until the person's next action.
 	private var message: UILabel?
 	private var touches: TouchWatcher?
@@ -370,6 +479,8 @@ final class ViewTree {
 	private(set) var overlays: OverlayHost!
 	/// Each shown pre-composited opacity group's overlay, by instance id.
 	private var groups: [String: GroupOverlayView] = [:]
+	/// Each box moved into its stacking parent's view, by instance id: the view it was built in and the view that followed it there.
+	private var restacked: [String: Restacked] = [:]
 
 	init(
 		runtime: NativeRuntime, layout: StyleLayout?, sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:],
@@ -388,6 +499,7 @@ final class ViewTree {
 		self.ask = ask
 		keyboard = KeyboardDismisser(page)
 		assignment = layout?.start ?? 0
+		shown = assignment
 		let payload = runtime.payload
 		let nodes = Dictionary(uniqueKeysWithValues: payload.nodes.map { ($0.id, $0) })
 		self.nodes = nodes
@@ -444,6 +556,7 @@ final class ViewTree {
 		if layout != nil {
 			root.layer.insertSublayer(bodyLayer, at: 0)
 			paintBody()
+			restackShadows()
 		}
 	}
 
@@ -488,6 +601,7 @@ final class ViewTree {
 	func relayout(_ new: StyleLayout) throws {
 		guard layout != nil else { return }
 		layout = new
+		reselect()
 		try repaint { _ in true }
 		paintBody()
 		try sizePage()
@@ -497,13 +611,43 @@ final class ViewTree {
 	private func sizePage() throws {
 		guard let layout else { return }
 		let viewport = layout.viewport
-		let range = layout.pageScrolls[assignment]
+		let range = layout.pageScrolls[shown]
 		page.contentSize = CGSize(width: viewport.width + (range?.maxX ?? 0), height: viewport.height + (range?.maxY ?? 0))
 		root.frame = CGRect(origin: .zero, size: page.contentSize)
+		try restSticky()
 		guard range == nil else { return }
 		let drawn = root.subviews.reduce(CGRect.null) { $0.union($1.frame) }
 		if drawn.maxX > viewport.width + 0.5 || drawn.maxY > viewport.height + 0.5 {
 			throw HostError("the page is \(drawn.maxY) points tall on a \(viewport.height) point screen, and Dragon does not decide its scroll range: \(layout.pageScrollUndecided ?? "the style export has no page range")")
+		}
+	}
+
+	/// The sticky views' places as just laid out, then moved for the page's current scroll offset.
+	private func restSticky() throws {
+		stickyRest = [:]
+		guard let layout, let run = stickyShift else { return }
+		for (id, d) in try layout.stickyShifts(assignment: assignment, x: 0, y: 0, run: run) {
+			guard let view = elements[id] else { continue }
+			stickyRest[id] = (view.center, d.dx, d.dy)
+		}
+		if stickyWatch == nil && !stickyRest.isEmpty {
+			stickyWatch = page.observe(\.contentOffset) { [weak self] _, _ in MainActor.assumeIsolated { self?.stick() } }
+		}
+		stick()
+	}
+
+	/// Each sticky view moved by Dragon's shift at the page's scroll offset, less the shift its laid-out place already holds.
+	private func stick() {
+		guard let layout, let run = stickyShift, !stickyRest.isEmpty else { return }
+		do {
+			// The scrollport starts below the bars the page scrolls under, as the web's viewport starts at the top of the page.
+			let x = Double(page.contentOffset.x + page.adjustedContentInset.left), y = Double(page.contentOffset.y + page.adjustedContentInset.top)
+			for (id, d) in try layout.stickyShifts(assignment: assignment, x: x, y: y, run: run) {
+				guard let rest = stickyRest[id], let view = elements[id] else { continue }
+				view.center = CGPoint(x: rest.center.x + CGFloat(d.dx - rest.dx), y: rest.center.y + CGFloat(d.dy - rest.dy))
+			}
+		} catch {
+			fatalError("Markless iOS host: \(error)")
 		}
 	}
 
@@ -520,7 +664,12 @@ final class ViewTree {
 		let watcher = TouchWatcher { [weak self] in self?.dismissMessage() }
 		screen.addGestureRecognizer(watcher)
 		touches = watcher
-		do { try overlays.mount(in: screen) } catch { fatalError("Markless iOS host: \(error)") }
+		if layout?.interaction.isEmpty == false {
+			let interaction = InteractionWatcher { [weak self] phase, point in self?.interacted(phase, at: point) }
+			screen.addGestureRecognizer(interaction)
+			interactionWatcher = interaction
+		}
+		do { try overlays.mount(in: screen) } catch { hostFailed("\(error)") }
 		guard layout == nil else { return }
 		root.translatesAutoresizingMaskIntoConstraints = false
 		let content = page.contentLayoutGuide
@@ -538,6 +687,8 @@ final class ViewTree {
 		dismissMessage()
 		if let touches { touches.view?.removeGestureRecognizer(touches) }
 		touches = nil
+		if let interactionWatcher { interactionWatcher.view?.removeGestureRecognizer(interactionWatcher) }
+		interactionWatcher = nil
 		overlays.unmount()
 		closeSheets()
 		page.removeFromSuperview()
@@ -575,14 +726,14 @@ final class ViewTree {
 	}
 
 	/// The colour behind the page in the current assignment: the export's canvas, else the web canvas's white.
-	var canvas: UIColor? { layout.map { $0.canvases[assignment].map(uiColor) ?? .white } }
+	var canvas: UIColor? { layout.map { $0.canvases[shown].map(uiColor) ?? .white } }
 
 	/// body's own background, under every view of the page, where the current assignment gives it one.
 	private func paintBody() {
 		CATransaction.begin()
 		CATransaction.setDisableActions(true)
 		defer { CATransaction.commit() }
-		guard let body = layout?.bodies[assignment] else {
+		guard let body = layout?.bodies[shown] else {
 			bodyLayer.isHidden = true
 			return
 		}
@@ -650,8 +801,12 @@ final class ViewTree {
 				guard let tick = ticks[node], let view = elements[node] else { throw HostError("journal names checkbox \(node), which is not shown") }
 				ticks[node] = (tick.radio, checked)
 				drawTick(node, view)
-			case let .property(node, _, value):
+			case let .property(node, name, value):
 				if elements[node] is AbsentField { continue }
+				if name == "files", let picker = elements[node] as? FileInputView {
+					picker.show(names: value)
+					continue
+				}
 				if let area = elements[node] as? TextArea {
 					area.text = value
 					continue
@@ -671,6 +826,7 @@ final class ViewTree {
 				}
 				if flowing.contains(node) {
 					attributes[node, default: [:]][name] = value
+					if let button = contexts[node]?.button { refreshLabel(of: button) }
 					continue
 				}
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
@@ -689,6 +845,10 @@ final class ViewTree {
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
 				root.layoutIfNeeded()
 				// As on the web: scrollIntoView aligns the element to the start; focus brings it into view unless told not to.
+				if command == "showPicker" {
+					(view as? FileInputView)?.open()
+					break
+				}
 				if command == "scrollIntoView" {
 					bringIntoView(view, block: scrollIntoViewAlign.block, inline: scrollIntoViewAlign.inline)
 					break
@@ -732,6 +892,7 @@ final class ViewTree {
 			case let .state(cell, value):
 				if let layout, cell != StyleBands.state || layout.stateCells.contains(cell) {
 					assignment = try layout.next(from: assignment, cell: cell, value: value)
+					reselect()
 				}
 				for (sheet, styles) in sheetStyles {
 					var moved = styles
@@ -784,6 +945,7 @@ final class ViewTree {
 		refreshRelations()
 		refreshSelects()
 		if layout == nil { alignTables() }
+		restackShadows()
 		markGroupsDirty()
 		overlays.flush()
 		announce(liveChanges)
@@ -809,11 +971,14 @@ final class ViewTree {
 		return nil
 	}
 
-	/// How a live region speaks now: as built, or, when its attributes follow state, as they read at this moment.
-	private func liveNow(_ node: String) -> NativeLive? {
-		guard let follows = nodes[node]?.liveFollows else { return nodes[node]?.live }
-		guard case let .string(politeness) = try? runtime.evaluate(follows.politeness) else { return nil }
-		return NativeLive(assertive: politeness == "assertive", atomic: (try? runtime.evaluate(follows.atomic)) == .bool(true))
+	/// How a live region (a row's copy keeps its `@key`) speaks now: as built, or, when its attributes follow state, as they
+	/// read at this moment in its own row.
+	private func liveNow(_ region: String) -> NativeLive? {
+		let base = region.split(separator: "@").first.map(String.init) ?? region
+		guard let node = nodes[base], let follows = node.liveFollows else { return nodes[base]?.live }
+		let scope = (try? runtime.instances(of: node).first { $0.id == region }?.scope) ?? .empty
+		guard case let .string(politeness) = try? runtime.evaluate(follows.politeness, in: scope) else { return nil }
+		return NativeLive(assertive: politeness == "assertive", atomic: (try? runtime.evaluate(follows.atomic, in: scope)) == .bool(true))
 	}
 
 	/// Each live region a journal changed, spoken once: whole when atomic, else the text that changed.
@@ -825,8 +990,7 @@ final class ViewTree {
 			changed[region, default: []].append(text)
 		}
 		for region in order {
-			let base = region.split(separator: "@").first.map(String.init) ?? region
-			guard let live = liveNow(base), let view = elements[region] ?? paragraphs[region]?.view else { continue }
+			guard let live = liveNow(region), let view = elements[region] ?? paragraphs[region]?.view else { continue }
 			let spoken = live.atomic ? text(within: view) : changed[region, default: []].joined(separator: " ")
 			if !spoken.isEmpty { announce(spoken, live.assertive) }
 		}
@@ -884,7 +1048,8 @@ final class ViewTree {
 
 	/// The text an element shows, in view order: what `aria-labelledby` and `aria-describedby` read from it.
 	private func text(within view: UIView, skipping skipped: UIView? = nil) -> String {
-		if view === skipped { return "" }
+		// A list item's marker is a decoration (CSS's ::marker), not text of the element.
+		if view === skipped || decorations.contains(ObjectIdentifier(view)) { return "" }
 		if let label = view as? UILabel { return label.text ?? "" }
 		return view.subviews.map { text(within: $0, skipping: skipped) }.filter { !$0.isEmpty }.joined(separator: " ")
 	}
@@ -903,6 +1068,8 @@ final class ViewTree {
 			if let hint = named("aria-describedby") { view.accessibilityHint = hint }
 			guard let target = current["for"], let control = elements[target] else { continue }
 			let own = attributes[target] ?? [:]
+			// A control hidden from assistive technology takes no name, and its label reads as the text it is.
+			if own["aria-hidden"] == "true" { continue }
 			let unnamed = own["aria-label"] == nil && own["aria-labelledby"] == nil
 			if unnamed { control.accessibilityLabel = text(within: view, skipping: control) }
 			if !control.isDescendant(of: view) { view.accessibilityElementsHidden = true }
@@ -911,17 +1078,26 @@ final class ViewTree {
 	}
 
 	/// Paints a view and puts it at its frame; inside a scroll container, frames count from the scroll view's padding box.
-	private func place(_ id: String, _ view: UIView, _ given: ResolvedStyle) throws {
-		var style = given
-		style.cornerRadius = try fittedRadius(id, given)
+	private func place(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws {
+		try restack(id, view, style)
 		// UIKit leaves frame undefined under a transform: the box is placed untransformed, then transformed at its new size.
 		if !CATransform3DIsIdentity(view.layer.transform) { view.layer.setAffineTransform(.identity) }
 		try paint(view, style, faces: faces)
 		if let label = view as? UILabel { drawLines(label, style) }
+		if let clip = clipViews[id] { clip.shape(style.childClip, in: view.bounds) }
+		else if style.childClip != nil, !(view is TextField), !(view is TextArea) { throw HostError("\(id) began clipping overflow past its borders after it was built") }
 		if let host = view.superview as? ContainerScrollView { view.frame.origin = CGPoint(x: view.frame.minX - host.inset.left, y: view.frame.minY - host.inset.top) }
+		try paintShadow(id, view, style)
+		try paintOutline(id, style)
 		let shown = style.frame != nil && !(view is AbsentField)
 		try applyTransform(id, view, shown ? style.transform : nil)
 		try paintGroup(id, view, shown ? style.group : nil)
+		if let opacity = shown ? style.opacity : nil {
+			guard let alpha8 = DragonPaint.opacityAlpha8 else { throw HostError("\(id): opacity needs Dragon's alpha byte, which this host does not link") }
+			view.alpha = CGFloat(try alpha8(opacity) / 255)
+		} else {
+			view.alpha = 1
+		}
 		markGroupsDirty()
 		guard let scroll = scrollViews[id] else {
 			if style.scroll != nil { throw HostError("\(id) became a scroll container after it was built") }
@@ -929,15 +1105,6 @@ final class ViewTree {
 		}
 		guard let s = style.scroll else { throw HostError("\(id) stopped being a scroll container after it was built") }
 		scroll.configure(s, in: view.bounds.size, cornerRadius: style.cornerRadius)
-	}
-
-	/// The box's corner radius in points as Chrome draws it: scaled down where adjacent corners would overlap (a 999px pill is
-	/// half its height). Core Animation draws a radius past half a side as nothing on screen and as a square in render(in:).
-	private func fittedRadius(_ id: String, _ style: ResolvedStyle) throws -> Double {
-		guard style.cornerRadius > 0, let frame = style.frame, let fit = DragonPaint.cornerRadii, let dpr = layout?.dpr else { return style.cornerRadius }
-		let radii = try fit(Array(repeating: (percent: false, value: style.cornerRadius), count: 8), frame.width * dpr, frame.height * dpr, dpr)
-		guard radii.count == 8, radii.allSatisfy({ $0 == radii[0] }) else { throw HostError("\(id): Dragon's corner radii \(radii) are not one uniform radius") }
-		return radii[0] / dpr
 	}
 
 	/// Shows a pre-composited opacity group's composite over its view, or takes it away.
@@ -989,11 +1156,64 @@ final class ViewTree {
 		},
 		overlays: { [unowned self] in Array(self.groups.values) })
 
-	/// Draws Dragon's lines over a label in a system face while its text is the one Dragon laid out; otherwise the label draws its own.
+	private func paintOutline(_ id: String, _ style: ResolvedStyle) throws {
+		guard let outline = style.outline else {
+			outlines.removeValue(forKey: id)?.removeFromSuperview()
+			return
+		}
+		guard let host = elements[outline.host] else { throw HostError("\(id): its outline is drawn in \(outline.host), which has no view") }
+		let view = outlines[id] ?? OutlineView()
+		outlines[id] = view
+		try view.apply(outline, in: host)
+	}
+
+	/// Views inserted beside a box since its shadow was placed go beneath that shadow again.
+	private func restackShadows() {
+		for (id, layers) in shadows { if let view = elements[id] { layers.restack(beneath: view) } }
+	}
+
+	private func paintShadow(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws {
+		guard let shadow = style.shadow else {
+			shadows.removeValue(forKey: id)?.remove()
+			return
+		}
+		if style.clipRect != nil { throw HostError("\(id): box-shadow on a box with a clip-path is not implemented on iOS") }
+		let layers = shadows[id] ?? ShadowLayers()
+		shadows[id] = layers
+		try layers.apply(shadow, to: view)
+	}
+
+	/// Moves a box whose stacking context paints it past ancestors with later siblings into the view of its `stackingParent`, where
+	/// its zPosition orders it among that context's boxes, and back to the view it was built in when it no longer is.
+	private func restack(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws {
+		guard style.frame != nil else { return }
+		if let parent = style.stackingParent {
+			guard let target = scrollViews[parent] ?? clipViews[parent] ?? elements[parent] else { throw HostError("\(id) paints in the order of \(parent), which has no view") }
+			if view.superview === target { return }
+			if restacked[id] == nil, let home = view.superview, let at = home.subviews.firstIndex(of: view) {
+				restacked[id] = Restacked(home: home, next: at + 1 < home.subviews.count ? home.subviews[at + 1] : nil)
+			}
+			view.removeFromSuperview()
+			// After the boxes moved there that paint below it, so hit testing, which walks subviews from the last, meets the topmost first.
+			let z = style.paintOrder.map { CGFloat($0.bucket) * 100_000 + CGFloat($0.rank) + 1 } ?? 0
+			let moved = Set(restacked.keys.compactMap { elements[$0].map(ObjectIdentifier.init) })
+			if let above = target.subviews.firstIndex(where: { moved.contains(ObjectIdentifier($0)) && $0.layer.zPosition > z }) {
+				target.insertSubview(view, at: above)
+			} else {
+				target.addSubview(view)
+			}
+		} else if let place = restacked.removeValue(forKey: id) {
+			guard let home = place.home else { return }
+			view.removeFromSuperview()
+			if let next = place.next, next.superview === home { home.insertSubview(view, belowSubview: next) } else { home.addSubview(view) }
+		}
+	}
+
+	/// Draws Dragon's lines over a label while its text is the one Dragon laid out; otherwise the label draws its own.
 	private func drawLines(_ label: UILabel, _ given: ResolvedStyle? = nil) {
 		let drawn = label.layer.sublayers?.first { $0 is GlyphLinesLayer } as? GlyphLinesLayer
 		guard let id = label.accessibilityIdentifier, let style = given ?? self.style(of: id), let lines = style.lines,
-			style.linesText == label.text, lines.allSatisfy({ $0.runs.allSatisfy { systemFaces[$0.face] != nil } })
+			style.linesText == label.text, lines.allSatisfy({ $0.runs.allSatisfy { systemFaces[$0.face] != nil || faces[$0.face] != nil } })
 		else {
 			if let drawn {
 				drawn.removeFromSuperlayer()
@@ -1014,6 +1234,7 @@ final class ViewTree {
 		layer.contentsScale = scale
 		layer.lines = lines
 		layer.faces = systemFaces
+		layer.webFaces = faces
 		layer.setNeedsDisplay()
 		label.textColor = .clear
 	}
@@ -1041,8 +1262,79 @@ final class ViewTree {
 			sheetStyles[sheet] = next
 		}
 		guard moved else { return }
+		reselect()
 		try repaint { _ in true }
 		try sizePage()
+	}
+
+	/// A touch on the page as Dragon's interaction runtime takes it: the element under the finger, then the state it selects.
+	private func interacted(_ phase: InteractionWatcher.Phase, at point: CGPoint) {
+		let node = phase == .cancelled ? nil : touchedNode(at: point)
+		switch phase {
+		case .began:
+			pressedRow = node?.row
+			interactionSteps.append(("touch-down", node?.id))
+		case .ended:
+			pressedRow = nil
+			focusedRow = node?.row
+			interactionSteps.append(("touch-up", node?.id))
+		case .cancelled:
+			pressedRow = nil
+			interactionSteps.append(("touch-cancel", nil))
+		}
+		let before = shown
+		reselect()
+		guard shown != before else { return }
+		do {
+			try repaint { _ in true }
+			paintBody()
+			try sizePage()
+		} catch {
+			fatalError("Markless iOS host: \(error)")
+		}
+		onShown?()
+	}
+
+	/// The payload node under `point` and, inside a list row, the row copy it is in.
+	private func touchedNode(at point: CGPoint) -> (id: String, row: String?)? {
+		guard let screen = page.superview, var view = screen.hitTest(point, with: nil) else { return nil }
+		let ids = Dictionary(elements.map { (ObjectIdentifier($0.value), $0.key) }, uniquingKeysWith: { a, _ in a })
+		while true {
+			if let id = ids[ObjectIdentifier(view)] {
+				let template = templates[id] ?? id
+				return (template, id.firstIndex(of: "@").map { String(id[id.index(after: $0)...]) })
+			}
+			guard let parent = view.superview else { return nil }
+			view = parent
+		}
+	}
+
+	/// The entry to show: the state `rt-interaction` selects over the steps in the assignment's level, or the assignment.
+	private func reselect() {
+		defer { onEntries?() }
+		shown = assignment
+		guard let layout, let library, layout.interaction.indices.contains(assignment) else { return }
+		let level = layout.interaction[assignment]
+		guard !level.entries.isEmpty else { return }
+		// A step names the nearest ancestor the level's tables address; one under none of them touches no element (-1).
+		let index = { (node: String?) -> Int in
+			var id = node
+			while let at = id {
+				if let found = level.addresses.firstIndex(of: at) { return found }
+				id = self.nodes[at]?.parent
+			}
+			return -1
+		}
+		let steps = interactionSteps.map { step -> String in
+			step.op == "touch-cancel" ? "[\"touch-cancel\"]" : "[\"\(step.op)\",\(index(step.node))]"
+		}
+		let line = "[\"rt-interaction\",\(level.tables),\(level.entries.count),[\(steps.joined(separator: ","))]]"
+		guard let records = try? JSONValue.parse(Data(library(line).utf8)), case let .array(out) = records, out.count == 2,
+			case .string("ok") = out[0], case let .array(trace) = out[1], case let .array(last)? = trace.last, last.count == 6,
+			case let .string(bits) = last[5], let pattern = UInt64(bits, radix: 16)
+		else { return }
+		let state = Double(bitPattern: pattern)
+		if state >= 0, Int(state) < level.entries.count { shown = level.entries[Int(state)] }
 	}
 
 	private func style(of id: String) -> ResolvedStyle? {
@@ -1051,8 +1343,11 @@ final class ViewTree {
 			guard let styles = sheetStyles[sheet] else { return nil }
 			return styles.heights[styles.height].layout.assignments[styles.assignments[styles.height]][template]
 		}
+		// An interaction state styles the row copy the touch was in; every other copy of that row keeps the assignment's look.
+		let row = id.firstIndex(of: "@").map { String(id[id.index(after: $0)...]) }
+		let entry = shown != assignment && id != template && row != pressedRow && row != focusedRow ? assignment : shown
 		// A row's copy has its own box once the page's rows are laid out; until then its template's.
-		return layout?.assignments[assignment][id] ?? layout?.assignments[assignment][template]
+		return layout?.assignments[entry][id] ?? layout?.assignments[entry][template]
 	}
 
 	private func repaint(where included: (String) -> Bool) throws {
@@ -1189,7 +1484,7 @@ final class ViewTree {
 						}
 					}
 					view = drawn
-				} else if element == "button" || element == "a" {
+				} else if element == "button" || element == "a" || element == "summary" {
 					if context.button != nil { throw HostError("<\(element)> \(id) is inside another control") }
 					let control = UIButton(type: .custom)
 					control.isAccessibilityElement = true
@@ -1243,7 +1538,7 @@ final class ViewTree {
 									onAction(NativeAction(event: .choose, host: choice.option))
 								}
 							}
-						} catch { fatalError("Markless iOS host: \(error)") }
+						} catch { hostFailed("\(error)") }
 					}
 					if layout == nil {
 						select.layer.borderWidth = 1
@@ -1264,11 +1559,22 @@ final class ViewTree {
 				} else if element == "input", ["checkbox", "radio"].contains(staticAttributes["type"]) {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					if !context.suffix.isEmpty { throw HostError("a checkbox in a list row (\(id)) has no iOS host support yet") }
-					let control = UIButton(type: .custom)
+					let control = CheckboxButton(type: .custom)
 					control.isAccessibilityElement = true
 					control.accessibilityTraits = staticAttributes["type"] == "checkbox" ? [.button, .toggleButton] : .button
 					ticks[id] = (staticAttributes["type"] == "radio", try runtime.isChecked(id))
 					view = control
+				} else if element == "input", staticAttributes["type"] == "file" {
+					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
+					let picker = FileInputView(unseen: staticAttributes["aria-hidden"] == "true")
+					picker.presenter = { [weak self] in self?.presenter }
+					picker.accept = staticAttributes["accept"] ?? ""
+					picker.multiple = staticAttributes["multiple"] != nil
+					// A choice reaches the page whether or not the input has a handler: a form's FormData reads it.
+					picker.onPick = { [onAction] files in onAction(NativeAction(event: .pick, host: id, files: files)) }
+					// Its button and summary sit side by side in its own stack view, which the stacking layout leaves alone.
+					leaves.insert(ObjectIdentifier(picker))
+					view = picker
 				} else if element == "input", staticAttributes["type"] == "range" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					view = RangeSlider()
@@ -1334,6 +1640,7 @@ final class ViewTree {
 				inner.heading = context.heading || headings.contains(element)
 				inner.look = context.look.applying(node.defaultStyle)
 				if layout == nil, let style = node.defaultStyle { applyBlockStyle(style, to: view) }
+				if layout == nil, inner.look.centered { centered.insert(ObjectIdentifier(view)) }
 				if layout == nil, element == "li", listMarkers[ObjectIdentifier(container)] != nil { addMarker(to: view) }
 				view.accessibilityIdentifier = id
 				elements[id] = view
@@ -1350,6 +1657,12 @@ final class ViewTree {
 						scroll.accessibilityIdentifier = "\(id):scroll"
 						view.addSubview(scroll)
 						scrollViews[id] = scroll
+					}
+					// A text field clips its value to the editor box itself; a view over it would take its touches.
+					if !(view is TextField), !(view is TextArea), style.childClip != nil || layout?.assignments.contains(where: { ($0[id] ?? $0[template])?.childClip != nil }) == true {
+						let clip = PaddingClipView()
+						view.addSubview(clip)
+						clipViews[id] = clip
 					}
 					try place(id, view, style)
 				}
@@ -1376,7 +1689,7 @@ final class ViewTree {
 					if let area = view as? TextArea { area.text = text ?? "" } else { (view as? UITextField)?.text = text }
 				}
 				var childIndex = 0
-				_ = try build(template, in: scrollViews[id] ?? view, at: &childIndex, inner)
+				_ = try build(template, in: scrollViews[id] ?? clipViews[id] ?? view, at: &childIndex, inner)
 				applyAttributes(id, view)
 				// The stacking layout sizes a control by its text; one with none (a switch's thumb) gets the 44 pt touch target.
 				if layout == nil, view is UIButton, text(within: view).isEmpty {
@@ -1426,7 +1739,7 @@ final class ViewTree {
 				if sheetStyles[template] != nil {
 					sheet.area = { [weak self] snapPoint in self?.sheetArea(template, at: snapPoint) }
 					sheet.onRest = { [weak self] snapPoint in
-						do { try self?.sheetRested(template, at: snapPoint) } catch { fatalError("Markless iOS host: \(error)") }
+						do { try self?.sheetRested(template, at: snapPoint) } catch { hostFailed("\(error)") }
 					}
 				} else if layout != nil {
 					throw HostError("system sheet \(id) is on a styled page but has no styles of its own")
@@ -1458,6 +1771,7 @@ final class ViewTree {
 				// An element that is not a button (a list row): a tap anywhere in it, its text included, presses it.
 				view.isUserInteractionEnabled = true
 				view.addGestureRecognizer(ActivateGesture { taps in onAction(NativeAction(event: .activate, host: id, detail: taps)) })
+			case (.input, is FileInputView): break
 			case let (.input, slider as RangeSlider):
 				slider.onInput = { value in onAction(NativeAction(event: .input, host: id, value: value)) }
 			case let (.commit, slider as RangeSlider):
@@ -1493,8 +1807,8 @@ final class ViewTree {
 			case (.input, _ as SelectButton):
 				// A select's change runs in the runtime when a choice is made (a `choose` action).
 				continue
-			case (.idle, _), (.visible, _), (.dismiss, _), (.close, _), (.keydown, _), (_, _) where event.event.isPointer:
-				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host, close and a keydown off a text field by the runtime.
+			case (.idle, _), (.visible, _), (.dismiss, _), (.close, _), (.keydown, _), (.animationstart, _), (.animationiteration, _), (.animationend, _), (.animationcancel, _), (_, _) where event.event.isPointer:
+				// Raised elsewhere: idle, visible and animation events by the screen's controller, dismiss and pointer events by the overlay host, close and a keydown off a text field by the runtime.
 				continue
 			case (.contextmenu, _):
 				// Safari on iOS raises no contextmenu for a long press, so neither does this host.
@@ -1521,6 +1835,8 @@ final class ViewTree {
 		}
 		labels.removeValue(forKey: id)?.removeFromSuperview()
 		scrollViews.removeValue(forKey: id)
+		shadows.removeValue(forKey: id)?.remove()
+		outlines.removeValue(forKey: id)?.removeFromSuperview()
 		paragraphs.removeValue(forKey: id)?.view.removeFromSuperview()
 		paragraphTexts.removeValue(forKey: id)
 		flowing.remove(id)
@@ -1529,6 +1845,7 @@ final class ViewTree {
 			view.removeFromSuperview()
 		}
 		contexts.removeValue(forKey: id)
+		restacked.removeValue(forKey: id)
 		templates.removeValue(forKey: id)
 		attributes.removeValue(forKey: id)
 	}
@@ -1536,6 +1853,8 @@ final class ViewTree {
 	/// Static and bound attributes as platform state; `class` reaches views only through the style export.
 	private func applyAttributes(_ id: String, _ view: UIView) {
 		let current = attributes[id] ?? [:]
+		// A control's name is read from its content, so an attribute inside it (hidden, aria-label) renames it.
+		defer { if let button = contexts[id]?.button, button !== view { refreshLabel(of: button) } }
 		if view is AbsentField { return }
 		if let slider = view as? RangeSlider {
 			slider.show(current)
@@ -1556,7 +1875,7 @@ final class ViewTree {
 			let src = current["src"]
 			// A photo the device took is a `file:` URL; any other src is a file the app packaged when it was built.
 			let packaged = src.flatMap { images[$0] }
-			let image = packaged?.data.flatMap { UIImage(data: $0) }
+			let image = packaged?.picture
 				?? src.flatMap { URL(string: $0) }.flatMap { $0.isFileURL ? UIImage(contentsOfFile: $0.path) : nil }
 			let natural = packaged.flatMap { p in p.width.flatMap { w in p.height.map { CGSize(width: w, height: $0) } } }
 			let length = { (name: String) in current[name].flatMap { Double($0.trimmingCharacters(in: .whitespaces)) } }
@@ -1594,6 +1913,7 @@ final class ViewTree {
 			}
 			view.accessibilityValue = current["aria-expanded"].map { $0 == "true" ? "expanded" : "collapsed" }
 		}
+		disclosures[ObjectIdentifier(view)]?.text = current["aria-expanded"] == "true" ? "\u{25BE}" : "\u{25B8}"
 		view.accessibilityElementsHidden = current["aria-hidden"] == "true"
 		// With a style export Dragon decides visibility (a hidden element has no frame); the stacking layout reads `hidden`.
 		if layout == nil, !dialogIds.contains(id) {
@@ -1601,16 +1921,43 @@ final class ViewTree {
 			let hidden = current["hidden"] != nil || view.superview is SelectButton
 			if view.isHidden != hidden {
 				view.isHidden = hidden
-				if let parent = view.superview, !(parent is UIButton || parent is OverlayCard) { stack(parent) }
+				if contexts[id]?.button != nil {
+					let labels = hideLabels(in: view, hidden)
+					stackTree(view)
+					if hidden {
+						for label in labels {
+							label.translatesAutoresizingMaskIntoConstraints = true
+							label.frame = .zero
+						}
+					}
+				}
+				if let parent = view.superview, !(parent is SelectButton || parent is OverlayCard) { stack(parent) }
 			}
+		}
+	}
+
+	/// A hidden element inside a control has no layout, as `display: none`: UIKit's automation tree lists a control's labels
+	/// at their frames whatever their `isHidden`, so each label under it is hidden and unplaced. One under a still-hidden
+	/// element stays so.
+	private func hideLabels(in view: UIView, _ hidden: Bool) -> [UILabel] {
+		view.subviews.filter { !decorations.contains(ObjectIdentifier($0)) && !leaves.contains(ObjectIdentifier($0)) }.flatMap { child -> [UILabel] in
+			if let label = child as? UILabel {
+				label.isHidden = hidden
+				return [label]
+			}
+			return child.isHidden ? [] : hideLabels(in: child, hidden)
 		}
 	}
 
 	private func drawTick(_ id: String, _ view: UIView) {
 		guard let tick = ticks[id], let button = view as? UIButton else { return }
+		button.accessibilityValue = tick.checked ? "1" : "0"
+		if let box = button as? CheckboxButton {
+			box.show(checked: tick.checked)
+			if box.themed { return }
+		}
 		let symbol = tick.radio ? (tick.checked ? "largecircle.fill.circle" : "circle") : (tick.checked ? "checkmark.square.fill" : "square")
 		button.setImage(UIImage(systemName: symbol), for: .normal)
-		button.accessibilityValue = tick.checked ? "1" : "0"
 	}
 
 	/// Each select shows its chosen option's label, as the web's closed `<select>` does.
@@ -1619,7 +1966,7 @@ final class ViewTree {
 			guard let select = view as? SelectButton, let template = templates[id] else { continue }
 			do {
 				select.show(try runtime.choices(of: template).first { $0.selected }?.label ?? "")
-			} catch { fatalError("Markless iOS host: \(error)") }
+			} catch { hostFailed("\(error)") }
 		}
 	}
 
@@ -1633,19 +1980,40 @@ final class ViewTree {
 			button.accessibilityLabel = label
 			return
 		}
-		// As the web names a button from its content: its text, and the label of an image or svg inside it.
+		// As the web names a button from its content: its shown text, and the label of an element, image or svg inside it.
 		func texts(_ view: UIView) -> [String] {
 			view.subviews.flatMap { child -> [String] in
-				if let label = child as? UILabel { return [label.text ?? ""] }
+				if let label = child as? UILabel {
+					if decorations.contains(ObjectIdentifier(label)) { return [] }
+					if let id = label.accessibilityIdentifier, let paragraph = paragraphs[id], paragraph.label === label { return [spokenName(of: paragraph)] }
+					return [label.text ?? ""]
+				}
+				let own = child.accessibilityIdentifier.flatMap { attributes[$0] }
+				if child.isHidden || own?["hidden"] != nil || own?["aria-hidden"] == "true" { return [] }
 				if child is DrawingView || child is UIImageView {
-					let own = child.accessibilityIdentifier.flatMap { attributes[$0] }
-					if own?["aria-hidden"] == "true" { return [] }
 					return [own?["aria-label"] ?? (child is UIImageView ? own?["alt"] : nil) ?? ""]
 				}
+				if let label = own?["aria-label"] { return [label] }
 				return texts(child)
 			}
 		}
-		button.accessibilityLabel = texts(button).joined()
+		button.accessibilityLabel = texts(button).joined().split(whereSeparator: \.isWhitespace).joined(separator: " ")
+	}
+
+	/// A paragraph's part of a control's name, as the web reads it: without hidden or aria-hidden phrase elements, and an
+	/// element's aria-label in place of its text.
+	private func spokenName(of paragraph: Paragraph) -> String {
+		func walk(_ template: String) -> String {
+			guard let node = nodes[template] else { return "" }
+			if node.isText { return paragraphTexts[template + paragraph.suffix] ?? "" }
+			if node.defaultStyle?.flow == .break { return " " }
+			let own = attributes[template + paragraph.suffix] ?? [:]
+			if own["hidden"] != nil || own["aria-hidden"] == "true" { return "" }
+			if let label = own["aria-label"] { return label }
+			let inner = (slots[template] ?? []).map(walk).joined()
+			return node.defaultStyle?.quotes == true ? "\u{201C}\(inner)\u{201D}" : inner
+		}
+		return paragraph.nodes.map(walk).joined()
 	}
 
 	private func stackTree(_ view: UIView) {
@@ -1664,6 +2032,7 @@ final class ViewTree {
 		var constraints: [NSLayoutConstraint] = []
 		var above = container.topAnchor
 		let indent = indents[ObjectIdentifier(container)] ?? 0
+		let middle = centered.contains(ObjectIdentifier(container))
 		var top = container
 		while let parent = top.superview { top = parent }
 		for child in stacked(container) {
@@ -1671,11 +2040,14 @@ final class ViewTree {
 			let wide = fullWidth.contains(ObjectIdentifier(child))
 			constraints += [
 				child.topAnchor.constraint(equalTo: above),
-				child.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: indent),
+				middle && !wide
+					? child.centerXAnchor.constraint(equalTo: container.centerXAnchor, constant: indent / 2)
+					: child.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: indent),
 				wide
 					? child.trailingAnchor.constraint(equalTo: container.trailingAnchor)
 					: child.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor),
 			]
+			if middle && !wide { constraints.append(child.leadingAnchor.constraint(greaterThanOrEqualTo: container.leadingAnchor, constant: indent)) }
 			if wide {
 				// As wide as the page allows: a box with no width of its own (a rule, a code block) takes the line.
 				let page = child.widthAnchor.constraint(equalTo: top.widthAnchor)
@@ -1776,6 +2148,7 @@ final class ViewTree {
 			])
 		}
 		if let marker = style.marker { listMarkers[id] = marker }
+		if style.disclosure { addDisclosure(to: view) }
 		switch style.table {
 		case "table":
 			tables.insert(id)
@@ -1784,6 +2157,24 @@ final class ViewTree {
 		case "cell": tableCells.insert(id)
 		default: break
 		}
+	}
+
+	/// A summary's triangle (`list-style: disclosure-closed inside`), in an inset before its content; it is not read.
+	private func addDisclosure(to summary: UIView) {
+		let marker = UILabel()
+		marker.isAccessibilityElement = false
+		marker.isUserInteractionEnabled = false
+		marker.translatesAutoresizingMaskIntoConstraints = false
+		marker.text = "\u{25B8}"
+		summary.addSubview(marker)
+		decorations.insert(ObjectIdentifier(marker))
+		disclosures[ObjectIdentifier(summary)] = marker
+		let glyphs = ["\u{25B8} ", "\u{25BE} "].map { ($0 as NSString).size(withAttributes: [.font: marker.font as Any]).width }
+		indents[ObjectIdentifier(summary)] = ceil(glyphs.max() ?? 0)
+		NSLayoutConstraint.activate([
+			marker.leadingAnchor.constraint(equalTo: summary.leadingAnchor),
+			marker.topAnchor.constraint(equalTo: summary.topAnchor),
+		])
 	}
 
 	/// A list item's marker, beside it in its list's inset; it is neither read nor part of the item's text.
@@ -1806,6 +2197,7 @@ final class ViewTree {
 		let label = UILabel()
 		label.isUserInteractionEnabled = false
 		label.numberOfLines = 0
+		if context.look.centered { label.textAlignment = .center }
 		label.accessibilityIdentifier = run[0] + context.suffix
 		if context.button != nil {
 			label.isAccessibilityElement = false
@@ -1938,6 +2330,16 @@ final class ViewTree {
 
 /// `<audio controls>`: a button reading "Play", or "Pause" while its file plays.
 @MainActor
+/// Where a box moved into its stacking parent's view was built: its home view and the view after it there.
+final class Restacked {
+	weak var home: UIView?
+	weak var next: UIView?
+	init(home: UIView, next: UIView?) {
+		self.home = home
+		self.next = next
+	}
+}
+
 final class AudioButton: UIButton, AVAudioPlayerDelegate {
 	private var player: AVAudioPlayer?
 	private var source: String?
@@ -2013,6 +2415,40 @@ final class SelectButton: UIButton {
 	func show(_ label: String) {
 		display.text = label
 		accessibilityValue = label
+	}
+
+	private let arrow = CAShapeLayer()
+
+	/// On a styled page: the label in Dragon's box for it, vertically centred, and Dragon's arrow stroked over the background
+	/// and under the border, as Chrome paints a menulist-button.
+	func paint(arrow paint: ResolvedStyle.SelectArrowPaint?, label: ResolvedStyle.SelectLabel?, faces: [String: UIFontDescriptor]) throws {
+		if let label {
+			guard let face = faces[label.fontFamily] else { throw HostError("font \(label.fontFamily) was not registered") }
+			display.font = UIFont(descriptor: face, size: label.fontSize)
+			if let color = label.color { display.textColor = uiColor(color) }
+			display.lineBreakMode = .byClipping
+			display.frame = CGRect(x: label.frame.x, y: label.frame.y, width: label.frame.width, height: label.frame.height)
+		}
+		display.isHidden = label == nil
+		guard let paint else {
+			arrow.removeFromSuperlayer()
+			return
+		}
+		let a = paint.arrow
+		let point = { (k: Int) in CGPoint(x: (a.originX + a.points[k]) / paint.scale, y: (a.originY + a.points[k + 1]) / paint.scale) }
+		let path = CGMutablePath()
+		path.move(to: point(0))
+		for k in stride(from: 2, to: a.points.count, by: 2) { path.addLine(to: point(k)) }
+		arrow.path = path
+		arrow.fillColor = nil
+		arrow.strokeColor = uiColor(paint.color).cgColor
+		arrow.lineWidth = a.strokeWidth / paint.scale
+		arrow.lineCap = .butt
+		arrow.lineJoin = .miter
+		arrow.miterLimit = 4
+		arrow.frame = bounds
+		arrow.contentsScale = paint.scale
+		if arrow.superlayer == nil { layer.addSublayer(arrow) }
 	}
 }
 
@@ -2222,7 +2658,7 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	view.layer.borderWidth = style.borderWidth
 	view.layer.borderColor = style.borderColor.map(uiColor)?.cgColor
 	view.layer.cornerRadius = style.cornerRadius
-	view.clipsToBounds = style.clipsChildren
+	view.clipsToBounds = style.clipsChildren && style.childClip == nil
 	// Siblings draw by zPosition: in-flow boxes at 0, negative z-index below them, positioned boxes above in their context's order.
 	view.layer.zPosition = style.paintOrder.map { CGFloat($0.bucket) * 100_000 + CGFloat($0.rank) + 1 } ?? 0
 	// A layer mask clips the box and its subviews without touching their accessibility, as Chrome keeps clipped text exposed.
@@ -2234,7 +2670,7 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	} else {
 		view.layer.mask = nil
 	}
-	paintSides(view, style.sides)
+	paintSides(view, style.sides, radius: style.cornerRadius)
 	paintDashed(view, style.dashedBorder)
 	if let drawing = view as? DrawingView {
 		// An svg's text colour is what its currentColor paints.
@@ -2242,6 +2678,23 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 		drawing.isHidden = style.hidden
 		return
 	}
+	if let select = view as? SelectButton {
+		try select.paint(arrow: style.selectArrow, label: style.selectLabel, faces: faces)
+		return
+	}
+	if let box = view as? CheckboxButton {
+		box.paint(style.checkbox)
+		return
+	}
+	if let field = view as? TextField {
+		try field.paint(style.textField, faces: faces)
+		return
+	}
+	if let area = view as? TextArea {
+		try area.paint(style.textField, faces: faces)
+		return
+	}
+	if style.checkbox != nil { throw HostError("\(view.accessibilityIdentifier ?? "a box") draws a themed checkbox but is not a checkbox") }
 	guard let label = view as? UILabel else {
 		if style.font != nil || style.textColor != nil { throw HostError("\(view.accessibilityIdentifier ?? "a box") has text styles but is not text") }
 		return
@@ -2259,6 +2712,8 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 final class GlyphLinesLayer: CALayer {
 	var lines: [TextLine] = []
 	var faces: [String: SystemFace] = [:]
+	/// The app's own font files, whose glyph ids are the ones Dragon shaped them to.
+	var webFaces: [String: UIFontDescriptor] = [:]
 	var textColor: UIColor = .black
 	/// How far the layer reaches past the label on every side, in points.
 	var slack: CGFloat = 0
@@ -2271,8 +2726,12 @@ final class GlyphLinesLayer: CALayer {
 		ctx.setFillColor(textColor.cgColor)
 		for line in lines {
 			for run in line.runs {
-				guard let face = faces[run.face] else { continue }
-				let font = systemFont(face, size: run.size)
+				let font: CTFont
+				if let face = faces[run.face] {
+					font = systemFont(face, size: run.size)
+				} else if let face = webFaces[run.face] {
+					font = CTFontCreateWithFontDescriptor(face as CTFontDescriptor, run.size, nil)
+				} else { continue }
 				let glyphs = run.glyphs.map { CGGlyph($0) }
 				let positions = run.xs.map { CGPoint(x: $0 + slack, y: bounds.height - (line.baseline + slack)) }
 				CTFontDrawGlyphs(font, glyphs, positions, glyphs.count, ctx)
@@ -2297,13 +2756,28 @@ func systemFont(_ face: SystemFace, size: Double) -> CTFont {
 private func uiColor(_ color: RGBA) -> UIColor {
 	UIColor(red: color.r / 255, green: color.g / 255, blue: color.b / 255, alpha: color.alpha / 255)
 }
-/// One sublayer per side, for borders whose sides differ; Chrome's diagonal corner joins are not drawn.
+/// One sublayer per side, for borders whose sides differ; Chrome's diagonal corner joins are not drawn. A rounded box's sides,
+/// which share a colour, are one ring between its outer corners and its padding box.
 @MainActor
-private func paintSides(_ view: UIView, _ sides: [ResolvedStyle.Side]?) {
+private func paintSides(_ view: UIView, _ sides: [ResolvedStyle.Side]?, radius: Double) {
 	let name = "markless-border-side"
 	view.layer.sublayers?.filter { $0.name == name }.forEach { $0.removeFromSuperlayer() }
 	guard let sides else { return }
 	let b = view.bounds
+	if radius > 0, let color = sides.first(where: { $0.width > 0 })?.color {
+		let inner = PaddingBox(radius: radius, top: sides[0].width, right: sides[1].width, bottom: sides[2].width, left: sides[3].width)
+		let ring = CAShapeLayer()
+		ring.name = name
+		ring.frame = b
+		let path = CGMutablePath()
+		path.addPath(roundedPath(b, Array(repeating: PaddingBox.Corner(x: radius, y: radius), count: 4)))
+		path.addPath(paddingBoxPath(inner, in: b))
+		ring.path = path
+		ring.fillRule = .evenOdd
+		ring.fillColor = uiColor(color).cgColor
+		view.layer.addSublayer(ring)
+		return
+	}
 	let rects = [
 		CGRect(x: 0, y: 0, width: b.width, height: sides[0].width),
 		CGRect(x: b.width - sides[1].width, y: 0, width: sides[1].width, height: b.height),
@@ -2347,47 +2821,141 @@ private final class DashedBorderLayer: CALayer {
 
 	override func draw(in ctx: CGContext) {
 		guard let border else { return }
-		ctx.saveGState()
-		ctx.scaleBy(x: 1 / border.scale, y: 1 / border.scale)
-		ctx.translateBy(x: border.ops.originX, y: border.ops.originY)
-		for o in border.ops.ops {
-			let pts = o.points
-			switch o.op {
-			case "begin-layer":
-				ctx.saveGState()
-				ctx.setAlpha(o.alpha)
-				ctx.beginTransparencyLayer(auxiliaryInfo: nil)
-			case "end-layer":
-				ctx.endTransparencyLayer()
-				ctx.restoreGState()
-			case "save": ctx.saveGState()
-			case "restore": ctx.restoreGState()
-			case "clip":
-				ctx.setShouldAntialias(o.antialias)
+		drawBorderOps(ctx, border.ops.ops, colors: border.colors, scale: border.scale, dx: border.ops.originX, dy: border.ops.originY)
+	}
+}
+
+/// Dragon's side-painter operations (paint-dash.ts) in device px, shifted by dx, dy, as Dragon's own UIKit paint draws them.
+func drawBorderOps(_ ctx: CGContext, _ ops: [BorderOps.Op], colors: [RGBA], scale: Double, dx: Double, dy: Double) {
+	ctx.saveGState()
+	ctx.scaleBy(x: 1 / scale, y: 1 / scale)
+	ctx.translateBy(x: dx, y: dy)
+	for o in ops {
+		let pts = o.points
+		switch o.op {
+		case "begin-layer":
+			ctx.saveGState()
+			ctx.setAlpha(o.alpha)
+			ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+		case "end-layer":
+			ctx.endTransparencyLayer()
+			ctx.restoreGState()
+		case "save": ctx.saveGState()
+		case "restore": ctx.restoreGState()
+		case "clip":
+			ctx.setShouldAntialias(o.antialias)
+			ctx.addPath(polygon(pts))
+			ctx.clip()
+			ctx.setShouldAntialias(true)
+		default:
+			let c = colors[o.side]
+			ctx.setFillColor(UIColor(red: c.r / 255, green: c.g / 255, blue: c.b / 255, alpha: o.alpha).cgColor)
+			ctx.setShouldAntialias(o.antialias)
+			if o.op == "fill" {
 				ctx.addPath(polygon(pts))
-				ctx.clip()
-				ctx.setShouldAntialias(true)
-			default:
-				let c = border.colors[o.side]
-				ctx.setFillColor(UIColor(red: c.r / 255, green: c.g / 255, blue: c.b / 255, alpha: o.alpha).cgColor)
-				ctx.setShouldAntialias(o.antialias)
-				if o.op == "fill" {
-					ctx.addPath(polygon(pts))
-					ctx.fillPath()
-				} else {
-					ctx.fillEllipse(in: CGRect(x: pts[0] - pts[2], y: pts[1] - pts[2], width: 2 * pts[2], height: 2 * pts[2]))
-				}
-				ctx.setShouldAntialias(true)
+				ctx.fillPath()
+			} else {
+				ctx.fillEllipse(in: CGRect(x: pts[0] - pts[2], y: pts[1] - pts[2], width: 2 * pts[2], height: 2 * pts[2]))
 			}
+			ctx.setShouldAntialias(true)
 		}
-		ctx.restoreGState()
+	}
+	ctx.restoreGState()
+}
+
+private func polygon(_ pts: [Double]) -> CGPath {
+	let path = CGMutablePath()
+	path.addLines(between: stride(from: 0, to: pts.count - 1, by: 2).map { CGPoint(x: pts[$0], y: pts[$0 + 1]) })
+	path.closeSubpath()
+	return path
+}
+
+/// A checkbox or radio button. On a styled page a checkbox draws Chrome's theme marks from Dragon's plan, in the checkedness the
+/// runtime keeps (`show`); otherwise the platform's symbol.
+final class CheckboxButton: UIButton {
+	private var drawn: CheckboxLayer?
+	private var checked = false
+	var themed: Bool { drawn != nil }
+
+	func show(checked: Bool) {
+		self.checked = checked
+		drawn?.checked = checked
+		drawn?.setNeedsDisplay()
 	}
 
-	private func polygon(_ pts: [Double]) -> CGPath {
-		let path = CGMutablePath()
-		path.addLines(between: stride(from: 0, to: pts.count - 1, by: 2).map { CGPoint(x: pts[$0], y: pts[$0 + 1]) })
-		path.closeSubpath()
-		return path
+	func paint(_ paint: ResolvedStyle.CheckboxPaint?) {
+		guard let paint else {
+			drawn?.removeFromSuperlayer()
+			drawn = nil
+			return
+		}
+		let marks = drawn ?? CheckboxLayer()
+		marks.paint = paint
+		marks.checked = checked
+		marks.frame = bounds
+		marks.contentsScale = paint.scale
+		// Over the background and under the border, as Chrome paints the theme's checkbox.
+		if drawn == nil { layer.insertSublayer(marks, at: 0) }
+		drawn = marks
+		setImage(nil, for: .normal)
+		marks.setNeedsDisplay()
+	}
+
+	override func layoutSubviews() {
+		super.layoutSubviews()
+		drawn?.frame = bounds
+	}
+}
+
+/// Dragon's `dragonPaintCheckbox`: the marks in device px from the snapped border box.
+private final class CheckboxLayer: CALayer {
+	var paint: ResolvedStyle.CheckboxPaint?
+	var checked = false
+
+	override func draw(in ctx: CGContext) {
+		guard let paint else { return }
+		let m = paint.marks, c = paint.colors
+		ctx.saveGState()
+		ctx.scaleBy(x: 1 / paint.scale, y: 1 / paint.scale)
+		ctx.translateBy(x: m.originX, y: m.originY)
+		ctx.setShouldAntialias(true)
+		let square = CGRect(x: m.x, y: m.y, width: m.side, height: m.side)
+		let rounded = { (r: CGRect) -> CGPath in
+			let k = min(CGFloat(m.radius), min(r.width, r.height) / 2)
+			return CGPath(roundedRect: r, cornerWidth: k, cornerHeight: k, transform: nil)
+		}
+		if m.plain {
+			ctx.setFillColor(uiColor(checked ? c.check : c.uncheckedBorder).cgColor)
+			ctx.fill(square)
+			ctx.restoreGState()
+			return
+		}
+		let inset = CGFloat(m.backgroundInset)
+		ctx.addPath(rounded(square.insetBy(dx: inset, dy: inset)))
+		ctx.setFillColor(uiColor(checked ? c.checkedBackground : c.uncheckedBackground).cgColor)
+		ctx.fillPath()
+		if checked {
+			ctx.addPath(rounded(square))
+			ctx.setFillColor(uiColor(c.fill).cgColor)
+			ctx.fillPath()
+			let p = m.check
+			ctx.move(to: CGPoint(x: p[0], y: p[1]))
+			ctx.addLine(to: CGPoint(x: p[2], y: p[3]))
+			ctx.addLine(to: CGPoint(x: p[4], y: p[5]))
+			ctx.setLineWidth(CGFloat(m.checkWidth))
+			ctx.setLineCap(.butt)
+			ctx.setLineJoin(.miter)
+			ctx.setMiterLimit(4)
+			ctx.setStrokeColor(uiColor(c.check).cgColor)
+			ctx.strokePath()
+		} else {
+			let border = CGFloat(m.borderInset)
+			ctx.addPath(rounded(square.insetBy(dx: border, dy: border)))
+			ctx.setLineWidth(CGFloat(m.borderWidth))
+			ctx.setStrokeColor(uiColor(c.uncheckedBorder).cgColor)
+			ctx.strokePath()
+		}
+		ctx.restoreGState()
 	}
 }
 
@@ -2421,6 +2989,63 @@ private final class TouchWatcher: UIGestureRecognizer {
 	}
 }
 
+/// Every touch on the page, observed for Dragon's interaction runtime: it never recognises, so it takes no touch from a control.
+private final class InteractionWatcher: UIGestureRecognizer, UIGestureRecognizerDelegate {
+	enum Phase { case began, ended, cancelled }
+	private let report: (Phase, CGPoint) -> Void
+	init(_ report: @escaping (Phase, CGPoint) -> Void) {
+		self.report = report
+		super.init(target: nil, action: nil)
+		cancelsTouchesInView = false
+		delaysTouchesBegan = false
+		delaysTouchesEnded = false
+		delegate = self
+	}
+
+	/// The finger the runtime follows (the first down; others are ignored), where and when it went down.
+	private var finger: (touch: UITouch, at: CGPoint, time: TimeInterval)?
+	/// Past this the finger scrolls: Chrome cancels the press (pointercancel), and the lift focuses nothing.
+	private let slop: CGFloat = 10
+	/// A finger held this long is a long press, whose lift is not a tap, as in Chrome.
+	private let longPress: TimeInterval = 0.5
+
+	override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+		guard finger == nil, let touch = touches.first, let view else { return }
+		let at = touch.location(in: view)
+		finger = (touch, at, touch.timestamp)
+		report(.began, at)
+	}
+
+	override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
+		guard let finger, touches.contains(finger.touch), let view else { return }
+		let at = finger.touch.location(in: view)
+		if hypot(at.x - finger.at.x, at.y - finger.at.y) > slop { end(.cancelled, .zero) }
+	}
+
+	override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+		guard let finger, touches.contains(finger.touch), let view else { return }
+		if finger.touch.timestamp - finger.time >= longPress { end(.cancelled, .zero) } else { end(.ended, finger.touch.location(in: view)) }
+	}
+
+	override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+		guard let finger, touches.contains(finger.touch) else { return }
+		end(.cancelled, .zero)
+	}
+
+	private func end(_ phase: Phase, _ at: CGPoint) {
+		finger = nil
+		report(phase, at)
+		state = .failed
+	}
+
+	override func reset() {
+		super.reset()
+		finger = nil
+	}
+
+	func gestureRecognizer(_ a: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith b: UIGestureRecognizer) -> Bool { true }
+}
+
 /// A tap that presses an element which is not a button.
 private final class ActivateGesture: UITapGestureRecognizer {
 	private let action: (Int) -> Void
@@ -2440,6 +3065,54 @@ private final class ActivateGesture: UITapGestureRecognizer {
 
 /// How many quick taps in one place a button's current press is: its `event.detail`.
 final class TapCount { var value = 1 }
+
+/// The children of a box that clips overflow past its borders: a view over the whole box masked to its padding box, so the
+/// box's own border and background are not clipped and its children keep their frames.
+@MainActor
+final class PaddingClipView: UIView {
+	func shape(_ box: PaddingBox?, in bounds: CGRect) {
+		frame = bounds
+		guard let box else {
+			layer.mask = nil
+			return
+		}
+		CATransaction.begin()
+		CATransaction.setDisableActions(true)
+		let mask = layer.mask as? CAShapeLayer ?? CAShapeLayer()
+		mask.frame = bounds
+		mask.path = paddingBoxPath(box, in: bounds)
+		layer.mask = mask
+		CATransaction.commit()
+	}
+}
+
+func paddingBoxPath(_ box: PaddingBox, in bounds: CGRect) -> CGPath {
+	let rect = CGRect(
+		x: box.left, y: box.top, width: max(0, bounds.width - box.left - box.right), height: max(0, bounds.height - box.top - box.bottom))
+	return roundedPath(rect, box.corners)
+}
+
+/// A rect with each corner (from the top left, clockwise) a quarter ellipse of its radii; a corner with a zero radius is square.
+func roundedPath(_ r: CGRect, _ corners: [PaddingBox.Corner]) -> CGPath {
+	let path = CGMutablePath()
+	let vertices = [CGPoint(x: r.minX, y: r.minY), CGPoint(x: r.maxX, y: r.minY), CGPoint(x: r.maxX, y: r.maxY), CGPoint(x: r.minX, y: r.maxY)]
+	let inward: [(x: CGFloat, y: CGFloat)] = [(1, 1), (-1, 1), (-1, -1), (1, -1)]
+	let rounded = corners.map { $0.x > 0 && $0.y > 0 }
+	path.move(to: rounded[0] ? CGPoint(x: r.minX + corners[0].x, y: r.minY) : vertices[0])
+	for k in [1, 2, 3, 0] {
+		guard rounded[k] else {
+			path.addLine(to: vertices[k])
+			continue
+		}
+		let c = corners[k]
+		let center = CGPoint(x: vertices[k].x + inward[k].x * c.x, y: vertices[k].y + inward[k].y * c.y)
+		path.addRelativeArc(
+			center: .zero, radius: 1, startAngle: CGFloat(k + 2) * .pi / 2, delta: .pi / 2,
+			transform: CGAffineTransform(translationX: center.x, y: center.y).scaledBy(x: c.x, y: c.y))
+	}
+	path.closeSubpath()
+	return path
+}
 
 /// A scroll container's scroll view over its padding box. A drag that starts toward an edge it is already at goes to the
 /// scroll view around it, as the web chains a scroll to the page once a box is at its end.
@@ -2539,6 +3212,57 @@ final class TextField: UITextField, KeyedInput, UITextFieldDelegate {
 		if pasteLeavesOut() { return }
 		super.paste(sender)
 	}
+
+	private var styled: ResolvedStyle.TextFieldPaint?
+
+	/// On a styled page: the value and caret in Dragon's editor box, in its font and colour, and Dragon's placeholder in its box.
+	func paint(_ paint: ResolvedStyle.TextFieldPaint?, faces: [String: UIFontDescriptor]) throws {
+		let font = { (family: String, size: Double) throws -> UIFont in
+			guard let face = faces[family] else { throw HostError("font \(family) was not registered") }
+			return UIFont(descriptor: face, size: size)
+		}
+		if let paint {
+			self.font = try font(paint.fontFamily, paint.fontSize)
+			if let color = paint.color { textColor = uiColor(color) }
+		}
+		attributedPlaceholder = try paint?.placeholder.map { shown in
+			var look: [NSAttributedString.Key: Any] = [.font: try font(shown.fontFamily, shown.fontSize)]
+			if let color = shown.color { look[.foregroundColor] = uiColor(color) }
+			return NSAttributedString(string: shown.text, attributes: look)
+		}
+		styled = paint
+		clearButtonMode = paint?.clear == nil ? .never : .whileEditing
+		setNeedsLayout()
+	}
+
+	/// The clear button empties the field as typing does, so the page's input handler sees it, as Chrome's cancel button fires input.
+	func textFieldShouldClear(_ textField: UITextField) -> Bool {
+		text = ""
+		sendActions(for: .editingChanged)
+		return false
+	}
+
+	override func clearButtonRect(forBounds bounds: CGRect) -> CGRect {
+		rect(styled?.clear, or: super.clearButtonRect(forBounds: bounds))
+	}
+
+	private func rect(_ frame: Frame?, or fallback: CGRect) -> CGRect {
+		frame.map { CGRect(x: $0.x, y: $0.y, width: $0.width, height: $0.height) } ?? fallback
+	}
+
+	/// The editor box's columns at the height UIKit asks for, moved by how far the box's middle is from the field's: UIKit centres
+	/// the line there, and draws no value or caret in a rect it did not size itself.
+	private func valueRect(_ bounds: CGRect) -> CGRect? {
+		guard let editor = styled?.editor else { return nil }
+		let shift = editor.y + editor.height / 2 - self.bounds.midY
+		return CGRect(x: editor.x, y: bounds.minY + shift, width: editor.width, height: bounds.height)
+	}
+
+	override func textRect(forBounds bounds: CGRect) -> CGRect { valueRect(bounds) ?? super.textRect(forBounds: bounds) }
+	override func editingRect(forBounds bounds: CGRect) -> CGRect { valueRect(bounds) ?? super.editingRect(forBounds: bounds) }
+	override func placeholderRect(forBounds bounds: CGRect) -> CGRect {
+		rect(styled?.placeholder?.frame ?? styled?.editor, or: super.placeholderRect(forBounds: bounds))
+	}
 }
 
 /// A `<textarea>`: a text view that reports each edit as a text field's `editingChanged` does; Return adds a line.
@@ -2574,7 +3298,64 @@ final class TextArea: UITextView, UITextViewDelegate, KeyedInput {
 	}
 
 	func textViewDidChange(_ textView: UITextView) {
+		placeholderLabel.isHidden = !text.isEmpty
 		for change in onChange { change(text) }
+	}
+
+	private var styled: ResolvedStyle.TextFieldPaint?
+	private let placeholderLabel = UILabel()
+
+	/// On a styled page: the text in Dragon's font and colour, inset to the editor box, its lines Dragon's pitch apart with the first
+	/// baseline where Dragon puts it, and Dragon's placeholder in its box while the text is empty.
+	func paint(_ paint: ResolvedStyle.TextFieldPaint?, faces: [String: UIFontDescriptor]) throws {
+		styled = paint
+		guard let paint else { return }
+		let font = { (family: String, size: Double) throws -> UIFont in
+			guard let face = faces[family] else { throw HostError("font \(family) was not registered") }
+			return UIFont(descriptor: face, size: size)
+		}
+		let own = try font(paint.fontFamily, paint.fontSize)
+		var look: [NSAttributedString.Key: Any] = [.font: own]
+		if let color = paint.color { look[.foregroundColor] = uiColor(color) }
+		if let lines = paint.lines {
+			let spacing = NSMutableParagraphStyle()
+			spacing.minimumLineHeight = lines.pitch
+			spacing.maximumLineHeight = lines.pitch
+			look[.paragraphStyle] = spacing
+			// TextKit sets a fixed-height line's baseline at its height plus the face's descender; Dragon's is `above` below the top.
+			look[.baselineOffset] = lines.pitch + own.descender - lines.above
+		}
+		typingAttributes = look
+		attributedText = NSAttributedString(string: text, attributes: look)
+		textContainer.lineFragmentPadding = 0
+		if let shown = paint.placeholder {
+			placeholderLabel.text = shown.text
+			placeholderLabel.font = try font(shown.fontFamily, shown.fontSize)
+			placeholderLabel.textColor = shown.color.map(uiColor) ?? .placeholderText
+			placeholderLabel.isAccessibilityElement = false
+			if placeholderLabel.superview == nil { addSubview(placeholderLabel) }
+		} else {
+			placeholderLabel.removeFromSuperview()
+		}
+		placeholderLabel.isHidden = !text.isEmpty
+		setNeedsLayout()
+	}
+
+	/// While empty, the placeholder is the value read out, as a text field's is.
+	override var accessibilityValue: String? {
+		get { text.isEmpty && placeholderLabel.superview != nil ? placeholderLabel.text : super.accessibilityValue }
+		set { super.accessibilityValue = newValue }
+	}
+
+	override func layoutSubviews() {
+		super.layoutSubviews()
+		guard let paint = styled else { return }
+		let e = paint.editor
+		let bottom = paint.lines.map { $0.insets[2] + e.y - $0.insets[0] } ?? e.y
+		textContainerInset = UIEdgeInsets(top: e.y, left: e.x, bottom: bottom, right: bounds.width - e.x - e.width)
+		if let shown = paint.placeholder {
+			placeholderLabel.frame = CGRect(x: shown.frame.x, y: shown.frame.y, width: shown.frame.width, height: shown.frame.height)
+		}
 	}
 
 	func textViewDidBeginEditing(_ textView: UITextView) {

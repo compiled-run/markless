@@ -1,0 +1,24 @@
+{
+	"rung": 173,
+	"name": "a span inside a button or a link that starts hidden shows once unhidden and leaves again when hidden, its text in the control's name only while shown, as on the web",
+	"steps": [
+		{ "visible": ["Basket", "Add", "Empty", "Items: 0", "Bag", "Cart"], "absent": ["(0)"] },
+		{
+			"do": { "tap": "Add" },
+			"visible": ["Items: 1"],
+			"absent": ["Items: 0", "(0)"],
+			"visibleOn": { "web": ["Bag(1)", "Cart(1)"], "ios": ["Bag(1)", "Cart(1)", "(1)"], "android": ["(1)"] }
+		},
+		{
+			"do": { "tap": "Add" },
+			"visible": ["Items: 2"],
+			"absent": ["Items: 1", "(1)", "Bag(1)", "Cart(1)"],
+			"visibleOn": { "web": ["Bag(2)", "Cart(2)"], "ios": ["Bag(2)", "Cart(2)", "(2)"], "android": ["(2)"] }
+		},
+		{
+			"do": { "tap": "Empty" },
+			"visible": ["Items: 0", "Bag", "Cart"],
+			"absent": ["Items: 2", "(0)", "(2)", "Bag(2)", "Cart(2)"]
+		}
+	]
+}

@@ -22,7 +22,7 @@ private func allVectorFiles() throws -> [URL] {
 }
 
 private func versionOf(_ file: URL) throws -> String? {
-	guard case let .object(fields) = try JSONValue.parse(Data(contentsOf: file)) else { return nil }
+	guard case let .object(fields) = try JSONValue.parse(ConformanceEngine.vectorData(file)) else { return nil }
 	if case let .string(version)? = fields.first(where: { $0.0 == "version" })?.1 { return version }
 	return nil
 }
@@ -37,7 +37,7 @@ private func appVectorFiles() throws -> [URL] { try allVectorFiles().filter { tr
 /// The stack after each action: its paths, the top screen's title and texts, as `nativeAppConformance` writes them.
 @Test(arguments: try appVectorFiles())
 func reproducesAppConformanceVector(file: URL) throws {
-	guard case let .object(fields) = try JSONValue.parse(Data(contentsOf: file)) else { Issue.record("vector is not an object"); return }
+	guard case let .object(fields) = try JSONValue.parse(ConformanceEngine.vectorData(file)) else { Issue.record("vector is not an object"); return }
 	let field = { (key: String) -> JSONValue? in fields.first { $0.0 == key }?.1 }
 	#expect(fields.map(\.0) == ["version", "app", "open"] + (field("started") == nil ? [] : ["started"]) + ["initial", "steps"])
 	guard case let .string(open)? = field("open") else { Issue.record("open is not a path"); return }
@@ -76,7 +76,7 @@ func reproducesAppConformanceVector(file: URL) throws {
 
 @Test(arguments: try vectorFiles())
 func reproducesConformanceVector(file: URL) throws {
-	let vector = try JSONValue.parse(Data(contentsOf: file))
+	let vector = try JSONValue.parse(ConformanceEngine.vectorData(file))
 	guard case let .object(fields) = vector else { Issue.record("vector is not an object"); return }
 	let field = { (key: String) -> JSONValue? in fields.first { $0.0 == key }?.1 }
 	let known = ["version", "payload", "params", "preferredLanguages", "now", "layout", "initial", "initialChecks", "initialSelections", "initialAttributes", "initialProperties", "initialArms", "initialRows", "initialSheets", "tasks", "start", "steps", "leave"]
@@ -196,7 +196,7 @@ func reproducesConformanceVector(file: URL) throws {
 			case let .string(eventName)? = actionFields.first(where: { $0.0 == "event" })?.1,
 			let event = NativeEventName(rawValue: eventName),
 			actionFields.allSatisfy({
-				(event == .timer ? ["event", "timer"] : ["event", "host", "value", "reason", "key", "text", "detail"] + (event.isTouch ? ["pointerId", "x", "y", "time"] : event == .contextmenu ? ["x", "y", "time"] : [])).contains($0.0)
+				(event == .timer ? ["event", "timer"] : ["event", "host", "value", "reason", "key", "text", "detail", "animationName", "elapsedTime"] + (event == .pick ? ["files"] : []) + (event.isTouch ? ["pointerId", "x", "y", "time"] : event == .contextmenu ? ["x", "y", "time"] : [])).contains($0.0)
 			}),
 			let expected = stepFields.first(where: { $0.0 == "journal" })?.1
 		else { Issue.record("malformed step \(step.jsonText)"); return }
@@ -207,9 +207,23 @@ func reproducesConformanceVector(file: URL) throws {
 			action = NativeAction(event: .timer, timer: try #require(string("timer")))
 		} else {
 			let detail: Int? = if case let .number(count)? = actionFields.first(where: { $0.0 == "detail" })?.1 { Int(count) } else { nil }
+			var files: [NativePickedFile]?
+			if case let .array(chosen)? = actionFields.first(where: { $0.0 == "files" })?.1 {
+				files = try chosen.map { file in
+					guard case let .object(fields) = file else { throw VectorError("a picked file is not an object") }
+					let member = { (key: String) in fields.first(where: { $0.0 == key })?.1 }
+					guard case let .string(ref)? = member("ref"), case let .string(name)? = member("name"), case let .number(size)? = member("size"),
+						case let .string(type)? = member("type"), case let .number(lastModified)? = member("lastModified")
+					else { throw VectorError("a picked file lacks ref, name, size, type or lastModified") }
+					return NativePickedFile(ref: ref, name: name, size: size, type: type, lastModified: lastModified)
+				}
+			}
+			// An animation event carries its name as the action's value and its elapsed time as the action's time.
+			let animating = [.animationstart, .animationiteration, .animationend, .animationcancel].contains(event)
 			action = NativeAction(
-				event: event, host: try #require(string("host")), value: string(event == .keydown || event == .keyup ? "key" : event == .paste ? "text" : "value"), reason: string("reason"),
-				detail: detail, pointerId: number("pointerId"), x: number("x"), y: number("y"), time: number("time"))
+				event: event, host: try #require(string("host")),
+				value: string(event == .keydown || event == .keyup ? "key" : event == .paste ? "text" : animating ? "animationName" : "value"), reason: string("reason"),
+				detail: detail, pointerId: number("pointerId"), x: number("x"), y: number("y"), time: number(animating ? "elapsedTime" : "time"), files: files)
 		}
 		let journal = JSONValue.array(try runtime.dispatch(action).map(\.json))
 		#expect(Array(journal.jsonText.utf8) == Array(expected.jsonText.utf8), "\(file.lastPathComponent) \(eventName) on \(action.timer ?? action.host)")
@@ -219,7 +233,7 @@ func reproducesConformanceVector(file: URL) throws {
 /// A page whose handlers are all data never starts the engine; a script page starts the app's one engine on first use.
 @Test func engineStartsOnFirstScriptUseOnly() throws {
 	let file = conformanceDirectory.appendingPathComponent("script-app.json")
-	guard case let .object(fields) = try JSONValue.parse(Data(contentsOf: file)) else { Issue.record("vector is not an object"); return }
+	guard case let .object(fields) = try JSONValue.parse(ConformanceEngine.vectorData(file)) else { Issue.record("vector is not an object"); return }
 	let host = conformanceScriptHost()
 	let stack = try NativeAppStack(app: try NativeAppPayload.decode(try #require(fields.first { $0.0 == "app" }?.1)), path: "/", scriptHost: host)
 	_ = try stack.dispatch(NativeAction(event: .activate, host: "h3"))

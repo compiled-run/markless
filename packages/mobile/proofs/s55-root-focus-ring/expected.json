@@ -1,0 +1,24 @@
+{
+	"rung": "S55",
+	"name": "A page-wide :focus-visible outline rule, which reaches html and body, leaves every page styled: a phone never focuses the root with a keyboard ring, so the hosts draw no ring there, and the styled pages open and go back on the web, iOS and Android",
+	"steps": [
+		{
+			"visible": ["Focus ring", "Open the note"],
+			"absent": ["The ring note"]
+		},
+		{
+			"do": {
+				"tap": "Open the note"
+			},
+			"visible": ["The ring note", "Back home"],
+			"absent": ["Focus ring"]
+		},
+		{
+			"do": {
+				"tap": "Back home"
+			},
+			"visible": ["Focus ring", "Open the note"],
+			"absent": ["The ring note"]
+		}
+	]
+}

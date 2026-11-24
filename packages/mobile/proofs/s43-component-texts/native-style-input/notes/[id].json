@@ -1,0 +1,233 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Note",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "note mk-txwvqw"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0/h0",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "heading mk-12ppqig"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:0/h0:text0",
+			"parent": "component-edge:0/h0",
+			"text": "Note "
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"type": "button",
+				"class": "button mk-txwvqw"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Delete"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:1/h0",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {},
+			"attributesByState": {
+				"ui-open": [
+					{
+						"when": {
+							"component-edge:1/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:1/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": true
+						},
+						"value": ""
+					}
+				],
+				"ui-closed": [
+					{
+						"when": {
+							"component-edge:1/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:1/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": true
+						},
+						"value": null
+					}
+				]
+			}
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:2/h2",
+			"element": "div",
+			"parent": "component-edge:1/h0",
+			"attributes": {
+				"class": "backdrop mk-txwvqw",
+				"overlay": ""
+			},
+			"attributesByState": {
+				"hidden": [
+					{
+						"when": {
+							"component-edge:1/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:1/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": true
+						},
+						"value": null
+					}
+				],
+				"ui-open": [
+					{
+						"when": {
+							"component-edge:1/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:1/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": true
+						},
+						"value": ""
+					}
+				],
+				"ui-closed": [
+					{
+						"when": {
+							"component-edge:1/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:1/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": true
+						},
+						"value": null
+					}
+				]
+			}
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:3/h3",
+			"element": "div",
+			"parent": "component-edge:2/h2",
+			"attributes": {
+				"class": "dialog mk-txwvqw",
+				"aria-modal": "true",
+				"role": "dialog",
+				"aria-labelledby": "component-edge:4/h4",
+				"aria-describedby": "component-edge:5/h5"
+			},
+			"attributesByState": {
+				"ui-open": [
+					{
+						"when": {
+							"component-edge:1/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:1/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": true
+						},
+						"value": ""
+					}
+				],
+				"ui-closed": [
+					{
+						"when": {
+							"component-edge:1/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:1/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": true
+						},
+						"value": null
+					}
+				]
+			}
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:4/h4",
+			"element": "h2",
+			"parent": "component-edge:3/h3",
+			"attributes": {}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:4/h4:text0",
+			"parent": "component-edge:4/h4",
+			"text": "Delete this note?"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:5/h5",
+			"element": "p",
+			"parent": "component-edge:3/h3",
+			"attributes": {}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:5/h5:text0",
+			"parent": "component-edge:5/h5",
+			"text": "“” will be gone for good."
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:6/h6",
+			"element": "button",
+			"parent": "component-edge:3/h3",
+			"attributes": {
+				"class": "button mk-txwvqw",
+				"type": "button"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:6/h6:text0",
+			"parent": "component-edge:6/h6",
+			"text": "Keep it"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.heading.mk-12ppqig {\n\t\t\t\tmargin: 0;\n\t\t\t\tfont-size: 28px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n.note.mk-txwvqw {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #f8f9fa;\n\t\t\t}\n\t\t\t.button.mk-txwvqw {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 12px 18px;\n\t\t\t\tborder: 2px solid #1d1b16;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffd166;\n\t\t\t\tcolor: #1d1b16;\n\t\t\t\tfont: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t}\n\t\t\t.backdrop.mk-txwvqw:not([hidden]) {\n\t\t\t\tposition: fixed;\n\t\t\t\tinset: 0;\n\t\t\t\tdisplay: grid;\n\t\t\t\tplace-items: center;\n\t\t\t\tpadding: 20px;\n\t\t\t\tbackground: rgb(0 0 0 / 0.45);\n\t\t\t}\n\t\t\t.dialog.mk-txwvqw {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgap: 12px;\n\t\t\t\twidth: min(420px, 100%);\n\t\t\t\tpadding: 24px;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t}",
+	"states": [
+		{
+			"cell": "component-edge:1/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+			"domain": [
+				false,
+				true
+			],
+			"initial": false
+		}
+	]
+}

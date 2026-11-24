@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r138-trailing-slash
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Start here
 - assertVisible: Open about
 - assertNotVisible: About this app

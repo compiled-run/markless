@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u16-button-disabled
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Disabled
 - assertVisible: Send
 - assertVisible: Lock

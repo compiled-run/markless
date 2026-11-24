@@ -1,0 +1,17 @@
+{
+	"perPage": {
+		"/": 133550
+	},
+	"perPageTotal": 133550,
+	"app": 118419,
+	"targets": {
+		"ios": {
+			"writeLists": 10,
+			"writeListReferences": 30
+		},
+		"android": {
+			"writeLists": 10,
+			"writeListReferences": 30
+		}
+	}
+}

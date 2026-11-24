@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r103-pre
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Preformatted
 - assertVisible: "lines: 1"
 - runFlow:

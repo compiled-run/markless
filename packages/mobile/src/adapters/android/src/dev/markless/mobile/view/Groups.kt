@@ -80,11 +80,14 @@ internal class DragonComposite private constructor() {
 /**
  * A box's transform in device px: Dragon's functions matrix as a rotation times an axis-aligned scale, set as the View's pivot
  * (the origin), translation, rotation and scale; RenderNode composes T(translation) · T(pivot) · R · S · T(-pivot).
+ * [sticky] is the sticky move the host has added to the view's translation, which the transform's translation is added to.
  */
-internal fun applyTransform(id: String, view: View, t: StyleWrite.Transform?, widthPx: Double, heightPx: Double, dpr: Double) {
+internal fun applyTransform(id: String, view: View, t: StyleWrite.Transform?, widthPx: Double, heightPx: Double, dpr: Double, sticky: FloatArray?) {
+	val keepX = sticky?.get(0) ?: 0f
+	val keepY = sticky?.get(1) ?: 0f
 	if (t == null || t.functions.isEmpty()) {
-		view.translationX = 0f
-		view.translationY = 0f
+		view.translationX = keepX
+		view.translationY = keepY
 		view.rotation = 0f
 		view.scaleX = 1f
 		view.scaleY = 1f
@@ -106,8 +109,8 @@ internal fun applyTransform(id: String, view: View, t: StyleWrite.Transform?, wi
 	}
 	view.pivotX = (o[0] * dpr).toFloat()
 	view.pivotY = (o[1] * dpr).toFloat()
-	view.translationX = (m[4] * dpr).toFloat()
-	view.translationY = (m[5] * dpr).toFloat()
+	view.translationX = (m[4] * dpr).toFloat() + keepX
+	view.translationY = (m[5] * dpr).toFloat() + keepY
 	view.rotation = degrees.toFloat()
 	view.scaleX = sx.toFloat()
 	view.scaleY = sy.toFloat()

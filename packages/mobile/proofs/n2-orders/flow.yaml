@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: n2-orders
 ---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
 - launchApp:
-    clearState: true
     arguments:
       route: /orders
 - assertVisible: Your orders

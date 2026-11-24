@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j6-engine-on-demand
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Data only
 - assertVisible: Taps 0
 - assertVisible: Open script

@@ -32,20 +32,38 @@ import {
 	servedFileReader,
 	servedReader,
 } from '../src/harness/rung.ts';
-import { echoText } from '../src/harness/echo-server.ts';
+import { echoText, multipartText } from '../src/harness/echo-server.ts';
+
+/** The reference host's chosen files: each reference names the text a request reads back. */
+const picked = new Map<string, string>();
+const pickedRef = (text: string) => {
+	const ref = `picked:${picked.size + 1}`;
+	picked.set(ref, text);
+	return ref;
+};
+const MULTIPART_BOUNDARY = 'MarklessReferenceBoundary';
 import { nativeMaxLength, nativeRangeValue } from '@markless/serializer/native-view';
 import { nodeScriptHost } from '../src/node-engine.ts';
 import {
+	describeText,
 	looksOnly,
 	navRungFolders,
 	sheetStyleRungFolders,
 	styleRungFolders,
+	PHONE_REFUSED_RUNGS,
 	proofsDir,
 	readRung,
+	readsAs,
 	rungFolders,
+	selector,
 	type LadderRung,
 	type LadderStep,
+	type LadderText,
 } from '../proofs/ladder.ts';
+
+// A text named by how it starts is on screen when some shown text starts with it, as Maestro's anchored selector matches.
+const reading = (text: LadderText) =>
+	typeof text === 'string' ? text : expect.stringMatching(new RegExp(selector(text), 's'));
 
 /**
  * The key, at a `rows` entry's list, of the row an instance id sits in, when it sits in that copy of the list: an inner
@@ -78,12 +96,25 @@ const typedInto = (text: string, maxlength: string | null) => {
 // web build shows; a rung the compiler cannot lower yet must be refused by name, never emitted half right.
 const NATIVE_UNSUPPORTED = 'MARKLESS_NATIVE_UNSUPPORTED';
 /** Whether a field's `value` property is bound; any other `value` write is a textarea's default value. */
-const bindsValue = (nodeOf: ReadonlyMap<string, NativeViewPayload['nodes'][number]>, id: string) => {
+const bindsValue = (
+	nodeOf: ReadonlyMap<string, NativeViewPayload['nodes'][number]>,
+	id: string,
+) => {
 	const node = nodeOf.get(id.split('@')[0]!);
-	return node?.kind === 'element' && (node.bindings ?? []).some((binding) => 'property' in binding && binding.property === 'value');
+	return (
+		node?.kind === 'element' &&
+		(node.bindings ?? []).some(
+			(binding) => 'property' in binding && binding.property === 'value',
+		)
+	);
 };
-// The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
-const REFUSED_RUNGS = new Set(['y4-sheet-beside-drawer', 'j7-page-refused']);
+// The one-screen rungs the compiler refuses on purpose; every other rung must lower, so a rung cannot stop lowering unseen.
+const REFUSED_RUNGS = new Set(
+	Object.keys(PHONE_REFUSED_RUNGS).filter((rung) => PHONE_REFUSED_RUNGS[rung] === 'compiler'),
+);
+// Rungs whose later steps wait on CSS animation events, which only Dragon's animator on the phones (and the browser) runs: this
+// walk checks their launch screen, and the phones and the web column check every step.
+const ANIMATED_RUNGS = new Set(['s34-animation-end']);
 // The <input> types a host draws as a control a press acts on; every other type is a text field that takes the keyboard.
 const PRESSED_INPUT_TYPES = new Set(['checkbox', 'radio', 'range', 'hidden']);
 
@@ -100,10 +131,14 @@ function scriptServices() {
 		else if (entry.op === 'clearTimer') timers.delete(entry.timer);
 		else if (entry.op === 'fetch') {
 			const url = new URL(entry.request.url);
+			const body = entry.request.body;
 			const contentType =
 				entry.request.headers.find(
 					([name]) => name.toLowerCase() === 'content-type',
-				)?.[1] ?? null;
+				)?.[1] ??
+				(body !== null && typeof body === 'object'
+					? `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`
+					: null);
 			return {
 				event: 'response',
 				id: entry.id,
@@ -115,7 +150,12 @@ function scriptServices() {
 						method: entry.request.method,
 						url: url.pathname + url.search,
 						contentType,
-						body: entry.request.body ?? '',
+						body:
+							body !== null && typeof body === 'object'
+								? multipartText(body.form, MULTIPART_BOUNDARY, (ref) =>
+										picked.get(ref)!,
+									)
+								: (body ?? ''),
 					}),
 				},
 			};
@@ -154,6 +194,8 @@ function mirror(
 	let title: string | null = null;
 	// What the platform's sheets show: changed only by `sheet` entries.
 	const sheetOpen = new Map<string, boolean>();
+	// Each option's selectedness as the journal reported it; an option a new row adds starts unselected.
+	const selected = new Map<string, boolean>();
 	const mount = (next: NativeRuntime) => {
 		runtime = next;
 		texts.clear();
@@ -168,6 +210,8 @@ function mirror(
 		title = runtime.title();
 		sheetOpen.clear();
 		for (const [node, open] of runtime.sheets()) sheetOpen.set(node, open);
+		selected.clear();
+		for (const [node, value] of runtime.selections()) selected.set(node, value);
 	};
 	mount(opened);
 	const nodeOf = new Map(payload.nodes.map((node) => [node.id, node]));
@@ -210,6 +254,8 @@ function mirror(
 		const node = nodeOf.get(baseOf(id));
 		if (!node) return false;
 		if (node.kind === 'element') {
+			// An option shows only in its select's list, which is closed between steps.
+			if (node.element === 'option') return true;
 			const bound = attributes.get(`${id}\0hidden`);
 			if ((bound !== undefined ? bound : (node.attributes?.['hidden'] ?? null)) !== null)
 				return true;
@@ -219,20 +265,50 @@ function mirror(
 			hiddenWithin(`${node.parent}${nodeOf.get(node.parent)?.row ? suffix : ''}`)
 		);
 	};
+	// A closed select shows its chosen option's label.
+	const chosenLabels = () =>
+		payload.nodes.flatMap((node) =>
+			node.kind === 'element' &&
+			node.element === 'select' &&
+			shownNode(node.id) &&
+			!hiddenWithin(node.id)
+				? runtime
+						.choices(node.id)
+						.flatMap((choice) => (selected.get(choice.option) ? [choice.label] : []))
+				: [],
+		);
 	// What a flow can see or tap: shown text, and each shown element's accessible name (aria-label, bound or static).
 	const labels = () =>
 		payload.nodes.flatMap((node) => {
 			if (node.kind !== 'element') return [];
 			const bound = attributes.get(`${node.id}\0aria-label`);
 			const label =
-				bound !== undefined ? bound : (node.attributes?.['aria-label'] ?? node.drawing?.label ?? null);
+				bound !== undefined
+					? bound
+					: (node.attributes?.['aria-label'] ?? node.drawing?.label ?? null);
 			return label !== null && shownNode(node.id) ? [[node.id, label] as const] : [];
 		});
+	// A field with no value binding holds its `value` attribute until something is typed into it.
+	const valueAttribute = (host: string) => {
+		const node = nodeOf.get(host);
+		if (node?.kind !== 'element' || (node.element !== 'input' && node.element !== 'textarea')) return undefined;
+		return attributes.get(`${host}\0value`) ?? node.attributes?.['value'] ?? '';
+	};
+	// An empty field shows its placeholder.
+	const placeholders = () =>
+		payload.nodes.flatMap((node) => {
+			if (node.kind !== 'element' || (node.element !== 'input' && node.element !== 'textarea') || !shownNode(node.id) || hiddenWithin(node.id)) return [];
+			const bound = attributes.get(`${node.id}\0placeholder`);
+			const placeholder = bound !== undefined ? bound : (node.attributes?.['placeholder'] ?? null);
+			return placeholder !== null && (properties.get(node.id) ?? valueAttribute(node.id)) === '' ? [placeholder] : [];
+		});
 	// The element a text names: a labelled element, or the element holding that text (a row instance keeps its key).
-	const elementReading = (text: string) => {
-		const labelled = labels().find(([, label]) => label === text)?.[0];
+	const elementReading = (text: LadderText) => {
+		const labelled = labels().find(([, label]) => readsAs(label, text))?.[0];
 		if (labelled) return labelled;
-		const node = [...texts].find(([id, shown]) => shown === text && !inClosedSheet(id))?.[0];
+		const node = [...texts].find(
+			([id, shown]) => readsAs(shown, text) && !inClosedSheet(id),
+		)?.[0];
 		if (!node) return undefined;
 		const parent = nodeOf.get(baseOf(node))?.parent ?? undefined;
 		return parent && node.includes('@') && nodeOf.get(parent)?.row
@@ -245,6 +321,8 @@ function mirror(
 		else if (entry.op === 'title') title = entry.value;
 		else if (entry.op === 'attribute')
 			attributes.set(`${entry.node}\0${entry.name}`, entry.value);
+		else if (entry.op === 'property' && entry.name === 'selected')
+			selected.set(entry.node, entry.value);
 		else if (entry.op === 'property') {
 			// A textarea's default value reaches its text, which this column does not compare.
 			if (bindsValue(nodeOf, entry.node)) properties.set(entry.node, entry.value);
@@ -264,14 +342,17 @@ function mirror(
 			}
 			for (const [id, text] of runtime.texts()) {
 				const key = rowKeyIn(nodeOf, entry.node, id);
-				if (key !== undefined && entry.keys.includes(key)) texts.set(id, kept.get(id) ?? text);
+				if (key !== undefined && entry.keys.includes(key))
+					texts.set(id, kept.get(id) ?? text);
 			}
 			// A row's copy is built with its bound attributes, as an arm's nodes are; a row that left takes its own with it.
 			for (const key of attributes.keys())
-				if (rowKeyIn(nodeOf, entry.node, key.split('\0')[0]!) !== undefined) attributes.delete(key);
+				if (rowKeyIn(nodeOf, entry.node, key.split('\0')[0]!) !== undefined)
+					attributes.delete(key);
 			for (const [node, name, value] of runtime.attributes()) {
 				const key = rowKeyIn(nodeOf, entry.node, node);
-				if (key !== undefined && entry.keys.includes(key)) attributes.set(`${node}\0${name}`, value);
+				if (key !== undefined && entry.keys.includes(key))
+					attributes.set(`${node}\0${name}`, value);
 			}
 		} else if (entry.op === 'arm') {
 			chosen.set(entry.node, entry.index);
@@ -293,7 +374,14 @@ function mirror(
 		mount,
 		apply,
 		elementReading,
+		// A press on a <label> acts on the control its `for` names, as both hosts pass it on.
+		pressed: (host: string) =>
+			nodeOf.get(baseOf(host))?.element === 'label'
+				? (attributes.get(`${host}\0for`) ?? host)
+				: host,
 		disabled: (host: string) => attributes.get(`${host}\0disabled`) != null,
+		/** The control a <label> names, which a host types into when the label's text is the field's name. */
+		labelled: (host: string) => attributes.get(`${host}\0for`) ?? null,
 		/** Types into the emptied field and returns what it holds. */
 		typed: (host: string, text: string) => {
 			const bound = attributes.get(`${host}\0maxlength`);
@@ -310,8 +398,9 @@ function mirror(
 		},
 		check(step: LadderStep, index: number) {
 			for (const [field, value] of Object.entries(step.fields ?? {})) {
-				const host = elementReading(field);
-				expect(host && properties.get(host), `step ${index}: the field "${field}"`).toBe(
+				const reading = elementReading(field);
+				const host = reading && (attributes.get(`${reading}\0for`) ?? reading);
+				expect(host && (properties.get(host) ?? valueAttribute(host)), `step ${index}: the field "${field}"`).toBe(
 					value,
 				);
 			}
@@ -320,10 +409,12 @@ function mirror(
 				[...texts].filter(([id]) => !inClosedSheet(id) && !hiddenWithin(id)),
 			);
 			const read = styled ? [...open.values()] : nativeShownTexts(payload, open);
-			const shown = [...read, ...labels().map(([, label]) => label)];
-			expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
+			const shown = [...read, ...labels().map(([, label]) => label), ...chosenLabels(), ...placeholders()];
+			expect(shown, `step ${index}`).toEqual(
+				expect.arrayContaining(step.visible.map(reading)),
+			);
 			for (const text of step.absent ?? [])
-				expect(shown, `step ${index}`).not.toContain(text);
+				expect(shown, `step ${index}`).not.toEqual(expect.arrayContaining([reading(text)]));
 			// Which texts a page's styles hide is Dragon's layout; the payload must still hold them.
 			for (const text of step.hidden ?? [])
 				expect([...open.values()], `step ${index}`).toContain(text);
@@ -353,6 +444,11 @@ function mirror(
 				`step ${index}: the journal left a field stale`,
 			).toEqual(properties);
 			expect(runtime.title(), `step ${index}: the journal left the title stale`).toBe(title);
+			for (const [node, value] of runtime.selections())
+				expect(
+					selected.get(node) ?? false,
+					`step ${index}: the journal left ${node}'s selectedness stale`,
+				).toBe(value);
 		},
 	};
 }
@@ -409,38 +505,65 @@ function walkApp(
 		if (answer) for (const next of appRuntime.dispatch(answer)) stack.at(-1)!.apply(next, -1);
 	}
 	for (const [index, step] of steps.entries()) {
-		const action = step.do;
+		const action = step.do && 'tapAt' in step.do ? { tap: step.do.tapAt.on } : step.do;
 		if (action && 'back' in action) {
 			const journal = appRuntime.dispatch({ event: 'back' });
 			stack.pop();
 			// The screen shown again takes what a page above it changed in the app-wide and storage cells; nothing else changes.
 			const resumed = appRuntime.screens().at(-1)!.runtime.resume();
-			expect(resumed, `step ${index}: the screen shown again had resumed already`).toEqual([]);
-			const shownAgain = journal.filter((entry) => entry.op !== 'abort' && entry.op !== 'clearTimer');
+			expect(resumed, `step ${index}: the screen shown again had resumed already`).toEqual(
+				[],
+			);
+			const shownAgain = journal.filter(
+				(entry) => entry.op !== 'abort' && entry.op !== 'clearTimer',
+			);
 			const kept = pageOf(appRuntime.screens().at(-1)!.route).cells.some(
 				(cell) => cell.app || cell.storage,
 			);
-			if (!kept) expect(shownAgain, `step ${index}: Back journals only what it cancels`).toEqual([]);
+			if (!kept)
+				expect(shownAgain, `step ${index}: Back journals only what it cancels`).toEqual([]);
 			for (const entry of shownAgain) stack.at(-1)!.apply(entry, -1);
 		} else if (
 			looksOnly(action) ||
 			(action && ('swipe' in action || 'scrollTo' in action || 'orientation' in action))
 		) {
 			// Neither the appearance, a rotation, nor a sheet's resting height or scroll changes state: the hosts restyle and lay out.
+		} else if (action && 'choose' in action) {
+			const top = stack.at(-1)!;
+			const select = top.elementReading(action.choose.field);
+			if (!select) throw new Error(`step ${index}: no select reads "${action.choose.field}"`);
+			const choice = top.runtime
+				.choices(select)
+				.find((one) => one.label === action.choose.option);
+			if (!choice || choice.disabled)
+				throw new Error(
+					`step ${index}: "${action.choose.field}" has no option "${action.choose.option}" to pick`,
+				);
+			for (const entry of appRuntime.dispatch({ event: 'choose', host: choice.option }))
+				top.apply(entry, index);
 		} else if (action) {
 			const top = stack.at(-1)!;
-			const host = top.elementReading(
-				'tap' in action ? action.tap : 'type' in action ? action.type.field : '',
+			const reading = top.elementReading(
+				'tap' in action
+					? action.tap
+					: 'type' in action
+						? action.type.field
+						: 'clear' in action
+							? action.clear
+							: '',
 			);
+			const host =
+				reading && ('type' in action || 'clear' in action) ? (top.labelled(reading) ?? reading) : reading;
 			if (!host) throw new Error(`step ${index}: nothing on the top screen to act on`);
+			// A clear control empties the field and fires input, as typing does.
 			const journal =
 				'tap' in action
-					? appRuntime.dispatch({ event: 'activate', host })
-					: 'type' in action
+					? appRuntime.dispatch({ event: 'activate', host: top.pressed(host) })
+					: 'type' in action || 'clear' in action
 						? appRuntime.dispatch({
 								event: 'input',
 								host,
-								value: top.typed(host, action.type.text),
+								value: top.typed(host, 'type' in action ? action.type.text : ''),
 							})
 						: [];
 			// What a journal shows goes to the top screen; a navigation opens the next one, as the hosts push it.
@@ -482,6 +605,7 @@ function walk(
 	target: 'ios' | 'android',
 	styled = false,
 	belowFold?: string,
+	pick?: LadderRung['pick'],
 ) {
 	const store = new Map<string, NativeValue>();
 	let calls: string[] = [];
@@ -718,16 +842,53 @@ function walk(
 						.join(' '));
 		return label !== null && shownNode(node.id) ? [[id, label] as const] : [];
 	};
+	// iOS reads a button or a link as one element, named as the web names it from content: shown text and inner labels.
+	const contentName = (parent: string, suffix: string): string =>
+		payload.nodes
+			.filter((child) => child.parent === parent)
+			.map((child) => {
+				const id = `${child.id}${child.row ? suffix : ''}`;
+				if (!shownNode(id)) return '';
+				if (child.kind === 'text') return texts.get(id) ?? '';
+				if (child.kind !== 'element' || hiddenWithin(id)) return '';
+				const ariaHidden = attributes.get(`${id}\0aria-hidden`);
+				if ((ariaHidden !== undefined ? ariaHidden : child.attributes?.['aria-hidden']) === 'true') return '';
+				return labelOf(child, id)[0]?.[1] ?? contentName(child.id, suffix);
+			})
+			.join('');
+	const controlNames = () =>
+		payload.nodes.flatMap((node) => {
+			if (node.kind !== 'element' || !['button', 'a'].includes(node.element)) return [];
+			const ids = node.row
+				? (new Map(runtime.rows()).get(node.row) ?? []).map((key) => `${node.id}@${key}`)
+				: [node.id];
+			return ids
+				.filter((id) => shownNode(id) && !hiddenWithin(id) && labelOf(node, id).length === 0)
+				.map((id) =>
+					[...contentName(node.id, instanceOf(id).suffix)]
+						.map((character) => (character.trim() === '' ? ' ' : character))
+						.join('')
+						.split(' ')
+						.filter((word) => word !== '')
+						.join(' '),
+				);
+		});
 	// A text field by its accessible name, as the web finds a textbox: a control named the same (a preview button) is not one.
-	const fieldReading = (text: string) =>
+	const fieldReading = (text: LadderText) =>
 		labels().find(([id, label]) => {
 			const element = nodeOf.get(id.split('@')[0]!);
-			return label === text && element?.kind === 'element' && (element.element === 'input' || element.element === 'textarea');
+			return (
+				readsAs(label, text) &&
+				element?.kind === 'element' &&
+				(element.element === 'input' || element.element === 'textarea')
+			);
 		})?.[0] ?? elementReading(text);
-	const elementReading = (text: string) => {
-		const labelled = labels().find(([, label]) => label === text)?.[0];
+	const elementReading = (text: LadderText) => {
+		const labelled = labels().find(([, label]) => readsAs(label, text))?.[0];
 		if (labelled) return labelled;
-		const node = shownTexts().find(([id, shown]) => shown === text && !hiddenWithin(id))?.[0];
+		const node = shownTexts().find(
+			([id, shown]) => readsAs(shown, text) && !hiddenWithin(id),
+		)?.[0];
 		return node ? parentOf(node) : undefined;
 	};
 	// A field's text: what its `value` binding or attribute gave it, then what was typed or the journal wrote.
@@ -739,7 +900,12 @@ function walk(
 		if (node.element === 'input') return node.attributes?.['value'] ?? '';
 		// A textarea shows its `value` attribute as the host built it, then the default values the journal writes.
 		if (node.element === 'textarea')
-			return shownDefaults.get(id) ?? builtAttributes.get(`${id}\0value`) ?? node.attributes?.['value'] ?? '';
+			return (
+				shownDefaults.get(id) ??
+				builtAttributes.get(`${id}\0value`) ??
+				node.attributes?.['value'] ??
+				''
+			);
 		return undefined;
 	};
 	const typed = new Map<string, string>();
@@ -749,8 +915,13 @@ function walk(
 	// A closed select shows its chosen option's label; its options show only in its list.
 	const chosenLabels = () =>
 		payload.nodes.flatMap((node) =>
-			node.kind === 'element' && node.element === 'select' && shownNode(node.id) && !hiddenWithin(node.id)
-				? runtime.choices(node.id).flatMap((choice) => (selected.get(choice.option) ? [choice.label] : []))
+			node.kind === 'element' &&
+			node.element === 'select' &&
+			shownNode(node.id) &&
+			!hiddenWithin(node.id)
+				? runtime
+						.choices(node.id)
+						.flatMap((choice) => (selected.get(choice.option) ? [choice.label] : []))
 				: [],
 		);
 	const attributeNow = (id: string, name: string) => {
@@ -857,9 +1028,14 @@ function walk(
 				checks.set(entry.node, entry.value);
 			else if (entry.op === 'property' && entry.name === 'selected')
 				selected.set(entry.node, entry.value);
+			// A file input's shown names are the host's to draw; the runtime keeps no field text for them.
+			else if (entry.op === 'property' && entry.name === 'files') continue;
 			else if (entry.op === 'property') {
 				const node = nodeOf.get(entry.node.split('@')[0]!);
-				const followsDefault = node?.kind === 'element' && node.element === 'textarea' && !bindsValue(nodeOf, entry.node);
+				const followsDefault =
+					node?.kind === 'element' &&
+					node.element === 'textarea' &&
+					!bindsValue(nodeOf, entry.node);
 				if (followsDefault) shownDefaults.set(entry.node, entry.value);
 				else properties.set(entry.node, entry.value);
 				typed.delete(entry.node);
@@ -869,7 +1045,8 @@ function walk(
 				runtime = createNativeRuntime(payload, store, entry.params);
 				mount();
 			} else if (entry.op === 'rows') {
-				for (const [node, index] of runtime.arms()) if (!chosen.has(node)) chosen.set(node, index);
+				for (const [node, index] of runtime.arms())
+					if (!chosen.has(node)) chosen.set(node, index);
 				const kept = new Map<string, string>();
 				for (const [id, text] of texts) {
 					const key = rowKeyIn(nodeOf, entry.node, id);
@@ -879,7 +1056,8 @@ function walk(
 				}
 				for (const [id, text] of runtime.texts()) {
 					const key = rowKeyIn(nodeOf, entry.node, id);
-					if (key !== undefined && entry.keys.includes(key)) texts.set(id, kept.get(id) ?? text);
+					if (key !== undefined && entry.keys.includes(key))
+						texts.set(id, kept.get(id) ?? text);
 				}
 				// A row that stays keeps its attributes; a new row's are built from current values.
 				const keptAttributes = new Map<string, string | null>();
@@ -912,7 +1090,8 @@ function walk(
 					if (inArm(node, entry.node)) checks.set(node, checked);
 				for (const id of typed.keys()) if (inArm(id, entry.node)) typed.delete(id);
 				// A sheet leaves with its arm, closed; one that comes is built open or closed as its state says.
-				for (const node of sheetOpen.keys()) if (inArm(node, entry.node)) sheetOpen.delete(node);
+				for (const node of sheetOpen.keys())
+					if (inArm(node, entry.node)) sheetOpen.delete(node);
 				for (const [node, open] of runtime.sheets())
 					if (inArm(node, entry.node)) sheetOpen.set(node, open);
 			} else if (entry.op === 'sheet') sheetOpen.set(entry.node, entry.open);
@@ -940,7 +1119,8 @@ function walk(
 	}
 	startTasks();
 	for (const [index, step] of steps.entries()) {
-		const action = step.do;
+		// The reference lays nothing out: a tap at a point is a tap on the element the step says is there.
+		const action = step.do && 'tapAt' in step.do ? { tap: step.do.tapAt.on } : step.do;
 		if (action) invalid = undefined;
 		if (action && 'relaunch' in action) {
 			if (action.permissions?.location === 'unset') permission = 'unknown';
@@ -974,7 +1154,8 @@ function walk(
 			else permission = given;
 			refreshAccess(index);
 			for (const cell of waiting.splice(0)) apply(answer(cell), index);
-			for (const continuation of waitingCalls.splice(0)) apply(answerCall(continuation), index);
+			for (const continuation of waitingCalls.splice(0))
+				apply(answerCall(continuation), index);
 			for (const object of waitingForMicrophone.splice(0))
 				if (given === 'granted') recording.set(object, 0);
 				else apply(setObject(object, 'recorder.active', false), index);
@@ -1035,13 +1216,18 @@ function walk(
 				throw new Error(`step ${index}: no select reads "${action.choose.field}"`);
 			if (attributeNow(select, 'disabled') != null)
 				throw new Error(`step ${index}: "${action.choose.field}" is disabled`);
-			const choice = runtime.choices(select).find((one) => one.label === action.choose.option);
+			const choice = runtime
+				.choices(select)
+				.find((one) => one.label === action.choose.option);
 			if (!choice || choice.disabled)
-				throw new Error(`step ${index}: "${action.choose.field}" has no option "${action.choose.option}" to pick`);
+				throw new Error(
+					`step ${index}: "${action.choose.field}" has no option "${action.choose.option}" to pick`,
+				);
 			apply(runtime.dispatch({ event: 'choose', host: choice.option }), index);
 		} else if (action && 'slide' in action) {
 			const slider = elementReading(action.slide.field);
-			if (!slider) throw new Error(`step ${index}: nothing reads "${action.slide.field}" to slide`);
+			if (!slider)
+				throw new Error(`step ${index}: nothing reads "${action.slide.field}" to slide`);
 			// The phone reports the end the thumb reaches, on the slider's step, as an input.
 			const end = attributeNow(slider, action.slide.to === 'max' ? 'max' : 'min');
 			const value = nativeRangeValue(
@@ -1060,8 +1246,18 @@ function walk(
 			// A finger's drag as a phone reports it: down, a move every 16 ms of 20 points, and up; the platform takes a drag along
 			// a box that scrolls after a few moves, as both phones' browsers do.
 			const step = action.drag.direction === 'right' ? { x: 20, y: 0 } : { x: 0, y: -20 };
-			const touch = (event: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel', n: number) =>
-				runtime.dispatch({ event, host, pointerId: 1, x: 100 + step.x * n, y: 300 + step.y * n, time: 16 * n });
+			const touch = (
+				event: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel',
+				n: number,
+			) =>
+				runtime.dispatch({
+					event,
+					host,
+					pointerId: 1,
+					x: 100 + step.x * n,
+					y: 300 + step.y * n,
+					time: 16 * n,
+				});
 			const out = [...touch('pointerdown', 0)];
 			const moves = action.drag.scrolls ? 3 : 10;
 			for (let n = 1; n <= moves; n++) out.push(...touch('pointermove', n));
@@ -1090,7 +1286,15 @@ function walk(
 				index,
 			);
 		} else if (action && 'appearance' in action) scheme = action.appearance;
-		else if (action && !('tap' in action) && !('doubleTap' in action) && !('type' in action) && !('submit' in action) && !('erase' in action) && !('dismissSheet' in action))
+		else if (
+			action &&
+			!('tap' in action) &&
+			!('doubleTap' in action) &&
+			!('type' in action) &&
+			!('submit' in action) &&
+			!('erase' in action) &&
+			!('dismissSheet' in action)
+		)
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
 			const sheet = openSheet(index);
@@ -1106,21 +1310,27 @@ function walk(
 					: 'doubleTap' in action
 						? action.doubleTap
 						: 'type' in action
-						? action.type.field
-						: 'erase' in action
-							? action.erase
-							: action.submit;
-			const host = 'tap' in action || 'doubleTap' in action ? elementReading(name) : fieldReading(name);
+							? action.type.field
+							: 'erase' in action
+								? action.erase
+								: action.submit;
+			const host =
+				'tap' in action || 'doubleTap' in action
+					? elementReading(name)
+					: fieldReading(name);
 			if (!host)
 				throw new Error(
-					`step ${index}: nothing reads "${name}" to ${'tap' in action ? 'tap' : 'type into'}`,
+					`step ${index}: nothing reads ${describeText(name)} to ${'tap' in action ? 'tap' : 'type into'}`,
 				);
 			if (attributeNow(host, 'disabled') != null)
-				throw new Error(`step ${index}: "${name}" is disabled`);
+				throw new Error(`step ${index}: ${describeText(name)} is disabled`);
 			// Typing shows the text in the field at once; the input event then runs the handler.
 			const text =
 				'type' in action
-					? typedInto((action.type.append ? fieldText(host) : '') + action.type.text, attributeNow(host, 'maxlength'))
+					? typedInto(
+							(action.type.append ? fieldText(host) : '') + action.type.text,
+							attributeNow(host, 'maxlength'),
+						)
 					: undefined;
 			if (text !== undefined) {
 				if (properties.has(host)) properties.set(host, text);
@@ -1158,12 +1368,20 @@ function walk(
 					if (element?.kind === 'element' && element.element === 'label') break;
 					climb = element?.parent;
 				}
-				const named = climb ? attributeNow(nodeOf.get(climb)?.row ? `${climb}${key}` : climb, 'for') : null;
+				const named = climb
+					? attributeNow(nodeOf.get(climb)?.row ? `${climb}${key}` : climb, 'for')
+					: null;
 				const control = named ? nodeOf.get(named.split('@')[0]!) : undefined;
 				if (named && control?.kind === 'element') {
 					const type = control.attributes?.['type'] ?? 'text';
-					const pressable = payload.events.some((event) => event.host === control.id && event.event === 'activate');
-					if (control.element === 'textarea' || (control.element === 'input' && !PRESSED_INPUT_TYPES.has(type)) || !pressable)
+					const pressable = payload.events.some(
+						(event) => event.host === control.id && event.event === 'activate',
+					);
+					if (
+						control.element === 'textarea' ||
+						(control.element === 'input' && !PRESSED_INPUT_TYPES.has(type)) ||
+						!pressable
+					)
 						focusing = named;
 					else pressed = named;
 				}
@@ -1174,29 +1392,48 @@ function walk(
 			);
 			const activates = !!pressed;
 			if ('tap' in action && !activates && !focusing && touched.length === 0)
-				throw new Error(`step ${index}: "${name}" is not a control and the press changed nothing`);
+				throw new Error(
+					`step ${index}: "${name}" is not a control and the press changed nothing`,
+				);
 			// A field takes the keyboard when typed into, and gives it up when anything else is tapped: its focus and blur run.
-			const handles = (node: string, event: 'input' | 'focus' | 'blur' | 'keydown' | 'keyup') =>
-				payload.events.some((candidate) => candidate.host === node.split('@')[0] && candidate.event === event);
+			const handles = (
+				node: string,
+				event: 'input' | 'focus' | 'blur' | 'keydown' | 'keyup',
+			) =>
+				payload.events.some(
+					(candidate) =>
+						candidate.host === node.split('@')[0] && candidate.event === event,
+				);
 			if ('type' in action && focused !== host) {
-				if (focused && handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
+				if (focused && handles(focused, 'blur'))
+					apply(runtime.dispatch({ event: 'blur', host: focused }), index);
 				focused = host;
-				if (handles(host, 'focus')) apply(runtime.dispatch({ event: 'focus', host }), index);
+				if (handles(host, 'focus'))
+					apply(runtime.dispatch({ event: 'focus', host }), index);
 			}
-			if (('tap' in action || 'doubleTap' in action) && focused && focused !== host && focused !== focusing) {
-				if (handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
+			if (
+				('tap' in action || 'doubleTap' in action) &&
+				focused &&
+				focused !== host &&
+				focused !== focusing
+			) {
+				if (handles(focused, 'blur'))
+					apply(runtime.dispatch({ event: 'blur', host: focused }), index);
 				focused = undefined;
 			}
 			if (focusing && focused !== focusing) {
 				focused = focusing;
-				if (handles(focusing, 'focus')) apply(runtime.dispatch({ event: 'focus', host: focusing }), index);
+				if (handles(focusing, 'focus'))
+					apply(runtime.dispatch({ event: 'focus', host: focusing }), index);
 			}
 			// Backspace with the cursor at the end takes the last character; the input event then runs the handler.
 			const erased = (field: string): ReturnType<typeof runtime.dispatch> => {
 				const text = [...fieldText(field)].slice(0, -1).join('');
 				if (properties.has(field)) properties.set(field, text);
 				else typed.set(field, text);
-				return handles(field, 'input') ? runtime.dispatch({ event: 'input', host: field, value: text }) : [];
+				return handles(field, 'input')
+					? runtime.dispatch({ event: 'input', host: field, value: text })
+					: [];
 			};
 			// A key runs the field's keydown handler first; preventDefault() there leaves out what the key does.
 			const keyed = (key: string): boolean => {
@@ -1207,7 +1444,8 @@ function walk(
 			};
 			// A key's keyup runs after what the key did, or after its keydown left that out.
 			const keyedUp = (key: string) => {
-				if (handles(host, 'keyup')) apply(runtime.dispatch({ event: 'keyup', host, key }), index);
+				if (handles(host, 'keyup'))
+					apply(runtime.dispatch({ event: 'keyup', host, key }), index);
 			};
 			// With a keyup handler, typing is key by key, each key's edit between its keydown and its keyup, as on the web.
 			const byKey = 'type' in action && handles(host, 'keyup');
@@ -1222,14 +1460,18 @@ function walk(
 						sofar += kept[[...sofar].length];
 						if (properties.has(host)) properties.set(host, sofar);
 						else typed.set(host, sofar);
-						if (handles(host, 'input')) apply(runtime.dispatch({ event: 'input', host, value: sofar }), index);
+						if (handles(host, 'input'))
+							apply(runtime.dispatch({ event: 'input', host, value: sofar }), index);
 					}
 					keyedUp(key);
 				}
 			}
 			// A double tap is two presses, the second counted 2.
 			if ('doubleTap' in action)
-				apply(runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 1 }), index);
+				apply(
+					runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 1 }),
+					index,
+				);
 			const dispatched =
 				'tap' in action
 					? activates && !focusing
@@ -1237,25 +1479,44 @@ function walk(
 						: []
 					: 'doubleTap' in action
 						? runtime.dispatch({ event: 'activate', host: pressed ?? host, detail: 2 })
-					: 'type' in action
-						? handles(host, 'input') && !byKey
-							? runtime.dispatch({ event: 'input', host, value: text! })
-							: []
-						: 'erase' in action
-							? keyed('Backspace') || fieldText(host) === ''
-								? []
-								: erased(host)
-							: keyed('Enter') || !returns
-								? []
-								: runtime.dispatch({ event: 'enter', host });
+						: 'type' in action
+							? handles(host, 'input') && !byKey
+								? runtime.dispatch({ event: 'input', host, value: text! })
+								: []
+							: 'erase' in action
+								? keyed('Backspace') || fieldText(host) === ''
+									? []
+									: erased(host)
+								: keyed('Enter') || !returns
+									? []
+									: runtime.dispatch({ event: 'enter', host });
 			apply(dispatched, index);
 			// A focus() a handler asks for gives a text field the keyboard, as the host does: its focus handler runs.
 			for (const entry of dispatched)
 				if (entry.op === 'command' && entry.command === 'focus' && entry.node !== focused) {
-					if (focused && handles(focused, 'blur')) apply(runtime.dispatch({ event: 'blur', host: focused }), index);
+					if (focused && handles(focused, 'blur'))
+						apply(runtime.dispatch({ event: 'blur', host: focused }), index);
 					focused = entry.node;
-					if (handles(entry.node, 'focus')) apply(runtime.dispatch({ event: 'focus', host: entry.node }), index);
+					if (handles(entry.node, 'focus'))
+						apply(runtime.dispatch({ event: 'focus', host: entry.node }), index);
 				}
+			// A picker a handler opens answers with the rung's files, as the hosts' launch argument does.
+			for (const entry of dispatched)
+				if (entry.op === 'command' && entry.command === 'showPicker' && pick)
+					apply(
+						runtime.dispatch({
+							event: 'pick',
+							host: entry.node,
+							files: pick.map((file) => ({
+								ref: pickedRef(file.text),
+								name: file.name,
+								size: new TextEncoder().encode(file.text).length,
+								type: file.type,
+								lastModified: clock,
+							})),
+						}),
+						index,
+					);
 			if ('erase' in action) keyedUp('Backspace');
 			else if ('submit' in action) keyedUp('Enter');
 		}
@@ -1327,10 +1588,15 @@ function walk(
 				.map(([, label]) => label),
 			...chosenLabels(),
 		];
-		expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
-		for (const text of step.absent ?? []) expect(shown, `step ${index}`).not.toContain(text);
+		const found = [...shown, ...(target === 'ios' ? controlNames() : [])];
+		expect(found, `step ${index}`).toEqual(expect.arrayContaining(step.visible.map(reading)));
+		for (const text of step.absent ?? [])
+			expect(found, `step ${index}`).not.toEqual(expect.arrayContaining([reading(text)]));
 		for (const [node, value] of runtime.selections())
-			expect(selected.get(node) ?? false, `step ${index}: the journal left ${node}'s selectedness stale`).toBe(value);
+			expect(
+				selected.get(node) ?? false,
+				`step ${index}: the journal left ${node}'s selectedness stale`,
+			).toBe(value);
 		expect(shown, `step ${index}: scrolled out of sight, still held`).toEqual(
 			expect.arrayContaining([...(step.offScreen ?? [])]),
 		);
@@ -1357,10 +1623,9 @@ function walk(
 			new Map(runtime.checks()),
 			`step ${index}: the journal left a checkbox stale`,
 		).toEqual(checks);
-		expect(
-			new Map(runtime.fields()),
-			`step ${index}: the journal left a field stale`,
-		).toEqual(properties);
+		expect(new Map(runtime.fields()), `step ${index}: the journal left a field stale`).toEqual(
+			properties,
+		);
 		expect(
 			new Map(runtime.sheets()),
 			`step ${index}: a sheet shows what its state does not say`,
@@ -1413,7 +1678,9 @@ test.each(
 						? ['error', diagnostic.code]
 						: [
 								'warning',
-								[NATIVE_MOUSE_ONLY_CODE, NATIVE_DROP_ONLY_CODE].includes(diagnostic.code)
+								[NATIVE_MOUSE_ONLY_CODE, NATIVE_DROP_ONLY_CODE].includes(
+									diagnostic.code,
+								)
 									? diagnostic.code
 									: NATIVE_KEYBOARD_ONLY_CODE,
 							],
@@ -1437,6 +1704,7 @@ test.each(
 			target,
 			build.styles.length > 0 || build.stylesheets.length > 0,
 			rung.belowFold,
+			rung.pick,
 		);
 	},
 );
@@ -1458,12 +1726,14 @@ test.each([...navRungFolders(), ...styleRungFolders(), ...sheetStyleRungFolders(
 		).toEqual([]);
 		for (const page of refused)
 			expect(
-				build.diagnostics.some((diagnostic) => diagnostic.page === page && diagnostic.severity === 'error'),
+				build.diagnostics.some(
+					(diagnostic) => diagnostic.page === page && diagnostic.severity === 'error',
+				),
 				`${page} is refused`,
 			).toBe(true);
 		walkApp(
 			build.payload!,
-			rung.steps,
+			ANIMATED_RUNGS.has(folder) ? rung.steps.slice(0, 1) : rung.steps,
 			rung.start ?? '/',
 			new Set(build.styleInputs.map((input) => input.pattern)),
 			rung.location,

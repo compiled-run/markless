@@ -20,7 +20,11 @@ public final class MarklessViewController: UIViewController {
 	private let payload: NativeViewPayload
 	private let style: StyleExport?
 	/// The page area in points and the slot values the views were last laid out for by Dragon's plan; nil until then.
-	private var laidOutFor: (size: CGSize, slots: [Double])?
+	private var laidOutFor: (size: CGSize, slots: [Double], texts: [String: String])?
+	/// The entries Dragon has laid out at `laidOutFor`, and the export holding them: a page lays out only the entries it shows.
+	private var laidEntries: Set<Int> = []
+	private var laidExport: StyleExport?
+	private var layingOut = false
 	/// Each style slot's current number, by slot id: what Dragon's plan lays the page out with.
 	private var slotValues: [String: Double] = [:]
 	/// The texts at mount, which the style export laid out: a later layout checks the export against them, not the texts now.
@@ -33,6 +37,10 @@ public final class MarklessViewController: UIViewController {
 	private let device: NativeDevice
 	private var runtime: NativeRuntime
 	private var layout: StyleLayout?
+	/// The page's transitions and animations run by Dragon's animator, and the display link that moves them while they run.
+	private var animation: AnimationRun?
+	private var animationLink: CADisplayLink?
+	private var animationLast: CFTimeInterval?
 	/// The `@media` band the views show, and the bands it is picked from; nil without bands.
 	private var band: Int?
 	private var bands: StyleBands?
@@ -47,7 +55,7 @@ public final class MarklessViewController: UIViewController {
 	/// This screen's in-flight script requests: the request id the script gave, to the token that cancels it.
 	private var requests: [Int: Int] = [:]
 	/// In an app: opens the page a `navigate` entry names, pushed or in this screen's place.
-	var navigator: ((_ route: String, _ params: [NativeRouteParam], _ replace: Bool) throws -> Void)?
+	var navigator: ((_ route: String, _ params: [NativeRouteParam], _ search: String, _ replace: Bool) throws -> Void)?
 
 	/// `route`: the path a page opens at, matched against the payload's route; by default the `-route` launch argument.
 	public init(
@@ -90,16 +98,15 @@ public final class MarklessViewController: UIViewController {
 				originX: length(transform.originX), originY: length(transform.originY), width: width, height: height)
 		}
 		DragonPaint.opacityAlpha8 = DragonPlan.opacityAlpha8
-		DragonPaint.cornerRadii = { try DragonPlan.cornerRadii($0, width: $1, height: $2, dpr: $3) }
 		DragonPaint.groupComposite = { try DragonPlan.groupComposite($0, $1, $2, $3, $4, $5, $6, $7, $8, fold: false) }
 		DragonPaint.groupCompositeLayered = DragonPlan.groupCompositeLayered
 		#endif
 	}
 
-	/// One screen of an app: the page for a route, opened with its params and its route's styles.
+	/// One screen of an app: the page for a route, opened with its params, its query and its route's styles.
 	init(
-		page: NativeViewPayload, params: [NativeRouteParam], store: NativeStore, style: StyleExport?, fonts: [String: Data], images: [String: NativeImageAsset] = [:],
-		device: NativeDevice
+		page: NativeViewPayload, params: [NativeRouteParam], search: String = "", store: NativeStore, style: StyleExport?, fonts: [String: Data],
+		images: [String: NativeImageAsset] = [:], device: NativeDevice
 	) throws {
 		FirstFrame.controllerCreated()
 		self.device = device
@@ -108,7 +115,7 @@ public final class MarklessViewController: UIViewController {
 		self.fonts = fonts
 		self.images = images
 		self.store = store
-		runtime = NativeRuntime(payload: page, store: store, params: params, scriptHost: MarklessScripting.shared.host)
+		runtime = NativeRuntime(payload: page, store: store, params: params, search: search, scriptHost: MarklessScripting.shared.host)
 		super.init(nibName: nil, bundle: nil)
 		Self.linkDragon()
 		try buildPage()
@@ -132,7 +139,7 @@ public final class MarklessViewController: UIViewController {
 			self.band = now
 			paintCanvas()
 		} catch {
-			fatalError("Markless iOS host: \(error)")
+			hostFailed("\(error)")
 		}
 	}
 
@@ -164,6 +171,8 @@ public final class MarklessViewController: UIViewController {
 	/// Fills the device cells from the device, then builds the views and starts the page's async device calls.
 	private func buildPage() throws {
 		runtime.measure = { [weak self] id in self?.measureBox(id) }
+		// Safari reports the screen's scale as devicePixelRatio.
+		runtime.devicePixelRatio = { [weak self] in Double(self?.traitCollection.displayScale ?? 1) }
 		runtime.media = { [weak self] in
 			[
 				("prefers-reduced-motion", UIAccessibility.isReduceMotionEnabled ? "reduce" : "no-preference"),
@@ -182,7 +191,14 @@ public final class MarklessViewController: UIViewController {
 		let dark = traitCollection.userInterfaceStyle == .dark
 		let texts = try runtime.texts()
 		mountTexts = texts
-		layout = try style.map { try $0.resolve(for: payload, initialTexts: texts, value: runtime.value(of:), arm: runtime.styleArm(of:), dark: dark) }
+		// With Dragon's plan the page's first layout lays out the texts it shows now, which the build could not know (stored data,
+		// the route's params); without one each text must be the one the build laid out.
+		#if canImport(DragonPlan)
+		let checked = style?.plan == nil ? texts : []
+		#else
+		let checked = texts
+		#endif
+		layout = try style.map { try $0.resolve(for: payload, initialTexts: checked, value: runtime.value(of:), arm: runtime.styleArm(of:), dark: dark) }
 		var sheetLayouts: [String: [(snapPoint: Double, layout: StyleLayout)]] = [:]
 		for sheet in style?.sheets ?? [] {
 			sheetLayouts[sheet.node] = try style!.resolveSheet(sheet.node, for: payload, initialTexts: texts, value: runtime.value(of:), arm: runtime.styleArm(of:), dark: dark)
@@ -198,6 +214,18 @@ public final class MarklessViewController: UIViewController {
 			ask: { [weak self] action in self?.perform(action) ?? false },
 			objectView: { object, kind in try device.view(for: object, device: kind) }, images: images)
 		tree?.presenter = self
+		#if canImport(DragonPlan)
+		tree?.library = DragonPlan.library
+		tree?.onEntries = { [weak self] in self?.layOutAtScreenSize() }
+		tree?.onShown = { [weak self] in
+			self?.paintCanvas()
+			self?.writeLayoutDump()
+		}
+		tree?.stickyShift = DragonPlan.sticky
+		if let style, style.anim != nil, let tree {
+			animation = AnimationRun(style: style, initial: tree.assignment, run: DragonPlan.animation)
+		}
+		#endif
 		navigationItem.title = try runtime.title()
 		try runCalls(try runtime.tasks())
 		apply { try self.runtime.start() }
@@ -208,7 +236,7 @@ public final class MarklessViewController: UIViewController {
 		do {
 			try runCalls(try runtime.leave())
 		} catch {
-			fatalError("Markless iOS host: \(error)")
+			hostFailed("\(error)")
 		}
 	}
 
@@ -270,12 +298,48 @@ public final class MarklessViewController: UIViewController {
 			followSlots(journal)
 			if movesRows(journal) { layOutAtScreenSize(rowsMoved: true) }
 			try runCalls(journal)
+			if let tree { animation?.moved(to: tree.assignment) }
 		} catch {
-			fatalError("Markless iOS host: \(error)")
+			hostFailed("\(error)")
 		}
+		runAnimation()
 		writeLayoutDump()
 		tree?.presenter = self
 		scheduleLoadEvents()
+	}
+
+	/// Runs Dragon's animator up to now: dispatches each animation event a handler listens for, and keeps the display link
+	/// running while an animation or transition does.
+	private func runAnimation() {
+		guard let animation else { return }
+		let size = view.safeAreaLayoutGuide.layoutFrame.size
+		guard size.width > 0, size.height > 0 else { return }
+		let next: (events: [AnimationEvent], busy: Bool)
+		do {
+			next = try animation.next(dpr: Double(traitCollection.displayScale), width: Double(size.width), height: Double(size.height))
+		} catch {
+			hostFailed("\(error)")
+		}
+		if next.busy, animationLink == nil {
+			let link = CADisplayLink(target: self, selector: #selector(animationFrame(_:)))
+			link.add(to: .main, forMode: .common)
+			animationLink = link
+		} else if !next.busy {
+			animationLink?.invalidate()
+			animationLink = nil
+			animationLast = nil
+		}
+		for event in next.events {
+			let host = event.node.firstIndex(of: "@").map { String(event.node[..<$0]) } ?? event.node
+			guard payload.events.contains(where: { $0.host == host && $0.event == event.event }) else { continue }
+			apply { try self.runtime.dispatch(NativeAction(event: event.event, host: event.node, value: event.name, time: event.elapsedTime)) }
+		}
+	}
+
+	@objc private func animationFrame(_ link: CADisplayLink) {
+		if let last = animationLast { animation?.advanced(ms: (link.timestamp - last) * 1000) }
+		animationLast = link.timestamp
+		runAnimation()
 	}
 
 	/// After the first frame and after every journal: `idle` for the elements due one, `visible` for those on screen.
@@ -362,39 +426,85 @@ public final class MarklessViewController: UIViewController {
 		let started = CFAbsoluteTimeGetCurrent()
 		do {
 			let slots = try style.slots.map { slot in
-				guard let value = slotValues[slot.id] else { throw HostError("the style export lays out slot \(slot.id), which the payload does not compute") }
+				// A slot inside a row has a value per row copy, which the rows carry; the page lays its template out at the first value.
+				guard let value = slotValues[slot.id] ?? (isRowSlot(slot.id) ? slot.initial : nil) else { throw HostError("the style export lays out slot \(slot.id), which the payload does not compute") }
 				return value
 			}
-			guard size.width > 0, size.height > 0, rowsMoved || size != laidOutFor?.size || slots.map(\.bitPattern) != laidOutFor?.slots.map(\.bitPattern) else { return }
+			let pageRows = Dictionary(payload.nodes.map { ($0.id, $0.row) }, uniquingKeysWith: { a, _ in a })
+			let texts = Dictionary(try runtime.texts().filter { pageRows[$0.node] != nil && pageRows[$0.node]! == nil }.map { ($0.node, $0.text) }, uniquingKeysWith: { a, _ in a })
+			guard size.width > 0, size.height > 0, !layingOut else { return }
+			let same = !rowsMoved && size == laidOutFor?.size && slots.map(\.bitPattern) == laidOutFor?.slots.map(\.bitPattern) && texts == laidOutFor?.texts
+			// The shown entries, at every @media band: the band this size selects is only decided once the page is laid out at it.
+			let needed = Set([tree.assignment, tree.shown].flatMap { entry in
+				let values = style.assignments[min(entry, style.assignments.count - 1)].values
+				return style.assignments.indices.filter { k in
+					k == entry || (entry < style.assignments.count && style.assignments[k].values.allSatisfy { key, value in
+						key == StyleBands.state || values[key].map { $0.strictlyEquals(value) } ?? false
+					})
+				}
+			})
+			if same && needed.isSubset(of: laidEntries) { return }
+			if !same {
+				laidEntries = []
+				laidExport = nil
+			}
+			let entries = needed.subtracting(laidEntries)
 			let scale = Double(traitCollection.displayScale)
-			let shape = coreTextRowShaper(faces: style.systemFaces, dpr: scale)
-			let relaid = try style.laidOut(
-				width: Double(size.width), height: Double(size.height), scale: scale, slots: slots, layout: DragonPlan.layout,
-				rows: style.planRepeats.isEmpty ? nil : try style.shownRows(payload, runtime: runtime),
-				rowsLayout: { DragonPlan.rowsLayout($0, shape: shape) })
+			let shaper = coreTextRowShaper(faces: style.systemFaces, authored: fonts, dpr: scale)
+			var unshaped = false
+			let shape: (String, Double, String, Int, Int, String, [Double]) throws -> [Double] = { face, size, text, start, end, language, features in
+				if style.systemFaces[face] == nil && self.fonts[face] == nil { unshaped = true }
+				return try shaper(face, size, text, start, end, language, features)
+			}
+			let rows = style.planRepeats.isEmpty ? nil : try style.shownRows(payload, runtime: runtime)
+			let lay = { (texts: [String: String]) in
+				try style.laidOut(
+					width: Double(size.width), height: Double(size.height), scale: scale, slots: slots, layout: DragonPlan.layout,
+					rows: rows, rowsLayout: { DragonPlan.rowsLayout($0, shape: shape) }, texts: texts, entries: entries, previous: self.laidExport)
+			}
+			// Page texts in a face this host cannot shape keep the boxes the build laid them out in, as before they followed state.
+			let relaid: StyleExport
+			// The layout holds the texts the page shows now, unless it kept the build's boxes.
+			var laidTexts = try runtime.texts()
+			do { relaid = try lay(texts) } catch where unshaped && !texts.isEmpty {
+				relaid = try lay([:])
+				laidTexts = mountTexts
+			}
 			let now = try relaid.resolve(
-				for: payload, initialTexts: mountTexts, value: runtime.value(of:), dark: traitCollection.userInterfaceStyle == .dark)
+				for: payload, initialTexts: laidTexts, value: runtime.value(of:), arm: runtime.styleArm(of:),
+				dark: traitCollection.userInterfaceStyle == .dark)
+			laidEntries.formUnion(entries)
+			laidExport = relaid
+			laidOutFor = (size, slots, texts)
+			layingOut = true
+			defer { layingOut = false }
 			try tree.relayout(now)
 			layout = now
-			laidOutFor = (size, slots)
 			applyBand()
 			layoutMilliseconds = (CFAbsoluteTimeGetCurrent() - started) * 1000
 		} catch {
-			fatalError("Markless iOS host: \(error)")
+			hostFailed("\(error)")
 		}
 		#endif
 		writeLayoutDump()
 	}
 
-	/// A `slot` entry's value lays the page out again at its current size, once the rest of the journal is applied.
+	/// A `slot` entry's value, or a page text's change, lays the page out again at its current size, once the rest of the journal is applied.
 	private func followSlots(_ journal: [NativeJournalEntry]) {
 		var moved = false
+		var rowMoved = false
 		for case let .slot(slot, value) in journal {
 			slotValues[slot] = value
 			moved = true
+			if slot.contains("@") { rowMoved = true }
 		}
-		if moved, isViewLoaded { layOutAtScreenSize() }
+		// A page text that changes, or one an arm shows, may change its box: the layout compares the texts it last laid out with.
+		for case let .text(node, _) in journal where !node.contains("@") { moved = true }
+		for case let .arm(node, _) in journal where !node.contains("@") { moved = true }
+		if moved, isViewLoaded { layOutAtScreenSize(rowsMoved: rowMoved) }
 	}
+
+	private func isRowSlot(_ id: String) -> Bool { payload.slots.contains { $0.id == id && $0.row != nil } }
 
 	/// With the launch argument `-markless-layout-dump`, every shown box in points from the page's top left, written to
 	/// Documents/markless-layout.json after each layout and each journal, for a check against the phone's browser.
@@ -407,6 +517,8 @@ public final class MarklessViewController: UIViewController {
 			("viewport", .object([("width", number(size.width)), ("height", number(size.height))])),
 			("scale", number(traitCollection.displayScale)),
 			("assignment", .number(Double(tree.assignment))),
+			// The entry shown: the assignment, or the interaction state (:active, :focus) selected in it.
+			("shown", .number(Double(tree.shown))),
 			("layoutMilliseconds", layoutMilliseconds.map { .number($0) } ?? .null),
 			("nodes", .array(tree.shownFrames().map { node in
 				.array([.string(node.id), number(node.frame.minX), number(node.frame.minY), number(node.frame.width), number(node.frame.height)])
@@ -447,7 +559,7 @@ public final class MarklessViewController: UIViewController {
 	public override func viewIsAppearing(_ animated: Bool) {
 		super.viewIsAppearing(animated)
 		if let layout, style?.plan == nil, abs(traitCollection.displayScale - layout.dpr) > 0.001 {
-			fatalError("Markless iOS host: the style export was laid out at \(layout.dpr)x, this screen is \(traitCollection.displayScale)x")
+			hostFailed("the style export was laid out at \(layout.dpr)x, this screen is \(traitCollection.displayScale)x")
 		}
 		applyBand()
 		var pops = [navigationController?.interactivePopGestureRecognizer]
@@ -480,9 +592,9 @@ public final class MarklessViewController: UIViewController {
 		var prevented = false
 		do {
 			let journal = try runtime.dispatch(action)
-			if case let .navigate(route, params, replace)? = journal.last {
+			if case let .navigate(route, params, search, replace)? = journal.last {
 				if replace || navigator == nil { leave() }
-				if let navigator { try navigator(route, params, replace) } else { try navigate(route, params) }
+				if let navigator { try navigator(route, params, search, replace) } else { try navigate(route, params, search) }
 				return false
 			}
 			prevented = journal.contains(.preventDefault)
@@ -492,19 +604,22 @@ public final class MarklessViewController: UIViewController {
 			if movesRows(journal) { layOutAtScreenSize(rowsMoved: true) }
 			try runCalls(journal)
 			paintCanvas()
+			if let tree { animation?.moved(to: tree.assignment) }
 		} catch {
-			fatalError("Markless iOS host: \(error)")
+			hostFailed("\(error)")
 		}
+		runAnimation()
 		scheduleLoadEvents()
 		return prevented
 	}
 
-	/// Builds the page at `route` from scratch with `params`; its state starts over.
-	private func navigate(_ route: String, _ params: [NativeRouteParam]) throws {
+	/// Builds the page at `route` from scratch with `params` and `search`; its state starts over.
+	private func navigate(_ route: String, _ params: [NativeRouteParam], _ search: String) throws {
 		guard payload.route?.pattern == route else { throw HostError("no page for \(route): this payload is \(payload.route?.pattern ?? "not a page")") }
 		for object in payload.objects { device.release(object.id) }
 		runtime = NativeRuntime(
-			payload: payload, store: store, params: params, preferredLanguages: Locale.preferredLanguages, scriptHost: MarklessScripting.shared.host)
+			payload: payload, store: store, params: params, search: search, preferredLanguages: Locale.preferredLanguages,
+			scriptHost: MarklessScripting.shared.host)
 		scrollWatches = [:]
 		tree?.unmount()
 		try buildPage()
@@ -519,8 +634,9 @@ private func registerFaces(_ files: [(id: String, file: String)], fonts: [String
 	var faces: [String: UIFontDescriptor] = [:]
 	for (id, file) in files {
 		guard let bytes = fonts[id] else { throw HostError("the style export needs font \(id) (\(file)), which was not given") }
+		// Dragon names the face it bundles (Ahem) by name; every other face by its sha256.
 		let digest = "sha256:" + SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
-		guard digest == id else { throw HostError("font bytes given for \(id) hash to \(digest)") }
+		guard digest == id || !id.hasPrefix("sha256:") else { throw HostError("font bytes given for \(id) hash to \(digest)") }
 		guard let descriptor = CTFontManagerCreateFontDescriptorFromData(bytes as CFData) else {
 			throw HostError("font \(id) (\(file)) is not a font file")
 		}

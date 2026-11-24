@@ -1,0 +1,25 @@
+appId: ${APP_ID}
+name: r165-press-bubbles
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Bubbling
+- assertVisible: Inner
+- assertVisible: Stop
+- assertVisible: start
+- tapOn: Inner
+- assertNotVisible: start
+- assertVisible: start>button>card
+- assertNotVisible: start
+- tapOn: Stop
+- assertNotVisible: start>button>card
+- assertVisible: start>button>card>stopped
+- assertNotVisible: start>button>card
+- tapOn: Card body
+- assertNotVisible: start>button>card>stopped
+- assertVisible: start>button>card>stopped>card
+- assertNotVisible: start>button>card>stopped

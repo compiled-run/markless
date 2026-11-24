@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j14-async-retry
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Retry
 - assertVisible: "Tries: 0"
 - assertVisible: Looking up

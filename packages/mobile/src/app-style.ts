@@ -33,6 +33,16 @@ type DragonTarget = {
 	}>;
 	readonly next: Json;
 	readonly bands?: Json;
+	/**
+	 * Only when an assignment has interaction states (:hover, :active, :focus): per assignment, Dragon's interaction runtime tables,
+	 * the node each table index names, each state laid out like an assignment, what each state matches, each address inside a
+	 * list row with its list, and with a plan each state's plan assignment (after the program's own, in level then state order).
+	 */
+	readonly interaction?: {
+		readonly levels: ReadonlyArray<
+			{ readonly states: DragonTarget['assignments'] } & { readonly [field: string]: Json }
+		>;
+	};
 };
 
 /** A face by its `sha256:` id: `file` is in the Dragon checkout, or with `from: 'input'` beside the style input. */
@@ -56,13 +66,23 @@ export type DragonStyleExport = {
 	readonly slots?: ReadonlyArray<Json>;
 };
 
-type InternedTarget = Omit<DragonTarget, 'backend' | 'viewport' | 'dpr' | 'assignments'> & {
-	readonly assignments: ReadonlyArray<{
-		readonly values: Json;
-		readonly nodes: ReadonlyArray<Omit<DragonNode, 'writes'> & { readonly writes: number }>;
-		readonly canvas: Json;
-		readonly bodyBackground?: Json;
-	}>;
+type InternedNode = Omit<DragonNode, 'writes'> & { readonly writes: number };
+
+type InternedAssignment = {
+	readonly values: Json;
+	/** Each node an index into the target's `nodes`: an interaction state repeats most of its assignment's nodes unchanged. */
+	readonly nodes: ReadonlyArray<number>;
+	readonly canvas: Json;
+	readonly bodyBackground?: Json;
+};
+
+type InternedTarget = Omit<DragonTarget, 'backend' | 'viewport' | 'dpr' | 'assignments' | 'interaction'> & {
+	readonly assignments: ReadonlyArray<InternedAssignment>;
+	readonly interaction?: {
+		readonly levels: ReadonlyArray<
+			{ readonly states: ReadonlyArray<InternedAssignment> } & { readonly [field: string]: Json }
+		>;
+	};
 };
 
 /** A page's styles inside the app file: Dragon's target fields, each node's `writes` an index into the target's `writes`. */
@@ -119,6 +139,8 @@ export type NativeAppStyle = {
 				readonly dpr: number;
 				/** Every distinct list of lowered writes in the app, once: a component styled alike on two pages shares its lists. */
 				readonly writes: ReadonlyArray<ReadonlyArray<Json>>;
+				/** Every distinct node of every assignment and interaction state, once, its `writes` an index into `writes`. */
+				readonly nodes: ReadonlyArray<InternedNode>;
 				/** Only the routes with styles, in the app payload's route order. */
 				readonly routes: ReadonlyArray<NativeAppStyleRoute>;
 			}
@@ -169,22 +191,48 @@ export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): Native
 			}
 			return index;
 		};
+		const nodes: InternedNode[] = [];
+		const nodeIndexOf = new Map<string, number>();
+		const internNode = (node: DragonNode): number => {
+			const entry = { ...node, writes: intern(node.writes) };
+			const key = JSON.stringify(entry);
+			let index = nodeIndexOf.get(key);
+			if (index === undefined) {
+				index = nodes.push(entry) - 1;
+				nodeIndexOf.set(key, index);
+			}
+			return index;
+		};
+		const internedAssignment = (
+			assignment: DragonTarget['assignments'][number],
+			what: string,
+		): InternedAssignment => ({
+			values: assignment.values,
+			canvas: assignment.canvas ?? fail(`${what} has no canvas`),
+			...(assignment.bodyBackground === undefined
+				? {}
+				: { bodyBackground: assignment.bodyBackground }),
+			nodes: assignment.nodes.map(internNode),
+		});
 		const interned = (target: DragonTarget, what: string): InternedTarget => {
-			const { backend: _b, viewport: _v, dpr: _d, assignments, ...rest } = target;
+			const { backend: _b, viewport: _v, dpr: _d, assignments, interaction, ...rest } = target;
 			return {
 				...rest,
-				assignments: assignments.map((assignment, index) => ({
-					values: assignment.values,
-					canvas:
-						assignment.canvas ?? fail(`${what}'s assignment ${index} has no canvas`),
-					...(assignment.bodyBackground === undefined
-						? {}
-						: { bodyBackground: assignment.bodyBackground }),
-					nodes: assignment.nodes.map((node) => ({
-						...node,
-						writes: intern(node.writes),
-					})),
-				})),
+				assignments: assignments.map((assignment, index) =>
+					internedAssignment(assignment, `${what}'s assignment ${index}`),
+				),
+				...(interaction === undefined
+					? {}
+					: {
+							interaction: {
+								levels: interaction.levels.map((level, i) => ({
+									...level,
+									states: level.states.map((state, k) =>
+										internedAssignment(state, `${what}'s assignment ${i} interaction state ${k}`),
+									),
+								})),
+							},
+						}),
 			};
 		};
 		const routes = pages.map(({ pattern, exported, sheets }): NativeAppStyleRoute => {
@@ -231,7 +279,7 @@ export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): Native
 					: {}),
 			};
 		});
-		targets[name] = { backend, viewport, dpr, writes: lists, routes };
+		targets[name] = { backend, viewport, dpr, writes: lists, nodes, routes };
 	}
 	const systemFonts = appStyleSystemFonts(pages);
 	return {
@@ -268,10 +316,11 @@ export function appStyleFonts(pages: ReadonlyArray<NativeAppStylePage>): StyleFo
 		for (const font of [exported, ...(sheets ?? []).map((sheet) => sheet.exported)].flatMap(
 			(e) => e.fonts,
 		)) {
-			const seen = fonts.get(font.id) ?? font;
-			if (seen.file !== font.file || seen.from !== font.from)
+			// The id is the file's sha256, so a face decoded beside each page's input is one face.
+			const seen = fonts.get(font.id);
+			if (seen !== undefined && seen.from !== font.from)
 				throw new Error(`font ${font.id} names two files`);
-			fonts.set(font.id, font);
+			if (seen === undefined) fonts.set(font.id, font);
 		}
 	return [...fonts.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
 }

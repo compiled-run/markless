@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: z4-sheet-dark-mode
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - setDarkMode: disabled
 - assertVisible: Journal
 - assertVisible: Read today

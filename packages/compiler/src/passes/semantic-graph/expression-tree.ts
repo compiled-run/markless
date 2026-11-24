@@ -9,6 +9,7 @@ import type {
 	SemanticModuleConstant,
 	SemanticModuleFunction,
 } from '../../artifacts.ts';
+import { returnsOf } from './value-set.ts';
 import { sourceSpan } from '../../ast/source.ts';
 import type { SourceSpan } from '../../diagnostics.ts';
 
@@ -1003,6 +1004,7 @@ function moduleFunctionsOf(
 			exportNames: exportNames.get(name) ?? [],
 			native: functionBodyOf(node),
 			...(effects ? { effects } : {}),
+			returns: returnsOf(node),
 		};
 	});
 }
@@ -1099,6 +1101,7 @@ function parameterNamesOf(node: AnyNode): ReadonlyArray<string> {
 export const NATIVE_FACT_COLLECTORS: NativeFactCollectors = {
 	expression: expressionTreeOf as NativeFactCollectors['expression'],
 	computedValue: computedValueOf as NativeFactCollectors['computedValue'],
+	returns: returnsOf as NativeFactCollectors['returns'],
 	functionBody: functionBodyOf as NativeFactCollectors['functionBody'],
 	moduleFunctions: moduleFunctionsOf as NativeFactCollectors['moduleFunctions'],
 	moduleConstants: moduleConstantsOf as NativeFactCollectors['moduleConstants'],

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r132-body-constants
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Count
 - assertVisible: "2"
 - assertVisible: Now 2

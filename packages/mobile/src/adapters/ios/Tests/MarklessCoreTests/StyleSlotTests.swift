@@ -47,7 +47,7 @@ private func hex(_ value: Double) -> String {
 		let frame = [0, 0, 10, 10].map { hex(Double($0)) }.joined(separator: ",")
 		return "[\"ok\",[\(hex(0)),\(hex(0)),\(hex(0)),\(hex(0))],[[\"h0\",[\(frame)],null,null,null,null]],[[\"h0\",\"background-color\",[\"color\",\"r\"],\(hex(5))]]]"
 	}
-	#expect(sent.count == 1 && sent[0].hasSuffix(",\"slots\":[\(hex(5))]}"))
+	#expect(sent.count == 1 && sent[0].hasSuffix(",\"slots\":[\(hex(5))],\"sticky\":true,\"textAreas\":true}"))
 	guard case let .backgroundColor(color)? = relaid.assignments[0].nodes[0].writes.first else {
 		Issue.record("no background-color write")
 		return
@@ -63,4 +63,14 @@ private func hex(_ value: Double) -> String {
 			return "[\"ok\",[\(hex(0)),\(hex(0)),\(hex(0)),\(hex(0))],[[\"h0\",[\(frame)],null,null,null,null]],[[\"h0\",\"background-color\",[\"color\",\"hue\"],\(hex(5))]]]"
 		}
 	}
+}
+
+@Test func laidOutKeepsDragonsReasonWhenItLeavesThePageRangeUndecided() throws {
+	let style = try StyleExport.decode(slotExport)
+	let relaid = try style.laidOut(width: 100, height: 100, scale: 1, slots: [5]) { _ in
+		let frame = [0, 0, 10, 10].map { hex(Double($0)) }.joined(separator: ",")
+		return "[\"ok\",[\"undecided\",\"m3\",\"an overflow clip on a box the page scrolls\"],[[\"h0\",[\(frame)],null,null,null,null]],[]]"
+	}
+	#expect(relaid.pageScrolls == [nil])
+	#expect(relaid.pageScrollUndecided == "m3: an overflow clip on a box the page scrolls")
 }

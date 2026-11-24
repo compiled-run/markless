@@ -14,6 +14,11 @@ Android APK around the hosts in `src/adapters/`, embeds the payload, installs bo
 itself (and shuts down afterwards unless `--keep-devices`), runs the rung's `flow.yaml` with Maestro on each, saves a
 screenshot after every step and before every action to `<rung>/screenshots/{ios,android}/`, and checks every step of
 `expected.json`.
+
+A styled rung or app page gets its style export from Dragon (`MARKLESS_DRAGON_DIR`). An app's pages export at once, up to one
+per worker the machine queue gives (`HEAVY_WORKERS`). Each export is cached under `~/.cache/markless-proof/style-exports` by
+a hash of Dragon's commit, `--plan`, the OS release (the system fonts), the input file's path and bytes, and every font file it
+names; a Dragon checkout with uncommitted changes is never cached. A rebuild with nothing changed takes about a second.
 It exits 1 unless every rung passes on both platforms; there is no way to run one platform alone.
 
 | What                     | Where                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -56,11 +61,17 @@ pnpm --filter @markless/mobile proof --host stub src/harness/fixture/00-harness-
 
 ## On CI
 
-`.github/workflows/native-proofs.yml` (pull requests into `cw/native-targets`, and by hand; not on main) runs iOS on a
+`.github/workflows/native-proofs.yml` (pull requests into main that change this package, and by hand) runs iOS on a
 macOS runner and Android on a Linux runner with KVM, since GitHub's Apple silicon runners cannot run the Android emulator.
 Each job runs `--platform <ios|android> --report <dir>`, which exits on its own platform's result but says it is not a
 proof; the `verdict` job runs `node src/harness/verdict.ts ios.json android.json`, which fails unless both reports exist,
-cover the same rungs and passed every one. The same split works locally:
+cover the same rungs and passed every one.
+
+On a pull request push, a Linux job first prints the iOS job's pass key (`node src/harness/ios-proof-key.ts <rungs>`):
+each rung bundled as the phone runner bundles it, the iOS host, the rest of `src` but Android's sources and the runner,
+the rung folders, `proofs/ladder.ts`, `dragon.json`, the lockfile and the workflow. When an earlier push of the same pull
+request passed on iOS with that key, the macOS job does not run and the verdict reads that run's iOS report, naming the
+run. A rung that does not build on Linux gives no key, so the job runs. The same split works locally:
 
 ```sh
 pnpm --filter @markless/mobile proof --platform ios --report /tmp/r proofs/03-counter

@@ -1,0 +1,23 @@
+{
+	"rung": "S24",
+	"name": "A styled <select> (the notes form's: full width, padding, a 1px border, a radius, a background, font: inherit) and one with appearance: none, laid out and drawn as Chrome draws them, drop-down arrow included; choosing an option shows it",
+	"steps": [
+		{
+			"visible": ["Tag a note", "Home", "Small", "Tagged Home"],
+			"absent": ["Work", "Ideas", "Large"],
+			"title": "Tagging"
+		},
+		{
+			"do": { "choose": { "field": "Tag", "option": "Work" } },
+			"visible": ["Work", "Tagged Work", "Small"],
+			"absent": ["Tagged Home", "Ideas"],
+			"title": "Tagging"
+		},
+		{
+			"do": { "choose": { "field": "Size", "option": "Large" } },
+			"visible": ["Large", "Tagged Work"],
+			"absent": ["Small", "Tagged Home"],
+			"title": "Tagging"
+		}
+	]
+}

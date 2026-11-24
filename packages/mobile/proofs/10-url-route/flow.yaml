@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 10-url-route
 ---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
 - launchApp:
-    clearState: true
     arguments:
       route: /apple
 - assertVisible: Fruit apple

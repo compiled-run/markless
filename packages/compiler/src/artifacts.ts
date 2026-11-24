@@ -101,6 +101,8 @@ export type NativeFactCollectors = {
 	readonly expression: (node: never) => SemanticExpression;
 	/** A computed's function as one tree: its block's statements, or its expression body; none without a body. */
 	readonly computedValue: (fn: never) => SemanticExpression | undefined;
+	/** What a function can return, read off its syntax. */
+	readonly returns: (fn: never) => SemanticValueSet;
 	/** A module-level function's parameters and body as one tree. */
 	readonly functionBody: (node: never) => SemanticModuleFunction['native'];
 	/** Each top-level function that is not a component, with the names it is exported by. */
@@ -126,8 +128,11 @@ export type NativeFactCollectors = {
 export type SemanticScriptGlobal = {
 	readonly name: string;
 	readonly span: SourceSpan;
-	/** Only `typeof name`: feature detection, which the engine answers by itself. */
-	readonly typeofOnly: boolean;
+	/**
+	 * How the code reaches it: `typeof` only feature-detects, which the engine answers by itself; `ifPresent` reads it
+	 * only past a `typeof name` test that found it defined, so never where it is absent.
+	 */
+	readonly reach: 'typeof' | 'ifPresent' | 'read';
 	/** `window.x`, `globalThis.x`, `self.x`: the property read off the global object. */
 	readonly property?: string;
 	/** `document.activeElement`: the member this use reads straight off the global, when it reads one by name. */
@@ -514,6 +519,8 @@ export type SemanticGraphBinding = {
 	readonly nativeExpression?: SemanticExpression;
 	/** Where a computed's function is written, for native builds only: the script engine runs it when data cannot. */
 	readonly nativeFunctionSpan?: SourceSpan;
+	/** What a computed's function can give (an async one: what it settles to), for native builds only. */
+	readonly nativeReturns?: SemanticValueSet;
 	readonly functionSource?: string;
 	// A synthetic computed spelling one run of text: inside @try it waits on its async inputs, not on itself.
 	readonly joinsText?: true;
@@ -1445,6 +1452,17 @@ export type SemanticGraphAlias = {
 	readonly sourceSpan?: SourceSpan;
 };
 
+/**
+ * What a function or computed can give, read off its syntax for native builds: the literals a value can be, an object's
+ * fields, an array's elements, or a call to a function the build resolves by name. Anything else is unknown.
+ */
+export type SemanticValueSet =
+	| { readonly kind: 'literals'; readonly values: ReadonlyArray<string | number | boolean | null> }
+	| { readonly kind: 'object'; readonly fields: Readonly<Record<string, SemanticValueSet>> }
+	| { readonly kind: 'array'; readonly elements: SemanticValueSet }
+	| { readonly kind: 'call'; readonly callee: string }
+	| { readonly kind: 'unknown' };
+
 /** A top-level `function` of a module: what a native build inlines where an expression calls it. */
 export type SemanticModuleFunction = {
 	readonly name: string;
@@ -1457,6 +1475,8 @@ export type SemanticModuleFunction = {
 	};
 	/** Its body as handler statements, for a call made for what it does (`focusIntoSurface(...)`) rather than its value. */
 	readonly effects?: ReadonlyArray<SemanticHandlerStatement>;
+	/** What it can return (an async function: what its promise settles to). */
+	readonly returns?: SemanticValueSet;
 };
 
 /** A top-level `const` of a module that no statement writes through: what a native build reads where a name reads it. */

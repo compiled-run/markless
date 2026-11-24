@@ -90,7 +90,11 @@ export type NativeStyleInput = {
 	/** A system sheet's content at one resting height: the content area's size per target, in CSS px. */
 	readonly viewports?: ReturnType<typeof sheetViewports>;
 	/** The numbers `styleTemplate`s read (the payload's `slots`), each at the value it has at mount; Dragon finds what each moves. */
-	readonly slots?: ReadonlyArray<{ readonly id: string; readonly initial: number; readonly integer?: true }>;
+	readonly slots?: ReadonlyArray<{
+		readonly id: string;
+		readonly initial: number;
+		readonly integer?: true;
+	}>;
 	/**
 	 * Each relative `@font-face` src url of the stylesheets, as `css` spells it, and the font file it names, resolved against its
 	 * stylesheet's file. Written to disk with `file` relative to the input file (`nativeStyleInputAt`).
@@ -116,16 +120,41 @@ export function rowAttributeOptions(
 	name: string,
 	expr: NativeExpr,
 	booleanCells: ReadonlySet<string> = new Set(),
+	itemValues: ItemValues = () => undefined,
 ): ReadonlyArray<string | null> | undefined {
 	if (givesBoolean(expr, booleanCells))
-		return [...new Set([marklessAttributeValue(name, true), marklessAttributeValue(name, false)])];
+		return [
+			...new Set([marklessAttributeValue(name, true), marklessAttributeValue(name, false)]),
+		];
 	if ('literal' in expr) return [marklessAttributeValue(name, expr.literal)];
 	if ('if' in expr) {
-		const whenTrue = rowAttributeOptions(name, expr.whenTrue, booleanCells);
-		const whenFalse = rowAttributeOptions(name, expr.whenFalse, booleanCells);
+		const whenTrue = rowAttributeOptions(name, expr.whenTrue, booleanCells, itemValues);
+		const whenFalse = rowAttributeOptions(name, expr.whenFalse, booleanCells, itemValues);
 		return whenTrue && whenFalse ? [...new Set([...whenTrue, ...whenFalse])] : undefined;
 	}
-	return undefined;
+	const listed = itemValues(expr);
+	return listed && [...new Set(listed.map((value) => marklessAttributeValue(name, value)))];
+}
+
+/** The values a read of a row's item field can give, when its list's `itemValues` lists them. */
+type ItemValues = (expr: NativeExpr) => ReadonlyArray<string | number | boolean | null> | undefined;
+
+/** Reads each repeat's `itemValues` for `rowAttributeOptions`: a field path read off a row's item. */
+export function itemValuesOf(payload: NativeViewPayload): ItemValues {
+	const lists = new Map(
+		payload.nodes.flatMap((node) =>
+			node.kind === 'repeat' && node.itemValues ? [[node.id, node.itemValues] as const] : [],
+		),
+	);
+	return (expr) => {
+		const path: string[] = [];
+		let at = expr;
+		while ('member' in at && typeof at.property === 'string') {
+			path.unshift(at.property);
+			at = at.member;
+		}
+		return 'item' in at && path.length > 0 ? lists.get(at.item)?.[path.join('.')] : undefined;
+	};
 }
 
 /**
@@ -144,7 +173,9 @@ function givesBoolean(expr: NativeExpr, booleanCells: ReadonlySet<string>): bool
 			givesBoolean(expr.right, booleanCells)
 		);
 	if ('if' in expr)
-		return givesBoolean(expr.whenTrue, booleanCells) && givesBoolean(expr.whenFalse, booleanCells);
+		return (
+			givesBoolean(expr.whenTrue, booleanCells) && givesBoolean(expr.whenFalse, booleanCells)
+		);
 	return false;
 }
 
@@ -236,6 +267,18 @@ const cellsOf = (expr: unknown, into: Set<string>): Set<string> => {
 	return into;
 };
 
+/** Each payload node's system sheet: the nearest sheet among its ancestors, or null for the page's own content. */
+export function sheetsOf(payload: NativeViewPayload): ReadonlyMap<string, string | null> {
+	const byId = new Map(payload.nodes.map((node) => [node.id, node]));
+	return new Map(
+		payload.nodes.map((node): [string, string | null] => {
+			for (let at = node.parent; at !== null; at = byId.get(at)?.parent ?? null)
+				if (byId.get(at)?.kind === 'sheet') return [node.id, at];
+			return [node.id, null];
+		}),
+	);
+}
+
 /**
  * A page's style inputs: the page without its system sheets, then each sheet's content once per resting height. Each
  * sheet's content is laid out as a document of its own, the size of the sheet's content area, with the page's CSS: the
@@ -254,12 +297,7 @@ export function nativeStyleInputs(
 	}>;
 } {
 	const byId = new Map(payload.nodes.map((node) => [node.id, node]));
-	const sheetOf = (node: PayloadNode): string | null => {
-		for (let at = node.parent; at !== null; at = byId.get(at)?.parent ?? null)
-			if (byId.get(at)?.kind === 'sheet') return at;
-		return null;
-	};
-	const rootOf = new Map(payload.nodes.map((node) => [node.id, sheetOf(node)]));
+	const rootOf = sheetsOf(payload);
 	const page = nativeStyleInput(
 		payload,
 		styles,
@@ -340,7 +378,11 @@ export function nativeStyleInput(
 	const initial = new Map(mounted.texts());
 	const slotIds = new Set(
 		nodes.flatMap((node) =>
-			node.kind === 'element' ? (node.style ?? []).flatMap((part) => (typeof part === 'string' ? [] : [part.slot])) : [],
+			node.kind === 'element'
+				? (node.style ?? []).flatMap((part) =>
+						typeof part === 'string' ? [] : [part.slot],
+					)
+				: [],
 		),
 	);
 	const slots = (payload.slots ?? []).filter((slot) => slotIds.has(slot.id));
@@ -359,31 +401,54 @@ export function nativeStyleInput(
 					throw new Error('no script');
 				},
 			});
-	const states: NativeStyleInput['states'][number][] = payload.cells.flatMap((cell): NativeStyleInput['states'][number][] => {
-		if (!cell.styled || (cells && !cells.has(cell.id))) return [];
-		if (typeof cell.initial === 'boolean')
-			return [{ cell: cell.id, domain: [false, true], initial: cell.initial }];
-		if (typeof cell.initial === 'string' && cell.domain)
-			return [{ cell: cell.id, domain: cell.domain, initial: cell.initial }];
-		throw new Error(
-			`${cell.name} decides a class or a ui-* attribute, but not every value it can hold is known at build time; Dragon needs a finite domain`,
-		);
-	});
-	const caseIds = new Set(nodes.flatMap((node) => (node.kind === 'element' && node.styleWhen ? [node.styleWhen.case] : [])));
+	const states: NativeStyleInput['states'][number][] = payload.cells.flatMap(
+		(cell): NativeStyleInput['states'][number][] => {
+			if (!cell.styled || (cells && !cells.has(cell.id))) return [];
+			if (typeof cell.initial === 'boolean')
+				return [{ cell: cell.id, domain: [false, true], initial: cell.initial }];
+			if (typeof cell.initial === 'string' && cell.domain)
+				return [{ cell: cell.id, domain: cell.domain, initial: cell.initial }];
+			throw new Error(
+				`${cell.name} decides a class or a ui-* attribute, but not every value it can hold is known at build time; Dragon needs a finite domain`,
+			);
+		},
+	);
+	const caseIds = new Set(
+		nodes.flatMap((node) =>
+			node.kind === 'element' && node.styleWhen ? [node.styleWhen.case] : [],
+		),
+	);
 	const caseAtMount = new Map(mounted.styleCases());
 	for (const styleCase of payload.styleCases ?? [])
 		if (caseIds.has(styleCase.id))
-			states.push({ cell: styleCase.id, domain: [false, true], initial: caseAtMount.get(styleCase.id)! });
+			states.push({
+				cell: styleCase.id,
+				domain: [false, true],
+				initial: caseAtMount.get(styleCase.id)!,
+			});
 	// A row's class or ui-* attribute its item decides: a state per row over the values it can give, by their index.
-	const rowOptions = new Map<string, { node: string; attribute: string; options: ReadonlyArray<string | null> }>();
+	const rowOptions = new Map<
+		string,
+		{ node: string; attribute: string; options: ReadonlyArray<string | null> }
+	>();
 	for (const node of nodes) {
 		if (node.kind !== 'element' || !node.row) continue;
 		for (const binding of node.bindings ?? []) {
 			if (!('attribute' in binding)) continue;
 			if (!nativeStyleRowAttribute(binding.attribute, tested)) continue;
 			if (!readsRow(payload, binding.value)) continue;
-			const options = rowAttributeOptions(binding.attribute, binding.value, booleanCellsOf(payload));
-			if (options) rowOptions.set(`${node.id}#${binding.attribute}`, { node: node.id, attribute: binding.attribute, options });
+			const options = rowAttributeOptions(
+				binding.attribute,
+				binding.value,
+				booleanCellsOf(payload),
+				itemValuesOf(payload),
+			);
+			if (options)
+				rowOptions.set(`${node.id}#${binding.attribute}`, {
+					node: node.id,
+					attribute: binding.attribute,
+					options,
+				});
 		}
 	}
 	states.push(
@@ -405,9 +470,33 @@ export function nativeStyleInput(
 		[{}],
 	);
 	const initialCells = new Map(payload.cells.map((cell) => [cell.id, cell.initial]));
+	// A <select>'s @for over a constant list becomes plain options, so Dragon can measure its widest option.
+	const optionRows = new Map<string, ReadonlyArray<string>>();
+	for (const node of nodes) {
+		if (
+			node.kind !== 'repeat' ||
+			node.row ||
+			node.keyParts ||
+			(!node.byIndex && node.key.length > 0)
+		)
+			continue;
+		const parent = nodes.find((candidate) => candidate.id === node.parent);
+		if (parent?.kind !== 'element' || parent.element !== 'select' || !('array' in node.list))
+			continue;
+		const items = node.list.array;
+		if (!items.every((item) => !item.spread && 'literal' in item.value)) continue;
+		optionRows.set(
+			node.id,
+			items.map((item, index) =>
+				node.byIndex
+					? String(index)
+					: String((item.value as { readonly literal: unknown }).literal),
+			),
+		);
+	}
 	// A branch an outer arm hides keeps a value no box reads, since each arm inside it also needs that outer arm: its first.
 	const repeats = nodes.flatMap((node) =>
-		node.kind === 'repeat' && !node.row
+		node.kind === 'repeat' && !node.row && !optionRows.has(node.id)
 			? [
 					{
 						id: node.id,
@@ -425,15 +514,19 @@ export function nativeStyleInput(
 			{
 				id: node.id,
 				domain,
-				initial: shown === undefined ? domain[0]! : shown === null ? NATIVE_NO_ARM : String(shown),
+				initial:
+					shown === undefined
+						? domain[0]!
+						: shown === null
+							? NATIVE_NO_ARM
+							: String(shown),
 				...(node.arm ? { arm: node.arm } : {}),
 			},
 		];
 	});
+	type TextParts = Extract<NativeViewPayload['nodes'][number], { kind: 'text' }>['parts'];
 	// A node in an arm not shown at mount still gets laid out: its literals and its cells' first values (an expression reads as '').
-	const unshownText = (
-		parts: Extract<NativeViewPayload['nodes'][number], { kind: 'text' }>['parts'],
-	) =>
+	const unshownText = (parts: TextParts) =>
 		parts
 			.map((part) =>
 				'text' in part
@@ -443,13 +536,47 @@ export function nativeStyleInput(
 						: '',
 			)
 			.join('');
+	// A text the build reads as '' from expressions it cannot know (an unshown arm's data, the route's params) stands in as a
+	// no-break space: Dragon lays out no box for an empty text, and the host lays the real text out in that box on the phone.
+	const standIn = (text: string, parts: TextParts) =>
+		text === '' && parts.some((part) => 'expr' in part) ? '\u00a0' : text;
 	return {
 		version: NATIVE_STYLE_INPUT_VERSION,
 		component: payload.component,
 		nodes: nodes.flatMap((node): NativeStyleInput['nodes'][number][] => {
 			// A row's nodes name their list: Dragon refuses them by name until rows are laid out on the phone.
-			const place = { ...(node.arm ? { arm: node.arm } : {}), ...(node.row ? { row: node.row } : {}) };
+			const place = {
+				...(node.arm ? { arm: node.arm } : {}),
+				...(node.row ? { row: node.row } : {}),
+			};
 			if (node.kind === 'branch' || node.kind === 'repeat') return [];
+			const rows = node.row ? optionRows.get(node.row) : undefined;
+			if (rows) {
+				const list = nodes.find((candidate) => candidate.id === node.row)!;
+				return rows.map((key, index): NativeStyleInput['nodes'][number] => {
+					const parent =
+						node.parent === list.parent ? node.parent! : `${node.parent}@${index}`;
+					const arm = node.arm ? { arm: node.arm } : list.arm ? { arm: list.arm } : {};
+					if (node.kind === 'text')
+						return {
+							kind: 'text',
+							id: `${node.id}@${index}`,
+							parent,
+							text: initial.get(`${node.id}@${key}`) ?? '',
+							...arm,
+						};
+					if (node.kind !== 'element')
+						throw new Error(`${node.id}: a <select>'s option row holds a ${node.kind}`);
+					return {
+						kind: 'element',
+						id: `${node.id}@${index}`,
+						element: node.element,
+						parent,
+						attributes: { ...node.attributes },
+						...arm,
+					};
+				});
+			}
 			if (node.kind === 'sheet')
 				throw new Error(
 					`${node.id}: a styled system sheet's content is laid out as its own document, which only the app style file carries (an app's pages/ folder)`,
@@ -494,7 +621,9 @@ export function nativeStyleInput(
 						kind: 'text',
 						id: node.id,
 						parent: sheet && parent === sheet.id ? sheet.parent! : parent,
-						text: node.row ? rowText(node.id) : (initial.get(node.id) ?? unshownText(node.parts)),
+						text: node.row
+							? rowText(node.id)
+							: standIn(initial.get(node.id) ?? unshownText(node.parts), node.parts),
 						...(textByState.some((entry) => entry.value !== textByState[0]!.value)
 							? { textByState }
 							: {}),
@@ -511,7 +640,9 @@ export function nativeStyleInput(
 			) => evaluateAt(expr, new Map([...initialCells, ...Object.entries(when)]));
 			const byRow = (attribute: string, when: Record<string, NativeStyleValue>) => {
 				const own = rowOptionOf(node.id, attribute);
-				return own ? { value: own.options[Number(when[`${node.id}#${attribute}`])] ?? null } : undefined;
+				return own
+					? { value: own.options[Number(when[`${node.id}#${attribute}`])] ?? null }
+					: undefined;
 			};
 			const classByState = classBinding
 				? combinations.map((when) => {
@@ -540,13 +671,39 @@ export function nativeStyleInput(
 						when,
 						value: row
 							? row.value
-							: (marklessAttributeValue(binding.attribute, evaluate(binding.value, when)) ?? null),
+							: (marklessAttributeValue(
+									binding.attribute,
+									evaluate(binding.value, when),
+								) ?? null),
 					};
 				});
 				if (byState.every((entry) => entry.value === byState[0]!.value)) {
 					if (byState[0]!.value !== null)
 						attributes[binding.attribute] = byState[0]!.value;
 				} else attributesByState[binding.attribute] = byState;
+			}
+			// Dragon lays a textarea's value out as its text child, kept even while empty so the host's edits have a leaf to land in.
+			const areaText =
+				node.element === 'textarea'
+					? {
+							kind: 'text' as const,
+							id: `${node.id}:text0`,
+							parent: node.id,
+							text: attributes['value'] ?? '',
+							...(attributesByState['value']
+								? {
+										textByState: attributesByState['value'].map((entry) => ({
+											when: entry.when,
+											value: entry.value ?? '',
+										})),
+									}
+								: {}),
+							...place,
+						}
+					: undefined;
+			if (areaText) {
+				delete attributes['value'];
+				delete attributesByState['value'];
 			}
 			return [
 				{
@@ -563,12 +720,16 @@ export function nativeStyleInput(
 						? {
 								styleByState: combinations.map((when) => ({
 									when,
-									template: when[node.styleWhen!.case] === node.styleWhen!.value ? node.style! : [],
+									template:
+										when[node.styleWhen!.case] === node.styleWhen!.value
+											? node.style!
+											: [],
 								})),
 							}
 						: {}),
 					...place,
 				},
+				...(areaText ? [areaText] : []),
 			];
 		}),
 		css: [...stylesheets, ...styles].map((style) => style.cssText).join('\n'),
@@ -578,7 +739,11 @@ export function nativeStyleInput(
 			? {
 					slots: slots.map((slot) => ({
 						id: slot.id,
-						initial: slotAtMount.get(slot.id)!,
+						// A row's slot is laid out at its first row's value, as the template row is; with no row at mount, at 0.
+						initial:
+							slotAtMount.get(slot.id) ??
+							[...slotAtMount].find(([id]) => id.startsWith(`${slot.id}@`))?.[1] ??
+							0,
 						...(slot.integer ? { integer: true as const } : {}),
 					})),
 				}

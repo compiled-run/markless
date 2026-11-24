@@ -23,13 +23,16 @@ import type { ScrollVectors } from '../src/scroll.ts';
 import {
 	allRungFolders,
 	callsText,
+	describeText,
 	proofsDir,
 	readRung,
+	selector,
 	sheetStyleRungFolders,
 	styleRungFolders,
 	SWIPES_UNTIL,
 	type LadderRung,
 	type LadderStep,
+	type LadderText,
 } from '../proofs/ladder.ts';
 
 // The web column of the ladder: each rung's App.tsrx built as the page of a real router app,
@@ -158,24 +161,37 @@ function recordDeviceCalls() {
 
 // A visible text or an accessible name, the two ways a Maestro selector finds a view.
 // A closed select shows its chosen option's label, as the phones draw it.
-/** The field a person types into by its name: a text field, or a number field (a spinbutton). */
+/** The field a person types into by its name: a text field, a number field (a spinbutton) or a search field (a searchbox). */
 const typedField = (page: Page, name: string): Locator =>
-	page.getByRole('textbox', { name, exact: true }).or(page.getByRole('spinbutton', { name, exact: true }));
-const shown = (page: Page, text: string): Locator =>
 	page
+		.getByRole('textbox', { name, exact: true })
+		.or(page.getByRole('spinbutton', { name, exact: true }))
+		.or(page.getByRole('searchbox', { name, exact: true }));
+// A text named by how it starts matches as a plain one does, each element's whole text or name beginning with it.
+const named = (text: LadderText): string | RegExp =>
+	typeof text === 'string' ? text : new RegExp(selector(text), 's');
+const shown = (page: Page, given: LadderText): Locator => {
+	const text = named(given);
+	return page
 		.getByText(text, { exact: true })
 		.or(page.getByLabel(text, { exact: true }))
+		// A control is found by its accessible name, as a phone's label for it reads: without the text of a hidden child.
+		.or(page.getByRole('button', { name: text, exact: true }))
+		.or(page.getByRole('link', { name: text, exact: true }))
 		.or(page.getByRole('img', { name: text, exact: true }))
 		// An image is found by its alt text, its accessible name, as a phone's screen reader names it.
 		.or(page.getByAltText(text, { exact: true }))
+		// A placeholder is on screen only while its field is empty, as a phone's hint is.
+		.or(page.locator(':placeholder-shown').and(page.getByPlaceholder(text, { exact: true })))
 		.or(page.getByRole('combobox').filter({ has: page.locator('option:checked').getByText(text, { exact: true }) }));
+};
 
 // The phone the style exports lay out for (Dragon's iOS viewport): a rung that scrolls scrolls here as on the phones.
 const PHONE = { width: 402, height: 778 };
 
 // On screen: drawn (not visibility: hidden) and some of it inside the viewport, not clipped away by a scrolling box, as an
 // IntersectionObserver reports.
-const onScreenCount = (page: Page, text: string): Promise<number> =>
+const onScreenCount = (page: Page, text: LadderText): Promise<number> =>
 	shown(page, text).evaluateAll(async (elements) => {
 		const seen = await Promise.all(
 			elements.map(
@@ -272,13 +288,13 @@ async function act(page: Page, step: LadderStep) {
 		const tap = 'tap' in action ? action.tap : action.doubleTap;
 		// A text that is also a control's accessible name (a label and the switch it names) taps the control, as on a phone;
 		// a button named by its own text comes first, over a region its heading also names.
-		const button = page.getByRole('button', { name: tap, exact: true });
-		const named = page.getByLabel(tap, { exact: true });
+		const button = page.getByRole('button', { name: named(tap), exact: true });
+		const labelled = page.getByLabel(named(tap), { exact: true });
 		const target =
 			(await button.count()) === 1
 				? button
-				: (await named.count()) === 1
-					? named
+				: (await labelled.count()) === 1
+					? labelled
 					: shown(page, tap);
 		await ('tap' in action ? target.click() : target.dblclick());
 	} else if ('type' in action) {
@@ -292,6 +308,7 @@ async function act(page: Page, step: LadderStep) {
 		await field.press('End');
 		await field.press('Backspace');
 	}
+	else if ('clear' in action) await pressCancelButton(page, action.clear);
 	else if ('choose' in action)
 		await page
 			.getByRole('combobox', { name: action.choose.field, exact: true })
@@ -299,6 +316,26 @@ async function act(page: Page, step: LadderStep) {
 	else if ('relaunch' in action) await page.reload();
 	else if ('back' in action) await page.goBack();
 	else if ('escape' in action) await page.keyboard.press('Escape');
+	else if ('tapAt' in action) {
+		const size = page.viewportSize();
+		if (size === null) throw new Error('the page has no viewport size');
+		const x = (size.width * action.tapAt.point[0]) / 100;
+		const y = (size.height * action.tapAt.point[1]) / 100;
+		// The element `on` names (by accessible name or exact text) must hold Chrome's element at the point.
+		const inside = await page.evaluate(
+			([px, py, on]) => {
+				const at = document.elementFromPoint(px as number, py as number);
+				const named = [...document.querySelectorAll('*')].filter(
+					(e) => e.getAttribute('aria-label') === on || e.textContent?.trim() === on,
+				);
+				return at !== null && named.some((e) => e.contains(at));
+			},
+			[x, y, action.tapAt.on] as const,
+		);
+		if (!inside)
+			throw new Error(`Chrome's element at ${x}, ${y} is not inside the element showing "${action.tapAt.on}"`);
+		await page.mouse.click(x, y);
+	}
 	else if ('pressBackdrop' in action) {
 		// Unstyled, the backdrop has no area beside its surface to click, so the press is dispatched on the element itself.
 		const backdrop = await page.locator('[overlay]:not([hidden])').last().elementHandle();
@@ -331,14 +368,51 @@ async function act(page: Page, step: LadderStep) {
 	} else if ('wait' in action) await page.clock.runFor(action.wait);
 }
 
+// A press on Chrome's own cancel button, inside the search field's user-agent shadow tree, which only DevTools reaches.
+async function pressCancelButton(page: Page, name: string) {
+	const field = typedField(page, name);
+	await field.evaluate((element) => element.setAttribute('data-ladder-clear', ''));
+	type DomNode = {
+		nodeId: number;
+		attributes?: string[];
+		children?: DomNode[];
+		shadowRoots?: DomNode[];
+	};
+	const cdp = await page.context().newCDPSession(page);
+	try {
+		const { root } = (await cdp.send('DOM.getDocument', { depth: -1, pierce: true })) as { root: DomNode };
+		const all = (node: DomNode): DomNode[] => [
+			node,
+			...[...(node.children ?? []), ...(node.shadowRoots ?? [])].flatMap(all),
+		];
+		const attribute = (node: DomNode, name: string) => {
+			const at = node.attributes?.indexOf(name) ?? -1;
+			return at >= 0 && at % 2 === 0 ? node.attributes![at + 1] : undefined;
+		};
+		const input = all(root).find((node) => attribute(node, 'data-ladder-clear') !== undefined);
+		const button = input
+			&& all(input).find((node) => attribute(node, 'pseudo') === '-webkit-search-cancel-button');
+		if (!button) throw new Error(`"${name}" has no cancel button`);
+		const { model } = (await cdp.send('DOM.getBoxModel', { nodeId: button.nodeId })) as {
+			model: { content: number[] };
+		};
+		const [x1, y1, , , x3, y3] = model.content;
+		await page.mouse.click((x1! + x3!) / 2, (y1! + y3!) / 2);
+	} finally {
+		await cdp.detach();
+		await field.evaluate((element) => element.removeAttribute('data-ladder-clear'));
+	}
+}
+
 // Every expectation of a step read at one moment, so a screen the action has not reached yet cannot pass.
 async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 	const failed: string[] = [];
 	const onScreen = (text: string) => shown(page, text).filter({ visible: true });
 	for (const text of step.visible)
-		if ((await onScreenCount(page, text)) === 0) failed.push(`"${text}" is not on screen`);
+		if ((await onScreenCount(page, text)) === 0)
+			failed.push(`${describeText(text)} is not on screen`);
 	for (const text of step.absent ?? [])
-		if ((await onScreenCount(page, text)) > 0) failed.push(`"${text}" is on screen`);
+		if ((await onScreenCount(page, text)) > 0) failed.push(`${describeText(text)} is on screen`);
 	for (const text of step.hidden ?? []) {
 		if ((await shown(page, text).count()) === 0) failed.push(`"${text}" is not on the page`);
 		else if ((await onScreenCount(page, text)) > 0) failed.push(`"${text}" is on screen`);
@@ -351,7 +425,7 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 		if ((await onScreen(text).count()) === 0 || !(await onScreen(text).first().isDisabled()))
 			failed.push(`"${text}" is not a disabled control on screen`);
 	for (const [name, value] of Object.entries(step.fields ?? {})) {
-		const held = await page.getByRole('textbox', { name, exact: true }).inputValue();
+		const held = await typedField(page, name).inputValue();
 		if (held !== value) failed.push(`field "${name}" holds "${held}"`);
 	}
 	if (step.title !== undefined && (await page.title()) !== step.title)
@@ -452,6 +526,12 @@ describe.each(allRungFolders())('%s', (folder) => {
 			page.on('console', (message) => {
 				if (message.type() === 'error') errors.push(message.text());
 			});
+			const picked = rung.pick?.map((file) => ({
+				name: file.name,
+				mimeType: file.type,
+				buffer: Buffer.from(file.text),
+			}));
+			if (picked) page.on('filechooser', (chooser) => void chooser.setFiles(picked));
 			if (rung.steps.some((step) => step.do && 'wait' in step.do)) await page.clock.install();
 			await page.goto(`${origin}${start}`);
 			if (rung.steps.some((step) => step.do && 'wait' in step.do))

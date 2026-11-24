@@ -19,6 +19,7 @@ import {
 	NATIVE_SCRIPT_CLICK_FIELDS,
 	NATIVE_SCRIPT_KEY_FIELDS,
 	NATIVE_SCRIPT_POINTER_FIELDS,
+	NATIVE_SCRIPT_SUBMITTED_FORM,
 	nativeLocale,
 	nativeNumberMessage,
 	nativeNumberProblem,
@@ -33,6 +34,7 @@ import {
 	nativeTooLongMessage,
 	NATIVE_SCRIPT_MEDIA_DEFAULTS,
 	type NativeScriptMedia,
+	type NativeScriptScreen,
 } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeScriptEngine } from './script-engine.ts';
@@ -60,8 +62,25 @@ export type NativeAction =
 	| { readonly event: 'keydown'; readonly host: string; readonly key: string }
 	/** The same key after what it did to the text (or did not, when its keydown was prevented). */
 	| { readonly event: 'keyup'; readonly host: string; readonly key: string }
+	/** The files a person chose in the picker a file input opened; its `input` and `change` handlers run with them. */
+	| {
+			readonly event: 'pick';
+			readonly host: string;
+			readonly files: ReadonlyArray<NativePickedFile>;
+	  }
 	/** A paste into a text field from its edit menu, before the text goes in. */
 	| { readonly event: 'paste'; readonly host: string; readonly text: string }
+	/** A CSS animation's event on a styled page, from the host's run of Dragon's animator: its name and elapsed time in seconds. */
+	| {
+			readonly event:
+				| 'animationstart'
+				| 'animationiteration'
+				| 'animationend'
+				| 'animationcancel';
+			readonly host: string;
+			readonly animationName: string;
+			readonly elapsedTime: number;
+	  }
 	/** A live device value changed (connectivity, permission): the host writes the device cell. */
 	| { readonly event: 'device'; readonly cell: string; readonly value: Value }
 	/** A device call the host started has answered: a task cell takes `{ state: 'value', value }` or the error. */
@@ -217,8 +236,20 @@ type Raised = {
 };
 const RAISE_DEPTH = 32;
 
+/** A file a picker chose, as a page's `File` describes it. */
+export type NativePickedFile = {
+	/** The host's own name for the file, which it reads the bytes back by when a request sends it. */
+	readonly ref: string;
+	readonly name: string;
+	readonly size: number;
+	readonly type: string;
+	readonly lastModified: number;
+};
+
 /** What the event running a handler carries, by the field a `{ event }` expression names. */
 export type NativeEventFields = {
+	/** A file input's `input` or `change`: what the picker chose, which its JavaScript reads from `files`. */
+	readonly files?: ReadonlyArray<NativePickedFile>;
 	readonly value?: string;
 	/** A text field's `keydown` or `keyup`: the key as the phone's browser names it. */
 	readonly key?: string;
@@ -226,6 +257,9 @@ export type NativeEventFields = {
 	readonly text?: string;
 	/** A press: how many presses in a row on the element. */
 	readonly detail?: number;
+	/** An animation event: the `@keyframes` name and the elapsed time in seconds. */
+	readonly animationName?: string;
+	readonly elapsedTime?: number;
 	readonly reason?: string;
 	readonly pressTarget?: string | null;
 	readonly target?: string;
@@ -273,6 +307,8 @@ export type NativeScope = {
 	readonly locals: ReadonlyMap<string, Value>;
 	/** The page's route params. */
 	readonly params?: Readonly<Record<string, string>>;
+	/** The page's address, as its `url` prop reads it (`{ route: 'url' }`). */
+	readonly url?: { readonly pathname: string; readonly search: string; readonly hash: '' };
 	/** A form's entries now, for `{ formData }`. */
 	readonly formData?: (form: string) => Value;
 	/** A checkbox's or radio button's checkedness now, for `{ checked }`. */
@@ -430,9 +466,13 @@ export function evaluateNativeExpr(
 			typeof within === 'string' && typeof node === 'string' && dom().contains(within, node)
 		);
 	}
-	if ('route' in expr) {
+	if ('route' in expr && expr.route === 'params') {
 		if (!scope.params) throw new Error('route params read on a component that is not a page');
 		return { ...scope.params };
+	}
+	if ('route' in expr && expr.route === 'url') {
+		if (!scope.url) throw new Error('the url read on a component that is not a page');
+		return { ...scope.url };
 	}
 	if ('item' in expr) {
 		if (!scope.items.has(expr.item))
@@ -483,6 +523,7 @@ export function evaluateNativeExpr(
 							{
 								items: scope.items,
 								...(scope.params ? { params: scope.params } : {}),
+								...(scope.url ? { url: scope.url } : {}),
 								...(scope.now ? { now: scope.now } : {}),
 								locals: new Map([
 									...scope.locals,
@@ -630,12 +671,21 @@ export function evaluateWithScript(
 ): (expr: NativeExpr, values: ReadonlyMap<string, Value>) => Value {
 	let engine: NativeScriptEngine | undefined;
 	const script = payload.script;
+	// As the build's first render reads them: each route param '', no query.
+	const params = Object.fromEntries((payload.route?.params ?? []).map((name) => [name, '']));
+	const page: NativeScope = payload.route
+		? {
+				...EMPTY_SCOPE,
+				params,
+				url: { pathname: nativeRoutePath(payload.route.pattern, params), search: '', hash: '' },
+			}
+		: EMPTY_SCOPE;
 	const evaluate = (expr: NativeExpr, values: ReadonlyMap<string, Value>): Value =>
 		evaluateNativeExpr(
 			expr,
 			(cell) => values.get(cell) ?? null,
 			undefined,
-			EMPTY_SCOPE,
+			page,
 			(fn, bindings) => {
 				if (!script)
 					throw new Error(`the script computed ${fn} in a payload with no script`);
@@ -671,7 +721,9 @@ export function evaluateWithScript(
 															}
 														: 'callback' in binding
 															? binding
-															: {
+															: 'url' in binding
+																? { url: evaluate({ route: 'url' }, values) }
+																: {
 																	value: evaluate(
 																		binding.value,
 																		values,
@@ -722,10 +774,17 @@ export function createNativeRuntime(
 	measure?: (id: string) => NativeElementBox | null,
 	/** The device's answers to the media features a script's `matchMedia` reads, read as each entry begins. */
 	media: () => NativeScriptMedia = () => NATIVE_SCRIPT_MEDIA_DEFAULTS,
+	/** The screen's device pixels per CSS px that a script's `devicePixelRatio` reads, read as each entry begins. */
+	screenFacts: () => NativeScriptScreen = () => ({ devicePixelRatio: 1 }),
+	/** The query the page opened with (`?tab=done`, or ''), which its `url` prop reads. */
+	search = '',
 ): NativeRuntime {
 	const base: NativeScope = {
 		...EMPTY_SCOPE,
 		params,
+		...(payload.route
+			? { url: { pathname: nativeRoutePath(payload.route.pattern, params), search, hash: '' as const } }
+			: {}),
 		formData: (form) => entriesOf(form),
 		checked: (node) => checkedOf(node),
 		fieldText: (node) => textOf(node),
@@ -886,7 +945,9 @@ export function createNativeRuntime(
 												}
 											: 'callback' in binding
 												? binding
-												: {
+												: 'url' in binding
+													? { url: evaluate({ route: 'url' }, eventValue, scope) }
+													: {
 														value: evaluate(
 															binding.value,
 															eventValue,
@@ -976,6 +1037,12 @@ export function createNativeRuntime(
 			}
 		};
 		visit(frame);
+		// A submitted form's file inputs: its JavaScript reads the files each holds.
+		const submitted = (frame[NATIVE_SCRIPT_SUBMITTED_FORM] as { value?: unknown } | undefined)
+			?.value;
+		if (Array.isArray(submitted))
+			for (const [, value] of submitted as [string, unknown][])
+				if (value && typeof value === 'object' && 'files' in value) add(value.files);
 		also.forEach(add);
 		return facts;
 	};
@@ -987,6 +1054,7 @@ export function createNativeRuntime(
 			: {}),
 		...(script?.services.includes('navigate') ? { params } : {}),
 		...(script?.services.includes('media') ? { media: media() } : {}),
+		...(script?.services.includes('screen') ? { screen: screenFacts() } : {}),
 	});
 	/** One engine entry, then what it asked for: its writes land in cells; timers, clears and requests become entries. */
 	/** Submissions held by a script promise not settled yet, by the engine's run number. */
@@ -1000,7 +1068,7 @@ export function createNativeRuntime(
 			focused !== null && focused !== NATIVE_DOCUMENT_BODY
 				? { focused, focusElements: elementFacts({}, [focused]) }
 				: {};
-		call('enter', { ...entry, ...focus, ...entryCells() });
+		call('enter', { ...entry, screen, ...focus, ...entryCells() });
 		const result = JSON.parse(call('leave')) as {
 			readonly pending: ReadonlyArray<number>;
 			readonly settled: ReadonlyArray<number>;
@@ -1022,15 +1090,24 @@ export function createNativeRuntime(
 			readonly navigate?: {
 				readonly route: string;
 				readonly params: Readonly<Record<string, string>>;
+				readonly search?: string;
 				readonly replace: boolean;
 			};
 			readonly commands?: ReadonlyArray<
-				| readonly [string, 'focus' | 'scrollIntoView' | 'showModal' | 'close', boolean]
+				| readonly [
+						string,
+						'focus' | 'scrollIntoView' | 'showModal' | 'close' | 'showPicker',
+						boolean,
+				  ]
 				| readonly [string, 'setPointerCapture' | 'releasePointerCapture', number]
+				/** The names a handler gave a file input, as a JSON array. */
+				| readonly [string, 'files', string]
 			>;
 			readonly raises?: ReadonlyArray<Raised>;
 			/** A key or paste handler called `preventDefault()` before it first awaited. */
 			readonly prevented?: true;
+			/** A click handler called `stopPropagation()` before it first awaited. */
+			readonly stopped?: true;
 			/** The text an input handler set on its field (`event.target.value = …`). */
 			readonly value?: string;
 			/** The event types the page's document listens for now, when an entry changed them. */
@@ -1038,6 +1115,7 @@ export function createNativeRuntime(
 			/** The elements the entry that changed them held, which the document's listeners may read later. */
 			readonly watch?: ReadonlyArray<string>;
 		};
+		if (result.stopped) propagationStopped = true;
 		if (result.listening) {
 			documentListening.clear();
 			for (const type of result.listening) documentListening.add(type);
@@ -1110,6 +1188,9 @@ export function createNativeRuntime(
 						else if (touch.capture === node) touch.capture = null;
 						return [];
 					}
+					// A file input shows the names of the files a handler gave it.
+					if (command === 'files')
+						return [{ op: 'property', node, name: 'files', value: String(argument) }];
 					const preventScroll = argument === true;
 					// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
 					if (command === 'showModal' || command === 'close') {
@@ -1131,7 +1212,14 @@ export function createNativeRuntime(
 			),
 			...(result.prevented ? [{ op: 'preventDefault' } as NativeJournalEntry] : []),
 			...(result.value !== undefined && typing !== undefined
-				? [{ op: 'property', node: typing, name: 'value', value: result.value } as NativeJournalEntry]
+				? [
+						{
+							op: 'property',
+							node: typing,
+							name: 'value',
+							value: result.value,
+						} as NativeJournalEntry,
+					]
 				: []),
 			...raised,
 			...(result.navigate
@@ -1140,6 +1228,7 @@ export function createNativeRuntime(
 							op: 'navigate',
 							route: result.navigate.route,
 							params: result.navigate.params,
+							...(result.navigate.search ? { search: result.navigate.search } : {}),
 							...(result.navigate.replace ? { replace: true as const } : {}),
 						} satisfies NativeJournalEntry,
 					]
@@ -1148,6 +1237,8 @@ export function createNativeRuntime(
 	};
 	/** How deep events raised from JavaScript may nest (a handler that raises one that raises another...). */
 	let raising = 0;
+	/** A click handler called stopPropagation(): the press goes no further out. */
+	let propagationStopped = false;
 	/**
 	 * An event a script dispatched on an element (or its `click()`), raised once the script returned: `click` as a press
 	 * on the innermost element from it outwards that has one; any other type on the element, then its ancestors when it
@@ -1168,14 +1259,7 @@ export function createNativeRuntime(
 			const calls: NativeJournalEntry[] = [];
 			if (event.type === 'click') {
 				const pressed = chain.find((node) => handlerOf(nodeOf(node), 'activate'));
-				const scope = pressed && scopeOf(pressed);
-				return pressed && scope
-					? run(
-							handlers.get(handlerOf(nodeOf(pressed), 'activate')!.handler) ?? [],
-							clickFields(false),
-							scope,
-						)
-					: [];
+				return pressed ? press(pressed, clickFields(false)) : [];
 			}
 			for (const node of event.bubbles ? chain : chain.slice(0, 1)) {
 				const own = handlerOf(nodeOf(node), event.type as NativePointerEventName);
@@ -1253,7 +1337,6 @@ export function createNativeRuntime(
 			out.push(
 				...enter({
 					kind: 'tasks',
-					screen,
 					tasks,
 					...(again.length > 0 ? { retry: again } : {}),
 				}),
@@ -1280,7 +1363,9 @@ export function createNativeRuntime(
 										? evaluate(binding.elements, undefined, scope)
 										: 'callback' in binding
 											? null
-											: evaluate(binding.value, undefined, scope),
+											: 'url' in binding
+												? evaluate({ route: 'url' }, undefined, scope)
+												: evaluate(binding.value, undefined, scope),
 		);
 	// As on the web, a computed is not run again while nothing it reads has changed.
 	const computed = new Map<string, Value>();
@@ -1597,20 +1682,40 @@ export function createNativeRuntime(
 		);
 	// A slot whose style case does not show its text keeps its last value: its expression may not hold then (`point.x`).
 	const keptSlots = new Map<string, number>();
+	// The element whose style holds each slot: a slot inside a row has one value per row copy, `<slot>@<key>`.
+	const slotOwner = new Map(
+		payload.nodes.flatMap((node) =>
+			node.kind === 'element'
+				? (node.style ?? []).flatMap((part) =>
+						typeof part === 'string' ? [] : [[part.slot, node] as const],
+					)
+				: [],
+		),
+	);
 	const slotValues = () => {
 		const cases = new Map(caseValues());
-		return (payload.slots ?? []).map((slot) => {
+		return (payload.slots ?? []).flatMap((slot): (readonly [string, number])[] => {
 			if (slot.when && cases.get(slot.when.case) !== slot.when.value)
-				return [slot.id, keptSlots.get(slot.id) ?? 0] as const;
-			const value = evaluate(slot.value);
-			if (typeof value !== 'number' || !Number.isFinite(value))
-				throw new Error(
-					`style slot ${slot.id} is ${JSON.stringify(value)}, not a finite number`,
-				);
-			if (slot.integer && !Number.isInteger(value))
-				throw new Error(`style slot ${slot.id} is ${value}, not a whole number`);
-			keptSlots.set(slot.id, value);
-			return [slot.id, value] as const;
+				return [[slot.id, keptSlots.get(slot.id) ?? 0]];
+			const owner = slotOwner.get(slot.id);
+			const copies =
+				slot.row && owner
+					? instances(owner).map(
+							({ id, scope }) =>
+								[`${slot.id}${id.slice(owner.id.length)}`, scope] as const,
+						)
+					: [[slot.id, base] as const];
+			return copies.map(([id, scope]) => {
+				const value = evaluate(slot.value, undefined, scope);
+				if (typeof value !== 'number' || !Number.isFinite(value))
+					throw new Error(
+						`style slot ${id} is ${JSON.stringify(value)}, not a finite number`,
+					);
+				if (slot.integer && !Number.isInteger(value))
+					throw new Error(`style slot ${id} is ${value}, not a whole number`);
+				keptSlots.set(id, value);
+				return [id, value] as const;
+			});
 		});
 	};
 	/** Text fields with no `value` binding whose text a handler wrote (`field.value = text`): their text is journalled too. */
@@ -1890,6 +1995,8 @@ export function createNativeRuntime(
 				return chosen ? [[name, optionValue(chosen)]] : [];
 			}
 			if (kind === 'number') return [[name, nativeNumberValue(textOf(node))]];
+			// The files are its JavaScript's: the entry names the input, and the engine reads what it holds.
+			if (kind === 'file') return [[name, { files: node }]];
 			return [
 				[name, kind === 'hidden' ? (attributeNow(node, 'value') ?? '') : valueOf(node)],
 			];
@@ -1897,7 +2004,7 @@ export function createNativeRuntime(
 	}
 	/** Why a field stops a submit, as the web says it, or undefined when it does not. */
 	const invalidity = (node: string, kind: NativeFieldKind): string | undefined => {
-		if (kind === 'hidden' || !shown(elementOf(node))) return undefined;
+		if (kind === 'hidden' || kind === 'file' || !shown(elementOf(node))) return undefined;
 		if (attributeNow(node, 'disabled') !== null) return undefined;
 		// A readonly text field is barred from constraint validation.
 		if (kind === 'text' && attributeNow(node, 'readonly') !== null) return undefined;
@@ -2060,8 +2167,41 @@ export function createNativeRuntime(
 			node;
 			node = nodesById.get(node)?.parent
 		)
-			out.push(node === nodeOf(id) ? id : key && nodesById.get(node)?.row ? `${node}${key}` : node);
+			out.push(
+				node === nodeOf(id) ? id : key && nodesById.get(node)?.row ? `${node}${key}` : node,
+			);
 		return out;
+	};
+	/**
+	 * A press on `pressed`, as a browser's click: its own handler, then the handler of each element around it, innermost
+	 * first, until one stops propagation. An element around it whose handler reads where the press landed runs its copy for
+	 * the pressed element (`<handler>@<node>`), which a pressed element with no handler of its own holds as its own.
+	 */
+	const press = (pressed: string, fields: NativeEventFields): NativeJournalEntry[] => {
+		propagationStopped = false;
+		const own = nodeOf(pressed);
+		const ownHandler = handlerOf(own, 'activate')?.handler;
+		const journal: NativeJournalEntry[] = [];
+		for (const id of chainOf(pressed)) {
+			const node = nodeOf(id);
+			const bound = handlerOf(node, 'activate');
+			const scope = bound && scopeOf(id);
+			if (!bound || !scope) continue;
+			// A copy (`<handler>@<node>`) stands for the handler around it, and runs only as the pressed element's own.
+			if (node !== own && bound.handler.includes('@')) continue;
+			const copy = node === own ? undefined : `${bound.handler}@${own}`;
+			if (copy && ownHandler === copy) continue;
+			journal.push(
+				...run(
+					handlers.get(copy && handlers.has(copy) ? copy : bound.handler) ?? [],
+					fields,
+					scope,
+				),
+			);
+			if (propagationStopped || journal.some((entry) => entry.op === 'navigate')) break;
+		}
+		propagationStopped = false;
+		return journal;
 	};
 	/** `idle` and `visible` handlers that ran, by `<event>\0<instance>`; an instance that leaves the screen is forgotten. */
 	const fired = new Set<string>();
@@ -2152,7 +2292,7 @@ export function createNativeRuntime(
 		leave: () =>
 			asyncSent === null
 				? []
-				: enter({ kind: 'tasks', screen, tasks: [], leave: true }).filter(
+				: enter({ kind: 'tasks', tasks: [], leave: true }).filter(
 						(entry) => entry.op === 'abort',
 					),
 		dispatch(action) {
@@ -2380,7 +2520,11 @@ export function createNativeRuntime(
 								});
 						}
 						if (documentListening.has(type))
-							runs.push({ handler: '', fields: fieldsOf(type, target, target, related), document: type });
+							runs.push({
+								handler: '',
+								fields: fieldsOf(type, target, target, related),
+								document: type,
+							});
 					};
 					/** `pointerenter` on each element `target` is in that `from` is not, outermost first; `pointerleave` the other way. */
 					const crossing = (
@@ -2403,14 +2547,23 @@ export function createNativeRuntime(
 					const flush = (): NativeJournalEntry[] | undefined => {
 						for (const step of runs.splice(0)) {
 							if (step.document) {
-								const { target: from, relatedTarget, currentTarget: _, ...fields } = step.fields;
+								const {
+									target: from,
+									relatedTarget,
+									currentTarget: _,
+									...fields
+								} = step.fields;
 								calls.push(
 									...enter({
 										kind: 'document',
 										event: {
 											type: step.document,
 											...fields,
-											nodes: { target: from ?? null, currentTarget: null, relatedTarget: relatedTarget ?? null },
+											nodes: {
+												target: from ?? null,
+												currentTarget: null,
+												relatedTarget: relatedTarget ?? null,
+											},
 										},
 										elements: elementFacts({}, [
 											...documentElements,
@@ -2545,9 +2698,21 @@ export function createNativeRuntime(
 			// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
 			const at = action.host.indexOf('@');
 			const host = at < 0 ? action.host : action.host.slice(0, at);
+			const named = action.event === 'pick' ? 'input' : action.event;
 			const event = payload.events.find(
-				(candidate) => candidate.host === host && candidate.event === action.event,
+				(candidate) => candidate.host === host && candidate.event === named,
 			);
+			if (!event && action.event === 'pick')
+				return script
+					? change(action.host, undefined, () =>
+							enter({
+								kind: 'pick',
+								node: action.host,
+								files: action.files,
+								elements: elementFacts({}, [action.host]),
+							}),
+						)
+					: [];
 			if (!event) throw new Error(`no ${action.event} handler on ${action.host}`);
 			const instance = payload.nodes
 				.flatMap((node) => (node.id === host ? instances(node) : []))
@@ -2561,9 +2726,20 @@ export function createNativeRuntime(
 					? { key: action.key, value: textOf(action.host) }
 					: action.event === 'paste'
 						? { text: action.text, value: textOf(action.host) }
-						: action.event === 'activate'
-							? { detail: action.detail ?? 1 }
-							: edit;
+						: action.event === 'pick'
+							? {
+									files: action.files,
+									target: action.host,
+									currentTarget: action.host,
+								}
+							: action.event === 'activate'
+								? { detail: action.detail ?? 1 }
+								: 'animationName' in action
+									? {
+											animationName: action.animationName,
+											elapsedTime: action.elapsedTime,
+										}
+									: edit;
 			// A press focuses the control it presses, as the browser does.
 			if (action.event === 'activate') focused = action.host;
 			// A number field's handlers read its value, which is empty while its text is no number.
@@ -2576,7 +2752,9 @@ export function createNativeRuntime(
 						? nativeNumberValue(eventValue)
 						: eventValue;
 			return change(action.host, edit, () =>
-				run(handlers.get(event.handler) ?? [], fields, scope),
+				action.event === 'activate'
+					? press(action.host, fields as NativeEventFields)
+					: run(handlers.get(event.handler) ?? [], fields, scope),
 			);
 		},
 		due,
@@ -2663,6 +2841,7 @@ export function createNativeRuntime(
 						op: 'navigate',
 						route: op.route,
 						params,
+						...(op.search ? { search: op.search } : {}),
 						...(op.replace ? { replace: true as const } : {}),
 					},
 				];
@@ -2697,6 +2876,10 @@ export function createNativeRuntime(
 			}
 			if (op.op === 'preventDefault') {
 				calls.push({ op: 'preventDefault' });
+				continue;
+			}
+			if (op.op === 'stopPropagation') {
+				propagationStopped = true;
 				continue;
 			}
 			if (op.op === 'fieldText') {
@@ -2779,6 +2962,9 @@ export function createNativeRuntime(
 									: {}),
 								...(typeof eventValue === 'object' && eventValue.text !== undefined
 									? { text: eventValue.text }
+									: {}),
+								...(typeof eventValue === 'object' && eventValue.files !== undefined
+									? { files: eventValue.files }
 									: {}),
 								...Object.fromEntries(touch),
 								...(nodes ? { nodes } : {}),
@@ -2897,7 +3083,8 @@ export function createNativeRuntime(
 			);
 			// A `value` binding writes the field only when its own value changes, as on the web: typing alone never resets it.
 			const beforeProperties = keyed(properties());
-			const typedKey = eventValue !== undefined && host !== undefined ? `${host}\0value` : undefined;
+			const typedKey =
+				eventValue !== undefined && host !== undefined ? `${host}\0value` : undefined;
 			if (eventValue !== undefined && host !== undefined) edited.set(host, eventValue);
 			typing = typeof eventValue === 'string' ? host : undefined;
 			const beforeArms = new Map(arms());
@@ -3060,7 +3247,9 @@ export function createNativeRuntime(
 								!before.has(key) ||
 								!after.has(key) ||
 								before.get(key) === after.get(key) ||
-								(!('attribute' in binding) && key === typedKey && after.get(key) === eventValue)
+								(!('attribute' in binding) &&
+									key === typedKey &&
+									after.get(key) === eventValue)
 							)
 								return [];
 							return 'attribute' in binding
@@ -3152,4 +3341,20 @@ export function createNativeRuntime(
 			];
 		}
 	}
+}
+
+/** The path a route pattern names with these params, each param URL-encoded. */
+export function nativeRoutePath(pattern: string, params: Readonly<Record<string, string>>): string {
+	const path = pattern
+		.split('/')
+		.filter((segment) => segment.length > 0)
+		.map((part) => {
+			if (!(part.startsWith('[') && part.endsWith(']'))) return part;
+			const value = params[part.slice(1, -1)];
+			if (value === undefined)
+				throw new Error(`${pattern} needs the param ${part.slice(1, -1)}`);
+			return encodeURIComponent(value);
+		})
+		.join('/');
+	return `/${path}`;
 }

@@ -7,8 +7,6 @@ public enum DragonPaint {
 	/// A transform at a border box of width x height points, as [a, b, c, d, tx, ty] about the box's centre.
 	nonisolated(unsafe) public static var transformMatrix: ((StyleTransform, Double, Double) throws -> [Double])?
 	nonisolated(unsafe) public static var opacityAlpha8: ((Double) throws -> Double)?
-	/// The eight corner radii in device px of a border box (width, height in device px) at a device scale, from its authored radii.
-	nonisolated(unsafe) public static var cornerRadii: (([(percent: Bool, value: Double)], Double, Double, Double) throws -> [Double])?
 	/// A group's layer pixel over its backdrop pixel (premultiplied RGBA bytes) at an alpha byte, packed r | g << 8 | b << 16 | a << 24.
 	nonisolated(unsafe) public static var groupComposite: ((Double, Double, Double, Double, Double, Double, Double, Double, Double) throws -> Double)?
 	/// The same, when Chrome composites the group in a layer of its own.

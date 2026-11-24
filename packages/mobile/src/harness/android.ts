@@ -27,7 +27,7 @@ import {
 	PROOF_APP_NAME,
 	PROOF_LINK_SCHEME,
 	PROOF_PAYLOAD_PATH,
-	PROOF_STYLE_PATH,
+	stylesShapeText,
 } from './proof-app.ts';
 import type { DeviceManifest } from '../permissions.ts';
 import type { ProofAssets } from './rung.ts';
@@ -266,7 +266,9 @@ export async function buildAndroidShell(
 			...filesUnder(generated, '.java'),
 		]);
 		const classpath = [tools.androidJar, classes, ...libraries.jars].join(':');
+		// kotlinc's launcher caps its heap at 512 MB unless JAVA_OPTS is set; the app and Dragon's engine together outgrew it.
 		await exec('kotlinc', [
+			'-J-Xmx2g',
 			'-classpath',
 			classpath,
 			'-jvm-target',
@@ -394,15 +396,6 @@ function dragonKotlin() {
 	return { key: contentKey(generated, sources), sources };
 }
 
-/** Whether the app's styles lay a list's rows out on the phone, which needs Dragon's HarfBuzz shim in the APK. */
-function stylesHaveRows(assets: ProofAssets): boolean {
-	const bytes = assets.get(PROOF_STYLE_PATH);
-	if (!bytes) return false;
-	const style = JSON.parse(new TextDecoder().decode(bytes)) as {
-		readonly targets?: { readonly android?: { readonly routes?: ReadonlyArray<{ readonly planRepeats?: ReadonlyArray<unknown> }> } };
-	};
-	return (style.targets?.android?.routes ?? []).some((route) => (route.planRepeats ?? []).length > 0);
-}
 
 /**
  * Dragon's HarfBuzz shim for the emulator's ABI (`libdragon_hb.so`, with its JNI glue), built from the Dragon checkout with Zig
@@ -536,7 +529,7 @@ export async function packProofApk(
 		assetDir,
 	]);
 	await exec('zip', ['-q', '-j', unsigned, ...shell.dex]);
-	if (stylesHaveRows(assets)) {
+	if (stylesShapeText(assets)) {
 		const staged = join(workDir, 'shaper');
 		mkdirSync(join(staged, 'lib', engineAbi()), { recursive: true });
 		copyFileSync(await dragonHarfBuzz(tools), join(staged, 'lib', engineAbi(), 'libdragon_hb.so'));

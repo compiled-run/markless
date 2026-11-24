@@ -1,0 +1,25 @@
+[Unit]
+Description=Stop the phone emulators once their chunks finish, and stay up while paused
+
+[Service]
+User=ghphone
+Group=ghphone
+ExecStart=/opt/pc-phones/pause
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=tmpfs
+BindPaths=/home/ghphone
+ProtectProc=invisible
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+TemporaryFileSystem=/mnt:ro
+BindReadOnlyPaths=/mnt/wsl/resolv.conf
+InaccessiblePaths=/run/WSL /init -/usr/lib/wsl -/var/log/journal -/etc/markless-runner -/var/log/markless-runner -/etc/pc-phones-link -/opt/markless-runner/template
+IPAddressDeny=10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16 100.64.0.0/10 fc00::/7 fe80::/10
+IPAddressAllow=10.255.255.254/32 127.0.0.0/8 ::1/128
+MemoryMax=16G
+CPUWeight=50
+Nice=10
+TasksMax=8192

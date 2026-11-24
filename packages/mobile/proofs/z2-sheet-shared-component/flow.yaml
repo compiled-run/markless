@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: z2-sheet-shared-component
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Basil
 - assertVisible: In season
 - assertVisible: More about basil

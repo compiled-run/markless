@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s8-no-scheme
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - setDarkMode: disabled
 - assertVisible: Seeds by day
 - assertVisible: "No color-scheme: white in dark mode too"
