@@ -42,7 +42,11 @@ import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.ScrollView
 import android.widget.TextView
+import dev.markless.mobile.core.Json
 import dev.markless.mobile.core.MemoryStore
+import dev.markless.mobile.core.arr
+import dev.markless.mobile.core.text
+import dev.markless.mobile.style.Bands
 import dev.markless.mobile.core.ScrollAlignment
 import dev.markless.mobile.core.ScrollBox
 import dev.markless.mobile.core.ScrollRange
@@ -63,9 +67,6 @@ import dev.markless.mobile.core.Scope
 import dev.markless.mobile.core.Store
 import dev.markless.mobile.style.AnimationRun
 import dev.markless.mobile.style.Assignment
-import dev.markless.mobile.core.Json
-import dev.markless.mobile.core.arr
-import dev.markless.mobile.core.text
 import dev.markless.mobile.core.jsonNumber
 import dev.markless.mobile.style.StickyRow
 import dev.markless.mobile.style.Edges
@@ -275,6 +276,15 @@ class MarklessHost(
 		var export = export
 			private set
 		var assignment = export.start(styledCells, runtime::value, isDark(context.resources.configuration), everyCell, styledBranches, runtime::styleArm, export.rowStates(payload))
+		/** The entry shown: the assignment, or the interaction state (`:active`, `:focus`) Dragon's runtime selects in it. */
+		var shown = assignment
+
+		/** The entry [id] takes: in a list row, an interaction state styles only the row the press or the focus is in. */
+		fun entryFor(id: String, template: String): Int {
+			if (shown == assignment || id == template) return shown
+			val key = id.substringAfter('@')
+			return if (key == pressedRow || key == focusedRow) shown else assignment
+		}
 		var absolutes: List<Map<String, Pair<Double, Double>>> = export.assignments.map { a -> absoluteOrigins(a.nodes) }
 			private set
 
@@ -286,6 +296,7 @@ class MarklessHost(
 		fun relaid(next: StyleExport) {
 			export = next
 			absolutes = next.assignments.map { a -> absoluteOrigins(a.nodes) }
+			reselect(this)
 		}
 
 		/** Moves to the assignment [cell] = [value] reaches; false when no state of this document follows [cell]. */
@@ -293,12 +304,21 @@ class MarklessHost(
 			val state = if (cell == BAND_KEY) export.bandState else export.stateOrNone(cell)
 			if (state < 0) return false
 			assignment = export.next(assignment, state, value)
+			reselect(this)
 			return true
 		}
 
 		/** The bottom edge of its lowest box, in device px from the document's top. */
-		fun contentBottom(): Double = export.assignments[assignment].nodes.maxOf { n -> (absolutes[assignment][n.id]?.second ?: 0.0) + (n.frame?.height ?: 0.0) }
+		fun contentBottom(): Double = export.assignments[shown].nodes.maxOf { n -> (absolutes[shown][n.id]?.second ?: 0.0) + (n.frame?.height ?: 0.0) }
 	}
+
+	/** The pointer steps since the page opened, by the node each names, replayed through the current level's tables. */
+	private val interactionSteps = mutableListOf<Pair<String, String?>>()
+	/** The list row (`@<key>` of its copies) the finger is pressing, and the one the focused element is in. */
+	private var pressedRow: String? = null
+	private var focusedRow: String? = null
+	/** Where the current touch began, to tell a tap from a scroll. */
+	private var touchStart: Pair<Float, Float>? = null
 
 	private val page: Layout? = style?.let { Layout(it, everyCell = true) }
 	/** The page's transitions and animations, run by Dragon's animator while they run, one display frame at a time. */
@@ -607,7 +627,95 @@ class MarklessHost(
 	}
 
 	/** Reports a touch in window coordinates to the runtime as pointer events; call it before the views see the touch. True when a long press took the gesture. */
-	fun touch(event: android.view.MotionEvent): Boolean = overlays.touch(event)
+	fun touch(event: android.view.MotionEvent): Boolean {
+		val pressedLong = overlays.touch(event)
+		interact(event, pressedLong)
+		return pressedLong
+	}
+
+
+	/** A touch on the page as Dragon's interaction runtime takes it: the element under the finger, then the state it selects. */
+	private fun interact(e: android.view.MotionEvent, pressedLong: Boolean) {
+		val p = page ?: return
+		if (p.export.interaction.isEmpty()) return
+		when (e.actionMasked) {
+			android.view.MotionEvent.ACTION_DOWN -> {
+				val at = touchedNode(e.rawX, e.rawY)
+				pressedRow = at?.second
+				touchStart = e.rawX to e.rawY
+				interactionSteps += "touch-down" to at?.first
+			}
+			android.view.MotionEvent.ACTION_MOVE -> {
+				// A finger that moves past the touch slop scrolls: Chrome cancels the press (pointercancel), and the lift focuses nothing.
+				val start = touchStart ?: return
+				val slop = android.view.ViewConfiguration.get(context).scaledTouchSlop
+				if (Math.hypot((e.rawX - start.first).toDouble(), (e.rawY - start.second).toDouble()) <= slop) return
+				touchStart = null
+				pressedRow = null
+				interactionSteps += "touch-cancel" to null
+			}
+			android.view.MotionEvent.ACTION_UP -> {
+				if (touchStart == null) return
+				touchStart = null
+				pressedRow = null
+				// After a long press the lift is not a tap, as in Chrome.
+				if (pressedLong) interactionSteps += "touch-cancel" to null
+				else {
+					val at = touchedNode(e.rawX, e.rawY)
+					interactionSteps += "touch-up" to at?.first
+					focusedRow = at?.second
+				}
+			}
+			android.view.MotionEvent.ACTION_CANCEL -> {
+				touchStart = null
+				pressedRow = null
+				interactionSteps += "touch-cancel" to null
+			}
+			else -> return
+		}
+		val before = p.shown
+		reselect(p)
+		// repaint lays the page out again, which takes the shown entry's page range (pageSize).
+		if (p.shown != before) repaint()
+	}
+
+	/** The payload node of the innermost shown view under the screen point, and the row copy it is in. */
+	private fun touchedNode(x: Float, y: Float): Pair<String, String?>? {
+		// Screen coordinates, as MotionEvent.raw* are: a window in split screen is not at the screen's origin.
+		val at = IntArray(2)
+		val hit = views.entries.filter { (_, v) ->
+			v.isShown && v.width > 0 && v.height > 0 && run {
+				v.getLocationOnScreen(at)
+				x >= at[0] && x < at[0] + v.width && y >= at[1] && y < at[1] + v.height
+			}
+		}.maxByOrNull { (_, v) -> generateSequence(v.parent) { it.parent }.count() } ?: return null
+		val template = hit.key.substringBefore('@')
+		return template to hit.key.substringAfter('@', "").ifEmpty { null }
+	}
+
+	/** The entry [l] shows: the state `rt-interaction` selects over the steps in its assignment's level, or the assignment. */
+	private fun reselect(l: Layout) {
+		l.shown = l.assignment
+		val level = l.export.interaction.getOrNull(l.assignment) ?: return
+		val library = Bands.library ?: return
+		if (level.entries.isEmpty()) return
+		// A step names the nearest ancestor the level's tables address; one under none of them touches no element (-1).
+		fun index(node: String?): Int {
+			var id = node
+			while (id != null) {
+				val found = level.addresses.indexOf(id)
+				if (found >= 0) return found
+				id = runtime.node(id).parent
+			}
+			return -1
+		}
+		val steps = interactionSteps.joinToString(",") { (op, node) -> if (op == "touch-cancel") "[\"touch-cancel\"]" else "[\"$op\",${index(node)}]" }
+		val out = Json.parse(library("[\"rt-interaction\",${level.tables},${level.entries.size},[$steps]]")).arr("rt-interaction")
+		if ((out.getOrNull(0) as? Json.Str)?.value != "ok") throw MarklessHostError("Dragon's interaction runtime refused the page's tables: ${out.firstOrNull()?.text()}")
+		val last = (out[1] as Json.Arr).items.lastOrNull()?.arr("rt-interaction step") ?: return
+		val state = Double.fromBits(java.lang.Long.parseUnsignedLong((last[5] as Json.Str).value, 16))
+		if (state >= 0 && state.toInt() < level.entries.size) l.shown = level.entries[state.toInt()]
+	}
 
 	private var lastPress: Triple<String, Long, Int>? = null
 
@@ -715,13 +823,13 @@ class MarklessHost(
 	}
 
 	/** The colour behind the page in the current assignment (the export's canvas, else the web canvas's white); null unstyled. */
-	val canvasColor: Int? get() = page?.let { it.export.assignments[it.assignment].canvas?.argb ?: Color.WHITE }
+	val canvasColor: Int? get() = page?.let { it.export.assignments[it.shown].canvas?.argb ?: Color.WHITE }
 
 	/** body's own box and colour in the current assignment, in the page's pixels as [rootFrame]; null when body paints none. */
 	val bodyBox: Pair<Rect, Int>? get() = page?.let { p ->
-		val color = p.export.assignments[p.assignment].body ?: return@let null
-		val origin = p.absolutes[p.assignment]["body"] ?: throw MarklessHostError("body paints a background, but the style export gives it no box")
-		val frame = p.export.assignments[p.assignment].byId.getValue("body").frame!!
+		val color = p.export.assignments[p.shown].body ?: return@let null
+		val origin = p.absolutes[p.shown]["body"] ?: throw MarklessHostError("body paints a background, but the style export gives it no box")
+		val frame = p.export.assignments[p.shown].byId.getValue("body").frame!!
 		Rect(origin.first.roundToInt(), origin.second.roundToInt(), (origin.first + frame.width).roundToInt(), (origin.second + frame.height).roundToInt()) to color.argb
 	}
 
@@ -737,6 +845,9 @@ class MarklessHost(
 
 	/** The page's current style assignment; null unstyled. */
 	val assignment: Int? get() = page?.assignment
+
+	/** The page's entry shown: the assignment, or the interaction state selected in it; null unstyled. */
+	val shown: Int? get() = page?.shown
 
 	/**
 	 * With Dragon's plan, the page lays out at the size it is shown at, as a browser does: [widthPx] x [heightPx] is the page
@@ -1313,7 +1424,7 @@ class MarklessHost(
 		val st = style ?: return null
 		val w = (st.viewportWidth * dpr).roundToInt()
 		val h = (st.viewportHeight * dpr).roundToInt()
-		val range = st.assignments[page!!.assignment].pageScroll
+		val range = st.assignments[page!!.shown].pageScroll
 		if (range != null) {
 			if (range.minX != 0.0 || range.minY != 0.0 || range.maxX != 0.0) throw MarklessHostError("a page scroll range of $range (wider than the screen, or starting before 0) is not implemented on Android")
 			return w to h + range.maxY.roundToInt()
@@ -1594,7 +1705,8 @@ class MarklessHost(
 	private fun place(inst: Instance, view: View) {
 		val node = inst.node
 		val layout = layoutOf(node) ?: return
-		val styled = layout.export.assignments[layout.assignment]
+		val entry = layout.entryFor(inst.id, node.id)
+		val styled = layout.export.assignments[entry]
 		// Dragon lays out no box for what shows only in a select's picker.
 		if (node.id in picker && styled.byId[inst.id] == null) return
 		val s = styled.byId[inst.id] ?: if (node.row != null && layout.export.planRepeats.isNotEmpty()) {
@@ -1604,7 +1716,7 @@ class MarklessHost(
 			return
 		} else throw MarklessHostError("style export has no node \"${inst.id}\"")
 		if (s.kind != (if (node is Node.Text) "text" else "element")) throw MarklessHostError("style node \"${inst.id}\" is a ${s.kind}")
-		val absolute = layout.absolutes[layout.assignment]
+		val absolute = layout.absolutes[entry]
 		val frame = s.frame
 		val origin = absolute[s.id]
 		if (inst.id in inert) {
@@ -1784,8 +1896,8 @@ class MarklessHost(
 	/** After layout: the largest gap, in device px, between any edge of a view's laid-out box (relative to the root) and its Dragon frame. */
 	fun frameDeviation(): Double {
 		val page = page ?: throw MarklessHostError("no style export to compare frames with")
-		val absolute = page.absolutes[page.assignment]
-		val styled = page.export.assignments[page.assignment]
+		val absolute = page.absolutes[page.shown]
+		val styled = page.export.assignments[page.shown]
 		val origin = absolute.getValue(payload.nodes.first().id)
 		val rootAt = IntArray(2).also { root.getLocationInWindow(it) }
 		var worst = 0.0
@@ -1986,6 +2098,14 @@ class MarklessHost(
 			maxOf(0, (fx + field.width).roundToInt() - (ex + box.width).roundToInt()), maxOf(0, (fy + field.height).roundToInt() - (ey + box.height).roundToInt()),
 		)
 		view.gravity = Gravity.CENTER_VERTICAL or Gravity.START
+		// A textarea's lines start at the editor's top, Dragon's pitch apart, its first baseline where Dragon puts it; its bottom inset is its padding.
+		styled.textAreas[s.id]?.let { lines ->
+			val top = ey.roundToInt() - fy.roundToInt()
+			view.gravity = Gravity.TOP or Gravity.START
+			view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, (lines.insets[2] + (ey - fy) - lines.insets[0]).roundToInt())
+			view.firstBaselineToTopHeight = top + lines.above.roundToInt()
+			view.setLineHeight(lines.pitch.roundToInt())
+		}
 		clearControl(view, s, styled, absolute)
 		fun look(n: StyledNode): Pair<StyleWrite.Font, Int?> =
 			(n.writes.filterIsInstance<StyleWrite.Font>().lastOrNull() ?: throw MarklessHostError("\"${n.id}\" has no font")) to

@@ -1,0 +1,43 @@
+appId: ${APP_ID}
+name: j54-async-chain
+---
+- launchApp:
+    clearState: true
+- assertVisible: Chain
+- assertVisible: "Asked: 1"
+- assertVisible: Waiting for second
+- assertNotVisible: "Second: B2"
+- extendedWaitUntil:
+    visible: "Asked: 1"
+    timeout: 19000
+- assertVisible: "Second: B2"
+- assertNotVisible: Waiting for second
+- assertVisible: "Asked: 1"
+- assertVisible: "Second: B2"
+- assertNotVisible: Waiting for second
+- tapOn: Bump
+- assertNotVisible: "Asked: 1"
+- assertVisible: "Asked: 2"
+- assertVisible: "Second: B2"
+- assertNotVisible: "Asked: 1"
+- assertNotVisible: "Second: B3"
+- extendedWaitUntil:
+    visible: "Asked: 2"
+    timeout: 19000
+- assertVisible: "Second: B3"
+- assertNotVisible: "Second: B2"
+- assertVisible: "Asked: 2"
+- assertVisible: "Second: B3"
+- assertNotVisible: "Second: B2"
+- tapOn: Break
+- assertNotVisible: "Asked: 2"
+- assertVisible: "Asked: -1"
+- assertVisible: "Second: B3"
+- assertNotVisible: "Asked: 2"
+- assertNotVisible: "Second failed: No A for -1"
+- extendedWaitUntil:
+    visible: "Second failed: No A for -1"
+    timeout: 19000
+- assertVisible: "Second failed: No A for -1"
+- assertVisible: "Second failed: No A for -1"
+- assertNotVisible: Waiting for second

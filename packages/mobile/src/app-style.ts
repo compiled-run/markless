@@ -33,6 +33,16 @@ type DragonTarget = {
 	}>;
 	readonly next: Json;
 	readonly bands?: Json;
+	/**
+	 * Only when an assignment has interaction states (:hover, :active, :focus): per assignment, Dragon's interaction runtime tables,
+	 * the node each table index names, each state laid out like an assignment, what each state matches, each address inside a
+	 * list row with its list, and with a plan each state's plan assignment (after the program's own, in level then state order).
+	 */
+	readonly interaction?: {
+		readonly levels: ReadonlyArray<
+			{ readonly states: DragonTarget['assignments'] } & { readonly [field: string]: Json }
+		>;
+	};
 };
 
 /** A face by its `sha256:` id: `file` is in the Dragon checkout, or with `from: 'input'` beside the style input. */
@@ -56,13 +66,20 @@ export type DragonStyleExport = {
 	readonly slots?: ReadonlyArray<Json>;
 };
 
-type InternedTarget = Omit<DragonTarget, 'backend' | 'viewport' | 'dpr' | 'assignments'> & {
-	readonly assignments: ReadonlyArray<{
-		readonly values: Json;
-		readonly nodes: ReadonlyArray<Omit<DragonNode, 'writes'> & { readonly writes: number }>;
-		readonly canvas: Json;
-		readonly bodyBackground?: Json;
-	}>;
+type InternedAssignment = {
+	readonly values: Json;
+	readonly nodes: ReadonlyArray<Omit<DragonNode, 'writes'> & { readonly writes: number }>;
+	readonly canvas: Json;
+	readonly bodyBackground?: Json;
+};
+
+type InternedTarget = Omit<DragonTarget, 'backend' | 'viewport' | 'dpr' | 'assignments' | 'interaction'> & {
+	readonly assignments: ReadonlyArray<InternedAssignment>;
+	readonly interaction?: {
+		readonly levels: ReadonlyArray<
+			{ readonly states: ReadonlyArray<InternedAssignment> } & { readonly [field: string]: Json }
+		>;
+	};
 };
 
 /** A page's styles inside the app file: Dragon's target fields, each node's `writes` an index into the target's `writes`. */
@@ -169,22 +186,36 @@ export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): Native
 			}
 			return index;
 		};
+		const internedAssignment = (
+			assignment: DragonTarget['assignments'][number],
+			what: string,
+		): InternedAssignment => ({
+			values: assignment.values,
+			canvas: assignment.canvas ?? fail(`${what} has no canvas`),
+			...(assignment.bodyBackground === undefined
+				? {}
+				: { bodyBackground: assignment.bodyBackground }),
+			nodes: assignment.nodes.map((node) => ({ ...node, writes: intern(node.writes) })),
+		});
 		const interned = (target: DragonTarget, what: string): InternedTarget => {
-			const { backend: _b, viewport: _v, dpr: _d, assignments, ...rest } = target;
+			const { backend: _b, viewport: _v, dpr: _d, assignments, interaction, ...rest } = target;
 			return {
 				...rest,
-				assignments: assignments.map((assignment, index) => ({
-					values: assignment.values,
-					canvas:
-						assignment.canvas ?? fail(`${what}'s assignment ${index} has no canvas`),
-					...(assignment.bodyBackground === undefined
-						? {}
-						: { bodyBackground: assignment.bodyBackground }),
-					nodes: assignment.nodes.map((node) => ({
-						...node,
-						writes: intern(node.writes),
-					})),
-				})),
+				assignments: assignments.map((assignment, index) =>
+					internedAssignment(assignment, `${what}'s assignment ${index}`),
+				),
+				...(interaction === undefined
+					? {}
+					: {
+							interaction: {
+								levels: interaction.levels.map((level, i) => ({
+									...level,
+									states: level.states.map((state, k) =>
+										internedAssignment(state, `${what}'s assignment ${i} interaction state ${k}`),
+									),
+								})),
+							},
+						}),
 			};
 		};
 		const routes = pages.map(({ pattern, exported, sheets }): NativeAppStyleRoute => {

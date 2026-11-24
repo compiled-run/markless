@@ -88,6 +88,14 @@ public struct ResolvedStyle: Equatable, Sendable {
 		public let color: RGBA?
 		public let placeholder: Placeholder?
 		public var clear: Frame? = nil
+		/// Only on a textarea: its line pitch and first baseline below a line's top, and its padding (top, right, bottom, left), in points.
+		public var lines: Lines? = nil
+
+		public struct Lines: Equatable, Sendable {
+			public let pitch: Double
+			public let above: Double
+			public let insets: [Double]
+		}
 
 		public struct Placeholder: Equatable, Sendable {
 			public let frame: Frame
@@ -184,6 +192,8 @@ public struct StyleLayout: Sendable {
 	public let bands: StyleBands?
 	/// Each assignment's document height in points: how far the laid-out content reaches down.
 	public let extents: [Double]
+	/// Per assignment, its interaction states, whose entries follow the assignments in every per-entry list here.
+	public let interaction: [StyleInteractionLevel]
 }
 
 extension StyleLayout {
@@ -275,7 +285,8 @@ extension StyleExport {
 			return NativeValue.number(Double(try bands.band(dark: dark, widthPx: viewport.width * dpr, heightPx: viewport.height * dpr, scale: dpr)))
 		}
 		let matches = { (index: Int) in zip(self.states, current).allSatisfy { state, value in self.assignments[index].values[state.key].map { $0.strictlyEquals(value) } ?? false } }
-		guard let start = matches(initial) ? initial : assignments.indices.first(where: matches) else {
+		// Interaction states come after the assignments and share their values; a page starts in an assignment.
+		guard let start = matches(initial) ? initial : next.indices.first(where: matches) else {
 			throw styleError("no assignment of the style export matches the cells' values \(current.map(\.jsonText))")
 		}
 		let picker = payload.pickerContent
@@ -308,7 +319,8 @@ extension StyleExport {
 					return (node.frame?.y ?? 0) + top(node.parent)
 				}
 				return (assignment.nodes.compactMap { node in node.frame.map { top(node.parent) + $0.y + $0.height } }.max() ?? 0) / dpr
-			})
+			},
+			interaction: interaction)
 	}
 
 	private func resolveNodes(
@@ -329,6 +341,7 @@ extension StyleExport {
 		}
 		let isInput = { (id: String) -> Bool in
 			if case .element("input", _, _)? = payloadById[id]?.kind { return true }
+			if case .element("textarea", _, _)? = payloadById[id]?.kind { return true }
 			return false
 		}
 		let postOrder = StyleExport.postOrder(nodes)
@@ -533,9 +546,11 @@ extension StyleExport {
 			placeholder = .init(frame: points(frame), text: words, fontFamily: drawn.font.family, fontSize: drawn.font.size, color: drawn.color)
 		}
 		let cancel = byId[field.id + "::cancel"].flatMap { $0.parent == field.id ? $0.frame : nil }
-		return ResolvedStyle.TextFieldPaint(
+		var paint = ResolvedStyle.TextFieldPaint(
 			editor: points(box), fontFamily: value.font.family, fontSize: value.font.size, color: value.color, placeholder: placeholder,
 			clear: cancel.map(points))
+		paint.lines = field.textAreaLines.map { .init(pitch: $0.pitch / dpr, above: $0.above / dpr, insets: $0.insets.map { $0 / dpr }) }
+		return paint
 	}
 
 	private func reHostOf(_ writes: [StyleWrite]) -> String? {
