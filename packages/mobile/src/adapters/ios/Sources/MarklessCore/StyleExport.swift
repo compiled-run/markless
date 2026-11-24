@@ -173,6 +173,8 @@ public struct StyleNode: Sendable {
 	public var selectArrow: SelectArrow? = nil
 	/// Only on a checkbox with a `checkbox` write, once Dragon's plan has laid the page out.
 	public var checkboxMarks: CheckboxMarks? = nil
+	/// Only on a textarea, once Dragon's plan has laid the page out: the lines its host view lays typed text out by.
+	public var textAreaLines: TextAreaLines? = nil
 
 	var drawsSelectArrow: Bool { writes.contains { if case .selectArrow = $0 { return true } else { return false } } }
 	var drawsCheckbox: Bool { writes.contains { if case .checkbox = $0 { return true } else { return false } } }
@@ -796,14 +798,14 @@ public struct StyleExport: Sendable {
 				if shown == nil { line += ",\"rows\":[]" }
 				line += ",\"texts\":" + JSONValue.array(changed.map { .array([.string(dragonId[$0.key] ?? $0.key), .string($0.value)]) }).jsonText
 			}
-			line += ",\"sticky\":true}"
+			line += ",\"sticky\":true,\"textAreas\":true}"
 			guard !live || rowsLayout != nil else { throw PayloadError(path: "plan layout", reason: "a page whose texts follow state needs Dragon's live layout") }
 			guard shown == nil || rowsLayout != nil else { throw PayloadError(path: "plan layout", reason: "a page with rows needs Dragon's rows layout") }
 			let result = try Reader(JSONValue.parse(Data((live ? rowsLayout!(line) : layout(line)).utf8)), at: "plan layout")
 			let parts = try result.array()
 			// Dragon's live layout answers a slotted page with each row's write numbers, an empty list when it lays out texts and no rows.
 			let fixed = !slotted ? 3 : (live ? 5 : 4)
-			guard parts.count >= fixed, parts.count <= fixed + 3, try parts[0].string() == "ok" else {
+			guard parts.count >= fixed, parts.count <= fixed + 4, try parts[0].string() == "ok" else {
 				throw PayloadError(path: "plan layout", reason: "Dragon's layout at \(width) x \(height) points and \(scale)x failed: \(result.value.jsonText)")
 			}
 			// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
@@ -815,6 +817,7 @@ public struct StyleExport: Sendable {
 			var arrows: [String: (strokeWidth: Double, points: [Double])] = [:]
 			var marks: [String: CheckboxMarks] = [:]
 			var sticky: [StickyRow] = []
+			var areas: [String: TextAreaLines] = [:]
 			var tags: Set<String> = []
 			for tagged in parts[fixed...] {
 				let suffix = try tagged.array()
@@ -826,6 +829,16 @@ public struct StyleExport: Sendable {
 						let s = try entry.array()
 						guard s.count == 15 else { throw entry.fail("expected an id and 14 numbers") }
 						sticky.append(StickyRow(id: exportId(try s[0].string()), row: entry.value))
+					}
+					continue
+				}
+				if tag == "text-areas" {
+					for entry in try suffix[1].array() {
+						let t = try entry.array()
+						guard t.count == 4 else { throw entry.fail("expected id, pitch, above and insets") }
+						let insets = try t[3].array().map { try planNumber($0.value) }
+						guard insets.count == 4 else { throw t[3].fail("insets are top, right, bottom and left") }
+						areas[exportId(try t[0].string())] = TextAreaLines(pitch: try planNumber(t[1].value), above: try planNumber(t[2].value), insets: insets)
 					}
 					continue
 				}
@@ -973,6 +986,7 @@ public struct StyleExport: Sendable {
 				} else if node.drawsSelectArrow {
 					throw PayloadError(path: "plan layout", reason: "\(node.id) draws a drop-down arrow, but Dragon's layout gives it no arrow geometry")
 				}
+				if let lines = areas.removeValue(forKey: node.id) { nodes[index].textAreaLines = lines }
 				if let m = marks.removeValue(forKey: node.id) {
 					guard node.drawsCheckbox else { throw PayloadError(path: "plan layout", reason: "Dragon's layout gives \(node.id) checkbox marks, but it draws no checkbox") }
 					nodes[index].checkboxMarks = CheckboxMarks(
@@ -1281,6 +1295,13 @@ public struct LaidOutRow: Sendable, Equatable {
 		self.texts = texts
 		self.slots = slots
 	}
+}
+
+/// A textarea's line pitch, its first baseline below a line's top, and its padding (top, right, bottom, left), in device px.
+public struct TextAreaLines: Equatable, Sendable {
+	public let pitch: Double
+	public let above: Double
+	public let insets: [Double]
 }
 
 /// A sticky box of a laid-out assignment: its export id, and its row as Dragon's plan layout wrote it (with Dragon's own id).
