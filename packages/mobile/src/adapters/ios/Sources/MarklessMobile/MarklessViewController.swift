@@ -435,14 +435,7 @@ public final class MarklessViewController: UIViewController {
 			guard size.width > 0, size.height > 0, !layingOut else { return }
 			let same = !rowsMoved && size == laidOutFor?.size && slots.map(\.bitPattern) == laidOutFor?.slots.map(\.bitPattern) && texts == laidOutFor?.texts
 			// The shown entries, at every @media band: the band this size selects is only decided once the page is laid out at it.
-			let needed = Set([tree.assignment, tree.shown].flatMap { entry in
-				let values = style.assignments[min(entry, style.assignments.count - 1)].values
-				return style.assignments.indices.filter { k in
-					k == entry || (entry < style.assignments.count && style.assignments[k].values.allSatisfy { key, value in
-						key == StyleBands.state || values[key].map { $0.strictlyEquals(value) } ?? false
-					})
-				}
-			})
+			let needed = style.bandTwins(of: tree.assignment).union(style.bandTwins(of: tree.shown))
 			if same && needed.isSubset(of: laidEntries) { return }
 			if !same {
 				laidEntries = []

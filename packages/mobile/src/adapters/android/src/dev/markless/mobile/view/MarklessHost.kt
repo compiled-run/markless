@@ -899,12 +899,7 @@ class MarklessHost(
 	 * laid out again.
 	 */
 	/** The page's assignment and shown entry, at every @media band: the band a size selects is only decided once the page is laid out at it. */
-	private fun entriesShown(p: Layout, export: StyleExport): Set<Int> = listOf(p.assignment, p.shown).flatMap { entry ->
-		val values = export.assignments.getOrNull(entry)?.values ?: return@flatMap listOf(entry)
-		export.assignments.indices.filter { k ->
-			k == entry || export.assignments[k].values.all { (key, value) -> key == BAND_KEY || values[key]?.let { Js.strictEquals(it, value) } == true }
-		}
-	}.toSet()
+	private fun entriesShown(p: Layout, export: StyleExport): Set<Int> = export.bandTwins(p.assignment) + export.bandTwins(p.shown)
 
 	fun layOutAt(widthPx: Int, heightPx: Int, rowsMoved: Boolean = false): Boolean {
 		val p = page ?: return false

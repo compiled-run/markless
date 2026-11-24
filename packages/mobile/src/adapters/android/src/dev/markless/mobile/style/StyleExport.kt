@@ -244,6 +244,14 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 	/** The assignment an entry belongs to: itself, or for an interaction state the assignment whose level holds it. */
 	fun assignmentOf(entry: Int): Int = interaction.indexOfFirst { entry in it.entries }.takeIf { it >= 0 } ?: entry
 
+	/** [entry] and each assignment that differs from it only in its @media band; an interaction state is laid out only when shown. */
+	fun bandTwins(entry: Int): Set<Int> {
+		val values = assignments.getOrNull(entry)?.values ?: return setOf(entry)
+		return next.indices.filter { k ->
+			assignments[k].values.all { (key, value) -> key == BAND_KEY || values[key]?.let { Js.strictEquals(it, value) } == true }
+		}.toSet() + entry
+	}
+
 
 	/** The index of [BAND_KEY] among [states], or -1 for an export without @media. */
 	val bandState: Int = states.indexOfFirst { it.key == BAND_KEY }

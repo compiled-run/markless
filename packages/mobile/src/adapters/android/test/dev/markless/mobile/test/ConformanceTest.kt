@@ -786,6 +786,21 @@ private fun appStyle(fixtures: File) {
 	refusesApp("slots on a route without a plan", text.replace("\"pattern\":", "\"slots\":[{\"id\":\"slot:h0#0\",\"initial\":25}],\"pattern\":"), "has slots but no layout plan")
 	refusesApp("a write index out of range", text.replace(Regex("\"writes\":\\s*\\d+(\\s*)}"), "\"writes\":99999$1}"), "not an index of the app's write lists")
 	refusesApp("an unknown route field", text.replace(Regex("\"pattern\":\\s*\"/help\""), "\"pattern\":\"/help\",\"extra\":1"), "unknown field \"extra\"")
+	// Each assignment given one interaction state with its own values: a state is laid out when shown, never as a band twin.
+	val staged = Json.parse(bytes) as Json.Obj
+	val stagedTarget = ((staged.fields.getValue("targets") as Json.Obj).fields.getValue("android") as Json.Obj)
+	for (route in (stagedTarget.fields.getValue("routes") as Json.Arr).items) {
+		val r = (route as Json.Obj).fields
+		val match = Json.Obj(linkedMapOf<String, Json>("active" to Json.Arr(emptyList()), "focus" to Json.Null, "hover" to Json.Arr(emptyList())))
+		r["interaction"] = Json.Obj(linkedMapOf<String, Json>("levels" to Json.Arr((r.getValue("assignments") as Json.Arr).items.map { a ->
+			Json.Obj(linkedMapOf<String, Json>("tables" to Json.Obj(linkedMapOf()), "addresses" to Json.Arr(emptyList()), "states" to Json.Arr(listOf(a)), "matches" to Json.Arr(listOf(match))))
+		})))
+	}
+	val withStates = StyleExport.decodeApp(canonical(staged).toByteArray()).getValue("/settings")
+	val twins = withStates.bandTwins(withStates.initial)
+	check("an assignment's band twins are assignments, not its interaction states", withStates.assignments.size == 2 * withStates.next.size && twins.size == 2 && withStates.initial in twins && twins.all { it < withStates.next.size }) { "$twins of ${withStates.assignments.size}" }
+	val pressed = withStates.interaction[withStates.initial].entries.single()
+	check("a shown interaction state is laid out beside its assignment's band twins", withStates.bandTwins(pressed) == twins + pressed) { "${withStates.bandTwins(pressed)}" }
 	// The same style with every node moved into the target's pool, each assignment naming its nodes by index.
 	val pooledRoot = Json.parse(bytes) as Json.Obj
 	val target = ((pooledRoot.fields.getValue("targets") as Json.Obj).fields.getValue("android") as Json.Obj).fields
