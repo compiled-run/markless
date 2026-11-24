@@ -321,6 +321,10 @@ class MarklessHost(
 	private val interactionSteps = mutableListOf<Pair<String, String?>>()
 	/** The list row (`@<key>` of its copies) the finger is pressing, and the one the focused element is in. */
 	private var pressedRow: String? = null
+	/** A finger is on the page: no view changes parent until it lifts, since a view that leaves its parent loses the touch. */
+	private var fingerDown = false
+	/** A restack waited for the finger to lift, and runs once the touch is over. */
+	private var restackAfterTouch = false
 	private var focusedRow: String? = null
 	/** Where the current touch began, to tell a tap from a scroll. */
 	private var touchStart: Pair<Float, Float>? = null
@@ -663,6 +667,7 @@ class MarklessHost(
 		if (p.export.interaction.isEmpty()) return
 		when (e.actionMasked) {
 			android.view.MotionEvent.ACTION_DOWN -> {
+				fingerDown = true
 				val at = touchedNode(e.rawX, e.rawY)
 				pressedRow = at?.second
 				touchStart = e.rawX to e.rawY
@@ -695,6 +700,15 @@ class MarklessHost(
 				interactionSteps += "touch-cancel" to null
 			}
 			else -> return
+		}
+		val lifted = e.actionMasked == android.view.MotionEvent.ACTION_UP || e.actionMasked == android.view.MotionEvent.ACTION_CANCEL
+		// The views take the lift first; the boxes a pressed state left in place move once it is over.
+		if (lifted) root.post {
+			fingerDown = false
+			if (restackAfterTouch && page === p) {
+				restackAfterTouch = false
+				repaint()
+			}
 		}
 		val before = p.shown
 		reselect(p)
@@ -1806,7 +1820,19 @@ class MarklessHost(
 			)
 		} else {
 			// A box its stacking context paints past ancestors with later siblings sits in that context's view, in its order.
-			val stackParent = paintOrder?.let { stackingParent(s, it, styled, { id -> id.substringBefore('@') in nodeIds }, parentId) }
+			var stackParent = paintOrder?.let { stackingParent(s, it, styled, { id -> id.substringBefore('@') in nodeIds }, parentId) }
+			if (fingerDown) {
+				val current = view.parent
+				val wanted = (stackParent ?: parentId)?.let { scrollers[it]?.second ?: views[it] }
+				if (current != null && wanted != null && current !== wanted) {
+					// Placed in the view it is in until the finger lifts.
+					val holder = views.entries.firstOrNull { it.value === current }?.key ?: scrollers.entries.firstOrNull { it.value.second === current }?.key
+					if (holder != null) {
+						restackAfterTouch = true
+						stackParent = holder.takeIf { it != parentId }
+					}
+				}
+			}
 			val frameParent = stackParent ?: parentId
 			// A sheet's top-level content sits in the sheet's content box, which is its document's origin.
 			var (ox, oy) = frameParent?.takeIf { it != sheet }?.let { absolute.getValue(it) }?.let { it.first.roundToInt() to it.second.roundToInt() } ?: (0 to 0)
