@@ -1711,6 +1711,10 @@ class MarklessHost(
 			view.visibility = View.GONE
 			removeOutline(inst.id)
 			return
+		} else if (node is Node.Text && view is TextView && view.text.isEmpty()) {
+			// Dragon, as the web, lays out no box for an empty text: it shows once a state gives it text and the page is laid out again.
+			view.visibility = View.GONE
+			return
 		} else throw MarklessHostError("style export has no node \"${inst.id}\"")
 		if (s.kind != (if (node is Node.Text) "text" else "element")) throw MarklessHostError("style node \"${inst.id}\" is a ${s.kind}")
 		val absolute = layout.absolutes[entry]

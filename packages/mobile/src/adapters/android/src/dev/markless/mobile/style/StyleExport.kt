@@ -455,7 +455,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			assignment.copy(pageScroll = pageScroll, sticky = sticky, textAreas = areas, nodes = withRows.map { slotted ->
 				val node = moved[slotted.id]?.let { slotted.copy(writes = slotWrites(slotted, it)) } ?: slotted
 				if (node.frame == null) return@map node
-				val f = geometry[node.id] ?: throw MarklessDecodeError("Dragon's layout has no box for ${node.id}")
+				// A text whose state emptied it has no box, as on the web.
+				val f = geometry[node.id] ?: if (node.kind == "text" && relaidTexts[node.id] == "") return@map node.copy(frame = null, borderWidths = null, borderOps = null, scrollRange = null, lines = null) else throw MarklessDecodeError("Dragon's layout has no box for ${node.id}")
 				val what = "plan layout of ${node.id}"
 				if (f.size != 6) throw MarklessDecodeError("$what: expected id, frame, border widths, lines, border operations and scroll range")
 				val frame = f[1].arr(what).map { planNumber(it) }
