@@ -50,6 +50,7 @@ import {
 	navRungFolders,
 	sheetStyleRungFolders,
 	styleRungFolders,
+	PHONE_REFUSED_RUNGS,
 	proofsDir,
 	readRung,
 	readsAs,
@@ -107,8 +108,10 @@ const bindsValue = (
 		)
 	);
 };
-// The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
-const REFUSED_RUNGS = new Set(['j7-page-refused']);
+// The one-screen rungs the compiler refuses on purpose; every other rung must lower, so a rung cannot stop lowering unseen.
+const REFUSED_RUNGS = new Set(
+	Object.keys(PHONE_REFUSED_RUNGS).filter((rung) => PHONE_REFUSED_RUNGS[rung] === 'compiler'),
+);
 // Rungs whose later steps wait on CSS animation events, which only Dragon's animator on the phones (and the browser) runs: this
 // walk checks their launch screen, and the phones and the web column check every step.
 const ANIMATED_RUNGS = new Set(['s34-animation-end']);
