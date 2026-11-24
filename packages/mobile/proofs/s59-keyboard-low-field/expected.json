@@ -1,0 +1,26 @@
+{
+	"rung": "S59",
+	"name": "Typing into a field low on a styled page keeps the page laid out at the full screen while the keyboard is up, and the field is scrolled into view, as Chrome and Safari do",
+	"steps": [
+		{
+			"visible": ["New note", "Body", "Nothing typed", "Title"],
+			"fields": {
+				"Title": ""
+			}
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Title",
+					"text": "Groceries",
+					"keepKeyboard": true
+				}
+			},
+			"visible": ["Typed", "Title"],
+			"absent": ["Nothing typed"],
+			"fields": {
+				"Title": "Groceries"
+			}
+		}
+	]
+}
