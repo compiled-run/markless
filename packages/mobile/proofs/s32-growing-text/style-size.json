@@ -1,8 +1,8 @@
 {
 	"perPage": {
-		"/": 62873
+		"/": 62863
 	},
-	"perPageTotal": 62873,
+	"perPageTotal": 62863,
 	"app": 60242,
 	"targets": {
 		"ios": {
