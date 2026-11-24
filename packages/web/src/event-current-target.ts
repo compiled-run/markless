@@ -9,11 +9,66 @@ export function marklessRunAtCurrentTarget<A, T>(
 ): T {
 	const target = Object(event) as { currentTarget?: unknown };
 	const aimed = Reflect.defineProperty(target, 'currentTarget', { value: element, configurable: true });
+	const restoreCapture = replayedPointerCapture(event);
 	try {
 		return run(context);
 	} finally {
+		restoreCapture?.();
 		if (aimed) delete target.currentTarget;
 	}
+}
+
+// On the window once a replayed press took a capture: the dispatch queue aims that pointer's later events with it.
+export const POINTER_CAPTURE_PROPERTY = '__mPC';
+
+type PointerFacts = { readonly type: string; readonly eventPhase?: number; readonly pointerId?: number; readonly timeStamp: number };
+// Per pointer: the element a replayed press captured it to, and the span of its events the browser sent before that capture existed.
+const heldCaptures = new Map<number | undefined, [element: Element, from: number, until: number]>();
+
+// A press that waited for its code takes its capture late: the events the browser already aimed elsewhere are handed to the capturing element.
+function replayedPointerCapture(event: unknown): (() => void) | undefined {
+	const { eventPhase, pointerId: id, timeStamp } = Object(event) as PointerFacts;
+	const proto = globalThis.Element?.prototype;
+	if (eventPhase !== 0 || id == null || !proto) return;
+	const { setPointerCapture: set, hasPointerCapture: has, releasePointerCapture: release } = proto;
+	// The pointer may have lifted while the code loaded; on time the call would have found it.
+	const call = (native: (pointerId: number) => void, element: Element, pointerId: number) => {
+		try {
+			native.call(element, pointerId);
+		} catch (error) {
+			if (pointerId !== id || (error as DOMException).name !== 'NotFoundError') throw error;
+		}
+	};
+	proto.setPointerCapture = function (pointerId) {
+		call(set, this, pointerId);
+		if (pointerId !== id) return;
+		heldCaptures.set(id, [this, timeStamp, performance.now()]);
+		Reflect.set(globalThis, POINTER_CAPTURE_PROPERTY, marklessCapturedInput);
+	};
+	proto.hasPointerCapture = function (pointerId) {
+		const held = heldCaptures.get(pointerId);
+		return has.call(this, pointerId) || (held?.[0] === this && timeStamp >= held[1] && timeStamp <= held[2]);
+	};
+	proto.releasePointerCapture = function (pointerId) {
+		const held = heldCaptures.get(pointerId);
+		if (held?.[0] === this) held[2] = Math.min(held[2], timeStamp);
+		call(release, this, pointerId);
+	};
+	return () => Object.assign(proto, { setPointerCapture: set, hasPointerCapture: has, releasePointerCapture: release });
+}
+
+/** A queued dispatch of a pointer event a replayed capture covers, aimed at the capturing element; any other dispatch as it came. */
+export function marklessCapturedInput<I extends { readonly root: { contains?(node: unknown): boolean }; readonly event: unknown }>(
+	input: I,
+): I {
+	const event = Object(input.event) as PointerFacts & { target?: unknown; __marklessPressPath?: unknown[] };
+	const held = heldCaptures.get(event.pointerId);
+	if (!held || event.type === 'pointerdown' || event.timeStamp < held[1] || event.timeStamp > held[2]) return input;
+	if (event.type === 'pointerup' || event.type === 'pointercancel') held[2] = event.timeStamp;
+	if (event.target === held[0] || !input.root.contains?.(held[0])) return input;
+	Object.defineProperty(event, 'target', { value: held[0], configurable: true });
+	event.__marklessPressPath = [held[0]];
+	return { ...input, element: held[0], eventRecord: null, eventIndex: undefined };
 }
 
 // Events a container has not handled yet; an in-place navigation waits for them.

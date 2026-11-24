@@ -1357,8 +1357,13 @@ function runInlineResumer(
 		for (const primeEventName of primeEventNames)
 			root.addEventListener(primeEventName, prime, true);
 	}
+	// The pointer a forwarded press holds down: its later events reach the runtime wherever they land, so a capture the press takes late still gets them.
+	let pressed = NaN;
 	const dispatch = (event: Event): unknown => {
 		if (root.__mL !== life) return root.removeEventListener(event.type, dispatch, true);
+		const pointer = (event as PointerEvent).pointerId;
+		const held = pointer === pressed;
+		if (held && (event.type == 'pointerup' || event.type == 'pointercancel')) pressed = NaN;
 		let policyApplied = false;
 		let scoped = false;
 		// The press-time path, so a target an earlier listener took out still reaches its host; a replayed early event has none.
@@ -1390,6 +1395,7 @@ function runInlineResumer(
 						(input as { syncPolicyAlreadyApplied?: boolean }).syncPolicyAlreadyApplied =
 							policyApplied;
 					}
+					if (event.type == 'pointerdown') pressed = pointer;
 					return forward(input, 1);
 				}
 				scoped = true;
@@ -1398,6 +1404,7 @@ function runInlineResumer(
 		}
 		if (
 			scoped ||
+			held ||
 			((forwardsUnknownElements || nestedEventNames.includes(event.type)) &&
 				!leavesPage(event))
 		) {

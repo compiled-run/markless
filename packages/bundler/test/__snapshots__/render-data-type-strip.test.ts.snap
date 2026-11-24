@@ -260,7 +260,7 @@ export function resumeContainerEvent(input) {
 			lastEventTime = eventTime;
 			let release;
 			const started = new Promise(resolve => release = resolve);
-			const run = () => root.__mL === life ? (root.__marklessReleaseDispatch = release, handler(next)) : release();
+			const run = () => root.__mL === life ? (root.__marklessReleaseDispatch = release, handler(globalThis.__mPC?.(next) ?? next)) : release();
 			done = tail.then(run, run);
 			done.then(release, release);
 			tail = started;

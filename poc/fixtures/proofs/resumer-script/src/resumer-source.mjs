@@ -40,6 +40,8 @@ export const EVENT_ONLY_RESUMER_ATTRIBUTION = {
 	failedImportRetry: 13,
 	// Paired OXC builds measured 1,415 -> 1,482: an event a host names a record for, received before the runtime starts, is recorded where a navigation waits for it, so its handler still runs.
 	inlineEventRecord: 67,
+	// Paired OXC builds measured 1,482 -> 1,530: after a press it forwards, every later event of that pointer reaches the runtime until the pointer lifts, so a capture the press takes once its code arrives still gets the moves and the release.
+	pressedPointerForward: 48,
 	gzipCrossTerm: 3,
 };
 
