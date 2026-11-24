@@ -66,9 +66,12 @@ export type DragonStyleExport = {
 	readonly slots?: ReadonlyArray<Json>;
 };
 
+type InternedNode = Omit<DragonNode, 'writes'> & { readonly writes: number };
+
 type InternedAssignment = {
 	readonly values: Json;
-	readonly nodes: ReadonlyArray<Omit<DragonNode, 'writes'> & { readonly writes: number }>;
+	/** Each node an index into the target's `nodes`: an interaction state repeats most of its assignment's nodes unchanged. */
+	readonly nodes: ReadonlyArray<number>;
 	readonly canvas: Json;
 	readonly bodyBackground?: Json;
 };
@@ -136,6 +139,8 @@ export type NativeAppStyle = {
 				readonly dpr: number;
 				/** Every distinct list of lowered writes in the app, once: a component styled alike on two pages shares its lists. */
 				readonly writes: ReadonlyArray<ReadonlyArray<Json>>;
+				/** Every distinct node of every assignment and interaction state, once, its `writes` an index into `writes`. */
+				readonly nodes: ReadonlyArray<InternedNode>;
 				/** Only the routes with styles, in the app payload's route order. */
 				readonly routes: ReadonlyArray<NativeAppStyleRoute>;
 			}
@@ -186,6 +191,18 @@ export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): Native
 			}
 			return index;
 		};
+		const nodes: InternedNode[] = [];
+		const nodeIndexOf = new Map<string, number>();
+		const internNode = (node: DragonNode): number => {
+			const entry = { ...node, writes: intern(node.writes) };
+			const key = JSON.stringify(entry);
+			let index = nodeIndexOf.get(key);
+			if (index === undefined) {
+				index = nodes.push(entry) - 1;
+				nodeIndexOf.set(key, index);
+			}
+			return index;
+		};
 		const internedAssignment = (
 			assignment: DragonTarget['assignments'][number],
 			what: string,
@@ -195,7 +212,7 @@ export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): Native
 			...(assignment.bodyBackground === undefined
 				? {}
 				: { bodyBackground: assignment.bodyBackground }),
-			nodes: assignment.nodes.map((node) => ({ ...node, writes: intern(node.writes) })),
+			nodes: assignment.nodes.map(internNode),
 		});
 		const interned = (target: DragonTarget, what: string): InternedTarget => {
 			const { backend: _b, viewport: _v, dpr: _d, assignments, interaction, ...rest } = target;
@@ -262,7 +279,7 @@ export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): Native
 					: {}),
 			};
 		});
-		targets[name] = { backend, viewport, dpr, writes: lists, routes };
+		targets[name] = { backend, viewport, dpr, writes: lists, nodes, routes };
 	}
 	const systemFonts = appStyleSystemFonts(pages);
 	return {

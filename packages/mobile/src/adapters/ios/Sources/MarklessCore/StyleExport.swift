@@ -431,18 +431,25 @@ public struct StyleExport: Sendable {
 		}
 		let fonts = try decodeFonts(fields["fonts"])
 		let chosen = try fields["targets"].field(target)
-		let targetFields = try chosen.object(["backend", "viewport", "dpr", "writes", "routes"])
+		let targetFields = try chosen.object(required: ["backend", "viewport", "dpr", "writes", "routes"], optional: ["nodes"])
 		let writes = try targetFields["writes"].array().map { list in _ = try list.array(); return list.value }
+		let withWrites = { (node: Reader) throws -> JSONValue in
+			guard case let .object(entries) = node.value else { throw node.fail("expected an object") }
+			let index = Int(try node.field("writes").number())
+			guard writes.indices.contains(index) else { throw node.fail("writes \(index) is not in the target's writes") }
+			return .object(entries.map { $0.0 == "writes" ? ("writes", writes[index]) : $0 })
+		}
+		let pool: [JSONValue] = targetFields.has("nodes") ? try targetFields["nodes"].array().map(withWrites) : []
 		var routes: [String: StyleExport] = [:]
 		let raw = { (fields: Fields, key: String) throws -> (String, JSONValue) in (key, try fields[key].value) }
 		let expanded = { (reader: Reader, f: Fields, viewport: (String, JSONValue)) throws -> StyleExport in
 			let expandAssignment = { (assignment: Reader) throws -> JSONValue in
 				let a = try assignment.object(required: ["values", "nodes", "canvas"], optional: ["bodyBackground"])
 				let nodes: [JSONValue] = try a["nodes"].array().map { node in
-					guard case let .object(entries) = node.value else { throw node.fail("expected an object") }
-					let index = Int(try node.field("writes").number())
-					guard writes.indices.contains(index) else { throw node.fail("writes \(index) is not in the target's writes") }
-					return .object(entries.map { $0.0 == "writes" ? ("writes", writes[index]) : $0 })
+					guard case .number = node.value else { return try withWrites(node) }
+					let index = Int(try node.number())
+					guard pool.indices.contains(index) else { throw node.fail("node \(index) is not in the target's nodes") }
+					return pool[index]
 				}
 				let body: [(String, JSONValue)] = a.has("bodyBackground") ? [("bodyBackground", try a["bodyBackground"].value)] : []
 				return .object([("values", try a["values"].value), ("nodes", .array(nodes)), ("canvas", try a["canvas"].value)] + body)

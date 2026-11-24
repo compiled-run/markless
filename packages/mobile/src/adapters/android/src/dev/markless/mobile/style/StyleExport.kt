@@ -647,7 +647,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val undecided = root["warnings"]?.arr("warnings")?.map { it.obj("warnings[]") }?.firstOrNull { w ->
 				w.field("code", "warning").str("code") == "DRAGON_PAGE_SCROLL_UNDECIDED" && w.field("message", "warning").str("message").startsWith("$target: ")
 			}?.let { it.getValue("message").str("message").removePrefix("$target: ") }
-			val style = withPlan(program(t, target, dpr, width, height, undecided) { w, what -> writes(w, what) }.copy(systemFaces = root["systemFonts"]?.let { systemFaces(it, target) } ?: emptyMap()), t, target)
+			val style = withPlan(program(t, target, dpr, width, height, undecided) { v, what -> node(v, what) { w, at -> writes(w, at) } }.copy(systemFaces = root["systemFonts"]?.let { systemFaces(it, target) } ?: emptyMap()), t, target)
 			val slots = root["slots"]?.let { exportSlots(it) } ?: return style
 			if (slots.isNotEmpty() && style.plan == null) throw MarklessDecodeError("style export has slots but $target has no layout plan to apply them")
 			return style.copy(slots = slots)
@@ -695,8 +695,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			return out
 		}
 
-		/** One target's states, assignments and next table; [writesOf] reads a node's `writes` field. */
-		private fun program(t: Map<String, Json>, target: String, dpr: Double, width: Double, height: Double, undecided: String?, writesOf: (Json, String) -> List<StyleWrite>): StyleExport {
+		/** One target's states, assignments and next table; [nodeOf] reads an assignment's node entry. */
+		private fun program(t: Map<String, Json>, target: String, dpr: Double, width: Double, height: Double, undecided: String?, nodeOf: (Json, String) -> StyledNode): StyleExport {
 			val states = t.field("states", target).arr("states").mapIndexed { n, v ->
 				val o = v.obj("states[$n]")
 				StyleState(o.field("key", "states[$n]").str("key"), o.field("domain", "states[$n]").arr("domain").map { scalar(it, "states[$n].domain[]") })
@@ -708,7 +708,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				if (canvas != null && canvas.alpha != 255) throw MarklessDecodeError("assignments[$a].canvas is not opaque")
 				val body = o["bodyBackground"]?.takeIf { it != Json.Null }?.let { color(it, "assignments[$a].bodyBackground") }
 				if (body != null && body.alpha != 255) throw MarklessDecodeError("assignments[$a].bodyBackground is not opaque")
-				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> node(x, "assignments[$a].nodes[$n]", writesOf) }, canvas, body, o["pageScroll"]?.let { range(it, "assignments[$a].pageScroll") })
+				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> nodeOf(x, "assignments[$a].nodes[$n]") }, canvas, body, o["pageScroll"]?.let { range(it, "assignments[$a].pageScroll") })
 			}
 			val assignments = t.field("assignments", target).arr("assignments").mapIndexed(decode).toMutableList()
 			val initial = t.field("initial", target).num("initial").toInt()
@@ -777,7 +777,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val version = root.field("version", "app style").str("version")
 			if (version != APP_STYLE_VERSION) throw MarklessDecodeError("unknown app style version \"$version\" (this host reads $APP_STYLE_VERSION)")
 			val t = root.field("targets", "app style").obj("targets").field(target, "targets").obj("targets.$target")
-			t.only(setOf("backend", "viewport", "dpr", "writes", "routes"), "targets.$target")
+			t.only(setOf("backend", "viewport", "dpr", "writes", "nodes", "routes"), "targets.$target")
 			val backend = t.field("backend", target).str("backend")
 			if (backend != ANDROID_BACKEND) throw MarklessDecodeError("app style backend is \"$backend\", not $ANDROID_BACKEND")
 			val viewport = t.field("viewport", target).obj("viewport")
@@ -785,17 +785,26 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val width = viewport.field("width", "viewport").num("width")
 			val height = viewport.field("height", "viewport").num("height")
 			val lists = t.field("writes", target).arr("writes").mapIndexed { n, w -> writes(w, "writes[$n]") }
+			val listedNode = { v: Json, what: String ->
+				node(v, what) { w, at ->
+					val i = w.num("$at.writes")
+					if (i != Math.floor(i) || i.toInt() !in lists.indices) throw MarklessDecodeError("$at.writes is $i, not an index of the app's write lists")
+					lists[i.toInt()]
+				}
+			}
+			val pool = t["nodes"]?.arr("targets.$target.nodes")?.mapIndexed { n, v -> listedNode(v, "nodes[$n]") } ?: emptyList()
+			val pooled = { v: Json, what: String ->
+				val i = v.num(what)
+				if (i != Math.floor(i) || i.toInt() !in pool.indices) throw MarklessDecodeError("$what is $i, not an index of the app's nodes")
+				pool[i.toInt()]
+			}
 			val routes = LinkedHashMap<String, StyleExport>()
 			for ((n, r) in t.field("routes", target).arr("routes").withIndex()) {
 				val o = r.obj("routes[$n]")
 				o.only(setOf("pattern", "component", "compiler", "readiness", "states", "initial", "next", "bands", "assignments", "sheets", "plan", "planNames", "planRepeats", "slots", "anim", "interaction"), "routes[$n]")
 				val pattern = o.field("pattern", "routes[$n]").str("pattern")
 				if (pattern in routes) throw MarklessDecodeError("app style lists route $pattern twice")
-				val listed = { w: Json, what: String ->
-					val i = w.num("$what.writes")
-					if (i != Math.floor(i) || i.toInt() !in lists.indices) throw MarklessDecodeError("$what.writes is $i, not an index of the app's write lists")
-					lists[i.toInt()]
-				}
+				val listed = { v: Json, what: String -> if (v is Json.Num) pooled(v, what) else listedNode(v, what) }
 				val sheets = LinkedHashMap<String, List<SheetHeight>>()
 				for ((k, sv) in (o["sheets"]?.arr("routes[$n].sheets") ?: emptyList()).withIndex()) {
 					val where = "routes[$n].sheets[$k]"
