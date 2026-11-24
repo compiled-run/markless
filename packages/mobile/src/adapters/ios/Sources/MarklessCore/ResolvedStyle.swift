@@ -34,6 +34,12 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var shadow: BoxShadow?
 	/// `visibility` other than visible (a text takes its element's): the view keeps its place, but paints nothing of its own.
 	public var hidden = false
+	/// The box's `transform`, resolved at its size when the host applies it.
+	public var transform: StyleTransform?
+	/// Set when Dragon pre-composites the box's opacity: the host draws the composite over the box.
+	public var group: OpacityGroup?
+	/// `opacity` the platform composites as the view's alpha.
+	public var opacity: Double?
 	/// A select's drop-down arrow, once Dragon's plan has laid the page out.
 	public var selectArrow: SelectArrowPaint?
 	/// A themed checkbox's marks and colours, once Dragon's plan has laid the page out.
@@ -51,6 +57,7 @@ public struct ResolvedStyle: Equatable, Sendable {
 			&& a.textColor == b.textColor && a.lines == b.lines && a.linesText == b.linesText && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll && a.hidden == b.hidden
 			&& a.clipsChildren == b.clipsChildren && a.childClip == b.childClip && a.clipRect == b.clipRect
 			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank && a.stackingParent == b.stackingParent && a.shadow == b.shadow
+			&& a.transform == b.transform && a.group == b.group && a.opacity == b.opacity
 			&& a.selectArrow == b.selectArrow && a.selectLabel == b.selectLabel && a.textField == b.textField && a.checkbox == b.checkbox && a.outline == b.outline
 	}
 
@@ -647,6 +654,9 @@ extension StyleExport {
 			case let .checkbox(colors):
 				if let marks = node.checkboxMarks { style.checkbox = ResolvedStyle.CheckboxPaint(marks: marks, colors: colors, scale: dpr) }
 			case .outline: break
+			case let .transform(transform): style.transform = transform
+			case let .opacityGroup(group): style.group = group
+			case let .opacity(opacity): style.opacity = opacity
 			}
 		}
 		// Radii that overlap scale down until they fit (css-backgrounds-3 §5.5); Core Animation draws no background past half the box.

@@ -68,7 +68,9 @@ class PageScrollView(context: Context) : ScrollView(context), TakesTouches {
 	}
 }
 
-class BoxScrollView(context: Context) : ScrollView(context), TakesTouches {
+class BoxScrollView(context: Context) : ScrollView(context), TakesTouches, SkipsBackdrop {
+	override fun drawChild(canvas: android.graphics.Canvas, child: View, drawingTime: Long): Boolean =
+		if (child in Backdrop.skip) false else super.drawChild(canvas, child, drawingTime)
 	private val latch = Latch(context)
 	private var released = false
 	override var onTake: (() -> Unit)? = null
@@ -84,7 +86,9 @@ class BoxScrollView(context: Context) : ScrollView(context), TakesTouches {
 	}
 }
 
-class BoxHorizontalScrollView(context: Context) : HorizontalScrollView(context), TakesTouches {
+class BoxHorizontalScrollView(context: Context) : HorizontalScrollView(context), TakesTouches, SkipsBackdrop {
+	override fun drawChild(canvas: android.graphics.Canvas, child: View, drawingTime: Long): Boolean =
+		if (child in Backdrop.skip) false else super.drawChild(canvas, child, drawingTime)
 	private val latch = Latch(context)
 	private var released = false
 	override var onTake: (() -> Unit)? = null

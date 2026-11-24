@@ -50,6 +50,46 @@ public enum StyleWrite: Sendable {
 	case checkbox(CheckboxColors)
 	/// `outline`: drawn after its stacking context's flow content, in the view of its paint layer (`Outline.layer`).
 	case outline(Outline)
+	/// `transform`: the functions and origin as Dragon wrote them, lengths in CSS px; Dragon's translated paint math resolves them at the box size.
+	case transform(StyleTransform)
+	/// `opacity` below 1 that Dragon pre-composites: the box keeps alpha 1 and shows the group composited over what paints before it.
+	case opacityGroup(OpacityGroup)
+	/// `opacity` below 1 that the platform composites: the view's alpha is Chrome's alpha byte / 255, its subtree drawn as one group.
+	case opacity(Double)
+}
+
+/// A transform length: CSS px (`px`), a percentage of the border box (`percent`), or both (`calc`).
+public struct TransformLength: Equatable, Sendable {
+	public let kind: String
+	public let px: Double
+	public let percent: Double
+}
+
+/// One transform function: `fn` is translate, translateX, translateY, rotate, scale, scaleX or scaleY; `angle` in degrees.
+public struct TransformFunction: Equatable, Sendable {
+	public let fn: String
+	public let x: TransformLength
+	public let y: TransformLength
+	public let angle: Double
+	public let sx: Double
+	public let sy: Double
+}
+
+public struct StyleTransform: Equatable, Sendable {
+	public let functions: [TransformFunction]
+	public let originX: TransformLength
+	public let originY: TransformLength
+}
+
+/// A pre-composited opacity group: its opacity, the box whose background holds it (nil: the canvas), the earlier groups its
+/// backdrop shows (Dragon ids), the sticky box it paints after, when there is one, and the earlier paint whose platform capture
+/// may differ from the screen (`unstable`).
+public struct OpacityGroup: Equatable, Sendable {
+	public let opacity: Double
+	public let backdrop: String?
+	public let painters: [String]
+	public let after: String?
+	public var unstable: [String] = []
 }
 
 /// An outline as Dragon lowers it: its style, width and offset in CSS px, its colour, a 3D style's lighter and darker colours,
@@ -154,6 +194,8 @@ public struct TextLine: Sendable, Equatable {
 	public let baseline: Double
 	public let runs: [GlyphRun]
 }
+
+private let transformFunctions = ["translate", "translateX", "translateY", "rotate", "scale", "scaleX", "scaleY"]
 
 public struct StyleNode: Sendable {
 	public let id: String
@@ -1276,9 +1318,43 @@ public struct StyleExport: Sendable {
 			return .outline(Outline(
 				style: style, width: width, offset: offset, color: try decodeColor(try f["color"]), tones: tones, radii: radii,
 				layer: try f["layer"].string()))
+		case "transform":
+			let f = try write.object(["kind", "ops", "origin", "key"])
+			try expectKey(f, "dragonTransform")
+			let functions = try f["ops"].array().map { op -> TransformFunction in
+				let o = try op.object(["fn", "x", "y", "angle", "sx", "sy"])
+				let fn = try o["fn"].string()
+				guard transformFunctions.contains(fn) else { throw PayloadError(path: op.path + ".fn", reason: "transform function \"\(fn)\" is not one of \(transformFunctions)") }
+				return TransformFunction(
+					fn: fn, x: try decodeLength(try o["x"]), y: try decodeLength(try o["y"]), angle: try o["angle"].number(), sx: try o["sx"].number(),
+					sy: try o["sy"].number())
+			}
+			let origin = try f["origin"].object(["x", "y"])
+			return .transform(StyleTransform(functions: functions, originX: try decodeLength(try origin["x"]), originY: try decodeLength(try origin["y"])))
+		case "opacity":
+			let f = try write.object(["kind", "opacity", "key"])
+			try expectKey(f, "alpha")
+			let opacity = try f["opacity"].number()
+			guard opacity >= 0, opacity < 1 else { throw PayloadError(path: write.path + ".opacity", reason: "opacity \(opacity) is not in [0, 1)") }
+			return .opacity(opacity)
+		case "opacity-group":
+			let f = try write.object(required: ["kind", "opacity", "backdrop", "painters", "key"], optional: ["after", "unstable"])
+			try expectKey(f, "dragonGroup")
+			let opacity = try f["opacity"].number()
+			guard opacity > 0, opacity < 1 else { throw PayloadError(path: write.path + ".opacity", reason: "opacity-group opacity \(opacity) is not in (0, 1)") }
+			return .opacityGroup(OpacityGroup(
+				opacity: opacity, backdrop: try f["backdrop"].optionalString(), painters: try f["painters"].array().map { try $0.string() },
+				after: f.has("after") ? try f["after"].string() : nil, unstable: f.has("unstable") ? try f["unstable"].array().map { try $0.string() } : []))
 		default:
 			throw PayloadError(path: write.path + ".kind", reason: "unknown style write kind \"\(kind)\"")
 		}
+	}
+
+	private static func decodeLength(_ reader: Reader) throws -> TransformLength {
+		let l = try reader.object(["kind", "px", "percent"])
+		let kind = try l["kind"].string()
+		guard ["px", "percent", "calc"].contains(kind) else { throw PayloadError(path: reader.path + ".kind", reason: "transform length kind \"\(kind)\" is not px, percent or calc") }
+		return TransformLength(kind: kind, px: try l["px"].number(), percent: try l["percent"].number())
 	}
 
 	private static func sides(_ reader: Reader) throws -> [Reader] {

@@ -60,6 +60,8 @@ import dev.markless.mobile.style.stackingParent
 import dev.markless.mobile.style.checkFlattenedInline
 import dev.markless.mobile.style.rowCopyOf
 import dev.markless.mobile.style.SelectArrow
+import dev.markless.mobile.style.TransformFunction
+import dev.markless.mobile.style.TransformLength
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -411,6 +413,40 @@ private fun styleExport(fixtures: File) {
 	val hidden = runCatching { StyleExport.decode(withVisibility("hidden").toByteArray()) }
 	check("decodes a visibility write", hidden.getOrNull()?.assignments?.get(0)?.byId?.get("h2")?.writes?.contains(StyleWrite.Visibility("hidden")) == true) { "${hidden.exceptionOrNull() ?: hidden.getOrNull()?.assignments?.get(0)?.byId?.get("h2")}" }
 	refusesStyle("a visibility it does not know", withVisibility("gone"), "visibility")
+	pressedStyles(text, ::refusesStyle)
+}
+
+/** A pressed button's `transform: scale(0.97)` and pre-composited `opacity: 0.85`, as Dragon writes them. */
+private fun pressedStyles(text: String, refusesStyle: (String, String, String) -> Unit) {
+	val writes = """{ "kind": "transform", "ops": [{ "fn": "scale", "x": { "kind": "px", "px": 0, "percent": 0 }, "y": { "kind": "px", "px": 0, "percent": 0 }, "angle": 0, "sx": 0.97, "sy": 0.97 }], "origin": { "x": { "kind": "percent", "px": 0, "percent": 50 }, "y": { "kind": "calc", "px": 2, "percent": 50 } }, "key": "dragonTransform" },
+		{ "kind": "opacity-group", "opacity": 0.85, "backdrop": null, "painters": ["h1"], "after": "h0", "key": "dragonGroup" },"""
+	fun pressed(edit: (String) -> String = { it }) = text.replace("\"writes\": [\n      {", "\"writes\": [\n      ${edit(writes)}\n      {")
+	check("the fixture gains a pressed state's writes", pressed() != text) { "" }
+	val decoded = runCatching { StyleExport.decode(pressed().toByteArray()) }
+	val h2 = decoded.getOrNull()?.assignments?.get(0)?.byId?.get("h2")?.writes.orEmpty()
+	val zero = TransformLength("px", 0.0, 0.0)
+	check("decodes a transform write", StyleWrite.Transform(listOf(TransformFunction("scale", zero, zero, 0.0, 0.97, 0.97)), TransformLength("percent", 0.0, 50.0), TransformLength("calc", 2.0, 50.0)) in h2) { "${decoded.exceptionOrNull() ?: h2}" }
+	check("decodes an opacity-group write", StyleWrite.OpacityGroup(0.85, null, listOf("h1"), "h0") in h2) { "${decoded.exceptionOrNull() ?: h2}" }
+	val backdrop = runCatching { StyleExport.decode(pressed { it.replace("\"backdrop\": null", "\"backdrop\": \"h0\"").replace(", \"after\": \"h0\"", "") }.toByteArray()) }
+	check("decodes a group's backdrop box, with no after", backdrop.getOrNull()?.assignments?.get(0)?.byId?.get("h2")?.writes?.contains(StyleWrite.OpacityGroup(0.85, "h0", listOf("h1"), null)) == true) { "${backdrop.exceptionOrNull() ?: backdrop.getOrNull()?.assignments?.get(0)?.byId?.get("h2")}" }
+	refusesStyle("a transform function it does not draw", pressed { it.replace("\"fn\": \"scale\"", "\"fn\": \"skewX\"") }, "transform function \"skewX\"")
+	refusesStyle("a transform length kind it does not know", pressed { it.replace("\"kind\": \"calc\"", "\"kind\": \"em\"") }, "transform length kind \"em\"")
+	refusesStyle("a transform under another key", pressed { it.replace("\"key\": \"dragonTransform\"", "\"key\": \"transform\"") }, "expected dragonTransform")
+	refusesStyle("an opaque opacity group", pressed { it.replace("\"opacity\": 0.85", "\"opacity\": 1") }, "opacity-group opacity 1.0 is not in (0, 1)")
+	refusesStyle("a painter that is not an id", pressed { it.replace("\"painters\": [\"h1\"]", "\"painters\": [1]") }, "painters")
+	refusesStyle("a filter group", pressed { it.replace("\"kind\": \"opacity-group\"", "\"kind\": \"filter-group\"") }, "unknown style write kind \"filter-group\"")
+	val alpha = { edit: (String) -> String -> pressed { edit(it.replace("{ \"kind\": \"opacity-group\", \"opacity\": 0.85, \"backdrop\": null, \"painters\": [\"h1\"], \"after\": \"h0\", \"key\": \"dragonGroup\" }", "{ \"kind\": \"opacity\", \"opacity\": 0.85, \"key\": \"alpha\" }")) } }
+	check("the fixture's group becomes a plain opacity", alpha { it } != pressed()) { "" }
+	val plain = runCatching { StyleExport.decode(alpha { it }.toByteArray()) }
+	check("decodes a plain opacity write", plain.getOrNull()?.assignments?.get(0)?.byId?.get("h2")?.writes?.contains(StyleWrite.Opacity(0.85)) == true) { "${plain.exceptionOrNull() ?: plain.getOrNull()?.assignments?.get(0)?.byId?.get("h2")}" }
+	refusesStyle("an opaque plain opacity", alpha { it.replace("\"opacity\": 0.85, \"key\": \"alpha\"", "\"opacity\": 1, \"key\": \"alpha\"") }, "opacity 1.0 is not in [0, 1)")
+	refusesStyle("a plain opacity under another key", alpha { it.replace("\"key\": \"alpha\"", "\"key\": \"opacity\"") }, "alpha")
+	check("a group without unstable paint lists none", (h2.firstOrNull { it is StyleWrite.OpacityGroup } as? StyleWrite.OpacityGroup)?.unstable == emptyList<String>()) { "$h2" }
+	val unstable = runCatching { StyleExport.decode(pressed { it.replace("\"after\": \"h0\",", "\"after\": \"h0\", \"unstable\": [\"h1\", \"h0\"],") }.toByteArray()) }
+	check("decodes a group's unstable earlier paint", unstable.getOrNull()?.assignments?.get(0)?.byId?.get("h2")?.writes?.contains(StyleWrite.OpacityGroup(0.85, null, listOf("h1"), "h0", listOf("h1", "h0"))) == true) { "${unstable.exceptionOrNull() ?: unstable.getOrNull()?.assignments?.get(0)?.byId?.get("h2")}" }
+	refusesStyle("unstable paint that is not ids", pressed { it.replace("\"after\": \"h0\",", "\"after\": \"h0\", \"unstable\": [3],") }, "unstable")
+	refusesStyle("unstable paint that is not a list", pressed { it.replace("\"after\": \"h0\",", "\"after\": \"h0\", \"unstable\": \"h1\",") }, "unstable")
+	refusesStyle("a group field it does not know", pressed { it.replace("\"after\": \"h0\",", "\"after\": \"h0\", \"stable\": [],") }, "stable")
 }
 
 private fun dashedBorders(fixtures: File) {

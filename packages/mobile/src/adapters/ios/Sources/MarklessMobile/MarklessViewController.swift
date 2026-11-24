@@ -91,6 +91,15 @@ public final class MarklessViewController: UIViewController {
 	private static func linkDragon() {
 		#if canImport(DragonPlan)
 		StyleBands.library = DragonPlan.library
+		DragonPaint.transformMatrix = { transform, width, height in
+			let length = { (l: TransformLength) in (kind: l.kind, px: l.px, percent: l.percent) }
+			return try DragonPlan.transformMatrix(
+				transform.functions.map { (fn: $0.fn, x: length($0.x), y: length($0.y), angle: $0.angle, sx: $0.sx, sy: $0.sy) },
+				originX: length(transform.originX), originY: length(transform.originY), width: width, height: height)
+		}
+		DragonPaint.opacityAlpha8 = DragonPlan.opacityAlpha8
+		DragonPaint.groupComposite = { try DragonPlan.groupComposite($0, $1, $2, $3, $4, $5, $6, $7, $8, fold: false) }
+		DragonPaint.groupCompositeLayered = DragonPlan.groupCompositeLayered
 		#endif
 	}
 

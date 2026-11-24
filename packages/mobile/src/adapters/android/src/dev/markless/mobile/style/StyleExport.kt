@@ -68,7 +68,25 @@ sealed interface StyleWrite {
 	 * lengths (percent, value; null: square) and the node whose paint layer paints it, after that layer's flow content.
 	 */
 	data class Outline(val style: String, val width: Double, val offset: Double, val color: Rgba, val tones: Pair<Rgba, Rgba>?, val radii: List<Pair<Boolean, Double>>?, val layer: String) : StyleWrite
+	/** `opacity` below 1 that the platform composites: the view's alpha is Chrome's alpha byte / 255, its subtree drawn as one group. */
+	data class Opacity(val opacity: Double) : StyleWrite
+	/** `transform`: the functions and origin as Dragon wrote them, lengths in CSS px; Dragon's translated paint math resolves them at the box size. */
+	data class Transform(val functions: List<TransformFunction>, val originX: TransformLength, val originY: TransformLength) : StyleWrite
+	/**
+	 * `opacity` below 1 that Dragon pre-composites: the box keeps alpha 1 and shows the group composited over what paints before it.
+	 * [backdrop] is the box whose background holds it (null: the canvas), [painters] the earlier groups its backdrop shows, [after]
+	 * the sticky box it paints after, [unstable] the earlier paint whose platform capture may differ from the screen.
+	 */
+	data class OpacityGroup(val opacity: Double, val backdrop: String?, val painters: List<String>, val after: String?, val unstable: List<String> = emptyList()) : StyleWrite
 }
+
+/** A transform length: CSS px (`px`), a percentage of the border box (`percent`), or both (`calc`). */
+data class TransformLength(val kind: String, val px: Double, val percent: Double)
+
+/** One transform function: [fn] is translate, translateX, translateY, rotate, scale, scaleX or scaleY; [angle] in degrees. */
+data class TransformFunction(val fn: String, val x: TransformLength, val y: TransformLength, val angle: Double, val sx: Double, val sy: Double)
+
+private val TRANSFORM_FUNCTIONS = listOf("translate", "translateX", "translateY", "rotate", "scale", "scaleX", "scaleY")
 
 /** The outline styles Dragon draws natively: solid and double rings, the others with Blink's side painter. */
 val OUTLINE_STYLES = listOf("solid", "double", "dotted", "dashed", "groove", "ridge", "inset", "outset")
@@ -918,6 +936,19 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			return Rgba(channel("r"), channel("g"), channel("b"), channel("alpha"))
 		}
 
+		private fun key(o: Map<String, Json>, expected: String, what: String) {
+			val actual = o.field("key", what).str("$what.key")
+			if (actual != expected) throw MarklessDecodeError("$what: ${o.field("kind", what).str("kind")} write with key $actual, expected $expected")
+		}
+
+		private fun length(v: Json, what: String): TransformLength {
+			val o = v.obj(what)
+			o.only(setOf("kind", "px", "percent"), what)
+			val kind = o.field("kind", what).str("$what.kind")
+			if (kind != "px" && kind != "percent" && kind != "calc") throw MarklessDecodeError("$what: transform length kind \"$kind\" is not px, percent or calc")
+			return TransformLength(kind, o.field("px", what).num("$what.px"), o.field("percent", what).num("$what.percent"))
+		}
+
 		private fun write(v: Json, what: String): StyleWrite {
 			val o = v.obj(what)
 			return when (val kind = o.field("kind", what).str("$what.kind")) {
@@ -993,6 +1024,36 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 						percent.value to l.field("value", what).num("$what.radii[].value")
 					}?.also { if (it.size != 8) throw MarklessDecodeError("$what: an outline's radii are 8 lengths, not ${it.size}") }
 					StyleWrite.Outline(style, width, offset, color(o.field("color", what), "$what.color"), tones, radii, o.field("layer", what).str("$what.layer"))
+				}
+				"transform" -> {
+					o.only(setOf("kind", "ops", "origin", "key"), what)
+					key(o, "dragonTransform", what)
+					val functions = o.field("ops", what).arr("$what.ops").mapIndexed { n, x ->
+						val at = "$what.ops[$n]"
+						val f = x.obj(at)
+						f.only(setOf("fn", "x", "y", "angle", "sx", "sy"), at)
+						val fn = f.field("fn", at).str("$at.fn")
+						if (fn !in TRANSFORM_FUNCTIONS) throw MarklessDecodeError("$at: transform function \"$fn\" is not one of $TRANSFORM_FUNCTIONS")
+						TransformFunction(fn, length(f.field("x", at), "$at.x"), length(f.field("y", at), "$at.y"), f.field("angle", at).num("$at.angle"), f.field("sx", at).num("$at.sx"), f.field("sy", at).num("$at.sy"))
+					}
+					val origin = o.field("origin", what).obj("$what.origin")
+					origin.only(setOf("x", "y"), "$what.origin")
+					StyleWrite.Transform(functions, length(origin.field("x", what), "$what.origin.x"), length(origin.field("y", what), "$what.origin.y"))
+				}
+				"opacity" -> {
+					o.only(setOf("kind", "opacity", "key"), what)
+					key(o, "alpha", what)
+					val opacity = o.field("opacity", what).num("$what.opacity")
+					if (!(opacity >= 0 && opacity < 1)) throw MarklessDecodeError("$what: opacity $opacity is not in [0, 1)")
+					StyleWrite.Opacity(opacity)
+				}
+				"opacity-group" -> {
+					o.only(setOf("kind", "opacity", "backdrop", "painters", "after", "unstable", "key"), what)
+					key(o, "dragonGroup", what)
+					val opacity = o.field("opacity", what).num("$what.opacity")
+					if (!(opacity > 0 && opacity < 1)) throw MarklessDecodeError("$what: opacity-group opacity $opacity is not in (0, 1)")
+					val backdrop = o.field("backdrop", what).let { if (it == Json.Null) null else it.str("$what.backdrop") }
+					StyleWrite.OpacityGroup(opacity, backdrop, o.field("painters", what).arr("$what.painters").map { it.str("$what.painters[]") }, o["after"]?.str("$what.after"), o["unstable"]?.arr("$what.unstable")?.map { it.str("$what.unstable[]") } ?: emptyList())
 				}
 				else -> throw MarklessDecodeError("$what has unknown style write kind \"$kind\"")
 			}

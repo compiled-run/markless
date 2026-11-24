@@ -1,0 +1,29 @@
+appId: ${APP_ID}
+name: s57-see-through
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: New note
+- assertVisible: Edit note
+- assertVisible: Release
+- assertVisible: Pill taps 0
+- assertNotVisible: Press
+- assertVisible: See-through
+- tapOn: Release
+- assertVisible: Press
+- assertNotVisible: Release
+- assertVisible: New note
+- assertVisible: Edit note
+- assertVisible: Press
+- assertNotVisible: Release
+- tapOn: Press
+- assertVisible: Release
+- assertNotVisible: Press
+- assertVisible: New note
+- assertVisible: Edit note
+- assertVisible: Release
+- assertNotVisible: Press
