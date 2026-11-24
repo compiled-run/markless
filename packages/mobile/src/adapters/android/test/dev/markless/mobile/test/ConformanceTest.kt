@@ -750,6 +750,21 @@ private fun appStyle(fixtures: File) {
 	refusesApp("slots on a route without a plan", text.replace("\"pattern\":", "\"slots\":[{\"id\":\"slot:h0#0\",\"initial\":25}],\"pattern\":"), "has slots but no layout plan")
 	refusesApp("a write index out of range", text.replace(Regex("\"writes\":\\s*\\d+(\\s*)}"), "\"writes\":99999$1}"), "not an index of the app's write lists")
 	refusesApp("an unknown route field", text.replace(Regex("\"pattern\":\\s*\"/help\""), "\"pattern\":\"/help\",\"extra\":1"), "unknown field \"extra\"")
+	// The same style with every node moved into the target's pool, each assignment naming its nodes by index.
+	val pooledRoot = Json.parse(bytes) as Json.Obj
+	val target = ((pooledRoot.fields.getValue("targets") as Json.Obj).fields.getValue("android") as Json.Obj).fields
+	val pool = ArrayList<Json>()
+	fun pooled(j: Json): Json = when (j) {
+		is Json.Obj -> Json.Obj(LinkedHashMap(j.fields.mapValues { (k, v) -> if (k == "nodes" && v is Json.Arr) Json.Arr(v.items.map { n -> Json.Num(pool.size.toDouble()).also { pool.add(n) } }) else pooled(v) }))
+		is Json.Arr -> Json.Arr(j.items.map(::pooled))
+		else -> j
+	}
+	target["routes"] = pooled(target.getValue("routes"))
+	target["nodes"] = Json.Arr(pool)
+	val pooledText = canonical(pooledRoot)
+	val fromPool = runCatching { StyleExport.decodeApp(pooledText.toByteArray()) }
+	check("a target's node pool decodes to the nodes it replaces", fromPool.getOrNull()?.let { p -> p.keys == routes.keys && routes.all { (k, s) -> p.getValue(k).assignments.map { it.nodes } == s.assignments.map { it.nodes } } } == true) { fromPool.exceptionOrNull().toString() }
+	refusesApp("a node index out of range", pooledText.replace("\"nodes\":[0,", "\"nodes\":[99999,"), "not an index of the app's nodes")
 }
 
 /** A system sheet's styled content: its own layout per resting height, and state that reaches it. */

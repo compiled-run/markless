@@ -56,8 +56,14 @@ test('a component styled alike on two pages carries its writes once; each page k
 	const style = nativeAppStyle(pages);
 	const ios = style.targets.ios!;
 	expect(ios.writes).toHaveLength(3);
-	const tagIndex = (route: number) => ios.routes[route]!.assignments[0]!.nodes[1]!.writes;
+	const tagIndex = (route: number) => ios.nodes[ios.routes[route]!.assignments[0]!.nodes[1]!]!.writes;
 	expect(tagIndex(0)).toBe(tagIndex(1));
+	// The tag is the same node on both pages, so both name one pool entry; each page's own background is its own.
+	expect(ios.nodes).toHaveLength(3);
+	expect(ios.routes.map((route) => route.assignments[0]!.nodes)).toEqual([
+		[0, 1],
+		[2, 1],
+	]);
 	expect(ios.writes[tagIndex(0)]).toEqual(tag);
 	expect(ios.routes.map((route) => route.pattern)).toEqual(['/', '/basil']);
 	expect(ios.routes.map((route) => route.assignments[0]!.canvas)).toEqual([
