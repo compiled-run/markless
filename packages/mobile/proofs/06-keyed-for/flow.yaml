@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 06-keyed-for
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Fruits
 - assertVisible: Apple
 - assertVisible: Pear

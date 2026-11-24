@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j16-script-navigate
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Order desk
 - assertVisible: Nothing yet
 - assertVisible: Open next order

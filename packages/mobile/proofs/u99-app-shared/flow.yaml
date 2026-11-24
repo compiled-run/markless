@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u99-app-shared
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: App-wide state
 - assertVisible: Top 0
 - assertVisible: Bump

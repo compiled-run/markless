@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: f2-return-key
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Find
 - assertVisible: No search yet
 - assertVisible: No place yet

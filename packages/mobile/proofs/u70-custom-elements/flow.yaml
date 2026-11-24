@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u70-custom-elements
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Conduit
 - assertVisible: Read the feed
 - assertVisible: Like 0

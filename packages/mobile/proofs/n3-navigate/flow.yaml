@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: n3-navigate
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Welcome screen ahead
 - assertVisible: Sign in
 - assertVisible: Home

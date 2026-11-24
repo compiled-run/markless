@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: n12-try-no-catch
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Home
 - assertVisible: Open account
 - tapOn: Open account

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u39-checklist
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Sandwich
 - assertVisible: Ticked 0
 - assertVisible: All

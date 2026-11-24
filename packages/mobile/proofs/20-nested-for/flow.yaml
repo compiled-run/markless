@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 20-nested-for
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Groups
 - assertVisible: Drop Fruit Apple
 - assertVisible: Drop Fruit Pear

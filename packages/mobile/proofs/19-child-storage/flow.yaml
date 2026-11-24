@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 19-child-storage
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Shared taps
 - assertVisible: Total 0
 - assertVisible: Left 0

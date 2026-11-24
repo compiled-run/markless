@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: n15-component-save
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: No notes yet
 - assertVisible: Write your first note
 - assertVisible: All notes

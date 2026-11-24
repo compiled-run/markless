@@ -4,8 +4,12 @@ name: d3-location
 - setLocation:
     latitude: 51.5
     longitude: -0.125
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
 - launchApp:
-    clearState: true
     permissions:
       location: unset
 - assertVisible:

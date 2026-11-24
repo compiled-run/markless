@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j13-async-rows
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Rows
 - assertVisible: "Words: 2"
 - assertVisible: Looking up apple

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j53-history
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Story list
 - assertVisible: Not read yet
 - assertVisible: Keep seven
@@ -31,16 +35,16 @@ name: j53-history
 - assertNotVisible: Login not read
 - assertVisible: Login
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertVisible: Home
 - assertVisible: Story list
 - assertVisible: Read again

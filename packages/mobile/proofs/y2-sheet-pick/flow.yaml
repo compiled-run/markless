@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: y2-sheet-pick
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Checkout
 - assertVisible: Ship to nowhere yet
 - assertVisible: Choose city

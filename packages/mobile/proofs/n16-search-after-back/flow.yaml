@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: n16-search-after-back
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: No notes yet
 - assertVisible: Write your first note
 - assertVisible: All notes
@@ -43,16 +47,16 @@ name: n16-search-after-back
 - assertNotVisible: Search notes
 - assertVisible: Note
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertVisible: Search notes
 - assertNotVisible: Edit
 - assertVisible: All notes

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j45-array-destructuring
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Files
 - assertVisible: app\.ts
 - assertVisible: page\.ts

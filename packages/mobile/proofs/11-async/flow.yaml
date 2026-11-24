@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 11-async
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Ask
 - assertVisible: Ask the sum
 - assertVisible: Ask the riddle

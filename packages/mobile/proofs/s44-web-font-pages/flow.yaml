@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s44-web-font-pages
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: All notes
 - assertVisible: New note
 - assertVisible: Groceries
@@ -17,16 +21,16 @@ name: s44-web-font-pages
 - assertNotVisible: All notes
 - assertVisible: Note
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertVisible: All notes
 - assertNotVisible: Milk and eggs
 - assertVisible: Home

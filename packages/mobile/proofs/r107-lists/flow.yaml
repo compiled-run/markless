@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r107-lists
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Lists
 - assertVisible: Seeds
 - assertVisible: Soil

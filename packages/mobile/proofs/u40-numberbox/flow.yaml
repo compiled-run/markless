@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u40-numberbox
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Order
 - assertVisible: Ordered 2
 - assertVisible: Presses cancelled 0
@@ -23,10 +27,10 @@ name: u40-numberbox
 - assertVisible: Presses cancelled 0
 - assertNotVisible: Ordered 4
 - swipe:
-      from:
-          text: Increase
-      direction: UP
-      duration: 800
+    from:
+      text: Increase
+    direction: UP
+    duration: 800
 - assertVisible: Ordered 4
 - assertNotVisible: Ordered 3
 - assertNotVisible: Presses cancelled 0

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: f14-password
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Account
 - assertVisible: 0 characters typed
 - assertVisible: Not signed in

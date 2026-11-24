@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u42-qr-code
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Pair a device
 - assertVisible: Showing alpha
 - assertVisible: New code

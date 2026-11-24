@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u98-family-styles
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Family styles
 - assertVisible: Top row
 - assertVisible: Badge

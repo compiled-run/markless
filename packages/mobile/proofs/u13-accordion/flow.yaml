@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u13-accordion
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Help
 - assertVisible: Shipping
 - assertVisible: Returns

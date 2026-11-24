@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: n17-page-url
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Home path /
 - assertVisible: Home search \[\]
 - assertVisible: Home tab no tab
@@ -18,16 +22,16 @@ name: n17-page-url
 - assertNotVisible: Home path /
 - assertVisible: Note
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertVisible: Home path /
 - assertNotVisible: Note 7
 - assertVisible: Home

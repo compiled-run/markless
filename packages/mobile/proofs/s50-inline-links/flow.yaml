@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s50-inline-links
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Notes
 - assertVisible: About these notes
 - assertVisible: Pick one below\.

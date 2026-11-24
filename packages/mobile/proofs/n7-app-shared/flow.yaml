@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: n7-app-shared
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Player
 - assertVisible: "Paused: Harbour Lights"
 - assertVisible: Play or pause

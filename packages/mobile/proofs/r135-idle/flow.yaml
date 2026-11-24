@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r135-idle
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Idle 1
 - assertVisible: More
 - assertNotVisible: Idle 0

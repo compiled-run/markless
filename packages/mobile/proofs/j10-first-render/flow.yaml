@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j10-first-render
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Data only
 - assertVisible: Taps 0
 - assertVisible: Open words

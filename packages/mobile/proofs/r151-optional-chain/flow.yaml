@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r151-optional-chain
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Profile
 - assertVisible: "Name: nobody"
 - assertVisible: "City: unknown"

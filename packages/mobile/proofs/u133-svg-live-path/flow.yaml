@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u133-svg-live-path
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Live paths
 - assertVisible: Icon octicon-heart
 - assertVisible: Corner mark

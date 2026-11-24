@@ -1,7 +1,11 @@
 appId: ${APP_ID}
 name: r172-svg-dashes
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Dashes
 - assertVisible: Dashes drawn

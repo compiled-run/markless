@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 07e-children-fallback
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Days
 - assertVisible: Monday
 - assertVisible: Taps 0

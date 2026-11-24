@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u66-state-seeds
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Seeds
 - assertVisible: Pear, Fig, Plum
 - assertVisible: First Pear

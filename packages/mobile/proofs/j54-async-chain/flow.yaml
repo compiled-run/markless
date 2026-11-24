@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j54-async-chain
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Chain
 - assertVisible: "Asked: 1"
 - assertVisible: Waiting for second

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u122-box-shadow
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Box shadow
 - assertVisible: Outer shadow
 - assertVisible: Inset shadow

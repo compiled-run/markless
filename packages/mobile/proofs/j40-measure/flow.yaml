@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j40-measure
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Boxes
 - assertVisible: Quarter not yet
 - assertVisible: Stacked not yet

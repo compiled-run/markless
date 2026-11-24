@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r173-hidden-in-press
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Basket
 - assertVisible: Add
 - assertVisible: Empty

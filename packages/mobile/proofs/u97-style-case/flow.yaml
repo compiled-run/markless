@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u97-style-case
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Style case
 - assertVisible: Middle row
 - assertVisible: Marker
@@ -10,37 +14,37 @@ name: u97-style-case
 - assertVisible: Close
 - assertVisible: Closed
 - assertVisible:
-      text: Middle row
-      below: Marker
+    text: Middle row
+    below: Marker
 - tapOn: Open
 - assertNotVisible: Closed
 - assertVisible:
-      text: Marker
-      below: Middle row
+    text: Marker
+    below: Middle row
 - assertVisible: Shown
 - assertNotVisible: Closed
 - assertVisible:
-      text: Marker
-      below: Middle row
+    text: Marker
+    below: Middle row
 - tapOn: Close
 - assertVisible: Closed
 - assertNotVisible: Shown
 - assertVisible:
-      text: Middle row
-      below: Marker
+    text: Middle row
+    below: Marker
 - assertVisible: Closed
 - assertNotVisible: Shown
 - assertVisible:
-      text: Middle row
-      below: Marker
+    text: Middle row
+    below: Marker
 - tapOn: Open
 - assertVisible: Shown
 - assertNotVisible: Closed
 - assertVisible:
-      text: Marker
-      below: Middle row
+    text: Marker
+    below: Middle row
 - assertVisible: Shown
 - assertNotVisible: Closed
 - assertVisible:
-      text: Marker
-      below: Middle row
+    text: Marker
+    below: Middle row

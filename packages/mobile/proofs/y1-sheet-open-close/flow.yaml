@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: y1-sheet-open-close
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Shop
 - assertVisible: Show filters
 - assertVisible: "Closed by the platform: 0"

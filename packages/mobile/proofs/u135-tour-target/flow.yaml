@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u135-tour-target
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Editor
 - assertVisible: Save
 - assertVisible: Share

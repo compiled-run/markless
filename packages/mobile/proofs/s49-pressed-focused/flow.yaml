@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s49-pressed-focused
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Pressed and focused
 - assertVisible: Press and hold
 - assertVisible: Pressed 0

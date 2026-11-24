@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 05b-choices
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Not started
 - assertVisible: List view
 - assertNotVisible: Halfway

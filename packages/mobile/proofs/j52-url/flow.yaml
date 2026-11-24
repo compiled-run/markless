@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j52-url
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Shop links
 - assertVisible: "Query: q=shoes&page=1"
 - assertVisible: Page 1

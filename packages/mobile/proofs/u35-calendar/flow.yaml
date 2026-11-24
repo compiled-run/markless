@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u35-calendar
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Delivery
 - assertVisible: Delivery date
 - assertVisible: August 2026

@@ -1,13 +1,17 @@
 appId: ${APP_ID}
 name: s45-text-interpolations
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Tally
 - assertVisible: Header taps 0 · Button taps 0 · Picked none
 - assertVisible: 0 by button
 - assertVisible: none, the colour the last tap on Pick red chose for the rest of
-      this page and every row
+    this page and every row
 - assertVisible: Tap button
 - assertVisible: Pick red
 - tapOn: Tally
@@ -24,5 +28,5 @@ name: s45-text-interpolations
 - assertNotVisible: Header taps 1 · Button taps 1 · Picked none
 - assertVisible: Header taps 1 · Button taps 1 · Picked red
 - assertVisible: red, the colour the last tap on Pick red chose for the rest of
-      this page and every row
+    this page and every row
 - assertNotVisible: Header taps 1 · Button taps 1 · Picked none

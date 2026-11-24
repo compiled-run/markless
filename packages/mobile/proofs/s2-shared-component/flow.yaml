@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s2-shared-component
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Seed shelf
 - assertVisible: Basil, in stock
 - assertVisible: Thyme, low
