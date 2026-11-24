@@ -415,6 +415,8 @@ final class ViewTree {
 	var library: ((String) -> String)?
 	/// Called after a touch shows another entry, so the screen repaints its canvas and the layout dump follows.
 	var onShown: (() -> Void)?
+	/// Called after the page moves to another assignment or entry, so the host lays it out if it has not yet.
+	var onEntries: (() -> Void)?
 	/// The pointer steps since the page opened, by the node each names, replayed through the current level's tables.
 	private var interactionSteps: [(op: String, node: String?)] = []
 	/// The list row (`@<key>` of its copies) the finger is pressing, and the one the focused element is in: an interaction state
@@ -1245,6 +1247,7 @@ final class ViewTree {
 
 	/// The entry to show: the state `rt-interaction` selects over the steps in the assignment's level, or the assignment.
 	private func reselect() {
+		defer { onEntries?() }
 		shown = assignment
 		guard let layout, let library, layout.interaction.indices.contains(assignment) else { return }
 		let level = layout.interaction[assignment]

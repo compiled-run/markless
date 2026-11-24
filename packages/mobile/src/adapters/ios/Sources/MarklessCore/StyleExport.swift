@@ -749,7 +749,7 @@ public struct StyleExport: Sendable {
 	public func laidOut(
 		width: Double, height: Double, scale: Double, slots values: [Double] = [], layout: (String) -> String,
 		rows: ((Int) throws -> [String: [LaidOutRow]])? = nil, rowsLayout: ((String) -> String)? = nil,
-		texts: [String: String] = [:]
+		texts: [String: String] = [:], entries: Set<Int>? = nil, previous: StyleExport? = nil
 	) throws -> StyleExport {
 		guard let plan else { return self }
 		guard values.count == slots.count else {
@@ -763,6 +763,14 @@ public struct StyleExport: Sendable {
 		var stickies: [[StickyRow]] = []
 		var undecided: String?
 		out.assignments = try assignments.indices.map { k in
+			// An entry the page does not show yet keeps the boxes it had; the host lays it out when a state first shows it.
+			if let entries, !entries.contains(k) {
+				let kept = previous ?? self
+				pages.append(k < kept.pageScrolls.count ? kept.pageScrolls[k] : nil)
+				stickies.append(k < kept.pageSticky.count ? kept.pageSticky[k] : [])
+				let a = kept.assignments[k]
+				return (a.values, a.nodes, a.canvas, a.body)
+			}
 			let names = k < planNames.count ? planNames[k] : [:]
 			let dragonId = Dictionary(names.map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
 			// An interaction state's rows are its assignment's; laid out in the state, a row of that assignment takes the state's look

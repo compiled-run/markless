@@ -298,13 +298,15 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 	 * `runMarklessLayout`; [slotValues] are the current values of [slots], in their order, and the writes they move are written
 	 * in. Without a plan the export is returned as it is.
 	 */
-	fun laidOut(width: Double, height: Double, scale: Double, layout: (String) -> String, slotValues: List<Double> = emptyList(), rows: ((Int) -> Map<String, List<LaidOutRow>>)? = null, rowsLayout: ((String) -> String)? = null, texts: Map<String, String> = emptyMap()): StyleExport {
+	fun laidOut(width: Double, height: Double, scale: Double, layout: (String) -> String, slotValues: List<Double> = emptyList(), rows: ((Int) -> Map<String, List<LaidOutRow>>)? = null, rowsLayout: ((String) -> String)? = null, texts: Map<String, String> = emptyMap(), entries: Set<Int>? = null, previous: StyleExport? = null): StyleExport {
 		val plan = plan ?: return this
 		if (slotValues.size != slots.size) throw MarklessDecodeError("the style export reads ${slots.size} slots; the layout was given ${slotValues.size} values")
 		val hex = { list: List<Double> -> Json.Arr(list.map { Json.Str(java.lang.Long.toHexString(it.toRawBits()).padStart(16, '0')) }) }
 		val slotsText = if (slots.isEmpty()) "" else ",\"slots\":${hex(slotValues).text()}"
 		var undecided: String? = null
 		val laid = assignments.indices.map { k ->
+			// An entry the page does not show yet keeps the boxes it had; the host lays it out when a state first shows it.
+			if (entries != null && k !in entries) return@map (previous ?: this).assignments[k]
 			val names = planNames.getOrNull(k) ?: emptyMap()
 			val dragonId = names.entries.associate { (d, m) -> m to d }
 			// An interaction state's rows are its assignment's; laid out in the state, a row of that assignment takes the state's look
