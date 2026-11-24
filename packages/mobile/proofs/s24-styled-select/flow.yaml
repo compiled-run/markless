@@ -1,0 +1,37 @@
+appId: ${APP_ID}
+name: s24-styled-select
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Tag a note
+- assertVisible: Home
+- assertVisible: Small
+- assertVisible: Tagged Home
+- assertNotVisible: Work
+- assertNotVisible: Ideas
+- assertNotVisible: Large
+- assertVisible: Tagging
+- tapOn: Tag
+- tapOn:
+    text: Work
+- assertVisible: Work
+- assertNotVisible: Tagged Home
+- assertVisible: Work
+- assertVisible: Tagged Work
+- assertVisible: Small
+- assertNotVisible: Tagged Home
+- assertNotVisible: Ideas
+- assertVisible: Tagging
+- tapOn: Size
+- tapOn:
+    text: Large
+- assertNotVisible: Small
+- assertVisible: Large
+- assertVisible: Tagged Work
+- assertNotVisible: Small
+- assertNotVisible: Tagged Home
+- assertVisible: Tagging

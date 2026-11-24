@@ -1,75 +1,79 @@
 appId: ${APP_ID}
 name: j12-async-nested
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Nested
 - assertVisible: Hide
-- assertVisible: 'Asked: apple'
+- assertVisible: "Asked: apple"
 - assertVisible: Loading word
 - assertNotVisible: Show
-- assertNotVisible: 'Word: apple'
+- assertNotVisible: "Word: apple"
 - extendedWaitUntil:
-      visible: 'Word: apple'
-      timeout: 15500
-- assertVisible: 'Word: apple'
+    visible: "Word: apple"
+    timeout: 15500
+- assertVisible: "Word: apple"
 - assertNotVisible: Loading word
-- assertVisible: 'Word: apple'
+- assertVisible: "Word: apple"
 - assertVisible: Loading detail
 - assertNotVisible: Loading word
-- assertNotVisible: 'Detail: pear'
+- assertNotVisible: "Detail: pear"
 - extendedWaitUntil:
-      visible: 'Word: apple'
-      timeout: 15500
-- assertVisible: 'Detail: pear'
+    visible: "Word: apple"
+    timeout: 15500
+- assertVisible: "Detail: pear"
 - assertNotVisible: Loading detail
-- assertVisible: 'Word: apple'
-- assertVisible: 'Detail: pear'
+- assertVisible: "Word: apple"
+- assertVisible: "Detail: pear"
 - assertNotVisible: Loading detail
-- assertNotVisible: 'Detail asked: missing'
+- assertNotVisible: "Detail asked: missing"
 - tapOn: Break detail
-- assertVisible: 'Detail asked: missing'
-- assertVisible: 'Detail: pear'
-- assertVisible: 'Detail asked: missing'
-- assertNotVisible: 'Detail failed: No entry for missing'
-- assertNotVisible: 'Detail asked: pear'
+- assertVisible: "Detail asked: missing"
+- assertVisible: "Detail: pear"
+- assertVisible: "Detail asked: missing"
+- assertNotVisible: "Detail failed: No entry for missing"
+- assertNotVisible: "Detail asked: pear"
 - extendedWaitUntil:
-      visible: 'Word: apple'
-      timeout: 15500
-- assertVisible: 'Detail failed: No entry for missing'
-- assertVisible: 'Word: apple'
-- assertVisible: 'Detail: pear'
-- assertVisible: 'Detail failed: No entry for missing'
-- assertNotVisible: 'Word failed: No entry for missing'
+    visible: "Word: apple"
+    timeout: 15500
+- assertVisible: "Detail failed: No entry for missing"
+- assertVisible: "Word: apple"
+- assertVisible: "Detail: pear"
+- assertVisible: "Detail failed: No entry for missing"
+- assertNotVisible: "Word failed: No entry for missing"
 - tapOn: Hide
-- assertNotVisible: 'Word: apple'
-- assertNotVisible: 'Detail: pear'
+- assertNotVisible: "Word: apple"
+- assertNotVisible: "Detail: pear"
 - assertVisible: Show
-- assertNotVisible: 'Word: apple'
-- assertNotVisible: 'Detail: pear'
+- assertNotVisible: "Word: apple"
+- assertNotVisible: "Detail: pear"
 - tapOn: Show
-- assertVisible: 'Word: apple'
+- assertVisible: "Word: apple"
 - assertNotVisible: Show
 - assertVisible: Hide
-- assertVisible: 'Word: apple'
-- assertVisible: 'Detail failed: No entry for missing'
+- assertVisible: "Word: apple"
+- assertVisible: "Detail failed: No entry for missing"
 - assertNotVisible: Show
 - assertNotVisible: Loading word
 - assertNotVisible: Loading detail
-- assertNotVisible: 'Detail: pear'
-- assertNotVisible: 'Asked: banana'
+- assertNotVisible: "Detail: pear"
+- assertNotVisible: "Asked: banana"
 - tapOn: Banana
-- assertVisible: 'Asked: banana'
-- assertVisible: 'Asked: banana'
-- assertVisible: 'Word: apple'
-- assertVisible: 'Detail failed: No entry for missing'
-- assertNotVisible: 'Asked: apple'
+- assertVisible: "Asked: banana"
+- assertVisible: "Asked: banana"
+- assertVisible: "Word: apple"
+- assertVisible: "Detail failed: No entry for missing"
+- assertNotVisible: "Asked: apple"
 - assertNotVisible: Loading word
 - extendedWaitUntil:
-      visible: 'Word: banana'
-      timeout: 15500
-- assertNotVisible: 'Word: apple'
-- assertVisible: 'Word: banana'
-- assertVisible: 'Detail failed: No entry for missing'
-- assertNotVisible: 'Word: apple'
+    visible: "Word: banana"
+    timeout: 15500
+- assertNotVisible: "Word: apple"
+- assertVisible: "Word: banana"
+- assertVisible: "Detail failed: No entry for missing"
+- assertNotVisible: "Word: apple"
 - assertNotVisible: Loading detail

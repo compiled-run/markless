@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: r155-images
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Images
+- assertVisible: Green badge
+- assertVisible: Orange photo
+- assertVisible: Turned photo
+- assertVisible: Red and blue flag
+- assertVisible: Green strip
+- assertVisible: No such picture
+- assertVisible: Show square
+- assertNotVisible: Blue square
+- tapOn: Show square
+- assertVisible: Blue square
+- assertNotVisible: Show square
+- assertVisible: Blue square
+- assertVisible: Hide square
+- assertNotVisible: Show square

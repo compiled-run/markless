@@ -1,0 +1,33 @@
+appId: ${APP_ID}
+name: u125-match-media
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- setDarkMode: disabled
+- assertVisible: Settings check
+- assertVisible: Checked 0
+- assertVisible: Motion unknown
+- assertVisible: Scheme unknown
+- tapOn: Checked 0
+- assertNotVisible: Motion unknown
+- assertNotVisible: Scheme unknown
+- assertVisible: Checked 1
+- assertVisible: Motion full
+- assertVisible: Scheme light
+- assertNotVisible: Motion unknown
+- assertNotVisible: Scheme unknown
+- setDarkMode: enabled
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible: Checked 1
+- assertVisible: Scheme light
+- tapOn: Checked 1
+- assertNotVisible: Scheme light
+- assertVisible: Checked 2
+- assertVisible: Motion full
+- assertVisible: Scheme dark
+- assertNotVisible: Scheme light

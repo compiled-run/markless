@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u12-buttongroup
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Format
 - assertVisible: Alignment
 - assertVisible: Left

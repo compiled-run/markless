@@ -1,0 +1,34 @@
+appId: ${APP_ID}
+name: u35-calendar
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Delivery
+- assertVisible: Delivery date
+- assertVisible: August 2026
+- assertVisible: Back
+- assertVisible: Forward
+- assertVisible: Picked none
+- tapOn: Forward
+- assertNotVisible: August 2026
+- assertVisible: September 2026
+- assertNotVisible: August 2026
+- tapOn: Back
+- assertVisible: August 2026
+- assertNotVisible: September 2026
+- assertVisible: August 2026
+- assertNotVisible: September 2026
+- tapOn: Back
+- assertNotVisible: August 2026
+- assertVisible: July 2026
+- assertVisible: Picked none
+- assertNotVisible: August 2026
+- tapOn: "9"
+- assertNotVisible: Picked none
+- assertVisible: Picked 2026-07-09
+- assertVisible: July 2026
+- assertNotVisible: Picked none

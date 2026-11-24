@@ -1,0 +1,73 @@
+appId: ${APP_ID}
+name: u134-outline
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Outline
+- assertVisible: Rounded ring
+- assertVisible: Double ring
+- assertVisible: Dashed ring
+- assertVisible: Groove ring
+- assertVisible: Left
+- assertVisible: Marked
+- assertVisible: Right
+- assertVisible: Widen
+- assertVisible: Narrow
+- assertVisible:
+    text: Double ring
+    below: Rounded ring
+- assertVisible:
+    text: Dashed ring
+    below: Double ring
+- assertVisible:
+    text: Groove ring
+    below: Dashed ring
+- assertVisible:
+    text: Marked
+    below: Groove ring
+- assertVisible:
+    text: Widen
+    below: Marked
+- tapOn: Widen
+- assertNotVisible: Narrow
+- assertVisible: Wide
+- assertNotVisible: Narrow
+- assertVisible:
+    text: Double ring
+    below: Rounded ring
+- assertVisible:
+    text: Dashed ring
+    below: Double ring
+- assertVisible:
+    text: Groove ring
+    below: Dashed ring
+- assertVisible:
+    text: Marked
+    below: Groove ring
+- assertVisible:
+    text: Widen
+    below: Marked
+- tapOn: Widen
+- assertVisible: Narrow
+- assertNotVisible: Wide
+- assertVisible: Narrow
+- assertNotVisible: Wide
+- assertVisible:
+    text: Double ring
+    below: Rounded ring
+- assertVisible:
+    text: Dashed ring
+    below: Double ring
+- assertVisible:
+    text: Groove ring
+    below: Dashed ring
+- assertVisible:
+    text: Marked
+    below: Groove ring
+- assertVisible:
+    text: Widen
+    below: Marked

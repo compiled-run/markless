@@ -1,0 +1,22 @@
+appId: ${APP_ID}
+name: u128-svg-gradients
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Gradients
+- assertVisible: Gradient swatches
+- assertVisible: Vite logo
+- assertVisible: Toggle swatches
+- tapOn: Toggle swatches
+- assertNotVisible: Gradient swatches
+- assertVisible: Gradients
+- assertVisible: Vite logo
+- assertNotVisible: Gradient swatches
+- tapOn: Toggle swatches
+- assertVisible: Gradient swatches
+- assertVisible: Gradient swatches
+- assertVisible: Vite logo

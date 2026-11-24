@@ -1,0 +1,18 @@
+appId: ${APP_ID}
+name: u77-svg-markers
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Route map
+- assertVisible: Turn route
+- assertVisible: Both ways
+- assertNotVisible: Four stops
+- tapOn: Turn route
+- assertVisible: Four stops
+- assertNotVisible: Both ways
+- assertVisible: Four stops
+- assertNotVisible: Both ways

@@ -1,0 +1,372 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "component-edge:1/state:where",
+				"name": "where",
+				"initial": "Nowhere yet"
+			},
+			{
+				"id": "component-edge:1/state:photo",
+				"name": "photo",
+				"initial": "No photo"
+			},
+			{
+				"id": "object:component-edge:1/cam:ready",
+				"name": "cam.ready",
+				"initial": false,
+				"device": "camera.ready",
+				"object": "object:component-edge:1/cam"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "h1",
+				"parent": "h6",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Field"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h0",
+				"element": "section",
+				"parent": "h6"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/component-edge:0",
+				"element": "camera",
+				"object": "object:component-edge:1/cam",
+				"parent": "component-edge:1/h0"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h1",
+				"element": "p",
+				"parent": "component-edge:1/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h1:text0",
+				"parent": "component-edge:1/h1",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"cell": "object:component-edge:1/cam:ready"
+							},
+							"whenTrue": {
+								"literal": "Camera ready"
+							},
+							"whenFalse": {
+								"literal": "Camera starting"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h2",
+				"element": "p",
+				"parent": "component-edge:1/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h2:text0",
+				"parent": "component-edge:1/h2",
+				"parts": [
+					{
+						"cell": "component-edge:1/state:where"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h3",
+				"element": "p",
+				"parent": "component-edge:1/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h3:text0",
+				"parent": "component-edge:1/h3",
+				"parts": [
+					{
+						"cell": "component-edge:1/state:photo"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h4",
+				"element": "button",
+				"parent": "component-edge:1/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h4:text0",
+				"parent": "component-edge:1/h4",
+				"parts": [
+					{
+						"text": "Where am I"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h5",
+				"element": "button",
+				"parent": "component-edge:1/h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h5:text0",
+				"parent": "component-edge:1/h5",
+				"parts": [
+					{
+						"text": "Take photo"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:1/h4",
+				"event": "activate",
+				"handler": "handler:component-edge:1/event:0"
+			},
+			{
+				"host": "component-edge:1/h5",
+				"event": "activate",
+				"handler": "handler:component-edge:1/event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:1/event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"where": {
+								"cell": "component-edge:1/state:where"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:1/event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:1",
+						"type": "click",
+						"bindings": {
+							"cam": {
+								"device": "camera",
+								"object": "object:component-edge:1/cam"
+							},
+							"photo": {
+								"cell": "component-edge:1/state:photo"
+							}
+						}
+					}
+				]
+			}
+		],
+		"objects": [
+			{
+				"id": "object:component-edge:1/cam",
+				"device": "camera",
+				"owner": "component-edge:1/h0"
+			}
+		],
+		"script": {
+			"id": "d962998aeac3725c",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [null, load(1)];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (async function() {\n __s.where = 'Locating';\n try {\n  const here = await globalThis[\"__marklessHost\"][\"devices\"][\"location\"].current();\n  __s.where = __i[1][\"place\"](here.latitude, here.longitude);\n  globalThis[\"__marklessHost\"][\"devices\"][\"haptics\"].tap();\n } catch (error) {\n  __s.where = `Refused: ${(error).name}`;\n }\n}.bind(this));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (async function() {\n const shot = await __s.cam.takePhoto();\n let sides = 0;\n for (const side of [shot.width, shot.height]) if (side > 0) sides++;\n __s.photo = sides === 2 ? 'Photo taken' : 'Empty photo';\n}.bind(this));\n};\n};\nmodules[1] = function (exports) {\n\"use strict\";\nvar __i = [];\n__export(exports, {\n\"place\": function () { return place; }\n});\nfunction place(latitude, longitude) {\n return `At ${latitude.toFixed(2)}, ${longitude.toFixed(3)}`;\n}\n};\n/*markless-engine:entries*/\n})(globalThis, \"d962998aeac3725c\");\n",
+			"services": [
+				"device"
+			]
+		}
+	},
+	"initial": [
+		[
+			"h7:text0",
+			"Field"
+		],
+		[
+			"component-edge:1/h1:text0",
+			"Camera starting"
+		],
+		[
+			"component-edge:1/h2:text0",
+			"Nowhere yet"
+		],
+		[
+			"component-edge:1/h3:text0",
+			"No photo"
+		],
+		[
+			"component-edge:1/h4:text0",
+			"Where am I"
+		],
+		[
+			"component-edge:1/h5:text0",
+			"Take photo"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "device",
+				"cell": "object:component-edge:1/cam:ready",
+				"value": true
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h1:text0",
+					"value": "Camera ready"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h2:text0",
+					"value": "Locating"
+				},
+				{
+					"op": "call",
+					"call": "location.current",
+					"arguments": [],
+					"resume": "script:1"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "resume",
+				"continuation": "script:1",
+				"value": {
+					"latitude": 51.5,
+					"longitude": -0.125,
+					"accuracy": 5
+				}
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h2:text0",
+					"value": "At 51.50, -0.125"
+				},
+				{
+					"op": "call",
+					"call": "haptics.tap",
+					"arguments": []
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h5"
+			},
+			"journal": [
+				{
+					"op": "call",
+					"call": "camera.takePhoto",
+					"object": "object:component-edge:1/cam",
+					"arguments": [],
+					"resume": "script:2"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "resume",
+				"continuation": "script:2",
+				"value": {
+					"url": "file:///photo.png",
+					"width": 640,
+					"height": 480
+				}
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h3:text0",
+					"value": "Photo taken"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h2:text0",
+					"value": "Locating"
+				},
+				{
+					"op": "call",
+					"call": "location.current",
+					"arguments": [],
+					"resume": "script:3"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "reject",
+				"continuation": "script:3",
+				"error": {
+					"name": "NotAllowedError",
+					"message": "Location was refused"
+				}
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h2:text0",
+					"value": "Refused: NotAllowedError"
+				}
+			]
+		}
+	]
+}

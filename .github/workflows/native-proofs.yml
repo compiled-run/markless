@@ -28,7 +28,45 @@ env:
     MAESTRO_VERSION: 2.12.1
 
 jobs:
+    # On a pull request push, the iOS job skips its macOS runner when the exact inputs it reads (ios-proof-key.ts: each rung
+    # as the phone runner bundles it, the iOS host, the harness and this workflow) already passed on an earlier push of the
+    # same pull request; the verdict then reads that run's iOS report. A rung that does not build here gives no key.
+    ios-inputs:
+        if: github.event_name == 'pull_request'
+        runs-on: ubuntu-26.04
+        timeout-minutes: 10
+        outputs:
+            key: ${{ steps.key.outputs.key }}
+            passed: ${{ steps.passed.outputs.cache-hit }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+            - id: key
+              working-directory: packages/mobile
+              run: |
+                  key=$(node src/harness/ios-proof-key.ts $RUNGS)
+                  if [ -n "$key" ]; then echo "key=native-proof-ios-passed-$key" >> "$GITHUB_OUTPUT"; fi
+            - id: passed
+              if: steps.key.outputs.key != ''
+              uses: actions/cache/restore@v4
+              with:
+                  path: .native-proof-ios
+                  key: ${{ steps.key.outputs.key }}
+                  lookup-only: true
+
     ios:
+        needs: ios-inputs
+        if: ${{ !cancelled() && needs.ios-inputs.outputs.passed != 'true' }}
         runs-on: macos-15
         timeout-minutes: 45
         steps:
@@ -48,6 +86,15 @@ jobs:
                   java-version: 21
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
+            - name: Read the Dragon commit packages/mobile/dragon.json pins
+              id: dragon
+              run: echo "commit=$(jq -r .commit packages/mobile/dragon.json)" >> "$GITHUB_OUTPUT"
+            - uses: actions/checkout@v4
+              with:
+                  repository: compiled-run/dragoncss
+                  ref: ${{ steps.dragon.outputs.commit }}
+                  path: dragon
+                  persist-credentials: false
             - name: Install Maestro
               run: |
                   curl -fsSL "https://get.maestro.mobile.dev" | MAESTRO_VERSION="$MAESTRO_VERSION" bash
@@ -55,8 +102,20 @@ jobs:
             - name: Run the rungs on an iOS simulator
               env:
                   MARKLESS_PROOF_SIMULATOR: iPhone 16
+                  MARKLESS_DRAGON_DIR: ${{ github.workspace }}/dragon
               working-directory: packages/mobile
               run: node src/harness/cli.ts --platform ios --report "$RUNNER_TEMP/proof-reports" $RUNGS
+            - name: Keep the passing iOS report under its inputs' key
+              if: needs.ios-inputs.outputs.key != ''
+              run: |
+                  mkdir .native-proof-ios
+                  cp "$RUNNER_TEMP/proof-reports/ios.json" .native-proof-ios/ios.json
+                  echo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > .native-proof-ios/run.txt
+            - if: needs.ios-inputs.outputs.key != ''
+              uses: actions/cache/save@v4
+              with:
+                  path: .native-proof-ios
+                  key: ${{ needs.ios-inputs.outputs.key }}
             - uses: actions/upload-artifact@v4
               if: always()
               with:
@@ -85,6 +144,15 @@ jobs:
                   java-version: 21
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
+            - name: Read the Dragon commit packages/mobile/dragon.json pins
+              id: dragon
+              run: echo "commit=$(jq -r .commit packages/mobile/dragon.json)" >> "$GITHUB_OUTPUT"
+            - uses: actions/checkout@v4
+              with:
+                  repository: compiled-run/dragoncss
+                  ref: ${{ steps.dragon.outputs.commit }}
+                  path: dragon
+                  persist-credentials: false
             - name: Let the emulator use KVM
               run: |
                   echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -101,6 +169,8 @@ jobs:
                   curl -fsSL "https://get.maestro.mobile.dev" | MAESTRO_VERSION="$MAESTRO_VERSION" bash
                   echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
             - name: Run the rungs on an Android emulator
+              env:
+                  MARKLESS_DRAGON_DIR: ${{ github.workspace }}/dragon
               working-directory: packages/mobile
               run: node src/harness/cli.ts --platform android --report "$RUNNER_TEMP/proof-reports" $RUNGS
             - uses: actions/upload-artifact@v4
@@ -113,7 +183,7 @@ jobs:
                       ~/.cache/markless-proof/logs/
 
     verdict:
-        needs: [ios, android]
+        needs: [ios-inputs, ios, android]
         if: always()
         runs-on: ubuntu-26.04
         timeout-minutes: 10
@@ -128,7 +198,18 @@ jobs:
               with:
                   pattern: native-proof-*
                   path: ${{ runner.temp }}/artifacts
+            - name: The earlier iOS pass with the same inputs
+              if: needs.ios-inputs.outputs.passed == 'true' && needs.ios.result == 'skipped'
+              uses: actions/cache/restore@v4
+              with:
+                  path: .native-proof-ios
+                  key: ${{ needs.ios-inputs.outputs.key }}
+                  fail-on-cache-miss: true
             - name: Both platforms passed every rung
               run: |
                   reports=$(find "$RUNNER_TEMP/artifacts" -name '*.json' -path '*proof-reports*')
+                  if [ -f .native-proof-ios/ios.json ]; then
+                      echo "iOS: the inputs are byte-identical to $(cat .native-proof-ios/run.txt), whose iOS report this reads"
+                      reports="$reports .native-proof-ios/ios.json"
+                  fi
                   node packages/mobile/src/harness/verdict.ts $reports

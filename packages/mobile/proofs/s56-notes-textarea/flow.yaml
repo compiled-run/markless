@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: s56-notes-textarea
+---
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - clearState
+- launchApp
+- assertVisible: Write the note
+- assertVisible: Nothing written
+- assertVisible: ''
+- assertVisible: Milk and eggs
+- assertVisible: Note body
+- tapOn: Body
+- eraseText
+- inputText: milk
+- hideKeyboard
+- assertNotVisible: Nothing written
+- assertVisible: milk
+- assertVisible: Written
+- assertNotVisible: Nothing written
+- assertVisible: milk
+- assertVisible: Milk and eggs

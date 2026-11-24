@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: y3-sheet-heights
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Catalog
 - assertVisible: Browse
 - assertNotVisible: All items
@@ -13,17 +17,17 @@ name: y3-sheet-heights
 - assertVisible: All items
 - assertVisible: Item 1
 - swipe:
-      start: 50%, 56%
-      end: 50%, 20%
-      duration: 600
+    start: 50%, 56%
+    end: 50%, 20%
+    duration: 600
 - waitForAnimationToEnd:
-      timeout: 5000
+    timeout: 5000
 - assertVisible: All items
 - assertVisible: Item 1
 - scrollUntilVisible:
-      element:
-          text: Item 70
-      direction: DOWN
+    element:
+      text: Item 70
+    direction: DOWN
 - assertVisible: Item 70
 - assertVisible: Close
 - tapOn: Close

@@ -1,0 +1,30 @@
+appId: ${APP_ID}
+name: 07e-children-fallback
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Days
+- assertVisible: Monday
+- assertVisible: Taps 0
+- assertVisible: Tap
+- assertVisible: Monday has a note
+- assertVisible: Tuesday
+- assertVisible: Nothing written on Tuesday
+- assertVisible: Tuesday is blank
+- assertVisible: Wednesday
+- assertVisible: Rain all day
+- assertVisible: Wednesday has a note
+- assertNotVisible: Nothing written on Monday
+- assertNotVisible: Monday is blank
+- assertNotVisible: Tuesday has a note
+- assertNotVisible: Nothing written on Wednesday
+- assertNotVisible: Wednesday is blank
+- tapOn: Tap
+- assertNotVisible: Taps 0
+- assertVisible: Taps 1
+- assertVisible: Nothing written on Tuesday
+- assertNotVisible: Taps 0

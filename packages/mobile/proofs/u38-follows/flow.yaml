@@ -1,0 +1,36 @@
+appId: ${APP_ID}
+name: u38-follows
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Follows
+- assertVisible: Count 0
+- assertVisible: Box off
+- tapOn: Add
+- assertNotVisible: Count 0
+- assertVisible: Count 1
+- assertVisible: Box off
+- assertNotVisible: Count 0
+- tapOn: Add
+- assertNotVisible: Count 1
+- assertNotVisible: Box off
+- assertVisible: Count 2
+- assertVisible: Box on
+- assertNotVisible: Count 1
+- assertNotVisible: Box off
+- tapOn: Box on
+- assertVisible: Box off
+- assertNotVisible: Box on
+- assertVisible: Box off
+- assertVisible: Count 2
+- assertNotVisible: Box on
+- tapOn: Add
+- assertNotVisible: Count 2
+- assertVisible: Count 3
+- assertVisible: Box off
+- assertNotVisible: Count 2
+- assertNotVisible: Box on

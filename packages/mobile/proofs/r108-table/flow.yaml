@@ -1,51 +1,55 @@
 appId: ${APP_ID}
 name: r108-table
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Table
 - assertVisible: Seed stock
 - assertVisible: Plant
 - assertVisible: Packets
 - assertVisible: Basil
-- assertVisible: '3'
+- assertVisible: "3"
 - assertVisible: Mint
-- assertVisible: '12'
+- assertVisible: "12"
 - assertVisible: Kinds
-- assertVisible: '2'
+- assertVisible: "2"
 - assertNotVisible: Thyme
 - assertVisible:
-      text: Plant
-      below: Seed stock
+    text: Plant
+    below: Seed stock
 - assertVisible:
-      text: Basil
-      below: Plant
+    text: Basil
+    below: Plant
 - assertVisible:
-      text: Mint
-      below: Basil
+    text: Mint
+    below: Basil
 - assertVisible:
-      text: Kinds
-      below: Mint
+    text: Kinds
+    below: Mint
 - tapOn: Add thyme
 - assertVisible: Thyme
 - assertVisible:
-      text: Basil
-      below: Plant
+    text: Basil
+    below: Plant
 - assertVisible:
-      text: Mint
-      below: Basil
+    text: Mint
+    below: Basil
 - assertVisible:
-      text: Thyme
-      below: Mint
+    text: Thyme
+    below: Mint
 - assertVisible: Thyme
-- assertVisible: '7'
-- assertVisible: '3'
+- assertVisible: "7"
+- assertVisible: "3"
 - assertVisible:
-      text: Basil
-      below: Plant
+    text: Basil
+    below: Plant
 - assertVisible:
-      text: Mint
-      below: Basil
+    text: Mint
+    below: Basil
 - assertVisible:
-      text: Thyme
-      below: Mint
+    text: Thyme
+    below: Mint

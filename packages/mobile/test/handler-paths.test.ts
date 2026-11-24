@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { NativeOp, NativeViewPayload } from '@markless/serializer';
+import type { NativeJournalEntry, NativeOp, NativeViewPayload } from '@markless/serializer';
 import {
 	compileNativeComponent,
 	createNativeAppRuntime,
@@ -57,10 +57,31 @@ const look = (
 		arms: runtime.arms(),
 		rows: runtime.rows(),
 	});
-	const start = runtime.start();
+	// Data names a call's continuation after its handler and JavaScript by number: an answer goes to the oldest call
+	// still waiting, and the journal spells each continuation by the order its call was made.
+	const waiting: string[] = [];
+	const order = new Map<string, number>();
+	const answering = (journal: ReadonlyArray<NativeJournalEntry>) =>
+		journal.map((entry) => {
+			if (entry.op !== 'call' || entry.resume === undefined) return entry;
+			waiting.push(entry.resume);
+			order.set(entry.resume, order.size);
+			return { ...entry, resume: `call ${order.get(entry.resume)}` };
+		});
+	const answer = (action: NativeAction): NativeAction =>
+		action.event === 'resume' || action.event === 'reject'
+			? { ...action, continuation: waiting.shift() ?? action.continuation }
+			: action;
+	const start = answering(runtime.start());
 	return {
 		initial: { start, ...screen() },
-		steps: actions.map((action) => ({ journal: runtime.dispatch(action), ...screen() })),
+		// Style-state entries follow what the build knows of a cell's values, which a cell JavaScript writes does not show.
+		steps: actions.map((action) => ({
+			journal: answering(runtime.dispatch(answer(action))).filter(
+				(entry) => entry.op !== 'state',
+			),
+			...screen(),
+		})),
 	};
 };
 
@@ -92,15 +113,19 @@ describe('a handler means the same as data and as JavaScript', () => {
 	});
 
 	it('forces most handlers of the vectors into the engine, so the comparison covers them', async () => {
-		// The engine has no elements: handlers that read focus, `contains` or an event's target element stay data.
-		const elementCases = new Set(['overlay', 'popover']);
+		// Handlers that read focus, `contains` or an event's target element stay data; the triggers, which call the family's
+		// shared methods, and popover's focus landing, which focuses a handle through its proxy, run as JavaScript.
+		const elementCases = new Map([
+			['overlay', 6],
+			['popover', 3],
+		]);
 		let data = 0;
 		let forced = 0;
 		for (const entry of CONFORMANCE_CASES) {
 			const chosen = await build(entry);
 			const moved = scriptOps(await build(entry, 'all')) - scriptOps(chosen);
 			if (elementCases.has(entry.name)) {
-				expect(moved, entry.name).toBe(0);
+				expect(moved, entry.name).toBe(elementCases.get(entry.name));
 				continue;
 			}
 			data += chosen.handlers.length - scriptOps(chosen);

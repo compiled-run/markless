@@ -1,0 +1,448 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:make",
+				"name": "make",
+				"initial": "none"
+			},
+			{
+				"id": "state:changes",
+				"name": "changes",
+				"initial": 0
+			},
+			{
+				"id": "state:size",
+				"name": "size",
+				"initial": "none"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Pick a car"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "select",
+				"parent": "h0",
+				"attributes": {
+					"name": "make",
+					"aria-label": "Make"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "option",
+				"parent": "h2",
+				"attributes": {
+					"value": "audi"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Audi"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "option",
+				"parent": "h2",
+				"attributes": {
+					"value": "toyota"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Toyota"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "option",
+				"parent": "h2",
+				"attributes": {
+					"value": "bmw"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "BMW"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "select",
+				"parent": "h0",
+				"attributes": {
+					"aria-label": "Size"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "option",
+				"parent": "h6"
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "small"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "option",
+				"parent": "h6"
+			},
+			{
+				"kind": "text",
+				"id": "h8:text0",
+				"parent": "h8",
+				"parts": [
+					{
+						"text": "large"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h9:text0",
+				"parent": "h9",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Make ",
+								{
+									"cell": "state:make"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h10",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h10:text0",
+				"parent": "h10",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Changes ",
+								{
+									"cell": "state:changes"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h11",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h11:text0",
+				"parent": "h11",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Size ",
+								{
+									"cell": "state:size"
+								},
+								""
+							]
+						}
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "input",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h6",
+				"event": "input",
+				"handler": "handler:event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:make",
+						"value": {
+							"event": "value"
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:changes",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "state:changes"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "change",
+						"bindings": {
+							"size": {
+								"cell": "state:size"
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "84fcdb1c2bd3f658",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction shout(text) {\n let out = '';\n for (const letter of text) out += letter.toUpperCase();\n return out;\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn ((event) => (__s.size = shout(event.currentTarget.value)));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"84fcdb1c2bd3f658\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Pick a car"
+		],
+		[
+			"h3:text0",
+			"Audi"
+		],
+		[
+			"h4:text0",
+			"Toyota"
+		],
+		[
+			"h5:text0",
+			"BMW"
+		],
+		[
+			"h7:text0",
+			"small"
+		],
+		[
+			"h8:text0",
+			"large"
+		],
+		[
+			"h9:text0",
+			"Make none"
+		],
+		[
+			"h10:text0",
+			"Changes 0"
+		],
+		[
+			"h11:text0",
+			"Size none"
+		]
+	],
+	"initialSelections": [
+		[
+			"h3",
+			true
+		],
+		[
+			"h4",
+			false
+		],
+		[
+			"h5",
+			false
+		],
+		[
+			"h7",
+			true
+		],
+		[
+			"h8",
+			false
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "choose",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h9:text0",
+					"value": "Make toyota"
+				},
+				{
+					"op": "text",
+					"node": "h10:text0",
+					"value": "Changes 1"
+				},
+				{
+					"op": "property",
+					"node": "h3",
+					"name": "selected",
+					"value": false
+				},
+				{
+					"op": "property",
+					"node": "h4",
+					"name": "selected",
+					"value": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "choose",
+				"host": "h4"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "choose",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h9:text0",
+					"value": "Make bmw"
+				},
+				{
+					"op": "text",
+					"node": "h10:text0",
+					"value": "Changes 2"
+				},
+				{
+					"op": "property",
+					"node": "h4",
+					"name": "selected",
+					"value": false
+				},
+				{
+					"op": "property",
+					"node": "h5",
+					"name": "selected",
+					"value": true
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "choose",
+				"host": "h8"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h11:text0",
+					"value": "Size LARGE"
+				},
+				{
+					"op": "property",
+					"node": "h7",
+					"name": "selected",
+					"value": false
+				},
+				{
+					"op": "property",
+					"node": "h8",
+					"name": "selected",
+					"value": true
+				}
+			]
+		}
+	]
+}

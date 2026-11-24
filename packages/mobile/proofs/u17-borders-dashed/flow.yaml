@@ -1,0 +1,19 @@
+appId: ${APP_ID}
+name: u17-borders-dashed
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Borders
+- assertVisible: Dashed all round
+- assertVisible: Dotted all round
+- assertVisible: Mixed sides
+- assertVisible: Tap
+- assertVisible: Taps 0
+- tapOn: Tap
+- assertNotVisible: Taps 0
+- assertVisible: Taps 1
+- assertNotVisible: Taps 0

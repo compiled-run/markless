@@ -1,0 +1,272 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:word",
+				"name": "word",
+				"initial": "items",
+				"styled": true,
+				"domain": [
+					"items",
+					"boxes"
+				]
+			},
+			{
+				"id": "state:quantities",
+				"name": "quantities",
+				"initial": []
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Tally"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "p",
+				"parent": "h0",
+				"bindings": [
+					{
+						"attribute": "hidden",
+						"value": {
+							"binary": "===",
+							"left": {
+								"script": "fn:1",
+								"bindings": {
+									"quantities": {
+										"cell": "state:quantities"
+									}
+								}
+							},
+							"right": {
+								"literal": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h0:text0",
+				"parent": "component-edge:0/h0",
+				"parts": [
+					{
+						"expr": {
+							"script": "fn:0",
+							"bindings": {
+								"word": {
+									"cell": "state:word"
+								}
+							}
+						}
+					},
+					{
+						"text": ": "
+					},
+					{
+						"expr": {
+							"script": "fn:1",
+							"bindings": {
+								"quantities": {
+									"cell": "state:quantities"
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Add two"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Rename"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:quantities",
+						"value": {
+							"array": [
+								{
+									"spread": true,
+									"value": {
+										"cell": "state:quantities"
+									}
+								},
+								{
+									"spread": false,
+									"value": {
+										"literal": 2
+									}
+								}
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:word",
+						"value": {
+							"literal": "boxes"
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "5f2f363c4f0734b6",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [null, load(1)];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn function () {\nreturn (__i[1][\"capital\"](__s.word));\n};\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn function () {\nreturn (__i[1][\"total\"](__s.quantities));\n};\n};\n};\nmodules[1] = function (exports) {\n\"use strict\";\nvar __i = [];\n__export(exports, {\n\"capital\": function () { return capital; },\n\"total\": function () { return total; }\n});\nfunction total(quantities) {\n return quantities.reduce((sum, quantity) => sum + quantity, 0);\n}\nfunction capital(word) {\n return word.charAt(0).toUpperCase() + word.slice(1);\n}\n};\n/*markless-engine:entries*/\n})(globalThis, \"5f2f363c4f0734b6\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Tally"
+		],
+		[
+			"component-edge:0/h0:text0",
+			"Items: 0"
+		],
+		[
+			"h2:text0",
+			"Add two"
+		],
+		[
+			"h3:text0",
+			"Rename"
+		]
+	],
+	"initialAttributes": [
+		[
+			"component-edge:0/h0",
+			"hidden",
+			""
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "component-edge:0/h0",
+					"name": "hidden",
+					"value": null
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h0:text0",
+					"value": "Items: 2"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h0:text0",
+					"value": "Items: 4"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:word",
+					"value": "boxes"
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h0:text0",
+					"value": "Boxes: 4"
+				}
+			]
+		}
+	]
+}

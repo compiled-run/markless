@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: u120-component-input-value
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: New note
+- assertVisible: Bumped 0
+- assertVisible: ""
+- tapOn: Title
+- eraseText
+- inputText: Groceries
+- hideKeyboard
+- assertVisible: Groceries
+- assertVisible: Bumped 0
+- assertVisible: Groceries
+- tapOn: Bumped 0
+- assertNotVisible: Bumped 0
+- assertVisible: Bumped 1
+- assertNotVisible: Bumped 0
+- assertVisible: Groceries

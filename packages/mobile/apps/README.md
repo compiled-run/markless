@@ -16,23 +16,42 @@ styles, and dark mode.
 
 ## Headline
 
-Screens that build for phones and match the web, out of all screens (`main` at `501fdb61d`, 2026-11-19):
+Screens that build for phones, and of those the screens Dragon styles, out of all screens (`main` at `afe355d98`,
+2026-11-20, Dragon checkout `native-ui-styles` at `d676879c5c`):
 
-| App     | Build and match |       Build |
-| ------- | --------------: | ----------: |
-| notes   |         not run |      0 of 6 |
-| shop    |         not run |      0 of 7 |
-| checkin |         not run |      3 of 5 |
-| **All** |     **not run** | **3 of 18** |
+| App     | Build and styled |       Build |
+| ------- | ---------------: | ----------: |
+| notes   |           0 of 6 |      3 of 6 |
+| shop    |           0 of 7 |      0 of 7 |
+| checkin |           0 of 5 |      3 of 5 |
+| **All** |      **0 of 18** | **6 of 18** |
 
-The checkin screens `/`, `/checkins/[id]` and `/permissions` build. No screen has been run on a phone on this commit, so
-"match" is not measured yet. Notes builds nothing because `compileNativeApp` throws on the app (#893): `/tags/[tag]`
-prints its route param, and the style pass renders the first frame with no params. With that one throw caught, notes
-`/`, `/tags` and `/tags/[tag]` build, which would make 6 of 18.
+notes `/`, `/tags`, `/tags/[tag]` and checkin `/`, `/checkins/[id]`, `/permissions` build, but every app here is
+styled, and a styled screen reaches a phone only with Dragon's style export. Dragon refuses all six:
 
-On 2026-11-18 (`cw/native-integration` at `3babf6ff2`), 0 of 18 built. #829 (handlers as JavaScript), #881 (a child
-component's prop that follows state), #883 (`@for` inside `@if` or `@try`) and #884 (`compileNativeApp` takes the app
-config) are what moved it.
+- Four have styles inside an `@if` arm or a `@for` row (an empty state, a list): "styles inside @if arms and @for rows are
+  not supported yet".
+- Two stop on the apps' web font: `@font-face { src: url(./fonts/QueGrotesque-Regular.woff2) }` "does not resolve to an
+  asset of the source snapshot". The Markless style input has no field for the files a stylesheet names, and Dragon's
+  reader of it starts with no assets.
+
+Both are Dragon work. So no yardstick screen runs on a phone yet, and "match" (the screens run on both phones and
+compared with the web) cannot be measured until they do. shop's 0 is the `import.meta` throw, fixed by #957.
+
+## Running an app on the phones
+
+Each app folder is also a phone rung: `expected.json` is a user's journey through the whole app (list, detail, typing,
+state, back), and `flow.yaml` is the Maestro flow it renders to (`node packages/mobile/proofs/write-flows.ts`;
+`test/app-rungs.test.ts` fails when they drift). The shared runner builds the app with `compileNativeApp`, every page
+under `pages/` and the app's own `app.json`, and runs the journey with a screenshot at every step:
+
+```sh
+MARKLESS_DRAGON_DIR=<Dragon checkout at dragon.json's pin> heavy pnpm --filter @markless/mobile phones submit \
+  "$PWD/packages/mobile/apps/notes" --platform ios
+```
+
+A page that does not build fails the whole app at `build`, as an app build would. These rungs are not in the ladder,
+so `--all` and `--affected` do not run them.
 
 ## How it is measured
 
@@ -41,7 +60,9 @@ config) are what moved it.
   Vitest project (`pnpm exec vp test run --project native-web`), the ladder's web column in `mobile-hosts.yml`, not in
   the unit shards. `MARKLESS_YARDSTICK_SCREENSHOTS=<dir>` saves a screenshot at each step.
 - Native: `node packages/mobile/apps/measure.ts --out packages/mobile/apps/yardstick.json` compiles each app's pages
-  with `compileNativeApp` (with `document.tsrx`, the app's `app.json`, the workspace module reader and stylesheets) and
+  with `compileNativeApp` (keeping the routes whose page builds when others refuse); with `--styles` and
+  `MARKLESS_DRAGON_DIR`, each screen that builds also runs through Dragon and records `styled` (true, Dragon's refusal,
+  or null for a screen with no styles) (with `document.tsrx`, the app's `app.json`, the workspace module reader and stylesheets) and
   records, per screen, whether it builds and every error diagnostic (code, message, file, line). When
   `compileNativeApp` throws, every screen of that app records the message under the code `THROWN`. `yardstick.json` is
   that output.

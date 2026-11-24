@@ -14,7 +14,7 @@ private let mobilePackage: URL = {
 private func counterPayload() throws -> Data { try vectorPayload("counter") }
 
 private func vectorPayload(_ name: String) throws -> Data {
-	guard case let .object(fields) = try JSONValue.parse(Data(contentsOf: mobilePackage.appendingPathComponent("conformance/\(name).json"))),
+	guard case let .object(fields) = try JSONValue.parse(ConformanceEngine.vectorData(mobilePackage.appendingPathComponent("conformance/\(name).json"))),
 		let payload = fields.first(where: { $0.0 == "payload" })?.1
 	else { throw HostError("no payload in the counter vector") }
 	return Data(payload.jsonText.utf8)
@@ -95,6 +95,36 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	#expect(throws: HostError.self) { try views.apply([.text(node: "h3:text0", value: "gone")]) }
 }
 
+@MainActor @Test func aHiddenElementInsideAControlTakesItsPlaceAndNameOnlyWhileShown() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("hidden-in-control"), store: MemoryStore())
+	let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 778))
+	window.rootViewController = controller
+	window.makeKeyAndVisible()
+	let views = try tree(controller)
+	let add = try #require(views.elements["h1"] as? UIButton)
+	let count = try #require(views.elements["h2"])
+	let link = try #require(views.elements["h4"] as? UIButton)
+	let badge = try #require(views.elements["h6"])
+	let width = { (view: UIView) -> CGFloat in
+		controller.view.layoutIfNeeded()
+		return view.frame.width
+	}
+	#expect(count.isHidden && badge.isHidden)
+	#expect(add.accessibilityLabel == "Add")
+	#expect(link.accessibilityLabel == "Cart")
+
+	add.sendActions(for: .touchUpInside)
+	#expect(!count.isHidden && !badge.isHidden)
+	#expect(width(count) > 0 && width(badge) > 0)
+	#expect(add.accessibilityLabel == "Add (1)")
+	#expect(link.accessibilityLabel == "Cart 1 in cart")
+
+	controller.perform(NativeAction(event: .activate, host: "h3"))
+	#expect(count.isHidden && badge.isHidden)
+	#expect(add.accessibilityLabel == "Add")
+	#expect(link.accessibilityLabel == "Cart")
+}
+
 @Test func userDefaultsKeepEachValueAsItsOwnType() throws {
 	let defaults = try #require(UserDefaults(suiteName: "markless-ios-host-tests"))
 	defaults.removePersistentDomain(forName: "markless-ios-host-tests")
@@ -108,6 +138,81 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	}
 	store.write("k", .null)
 	#expect(store.read("k") == nil)
+}
+
+@MainActor @Test func aLiveRegionAnnouncesItsChangeOnceAJournalIsApplied() throws {
+	var spoken: [(text: String, assertive: Bool)] = []
+	let controller = try MarklessViewController(payload: vectorPayload("live"), store: MemoryStore())
+	let views = try tree(controller)
+	views.announce = { spoken.append(($0, $1)) }
+	// An atomic region (an <output>) is read whole; a polite region without aria-atomic reads only what changed.
+	try views.apply([
+		.text(node: "h2:text0", value: "1 in basket"),
+		.text(node: "h5:text0", value: "Added 1"),
+	])
+	#expect(spoken.map(\.text) == ["1 in basket", "Added 1"])
+	#expect(spoken.allSatisfy { !$0.assertive })
+	spoken = []
+	try views.apply([.text(node: "h3:text0", value: "Too many")])
+	#expect(spoken.map(\.text) == ["Too many"])
+	#expect(spoken.first?.assertive == true)
+	spoken = []
+	try views.apply([.text(node: "h7:text0", value: "Panel shown")])
+	#expect(spoken.isEmpty)
+}
+
+@MainActor @Test func aTextareaSendsEachEditAndTakesWritesFromOtherHandlers() throws {
+	var sent: [NativeAction] = []
+	let controller = try MarklessViewController(payload: vectorPayload("notes"), store: MemoryStore())
+	let views = try tree(controller)
+	let area = try #require(views.elements["h1"] as? TextArea)
+	#expect(area.text == "First line")
+	#expect(area.accessibilityLabel == "Notes")
+	#expect(area.isEditable)
+	controller.view.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+	controller.view.layoutIfNeeded()
+	// Two lines tall, as Chrome's default rows="2".
+	#expect(area.frame.height > 2 * (area.font?.lineHeight ?? 17))
+	area.onChange.append { sent.append(NativeAction(event: .input, host: "h1", value: $0)) }
+	area.text = "First line\nSecond line"
+	area.delegate?.textViewDidChange?(area)
+	#expect(sent.last?.value == "First line\nSecond line")
+	try views.apply([.property(node: "h1", name: "value", value: "")])
+	#expect(area.text == "")
+}
+
+@MainActor @Test func aFieldsKeysAndPasteRunItsHandlersAndPreventDefaultLeavesOutWhatTheyDo() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("text-keys"), store: MemoryStore())
+	let views = try tree(controller)
+	let field = try #require(views.elements["h1"] as? TextField)
+	let area = try #require(views.elements["h2"] as? TextArea)
+	let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
+	window.rootViewController = controller
+	window.makeKeyAndVisible()
+	#expect(field.becomeFirstResponder())
+	field.insertText("a")
+	#expect(field.text == "a")
+	field.sendActions(for: .editingChanged)
+	#expect(field.delegate?.textFieldShouldReturn?(field) == false)
+	#expect(field.text == "")
+	#expect(views.labels["h3:text0"]?.text == "1 tags: a; 0 removed; last key Enter")
+	// Backspace in the empty field: the handler takes it, and there was nothing to delete anyway.
+	field.deleteBackward()
+	#expect(views.labels["h3:text0"]?.text == "1 tags: a; 1 removed; last key Backspace")
+	// The menu's Paste runs the handler, which prevents it, so nothing goes in (a test may not read the pasteboard).
+	field.paste(nil)
+	#expect(field.text == "")
+	_ = field.onPaste?("x,y")
+	#expect(views.labels["h4:text0"]?.text == "pasted x,y; sent")
+	#expect(area.becomeFirstResponder())
+	area.insertText("hi")
+	area.delegate?.textViewDidChange?(area)
+	area.insertText("\n")
+	#expect(area.text == "")
+	#expect(views.labels["h4:text0"]?.text == "pasted x,y; sent hi")
+	// With the textarea empty, Enter is not prevented and breaks the line.
+	area.insertText("\n")
+	#expect(area.text == "\n")
 }
 
 @MainActor @Test func aTextFieldSendsItsTextAndTakesWritesFromOtherHandlers() throws {
@@ -139,6 +244,26 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	try #require(views.elements["h4"] as? UIButton).sendActions(for: .touchUpInside)
 	#expect(field.text == "Bo")
 	#expect(views.labels["h3:text0"]?.text == "Hello Bo")
+}
+
+@MainActor @Test func aRangeIsASliderOnItsStepsThatSendsTheValueItLandsOn() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("range"), store: MemoryStore())
+	let views = try tree(controller)
+	let built = views.elements["h2"]
+	let slider = try #require(built as? RangeSlider, "h2 is \(String(describing: built.map { type(of: $0) }))")
+	controller.view.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+	controller.view.layoutIfNeeded()
+	#expect(slider.frame.width >= 129, "frame \(slider.frame)")
+	#expect(slider.frame.height >= 31, "frame \(slider.frame)")
+	#expect(slider.number == 5)
+	#expect(slider.accessibilityLabel == "Volume")
+	#expect(slider.accessibilityValue == "5")
+	var sent: [String] = []
+	slider.onInput = { sent.append($0) }
+	slider.accessibilityIncrement()
+	slider.accessibilityIncrement()
+	#expect(slider.number == 7)
+	#expect(sent == ["6", "7"])
 }
 
 @MainActor @Test func rowsAreBuiltRemovedAndMovedNotRebuilt() throws {
@@ -201,7 +326,7 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) {
 	var url = URL(fileURLWithPath: #filePath)
 	for _ in 0..<6 { url.deleteLastPathComponent() }
-	guard case let .object(fields) = try JSONValue.parse(Data(contentsOf: url.appendingPathComponent("conformance/attributes.json"))),
+	guard case let .object(fields) = try JSONValue.parse(ConformanceEngine.vectorData(url.appendingPathComponent("conformance/attributes.json"))),
 		let json = fields.first(where: { $0.0 == "payload" })?.1
 	else { throw PayloadError(path: "vector", reason: "no payload") }
 	let payload = try NativeViewPayload.decode(json)
@@ -420,5 +545,100 @@ private func scrollingCounterExport() throws -> Data {
 	views.bringIntoView(button, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline)
 	#expect(box.contentOffset.y == 200)
 	#expect(views.page.contentOffset.y + inset == 100)
+}
+
+@MainActor @Test func aLiveRegionWhoseAttributesFollowStateSpeaksAsTheyReadNow() throws {
+	var spoken: [(text: String, assertive: Bool)] = []
+	let controller = try MarklessViewController(payload: vectorPayload("live-follows"), store: MemoryStore())
+	let views = try tree(controller)
+	views.announce = { spoken.append(($0, $1)) }
+	// aria-live="polite" while playing: the next slide is read.
+	controller.perform(NativeAction(event: .activate, host: "h3"))
+	#expect(spoken.map(\.text) == ["Slide 2"])
+	#expect(spoken.first?.assertive == false)
+	// aria-live="off" once paused: nothing is read.
+	spoken = []
+	controller.perform(NativeAction(event: .activate, host: "h4"))
+	controller.perform(NativeAction(event: .activate, host: "h3"))
+	#expect(spoken.isEmpty)
+	// role="alert" once it fails: read at once, whole.
+	controller.perform(NativeAction(event: .activate, host: "h5"))
+	#expect(spoken.map(\.text) == ["Upload failed"])
+	#expect(spoken.first?.assertive == true)
+}
+@MainActor @Test func aRowsLiveRegionSpeaksByItsOwnRowsRule() throws {
+	var spoken: [(text: String, assertive: Bool)] = []
+	let controller = try MarklessViewController(payload: vectorPayload("row-live"), store: MemoryStore())
+	let views = try tree(controller)
+	views.announce = { spoken.append(($0, $1)) }
+	// The report's row turns role="alert": its own change is read at once.
+	controller.perform(NativeAction(event: .activate, host: "h4"))
+	#expect(spoken.map(\.text) == ["Report failed"], "\(spoken)")
+	#expect(spoken.first?.assertive == true)
+	// Back to role="status": read politely; the photo's row, unchanged, says nothing.
+	spoken = []
+	controller.perform(NativeAction(event: .activate, host: "h4"))
+	#expect(spoken.map(\.text) == ["Report saved"], "\(spoken)")
+	#expect(spoken.first?.assertive == false)
+}
+
+/// Which rows and which columns of a field hold dark pixels once it is drawn, holding `text`.
+@MainActor private func inked(_ field: UITextField, _ text: String) throws -> (rows: [Int], columns: [Int]) {
+	let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 354, height: 42))
+	field.frame = window.bounds
+	field.backgroundColor = .white
+	window.addSubview(field)
+	window.isHidden = false
+	field.text = text
+	field.layoutIfNeeded()
+	func display(_ layer: CALayer) {
+		layer.layoutIfNeeded()
+		layer.setNeedsDisplay()
+		layer.displayIfNeeded()
+		for sub in layer.sublayers ?? [] { display(sub) }
+	}
+	display(field.layer)
+	let format = UIGraphicsImageRendererFormat()
+	format.scale = 1
+	let image = UIGraphicsImageRenderer(bounds: field.bounds, format: format).image { field.layer.render(in: $0.cgContext) }
+	let cg = try #require(image.cgImage)
+	let pixels = try #require(cg.dataProvider?.data as Data?)
+	let dark = { (x: Int, y: Int) in pixels[y * cg.bytesPerRow + x * 4] < 128 }
+	return ((0..<42).filter { y in (0..<354).contains { dark($0, y) } }, (0..<354).filter { x in (0..<42).contains { dark(x, $0) } })
+}
+
+/// A styled field draws the value it holds in Dragon's editor box, in the editor's font: Ahem inks each character as a 1em box.
+@MainActor @Test func aStyledTextFieldDrawsItsValueInItsEditorBox() throws {
+	let dragon = try #require(ProcessInfo.processInfo.environment["MARKLESS_DRAGON_DIR"], "set TEST_RUNNER_MARKLESS_DRAGON_DIR")
+	let ahem = try Data(contentsOf: URL(fileURLWithPath: dragon).appendingPathComponent("vendor/fonts/Ahem.ttf"))
+	let face = try #require(CTFontManagerCreateFontDescriptorFromData(ahem as CFData)) as UIFontDescriptor
+	let field = TextField()
+	try field.paint(
+		.init(editor: Frame(x: 17, y: 13, width: 309, height: 16), fontFamily: "Ahem", fontSize: 16, color: RGBA(r: 0, g: 0, b: 0, alpha: 255), placeholder: nil),
+		faces: ["Ahem": face])
+	let ink = try inked(field, "milk")
+	#expect(ink.rows.first.map { (12...14).contains($0) } == true, "\(ink.rows)")
+	#expect(ink.rows.last.map { (27...29).contains($0) } == true, "\(ink.rows)")
+	#expect(ink.columns.first.map { (16...18).contains($0) } == true, "\(ink.columns)")
+	#expect(ink.columns.last.map { (79...81).contains($0) } == true, "\(ink.columns)")
+}
+
+/// A styled search field's clear button sits in Dragon's cancel box, shows while editing, and empties the field as typing does.
+@MainActor @Test func aStyledSearchFieldsClearButtonEmptiesItAsTypingDoes() throws {
+	let field = TextField(frame: CGRect(x: 0, y: 0, width: 354, height: 42))
+	let font = UIFont.systemFont(ofSize: 16).fontDescriptor
+	try field.paint(
+		.init(editor: Frame(x: 17, y: 13, width: 309, height: 16), fontFamily: "s", fontSize: 16, color: nil, placeholder: nil, clear: Frame(x: 327, y: 17.5, width: 7, height: 7)),
+		faces: ["s": font])
+	#expect(field.clearButtonMode == .whileEditing)
+	#expect(field.clearButtonRect(forBounds: field.bounds) == CGRect(x: 327, y: 17.5, width: 7, height: 7))
+	var sent: [String] = []
+	field.addAction(UIAction { [weak field] _ in sent.append(field?.text ?? "-") }, for: .editingChanged)
+	field.text = "milk"
+	#expect(field.delegate?.textFieldShouldClear?(field) == false)
+	#expect(field.text == "")
+	#expect(sent == [""])
+	try field.paint(.init(editor: Frame(x: 17, y: 13, width: 309, height: 16), fontFamily: "s", fontSize: 16, color: nil, placeholder: nil), faces: ["s": font])
+	#expect(field.clearButtonMode == .never)
 }
 #endif

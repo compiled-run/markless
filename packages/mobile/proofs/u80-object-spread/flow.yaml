@@ -1,0 +1,35 @@
+appId: ${APP_ID}
+name: u80-object-spread
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: a Ada x
+- assertVisible: b Bo y
+- assertVisible: first Ada x
+- assertNotVisible: a Cy x
+- tapOn: Rename
+- assertVisible: a Cy x
+- assertNotVisible: a Ada x
+- assertNotVisible: first Ada x
+- assertVisible: a Cy x
+- assertVisible: b Bo y
+- assertVisible: first Cy x
+- assertNotVisible: a Ada x
+- assertNotVisible: first Ada x
+- tapOn: Tag
+- assertNotVisible: first Cy x
+- assertVisible: first Cy z
+- assertVisible: a Cy x
+- assertNotVisible: first Cy x
+- assertNotVisible: a! Cy x
+- tapOn: Keep
+- assertVisible: a! Cy x
+- assertNotVisible: a Cy x
+- assertVisible: a! Cy x
+- assertVisible: b! Bo y
+- assertNotVisible: a Cy x
+- assertNotVisible: b Bo y

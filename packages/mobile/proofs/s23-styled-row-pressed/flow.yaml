@@ -1,0 +1,26 @@
+appId: ${APP_ID}
+name: s23-styled-row-pressed
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Sizes
+- assertVisible: Small
+- assertVisible: Medium
+- assertVisible: Large
+- assertVisible: Picked Medium
+- assertNotVisible: Picked Large
+- assertNotVisible: Picked Small
+- assertVisible: Sizes
+- tapOn: Large
+- assertVisible: Picked Large
+- assertNotVisible: Picked Medium
+- assertVisible: Picked Large
+- assertNotVisible: Picked Medium
+- tapOn: Small
+- assertNotVisible: Picked Large
+- assertVisible: Picked Small
+- assertNotVisible: Picked Large

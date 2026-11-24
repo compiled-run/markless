@@ -5,8 +5,10 @@ import { join } from 'node:path';
 import { bootEmulator, emulatorAnswers } from '../harness/android.ts';
 import { exec } from '../harness/exec.ts';
 import { bootSimulator } from '../harness/ios.ts';
+import { simctl, simulatorAnswers } from '../harness/simctl.ts';
 import type { AndroidTools } from '../harness/tools.ts';
 import type { PhoneAddress, PhoneSpec } from './pool.ts';
+import { remoteAnswers, remoteStop } from './remote.ts';
 
 /** Boots (or finds running) the phone and returns its address; the caller holds the machine queue's admission meanwhile. */
 export async function bootPhone(
@@ -18,28 +20,17 @@ export async function bootPhone(
 	return { device: (await bootEmulator(tools, spec.avd, spec.port)).serial };
 }
 
-/** Whether the phone still answers: the simulator reads Booted, the emulator is an adb `device` that finished booting. */
+/**
+ * Whether the phone still answers: the simulator reads Booted and answers a read of its appearance in time (a stuck one
+ * reads Booted and never answers), the emulator is an adb `device` that finished booting.
+ */
 export async function phoneAnswers(
 	spec: PhoneSpec,
 	address: PhoneAddress,
 	tools: AndroidTools | undefined,
 ): Promise<boolean> {
-	if (spec.platform === 'ios') {
-		const listed = await exec('xcrun', ['simctl', 'list', 'devices', '--json'], {
-			allowFailure: true,
-		});
-		if (listed.code !== 0) return false;
-		const devices = Object.values(
-			(
-				JSON.parse(listed.stdout) as {
-					devices: Record<string, Array<{ udid: string; state: string }>>;
-				}
-			).devices,
-		).flat();
-		return devices.some(
-			(device) => device.udid === address.device && device.state === 'Booted',
-		);
-	}
+	if (spec.platform === 'ios') return simulatorAnswers(address.device);
+	if (spec.remote !== undefined) return remoteAnswers({ ...spec, remote: spec.remote });
 	return tools !== undefined && emulatorAnswers(tools, address.device);
 }
 
@@ -53,10 +44,10 @@ export async function phoneRunning(
 			tools !== undefined &&
 			(await phoneAnswers(spec, { device: `emulator-${spec.port}` }, tools))
 		);
-	const listed = await exec('xcrun', ['simctl', 'list', 'devices', '--json'], {
+	const listed = await simctl(['list', 'devices', '--json'], {
 		allowFailure: true,
-	});
-	if (listed.code !== 0) return false;
+	}).catch(() => undefined);
+	if (listed?.code !== 0) return false;
 	return Object.values(
 		(
 			JSON.parse(listed.stdout) as {
@@ -71,9 +62,10 @@ export async function phoneRunning(
 /** Stops the phone so the next boot starts clean; only ever the pool's own phones, by their own names. */
 export async function stopPhone(spec: PhoneSpec, tools: AndroidTools | undefined): Promise<void> {
 	if (spec.platform === 'ios') {
-		await exec('xcrun', ['simctl', 'shutdown', spec.name], { allowFailure: true });
+		await simctl(['shutdown', spec.name], { allowFailure: true }).catch(() => undefined);
 		return;
 	}
+	if (spec.remote !== undefined) return remoteStop({ ...spec, remote: spec.remote });
 	if (!tools) return;
 	const serial = `emulator-${spec.port}`;
 	await exec(tools.adb, ['-s', serial, 'emu', 'kill'], {
@@ -81,7 +73,9 @@ export async function stopPhone(spec: PhoneSpec, tools: AndroidTools | undefined
 		timeoutMs: 20_000,
 	}).catch(() => undefined);
 	for (let waited = 0; waited < 60; waited++) {
-		const state = await exec(tools.adb, ['-s', serial, 'get-state'], { allowFailure: true });
+		const state = await exec(tools.adb, ['-s', serial, 'get-state'], {
+			allowFailure: true,
+		});
 		if (state.code !== 0) return;
 		await new Promise((resolve) => setTimeout(resolve, 1000));
 	}

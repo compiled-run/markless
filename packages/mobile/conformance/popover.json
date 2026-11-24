@@ -72,6 +72,9 @@
 				"id": "component-edge:0/h0",
 				"element": "div",
 				"parent": "h0",
+				"attributes": {
+					"class": "mk-1e25sqt"
+				},
 				"bindings": [
 					{
 						"attribute": "ui-open",
@@ -99,6 +102,7 @@
 				"element": "button",
 				"parent": "component-edge:0/h0",
 				"attributes": {
+					"class": "mk-xhmnfn",
 					"type": "button",
 					"aria-haspopup": "dialog"
 				},
@@ -159,6 +163,7 @@
 				"element": "div",
 				"parent": "component-edge:0/h0",
 				"attributes": {
+					"class": "mk-as9gn3",
 					"role": "dialog",
 					"overlay": ""
 				},
@@ -430,23 +435,11 @@
 								}
 							},
 							"right": {
-								"logical": "&&",
-								"left": {
-									"binary": "!==",
-									"left": {
-										"literal": "component-edge:2/h2"
-									},
-									"right": {
-										"literal": null
-									}
+								"contains": {
+									"literal": "component-edge:2/h2"
 								},
-								"right": {
-									"contains": {
-										"literal": "component-edge:2/h2"
-									},
-									"node": {
-										"focused": true
-									}
+								"node": {
+									"focused": true
 								}
 							}
 						},

@@ -1,0 +1,28 @@
+appId: ${APP_ID}
+name: u32-double-tap
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Photo
+- assertVisible: Not pressed
+- assertVisible: Presses 0
+- tapOn: Sunset
+- assertNotVisible: Not pressed
+- assertVisible: Pressed once \(1\)
+- assertVisible: Presses 1
+- assertNotVisible: Not pressed
+- doubleTapOn: Sunset
+- assertNotVisible: Pressed once \(1\)
+- assertVisible: Liked by a double tap
+- assertVisible: Presses 3
+- assertNotVisible: Pressed once \(1\)
+- tapOn: Sunset
+- assertVisible: Pressed once \(1\)
+- assertNotVisible: Liked by a double tap
+- assertVisible: Pressed once \(1\)
+- assertVisible: Presses 4
+- assertNotVisible: Liked by a double tap

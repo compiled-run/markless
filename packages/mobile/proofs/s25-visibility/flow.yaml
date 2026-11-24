@@ -1,0 +1,21 @@
+appId: ${APP_ID}
+name: s25-visibility
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Visibility
+- assertVisible: Secret note
+- assertVisible: Below the note
+- assertVisible: Visibility
+- tapOn: Toggle note
+- assertNotVisible: Secret note
+- assertVisible: Below the note
+- assertNotVisible: Secret note
+- tapOn: Toggle note
+- assertVisible: Secret note
+- assertVisible: Secret note
+- assertVisible: Below the note

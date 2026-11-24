@@ -1,0 +1,26 @@
+appId: ${APP_ID}
+name: r152-dynamic-tag
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Notes
+- assertVisible: Tap the first note
+- assertVisible: Tap the second note
+- assertVisible: "First taps: 0"
+- assertVisible: "Second taps: 0"
+- assertNotVisible: "First taps: 1"
+- tapOn: Tap the first note
+- assertVisible: "First taps: 1"
+- assertNotVisible: "First taps: 0"
+- assertVisible: "First taps: 1"
+- assertVisible: "Second taps: 0"
+- assertNotVisible: "First taps: 0"
+- tapOn: Tap the second note
+- assertNotVisible: "Second taps: 0"
+- assertVisible: "First taps: 1"
+- assertVisible: "Second taps: 1"
+- assertNotVisible: "Second taps: 0"

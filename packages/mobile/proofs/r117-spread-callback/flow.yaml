@@ -1,0 +1,26 @@
+appId: ${APP_ID}
+name: r117-spread-callback
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Chips
+- assertVisible: Red 0
+- assertVisible: Blue 0
+- assertVisible: Picked nothing
+- tapOn: Red 0
+- assertNotVisible: Red 0
+- assertNotVisible: Picked nothing
+- assertVisible: Red 1
+- assertVisible: Picked red
+- assertNotVisible: Red 0
+- assertNotVisible: Picked nothing
+- tapOn: Blue 0
+- assertNotVisible: Picked red
+- assertVisible: Blue 1
+- assertVisible: Picked \{"blue":"red"\}
+- assertNotVisible: Blue 0
+- assertNotVisible: Picked red

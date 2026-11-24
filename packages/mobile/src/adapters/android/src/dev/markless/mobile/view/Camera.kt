@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
 import android.graphics.SurfaceTexture
@@ -18,9 +19,17 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Surface
 import android.view.TextureView
+import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.TextView
+import dev.markless.mobile.core.Drawing
 import dev.markless.mobile.core.JsValue
+import dev.markless.mobile.core.Json
+import dev.markless.mobile.core.Payload
+import dev.markless.mobile.core.num
+import dev.markless.mobile.core.obj
+import dev.markless.mobile.core.str
 import java.io.File
 
 /** A view with a fixed size in dp: a camera preview or an image keeps its box before anything is drawn in it. */
@@ -33,18 +42,132 @@ open class SizedFrame(context: Context, private val widthDp: Int, private val he
 	}
 }
 
-/** An `img`: an ImageView in a fixed box. */
-class SizedImage(context: Context) : SizedFrame(context, 120, 90) {
-	val image = ImageView(context).apply { scaleType = ImageView.ScaleType.FIT_CENTER }
+/** An `iframe`: the platform's web view showing [src] in a box of the iframe's size, 300 by 150 by default as on the web. */
+class EmbeddedPage(context: Context, src: String, widthDp: Int, heightDp: Int) : SizedFrame(context, widthDp, heightDp) {
+	val page = android.webkit.WebView(context).apply { loadUrl(src) }
+
+	init {
+		addView(page, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+	}
+}
+
+/**
+ * An image the app packaged for an `<img src>`: its file under the APK's assets, or an SVG file's compiled drawing; its
+ * natural size in CSS px (none for an SVG file with only a viewBox's ratio); and a JPEG's EXIF orientation (1 to 8), which
+ * the browser applies and BitmapFactory does not.
+ */
+class PackagedImage(val file: String?, val width: Double?, val height: Double?, val orientation: Int = 1, val drawing: Drawing? = null)
+
+/** [bitmap] turned and mirrored as EXIF [orientation] says, as the browser draws it (`image-orientation: from-image`). */
+fun oriented(bitmap: Bitmap, orientation: Int): Bitmap {
+	val matrix = android.graphics.Matrix()
+	when (orientation) {
+		2 -> matrix.setScale(-1f, 1f)
+		3 -> matrix.setRotate(180f)
+		4 -> matrix.setScale(1f, -1f)
+		5 -> { matrix.setRotate(90f); matrix.postScale(-1f, 1f) }
+		6 -> matrix.setRotate(90f)
+		7 -> { matrix.setRotate(-90f); matrix.postScale(-1f, 1f) }
+		8 -> matrix.setRotate(-90f)
+		else -> return bitmap
+	}
+	return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+}
+
+/** The app's packaged images, from `markless/images.json` in the APK's assets; none when the app has no images. */
+fun packagedImages(context: Context): Map<String, PackagedImage> {
+	val text = runCatching { context.assets.open("markless/images.json").use { String(it.readBytes()) } }.getOrNull() ?: return emptyMap()
+	val json = Json.parse(text).obj("images")
+	return json.mapValues { (src, value) ->
+		val entry = value.obj("images.$src")
+		PackagedImage(
+			entry["file"]?.str("images.$src.file"), entry["width"]?.num("images.$src.width"), entry["height"]?.num("images.$src.height"),
+			entry["orientation"]?.num("images.$src.orientation")?.toInt() ?: 1,
+			entry["drawing"]?.let { Payload.drawing(it, "images.$src.drawing") },
+		)
+	}
+}
+
+/**
+ * An `img`: the picture at the web's size (its `width` and `height` attributes, else its natural size, keeping its ratio
+ * when only one is given); when there is no picture to draw, its alt text, as the browser shows it. With a style export,
+ * Dragon sizes the box ([sized] false).
+ */
+class SizedImage(context: Context, private val packaged: Map<String, PackagedImage>, private val sized: Boolean) : FrameLayout(context) {
+	val image = ImageView(context).apply { scaleType = ImageView.ScaleType.FIT_XY }
+	private val altText = TextView(context)
+	private var src: String? = null
+	private var alt: String? = null
+	private var width: Double? = null
+	private var height: Double? = null
+	private var natural: PackagedImage? = null
+	private var drawn: DrawingView? = null
+	// setImageBitmap(null) still sets a drawable, so whether a picture is shown is kept here.
+	private var shown = false
 
 	init {
 		addView(image, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+		addView(altText, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
 	}
 
-	/** Shows the picture at a `file:` URL; anything else shows nothing. */
-	fun show(src: String?) {
-		val path = src?.takeIf { it.startsWith("file:") }?.let { android.net.Uri.parse(it).path }
-		image.setImageBitmap(path?.let(BitmapFactory::decodeFile))
+	fun src(value: String?) {
+		src = value
+		natural = value?.let { packaged[it] }
+		drawn?.let(::removeView)
+		drawn = natural?.drawing?.let { DrawingView(context, it, 16.0 * resources.displayMetrics.density, fillsBox = true) }
+		drawn?.let { addView(it, 0, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)) }
+		// A photo the device took is a `file:` URL; any other src is a file the app packaged when it was built.
+		val bitmap = natural?.file?.let { file -> context.assets.open(file).use(BitmapFactory::decodeStream)?.let { oriented(it, natural!!.orientation) } }
+			?: value?.takeIf { it.startsWith("file:") }?.let { android.net.Uri.parse(it).path }?.let(BitmapFactory::decodeFile)
+		if (bitmap != null) image.setImageBitmap(bitmap) else image.setImageDrawable(null)
+		shown = bitmap != null || drawn != null
+		refresh()
+	}
+
+	fun alt(value: String?) {
+		alt = value
+		refresh()
+	}
+
+	fun length(name: String, value: String?) {
+		val number = value?.trim()?.toDoubleOrNull()
+		if (name == "width") width = number else height = number
+		requestLayout()
+	}
+
+	private fun refresh() {
+		altText.text = if (shown) null else alt
+		altText.visibility = if (shown || alt.isNullOrEmpty()) View.GONE else View.VISIBLE
+		requestLayout()
+	}
+
+	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+		if (!sized) return super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+		val density = resources.displayMetrics.density
+		var w = width
+		var h = height
+		val n = natural?.takeIf { shown }
+		val naturalWidth = n?.width?.takeIf { it > 0 && (n.height ?: 0.0) > 0 }
+		val naturalHeight = n?.height?.takeIf { naturalWidth != null }
+		val ratio = if (naturalWidth != null && naturalHeight != null) naturalWidth / naturalHeight
+			else n?.drawing?.viewBox?.takeIf { it[2] > 0 && it[3] > 0 }?.let { it[2] / it[3] }
+		if (ratio != null) {
+			if (w == null && h != null) w = h * ratio
+			if (h == null && w != null) h = w / ratio
+			w = w ?: naturalWidth
+			h = h ?: naturalHeight
+			// Only a ratio (an SVG file with only a viewBox): the width it is given, as the web's `<img>` takes its line.
+			if (w == null && h == null) {
+				w = MeasureSpec.getSize(widthMeasureSpec) / density.toDouble()
+				h = w / ratio
+			}
+		}
+		if (w == null || h == null) {
+			super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+			setMeasuredDimension(w?.let { (it * density).toInt() } ?: measuredWidth, h?.let { (it * density).toInt() } ?: measuredHeight)
+			return
+		}
+		super.onMeasure(MeasureSpec.makeMeasureSpec((w * density).toInt(), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec((h * density).toInt(), MeasureSpec.EXACTLY))
 	}
 }
 

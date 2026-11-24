@@ -3,15 +3,28 @@ import { join } from 'node:path';
 import { stringify } from 'yaml';
 import { PROOF_URL_SCHEME } from '../src/harness/proof-app.ts';
 
+/** A visible text or accessible name, whole or by how it starts (`{ "startsWith": "Groceries" }`, for a text ending in a run's date). */
+export type LadderText = string | { readonly startsWith: string };
+
+/** Whether a text a screen shows is the one `text` names. */
+export const readsAs = (shown: string, text: LadderText): boolean =>
+	typeof text === 'string' ? shown === text : shown.startsWith(text.startsWith);
+
+/** `text` as a message names it: in quotes, or `"Groceries…"` for a text named by how it starts. */
+export const describeText = (text: LadderText): string =>
+	typeof text === 'string' ? JSON.stringify(text) : `${JSON.stringify(text.startsWith).slice(0, -1)}…"`;
+
 /** One person's action between two looks at the screen. Every target is a visible text or an accessible name. */
 export type LadderAction =
-	| { readonly tap: string }
+	| { readonly tap: LadderText }
 	| {
 			readonly type: {
 				readonly field: string;
 				readonly text: string;
 				/** Leave the keyboard up afterwards, so the screenshot after the step shows what it covers. */
 				readonly keepKeyboard?: true;
+				/** Type after what the field holds instead of clearing it first: clearing presses Backspace, which a tag field reads. */
+				readonly append?: true;
 			};
 	  }
 	/**
@@ -34,6 +47,15 @@ export type LadderAction =
 	  }
 	/** The keyboard's return key in the text field with this accessible name. */
 	| { readonly submit: string }
+	/** The keyboard's delete key in the text field with this accessible name, its text cursor at the end. */
+	| { readonly erase: string }
+	/**
+	 * The clear control of the focused search field with this accessible name: Chrome's cancel button on the web, the hosts'
+	 * clear control (`CLEAR_BUTTON_LABEL`) on the phones.
+	 */
+	| { readonly clear: string }
+	/** Two quick taps on this text or accessible name: the second press's `event.detail` is 2. */
+	| { readonly doubleTap: LadderText }
 	/** Opens the `<select>` with this accessible name and picks the option with this label from its list. */
 	| { readonly choose: { readonly field: string; readonly option: string } }
 	/** Scroll until this text is on screen. */
@@ -61,19 +83,45 @@ export type LadderAction =
 	| { readonly back: 'gesture' | 'button' }
 	/** The device's light or dark appearance, switched in the system while the app runs (`prefers-color-scheme` on the web). */
 	| { readonly appearance: 'light' | 'dark' }
+	/** The phone turned upright or on its side while the app runs (the browser's viewport, its width and height swapped). */
+	| { readonly orientation: 'portrait' | 'landscape' }
 	/** Escape on the web, the back gesture on Android; iOS has none a flow can perform, so the step runs on Android only. */
 	| { readonly escape: true }
 	/** A press that starts and ends on the topmost overlay element itself, beside what it holds (a modal's backdrop). */
 	| { readonly pressBackdrop: true }
 	/**
+	 * A tap at a point of the screen, `[x, y]` in percent of it, on the element showing `on` there (a box drawn over another, as
+	 * a sticky header over the rows scrolled beneath it); the web test checks Chrome's element at that point is inside it.
+	 */
+	| { readonly tapAt: { readonly point: readonly [number, number]; readonly on: string } }
+	/**
 	 * A finger pressed on the element showing `on`, dragged toward `direction` and lifted. `scrolls` says the drag runs along
 	 * a box that scrolls that way, so the platform takes the touch for the scroll (the web's `pointercancel`); the phones and
 	 * the browser find that out for themselves, the reference ladder, which lays nothing out, is told.
 	 */
-	| { readonly drag: { readonly on: string; readonly direction: 'right' | 'up'; readonly scrolls?: true } };
+	| {
+			readonly drag: {
+				readonly on: string;
+				readonly direction: 'right' | 'up';
+				readonly scrolls?: true;
+			};
+	  }
+	/**
+	 * Moves the slider (`<input type="range">`) with this accessible name to its end, as a finger does from its thumb (a
+	 * rung starts the slider at its midpoint, where the thumb is); the web presses End or Home on it.
+	 */
+	| { readonly slide: { readonly field: string; readonly to: 'max' | 'min' } }
+	/**
+	 * A finger held still on the element showing this text, then lifted: Chrome on Android raises `contextmenu` for it,
+	 * Safari on iOS does not, so a rung says what each shows with `visibleOn`.
+	 */
+	| { readonly longPress: string };
 
 /** Where a phone flow presses the backdrop: above a centred surface, below the status bar. */
 export const BACKDROP_POINT = '50%,8%';
+
+/** The accessible name of a search field's clear control: UIKit's for its clear button, which the Android host gives its own. */
+export const CLEAR_BUTTON_LABEL = 'Clear text';
 
 /** Permissions a rung sets or clears, by the name Maestro's `launchApp` takes. */
 export type DevicePermission = 'location' | 'camera' | 'microphone';
@@ -95,15 +143,22 @@ export const SWIPES_UNTIL = 80;
 export type LadderStep = {
 	readonly do?: LadderAction;
 	/** Texts or accessible names that are on screen. */
-	readonly visible: readonly string[];
+	readonly visible: readonly LadderText[];
 	/** Texts or accessible names that are not on screen. */
-	readonly absent?: readonly string[];
+	readonly absent?: readonly LadderText[];
 	/** Texts or accessible names the page holds but that are scrolled out of sight. */
 	readonly offScreen?: readonly string[];
+	/** Texts the page holds but its styles do not show at this size (`display: none` in this band). */
+	readonly hidden?: readonly string[];
 	/** Controls, by text or accessible name, that are on screen and cannot be activated. */
 	readonly disabled?: readonly string[];
 	/** Texts that are on screen in this order, top to bottom. */
 	readonly order?: readonly string[];
+	/**
+	 * Texts on screen in this order, top to bottom, where styles rather than document order put them there (absolute
+	 * positions, flex `order`): the browser and the phones check it; the reference runtime, which has no layout, does not.
+	 */
+	readonly placed?: readonly string[];
 	/** Text fields, by accessible name, and the value each holds. */
 	readonly fields?: Readonly<Record<string, string>>;
 	/** The screen's title: the system navigation bar's on a phone, `document.title` on the web. */
@@ -139,6 +194,11 @@ export type LadderStep = {
 	readonly camera?: 'on' | 'off';
 	/** Phones only: whether a recorder holds the microphone, from the test build's label `MICROPHONE_STATE_ID`. */
 	readonly microphone?: 'on' | 'off';
+	/**
+	 * Android only: texts an `<iframe>`'s web view shows from the page it loads. The payload does not hold them, a browser
+	 * test reads only the page around the frame, and Maestro's iOS driver did not read into a WKWebView (2026-11-20).
+	 */
+	readonly embedded?: readonly string[];
 	/** Texts on screen on one platform only: a `platform` check shows a different arm on each. */
 	readonly visibleOn?: Readonly<Partial<Record<'ios' | 'android' | 'web', readonly string[]>>>;
 	/**
@@ -182,6 +242,13 @@ export const engineStartsText = (starts: number): string => `engine starts: ${st
  * where any outgoing connection on the machine can already hold it.
  */
 export const ECHO_SERVER_PORT = 28761;
+/**
+ * The port an app rung's own web server listens on while the rung runs on phones (`server: 'app'`), so its `api/` routes
+ * answer at the origin its app.json names. Fixed and below the ephemeral ranges, as the echo server's.
+ */
+export const APP_SERVER_PORT = 28762;
+/** The port each test server listens on. */
+export const SERVER_PORTS = { echo: ECHO_SERVER_PORT, app: APP_SERVER_PORT } as const;
 export const callsText = (calls: readonly string[]): string =>
 	`calls: ${calls.length === 0 ? 'none' : calls.join(', ')}`;
 
@@ -189,10 +256,17 @@ export type LadderRung = {
 	/** A number for the one-screen ladder, `N1`... for the navigation ladder, `D<n>` for the device ladder. */
 	readonly rung: number | string;
 	readonly name: string;
+	/**
+	 * Pressed-state checks of a styled page (`--held-check`): while a finger holds the element with this text, the page shows the
+	 * interaction state whose `:active` matches `node`, and once the finger lifts, its assignment again.
+	 */
+	readonly held?: readonly { readonly text: string; readonly node: string }[];
 	/** The route pattern App.tsrx is the page for, relative to the app root; the index route when absent. */
 	readonly route?: string;
 	/** The path the app opens at; `/` when absent. */
 	readonly start?: string;
+	/** Pages under `pages/` the phones do not build, each refused by name: the app builds without them, and a link to one opens the not-found page. */
+	readonly refusedPages?: readonly string[];
 	/**
 	 * The text of the first element the screens and the browser leave below the first screen. The reference runtime has no
 	 * layout, so it raises `visible` only for elements before that one in document order.
@@ -205,15 +279,26 @@ export type LadderRung = {
 	/** Permissions at the first launch; `unset` leaves the system to ask (Maestro grants every permission otherwise). */
 	readonly permissions?: Readonly<Partial<Record<DevicePermission, 'allow' | 'deny' | 'unset'>>>;
 	/**
+	 * What every file picker answers at once: each file's name, its text saved as UTF-8, and the MIME type the phones derive
+	 * from the name's extension (a launch argument on phones, the web test's file chooser), as the system picker is not the
+	 * proof's to drive.
+	 */
+	readonly pick?: ReadonlyArray<{ readonly name: string; readonly text: string; readonly type: string }>;
+	/**
 	 * The web build, where `@markless/device` is absent: the steps it shows instead (a device action has nothing to
 	 * act on there), and texts that must not appear in any file of the built output (removed at build time).
 	 */
 	readonly web?: {
 		readonly steps?: readonly LadderStep[];
 		readonly absentFromOutput?: readonly string[];
+		/** Console errors the browser logs as part of what the rung proves (a 404 answer it loads), each once per time. */
+		readonly consoleErrors?: readonly string[];
 	};
-	/** The test runs the echo server (`ECHO_SERVER_PORT`) while the rung runs, on the web and on phones. */
-	readonly server?: 'echo';
+	/**
+	 * The test runs the echo server (`ECHO_SERVER_PORT`) while the rung runs, on the web and on phones; or, for an app rung,
+	 * the app's own web build, whose `api/` routes answer at `APP_SERVER_PORT`.
+	 */
+	readonly server?: keyof typeof SERVER_PORTS;
 	readonly steps: readonly LadderStep[];
 };
 
@@ -223,8 +308,7 @@ export const rungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
 		.filter(
 			(entry) =>
-				entry.isDirectory() &&
-				/^((\d\d|[dp]\d)[a-z]?|[fjrtuy]\d+)-/.test(entry.name),
+				entry.isDirectory() && /^((\d\d|[dp]\d)[a-z]?|[fjrtuy]\d+)-/.test(entry.name),
 		)
 		.filter((entry) => !isApp(entry.name))
 		.map((entry) => entry.name)
@@ -233,13 +317,13 @@ export const rungFolders = (): string[] =>
 /** A rung that is an app of several routes (`pages/`) rather than one screen (`App.tsrx`). */
 const isApp = (folder: string): boolean => existsSync(join(proofsDir, folder, 'pages'));
 
-/** The navigation ladder: each folder an app (`pages/`) of several routes; an `r<n>` or `j<n>` rung with `pages/` too. */
+/** The navigation ladder: each folder an app (`pages/`) of several routes; a `j<n>`, `r<n>` or `u<n>` rung with `pages/` too. */
 export const navRungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
 		.filter(
 			(entry) =>
 				entry.isDirectory() &&
-				(/^n\d+-/.test(entry.name) || (/^[jr]\d+-/.test(entry.name) && isApp(entry.name))),
+				(/^n\d+-/.test(entry.name) || (/^[jru]\d+-/.test(entry.name) && isApp(entry.name))),
 		)
 		.map((entry) => entry.name)
 		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
@@ -249,7 +333,7 @@ export const styleRungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
 		.filter((entry) => entry.isDirectory() && /^s\d+-/.test(entry.name))
 		.map((entry) => entry.name)
-		.sort();
+		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
 
 /** The styled-sheet ladder: each folder an app whose page opens a system sheet with styled content. */
 export const sheetStyleRungFolders = (): string[] =>
@@ -273,8 +357,13 @@ export const looksOnly = (action: LadderAction | undefined): boolean =>
 export const readRung = (folder: string): LadderRung =>
 	JSON.parse(readFileSync(join(proofsDir, folder, 'expected.json'), 'utf8')) as LadderRung;
 
-// Maestro reads a selector's text as a regular expression over the whole label.
-const selector = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeSelector = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** `text` as a regular expression over a whole label, the way Maestro (with DOT_MATCHES_ALL) reads a selector. */
+export const selector = (text: LadderText): string =>
+	typeof text === 'string' ? escapeSelector(text) : `^${escapeSelector(text.startsWith)}.*`;
+
+const textKey = (text: LadderText): string => JSON.stringify(text);
 
 /**
  * The expectations of `step` that the previous step's screen contradicts. An action step needs at
@@ -282,9 +371,14 @@ const selector = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * it ends only once the app is back.
  */
 export function changeWitness(previous: LadderStep, step: LadderStep): LadderStep {
-	const wasShown = new Set(previous.visible);
-	const wasAbsent = new Set([...(previous.absent ?? []), ...(previous.offScreen ?? [])]);
+	const wasShown = new Set(previous.visible.map(textKey));
+	const wasAbsent = new Set(
+		[...(previous.absent ?? []), ...(previous.offScreen ?? []), ...(previous.hidden ?? [])].map(
+			textKey,
+		),
+	);
 	const order = step.order?.join('\n') !== previous.order?.join('\n') ? step.order : undefined;
+	const placed = step.placed?.join('\n') !== previous.placed?.join('\n') ? step.placed : undefined;
 	const fields = Object.fromEntries(
 		Object.entries(step.fields ?? {}).filter(
 			([name, value]) => previous.fields?.[name] !== value,
@@ -293,12 +387,16 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 	const calls =
 		step.calls && step.calls.join('\n') !== previous.calls?.join('\n') ? step.calls : undefined;
 	return {
-		visible: step.visible.filter((text) => wasAbsent.has(text)),
-		absent: (step.absent ?? []).filter((text) => wasShown.has(text)),
-		...((step.offScreen ?? []).some((text) => wasShown.has(text)) && {
-			offScreen: (step.offScreen ?? []).filter((text) => wasShown.has(text)),
+		visible: step.visible.filter((text) => wasAbsent.has(textKey(text))),
+		absent: (step.absent ?? []).filter((text) => wasShown.has(textKey(text))),
+		...((step.hidden ?? []).some((text) => wasShown.has(textKey(text))) && {
+			hidden: (step.hidden ?? []).filter((text) => wasShown.has(textKey(text))),
+		}),
+		...((step.offScreen ?? []).some((text) => wasShown.has(textKey(text))) && {
+			offScreen: (step.offScreen ?? []).filter((text) => wasShown.has(textKey(text))),
 		}),
 		...(order && { order }),
+		...(placed && { placed }),
 		...(Object.keys(fields).length > 0 && { fields }),
 		...(step.title !== undefined && step.title !== previous.title && { title: step.title }),
 		...(calls && { calls }),
@@ -316,7 +414,9 @@ export const witnessCount = (witness: LadderStep): number =>
 	witness.visible.length +
 	(witness.absent?.length ?? 0) +
 	(witness.offScreen?.length ?? 0) +
+	(witness.hidden?.length ?? 0) +
 	(witness.order ? 1 : 0) +
+	(witness.placed ? 1 : 0) +
 	Object.keys(witness.fields ?? {}).length +
 	(witness.calls ? 1 : 0) +
 	(witness.camera ? 1 : 0) +
@@ -330,7 +430,22 @@ const assertions = (step: LadderStep): unknown[] =>
 		? [{ assertVisible: { text: PERMISSION_PROMPTS[step.prompt] } }]
 		: step.system
 			? [{ assertVisible: { text: SYSTEM_SCREENS[step.system] } }]
-			: [...screenAssertions(step), ...platformAssertions(step)];
+			: [
+					...screenAssertions(step),
+					...platformAssertions(step),
+					...(step.embedded
+						? [
+								{
+									runFlow: {
+										when: { platform: MAESTRO_PLATFORM.android },
+										commands: step.embedded.map((text) => ({
+											assertVisible: selector(text),
+										})),
+									},
+								},
+							]
+						: []),
+				];
 
 const MAESTRO_PLATFORM = { ios: 'iOS', android: 'Android' } as const;
 
@@ -351,15 +466,17 @@ const platformAssertions = (step: LadderStep): unknown[] =>
 
 const screenAssertions = (step: LadderStep): unknown[] => [
 	...step.visible.map((text) => ({ assertVisible: selector(text) })),
-	...[...(step.absent ?? []), ...(step.offScreen ?? [])].map((text) => ({
+	...[...(step.absent ?? []), ...(step.offScreen ?? []), ...(step.hidden ?? [])].map((text) => ({
 		assertNotVisible: selector(text),
 	})),
 	...(step.disabled ?? []).map((text) => ({
 		assertVisible: { text: selector(text), enabled: false },
 	})),
-	...(step.order ?? []).slice(1).map((text, index) => ({
-		assertVisible: { text: selector(text), below: selector(step.order![index]!) },
-	})),
+	...[step.order ?? [], step.placed ?? []].flatMap((texts) =>
+		texts.slice(1).map((text, index) => ({
+			assertVisible: { text: selector(text), below: selector(texts[index]!) },
+		})),
+	),
 	...Object.values(step.fields ?? {}).map((value) => ({ assertVisible: selector(value) })),
 	...(step.title === undefined ? [] : [{ assertVisible: selector(step.title) }]),
 	...(step.calls
@@ -395,11 +512,14 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 	if ('type' in action)
 		return [
 			{ tapOn: selector(action.type.field) },
-			'eraseText',
+			...(action.type.append ? [] : ['eraseText']),
 			{ inputText: action.type.text },
 			...(action.type.keepKeyboard ? [] : ['hideKeyboard']),
 		];
 	if ('submit' in action) return [{ tapOn: selector(action.submit) }, { pressKey: 'Enter' }];
+	if ('erase' in action) return [{ tapOn: selector(action.erase) }, { pressKey: 'Backspace' }];
+	if ('clear' in action) return [{ tapOn: selector(CLEAR_BUTTON_LABEL) }];
+	if ('doubleTap' in action) return [{ doubleTapOn: selector(action.doubleTap) }];
 	if ('choose' in action)
 		return [
 			{ tapOn: selector(action.choose.field) },
@@ -459,6 +579,11 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			{ setDarkMode: action.appearance === 'dark' ? 'enabled' : 'disabled' },
 			{ waitForAnimationToEnd: { timeout: 5000 } },
 		];
+	if ('orientation' in action)
+		return [
+			{ setOrientation: action.orientation === 'portrait' ? 'PORTRAIT' : 'LANDSCAPE_LEFT' },
+			{ waitForAnimationToEnd: { timeout: 5000 } },
+		];
 	if ('back' in action)
 		return action.back === 'gesture'
 			? [EDGE_SWIPE]
@@ -490,8 +615,21 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 				},
 			},
 		];
+	if ('slide' in action)
+		return [
+			{
+				swipe: {
+					from: { text: selector(action.slide.field) },
+					direction: action.slide.to === 'max' ? 'RIGHT' : 'LEFT',
+					duration: 800,
+				},
+			},
+		];
+	if ('longPress' in action) return [{ longPressOn: { text: selector(action.longPress) } }];
 	if ('escape' in action) return ['back'];
 	if ('pressBackdrop' in action) return [{ tapOn: { point: BACKDROP_POINT } }];
+	if ('tapAt' in action)
+		return [{ tapOn: { point: `${action.tapAt.point[0]}%,${action.tapAt.point[1]}%` } }];
 	return [
 		{
 			extendedWaitUntil: {
@@ -504,27 +642,38 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 
 /** The Maestro commands of each step in order: step 0 launches the app, every later step is its action then its checks. */
 export function flowSteps(rung: LadderRung): unknown[][] {
+	// iOS's clearState reinstalls the app and launches it before FrontBoard knows it; the runner installs each rung's app fresh.
+	const cleared = onPlatform('Android', ['clearState']);
+	const options = {
+		...((rung.start || rung.pick) && {
+			arguments: {
+				...(rung.start && { route: rung.start }),
+				...(rung.pick && { pick: JSON.stringify(rung.pick) }),
+			},
+		}),
+		...(rung.permissions && { permissions: rung.permissions }),
+	};
 	const launch =
 		rung.open === 'link'
 			? [
-					{ launchApp: { clearState: true } },
+					cleared,
+					'launchApp',
 					'stopApp',
 					{ openLink: `${PROOF_URL_SCHEME}://app${rung.start ?? '/'}` },
 					// iOS asks before an outside caller opens an app by its URL scheme, until the simulator remembers the answer.
 					onPlatform('iOS', [{ tapOn: { text: 'Open', optional: true } }]),
 				]
 			: [
-					{
-						launchApp: {
-							clearState: true,
-							...(rung.start && { arguments: { route: rung.start } }),
-							...(rung.permissions && { permissions: rung.permissions }),
-						},
-					},
+					cleared,
+					Object.keys(options).length > 0 ? { launchApp: options } : 'launchApp',
 				];
 	// A rung that switches the appearance starts in light, whatever the device was left in.
 	const appearance = rung.steps.some((step) => looksOnly(step.do))
 		? [{ setDarkMode: 'disabled' }]
+		: [];
+	// A rung that turns the phone starts upright, whatever the device was left in.
+	const upright = rung.steps.some((step) => step.do && 'orientation' in step.do)
+		? [{ setOrientation: 'PORTRAIT' }]
 		: [];
 	// The Settings app keeps its place between runs; stopping it makes it open at its root every time.
 	const visitsSettings = rung.steps.some((step) => step.do && 'settings' in step.do);
@@ -541,7 +690,7 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 					]
 				: []),
 			...(index === 0 && rung.location ? [{ setLocation: rung.location }] : []),
-			...(index === 0 ? [...launch, ...appearance] : []),
+			...(index === 0 ? [...launch, ...appearance, ...upright] : []),
 			...(step.do ? actionCommands(step.do, step) : []),
 			...(index > 0
 				? assertions({

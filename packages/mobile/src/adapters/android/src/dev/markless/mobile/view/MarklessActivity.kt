@@ -3,6 +3,7 @@ package dev.markless.mobile.view
 import android.app.Activity
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.Insets
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
@@ -14,6 +15,7 @@ import android.text.style.ForegroundColorSpan
 import android.view.ContextThemeWrapper
 import android.view.MenuItem
 import android.view.MotionEvent
+import android.view.inputmethod.InputMethodManager
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
@@ -24,7 +26,10 @@ import android.widget.FrameLayout
 import dev.markless.mobile.core.AppPayload
 import dev.markless.mobile.core.FOCUS_INTO_VIEW
 import dev.markless.mobile.core.Payload
+import dev.markless.mobile.core.jsonNumber
+import dev.markless.mobile.core.jsonString
 import dev.markless.mobile.style.StyleExport
+import java.io.File
 import kotlin.math.roundToInt
 
 /**
@@ -36,6 +41,36 @@ import kotlin.math.roundToInt
 abstract class MarklessActivity : Activity() {
 	lateinit var host: MarklessHost
 		private set
+
+	/** A touch that starts outside the focused text field takes its focus and keyboard away, as a tap elsewhere does on the web. */
+	// Pointer events reach the runtime before the views, so a press is reported before the click it ends in.
+	override fun dispatchTouchEvent(e: MotionEvent): Boolean {
+		val pressedLong = ::host.isInitialized && host.touch(e)
+		if (e.actionMasked == MotionEvent.ACTION_DOWN && ::host.isInitialized) host.focusedField()?.let { field ->
+			val at = IntArray(2).also { field.getLocationOnScreen(it) }
+			val inside = e.rawX >= at[0] && e.rawX < at[0] + field.width && e.rawY >= at[1] && e.rawY < at[1] + field.height
+			if (!inside) {
+				// The window takes the focus itself: offered to its views first, it would land on the first focusable one, maybe this field.
+				(window.decorView as ViewGroup).apply {
+					isFocusableInTouchMode = true
+					descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
+					requestFocus()
+					descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+				}
+				(getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(field.windowToken, 0)
+			}
+		}
+		// After a long press the lift is not a tap, as in Chrome: the views see the gesture cancelled.
+		if (pressedLong && e.actionMasked == MotionEvent.ACTION_UP) {
+			val cancel = MotionEvent.obtain(e).apply { action = MotionEvent.ACTION_CANCEL }
+			try {
+				return super.dispatchTouchEvent(cancel)
+			} finally {
+				cancel.recycle()
+			}
+		}
+		return super.dispatchTouchEvent(e)
+	}
 
 	abstract fun payloadBytes(): ByteArray
 
@@ -60,10 +95,20 @@ abstract class MarklessActivity : Activity() {
 	override fun onResume() {
 		super.onResume()
 		device.resumed()
+		// Shown again after Back: the app-wide and storage cells a screen above changed reach this one.
+		if (::host.isInitialized) host.apply(host.runtime.resume())
 	}
+
+	/** The file input whose picker is open. */
+	internal var picking: FileInputView? = null
 
 	override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
 		super.onActivityResult(requestCode, resultCode, data)
+		if (requestCode == FileInputView.PICK_REQUEST) {
+			picking?.answered(resultCode, data)
+			picking = null
+			return
+		}
 		device.activityResult(requestCode)
 	}
 
@@ -110,11 +155,11 @@ abstract class MarklessActivity : Activity() {
 		val (route, params) = app.match(path) ?: throw MarklessHostError("$path is not a route of this app")
 		val styles = styleExportBytes()?.let { StyleExport.decodeApp(it) } ?: emptyMap()
 		for (pattern in styles.keys) if (app.routes.none { it.route.pattern == pattern }) throw MarklessHostError("the app style has styles for $pattern, which is not a route of this app")
-		show(MarklessHost(this, route.page, styles[route.route.pattern], params = params, device = device))
+		show(MarklessHost(this, route.page, styles[route.route.pattern], params = params, device = device, search = intent.getStringExtra(SEARCH) ?: ""))
 		title = host.runtime.title() ?: ""
 		host.onTitle = { title = it }
 		host.onNavigate = { entry ->
-			startActivity(screen(AppPayload.path(entry.route, entry.params), if (entry.replace) depth else depth + 1))
+			startActivity(screen(AppPayload.path(entry.route, entry.params), if (entry.replace) depth else depth + 1).putExtra(SEARCH, entry.search))
 			if (entry.replace) finish()
 		}
 		actionBar?.setDisplayHomeAsUpEnabled(depth > 0)
@@ -169,15 +214,34 @@ abstract class MarklessActivity : Activity() {
 		super.onTitleChanged(tinted, color)
 	}
 
-	private fun screen(path: String, depth: Int) = Intent(this, javaClass).putExtra(ROUTE, path).putExtra(DEPTH, depth)
+	private fun screen(path: String, depth: Int) = Intent(this, javaClass).putExtra(ROUTE, path).putExtra(DEPTH, depth).putExtra(LAYOUT_DUMP, layoutDump)
 
-	/** Builds the page from scratch with [params]: one page per payload, so a link names this page's own route. */
-	private fun open(params: Map<String, String>) {
+	/** Launched with the boolean extra [LAYOUT_DUMP]: every shown box is written to markless-layout.json after each layout and journal. */
+	private val layoutDump get() = intent.getBooleanExtra(LAYOUT_DUMP, false)
+
+	/**
+	 * Every shown box in dp from the page's top left ([page]), with the viewport the page is laid out at, written to
+	 * markless-layout.json in the app's external files folder, which adb can read, for a check against the phone's browser.
+	 */
+	private fun writeLayoutDump(page: View) {
+		if (!layoutDump || !::host.isInitialized || !page.isAttachedToWindow) return
+		val style = host.style ?: return
+		val density = resources.displayMetrics.density.toDouble()
+		val nodes = host.shownFrames(page).joinToString(",") { (id, box) -> "[${jsonString(id)},${box.joinToString(",") { jsonNumber(it / density) }}]" }
+		val text = "{\"component\":${jsonString(host.payload.component)},\"viewport\":{\"width\":${jsonNumber(style.viewportWidth)},\"height\":${jsonNumber(style.viewportHeight)}},\"scale\":${jsonNumber(density)},\"assignment\":${host.assignment},\"shown\":${host.shown},\"nodes\":[$nodes]}"
+		val dir = getExternalFilesDir(null) ?: return
+		val partial = File(dir, "markless-layout.json.partial")
+		partial.writeText(text)
+		partial.renameTo(File(dir, "markless-layout.json"))
+	}
+
+	/** Builds the page from scratch with [params] and [search]: one page per payload, so a link names this page's own route. */
+	private fun open(params: Map<String, String>, search: String = "") {
 		if (::host.isInitialized) host.release()
-		show(MarklessHost(this, payloadBytes(), styleExportBytes(), params = params, device = device))
+		show(MarklessHost(this, payloadBytes(), styleExportBytes(), params = params, device = device, search = search))
 		host.onNavigate = { entry ->
 			if (entry.route != host.payload.route?.pattern) throw MarklessHostError("navigate to ${entry.route}; this app holds only ${host.payload.route?.pattern}")
-			open(entry.params)
+			open(entry.params, entry.search)
 		}
 	}
 
@@ -192,16 +256,30 @@ abstract class MarklessActivity : Activity() {
 				else host.root.layout(f.left, f.top, f.right, f.bottom)
 			}
 
+			private val bodyPaint = android.graphics.Paint()
+
+			// body's own background, under the page, where the assignment gives it one.
+			override fun dispatchDraw(canvas: android.graphics.Canvas) {
+				host.bodyBox?.let { (rect, color) ->
+					bodyPaint.color = color
+					canvas.drawRect((paddingLeft + rect.left).toFloat(), (paddingTop + rect.top).toFloat(), (paddingLeft + rect.right).toFloat(), (paddingTop + rect.bottom).toFloat(), bodyPaint)
+				}
+				super.dispatchDraw(canvas)
+			}
+
 			override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
 				val f = host.rootFrame
 				val size = host.pageSize()
 				if (f == null || size == null) return super.onMeasure(widthMeasureSpec, heightMeasureSpec)
 				host.root.measure(MeasureSpec.makeMeasureSpec(f.width(), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(f.height(), MeasureSpec.EXACTLY))
 				setMeasuredDimension(maxOf(size.first, MeasureSpec.getSize(widthMeasureSpec)), size.second)
+				host.stick(page.scrollX, page.scrollY)
 			}
 		}
+		page.setOnScrollChangeListener { _, x, y, _, _ -> host.stick(x, y) }
+		var bars = Insets.NONE
 		page.setOnApplyWindowInsetsListener { v, insets ->
-			val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+			bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
 			val keyboard = insets.getInsets(WindowInsets.Type.ime()).bottom
 			// The keyboard takes the bottom of the screen, as it shrinks a phone browser's viewport; the page ends above it.
 			v.setPadding(bars.left, bars.top, bars.right, if (keyboard > 0) 0 else bars.bottom)
@@ -213,8 +291,27 @@ abstract class MarklessActivity : Activity() {
 		content.addView(host.root, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 		page.addView(content, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 		host.canvasColor?.let(page::setBackgroundColor)
-		host.onCanvas = page::setBackgroundColor
-		setContentView(FrameLayout(this).apply { addView(page, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)) })
+		host.onCanvas = { color ->
+			page.setBackgroundColor(color)
+			content.invalidate()
+		}
+		// With Dragon's plan the page lays out at the area inside the bars before it is measured: at first show and after a rotation.
+		val screen = object : FrameLayout(this) {
+			override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+				host.layOutAt(MeasureSpec.getSize(widthMeasureSpec) - bars.left - bars.right, MeasureSpec.getSize(heightMeasureSpec) - bars.top - bars.bottom)
+				super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+			}
+		}
+		screen.addView(page, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+		setContentView(screen)
+		if (layoutDump) {
+			screen.viewTreeObserver.addOnGlobalLayoutListener { writeLayoutDump(content) }
+			val journaled = host.onJournal
+			host.onJournal = { journal ->
+				journaled?.invoke(journal)
+				content.post { writeLayoutDump(content) }
+			}
+		}
 		if (!firstFrameLogged) logFirstFrame(page)
 		if (warmsScriptEngine) host.warmScriptWhenIdle()
 		if (host.style != null) page.post { android.util.Log.i(MarklessHost.TAG, "frames max gap ${host.frameDeviation()} device px") }
@@ -241,17 +338,14 @@ abstract class MarklessActivity : Activity() {
 
 	fun contentRoot(): View = host.root
 
-	// Pointer events reach the runtime before the views, so a press is reported before the click it ends in.
-	override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-		if (::host.isInitialized) host.touch(event)
-		return super.dispatchTouchEvent(event)
-	}
-
 	companion object {
 		/** The system's own theme, light or dark with the device. */
 		private val APP_THEME = if (Build.VERSION.SDK_INT >= 29) android.R.style.Theme_DeviceDefault_DayNight else android.R.style.Theme_Material_Light
 		const val ROUTE = "route"
+		const val LAYOUT_DUMP = "markless-layout-dump"
 		const val DEPTH = "markless.depth"
+		/** The query an app screen opens with, from the navigation that opened it. */
+		const val SEARCH = "markless.search"
 		/** A deep link's host: `markless-proof://app/<path>`; a test build's device links use another. */
 		const val APP_LINK_HOST = "app"
 	}

@@ -1,0 +1,46 @@
+{
+	"rung": "Y-shop",
+	"server": "app",
+	"name": "Yardstick shop as one app: product list, product detail, pick an option in a sheet, add to cart, back, cart total, change quantity",
+	"steps": [
+		{ "visible": ["New this week", "Refresh", "Desk lamp£48.00", "Copper kettle£64.00"], "title": "Shop" },
+		{
+			"do": { "tap": "Copper kettle£64.00" },
+			"visible": [
+				"Whistles when it is ready. Works on every hob.",
+				"Choose option",
+				"Add to cart"
+			],
+			"disabled": ["Add to cart"],
+			"absent": ["New this week"]
+		},
+		{
+			"do": { "tap": "Choose option" },
+			"visible": ["Choose an option", "1 litre", "2 litres"]
+		},
+		{
+			"do": { "tap": "2 litres" },
+			"visible": ["2 litres", "Add to cart"],
+			"absent": ["Choose an option", "Choose option"]
+		},
+		{
+			"do": { "tap": "Add to cart" },
+			"visible": ["Added to your cart", "1 in cart"]
+		},
+		{
+			"do": { "back": "button" },
+			"visible": ["New this week", "Copper kettle£64.00", "1 in cart"],
+			"absent": ["Added to your cart"]
+		},
+		{
+			"do": { "tap": "Cart" },
+			"visible": ["Copper kettle", "2 litres · £64.00", "£64.00", "Place order"],
+			"absent": ["New this week"]
+		},
+		{
+			"do": { "tap": "One more Copper kettle" },
+			"visible": ["£128.00", "2 in cart"],
+			"absent": ["1 in cart"]
+		}
+	]
+}

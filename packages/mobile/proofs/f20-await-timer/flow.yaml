@@ -1,0 +1,47 @@
+appId: ${APP_ID}
+name: f20-await-timer
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Draft
+- assertVisible: Save
+- assertVisible: Check name
+- assertVisible: Not saved
+- assertVisible: Not checked
+- tapOn: Save
+- assertNotVisible: Not saved
+- assertVisible: Not checked
+- assertNotVisible: Not saved
+- assertNotVisible: Saved
+- assertVisible:
+    text: Save
+    enabled: false
+- extendedWaitUntil:
+    visible: Saved
+    timeout: 17000
+- assertVisible: Saved
+- assertVisible: Saved
+- assertVisible: Save
+- assertVisible: Not checked
+- assertNotVisible: Saving
+- assertNotVisible: Uploading
+- tapOn: Check name
+- assertNotVisible: Not checked
+- assertVisible: Checking
+- assertVisible: Saved
+- assertNotVisible: Not checked
+- assertVisible:
+    text: Check name
+    enabled: false
+- extendedWaitUntil:
+    visible: Name taken
+    timeout: 17000
+- assertNotVisible: Checking
+- assertVisible: Name taken
+- assertVisible: Check name
+- assertNotVisible: Checking
+- assertNotVisible: Name free

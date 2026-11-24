@@ -1,0 +1,54 @@
+appId: ${APP_ID}
+name: j41-async-submit-script
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Check-in
+- assertVisible: Save
+- assertVisible: Nothing saved
+- tapOn: Title
+- eraseText
+- inputText: Pump house
+- hideKeyboard
+- assertVisible: Pump house
+- assertVisible: Nothing saved
+- assertVisible: Pump house
+- tapOn: Save
+- assertNotVisible: Nothing saved
+- assertVisible: Saving
+- assertNotVisible: Nothing saved
+- assertVisible:
+    text: Save
+    enabled: false
+- extendedWaitUntil:
+    visible: "Saved Pump house \\(site\\): 1 notes, 1 tags"
+    timeout: 18000
+- assertNotVisible: Saving
+- assertVisible: "Saved Pump house \\(site\\): 1 notes, 1 tags"
+- assertVisible: Save
+- assertNotVisible: Saving
+- tapOn: Title
+- eraseText
+- inputText: admin
+- hideKeyboard
+- assertVisible: admin
+- assertVisible: "Saved Pump house \\(site\\): 1 notes, 1 tags"
+- assertVisible: admin
+- tapOn: Save
+- assertNotVisible: "Saved Pump house \\(site\\): 1 notes, 1 tags"
+- assertVisible: Saving
+- assertNotVisible: "Saved Pump house \\(site\\): 1 notes, 1 tags"
+- assertVisible:
+    text: Save
+    enabled: false
+- extendedWaitUntil:
+    visible: The title admin is taken
+    timeout: 18000
+- assertNotVisible: Saving
+- assertVisible: The title admin is taken
+- assertVisible: Save
+- assertNotVisible: Saving

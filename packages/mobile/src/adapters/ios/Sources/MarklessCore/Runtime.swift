@@ -5,12 +5,15 @@ public struct NativeAction: Equatable, Sendable {
 	public let event: NativeEventName
 	/// The element acted on; "" for a `timer`.
 	public let host: String
-	/// For `input`: the field's whole text after the edit.
+	/// For `input`: the field's whole text after the edit; for `keydown`, the key; for `paste`, the pasted text; for an animation
+	/// event, the animation's name (its elapsed time in seconds is `time`).
 	public let value: String?
 	/// For `timer`: the journalled timer whose time has come.
 	public let timer: String?
 	/// For an overlay's `dismiss`: why (`escape`; an outside press arrives as `pointerdown`). A sheet's has none.
 	public let reason: String?
+	/// For `activate`: how many presses in a row on the element (a double tap's second is 2); nil reads as 1.
+	public let detail: Int?
 	/// For a touch (`pointerdown`, `pointermove`, `pointerup`, `pointercancel`): the touch, numbered from 1 as a phone browser
 	/// does (default 1); its place in points from the screen's top left (default 0, 0); the milliseconds since the screen
 	/// appeared (default 0).
@@ -18,14 +21,18 @@ public struct NativeAction: Equatable, Sendable {
 	public let x: Double?
 	public let y: Double?
 	public let time: Double?
+	/// For `pick`: the files chosen, each `{ name, size, type, lastModified }`.
+	public let files: [NativePickedFile]?
 
 	public init(
-		event: NativeEventName, host: String, value: String? = nil, reason: String? = nil, pointerId: Double? = nil, x: Double? = nil,
-		y: Double? = nil, time: Double? = nil
+		event: NativeEventName, host: String, value: String? = nil, reason: String? = nil, detail: Int? = nil, pointerId: Double? = nil,
+		x: Double? = nil, y: Double? = nil, time: Double? = nil, files: [NativePickedFile]? = nil
 	) {
 		self.event = event
 		self.host = host
+		self.files = files
 		self.value = value
+		self.detail = detail
 		timer = nil
 		self.reason = reason
 		self.pointerId = pointerId
@@ -38,12 +45,36 @@ public struct NativeAction: Equatable, Sendable {
 		self.event = event
 		host = ""
 		value = nil
+		detail = nil
 		self.timer = timer
 		reason = nil
+		files = nil
 		pointerId = nil
 		x = nil
 		y = nil
 		time = nil
+	}
+}
+
+/// A file a picker chose, as a page's `File` describes it.
+public struct NativePickedFile: Equatable, Sendable {
+	/// The host's own name for the file, which it reads the bytes back by when a request sends it.
+	public let ref: String
+	public let name: String
+	public let size: Double
+	public let type: String
+	public let lastModified: Double
+
+	public init(ref: String, name: String, size: Double, type: String, lastModified: Double) {
+		self.ref = ref
+		self.name = name
+		self.size = size
+		self.type = type
+		self.lastModified = lastModified
+	}
+
+	var value: NativeValue {
+		.object([("ref", .string(ref)), ("name", .string(name)), ("size", .number(size)), ("type", .string(type)), ("lastModified", .number(lastModified))])
 	}
 }
 
@@ -65,6 +96,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case text(node: String, value: String)
 	/// A styled cell's new value: the host moves to the style export's next assignment.
 	case state(cell: String, value: NativeValue)
+	/// A style slot's new value: the host lays the page out again with it through Dragon's plan.
+	case slot(slot: String, value: Double)
 	/// nil removes the attribute; "" is a bare attribute.
 	case attribute(node: String, name: String, value: String?)
 	/// An input's text; never sent to the field whose edit caused it while it already shows that text.
@@ -79,8 +112,9 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case arm(node: String, index: Int?)
 	/// A system sheet's `open` turned truthy (present it) or falsy (dismiss it, unless the platform already has).
 	case sheet(node: String, open: Bool)
-	/// Leave this page for the page at `route`, built from scratch with `params`: pushed, or in this screen's place.
-	case navigate(route: String, params: [NativeRouteParam], replace: Bool)
+	/// Leave this page for the page at `route`, built from scratch with `params` and the query `search` (or ""): pushed, or
+	/// in this screen's place.
+	case navigate(route: String, params: [NativeRouteParam], search: String, replace: Bool)
 	/// The page's title text changed.
 	case title(value: String)
 	/// Run a device call now (on `object` when it names one); with `result`, settle that task cell with what it gives; with
@@ -104,12 +138,16 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case abort(id: Int)
 	/// An element marked `overlay` joined the overlay stack (`open`) or left it; a modal one goes in the top layer.
 	case overlay(node: String, open: Bool, modal: Bool)
+	/// The `keydown` or `paste` handler called `preventDefault()`: the host leaves out what the key or paste does.
+	case preventDefault
 
 	public var json: JSONValue {
 		switch self {
 		case let .text(node, value): return .object([("op", .string("text")), ("node", .string(node)), ("value", .string(value))])
 		case let .state(cell, value):
 			return .object([("op", .string("state")), ("cell", .string(cell)), ("value", value.json)])
+		case let .slot(slot, value):
+			return .object([("op", .string("slot")), ("slot", .string(slot)), ("value", .number(value))])
 		case let .attribute(node, name, value):
 			return .object([("op", .string("attribute")), ("node", .string(node)), ("name", .string(name)), ("value", value.map(JSONValue.string) ?? .null)])
 		case let .property(node, name, value):
@@ -124,8 +162,9 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("arm")), ("node", .string(node)), ("index", index.map { .number(Double($0)) } ?? .null)])
 		case let .sheet(node, open):
 			return .object([("op", .string("sheet")), ("node", .string(node)), ("open", .bool(open))])
-		case let .navigate(route, params, replace):
+		case let .navigate(route, params, search, replace):
 			return .object([("op", .string("navigate")), ("route", .string(route)), ("params", .object(params.map { ($0.name, .string($0.value)) }))]
+				+ (search.isEmpty ? [] : [("search", .string(search))])
 				+ (replace ? [("replace", .bool(true))] : []))
 		case let .title(value): return .object([("op", .string("title")), ("value", .string(value))])
 		case let .call(call, object, arguments, result, resume):
@@ -149,6 +188,7 @@ public enum NativeJournalEntry: Equatable, Sendable {
 		case let .abort(id): return .object([("op", .string("abort")), ("id", .number(Double(id)))])
 		case let .overlay(node, open, modal):
 			return .object([("op", .string("overlay")), ("node", .string(node)), ("open", .bool(open)), ("modal", .bool(modal))])
+		case .preventDefault: return .object([("op", .string("preventDefault"))])
 		}
 	}
 }
@@ -176,6 +216,8 @@ public struct NativeScope: Sendable {
 	public var items: [String: NativeValue] = [:]
 	/// The row keys by `repeat` id, where a row's own state is read.
 	public var keys: [String: String] = [:]
+	/// Each row's position in its list by `repeat` id, from 0: what a `@for`'s `index` reads.
+	public var positions: [String: Int] = [:]
 	public var locals: [String: NativeValue] = [:]
 	public static let empty = NativeScope()
 }
@@ -211,20 +253,53 @@ nonisolated(unsafe) private var screenCount = 0
 /// The payload's state and op interpreter, matching `packages/mobile/src/runtime.ts` exactly.
 public final class NativeRuntime {
 	public let payload: NativeViewPayload
-	private var values: [String: NativeValue]
+	// Each write moves `version`, so a script computed is run again only once a cell may have changed.
+	private var values: [String: NativeValue] { didSet { version &+= 1 } }
+	/// Each style slot's last value, kept while its style case hides its text.
+	private var keptSlots: [String: Double] = [:]
+	/// Cells still `undefined` on the web: a script reads them so until one is written.
+	private var unset: Set<String> = []
+	/// Each following cell's last value of what it follows: the write runs again only when that value changes, as on the web.
+	private var followed: [String: NativeValue] = [:]
+	private var version = 0
+	private var computed: [String: NativeValue] = [:]
+	private var computedAt = -1
 	private let store: NativeStore
 	private let storageKeys: [String: String]
+	private let session: NativeAppSession
 	private let handlers: [String: [NativeOp]]
 	private let continuations: [String: NativeContinuation]
 	private let nodesById: [String: NativeNode]
 	private let params: [NativeRouteParam]
+	private let search: String
 	/// Row state's list by cell id: its values are kept as `<cell>@<key>`.
 	private let rowOfCell: [String: String]
 	private var eventValue: String?
+	/// In an `input` dispatch: the field's text, which it already shows.
+	private var edit: String?
 	/// What a dismiss or pointer event carries while its handlers run.
 	private var eventFields: [NativeEventField: NativeValue]?
+	/// A click handler called stopPropagation(): the press goes no further out.
+	private var propagationStopped = false
+	/// The arms on screen when the running action began; nil between actions, when what shows is what the cells say.
+	private var drawnArms: [String: Int?]?
+	/// A text field's key or paste event: the field's text then, a script handler's `event.target.value`.
+	private var targetText: String?
 	/// What a touch adds to a script pointer handler's event, in the order the reference writes them.
-	private let touchFields: [NativeEventField] = [.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp]
+	private let touchFields: [NativeEventField] = [.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp, .shiftKey, .ctrlKey, .altKey, .metaKey, .isTrusted, .detail, .key]
+	/// Where the last touch came up, which the click it makes reports; a click no touch made is at 0, 0.
+	private var tapPoint: (x: Double, y: Double)?
+	/// The element a phone browser's mouse is over: the last one tapped, until a tap elsewhere moves it.
+	private var mouseOver: String?
+
+	private func clickFields(trusted: Bool) -> [NativeEventField: NativeValue] {
+		let at = trusted ? tapPoint : nil
+		tapPoint = nil
+		return [
+			.isTrusted: .bool(trusted), .clientX: .number(at?.x ?? 0), .clientY: .number(at?.y ?? 0),
+			.shiftKey: .bool(false), .ctrlKey: .bool(false), .altKey: .bool(false), .metaKey: .bool(false), .detail: .number(0),
+		]
+	}
 	/// The element that has focus, or nil.
 	public private(set) var focused: String?
 	/// The overlay stack, topmost last, and the focus each overlay found when it joined, as the web's overlay behaviour keeps them.
@@ -233,10 +308,13 @@ public final class NativeRuntime {
 	/// Each touch that is down, by pointer id.
 	private var touches: [Double: TouchState] = [:]
 	private var overlayNodes: [NativeNode] = []
+	private let firstOfCell: [String: NativeExpr]
 	private let forms: [String: NativeForm]
 	/// A field's text a person typed since its `value` binding last changed it.
 	private var edited: [String: String] = [:]
 	private var running: [String: [Submission]] = [:]
+	/// Submissions held by a script promise not settled yet, by the engine's run number.
+	private var scriptRuns: [Int: Submission] = [:]
 	private var timers: [String: (ops: [NativeOp], context: Context)] = [:]
 	private var timerCount = 0
 	/// Every non-row checkbox and radio button, in payload order.
@@ -253,10 +331,22 @@ public final class NativeRuntime {
 	private var chosenNow: String?
 	private let missing: NativeValueMissing?
 	private let tooLong: NativeTooLong?
+	private let numberMessages: NativeNumberMessages?
+	private let emailMismatch: NativeEmailMismatch?
 	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
 	public private(set) var dialogs: [String: Bool]
+	/// Dialogs that closed during the current change, in order; each fires its `close` once the change's handler ends.
+	private var closing: [String] = []
 	/// Where a page with a script gets its engine; asked only when a script op runs or a script computed is read.
 	private let scriptHost: NativeScriptHost?
+	/// The screen's views: the box of an element (its node id, `<node>@<key>` in a row) a script reads, measured as an
+	/// entry begins; nil when it has no view.
+	public var measure: ((String) -> NativeElementBox?)?
+	/// The device's answers to the media features a script's `matchMedia` reads (`prefers-reduced-motion`, `prefers-color-scheme`),
+	/// read as each entry begins; the web's defaults when the host gives none.
+	public var media: () -> [(String, String)] = { [("prefers-reduced-motion", "no-preference"), ("prefers-color-scheme", "light")] }
+	/// The screen's device pixels per CSS px, which a script's `devicePixelRatio` reads as each entry begins.
+	public var devicePixelRatio: () -> Double = { 1 }
 
 	/// The device's clock, in milliseconds since 1970 (UTC).
 	private let now: () -> Double
@@ -268,15 +358,24 @@ public final class NativeRuntime {
 	private var asyncSent: String?
 	/// Async values a `reset` asked to run again, by slot, in order: sent with the next `tasks` entry.
 	private var retry: [String] = []
+	/// Why a first value taken when the screen opened failed; every later read fails with it, as the web's render does.
+	private var seedFailure: Error?
+	/// Seeded cells whose arm is hidden: their seed runs again when the arm shows, as its component renders then.
+	private var reseed = Set<String>()
 
-	/// `params`: the route params the page opened with; `now`: the clock (a conformance run fixes it).
-	/// `preferredLanguages`: the device's, most preferred first; the web's messages are shown in the first one the payload has.
+	/// `params`: the route params the page opened with; `search`: the query it opened with, or ""; `now`: the clock (a
+	/// conformance run fixes it). `preferredLanguages`: the device's, most preferred first; the web's messages are shown in
+	/// the first one the payload has.
 	public init(
-		payload: NativeViewPayload, store: NativeStore = MemoryStore(), params: [NativeRouteParam] = [], preferredLanguages: [String] = ["en"],
-		now: @escaping () -> Double = { (Date().timeIntervalSince1970 * 1000).rounded(.down) }, scriptHost: NativeScriptHost? = nil
+		payload: NativeViewPayload, store: NativeStore = MemoryStore(), params: [NativeRouteParam] = [], search: String = "",
+		preferredLanguages: [String] = ["en"],
+		now: @escaping () -> Double = { (Date().timeIntervalSince1970 * 1000).rounded(.down) }, scriptHost: NativeScriptHost? = nil,
+		session: NativeAppSession = .shared
 	) {
+		self.session = session
 		self.payload = payload
 		self.params = params
+		self.search = search
 		self.store = store
 		self.now = now
 		self.scriptHost = scriptHost
@@ -285,9 +384,10 @@ public final class NativeRuntime {
 		asyncCells = payload.cells.filter { $0.async != nil }
 		let opened = now()
 		values = Dictionary(uniqueKeysWithValues: payload.cells.map { cell in
-			(cell.id, cell.clock ? .number(opened) : cell.storageKey.flatMap(store.read) ?? cell.initial)
+			(cell.id, cell.clock ? .number(opened) : (cell.app ? session.values[cell.id] : nil) ?? cell.storageKey.flatMap(store.read) ?? cell.initial)
 		})
 		storageKeys = Dictionary(uniqueKeysWithValues: payload.cells.compactMap { cell in cell.storageKey.map { (cell.id, $0) } })
+		unset = Set(payload.cells.filter { $0.unset && $0.storageKey.flatMap(store.read) == nil && !($0.app && session.values[$0.id] != nil) }.map(\.id))
 		handlers = Dictionary(uniqueKeysWithValues: payload.handlers.map { ($0.id, $0.ops) })
 		var continuations: [String: NativeContinuation] = [:]
 		func collect(_ ops: [NativeOp]) {
@@ -299,6 +399,7 @@ public final class NativeRuntime {
 		for handler in payload.handlers { collect(handler.ops) }
 		self.continuations = continuations
 		rowOfCell = Dictionary(uniqueKeysWithValues: payload.cells.compactMap { cell in cell.row.map { (cell.id, $0) } })
+		firstOfCell = Dictionary(uniqueKeysWithValues: payload.cells.compactMap { cell in cell.first.map { (cell.id, $0) } })
 		nodesById = Dictionary(uniqueKeysWithValues: payload.nodes.map { ($0.id, $0) })
 		forms = Dictionary(payload.forms.map { ($0.node, $0) }, uniquingKeysWith: { first, _ in first })
 		ticked = payload.nodes.filter { node in
@@ -313,10 +414,23 @@ public final class NativeRuntime {
 		missing = payload.valueMissing.first { $0.locale == locale }?.messages
 		let tooLongLocale = nativeLocale(preferredLanguages, payload.tooLong.map(\.locale))
 		tooLong = payload.tooLong.first { $0.locale == tooLongLocale }?.message
+		let numberLocale = nativeLocale(preferredLanguages, payload.numberMessages.map(\.locale))
+		numberMessages = payload.numberMessages.first { $0.locale == numberLocale }?.messages
+		let mismatchLocale = nativeLocale(preferredLanguages, payload.typeMismatch.map(\.locale))
+		emailMismatch = payload.typeMismatch.first { $0.locale == mismatchLocale }?.message
 		dialogs = Dictionary(uniqueKeysWithValues: payload.nodes.compactMap { node in
 			if case let .element(element, _, _) = node.kind, element == "dialog" { return (node.id, false) }
 			return nil
 		})
+		// A first value the build could not know is taken when the screen opens, in cell order, as the body runs once on the web.
+		do {
+			for cell in payload.cells {
+				guard let seed = cell.seed else { continue }
+				if try isShown(cell.arm) { values[cell.id] = try evaluate(seed) } else { reseed.insert(cell.id) }
+			}
+		} catch {
+			seedFailure = error
+		}
 		for node in ticked {
 			guard case let .element(_, attributes, _) = node.kind else { continue }
 			checkedness[node.id] = (try? checkedBinding(node.id)) ?? (attributes["checked"] != nil)
@@ -325,8 +439,13 @@ public final class NativeRuntime {
 			guard node.row == nil, case let .element(_, attributes, bindings) = node.kind else { return false }
 			return attributes[OverlayProtocol.attribute] != nil && bindings.contains { !$0.isProperty && $0.name == "hidden" }
 		}
+		// Rows take their first values, and following cells theirs, before anything reads them. Shown at mount: the
+		// document's focus is the body.
+		try? seedRows()
+		try? follow()
+		// A box's `checked` binding reads cells only now settled (a group's value following its prop): it sets the box again.
+		for node in ticked { if let bound = try? checkedBinding(node.id) { checkedness[node.id] = bound } }
 		try? settleSelects()
-		// Shown at mount: the document's focus is the body.
 		if let shown = try? shownOverlays() {
 			stack = shown
 			for overlay in shown { origins[overlay] = nativeDocumentBody }
@@ -349,28 +468,29 @@ public final class NativeRuntime {
 		return false
 	}
 
-	private func keyedAttributes() throws -> [String: String?] {
-		Dictionary(try attributes().map { ("\($0.node)\u{0}\($0.name)", $0.value) }, uniquingKeysWith: { $1 })
+	private func shownOverlays() throws -> [String] {
+		try overlayNodes.filter { node in try !instances(of: node).isEmpty && attributeNow(node.id, "hidden") == nil }.map(\.id)
 	}
 
-	private func shownOverlays() throws -> [String] {
-		let now = try keyedAttributes()
-		return try overlayNodes.filter { node in try !instances(of: node).isEmpty && now["\(node.id)\u{0}hidden"] == .some(nil) }.map(\.id)
+	/// A hint (a tooltip, a hovercard) carries `overlay-hint` beside `overlay`, as authored.
+	private func isHint(_ overlay: String) -> Bool {
+		guard case let .element(_, attributes, _) = nodesById[overlay]?.kind else { return false }
+		return attributes[OverlayProtocol.hintAttribute] != nil
 	}
 
 	/// An overlay is modal when it or an element inside it has `aria-modal="true"`, bound or else static.
-	private func isModal(_ overlay: String, _ now: [String: String?]) -> Bool {
-		payload.nodes.contains { node in
+	private func isModal(_ overlay: String) throws -> Bool {
+		try payload.nodes.contains { node in
 			guard case let .element(_, attributes, _) = node.kind, contains(overlay, node.id) else { return false }
-			let value = now["\(node.id)\u{0}\(OverlayProtocol.modalAttribute)"] ?? attributes[OverlayProtocol.modalAttribute]
+			// A row's copies are keyed by row, so a row element is read as it was built.
+			let value = node.row != nil ? attributes[OverlayProtocol.modalAttribute] : try attributeNow(node.id, OverlayProtocol.modalAttribute)
 			return value == OverlayProtocol.modalValue
 		}
 	}
 
 	/// The overlay stack, topmost last, with whether each is modal.
 	public func overlays() throws -> [(node: String, modal: Bool)] {
-		let now = try keyedAttributes()
-		return stack.map { ($0, isModal($0, now)) }
+		try stack.map { ($0, try isModal($0)) }
 	}
 
 	/// Where a cell's value is kept: its id, or `<id>@<key>` for a row's own state, read in that row.
@@ -380,16 +500,70 @@ public final class NativeRuntime {
 		return "\(cell)@\(key)"
 	}
 
-	/// A row's state reads its first value until the row writes it.
+	/// A row's state reads its first value until the row writes it; one taken from the row's item is seeded before any change
+	/// (`seedRows`), so until the first change it reads the item as the row was built.
 	private func read(_ cell: String, in scope: NativeScope = .empty) throws -> NativeValue {
+		if let seedFailure { throw seedFailure }
 		guard let value = values[cell] else { throw RuntimeError(reason: "unknown cell \(cell)") }
-		return values[try slot(of: cell, in: scope)] ?? value
+		if let seeded = values[try slot(of: cell, in: scope)] { return seeded }
+		if let first = firstOfCell[cell] { return try evaluate(first, in: scope) }
+		return value
+	}
+
+	/// For each row's state that has `rebuiltBy`, by slot (`<cell>@<key>`): those values now, as JSON.
+	private func rowSignatures() throws -> [String: String] {
+		var signatures: [String: String] = [:]
+		for cell in payload.cells {
+			guard let row = cell.row, let rebuiltBy = cell.rebuiltBy, let list = nodesById[row], try isShown(list.arm) else { continue }
+			for (key, item) in try rows(of: row) {
+				let scope = NativeScope(items: [row: item], keys: [row: key])
+				signatures["\(cell.id)@\(key)"] = try rebuiltBy.map { try evaluate($0, in: scope).jsonText }.joined(separator: ",")
+			}
+		}
+		return signatures
+	}
+
+	/// As on the web, a part a row passes a changed value to is built again: that row's state starts over.
+	private func resetChangedRows(_ before: [String: String]) throws {
+		for (slot, now) in try rowSignatures() where before[slot].map({ $0 != now }) ?? false { values.removeValue(forKey: slot) }
+	}
+
+	/// A row's state with a `first` takes it once, from the row's item, when the row is built.
+	private func follow() throws {
+		for _ in 0...payload.cells.count {
+			var moved = false
+			for cell in payload.cells {
+				guard let follows = cell.follows else { continue }
+				let now = try evaluate(follows)
+				if followed[cell.id] == now { continue }
+				followed[cell.id] = now
+				if (values[cell.id] ?? .null) == now { continue }
+				values[cell.id] = now
+				unset.remove(cell.id)
+				moved = true
+			}
+			if !moved { return }
+		}
+		throw RuntimeError(reason: "following cells kept changing each other")
+	}
+
+	private func seedRows() throws {
+		for cell in payload.cells {
+			guard let row = cell.row, let first = cell.first, let list = nodesById[row], try isShown(list.arm) else { continue }
+			for (key, item) in try rows(of: row) where values["\(cell.id)@\(key)"] == nil {
+				values["\(cell.id)@\(key)"] = try evaluate(first, in: NativeScope(items: [row: item], keys: [row: key]))
+			}
+		}
 	}
 
 	/// The current value of a cell.
-	public func value(of cell: String) throws -> NativeValue { try read(cell) }
+	public func value(of cell: String) throws -> NativeValue {
+		if let styleCase = payload.styleCases.first(where: { $0.id == cell }) { return .bool(try evaluate(styleCase.value).isTruthy) }
+		return try read(cell)
+	}
 
 	public func evaluate(_ expr: NativeExpr, in scope: NativeScope = .empty) throws -> NativeValue {
+		if let seedFailure { throw seedFailure }
 		let evaluate = { (inner: NativeExpr) throws -> NativeValue in try self.evaluate(inner, in: scope) }
 		switch expr {
 		case let .cell(cell): return try read(cell, in: scope)
@@ -397,6 +571,9 @@ public final class NativeRuntime {
 		case let .item(repeatId):
 			guard let item = scope.items[repeatId] else { throw RuntimeError(reason: "the row item of \(repeatId) read outside its row") }
 			return item
+		case let .index(repeatId):
+			guard let position = scope.positions[repeatId] else { throw RuntimeError(reason: "the row index of \(repeatId) read outside its row") }
+			return .number(Double(position))
 		case let .local(name):
 			guard let value = scope.locals[name] else { throw RuntimeError(reason: "the parameter \(name) read outside its function") }
 			return value
@@ -410,6 +587,15 @@ public final class NativeRuntime {
 			}
 			return .array(values)
 		case let .object(fields): return .object(try fields.map { (key: $0.key, value: try evaluate($0.value)) })
+		case let .merge(parts):
+			var fields: [(key: String, value: NativeValue)] = []
+			for part in parts {
+				let value = try evaluate(part)
+				if case .null = value { continue }
+				guard case let .object(object) = value else { throw RuntimeError(reason: "a spread of a value that is not an object") }
+				fields += object.fields
+			}
+			return .object(fields)
 		case .lambda: throw RuntimeError(reason: "a function value outside a method call")
 		case let .method(method, target, arguments):
 			let targetValue = try evaluate(target)
@@ -423,8 +609,10 @@ public final class NativeRuntime {
 			}
 			return try callMethod(method, on: targetValue, args)
 		case .routeParams: return .object(params.map { (key: $0.name, value: .string($0.value)) })
+		case .routeURL: return try pageURL()
 		case let .checked(node): return .bool(try isChecked(node))
-		case let .formData(form): return .array(try entries(of: form).map { .array($0.map(NativeValue.string)) })
+		case let .field(node): return .string(try textOf(field: node))
+		case let .formData(form): return .array(try formEntries(of: form).map { .array([.string($0.name), $0.value]) })
 		case .event(.value):
 			guard let eventValue else { throw RuntimeError(reason: "the event's value read where the event has none") }
 			return .string(eventValue)
@@ -438,6 +626,21 @@ public final class NativeRuntime {
 		case let .isElement(inner):
 			guard case let .string(id) = try evaluate(inner) else { return .bool(false) }
 			return .bool(isElement(id))
+		case let .shown(id):
+			guard let node = nodesById[id] else { return .bool(false) }
+			return .bool(try !instances(of: node).isEmpty)
+		case let .byId(inner):
+			let wanted = try evaluate(inner)
+			if case .null = wanted { return .null }
+			return try elementById(textOf(wanted)).map(NativeValue.string) ?? .null
+		case let .drawn(node):
+			let chosen = try drawnArms ?? Dictionary(uniqueKeysWithValues: arms().map { ($0.node, $0.index) })
+			var at = nodesById[node]?.arm
+			while let place = at {
+				guard let shown = chosen[place.branch], shown == place.index else { return .null }
+				at = nodesById[place.branch]?.arm
+			}
+			return .string(node)
 		case let .contains(within, node):
 			let outer = try evaluate(within)
 			let inner = try evaluate(node)
@@ -472,6 +675,9 @@ public final class NativeRuntime {
 				case let .expr(inner): return try evaluate(inner).text
 				}
 			}.joined())
+		case let .optionalMember(inner, property):
+			if case .null = try evaluate(inner) { return .null }
+			return try evaluate(.member(inner, property))
 		case let .member(inner, property):
 			let value = try evaluate(inner)
 			switch value {
@@ -490,11 +696,22 @@ public final class NativeRuntime {
 			guard case let .number(at) = try evaluate(index), at >= 0, at.rounded() == at, at < Double(array.items.count) else { return .null }
 			return array.items[Int(at)]
 		case let .script(fn, bindings):
-			let frame = try frame(of: bindings, in: scope)
-			return try scriptHost.unwrap().entry {
-				let text = try callScript("enter", .object([("kind", .string("compute")), ("fn", .string(fn)), ("frame", frame)] + entryCells()))
-				return NativeValue(json: try JSONValue.parse(Data(text.utf8)))
+			// As on the web, a computed is not run again while nothing it reads has changed.
+			if computedAt != version {
+				computed = [:]
+				computedAt = version
 			}
+			let frame = try frame(of: bindings, in: scope)
+			let elements = try elementFacts(frame)
+			let key = JSONValue.array([.string(fn), frame, elements]).jsonText
+			if let known = computed[key] { return known }
+			let value = try scriptHost.unwrap().entry {
+				let text = try callScript("enter", .object([("kind", .string("compute")), ("fn", .string(fn)), ("frame", frame), ("elements", elements)] + entryCells()))
+				let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "compute").object(["json", "nonFinite"])
+				return try NativeValue.nonFiniteJoin(result["json"].value, result["nonFinite"].value)
+			}
+			computed[key] = value
+			return value
 		}
 	}
 
@@ -514,40 +731,155 @@ public final class NativeRuntime {
 			case let .fields(fields):
 				return (binding.name, .object([("fields", .object(try fields.map { ($0.name, .string(try slot(of: $0.cell, in: scope))) }))]))
 			case let .value(expr): return (binding.name, .object([("value", try evaluate(expr, in: scope).json)]))
+			case let .device(device, object): return (binding.name, .object([("device", .string(device)), ("object", .string(object))]))
+			case let .callback(fn): return (binding.name, .object([("callback", .string(fn))]))
+			case let .elements(expr): return (binding.name, .object([("elements", try evaluate(expr, in: scope).json)]))
+			case let .object(members): return (binding.name, .object([("object", try frame(of: members, in: scope))]))
+			case let .shared(members): return (binding.name, .object([("shared", try frame(of: members, in: scope))]))
+			case let .method(fn, members): return (binding.name, .object([("method", .string(fn)), ("frame", try frame(of: members, in: scope))]))
+			case .url: return (binding.name, .object([("url", try pageURL().json)]))
 			}
 		})
 	}
 
-	/// Every current value by slot (the page's cells in payload order, then row slots), and a seed when `crypto` is used.
+	/// What the host tells a script about the elements its frame passes as proxies: each one's attributes now and the
+	/// elements it is inside, nearest first.
+	private func elementFacts(_ frame: JSONValue, also: [String] = []) throws -> JSONValue {
+		var facts: [(String, JSONValue)] = []
+		var seen = Set<String>()
+		func add(_ value: JSONValue) throws {
+			guard case let .string(id) = value, !seen.contains(id), isElement(id), id != nativeDocumentBody else { return }
+			seen.insert(id)
+			let key = id.firstIndex(of: "@").map { String(id[$0...]) } ?? ""
+			let found = try element(nodeOf(id))
+			var names: [String] = []
+			for name in found.attributes.keys.sorted() + found.bindings.filter({ !$0.isProperty }).map(\.name) where !names.contains(name) { names.append(name) }
+			var attributes: [(String, JSONValue)] = []
+			let at = try instances(of: found.node).first { $0.id == id }?.scope ?? .empty
+			for name in names { if let value = try attribute(of: found.node, name, in: at) { attributes.append((name, .string(value))) } }
+			var ancestors: [JSONValue] = []
+			var up = found.node.parent
+			while let parent = up {
+				ancestors.append(.string(!key.isEmpty && nodesById[parent]?.row != nil ? parent + key : parent))
+				up = nodesById[parent]?.parent
+			}
+			let captures = touches.filter { $0.value.capture == id }.keys.sorted().map { JSONValue.number($0) }
+			var fact: [(String, JSONValue)] = [("attributes", .object(attributes)), ("ancestors", .array(ancestors))] + (captures.isEmpty ? [] : [("captures", .array(captures))])
+			if let box = measure?(id) {
+				fact.append(("box", .object([("x", .number(box.x)), ("y", .number(box.y)), ("width", .number(box.width)), ("height", .number(box.height))])))
+				fact.append(("direction", .string(box.rightToLeft ? "rtl" : "ltr")))
+			}
+			facts.append((id, .object(fact)))
+		}
+		func visit(_ frame: JSONValue) throws {
+			guard case let .object(names) = frame else { return }
+			for (_, binding) in names {
+				guard case let .object(fields) = binding else { continue }
+				for (key, inner) in fields where key == "object" || key == "shared" || key == "frame" { try visit(inner) }
+				// A submitted form's file inputs: its JavaScript reads the files each holds.
+				if case let .array(entries)? = fields.first(where: { $0.0 == "value" })?.1 {
+					for case let .array(pair) in entries where pair.count == 2 {
+						if case let .object(file) = pair[1], let node = file.first(where: { $0.0 == "files" })?.1 { try add(node) }
+					}
+				}
+				guard let given = fields.first(where: { $0.0 == "elements" })?.1 else { continue }
+				if case let .array(items) = given { for item in items { try add(item) } } else { try add(given) }
+			}
+		}
+		try visit(frame)
+		for id in also { try add(.string(id)) }
+		return .object(facts)
+	}
+
+	/// The page's address as its `url` prop reads it: the route pattern with its params, the query it opened with, no hash.
+	private func pageURL() throws -> NativeValue {
+		guard let route = payload.route else { throw RuntimeError(reason: "the url read on a component that is not a page") }
+		return .object([
+			(key: "pathname", value: .string(try NativeAppPayload.path(route.pattern, params))), (key: "search", value: .string(search)),
+			(key: "hash", value: .string("")),
+		])
+	}
+
+	/// Every current value by slot (the page's cells in payload order, then row slots), a seed when `crypto` is used, the
+	/// route params when `navigate` is, and the device's media answers when `media` is.
 	private func entryCells() -> [(String, JSONValue)] {
 		let ids = Set(payload.cells.map(\.id))
-		let cells = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0.json) } }
-			+ values.keys.filter { !ids.contains($0) }.sorted().map { ($0, values[$0]!.json) }
+		let slots = payload.cells.compactMap { cell in values[cell.id].map { (cell.id, $0) } }
+			+ values.keys.filter { !ids.contains($0) }.sorted().map { ($0, values[$0]!) }
+		// JSON writes Infinity and NaN as null: the entry lists where they were, each path starting with its slot.
+		let split = NativeValue.object(slots.map { (key: $0.0, value: $0.1) }).nonFiniteSplit
 		let crypto = payload.script?.services.contains(.crypto) == true
-		return [("cells", .object(cells))] + (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
+		let navigate = payload.script?.services.contains(.navigate) == true
+		let media = payload.script?.services.contains(.media) == true
+		let screen = payload.script?.services.contains(.screen) == true
+		let nonFinite: [(String, JSONValue)] = if case let .array(found) = split.nonFinite, !found.isEmpty { [("nonFinite", split.nonFinite)] } else { [] }
+		return [("cells", split.json)] + nonFinite
+			+ (unset.isEmpty ? [] : [("unset", .array(unset.sorted().map { .string($0) }))])
+			+ (crypto ? [("seed", .string(scriptHost?.seed() ?? ""))] : [])
+			+ (navigate ? [("params", .object(params.map { ($0.name, .string($0.value)) }))] : [])
+			+ (media ? [("media", .object(self.media().map { ($0.0, .string($0.1)) }))] : [])
+			+ (screen ? [("screen", .object([("devicePixelRatio", .number(devicePixelRatio()))]))] : [])
 	}
 
 	/// One engine entry, then what it asked for: its writes land in cells; clears, timers and requests become entries.
-	private func enter(_ entry: [(String, JSONValue)]) throws -> [NativeJournalEntry] {
+	/// A pointer run that is the document's, not an element handler's.
+	private static let documentRun = "\u{0}document:"
+
+	/// A pointer event bubbled to the document's listeners: its plain fields, and the elements it names as proxies.
+	private func document(_ type: String, _ fields: [NativeEventField: NativeValue]) throws -> [NativeJournalEntry] {
+		var event: [(String, JSONValue)] = [("type", .string(type))]
+		for field in [NativeEventField.button, .buttons, .clientX, .clientY, .pointerId, .pointerType, .isPrimary, .timeStamp] {
+			if let value = fields[field] { event.append((field.rawValue, value.json)) }
+		}
+		var target: String?
+		if case let .string(node)? = fields[.target] { target = node }
+		var related: JSONValue = .null
+		if case let .string(node)? = fields[.relatedTarget] { related = .string(node) }
+		event.append(("nodes", .object([("target", target.map(JSONValue.string) ?? .null), ("currentTarget", .null), ("relatedTarget", related)])))
+		let watched = documentElements.sorted() + (target.map { [$0] } ?? [])
+		return try enter([("kind", .string("document")), ("event", .object(event)), ("elements", try elementFacts(.object([]), also: watched))])
+	}
+
+	private func enter(_ entry: [(String, JSONValue)], submission: Submission? = nil) throws -> [NativeJournalEntry] {
+		// A handler may read the focused element; a computed, which renders, never does, so only entries carry it.
+		var focus: [(String, JSONValue)] = []
+		if let focused, focused != nativeDocumentBody {
+			focus = [("focused", .string(focused)), ("focusElements", try elementFacts(.object([]), also: [focused]))]
+		}
 		let text = try scriptHost.unwrap().entry { () throws -> String in
-			_ = try callScript("enter", .object(entry + entryCells()))
+			_ = try callScript("enter", .object(entry + [("screen", .number(Double(screen)))] + focus + entryCells()))
 			return try callScript("leave")
 		}
-		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave").object(["writes", "aborts", "timers", "clears", "requests", "logs"])
+		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "leave")
+			.object(required: ["writes", "aborts", "timers", "clears", "requests", "logs", "pending", "settled"], optional: ["calls", "commands", "navigate", "prevented", "stopped", "raises", "value", "listening", "watch"])
 		for write in try result["writes"].array() {
 			let pair = try write.array()
-			guard pair.count == 2 else { throw write.fail("a write is [slot, value]") }
+			guard pair.count == 2 || pair.count == 3 else { throw write.fail("a write is [slot, value] or [slot, value, nonFinite]") }
 			let slot = try pair[0].string()
 			let cell = slot.firstIndex(of: "@").map { String(slot[..<$0]) } ?? slot
 			guard values[cell] != nil, payload.cells.contains(where: { $0.id == cell }) else { throw RuntimeError(reason: "the script wrote unknown cell \(cell)") }
-			let value = NativeValue(json: pair[1].value)
+			let value = try NativeValue.nonFiniteJoin(pair[1].value, pair.count == 3 ? pair[2].value : nil)
 			values[slot] = value
+			unset.remove(slot)
 			if let key = storageKeys[cell] { store.write(key, value) }
 		}
+		if result.has("listening") { documentListening = Set(try result["listening"].array().map { try $0.string() }) }
+		if result.has("watch") { for id in try result["watch"].array() { documentElements.insert(try id.string()) } }
 		for line in try result["logs"].array() {
 			let pair = try line.array()
 			guard pair.count == 2 else { throw line.fail("a log line is [level, text]") }
 			scriptHost?.log(try pair[0].string(), try pair[1].string())
+		}
+		// A submit handler's promise keeps its submission running until the entry it settles in, as the web keeps the form busy.
+		for run in try result["pending"].array() {
+			guard let submission else { continue }
+			submission.pending += 1
+			scriptRuns[try wholeNumber(run)] = submission
+		}
+		for run in try result["settled"].array() {
+			guard let kept = scriptRuns.removeValue(forKey: try wholeNumber(run)) else { continue }
+			kept.pending -= 1
+			settle(kept)
 		}
 		let aborts = try result["aborts"].array().map { NativeJournalEntry.abort(id: try wholeNumber($0)) }
 		let clears = try result["clears"].array().map { NativeJournalEntry.clearTimer(timer: "\(scriptTimer)\(try wholeNumber($0))") }
@@ -561,9 +893,132 @@ public final class NativeRuntime {
 			let asked = try fields["request"].object(["url", "method", "headers", "body"])
 			return .fetch(id: try wholeNumber(fields["id"]), request: NativeFetchRequest(
 				url: try asked["url"].string(), method: try asked["method"].string(), headers: try decodeHeaders(asked["headers"]),
-				body: try asked["body"].optionalString()))
+				body: try NativeFetchBody.decode(asked["body"].value)))
 		}
-		return aborts + clears + timers + requests
+		let calls = try (result.has("calls") ? result["calls"].array() : []).map { asked -> NativeJournalEntry in
+			let fields = try asked.object(required: ["call", "arguments"], optional: ["id", "object"])
+			return .call(
+				call: try fields["call"].string(), object: fields.has("object") ? try fields["object"].string() : nil,
+				arguments: try fields["arguments"].array().map { NativeValue(json: $0.value) }, result: nil,
+				resume: fields.has("id") ? "\(scriptCall)\(try wholeNumber(fields["id"]))" : nil)
+		}
+		let commands = try (result.has("commands") ? result["commands"].array() : []).compactMap { command -> NativeJournalEntry? in
+			let parts = try command.array()
+			guard parts.count == 3 else { throw command.fail("a command is [node, command, preventScroll or pointerId]") }
+			let node = try parts[0].string()
+			let name = try parts[1].string()
+			if name == "setPointerCapture" || name == "releasePointerCapture" {
+				guard let touch = touches[try parts[2].number()] else { return nil }
+				if name == "setPointerCapture" { touch.capture = node } else if touch.capture == node { touch.capture = nil }
+				return nil
+			}
+			// A dialog's showModal() and close() change what the views show; the journal's dialog entry says so.
+			if name == "showModal" || name == "close" {
+				guard dialogs[node] != nil else { throw RuntimeError(reason: "\(name)() on \(node), which is not a dialog") }
+				setDialog(node, name == "showModal")
+				return nil
+			}
+			// A file input shows the names of the files a handler gave it.
+			if name == "files" { return .property(node: node, name: "files", value: try parts[2].string()) }
+			if name == "focus" { focused = node }
+			return .command(node: node, command: name, preventScroll: try parts[2].bool())
+		}
+		var raised: [NativeJournalEntry] = []
+		for event in try result.has("raises") ? result["raises"].array() : [] {
+			let taken = try raise(event)
+			if case .navigate? = taken.first { return taken }
+			raised += taken
+		}
+		// A click handler called stopPropagation() before it first awaited.
+		if result.has("stopped"), try result["stopped"].bool() { propagationStopped = true }
+		// A key or paste handler called preventDefault() before it first awaited.
+		let prevented: [NativeJournalEntry] = try result.has("prevented") && result["prevented"].bool() ? [.preventDefault] : []
+		// An input handler that set its field's value (`event.target.value = …`) writes the field, as the DOM's setter does.
+		var typed: [NativeJournalEntry] = []
+		if result.has("value"), let field = typing {
+			let text = try result["value"].string()
+			edited[field] = text
+			typed = [.property(node: field, name: "value", value: text)]
+		}
+		let entries: [NativeJournalEntry] = aborts + clears + timers + requests
+		guard result.has("navigate") else { return entries + calls + commands + prevented + typed + raised }
+		let opened = try result["navigate"].object(required: ["route", "params", "replace"], optional: ["search"])
+		let params = try opened["params"].keys().map { NativeRouteParam(name: $0, value: try opened["params"].field($0).string()) }
+		let search = opened.has("search") ? try opened["search"].string() : ""
+		return entries + calls + commands + prevented + typed + raised
+			+ [.navigate(route: try opened["route"].string(), params: params, search: search, replace: try opened["replace"].bool())]
+	}
+
+	/// How deep events raised from JavaScript may nest.
+	private let raiseDepth = 32
+	/// How many dialog close events one change runs, so close handlers that reopen and close their dialog end.
+	private let closeDepth = 16
+	private func setDialog(_ node: String, _ open: Bool) {
+		if dialogs[node] == true, !open { closing.append(node) }
+		dialogs[node] = open
+	}
+	private var raising = 0
+	/// The text field whose input event is running, which a handler's `event.target.value` write lands on.
+	private var typing: String?
+	/// The event types the page's document has listeners for, and the elements those listeners may read.
+	private var documentListening: Set<String> = []
+	private var documentElements: Set<String> = []
+
+	/// An event a script dispatched on an element (or its `click()`), raised once the script returned: `click` as a press on
+	/// the innermost element from it outwards that has one; any other type on the element, then its ancestors when it
+	/// bubbles, each running its own handler for that type.
+	private func raise(_ reader: Reader) throws -> [NativeJournalEntry] {
+		guard raising < raiseDepth else { throw RuntimeError(reason: "events raised from JavaScript nest deeper than \(raiseDepth)") }
+		raising += 1
+		let outer = eventFields
+		defer {
+			raising -= 1
+			eventFields = outer
+		}
+		let event = try reader.object(
+			required: ["node", "type", "bubbles"],
+			optional: ["reason", "relatedTarget", "pointerId", "pointerType", "isPrimary", "button", "buttons", "clientX", "clientY", "key"])
+		let target = try event["node"].string()
+		let type = try event["type"].string()
+		var chain: [String] = []
+		var at: String? = nodeOf(target)
+		while let node = at {
+			chain.append(node == nodeOf(target) ? target : node)
+			at = nodesById[node]?.parent
+		}
+		let scopeOf = { (id: String) throws -> NativeScope? in
+			guard let node = self.nodesById[self.nodeOf(id)] else { return nil }
+			return try self.instances(of: node).first { $0.id == id }?.scope
+		}
+		let handlerOf = { (id: String, name: NativeEventName) in self.payload.events.first { $0.host == self.nodeOf(id) && $0.event == name } }
+		if type == "click" {
+			guard let pressed = chain.first(where: { handlerOf($0, .activate) != nil }) else { return [] }
+			eventFields = clickFields(trusted: false)
+			return try press(pressed)
+		}
+		guard let name = NativeEventName(rawValue: type) else { return [] }
+		let optional = { (key: String, fallback: NativeValue) throws -> NativeValue in event.has(key) ? try event[key].scalar() : fallback }
+		var calls: [NativeJournalEntry] = []
+		let bubbles = try event["bubbles"].bool()
+		for node in bubbles ? chain : Array(chain.prefix(1)) {
+			guard let own = handlerOf(node, name), let scope = try scopeOf(node) else { continue }
+			eventFields = name == .dismiss
+				? [.reason: try optional("reason", .string("")), .pressTarget: .null, .isTrusted: .bool(false)]
+				: name == .keydown
+				? [.isTrusted: .bool(false), .key: try optional("key", .string("")), .target: .string(target), .currentTarget: .string(node)]
+				: [
+					.isTrusted: .bool(false),
+					.target: .string(target), .currentTarget: .string(node), .relatedTarget: try optional("relatedTarget", .null),
+					.button: try optional("button", .number(0)), .buttons: try optional("buttons", .number(0)),
+					.clientX: try optional("clientX", .number(0)), .clientY: try optional("clientY", .number(0)),
+					.pointerId: try optional("pointerId", .number(0)), .pointerType: try optional("pointerType", .string("")),
+					.isPrimary: try optional("isPrimary", .bool(false)), .timeStamp: .number(0),
+				]
+			let taken = try run(handlers[own.handler] ?? [], in: scope)
+			if case .navigate? = taken.first { return taken }
+			calls += taken
+		}
+		return calls
 	}
 
 	/// Tells the engine which async values are shown and what they read, when that moved; it starts and aborts runs.
@@ -594,7 +1049,7 @@ public final class NativeRuntime {
 			let sent = JSONValue.array([listed, .array(tasks.map { .array($0.frame.map { readFrame($0.1) }) })]).jsonText
 			if sent == asyncSent && retry.isEmpty { return out }
 			asyncSent = sent
-			var entry: [(String, JSONValue)] = [("kind", .string("tasks")), ("screen", .number(Double(screen))), ("tasks", listed)]
+			var entry: [(String, JSONValue)] = [("kind", .string("tasks")), ("tasks", listed)]
 			if !retry.isEmpty { entry.append(("retry", .array(retry.map { .string($0) }))) }
 			retry = []
 			out += try enter(entry)
@@ -612,6 +1067,11 @@ public final class NativeRuntime {
 		switch (kind, inner) {
 		case let ("slot", .string(slot)): return slotValue(slot)
 		case let ("fields", .object(slots)): return .array(slots.map { if case let .string(slot) = $0.1 { slotValue(slot) } else { .null } })
+		case ("callback", _): return .null
+		case let ("object", .object(members)), let ("shared", .object(members)): return .array(members.map { readFrame($0.1) })
+		case ("method", _):
+			guard let frame = fields.first(where: { $0.0 == "frame" })?.1, case let .object(members) = frame else { return .null }
+			return .array(members.map { readFrame($0.1) })
 		default: return inner
 		}
 	}
@@ -621,10 +1081,27 @@ public final class NativeRuntime {
 		asyncCells.isEmpty ? [] : try change(host: nil) { [] }
 	}
 
+	/// The screen shows again after Back: it takes the app's values of its app-wide cells and the device's of its storage
+	/// cells, which a page above it may have changed.
+	public func resume() throws -> [NativeJournalEntry] {
+		let moved = payload.cells.compactMap { cell -> (String, NativeValue)? in
+			guard let kept = cell.app ? session.values[cell.id] : cell.storageKey.flatMap(store.read), kept != values[cell.id] else { return nil }
+			return (cell.id, kept)
+		}
+		guard !moved.isEmpty else { return [] }
+		return try change(host: nil) {
+			for (cell, value) in moved {
+				values[cell] = value
+				unset.remove(cell)
+			}
+			return []
+		}
+	}
+
 	/// The screen is gone: its async values' runs are aborted; the journal holds the requests to cancel.
 	public func leave() throws -> [NativeJournalEntry] {
 		guard asyncSent != nil else { return [] }
-		return try enter([("kind", .string("tasks")), ("screen", .number(Double(screen))), ("tasks", .array([])), ("leave", .bool(true))])
+		return try enter([("kind", .string("tasks")), ("tasks", .array([])), ("leave", .bool(true))])
 			.filter { if case .abort = $0 { true } else { false } }
 	}
 
@@ -650,27 +1127,47 @@ public final class NativeRuntime {
 	}
 
 	/// A list's rows now: each item with its key, `String()` of the item at the key path.
-	public func rows(of repeatId: String) throws -> [(key: String, item: NativeValue)] {
-		guard let node = nodesById[repeatId], case let .repeat(list, keyPath) = node.kind else { throw RuntimeError(reason: "unknown list \(repeatId)") }
-		guard case let .array(array) = try evaluate(list) else { throw RuntimeError(reason: "\(repeatId) lists a value that is not an array") }
-		return try array.items.map { item in
+	public func rows(of repeatId: String, in scope: NativeScope = .empty) throws -> [(key: String, item: NativeValue)] {
+		guard let node = nodesById[repeatId], case let .repeat(list, keyPath, keyParts, _) = node.kind else { throw RuntimeError(reason: "unknown list \(repeatId)") }
+		guard case let .array(array) = try evaluate(list, in: scope) else { throw RuntimeError(reason: "\(repeatId) lists a value that is not an array") }
+		guard let keyPath else { return array.items.enumerated().map { (String($0.offset), $0.element) } }
+		let valueAt = { (item: NativeValue, path: [String]) throws -> NativeValue in
 			var key = item
-			for step in keyPath {
+			for step in path {
 				guard case let .object(object) = key, let next = object.get(step) else {
-					throw RuntimeError(reason: "\(repeatId): a row has no key at \(keyPath.joined(separator: "."))")
+					throw RuntimeError(reason: "\(repeatId): a row has no key at \(path.joined(separator: "."))")
 				}
 				key = next
 			}
-			return (key.text, item)
+			return key
+		}
+		return try array.items.map { item in
+			guard let keyParts else { return (try valueAt(item, keyPath).text, item) }
+			let key = try keyParts.map { part in
+				switch part {
+				case let .text(text): text
+				case let .path(path): try valueAt(item, path).text
+				}
+			}.joined()
+			return (key, item)
 		}
 	}
 
-	/// Every shown copy of a node.
+	/// Every shown copy of a node; a row of a list inside another list's row is keyed by both (`<id>@<outer>@<key>`).
 	public func instances(of node: NativeNode) throws -> [NativeInstance] {
 		guard let row = node.row else { return try isShown(node.arm) ? [NativeInstance(id: node.id, scope: .empty)] : [] }
-		guard let list = nodesById[row], try isShown(list.arm) else { return [] }
-		return try rows(of: row).map { NativeInstance(id: "\(node.id)@\($0.key)", scope: NativeScope(items: [row: $0.item], keys: [row: $0.key])) }
-			.filter { try isShown(node.arm, in: $0.scope) }
+		guard let list = nodesById[row] else { return [] }
+		return try instances(of: list).flatMap { copy in
+			let outer = list.row.flatMap { copy.scope.keys[$0] }
+			return try rows(of: row, in: copy.scope).enumerated().map { position, entry -> NativeInstance in
+				let suffix = outer.map { "\($0)@\(entry.key)" } ?? entry.key
+				var scope = copy.scope
+				scope.items[row] = entry.item
+				scope.keys[row] = suffix
+				scope.positions[row] = position
+				return NativeInstance(id: "\(node.id)@\(suffix)", scope: scope)
+			}
+		}.filter { try isShown(node.arm, in: $0.scope) }
 	}
 
 	public func text(of parts: [NativeTextPart], in scope: NativeScope = .empty) throws -> String {
@@ -724,9 +1221,11 @@ public final class NativeRuntime {
 
 	/// An attribute as the web has it now: a binding's value as written, else the attribute the element was built with.
 	private func attributeNow(_ id: String, _ name: String) throws -> String? {
-		let found = try element(id)
+		let found = try element(nodeOf(id))
 		if let binding = found.bindings.first(where: { !$0.isProperty && $0.name == name }) {
-			return marklessAttributeValue(name, try evaluate(binding.value))
+			// A row's copy (`<node>@<key>`) reads its own row.
+			let scope = id == found.node.id ? NativeScope.empty : try instances(of: found.node).first { $0.id == id }?.scope ?? .empty
+			return marklessAttributeValue(name, try evaluate(binding.value, in: scope))
 		}
 		return found.attributes[name]
 	}
@@ -736,13 +1235,19 @@ public final class NativeRuntime {
 	}
 
 	private func textOf(field id: String) throws -> String {
-		if let typed = edited[id] { return typed }
-		if let binding = try propertyBinding(id, "value") { return textOf(try evaluate(binding.value)) }
-		return try attributeNow(id, "value") ?? ""
+		let text: String
+		if let typed = edited[id] { text = typed }
+		else if let binding = try propertyBinding(id, "value") { text = textOf(try evaluate(binding.value)) }
+		else { text = try attributeNow(id, "value") ?? "" }
+		// A range keeps a number in its range and on its step, whatever it is given.
+		guard try attributeNow(id, "type") == "range" else { return text }
+		return nativeRangeValue(text, min: try attributeNow(id, "min"), max: try attributeNow(id, "max"), step: try attributeNow(id, "step"))
 	}
 
+	/// A box an arm hides is not built yet, so its binding (which may read what the arm's test guards) is not read.
 	private func checkedBinding(_ id: String) throws -> Bool? {
-		try propertyBinding(id, "checked").map { try evaluate($0.value).isTruthy }
+		if let node = ticked.first(where: { $0.id == id }), try instances(of: node).isEmpty { return nil }
+		return try propertyBinding(id, "checked").map { try evaluate($0.value).isTruthy }
 	}
 
 	/// A checkbox's or radio button's checkedness now.
@@ -760,6 +1265,14 @@ public final class NativeRuntime {
 		let id: String
 		let node: NativeNode
 		let scope: NativeScope
+	}
+
+	/// The first shown element whose `id` attribute is `wanted` now, as `document.getElementById` finds it.
+	private func elementById(_ wanted: String) throws -> String? {
+		for node in payload.nodes where node.isElement {
+			for instance in try instances(of: node) where try attribute(of: node, "id", in: instance.scope) == wanted { return instance.id }
+		}
+		return nil
 	}
 
 	/// An attribute of one instance as the web has it now: a binding's value in its row, else the attribute as built.
@@ -885,22 +1398,35 @@ public final class NativeRuntime {
 
 	private func isShownField(_ id: String) throws -> Bool { try isShown(try element(id).node.arm) }
 
-	/// A form's entry list as the web builds it: `[name, value]` pairs in tree order.
+	/// A form's entry list as the web builds it: `[name, value]` pairs in tree order; a file input's files are its JavaScript's.
 	public func entries(of id: String) throws -> [[String]] {
+		try formEntries(of: id).compactMap { entry in if case let .string(value) = entry.value { [entry.name, value] } else { nil } }
+	}
+
+	/// The entries a submit handler's FormData reads: a file input's entry names the input, whose files the engine holds.
+	private func formEntries(of id: String) throws -> [(name: String, value: NativeValue)] {
 		guard let form = forms[id] else { throw RuntimeError(reason: "\(id) is not a form") }
-		return try form.fields.compactMap { field -> [String]? in
+		return try form.fields.compactMap { field -> (name: String, value: NativeValue)? in
 			guard try isShownField(field.node), try attributeNow(field.node, "disabled") == nil,
 				let name = try attributeNow(field.node, "name"), !name.isEmpty
 			else { return nil }
 			switch field.kind {
-			case .checkbox, .radio: return try isChecked(field.node) ? [name, try attributeNow(field.node, "value") ?? "on"] : nil
-			case .hidden: return [name, try attributeNow(field.node, "value") ?? ""]
-			case .text: return [name, try textOf(field: field.node)]
+			case .checkbox, .radio: return try isChecked(field.node) ? (name, .string(try attributeNow(field.node, "value") ?? "on")) : nil
+			case .hidden: return (name, .string(try attributeNow(field.node, "value") ?? ""))
+			case .text: return (name, .string(try valueOf(field: field.node)))
+			case .number: return (name, .string(nativeNumberValue(try textOf(field: field.node))))
 			case .select:
 				guard let chosen = try options(of: field.node).first(where: { selectedness[$0.id] == true }) else { return nil }
-				return [name, try value(of: chosen)]
+				return (name, .string(try value(of: chosen)))
+			case .file: return (name, .object([(key: "files", value: .string(field.node))]))
 			}
 		}
+	}
+
+	/// A text field's value as the web keeps it: an email field drops line breaks and trims its ends.
+	private func valueOf(field node: String) throws -> String {
+		let text = try textOf(field: node)
+		return try attributeNow(node, "type") == "email" ? NativeEmailMismatch.value(text) : text
 	}
 
 	/// The first field that stops a submit and what the web says about it, or nil when none does.
@@ -915,8 +1441,10 @@ public final class NativeRuntime {
 
 	/// Why a field stops a submit, as the web says it, or nil when it does not.
 	private func invalidity(_ field: NativeForm.Field) throws -> String? {
-		guard field.kind != .hidden, field.kind != .select, try isShownField(field.node) else { return nil }
+		guard field.kind != .hidden, field.kind != .select, field.kind != .file, try isShownField(field.node) else { return nil }
 		guard try attributeNow(field.node, "disabled") == nil else { return nil }
+		// A readonly text field is barred from constraint validation.
+		if field.kind == .text, try attributeNow(field.node, "readonly") != nil { return nil }
 		// A radio button is missing its value when any button of its group is required and none is checked.
 		let required = field.kind == .radio
 			? try group(of: field.node).contains { try attributeNow($0.id, "required") != nil }
@@ -924,7 +1452,7 @@ public final class NativeRuntime {
 		if required {
 			let absent = switch field.kind {
 			case .radio: try group(of: field.node).allSatisfy { !(try isChecked($0.id)) }
-			case .text: try textOf(field: field.node) == ""
+			case .text, .number: try valueOf(field: field.node) == ""
 			default: !(try isChecked(field.node))
 			}
 			if absent {
@@ -935,6 +1463,18 @@ public final class NativeRuntime {
 				default: return missing.text
 				}
 			}
+		}
+		if field.kind == .number {
+			guard let problem = nativeNumberProblem(
+				try textOf(field: field.node), min: try attributeNow(field.node, "min"), max: try attributeNow(field.node, "max"),
+				step: try attributeNow(field.node, "step"), value: try attributeNow(field.node, "value"))
+			else { return nil }
+			guard let numberMessages else { throw RuntimeError(reason: "the payload has no messages for a number field") }
+			return numberMessages.message(problem)
+		}
+		if field.kind == .text, try attributeNow(field.node, "type") == "email" {
+			guard let emailMismatch else { throw RuntimeError(reason: "the payload has no message for an email field") }
+			if let message = emailMismatch.message(for: try valueOf(field: field.node)) { return message }
 		}
 		// Only text a person typed is too long: a value the app set is kept whole and passes.
 		guard field.kind == .text, let max = nativeMaxLength(try attributeNow(field.node, "maxlength")), let typed = edited[field.node],
@@ -972,36 +1512,79 @@ public final class NativeRuntime {
 		}
 	}
 
+	/// A branch's style state: the arm it shows ("0", "1", …, or "none"); nil while it is not shown.
+	public func styleArm(of branch: String) throws -> NativeValue? {
+		guard let shown = try arms().first(where: { $0.node == branch }) else { return nil }
+		return .string(shown.index.map(String.init) ?? "none")
+	}
+
 	/// Every shown list's row keys, in order.
 	public func rows() throws -> [(node: String, keys: [String])] {
-		try payload.nodes.compactMap { node in
-			guard case .repeat = node.kind, try isShown(node.arm) else { return nil }
-			return (node.id, try rows(of: node.id).map(\.key))
+		try payload.nodes.flatMap { node -> [(node: String, keys: [String])] in
+			guard case .repeat = node.kind else { return [] }
+			return try instances(of: node).map { ($0.id, try rows(of: node.id, in: $0.scope).map(\.key)) }
 		}
 	}
 
 	/// The page's `<title>` text, nil when it has none.
 	public func title() throws -> String? { try payload.title.map { try text(of: $0) } }
 
-	/// Every system sheet and whether its `open` is truthy.
+	/// Each style slot's number now, in the payload's order: what the host lays the page out with.
+	public func slots() throws -> [(slot: String, value: Double)] {
+		let cases = Dictionary(uniqueKeysWithValues: try styleCases().map { ($0.styleCase, $0.value) })
+		return try payload.slots.flatMap { slot -> [(slot: String, value: Double)] in
+			// Its expression may not hold while its style case hides the text (`point.x`), so it keeps its last value.
+			if let when = slot.when, cases[when.styleCase] != when.value { return [(slot.id, keptSlots[slot.id] ?? 0)] }
+			var copies: [(id: String, scope: NativeScope)] = [(slot.id, .empty)]
+			if slot.row != nil, let owner = payload.slotOwners[slot.id].flatMap({ nodesById[$0] }) {
+				copies = try instances(of: owner).map { ("\(slot.id)\($0.id.dropFirst(owner.id.count))", $0.scope) }
+			}
+			return try copies.map { copy in
+				let evaluated = try evaluate(slot.value, in: copy.scope)
+				guard case let .number(value) = evaluated, value.isFinite else {
+					throw RuntimeError(reason: "style slot \(copy.id) is \(evaluated.json.jsonText), not a finite number")
+				}
+				if slot.integer, value.rounded(.towardZero) != value {
+					throw RuntimeError(reason: "style slot \(copy.id) is \(JSONValue.number(value).jsonText), not a whole number")
+				}
+				keptSlots[copy.id] = value
+				return (copy.id, value)
+			}
+		}
+	}
+
+	/// Whether each style case's test holds now, in the payload's order: which of Dragon's assignments the style is in.
+	public func styleCases() throws -> [(styleCase: String, value: Bool)] {
+		try payload.styleCases.map { ($0.id, try evaluate($0.value).isTruthy) }
+	}
+
+	/// Every system sheet shown (its arm, if any, showing) and whether its `open` is truthy.
 	public func sheets() throws -> [(node: String, open: Bool)] {
 		try payload.nodes.compactMap { node in
-			guard case let .sheet(open, _, _, _) = node.kind else { return nil }
+			guard case let .sheet(open, _, _, _) = node.kind, try isShown(node.arm) else { return nil }
 			return (node.id, try evaluate(open).isTruthy)
 		}
 	}
 
 	/// Runs the handler bound to the action and returns the journal the host applies.
 	public func dispatch(_ action: NativeAction) throws -> [NativeJournalEntry] {
+		if action.event == .close || action.event.isMouse {
+			throw RuntimeError(reason: "\(action.event.rawValue) is raised by the runtime, not dispatched")
+		}
 		if action.event == .choose {
 			guard let option = nodesById[nodeOf(action.host)], case .element("option", _, _) = option.kind, let select = option.parent,
 				let instance = try options(of: select).first(where: { $0.id == action.host })
 			else { throw RuntimeError(reason: "\(action.host) is not a shown option of a select") }
 			return try change(host: nil) {
-				if try self.attributeNow(select, "disabled") == nil, try self.attribute(of: option, "disabled", in: instance.scope) == nil {
-					self.chosenNow = action.host
-				}
-				return []
+				guard try self.attributeNow(select, "disabled") == nil, try self.attribute(of: option, "disabled", in: instance.scope) == nil else { return [] }
+				let before = try self.options(of: select).first { self.selectedness[$0.id] == true }?.id
+				self.chosenNow = action.host
+				// A different choice fires the select's `change` (an `input` event here), its value the new option's.
+				guard before != action.host, let changed = self.payload.events.first(where: { $0.host == select && $0.event == .input }) else { return [] }
+				for one in try self.options(of: select) { self.selectedness[one.id] = one.id == action.host }
+				self.eventValue = try self.value(of: instance)
+				defer { self.eventValue = nil }
+				return try self.run(self.handlers[changed.handler] ?? [], in: instance.scope)
 			}
 		}
 		if action.event == .timer, let timer = action.timer, timer.hasPrefix(scriptTimer) {
@@ -1027,7 +1610,7 @@ public final class NativeRuntime {
 			guard dialogs[action.host] == true else { throw RuntimeError(reason: "\(action.host) is not an open dialog") }
 			let cancel = payload.events.first(where: { $0.host == action.host && $0.event == .cancel })
 			return try change(host: action.host) {
-				self.dialogs[action.host] = false
+				self.setDialog(action.host, false)
 				return try cancel.map { try self.run(self.handlers[$0.handler] ?? [], in: .empty) } ?? []
 			}
 		}
@@ -1049,9 +1632,24 @@ public final class NativeRuntime {
 		if action.event.isTouch {
 			return try touch(action, handlerOf: handlerOf)
 		}
+		if action.event == .contextmenu {
+			return try contextmenu(action, handlerOf: handlerOf)
+		}
 		// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
 		let host = action.host.firstIndex(of: "@").map { String(action.host[..<$0]) } ?? action.host
-		guard let bound = payload.events.first(where: { $0.host == host && $0.event == action.event }), let node = nodesById[host] else {
+		let named: NativeEventName = action.event == .pick ? .input : action.event
+		// A file input with no handler of its own still holds what was chosen, for a form's FormData to read.
+		if action.event == .pick, !payload.events.contains(where: { $0.host == host && $0.event == .input }) {
+			guard payload.script != nil else { return [] }
+			let files = JSONValue.array((action.files ?? []).map(\.value.json))
+			return try change(host: action.host) {
+				try self.enter([
+					("kind", .string("pick")), ("node", .string(action.host)), ("files", files),
+					("elements", try self.elementFacts(.object([]), also: [action.host])),
+				])
+			}
+		}
+		guard let bound = payload.events.first(where: { $0.host == host && $0.event == named }), let node = nodesById[host] else {
 			throw RuntimeError(reason: "no \(action.event.rawValue) handler on \(action.host)")
 		}
 		guard let instance = try instances(of: node).first(where: { $0.id == action.host }) else {
@@ -1060,9 +1658,80 @@ public final class NativeRuntime {
 		let scope = instance.scope
 		// A press focuses the control it presses, as the browser does.
 		if action.event == .activate { focused = action.host }
-		eventValue = action.event == .input ? action.value ?? "" : nil
-		defer { eventValue = nil }
-		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: scope) }
+		eventValue = action.event == .input || action.event == .commit ? action.value ?? "" : nil
+		edit = eventValue
+		switch action.event {
+		case .keydown, .keyup: eventFields = [.key: .string(action.value ?? "")]
+		case .paste: eventFields = [.text: .string(action.value ?? "")]
+		case .pick:
+			eventFields = [
+				.files: .array((action.files ?? []).map(\.value)), .target: .string(action.host), .currentTarget: .string(action.host),
+			]
+		case .activate: eventFields = clickFields(trusted: true).merging([.detail: .number(Double(action.detail ?? 1))]) { _, new in new }
+		case .animationstart, .animationiteration, .animationend, .animationcancel:
+			eventFields = [.animationName: .string(action.value ?? ""), .elapsedTime: .number(action.time ?? 0)]
+		default: break
+		}
+		if [.keydown, .keyup, .paste].contains(action.event) { targetText = try textOf(field: action.host) }
+		defer { eventValue = nil; edit = nil; eventFields = nil; targetText = nil }
+		// A number field keeps what was typed, and its handlers read its value, which is empty while that is no number.
+		let numeric = action.event == .input && { if case let .element(_, attributes, _) = node.kind { attributes["type"] == "number" } else { false } }()
+		return try change(host: action.host) {
+			if numeric, let typed = self.eventValue { self.eventValue = nativeNumberValue(typed) }
+			return action.event == .activate ? try self.press(action.host) : try self.run(self.handlers[bound.handler] ?? [], in: scope)
+		}
+	}
+
+	/// A press on `pressed`, as a browser's click: its own handler, then the handler of each element around it, innermost first,
+	/// until one stops propagation. An element around it whose handler reads where the press landed runs its copy for the
+	/// pressed element (`<handler>@<node>`), which a pressed element with no handler of its own holds as its own.
+	private func press(_ pressed: String) throws -> [NativeJournalEntry] {
+		propagationStopped = false
+		defer { propagationStopped = false }
+		let own = nodeOf(pressed)
+		let key = pressed.firstIndex(of: "@").map { String(pressed[$0...]) } ?? ""
+		let ownHandler = payload.events.first { $0.host == own && $0.event == .activate }?.handler
+		var journal: [NativeJournalEntry] = []
+		var at: String? = own
+		while let node = at {
+			at = nodesById[node]?.parent
+			let id = node == own ? pressed : !key.isEmpty && nodesById[node]?.row != nil ? node + key : node
+			guard let bound = payload.events.first(where: { $0.host == node && $0.event == .activate }), let element = nodesById[node],
+				let scope = try instances(of: element).first(where: { $0.id == id })?.scope else { continue }
+			// A copy stands for the handler around it, and runs only as the pressed element's own.
+			if node != own && bound.handler.contains("@") { continue }
+			let copy = node == own ? nil : "\(bound.handler)@\(own)"
+			if let copy, ownHandler == copy { continue }
+			let chosen = copy.flatMap { handlers[$0] != nil ? $0 : nil } ?? bound.handler
+			journal += try run(handlers[chosen] ?? [], in: scope)
+			if propagationStopped || journal.contains(where: { if case .navigate = $0 { true } else { false } }) { break }
+		}
+		return journal
+	}
+
+	/// A long press on the action's host: its `contextmenu` handler, then each one of the elements it is inside, innermost first.
+	private func contextmenu(_ action: NativeAction, handlerOf: (String, NativeEventName) -> NativeEvent?) throws -> [NativeJournalEntry] {
+		guard let node = nodesById[nodeOf(action.host)], let instance = try instances(of: node).first(where: { $0.id == action.host }) else {
+			throw RuntimeError(reason: "\(action.host) is not shown")
+		}
+		return try change(host: nil) {
+			defer { self.eventFields = nil }
+			var calls: [NativeJournalEntry] = []
+			var at: String? = self.nodeOf(action.host)
+			while let current = at {
+				let element = current == self.nodeOf(action.host) ? action.host : current
+				at = self.nodesById[current]?.parent
+				guard let own = handlerOf(current, .contextmenu) else { continue }
+				self.eventFields = [
+					.target: .string(action.host), .currentTarget: .string(element), .clientX: .number(action.x ?? 0),
+					.clientY: .number(action.y ?? 0), .timeStamp: .number(action.time ?? 0),
+				]
+				let taken = try self.run(self.handlers[own.handler] ?? [], in: instance.scope)
+				if case .navigate? = taken.first { return taken }
+				calls.append(contentsOf: taken)
+			}
+			return calls
+		}
 	}
 
 	/// A touch as a phone's browser raises it: `pointerover`, `pointerenter` outermost first, the overlay's outside press and
@@ -1082,12 +1751,14 @@ public final class NativeRuntime {
 			let state = down ?? TouchState(capture: action.host, over: action.host, primary: self.touches.values.allSatisfy { !$0.primary })
 			if down == nil { self.touches[pointerId] = state }
 			let x = action.x ?? 0, y = action.y ?? 0
-			/// The elements from `id` out to the root, innermost first.
+			if action.event != .pointermove { self.tapPoint = action.event == .pointerup ? (x, y) : nil }
+			/// The elements from `id` out to the root, innermost first; those in its row keep its row's key.
 			let chain = { (id: String) -> [String] in
+				let key = id.firstIndex(of: "@").map { String(id[$0...]) } ?? ""
 				var out: [String] = []
 				var at: String? = self.nodeOf(id)
 				while let current = at {
-					out.append(current == self.nodeOf(id) ? id : current)
+					out.append(current == self.nodeOf(id) ? id : !key.isEmpty && self.nodesById[current]?.row != nil ? current + key : current)
 					at = self.nodesById[current]?.parent
 				}
 				return out
@@ -1105,18 +1776,20 @@ public final class NativeRuntime {
 					.timeStamp: .number(action.time ?? 0),
 				]
 			}
-			var runs: [(handler: String, fields: [NativeEventField: NativeValue])] = []
+			var runs: [(handler: String, fields: [NativeEventField: NativeValue], scope: NativeScope?)] = []
 			let raise = { (type: NativeEventName, target: String, related: String?) in
 				for node in chain(target) {
-					if let own = handlerOf(self.nodeOf(node), type) { runs.append((own.handler, fieldsOf(type, target, node, related))) }
+					if let own = handlerOf(self.nodeOf(node), type) { runs.append((own.handler, fieldsOf(type, target, node, related), nil)) }
 				}
+				// The event bubbles on to the document's listeners after the element's own handlers.
+				if self.documentListening.contains(type.rawValue) { runs.append((Self.documentRun + type.rawValue, fieldsOf(type, target, target, related), nil)) }
 			}
 			/// `pointerenter` on each element `target` is in that `from` is not, outermost first; `pointerleave` the other way.
 			let crossing = { (type: NativeEventName, target: String, from: String?, related: String?) in
 				let outside = Set(from.map(chain) ?? [])
 				let nodes = chain(target).filter { !outside.contains($0) }
 				for node in type == .pointerenter ? nodes.reversed() : nodes {
-					if let own = handlerOf(self.nodeOf(node), type) { runs.append((own.handler, fieldsOf(type, node, node, related))) }
+					if let own = handlerOf(self.nodeOf(node), type) { runs.append((own.handler, fieldsOf(type, node, node, related), nil)) }
 				}
 			}
 			let flush = { () throws -> [NativeJournalEntry]? in
@@ -1124,8 +1797,12 @@ public final class NativeRuntime {
 				let steps = runs
 				runs = []
 				for step in steps {
+					if step.handler.hasPrefix(Self.documentRun) {
+						calls.append(contentsOf: try self.document(String(step.handler.dropFirst(Self.documentRun.count)), step.fields))
+						continue
+					}
 					self.eventFields = step.fields
-					let taken = try self.run(self.handlers[step.handler] ?? [], in: instance.scope)
+					let taken = try self.run(self.handlers[step.handler] ?? [], in: step.scope ?? instance.scope)
 					if case .navigate? = taken.first { return taken }
 					calls.append(contentsOf: taken)
 				}
@@ -1134,9 +1811,10 @@ public final class NativeRuntime {
 			if action.event == .pointerdown {
 				raise(.pointerover, action.host, nil)
 				crossing(.pointerenter, action.host, nil, nil)
-				// The behaviour's document listener hears the press: the topmost overlay it landed outside is told.
-				if let top = self.stack.last, !self.contains(top, action.host), let dismiss = handlerOf(top, .dismiss) {
-					runs.append((dismiss.handler, [.reason: .string("outside-press"), .pressTarget: .string(action.host)]))
+				// The behaviour's document listener hears the press: the topmost hint and the topmost other overlay it landed outside are told.
+				for top in [self.stack.last(where: self.isHint), self.stack.last(where: { !self.isHint($0) })] {
+					guard let top, !self.contains(top, action.host), let dismiss = handlerOf(top, .dismiss) else { continue }
+					runs.append((dismiss.handler, [.reason: .string("outside-press"), .pressTarget: .string(action.host)], nil))
 				}
 				raise(.pointerdown, action.host, nil)
 				return try flush() ?? calls
@@ -1164,6 +1842,45 @@ public final class NativeRuntime {
 			self.touches[pointerId] = nil
 			raise(.pointerout, target, nil)
 			crossing(.pointerleave, target, nil, nil)
+			if let lifted = try flush() { return lifted }
+			guard action.event == .pointerup else { return calls }
+			// A tap's compatibility mouse events, as a phone browser fires them before its click.
+			let scopeOf = { (id: String) throws -> NativeScope? in
+				guard let node = self.nodesById[self.nodeOf(id)] else { return nil }
+				return try self.instances(of: node).first { $0.id == id }?.scope
+			}
+			let mouseRun = { (type: NativeEventName, target: String, node: String, related: String?) throws in
+				guard let own = handlerOf(self.nodeOf(node), type) else { return }
+				let fields: [NativeEventField: NativeValue] = [
+					.target: .string(target), .currentTarget: .string(node), .relatedTarget: related.map(NativeValue.string) ?? .null,
+					.button: .number(0), .buttons: .number(type == .mousedown ? 1 : 0),
+					.clientX: .number(x), .clientY: .number(y), .timeStamp: .number(action.time ?? 0),
+				]
+				runs.append((own.handler, fields, try scopeOf(target)))
+			}
+			let mouse = { (type: NativeEventName, target: String, related: String?) throws in
+				for node in chain(target) { try mouseRun(type, target, node, related) }
+			}
+			let mouseCrossing = { (type: NativeEventName, target: String, from: String?, related: String?) throws in
+				let outside = Set(from.map(chain) ?? [])
+				let nodes = chain(target).filter { !outside.contains($0) }
+				for node in type == .mouseenter ? nodes.reversed() : nodes { try mouseRun(type, node, node, related) }
+			}
+			let tapped = action.host
+			// An element that left the screen took the mouse with it.
+			let from = try self.mouseOver.flatMap { try scopeOf($0) != nil ? $0 : nil }
+			if from != tapped {
+				if let from {
+					try mouse(.mouseout, from, tapped)
+					try mouseCrossing(.mouseleave, from, tapped, tapped)
+				}
+				try mouse(.mouseover, tapped, from)
+				try mouseCrossing(.mouseenter, tapped, from, from)
+				self.mouseOver = tapped
+			}
+			try mouse(.mousemove, tapped, nil)
+			try mouse(.mousedown, tapped, nil)
+			try mouse(.mouseup, tapped, nil)
 			return try flush() ?? calls
 		}
 	}
@@ -1176,17 +1893,35 @@ public final class NativeRuntime {
 		}
 	}
 
+	private func isShownInstance(_ id: String) throws -> Bool {
+		let template = id.firstIndex(of: "@").map { String(id[..<$0]) } ?? id
+		return try nodesById[template].map { node in try instances(of: node).contains { $0.id == id } } ?? false
+	}
+
+	/// A field an arm hid is a new element when it shows again: it starts from its markup, as the web builds it.
 	private func forgetHidden() throws {
-		for key in fired {
-			let id = String(key[key.index(after: key.firstIndex(of: "\u{0}")!)...])
-			let template = id.firstIndex(of: "@").map { String(id[..<$0]) } ?? id
-			let shown = try nodesById[template].map { node in try instances(of: node).contains { $0.id == id } } ?? false
-			if !shown { fired.remove(key) }
+		for key in fired where !(try isShownInstance(String(key[key.index(after: key.firstIndex(of: "\u{0}")!)...]))) { fired.remove(key) }
+		for id in edited.keys where !(try isShownInstance(id)) { edited[id] = nil }
+		for node in ticked where try instances(of: node).isEmpty {
+			guard case let .element(_, attributes, _) = node.kind else { continue }
+			checkedness[node.id] = try checkedBinding(node.id) ?? (attributes["checked"] != nil)
+		}
+		// A component an arm hid renders anew when it shows again, so its state starts over (a seed runs again then).
+		for cell in payload.cells where cell.arm != nil {
+			if !(try isShown(cell.arm)) {
+				values[cell.id] = cell.initial
+				if cell.seed != nil { reseed.insert(cell.id) }
+			} else if let seed = cell.seed, reseed.remove(cell.id) != nil {
+				values[cell.id] = try evaluate(seed)
+			}
 		}
 	}
 
 	/// A device call a handler awaited answered: its continuation runs with the answer as its local.
 	public func resume(_ continuation: String, value: NativeValue) throws -> [NativeJournalEntry] {
+		if let call = scriptCallId(continuation) {
+			return try change(host: nil) { try self.enter([("kind", .string("answer")), ("call", .number(Double(call))), ("value", value.json)]) }
+		}
 		guard let then = continuations[continuation] else { throw RuntimeError(reason: "no continuation \(continuation)") }
 		var scope = NativeScope.empty
 		scope.locals[then.as] = value
@@ -1195,10 +1930,15 @@ public final class NativeRuntime {
 
 	/// That call failed: the rest of the handler does not run, and the nearest `@catch` cell takes `{ name, message }`.
 	public func reject(_ continuation: String, name: String, message: String) throws -> [NativeJournalEntry] {
+		if let call = scriptCallId(continuation) {
+			let error = JSONValue.object([("name", .string(name)), ("message", .string(message))])
+			return try change(host: nil) { try self.enter([("kind", .string("answer")), ("call", .number(Double(call))), ("error", error)]) }
+		}
 		guard let then = continuations[continuation] else { throw RuntimeError(reason: "no continuation \(continuation)") }
 		guard let cell = then.catch else { return [] }
 		return try change(host: nil) {
 			self.values[cell] = .object([("name", .string(name)), ("message", .string(message))])
+			self.unset.remove(cell)
 			return []
 		}
 	}
@@ -1244,17 +1984,18 @@ public final class NativeRuntime {
 				submission?.pending += 1
 				let wait: Double = if case let .number(number) = ms, number > 0 { number } else { 0 }
 				calls.append(.timer(timer: id, ms: wait))
-			case let .navigate(route, params, replace):
+			case let .navigate(route, params, search, replace):
 				let resolved = try params.map { param -> NativeRouteParam in
 					switch param.value {
 					case let .string(text): return NativeRouteParam(name: param.name, value: text)
 					case let .expr(expr): return NativeRouteParam(name: param.name, value: try evaluate(expr, in: scope).text)
 					}
 				}
-				return [.navigate(route: route, params: resolved, replace: replace)]
+				return [.navigate(route: route, params: resolved, search: search, replace: replace)]
 			case let .assign(cell, expr):
 				let value = try evaluate(expr, in: scope)
 				values[try slot(of: cell, in: scope)] = value
+				unset.remove(cell)
 				if let key = storageKeys[cell] { store.write(key, value) }
 			case let .when(test, then, otherwise):
 				let taken = try run(try evaluate(test, in: scope).isTruthy ? then : otherwise, in: scope, submission: submission)
@@ -1262,13 +2003,24 @@ public final class NativeRuntime {
 				calls.append(contentsOf: taken)
 			case let .dialog(node, open):
 				guard dialogs[node] != nil else { throw RuntimeError(reason: "\(node) is not a dialog") }
-				dialogs[node] = open
+				setDialog(node, open)
 			case let .command(target, command, preventScroll):
 				let value = try evaluate(target, in: scope)
 				if value == .null || value == .string(nativeDocumentBody) { continue }
 				guard case let .string(node) = value, isElement(node) else { throw RuntimeError(reason: "\(command)() on a value that is not an element") }
 				if command == "focus" { focused = node }
 				calls.append(.command(node: node, command: command, preventScroll: preventScroll))
+			case .preventDefault:
+				calls.append(.preventDefault)
+			case .stopPropagation:
+				propagationStopped = true
+			case let .fieldText(target, value):
+				let id = try evaluate(target, in: scope)
+				if id == .null { continue }
+				guard case let .string(node) = id, isElement(node) else { throw RuntimeError(reason: "a field text written to a value that is not an element") }
+				let text = textOf(try evaluate(value, in: scope))
+				edited[node] = text
+				calls.append(.property(node: node, name: "value", value: text))
 			case let .capture(target, pointer, release):
 				guard case let .string(node) = try evaluate(target, in: scope), case let .number(id) = try evaluate(pointer, in: scope),
 					let touch = touches[id]
@@ -1278,10 +2030,28 @@ public final class NativeRuntime {
 				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
 			case let .script(fn, type, bindings, catchCell):
 				let touch = touchFields.compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
-				let event: JSONValue = .object([("type", .string(type))] + (eventValue.map { [("value", JSONValue.string($0))] } ?? []) + touch)
+				let typed = [NativeEventField.key, .text, .files].compactMap { field in eventFields?[field].map { (field.rawValue, $0.json) } }
+				var fields: [(String, JSONValue)] = [("type", .string(type))] + ((eventValue ?? targetText).map { [("value", JSONValue.string($0))] } ?? []) + typed + touch
+				var named: [String] = []
+				if case .string? = eventFields?[.currentTarget] {
+					let nodes: [(String, JSONValue)] = [NativeEventField.target, .currentTarget, .relatedTarget].map { field in
+						guard case let .string(node)? = eventFields?[field] else { return (field.rawValue, JSONValue.null) }
+						named.append(node)
+						return (field.rawValue, .string(node))
+					}
+					fields.append(("nodes", .object(nodes)))
+				}
+				var pressed: [String] = []
+				if case let .string(reason)? = eventFields?[.reason] {
+					var press: JSONValue = .null
+					if case let .string(node)? = eventFields?[.pressTarget] { press = .string(node); pressed = [node] }
+					fields.append(("detail", .object([("reason", .string(reason)), ("pressTarget", press)])))
+				}
+				let event: JSONValue = .object(fields)
+				let frame = try frame(of: bindings, in: scope)
 				calls.append(contentsOf: try enter(
-					[("kind", .string("dispatch")), ("fn", .string(fn)), ("frame", try frame(of: bindings, in: scope)), ("event", event)]
-						+ (try catchCell.map { [("catch", JSONValue.string(try slot(of: $0, in: scope)))] } ?? [])))
+					[("kind", .string("dispatch")), ("fn", .string(fn)), ("frame", frame), ("elements", try elementFacts(frame, also: named + pressed)), ("event", event)]
+						+ (try catchCell.map { [("catch", JSONValue.string(try slot(of: $0, in: scope)))] } ?? []), submission: submission))
 			}
 		}
 		return calls
@@ -1304,6 +2074,11 @@ public final class NativeRuntime {
 			calls.append(.invalid(node: invalid.node, message: invalid.message))
 			return []
 		}
+		if let opens = form.opens {
+			let url = nativeFormUrl(opens, try entries(of: formId).map { ($0[0], $0[1]) })
+			calls.append(.call(call: "browser.open", object: nil, arguments: [.string(url)], result: nil, resume: nil))
+			return []
+		}
 		let sent = try entries(of: formId)
 		let runs = running[formId] ?? []
 		if runs.contains(where: { $0.sent == sent && $0.submitter == submitter }) { return [] }
@@ -1322,7 +2097,7 @@ public final class NativeRuntime {
 	/// A live device value changed: writes its device cell and returns the journal.
 	public func device(_ cell: String, _ value: NativeValue) throws -> [NativeJournalEntry] {
 		guard payload.cells.contains(where: { $0.id == cell && $0.device != nil }) else { throw RuntimeError(reason: "\(cell) is not a device cell") }
-		return try change(host: nil) { self.values[cell] = value; return [] }
+		return try change(host: nil) { self.values[cell] = value; self.unset.remove(cell); return [] }
 	}
 
 	/// A device call answered: the task cell takes `{ state: 'value', value }`.
@@ -1337,7 +2112,7 @@ public final class NativeRuntime {
 
 	private func settle(_ cell: String, _ value: NativeValue) throws -> [NativeJournalEntry] {
 		guard payload.cells.contains(where: { $0.id == cell && $0.task != nil }) else { throw RuntimeError(reason: "\(cell) is not a task cell") }
-		return try change(host: nil) { self.values[cell] = value; return [] }
+		return try change(host: nil) { self.values[cell] = value; self.unset.remove(cell); return [] }
 	}
 
 	/// The calls a host starts at mount, one per task cell.
@@ -1354,18 +2129,19 @@ public final class NativeRuntime {
 		let keyed = { (list: [(node: String, name: String, value: String?)]) in
 			Dictionary(list.map { ("\($0.node)\u{0}\($0.name)", $0.value) }, uniquingKeysWith: { $1 })
 		}
+		try seedRows()
 		let cellsBefore = values
+		let slotsBefore = Dictionary(try slots().map { ($0.slot, $0.value) }, uniquingKeysWith: { $1 })
+		let casesBefore = Dictionary(uniqueKeysWithValues: try styleCases().map { ($0.styleCase, $0.value) })
 		let beforeTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let beforeAttributes = keyed(try boundAttributes())
 		let beforeMarks = keyed(marks())
 		let checkedBefore = checkedness
 		let selectedBefore = selectedness
 		let bindingsBefore = Dictionary(uniqueKeysWithValues: try ticked.map { ($0.id, try checkedBinding($0.id)) })
-		var beforeProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
-		if let eventValue, let host {
-			beforeProperties["\(host)\u{0}value"] = eventValue
-			edited[host] = eventValue
-		}
+		let beforeProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
+		if let edit, let host { edited[host] = edit }
+		typing = edit != nil ? host : nil
 		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let beforeRows = Dictionary(uniqueKeysWithValues: try rows().map { ($0.node, $0.keys) })
 		let beforeTitle = try title()
@@ -1374,23 +2150,54 @@ public final class NativeRuntime {
 		let ownedBefore = Set(try liveObjects())
 		let focusBefore = focused
 		let stackBefore = stack
+		let signaturesBefore = try rowSignatures()
+		drawnArms = beforeArms
+		defer { drawnArms = nil }
 		var calls = try apply()
 		if case .navigate? = calls.first { return calls }
-		calls += try syncAsync()
-		let shownNow = try shownOverlays()
-		let released = stackBefore.filter { !shownNow.contains($0) }
-		let enlisted = shownNow.filter { !stackBefore.contains($0) }
-		stack = stackBefore.filter(shownNow.contains) + enlisted
-		for overlay in enlisted { origins[overlay] = focusBefore ?? nativeDocumentBody }
-		let overlayAttributes = try keyedAttributes()
-		let overlays = released.map { NativeJournalEntry.overlay(node: $0, open: false, modal: isModal($0, overlayAttributes)) }
-			+ enlisted.map { NativeJournalEntry.overlay(node: $0, open: true, modal: isModal($0, overlayAttributes)) }
+		// As the browser queues a dialog's close event, it runs after the handler that closed it.
+		var fired = 0
+		while !closing.isEmpty, fired < closeDepth {
+			fired += 1
+			let node = closing.removeFirst()
+			guard let close = payload.events.first(where: { $0.host == node && $0.event == .close }) else { continue }
+			let scope = try nodesById[node].flatMap { try instances(of: $0).first { $0.id == node }?.scope } ?? .empty
+			let taken = try run(handlers[close.handler] ?? [], in: scope)
+			if case .navigate? = taken.first { return taken }
+			calls.append(contentsOf: taken)
+		}
+		closing.removeAll()
 		// A row that left takes its state with it; a later row with the same key starts from the first values.
 		let kept = Set(try rows().flatMap { list in list.keys.map { "\(list.node)\u{0}\($0)" } })
 		for slot in values.keys {
 			guard let at = slot.firstIndex(of: "@"), let list = rowOfCell[String(slot[..<at])] else { continue }
 			if !kept.contains("\(list)\u{0}\(slot[slot.index(after: at)...])") { values.removeValue(forKey: slot) }
 		}
+		try resetChangedRows(signaturesBefore)
+		try seedRows()
+		try follow()
+		calls += try syncAsync()
+		// An overlay becoming shown supersedes every shown hint it is not inside, before it joins the stack.
+		let shownFirst = try shownOverlays()
+		var working = stackBefore.filter(shownFirst.contains)
+		for newcomer in shownFirst where !stackBefore.contains(newcomer) {
+			for hint in working where isHint(hint) && !contains(hint, newcomer) {
+				guard let dismiss = payload.events.first(where: { $0.host == hint && $0.event == .dismiss }) else { continue }
+				eventFields = [.reason: .string("superseded"), .pressTarget: .null]
+				defer { eventFields = nil }
+				let taken = try run(handlers[dismiss.handler] ?? [], in: .empty)
+				if case .navigate? = taken.first { return taken }
+				calls.append(contentsOf: taken)
+			}
+			working.append(newcomer)
+		}
+		let shownNow = try shownOverlays()
+		let released = stackBefore.filter { !shownNow.contains($0) }
+		let enlisted = shownNow.filter { !stackBefore.contains($0) }
+		stack = stackBefore.filter(shownNow.contains) + enlisted
+		for overlay in enlisted { origins[overlay] = focusBefore ?? nativeDocumentBody }
+		let overlays = try released.map { NativeJournalEntry.overlay(node: $0, open: false, modal: try isModal($0)) }
+			+ enlisted.map { NativeJournalEntry.overlay(node: $0, open: true, modal: try isModal($0)) }
 		try forgetHidden()
 		let afterTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let afterAttributes = keyed(try boundAttributes())
@@ -1401,12 +2208,21 @@ public final class NativeRuntime {
 		let styles = payload.cells.compactMap { cell -> NativeJournalEntry? in
 			guard cell.styled, let before = cellsBefore[cell.id], let after = values[cell.id], !before.strictlyEquals(after) else { return nil }
 			return .state(cell: cell.id, value: after)
+		} + (try styleCases()).compactMap { styleCase -> NativeJournalEntry? in
+			casesBefore[styleCase.styleCase] == styleCase.value ? nil : .state(cell: styleCase.styleCase, value: .bool(styleCase.value))
+		} + (try slots()).compactMap { slot -> NativeJournalEntry? in
+			// Object.is: a finite number is the same only with the same bit pattern (0 and -0 differ).
+			slotsBefore[slot.slot]?.bitPattern == slot.value.bitPattern ? nil : .slot(slot: slot.slot, value: slot.value)
 		}
 		let entries = try payload.nodes.flatMap { node -> [NativeJournalEntry] in
 			switch node.kind {
 			case .repeat:
-				guard let before = beforeRows[node.id], let after = afterRows[node.id], before != after else { return [] }
-				return [.rows(node: node.id, keys: after)]
+				// Each shown copy of the list: an inner list has one per row of its outer list (`<id>@<key>`).
+				return try rows().compactMap { copy in
+					guard copy.node == node.id || copy.node.hasPrefix("\(node.id)@"),
+						let before = beforeRows[copy.node], let after = afterRows[copy.node], before != after else { return nil }
+					return .rows(node: copy.node, keys: after)
+				}
 			case .branch:
 				return try instances(of: node).compactMap { instance in
 					guard let before = beforeArms[instance.id], let after = afterArms[instance.id], before != after else { return nil }
@@ -1420,14 +2236,22 @@ public final class NativeRuntime {
 					guard let before = beforeTexts[instance.id], let after = afterTexts[instance.id], before != after else { return nil }
 					return .text(node: instance.id, value: after)
 				}
-			case let .element(_, _, bindings):
+			case let .element(element, _, bindings):
 				let opened: [NativeJournalEntry] = dialogs[node.id].flatMap { open in open != dialogsBefore[node.id] ? [.dialog(node: node.id, open: open)] : nil } ?? []
+				// A textarea nobody edited and no `value` property sets shows its `value` attribute, as the web's default value.
+				let followsDefault = element == "textarea" && !bindings.contains { $0.isProperty && $0.name == "value" }
 				return try opened + instances(of: node).flatMap { instance in
-					bindings.compactMap { binding -> NativeJournalEntry? in
+					bindings.flatMap { binding -> [NativeJournalEntry] in
 						let key = "\(instance.id)\u{0}\(binding.name)"
 						let (before, after) = binding.isProperty ? (beforeProperties, afterProperties) : (beforeAttributes, afterAttributes)
-						guard let old = before[key], let new = after[key], old != new else { return nil }
-						return binding.isProperty ? .property(node: instance.id, name: binding.name, value: new ?? "") : .attribute(node: instance.id, name: binding.name, value: new)
+						guard let old = before[key], let new = after[key], old != new else { return [] }
+						if binding.isProperty {
+							// A `value` binding writes the field only when its own value changes, as on the web: typing alone never resets it.
+							if instance.id == host, let edit, new == edit { return [] }
+							return [.property(node: instance.id, name: binding.name, value: new ?? "")]
+						}
+						let shown: [NativeJournalEntry] = followsDefault && binding.name == "value" && edited[instance.id] == nil ? [.property(node: instance.id, name: "value", value: new ?? "")] : []
+						return [.attribute(node: instance.id, name: binding.name, value: new)] + shown
 					}
 				}
 			}
@@ -1461,6 +2285,7 @@ public final class NativeRuntime {
 		let titled: [NativeJournalEntry] = afterTitle != beforeTitle ? afterTitle.map { [.title(value: $0)] } ?? [] : []
 		var journal: [NativeJournalEntry] = styles
 		for part in [entries, checks, chosen, marked, titled, releases, overlays, calls] { journal += part }
+		for cell in payload.cells where cell.app && !unset.contains(cell.id) { session.values[cell.id] = values[cell.id] }
 		return journal
 	}
 }
@@ -1470,14 +2295,26 @@ public struct NativeScreen {
 	public let route: String
 	public let params: [NativeRouteParam]
 	public let path: String
+	/// The query it opened with, or "".
+	public let search: String
 	public let runtime: NativeRuntime
 }
 
 /// The reference meaning of an app's stack (`packages/mobile/src/app.ts`): the UIKit stack is checked against it headless.
+/// The values of an app's app-wide `shared()` cells, one for every page; `shared` lasts as long as the app runs, as the web's
+/// module-level instance lasts as long as its page is open.
+public final class NativeAppSession: @unchecked Sendable {
+	// Read and written on the main thread only, where every runtime runs.
+	public static let shared = NativeAppSession()
+	public var values: [String: NativeValue] = [:]
+	public init() {}
+}
+
 public final class NativeAppStack {
 	public let app: NativeAppPayload
 	private let store: NativeStore
 	private let scriptHost: NativeScriptHost?
+	private let session = NativeAppSession()
 	public private(set) var screens: [NativeScreen]
 	/// What starting the screens the app opened with asked for, bottom first.
 	public private(set) var started: [NativeJournalEntry] = []
@@ -1495,18 +2332,18 @@ public final class NativeAppStack {
 		started = try screens.flatMap { try $0.runtime.start() }
 	}
 
-	public func screen(_ route: String, _ params: [NativeRouteParam]) throws -> NativeScreen {
+	public func screen(_ route: String, _ params: [NativeRouteParam], search: String = "") throws -> NativeScreen {
 		guard let entry = app.routes.first(where: { $0.pattern == route }) else { throw RuntimeError(reason: "no page for \(route)") }
 		return NativeScreen(
-			route: route, params: params, path: try NativeAppPayload.path(route, params),
-			runtime: NativeRuntime(payload: entry.page, store: store, params: params, scriptHost: scriptHost))
+			route: route, params: params, path: try NativeAppPayload.path(route, params), search: search,
+			runtime: NativeRuntime(payload: entry.page, store: store, params: params, search: search, scriptHost: scriptHost, session: session))
 	}
 
 	/// Runs an action on the top screen; a `navigate` entry pushes the new screen or replaces the top one.
 	public func dispatch(_ action: NativeAction) throws -> [NativeJournalEntry] {
 		let journal = try screens[screens.count - 1].runtime.dispatch(action)
-		if case let .navigate(route, params, replace)? = journal.last {
-			let next = try screen(route, params)
+		if case let .navigate(route, params, search, replace)? = journal.last {
+			let next = try screen(route, params, search: search)
 			let left = replace ? try screens.removeLast().runtime.leave() : []
 			screens.append(next)
 			return journal + left + (try next.runtime.start())
@@ -1514,11 +2351,30 @@ public final class NativeAppStack {
 		return journal
 	}
 
-	/// The platform's Back: the top screen goes and the one below shows as it was left; returns what its leaving cancels.
+	/// The platform's Back: the top screen goes and the one below shows as it was left, with the app's shared copies as they
+	/// are now; returns what its leaving cancels, then what the screen below takes from those copies.
 	@discardableResult
 	public func back() throws -> [NativeJournalEntry] {
 		guard screens.count > 1 else { throw RuntimeError(reason: "back on the first screen leaves the app") }
-		return try screens.removeLast().runtime.leave()
+		let left = try screens.removeLast().runtime.leave()
+		return left + (try screens[screens.count - 1].runtime.resume())
+	}
+}
+
+/// An element's box in CSS pixels from the screen's top left, and its text direction, as its view has them now.
+public struct NativeElementBox: Equatable {
+	public let x: Double
+	public let y: Double
+	public let width: Double
+	public let height: Double
+	public let rightToLeft: Bool
+
+	public init(x: Double, y: Double, width: Double, height: Double, rightToLeft: Bool) {
+		self.x = x
+		self.y = y
+		self.width = width
+		self.height = height
+		self.rightToLeft = rightToLeft
 	}
 }
 
@@ -1530,4 +2386,28 @@ extension Optional where Wrapped == NativeScriptHost {
 }
 
 /// The prefix of a timer the script set, as its `timer` entries name it (`script:3`); other timers are `after` ops.
+/// The URL a GET form leaves for: its action with the query replaced by the entries, each encoded as
+/// `application/x-www-form-urlencoded` (UTF-8, a space as `+`, all but `*-._` and ASCII letters and digits escaped).
+public func nativeFormUrl(_ action: String, _ entries: [(String, String)]) -> String {
+	let encode = { (text: String) -> String in
+		text.utf8.map { byte -> String in
+			switch byte {
+			case 0x20: return "+"
+			case 0x30...0x39, 0x41...0x5A, 0x61...0x7A, 0x2A, 0x2D, 0x2E, 0x5F: return String(UnicodeScalar(byte))
+			default: return String(format: "%%%02X", byte)
+			}
+		}.joined()
+	}
+	let fragment = action.firstIndex(of: "#").map { String(action[$0...]) } ?? ""
+	let base = action.firstIndex(of: "#").map { String(action[..<$0]) } ?? action
+	let path = base.firstIndex(of: "?").map { String(base[..<$0]) } ?? base
+	return path + "?" + entries.map { "\(encode($0.0))=\(encode($0.1))" }.joined(separator: "&") + fragment
+}
+
 public let scriptTimer = "script:"
+/// The continuation a device call from a script names: its answer goes back to the script.
+public let scriptCall = "script:"
+
+private func scriptCallId(_ continuation: String) -> Int? {
+	continuation.hasPrefix(scriptCall) ? Int(continuation.dropFirst(scriptCall.count)) : nil
+}

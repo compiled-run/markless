@@ -1,0 +1,32 @@
+appId: ${APP_ID}
+name: 24-row-index
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Ranked
+- assertVisible: 1\. Fig
+- assertVisible: 2\. Kiwi
+- assertVisible: 3\. Lime
+- assertNotVisible: 1\. Lime
+- tapOn: Reverse
+- assertVisible: 1\. Lime
+- assertNotVisible: 1\. Fig
+- assertNotVisible: 3\. Lime
+- assertVisible: 1\. Lime
+- assertVisible: 2\. Kiwi
+- assertVisible: 3\. Fig
+- assertNotVisible: 1\. Fig
+- assertNotVisible: 3\. Lime
+- tapOn: Drop the first
+- assertNotVisible: 1\. Lime
+- assertNotVisible: 3\. Fig
+- assertNotVisible: 2\. Kiwi
+- assertVisible: 1\. Kiwi
+- assertVisible: 2\. Fig
+- assertNotVisible: 1\. Lime
+- assertNotVisible: 3\. Fig
+- assertNotVisible: 2\. Kiwi

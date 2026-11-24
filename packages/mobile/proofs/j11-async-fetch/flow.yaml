@@ -1,67 +1,71 @@
 appId: ${APP_ID}
 name: j11-async-fetch
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Dictionary
-- assertVisible: 'Asked: apple'
+- assertVisible: "Asked: apple"
 - assertVisible: Looking up
-- assertNotVisible: 'Word: apple'
+- assertNotVisible: "Word: apple"
 - assertVisible:
-      id: markless-engine-starts
-      text: 'engine starts: 1'
+    id: markless-engine-starts
+    text: "engine starts: 1"
 - extendedWaitUntil:
-      visible: 'Word: apple'
-      timeout: 15500
-- assertVisible: 'Word: apple'
+    visible: "Word: apple"
+    timeout: 15500
+- assertVisible: "Word: apple"
 - assertNotVisible: Looking up
-- assertVisible: 'Word: apple'
-- assertVisible: 'Echo: apple'
-- assertVisible: 'Asked: apple'
+- assertVisible: "Word: apple"
+- assertVisible: "Echo: apple"
+- assertVisible: "Asked: apple"
 - assertNotVisible: Looking up
-- assertNotVisible: 'Asked: banana'
+- assertNotVisible: "Asked: banana"
 - tapOn: Banana
-- assertVisible: 'Asked: banana'
-- assertNotVisible: 'Asked: apple'
-- assertVisible: 'Asked: banana'
-- assertVisible: 'Word: apple'
-- assertNotVisible: 'Asked: apple'
+- assertVisible: "Asked: banana"
+- assertNotVisible: "Asked: apple"
+- assertVisible: "Asked: banana"
+- assertVisible: "Word: apple"
+- assertNotVisible: "Asked: apple"
 - assertNotVisible: Looking up
 - extendedWaitUntil:
-      visible: 'Word: banana'
-      timeout: 15500
-- assertNotVisible: 'Word: apple'
-- assertVisible: 'Word: banana'
-- assertVisible: 'Echo: banana'
-- assertNotVisible: 'Word: apple'
-- assertNotVisible: 'Asked: missing'
+    visible: "Word: banana"
+    timeout: 15500
+- assertNotVisible: "Word: apple"
+- assertVisible: "Word: banana"
+- assertVisible: "Echo: banana"
+- assertNotVisible: "Word: apple"
+- assertNotVisible: "Asked: missing"
 - tapOn: Missing
-- assertVisible: 'Asked: missing'
-- assertVisible: 'Asked: missing'
-- assertVisible: 'Word: banana'
-- assertNotVisible: 'Asked: banana'
-- assertNotVisible: 'Failed: No entry for missing'
+- assertVisible: "Asked: missing"
+- assertVisible: "Asked: missing"
+- assertVisible: "Word: banana"
+- assertNotVisible: "Asked: banana"
+- assertNotVisible: "Failed: No entry for missing"
 - extendedWaitUntil:
-      visible: 'Word: banana'
-      timeout: 15500
-- assertVisible: 'Failed: No entry for missing'
-- assertVisible: 'Word: banana'
-- assertVisible: 'Failed: No entry for missing'
+    visible: "Word: banana"
+    timeout: 15500
+- assertVisible: "Failed: No entry for missing"
+- assertVisible: "Word: banana"
+- assertVisible: "Failed: No entry for missing"
 - assertNotVisible: Looking up
-- assertNotVisible: 'Asked: cherry'
+- assertNotVisible: "Asked: cherry"
 - tapOn: Cherry
-- assertVisible: 'Asked: cherry'
-- assertVisible: 'Asked: cherry'
-- assertVisible: 'Word: banana'
-- assertVisible: 'Failed: No entry for missing'
-- assertNotVisible: 'Asked: missing'
+- assertVisible: "Asked: cherry"
+- assertVisible: "Asked: cherry"
+- assertVisible: "Word: banana"
+- assertVisible: "Failed: No entry for missing"
+- assertNotVisible: "Asked: missing"
 - assertNotVisible: Looking up
 - extendedWaitUntil:
-      visible: 'Word: cherry'
-      timeout: 15500
-- assertNotVisible: 'Word: banana'
-- assertNotVisible: 'Failed: No entry for missing'
-- assertVisible: 'Word: cherry'
-- assertVisible: 'Echo: cherry'
-- assertNotVisible: 'Word: banana'
-- assertNotVisible: 'Failed: No entry for missing'
+    visible: "Word: cherry"
+    timeout: 15500
+- assertNotVisible: "Word: banana"
+- assertNotVisible: "Failed: No entry for missing"
+- assertVisible: "Word: cherry"
+- assertVisible: "Echo: cherry"
+- assertNotVisible: "Word: banana"
+- assertNotVisible: "Failed: No entry for missing"

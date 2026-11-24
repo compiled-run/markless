@@ -1,0 +1,17 @@
+appId: ${APP_ID}
+name: u18-visually-hidden
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Hidden text
+- assertVisible: Shown above
+- assertVisible: Taps 0
+- assertVisible: Tap
+- tapOn: Tap
+- assertNotVisible: Taps 0
+- assertVisible: Taps 1
+- assertNotVisible: Taps 0

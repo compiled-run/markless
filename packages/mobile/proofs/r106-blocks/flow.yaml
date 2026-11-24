@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r106-blocks
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Blocks
 - assertVisible: Quotes, figures and rules
 - assertVisible: Second level
@@ -15,17 +19,17 @@ name: r106-blocks
 - assertVisible: Its caption
 - assertVisible: Contact the author
 - assertVisible:
-      text: Sixth level
-      below: Blocks
+    text: Sixth level
+    below: Blocks
 - assertVisible:
-      text: Simple things should be simple\.
-      below: Sixth level
+    text: Simple things should be simple\.
+    below: Sixth level
 - assertVisible:
-      text: A figure's content
-      below: Simple things should be simple\.
+    text: A figure's content
+    below: Simple things should be simple\.
 - assertVisible:
-      text: Its caption
-      below: A figure's content
+    text: Its caption
+    below: A figure's content
 - assertVisible:
-      text: Contact the author
-      below: Its caption
+    text: Contact the author
+    below: Its caption

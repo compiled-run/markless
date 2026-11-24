@@ -1,0 +1,21 @@
+appId: ${APP_ID}
+name: u68-component-rows
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Guide
+- assertVisible: "START: 2 pages"
+- assertVisible: "GUIDES: 3 pages"
+- assertVisible: Read 0
+- assertNotVisible: "Blog: 0 pages"
+- tapOn: Read 0
+- assertNotVisible: Read 0
+- assertVisible: Read 1
+- assertVisible: "START: 2 pages"
+- assertVisible: "GUIDES: 3 pages"
+- assertNotVisible: Read 0
+- assertNotVisible: "Blog: 0 pages"

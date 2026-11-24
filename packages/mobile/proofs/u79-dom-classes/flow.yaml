@@ -1,0 +1,32 @@
+appId: ${APP_ID}
+name: u79-dom-classes
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Field
+- assertVisible: Button
+- assertVisible: Note
+- assertVisible: Make
+- assertNotVisible: a text field
+- assertNotVisible: a button
+- assertNotVisible: an element
+- assertNotVisible: not constructible
+- tapOn: Field
+- assertVisible: a text field
+- assertVisible: a text field
+- tapOn: Button
+- assertNotVisible: a text field
+- assertVisible: a button
+- assertNotVisible: a text field
+- tapOn: Note
+- assertNotVisible: a button
+- assertVisible: an element
+- assertNotVisible: a button
+- tapOn: Make
+- assertNotVisible: an element
+- assertVisible: not constructible
+- assertNotVisible: an element

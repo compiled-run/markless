@@ -1,0 +1,53 @@
+appId: ${APP_ID}
+name: u92-slot-length
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Length slot
+- assertVisible: Row one
+- assertVisible: Row two
+- assertVisible: Marker
+- assertVisible: Lower
+- assertVisible: Drop 20
+- assertVisible:
+    text: Row one
+    below: Marker
+- assertVisible:
+    text: Row two
+    below: Row one
+- tapOn: Lower
+- assertNotVisible: Drop 20
+- assertVisible:
+    text: Marker
+    below: Row one
+- assertVisible:
+    text: Row two
+    below: Marker
+- assertVisible: Drop 90
+- assertNotVisible: Drop 20
+- assertVisible:
+    text: Marker
+    below: Row one
+- assertVisible:
+    text: Row two
+    below: Marker
+- tapOn: Lower
+- assertNotVisible: Drop 90
+- assertVisible:
+    text: Row two
+    below: Row one
+- assertVisible:
+    text: Marker
+    below: Row two
+- assertVisible: Drop 160
+- assertNotVisible: Drop 90
+- assertVisible:
+    text: Row two
+    below: Row one
+- assertVisible:
+    text: Marker
+    below: Row two

@@ -61,6 +61,8 @@ final class ProofDevice: NativeDevice {
 	func call(_ name: String, object: String?, _ arguments: [NativeValue], settle: (@MainActor (DeviceOutcome) -> Void)?) throws {
 		calls.append(name)
 		label.text = "calls: " + calls.joined(separator: ", ")
+		// The browser would cover the app the flow reads: the call is listed and goes no further.
+		if name == "browser.open" { return settle?(.value(.null)) ?? () }
 		if let object, name == "recorder.active" { return record(object, arguments.first == .bool(true)) }
 		guard let object, name.hasPrefix("camera.") else { return try platform.call(name, object: object, arguments, settle: settle) }
 		switch name {
@@ -266,9 +268,11 @@ final class ShellSceneDelegate: UIResponder, UIWindowSceneDelegate {
 			var fonts: [String: Data] = [:]
 			let fontFolder = bundle.appending(path: "markless-fonts")
 			for file in (try? FileManager.default.contentsOfDirectory(at: fontFolder, includingPropertiesForKeys: nil)) ?? [] {
-				fonts["sha256:" + file.deletingPathExtension().lastPathComponent] = try Data(contentsOf: file)
+				let name = file.deletingPathExtension().lastPathComponent
+				fonts[name.count == 64 && name.allSatisfy(\.isHexDigit) ? "sha256:" + name : name] = try Data(contentsOf: file)
 			}
-			return try MarklessRoot.controller(payload: payload, style: style, fonts: fonts, path: path, device: ProofDevice.shared)
+			return try MarklessRoot.controller(
+				payload: payload, style: style, fonts: fonts, images: NativeImageAsset.bundled(in: bundle), path: path, device: ProofDevice.shared)
 		} catch {
 			NSLog("markless-shell: %@", "\(error)")
 			let controller = UIViewController()

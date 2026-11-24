@@ -1,0 +1,102 @@
+appId: ${APP_ID}
+name: f9-form-arms
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Order
+- assertVisible: Send
+- assertVisible: Make it a gift
+- assertVisible: Typed nothing
+- assertVisible: Noted nothing
+- assertVisible: Not wrapped
+- assertVisible: Nothing sent
+- assertNotVisible: Send gift
+- assertNotVisible: No gift
+- assertNotVisible: Sent , note null, wrap null
+- tapOn: Send
+- assertVisible: Sent , note null, wrap null
+- assertNotVisible: Nothing sent
+- assertVisible: Sent , note null, wrap null
+- assertVisible: Make it a gift
+- assertVisible: Typed nothing
+- assertNotVisible: Nothing sent
+- assertNotVisible: Send gift
+- tapOn: Name
+- eraseText
+- inputText: Ann
+- hideKeyboard
+- assertNotVisible: Typed nothing
+- assertVisible: Typed Ann
+- assertVisible: Sent , note null, wrap null
+- assertVisible: Make it a gift
+- assertNotVisible: Typed nothing
+- assertNotVisible: Send gift
+- tapOn: Make it a gift
+- assertVisible: Send gift
+- assertNotVisible: Make it a gift
+- assertVisible: Send gift
+- assertVisible: No gift
+- assertVisible: Typed Ann
+- assertVisible: Sent , note null, wrap null
+- assertVisible: Noted nothing
+- assertNotVisible: Make it a gift
+- tapOn: Note
+- eraseText
+- inputText: Red
+- hideKeyboard
+- assertNotVisible: Noted nothing
+- assertVisible: Noted Red
+- assertVisible: Send gift
+- assertVisible: Not wrapped
+- assertVisible: Sent , note null, wrap null
+- assertNotVisible: Noted nothing
+- assertNotVisible: Make it a gift
+- assertNotVisible: Wrapped
+- tapOn: Wrap it
+- assertVisible: Wrapped
+- assertNotVisible: Not wrapped
+- assertVisible: Wrapped
+- assertVisible: Noted Red
+- assertVisible: Send gift
+- assertVisible: Sent , note null, wrap null
+- assertNotVisible: Not wrapped
+- assertNotVisible: Sent Ann, note Red, wrap on
+- tapOn: Send gift
+- assertVisible: Sent Ann, note Red, wrap on
+- assertNotVisible: Sent , note null, wrap null
+- assertVisible: Sent Ann, note Red, wrap on
+- assertVisible: Wrapped
+- assertVisible: No gift
+- assertNotVisible: Sent , note null, wrap null
+- assertNotVisible: Make it a gift
+- tapOn: No gift
+- assertVisible: Make it a gift
+- assertNotVisible: No gift
+- assertVisible: Make it a gift
+- assertVisible: Sent Ann, note Red, wrap on
+- assertNotVisible: Send gift
+- assertNotVisible: No gift
+- tapOn: Send
+- assertNotVisible: Sent Ann, note Red, wrap on
+- assertVisible: Sent Ann, note null, wrap null
+- assertVisible: Make it a gift
+- assertNotVisible: Sent Ann, note Red, wrap on
+- assertNotVisible: Send gift
+- tapOn: Make it a gift
+- assertVisible: Send gift
+- assertNotVisible: Make it a gift
+- assertVisible: Send gift
+- assertVisible: No gift
+- assertVisible: Sent Ann, note null, wrap null
+- assertNotVisible: Make it a gift
+- tapOn: Send gift
+- assertNotVisible: Sent Ann, note null, wrap null
+- assertVisible: Sent Ann, note , wrap null
+- assertVisible: No gift
+- assertNotVisible: Sent Ann, note null, wrap null
+- assertNotVisible: Sent Ann, note Red, wrap on
+- assertNotVisible: Make it a gift

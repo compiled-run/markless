@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u20-modal
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Modal
 - assertVisible: Delete draft
 - assertVisible: Sign out
@@ -19,7 +23,7 @@ name: u20-modal
 - assertVisible: It cannot be undone
 - assertVisible: Delete
 - tapOn:
-      point: 50%,8%
+    point: 50%,8%
 - assertNotVisible: Delete this draft\?
 - assertNotVisible: It cannot be undone
 - assertVisible: Delete draft
@@ -53,12 +57,12 @@ name: u20-modal
 - assertVisible: Delete this draft\?
 - assertVisible: Delete this draft\?
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - back
-          - assertNotVisible: Delete this draft\?
-          - assertVisible: Delete draft
-          - assertVisible: Changes 6
-          - assertNotVisible: Delete this draft\?
-          - assertNotVisible: Changes 4
+    when:
+      platform: Android
+    commands:
+      - back
+      - assertNotVisible: Delete this draft\?
+      - assertVisible: Delete draft
+      - assertVisible: Changes 6
+      - assertNotVisible: Delete this draft\?
+      - assertNotVisible: Changes 4

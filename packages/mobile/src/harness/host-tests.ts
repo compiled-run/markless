@@ -2,6 +2,7 @@
 // tests, its UIKit ones included, on the simulator the rungs use; the Kotlin host's JVM conformance test.
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { dragonDir } from '../style-export.ts';
 import { exec } from './exec.ts';
 import { cacheRoot, contentKey, filesUnder } from './tools.ts';
 
@@ -9,6 +10,7 @@ import { cacheRoot, contentKey, filesUnder } from './tools.ts';
 export const DRAGON_FONT_TESTS = [
 	'MarklessMobileTests/paintsDragonsExport()',
 	'MarklessMobileTests/refusesMissingOrWrongFonts()',
+	'MarklessMobileTests/aStyledTextFieldDrawsItsValueInItsEditorBox()',
 ] as const;
 
 export type HostTestOutcome = {
@@ -50,6 +52,26 @@ const failureLines = (output: string, pattern: RegExp) =>
 		.filter((line) => pattern.test(line))
 		.slice(0, 40);
 
+/** The Dragon checkout when there is one: the iOS UIKit tests that paint with its faces read their files from it. */
+export const dragonCheckout = (): string | undefined => {
+	const dir = dragonDir();
+	return existsSync(join(dir, 'package.json')) ? dir : undefined;
+};
+
+const iosHostTestSources = (iosPackage: string) => [
+	...filesUnder(iosPackage, '.swift'),
+	...filesUnder(join(iosPackage, 'Tests'), '.json'),
+	...filesUnder(conformance(iosPackage), '.json'),
+	...filesUnder(conformance(iosPackage), '.js'),
+];
+
+/**
+ * The iOS host tests' inputs, without the simulator: CI keys a pass with it, so a pull request whose inputs already passed
+ * on main or on an earlier push skips the macOS job.
+ */
+export const iosHostTestsKey = (iosPackage: string, dragon: string | undefined): string =>
+	contentKey(iosPackage, iosHostTestSources(iosPackage), [dragon ? 'fonts' : 'no-fonts']);
+
 /**
  * `xcodebuild test` of the iOS host package on a booted simulator: MarklessCore and the UIKit tests. Without a Dragon
  * checkout the two tests that need its font files are skipped by name, and the outcome lists them.
@@ -59,11 +81,7 @@ export function iosHostTests(
 	udid: string,
 	dragon: string | undefined,
 ): Promise<HostTestOutcome> {
-	const sources = [
-		...filesUnder(iosPackage, '.swift'),
-		...filesUnder(join(iosPackage, 'Tests'), '.json'),
-		...filesUnder(conformance(iosPackage), '.json'),
-	];
+	const sources = iosHostTestSources(iosPackage);
 	const key = contentKey(iosPackage, sources, [udid, dragon ? 'fonts' : 'no-fonts']);
 	return remembered('ios', key, async () => {
 		const skipped = dragon ? [] : [...DRAGON_FONT_TESTS];
@@ -109,6 +127,7 @@ export function androidHostTests(androidSources: string): Promise<HostTestOutcom
 		...filesUnder(hostDir, '.kt'),
 		...filesUnder(join(hostDir, 'test'), '.json'),
 		...filesUnder(conformance(hostDir), '.json'),
+		...filesUnder(conformance(hostDir), '.js'),
 		script,
 	];
 	return remembered('android', contentKey(hostDir, sources), async () => {

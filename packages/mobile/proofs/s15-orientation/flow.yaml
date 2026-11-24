@@ -1,0 +1,27 @@
+appId: ${APP_ID}
+name: s15-orientation
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- setOrientation: PORTRAIT
+- assertVisible: "Held upright: one day at a time"
+- assertNotVisible: "Turned on its side: the whole week"
+- assertVisible: Week
+- setOrientation: LANDSCAPE_LEFT
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible: "Turned on its side: the whole week"
+- assertNotVisible: "Held upright: one day at a time"
+- assertVisible: "Turned on its side: the whole week"
+- assertNotVisible: "Held upright: one day at a time"
+- setOrientation: PORTRAIT
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible: "Held upright: one day at a time"
+- assertNotVisible: "Turned on its side: the whole week"
+- assertVisible: "Held upright: one day at a time"
+- assertNotVisible: "Turned on its side: the whole week"

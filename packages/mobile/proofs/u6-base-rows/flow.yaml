@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u6-base-rows
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Tasks
 - assertVisible: Milk
 - assertVisible: Bread
@@ -12,8 +16,8 @@ name: u6-base-rows
 - assertNotVisible: No tasks
 - assertNotVisible: Eggs
 - assertVisible:
-      text: Bread
-      below: Milk
+    text: Bread
+    below: Milk
 - tapOn: Milk
 - assertNotVisible: Done 0
 - assertVisible: Done 1

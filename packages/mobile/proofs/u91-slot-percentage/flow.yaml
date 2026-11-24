@@ -1,0 +1,53 @@
+appId: ${APP_ID}
+name: u91-slot-percentage
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Percentage slot
+- assertVisible: Row one
+- assertVisible: Row two
+- assertVisible: Marker
+- assertVisible: Lower
+- assertVisible: Share 10
+- assertVisible:
+    text: Row one
+    below: Marker
+- assertVisible:
+    text: Row two
+    below: Row one
+- tapOn: Lower
+- assertNotVisible: Share 10
+- assertVisible:
+    text: Marker
+    below: Row one
+- assertVisible:
+    text: Row two
+    below: Marker
+- assertVisible: Share 50
+- assertNotVisible: Share 10
+- assertVisible:
+    text: Marker
+    below: Row one
+- assertVisible:
+    text: Row two
+    below: Marker
+- tapOn: Lower
+- assertNotVisible: Share 50
+- assertVisible:
+    text: Row two
+    below: Row one
+- assertVisible:
+    text: Marker
+    below: Row two
+- assertVisible: Share 90
+- assertNotVisible: Share 50
+- assertVisible:
+    text: Row two
+    below: Row one
+- assertVisible:
+    text: Marker
+    below: Row two

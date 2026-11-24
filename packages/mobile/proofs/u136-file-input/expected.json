@@ -1,0 +1,18 @@
+{
+	"rung": 241,
+	"name": "A button's showPicker() opens a file input's picker, and its change handler reads the files chosen, as on the web",
+	"pick": [
+		{ "name": "note.txt", "text": "hello", "type": "text/plain" },
+		{ "name": "list.txt", "text": "a,b", "type": "text/plain" }
+	],
+	"steps": [
+		{
+			"visible": ["Pick", "Choose", "none"]
+		},
+		{
+			"do": { "tap": "Choose" },
+			"visible": ["note.txt 5 text/plain, list.txt 3 text/plain"],
+			"absent": ["none"]
+		}
+	]
+}

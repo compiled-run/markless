@@ -4,7 +4,11 @@ import type {
 	ProtocolStatePayload,
 	ProtocolViewPayload,
 } from '@markless/serializer';
-import type { ProtocolSharedScope, RenderedPayloadScripts } from '@markless/serializer';
+import type {
+	ProtocolRepeatKeyParts,
+	ProtocolSharedScope,
+	RenderedPayloadScripts,
+} from '@markless/serializer';
 import type { CompilerDiagnostic, SourceSpan } from './diagnostics.ts';
 
 export type { CompilerDiagnostic, DiagnosticSuggestion, SourceSpan } from './diagnostics.ts';
@@ -97,6 +101,8 @@ export type NativeFactCollectors = {
 	readonly expression: (node: never) => SemanticExpression;
 	/** A computed's function as one tree: its block's statements, or its expression body; none without a body. */
 	readonly computedValue: (fn: never) => SemanticExpression | undefined;
+	/** What a function can return, read off its syntax. */
+	readonly returns: (fn: never) => SemanticValueSet;
 	/** A module-level function's parameters and body as one tree. */
 	readonly functionBody: (node: never) => SemanticModuleFunction['native'];
 	/** Each top-level function that is not a component, with the names it is exported by. */
@@ -122,10 +128,17 @@ export type NativeFactCollectors = {
 export type SemanticScriptGlobal = {
 	readonly name: string;
 	readonly span: SourceSpan;
-	/** Only `typeof name`: feature detection, which the engine answers by itself. */
-	readonly typeofOnly: boolean;
+	/**
+	 * How the code reaches it: `typeof` only feature-detects, which the engine answers by itself; `ifPresent` reads it
+	 * only past a `typeof name` test that found it defined, so never where it is absent.
+	 */
+	readonly reach: 'typeof' | 'ifPresent' | 'read';
 	/** `window.x`, `globalThis.x`, `self.x`: the property read off the global object. */
 	readonly property?: string;
+	/** `document.activeElement`: the member this use reads straight off the global, when it reads one by name. */
+	readonly member?: string;
+	/** A module statement's use inside a function it declares: it runs when that function is called, not as the module loads. */
+	readonly deferred?: true;
 };
 
 /** A handler's or computed's own JavaScript, as a phone's script engine runs it. Native builds only. */
@@ -137,7 +150,15 @@ export type SemanticScriptFunction = {
 	 */
 	readonly code: string;
 	/** The component's names it reads as `__s.<name>`, and whether it assigns them. */
-	readonly names: ReadonlyArray<{ readonly name: string; readonly written: boolean; readonly span: SourceSpan }>;
+	readonly names: ReadonlyArray<{
+		readonly name: string;
+		readonly written: boolean;
+		readonly span: SourceSpan;
+		/** The methods called on it (`cam.takePhoto()`), when every use is such a call; absent once any use is not. */
+		readonly calledOnly?: ReadonlyArray<string>;
+		/** The members it reads by name (`toasts.queue`), when every use is such a read; absent once any use is not. */
+		readonly membersOnly?: ReadonlyArray<string>;
+	}>;
 	/** Module-level names it reads as written, which its module's statements declare. */
 	readonly module: ReadonlyArray<string>;
 	/** What it reads from imports: `__i[slot]`, then `name` (null: the whole module). */
@@ -145,14 +166,23 @@ export type SemanticScriptFunction = {
 	/** Each use of its first parameter (the event), as the member path read off it (`['target', 'value']`; empty: whole). */
 	readonly event?: ReadonlyArray<{ readonly path: ReadonlyArray<string>; readonly span: SourceSpan }>;
 	readonly globals: ReadonlyArray<SemanticScriptGlobal>;
-	/** Framework imports it uses (`navigate`), which are not JavaScript a script can run. */
+	/** Framework imports it uses that are not JavaScript a script can run. */
 	readonly framework: ReadonlyArray<{ readonly name: string; readonly source: string; readonly span: SourceSpan }>;
+	/** Each place it reaches `navigate` from `@markless/router`, which the host's route table stands in for. */
+	readonly navigates: ReadonlyArray<SourceSpan>;
+	/** Each `@markless/device` call it makes (`location.current()`), which the host makes for it. */
+	readonly devices: ReadonlyArray<SemanticScriptDeviceCall>;
 	readonly span: SourceSpan;
 	/** Constructs the engine cannot run as written (an `enum`), from type erasure. */
 	readonly unsupported: ReadonlyArray<{ readonly construct: string; readonly span: SourceSpan }>;
 };
 
-export type SemanticScriptImportUse = { readonly slot: number; readonly name: string | null };
+export type SemanticScriptImportUse = {
+	readonly slot: number;
+	readonly name: string | null;
+	/** The members read on it (`toaster.say`), when every use reads one by name: of a namespace, only those reach the script. */
+	readonly members?: ReadonlyArray<string>;
+};
 
 /** One top-level statement of a module as script code, with what it declares and reaches. */
 export type SemanticScriptStatement = {
@@ -168,8 +198,13 @@ export type SemanticScriptStatement = {
 	/** Names it uses that a script leaves out (a component, top-level framework state). */
 	readonly dropped: ReadonlyArray<{ readonly name: string; readonly span: SourceSpan }>;
 	readonly framework: ReadonlyArray<{ readonly name: string; readonly source: string; readonly span: SourceSpan }>;
+	readonly navigates: ReadonlyArray<SourceSpan>;
+	readonly devices: ReadonlyArray<SemanticScriptDeviceCall>;
 	readonly unsupported: ReadonlyArray<{ readonly construct: string; readonly span: SourceSpan }>;
 };
+
+/** A `@markless/device` call a script makes, by the name a build records (`location.current`). */
+export type SemanticScriptDeviceCall = { readonly call: string; readonly span: SourceSpan };
 
 /** An export of a script module: a local name, a name of another module (`from` null: the whole module), or `export *`. */
 export type SemanticScriptExport =
@@ -315,6 +350,8 @@ export type SemanticComponentPropBinding =
 			readonly definitionSpans?: ReadonlyArray<SourceSpan>;
 			/** A callback's body as statements, collected for native builds only (`nativeFacts`). */
 			readonly nativeStatements?: ReadonlyArray<SemanticHandlerStatement>;
+			/** The name each callback parameter binds (`''` for a pattern), where `parameters` holds its source text. */
+			readonly nativeParameters?: ReadonlyArray<string>;
 			/** An opaque prop's value as a tree, collected for native builds only (`nativeFacts`). */
 			readonly nativeExpression?: SemanticExpression;
 			// `@catch (error, reset)` reset names a callback prop's own source calls, with the boundary each resets.
@@ -478,8 +515,12 @@ export type SemanticGraphBinding = {
 	readonly async?: boolean;
 	readonly asyncCapable?: boolean;
 	readonly dependencies?: ReadonlyArray<SemanticGraphDependency>;
-	/** A sync computed's body as a tree, for native builds only (`nativeFacts`). */
+	/** A sync computed's body, or a state's first value that does not fold, as a tree, for native builds only (`nativeFacts`). */
 	readonly nativeExpression?: SemanticExpression;
+	/** Where a computed's function is written, for native builds only: the script engine runs it when data cannot. */
+	readonly nativeFunctionSpan?: SourceSpan;
+	/** What a computed's function can give (an async one: what it settles to), for native builds only. */
+	readonly nativeReturns?: SemanticValueSet;
 	readonly functionSource?: string;
 	// A synthetic computed spelling one run of text: inside @try it waits on its async inputs, not on itself.
 	readonly joinsText?: true;
@@ -1033,10 +1074,14 @@ export type SemanticKeyedRepeat = {
 	readonly collectionPath: ReadonlyArray<string>;
 	/** The collection as a tree (native builds only). */
 	readonly collectionExpression?: SemanticExpression;
+	/** Where the collection is written, which finds it when no row element does (native builds only). */
+	readonly collectionSpan?: SourceSpan;
 	readonly keySource: string;
 	// Empty means the item ITSELF is the key (`key row`), which a list of scalars
 	// is; `indexKey` is what says a row has no data identity at all.
 	readonly keyPath: ReadonlyArray<string>;
+	// A key joined from the item's fields; `keyPath` is then empty and is not the key.
+	readonly keyParts?: ProtocolRepeatKeyParts;
 	readonly indexKey?: true;
 	// A @for inside another @for's row renders once per enclosing row.
 	readonly enclosingRepeatId?: string;
@@ -1407,6 +1452,17 @@ export type SemanticGraphAlias = {
 	readonly sourceSpan?: SourceSpan;
 };
 
+/**
+ * What a function or computed can give, read off its syntax for native builds: the literals a value can be, an object's
+ * fields, an array's elements, or a call to a function the build resolves by name. Anything else is unknown.
+ */
+export type SemanticValueSet =
+	| { readonly kind: 'literals'; readonly values: ReadonlyArray<string | number | boolean | null> }
+	| { readonly kind: 'object'; readonly fields: Readonly<Record<string, SemanticValueSet>> }
+	| { readonly kind: 'array'; readonly elements: SemanticValueSet }
+	| { readonly kind: 'call'; readonly callee: string }
+	| { readonly kind: 'unknown' };
+
 /** A top-level `function` of a module: what a native build inlines where an expression calls it. */
 export type SemanticModuleFunction = {
 	readonly name: string;
@@ -1419,6 +1475,8 @@ export type SemanticModuleFunction = {
 	};
 	/** Its body as handler statements, for a call made for what it does (`focusIntoSurface(...)`) rather than its value. */
 	readonly effects?: ReadonlyArray<SemanticHandlerStatement>;
+	/** What it can return (an async function: what its promise settles to). */
+	readonly returns?: SemanticValueSet;
 };
 
 /** A top-level `const` of a module that no statement writes through: what a native build reads where a name reads it. */
@@ -1512,7 +1570,13 @@ export type SemanticExpression =
 			readonly alternate: SemanticExpression;
 	  }
 	| { readonly kind: 'template'; readonly parts: ReadonlyArray<string | SemanticExpression> }
-	| { readonly kind: 'member'; readonly object: SemanticExpression; readonly property: string }
+	/** `optional`: the read is in an optional chain at or after a `?.`, so a nullish object gives undefined. */
+	| {
+			readonly kind: 'member';
+			readonly object: SemanticExpression;
+			readonly property: string;
+			readonly optional?: true;
+	  }
 	/** `object[index]` with an index that is not a literal. */
 	| {
 			readonly kind: 'index';
@@ -1541,6 +1605,8 @@ export type SemanticExpression =
 			readonly kind: 'object';
 			readonly entries: ReadonlyArray<readonly [string, SemanticExpression]>;
 	  }
+	/** An object literal with spreads (`{ ...row, name }`): each part's own fields in order, a later key winning. */
+	| { readonly kind: 'merge'; readonly parts: ReadonlyArray<SemanticExpression> }
 	/** A method called on a value: an array's or string's (with JavaScript's meaning), or an element's, which a native build resolves itself. */
 	| {
 			readonly kind: 'method';
@@ -1998,6 +2064,8 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				readonly cardinality: 'zero-or-one';
 				readonly nullishTag: 'omit';
 				readonly tag: SemanticMarkupResidue;
+				/** Native builds only: the tag as a tree a native build folds for each use. */
+				readonly nativeTag?: SemanticExpression;
 				readonly staticAttributes: Readonly<Record<string, string>>;
 				readonly attributeSlots: ReadonlyArray<
 					| {
@@ -2082,6 +2150,11 @@ export type SemanticGraphArtifact = {
 	readonly sharedCallbackBindings: ReadonlyArray<SemanticSharedCallbackBinding>;
 	readonly hostNodes: ReadonlyArray<SemanticHostNode>;
 	readonly keyedRepeats: ReadonlyArray<SemanticKeyedRepeat>;
+	/**
+	 * A `@for` written straight inside a component's tag whose rows this module cannot place, because it was analyzed
+	 * without the child's interface. Left out of `keyedRepeats`; a build that places rows itself (native) still reads it.
+	 */
+	readonly unplacedProjectedRepeats?: ReadonlyArray<SemanticKeyedRepeat>;
 	readonly events: ReadonlyArray<SemanticEvent>;
 	readonly syncPolicyConstants?: ReadonlyArray<SemanticSyncPolicyConstant>;
 	readonly behaviors: ReadonlyArray<SemanticBehavior>;
@@ -2167,6 +2240,7 @@ export type RenderDataRepeat = {
 	readonly collectionSource?: string;
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly keyPath: ReadonlyArray<string>;
+	readonly keyParts?: ProtocolRepeatKeyParts;
 	// Set only for `key row`: the empty path means read the item itself, not that
 	// the row is unkeyed. A position key stays a semantic-graph fact.
 	readonly itemKey?: true;
@@ -2339,6 +2413,7 @@ export type LoweredWriteThrough = {
 export type LoweredRowItem = {
 	readonly itemName: string;
 	readonly keyPath: ReadonlyArray<string> | null;
+	readonly keyParts?: ProtocolRepeatKeyParts;
 	readonly itemPath: ReadonlyArray<string>;
 	readonly enclosing?: LoweredRowItem;
 };
@@ -2422,6 +2497,7 @@ export type PayloadKeyedRepeat = {
 	readonly collectionGraphNodeId: string;
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly keyPath: ReadonlyArray<string>;
+	readonly keyParts?: ProtocolRepeatKeyParts;
 	// See SemanticKeyedRepeat: set only for a repeat inside another repeat's row.
 	readonly enclosingRepeatId?: string;
 	readonly enclosingItemPath?: ReadonlyArray<string>;
@@ -2703,6 +2779,7 @@ export type SymbolResolverPlan = {
 export type RowLocalStep = {
 	readonly rowIndex: number;
 	readonly keyPath: ReadonlyArray<string>;
+	readonly keyParts?: ProtocolRepeatKeyParts;
 	readonly indexKey?: true;
 	readonly graphNodeId?: string;
 	readonly collectionPath?: ReadonlyArray<string>;
@@ -3196,6 +3273,8 @@ export type RuntimeDemandMapArtifact = {
 	readonly nestedRecordModuleIds?: ReadonlyArray<string>;
 	readonly unknownRecordModuleIds: ReadonlyArray<string>;
 	readonly firstUsePage?: RuntimeDemandMapFirstUsePage;
+	/** A `@for` of this module is keyed by `keyParts`, so the app's browser runtime must join keys; absent otherwise. */
+	readonly joinedRepeatKeys?: true;
 };
 
 export type RuntimeDemandMapsArtifact = Record<RuntimeDemandClass, RuntimeDemandMapArtifact>;

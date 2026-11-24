@@ -1,0 +1,28 @@
+appId: ${APP_ID}
+name: u89-pointer-pressure
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Drag across this whole line to read the pressure
+- assertVisible: No press
+- assertVisible: No move
+- assertVisible: Not lifted
+- swipe:
+    from:
+      text: Drag across this whole line to read the pressure
+    direction: RIGHT
+    duration: 800
+- assertNotVisible: No press
+- assertNotVisible: No move
+- assertNotVisible: Not lifted
+- assertVisible: Pressed with pressure
+- assertVisible: Coalesced moves
+- assertVisible: Lifted at 0
+- assertNotVisible: No press
+- assertNotVisible: No move
+- assertNotVisible: Not lifted
+- assertNotVisible: No coalesced

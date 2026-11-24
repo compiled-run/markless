@@ -1,0 +1,14 @@
+appId: ${APP_ID}
+name: u36-datebox
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Booking
+- assertVisible: Start date
+- assertVisible: "3"
+- assertVisible: "30"
+- assertVisible: "2024"

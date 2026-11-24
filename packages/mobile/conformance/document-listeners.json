@@ -1,0 +1,169 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "Drag",
+		"cells": [
+			{
+				"id": "state:seen",
+				"name": "seen",
+				"initial": "none"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "div",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Pad"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"cell": "state:seen"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "pointerdown",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "pointerdown",
+						"bindings": {
+							"seen": {
+								"cell": "state:seen"
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "8e33cbe59e60ed73",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => {\n const onMove = (event) => {\n  __s.seen = `moved to ${event.clientY}`;\n };\n const onUp = () => {\n  document.removeEventListener('pointermove', onMove);\n  document.removeEventListener('pointerup', onUp);\n  __s.seen = `${__s.seen}, released`;\n };\n document.addEventListener('pointermove', onMove);\n document.addEventListener('pointerup', onUp);\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"8e33cbe59e60ed73\");\n",
+			"services": []
+		},
+		"documentEvents": true
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Pad"
+		],
+		[
+			"h2:text0",
+			"none"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h1",
+				"pointerId": 1,
+				"x": 20,
+				"y": 40,
+				"time": 1000
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "pointermove",
+				"host": "h1",
+				"pointerId": 1,
+				"x": 20,
+				"y": 60,
+				"time": 1016
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "moved to 60"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointermove",
+				"host": "h1",
+				"pointerId": 1,
+				"x": 20,
+				"y": 90,
+				"time": 1032
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "moved to 90"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerup",
+				"host": "h1",
+				"pointerId": 1,
+				"x": 20,
+				"y": 90,
+				"time": 1048
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "moved to 90, released"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "pointerdown",
+				"host": "h1",
+				"pointerId": 2,
+				"x": 20,
+				"y": 40,
+				"time": 2000
+			},
+			"journal": []
+		}
+	]
+}

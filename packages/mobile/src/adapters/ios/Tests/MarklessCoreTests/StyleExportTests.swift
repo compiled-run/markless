@@ -35,6 +35,33 @@ private func exportText(_ edit: (String) -> String = { $0 }) -> Data { Data(edit
 	#expect(layout.styles.count == decoded.nodes.count)
 }
 
+@Test func acceptsDragonsTextLinesWhichCoreTextDoesNotNeed() throws {
+	let (decoded, texts) = try payload()
+	let lines = "\"lines\": [{ \"top\": 0, \"baseline\": 70, \"runs\": [{ \"face\": \"Ahem\", \"size\": 60, \"glyphs\": [1, 2], \"xs\": [0, 60] }] }],\n     \"text\": \"Counter\""
+	let edited = exportText { $0.replacingOccurrences(of: "\"text\": \"Counter\"", with: lines) }
+	#expect(edited != counterExport)
+	let layout = try StyleExport.decode(edited).resolve(for: decoded, initialTexts: texts, value: noCells)
+	#expect(layout.styles["h1:text0"]?.frame == Frame(x: 0, y: 0, width: 284.953125 / 3, height: 29))
+}
+
+@Test func visibilityHiddenHidesTheBoxAndTheTextInsideIt() throws {
+	let (decoded, texts) = try payload()
+	let red = "\"writes\": [\n      {\n       \"kind\": \"background-color\",\n       \"color\": {\n        \"r\": 37,"
+	let hidden = "\"writes\": [\n      { \"kind\": \"visibility\", \"value\": \"hidden\", \"canvas\": false, \"key\": \"visibility\" },\n      {\n       \"kind\": \"background-color\",\n       \"color\": {\n        \"r\": 37,"
+	let edited = exportText { $0.replacingOccurrences(of: red, with: hidden) }
+	#expect(edited != counterExport)
+	let layout = try StyleExport.decode(edited).resolve(for: decoded, initialTexts: texts, value: noCells)
+	let button = try #require(layout.styles["h2"])
+	#expect(button.hidden)
+	#expect(button.background == nil)
+	#expect(button.borderWidth == 0)
+	#expect(layout.styles["h2:text0"]?.hidden == true)
+	#expect(layout.styles["h1"]?.hidden == false)
+	#expect(layout.styles["h1:text0"]?.hidden == false)
+	let gone = exportText { $0.replacingOccurrences(of: red, with: hidden.replacingOccurrences(of: "\"hidden\"", with: "\"gone\"")) }
+	#expect(throws: PayloadError.self) { try StyleExport.decode(gone).resolve(for: decoded, initialTexts: texts, value: noCells) }
+}
+
 @Test(arguments: [
 	("\"kind\": \"font\"", "\"kind\": \"letter-spacing\"", "unknown style write kind \"letter-spacing\""),
 	("dragon.native-style-export/0", "dragon.native-style-export/2", "unsupported schema"),
@@ -53,6 +80,16 @@ func refusesWhatItCannotDraw(find: String, replace: String, reason: String) thro
 	} catch {
 		#expect("\(error)".contains(reason), "\(error)")
 	}
+}
+
+@Test func anEmptyTextNeedsNoExportNodeAndAnyOtherTextDoes() throws {
+	let (decoded, texts) = try payload()
+	let renamed = exportText { $0.replacingOccurrences(of: "\"id\": \"h1:text0\"", with: "\"id\": \"h1:text9\"") }
+	let empty = texts.map { $0.node == "h1:text0" ? (node: $0.node, text: "") : $0 }
+	let layout = try StyleExport.decode(renamed).resolve(for: decoded, initialTexts: empty, value: noCells)
+	#expect(layout.styles["h1:text0"] == nil)
+	#expect(layout.styles["h1"] != nil)
+	#expect(throws: PayloadError.self) { try StyleExport.decode(renamed).resolve(for: decoded, initialTexts: texts, value: noCells) }
 }
 
 @Test func refusesAnonymousBoxesAndSyntheticBold() throws {
@@ -88,7 +125,7 @@ private func noCells(_ cell: String) throws -> NativeValue { throw PayloadError(
 private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) {
 	var url = URL(fileURLWithPath: #filePath)
 	for _ in 0..<6 { url.deleteLastPathComponent() }
-	guard case let .object(fields) = try JSONValue.parse(Data(contentsOf: url.appendingPathComponent("conformance/attributes.json"))),
+	guard case let .object(fields) = try JSONValue.parse(ConformanceEngine.vectorData(url.appendingPathComponent("conformance/attributes.json"))),
 		let json = fields.first(where: { $0.0 == "payload" })?.1
 	else { throw PayloadError(path: "vector", reason: "no payload") }
 	let payload = try NativeViewPayload.decode(json)
@@ -129,4 +166,14 @@ private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) 
 	#expect(export.assignments.count == 1)
 	#expect(export.notReady?.contains("analysis-only") == true)
 	#expect(export.assignments[0].nodes.contains { $0.isText })
+}
+
+@Test func readsTheSchemeEachAssignmentIsDrawnInAndRefusesAnUnknownOne() throws {
+	let url = try #require(Bundle.module.url(forResource: "Fixtures/ms-text.native-style", withExtension: "json"))
+	let text = String(decoding: try Data(contentsOf: url), as: UTF8.self)
+	let dark = text.replacingOccurrences(of: "\"values\": {},", with: "\"values\": {}, \"colorScheme\": \"dark\",")
+	#expect(dark != text)
+	#expect(try StyleExport.decode(Data(dark.utf8)).assignments.count == 1)
+	let other = text.replacingOccurrences(of: "\"values\": {},", with: "\"values\": {}, \"colorScheme\": \"sepia\",")
+	#expect(throws: PayloadError.self) { try StyleExport.decode(Data(other.utf8)) }
 }

@@ -1,0 +1,28 @@
+appId: ${APP_ID}
+name: u24-pagination-links
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Results
+- assertVisible: First
+- assertVisible: Second
+- assertVisible: Third
+- assertVisible: Showing page 1
+- assertNotVisible: Showing page 2
+- assertNotVisible: Showing page 3
+- tapOn: Third
+- assertVisible: Showing page 3
+- assertNotVisible: Showing page 1
+- assertVisible: Showing page 3
+- assertNotVisible: Showing page 1
+- assertNotVisible: Showing page 2
+- tapOn: Second
+- assertVisible: Showing page 2
+- assertNotVisible: Showing page 3
+- assertVisible: Showing page 2
+- assertNotVisible: Showing page 1
+- assertNotVisible: Showing page 3

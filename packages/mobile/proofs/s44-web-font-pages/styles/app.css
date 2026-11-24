@@ -1,0 +1,24 @@
+@font-face {
+	font-family: 'Que Grotesque';
+	font-weight: 400;
+	src: url('./fonts/QueGrotesque-Regular.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Que Grotesque';
+	font-weight: 600;
+	src: url('./fonts/QueGrotesque-SemiBold.woff2') format('woff2');
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	font-family: 'Que Grotesque', system-ui, sans-serif;
+	font-size: 16px;
+	line-height: 1.45;
+	color: #1f1d1a;
+	background: #fbf8f1;
+}

@@ -1,0 +1,517 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:editing",
+				"name": "editing",
+				"initial": false
+			},
+			{
+				"id": "state:note",
+				"name": "note",
+				"initial": "Not focused"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Rename"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Edit and focus"
+					}
+				]
+			},
+			{
+				"kind": "branch",
+				"id": "branch-site:0",
+				"parent": "h0",
+				"test": {
+					"cell": "state:editing"
+				},
+				"arms": 2
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "input",
+				"parent": "h0",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Focus"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Check"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Script"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Stop editing"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h8:text0",
+				"parent": "h8",
+				"parts": [
+					{
+						"cell": "state:note"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "focus",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h5",
+				"event": "activate",
+				"handler": "handler:event:3"
+			},
+			{
+				"host": "h6",
+				"event": "activate",
+				"handler": "handler:event:4"
+			},
+			{
+				"host": "h7",
+				"event": "activate",
+				"handler": "handler:event:5"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:editing",
+						"value": {
+							"literal": true
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:note",
+						"value": {
+							"literal": "Editing"
+						}
+					},
+					{
+						"op": "command",
+						"node": {
+							"drawn": "h3"
+						},
+						"command": "focus"
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:note",
+						"value": {
+							"literal": "Field focused"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "command",
+						"node": {
+							"drawn": "h3"
+						},
+						"command": "focus"
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:note",
+						"value": {
+							"if": {
+								"drawn": "h3"
+							},
+							"whenTrue": {
+								"literal": "Field shown"
+							},
+							"whenFalse": {
+								"literal": "No field"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:4",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"field": {
+								"elements": {
+									"logical": "??",
+									"left": {
+										"drawn": "h3"
+									},
+									"right": {
+										"literal": "#unbound"
+									}
+								}
+							},
+							"note": {
+								"cell": "state:note"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:5",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:editing",
+						"value": {
+							"literal": false
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:note",
+						"value": {
+							"literal": "Stopped"
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "3039a92eeb2a535e",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => {\n let seen = 'Script sees';\n for (const one of [__s.field]) seen += one === undefined ? ' nothing' : ' the field';\n __s.note = seen;\n __s.field?.focus();\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"3039a92eeb2a535e\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Rename"
+		],
+		[
+			"h2:text0",
+			"Edit and focus"
+		],
+		[
+			"h4:text0",
+			"Focus"
+		],
+		[
+			"h5:text0",
+			"Check"
+		],
+		[
+			"h6:text0",
+			"Script"
+		],
+		[
+			"h7:text0",
+			"Stop editing"
+		],
+		[
+			"h8:text0",
+			"Not focused"
+		]
+	],
+	"initialArms": [
+		[
+			"branch-site:0",
+			1
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h8:text0",
+					"value": "No field"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h8:text0",
+					"value": "Script sees nothing"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 0
+				},
+				{
+					"op": "text",
+					"node": "h8:text0",
+					"value": "Editing"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h8:text0",
+					"value": "Field shown"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h8:text0",
+					"value": "Script sees the field"
+				},
+				{
+					"op": "command",
+					"node": "h3",
+					"command": "focus"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "focus",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h8:text0",
+					"value": "Field focused"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h7"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 1
+				},
+				{
+					"op": "text",
+					"node": "h8:text0",
+					"value": "Stopped"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h8:text0",
+					"value": "No field"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 0
+				},
+				{
+					"op": "text",
+					"node": "h8:text0",
+					"value": "Editing"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "command",
+					"node": "h3",
+					"command": "focus"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "focus",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h8:text0",
+					"value": "Field focused"
+				}
+			]
+		}
+	]
+}

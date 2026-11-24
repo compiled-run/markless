@@ -1,0 +1,49 @@
+appId: ${APP_ID}
+name: u67-row-arms
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Errands
+- assertVisible: Finish Apples
+- assertVisible: Bread done
+- assertVisible: Add cheese
+- assertVisible: Undo all
+- assertNotVisible: Apples done
+- assertNotVisible: Finish Bread
+- assertNotVisible: Finish Cheese
+- tapOn: Finish Apples
+- assertVisible: Apples done
+- assertNotVisible: Finish Apples
+- assertVisible: Apples done
+- assertVisible: Bread done
+- assertNotVisible: Finish Apples
+- assertNotVisible: Finish Cheese
+- tapOn: Add cheese
+- assertVisible: Finish Cheese
+- assertVisible: Finish Cheese
+- assertVisible: Apples done
+- assertVisible: Bread done
+- assertNotVisible: Finish Apples
+- assertNotVisible: Finish Bread
+- tapOn: Undo all
+- assertVisible: Finish Apples
+- assertVisible: Finish Bread
+- assertNotVisible: Apples done
+- assertNotVisible: Bread done
+- assertVisible: Finish Apples
+- assertVisible: Finish Bread
+- assertVisible: Finish Cheese
+- assertNotVisible: Apples done
+- assertNotVisible: Bread done
+- tapOn: Finish Bread
+- assertVisible: Bread done
+- assertNotVisible: Finish Bread
+- assertVisible: Bread done
+- assertVisible: Finish Apples
+- assertVisible: Finish Cheese
+- assertNotVisible: Finish Bread
+- assertNotVisible: Apples done

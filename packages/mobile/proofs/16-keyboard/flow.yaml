@@ -1,19 +1,23 @@
 appId: ${APP_ID}
 name: 16-keyboard
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Keyboard
 - assertVisible: Line 1
 - assertNotVisible: Note
 - repeat:
-      times: 80
-      while:
-          notVisible: Note
-      commands:
-          - swipe:
-                start: 50%, 80%
-                end: 50%, 25%
+    times: 80
+    while:
+      notVisible: Note
+    commands:
+      - swipe:
+          start: 50%, 80%
+          end: 50%, 25%
 - assertVisible: Note
 - assertNotVisible: Keyboard
 - assertVisible: Note

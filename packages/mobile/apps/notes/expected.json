@@ -1,0 +1,74 @@
+{
+	"rung": "Y-notes",
+	"name": "Yardstick notes as one app: empty list, write a note, back to the list, open it, back, search",
+	"steps": [
+		{
+			"visible": ["No notes yet", "Write your first note"],
+			"title": "All notes"
+		},
+		{
+			"do": {
+				"tap": "Write your first note"
+			},
+			"visible": ["Title", "Save note"],
+			"absent": ["No notes yet"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Title",
+					"text": "Groceries"
+				}
+			},
+			"visible": ["Save note"],
+			"fields": {
+				"Title": "Groceries"
+			}
+		},
+		{
+			"do": {
+				"tap": "Save note"
+			},
+			"visible": ["Groceries", "Edit"],
+			"absent": ["Save note"]
+		},
+		{
+			"do": {
+				"back": "button"
+			},
+			"visible": ["Save note"],
+			"absent": ["Edit"]
+		},
+		{
+			"do": {
+				"back": "button"
+			},
+			"visible": ["All notes", { "startsWith": "Groceries" }],
+			"absent": ["Save note"]
+		},
+		{
+			"do": {
+				"tap": { "startsWith": "Groceries" }
+			},
+			"visible": ["Edit"],
+			"absent": ["Search notes"]
+		},
+		{
+			"do": {
+				"back": "button"
+			},
+			"visible": ["All notes", { "startsWith": "Groceries" }],
+			"absent": ["Edit"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Search notes",
+					"text": "zzz"
+				}
+			},
+			"visible": ["No notes match “zzz”"],
+			"absent": [{ "startsWith": "Groceries" }]
+		}
+	]
+}

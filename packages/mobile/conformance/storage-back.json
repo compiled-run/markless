@@ -1,0 +1,457 @@
+{
+	"version": "markless.native-app-conformance/0",
+	"app": {
+		"version": "markless.native-app/0",
+		"routes": [
+			{
+				"pattern": "/",
+				"params": [],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Home",
+					"route": {
+						"pattern": "/",
+						"params": []
+					},
+					"cells": [
+						{
+							"id": "storage:ladder-kept-back",
+							"name": "kept",
+							"initial": "0",
+							"storage": {
+								"key": "ladder-kept-back"
+							}
+						}
+					],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "h1",
+							"parent": "h0",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Home page"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h3",
+							"element": "p",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h3:text0",
+							"parent": "h3",
+							"parts": [
+								{
+									"text": "Home kept "
+								},
+								{
+									"cell": "storage:ladder-kept-back"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h4",
+							"element": "p",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h4:text0",
+							"parent": "h4",
+							"parts": [
+								{
+									"text": "Next is "
+								},
+								{
+									"expr": {
+										"binary": "+",
+										"left": {
+											"call": "Number",
+											"arguments": [
+												{
+													"cell": "storage:ladder-kept-back"
+												}
+											]
+										},
+										"right": {
+											"literal": 1
+										}
+									}
+								}
+							]
+						},
+						{
+							"kind": "branch",
+							"id": "branch-site:0",
+							"parent": "h0",
+							"test": {
+								"binary": "===",
+								"left": {
+									"cell": "storage:ladder-kept-back"
+								},
+								"right": {
+									"literal": "0"
+								}
+							},
+							"arms": 2
+						},
+						{
+							"kind": "element",
+							"id": "h5",
+							"element": "p",
+							"parent": "h0",
+							"arm": {
+								"branch": "branch-site:0",
+								"index": 0
+							}
+						},
+						{
+							"kind": "text",
+							"id": "h5:text0",
+							"parent": "h5",
+							"parts": [
+								{
+									"text": "Nothing kept yet"
+								}
+							],
+							"arm": {
+								"branch": "branch-site:0",
+								"index": 0
+							}
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0",
+							"element": "a",
+							"parent": "h0",
+							"attributes": {
+								"href": "/bump"
+							}
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0:text0",
+							"parent": "component-edge:0",
+							"parts": [
+								{
+									"text": "Open bump"
+								}
+							]
+						}
+					],
+					"events": [
+						{
+							"host": "component-edge:0",
+							"event": "activate",
+							"handler": "handler:component-edge:0"
+						}
+					],
+					"handlers": [
+						{
+							"id": "handler:component-edge:0",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/bump",
+									"params": {}
+								}
+							]
+						}
+					],
+					"title": [
+						{
+							"text": "Home"
+						}
+					]
+				}
+			},
+			{
+				"pattern": "/bump",
+				"params": [],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Bump",
+					"route": {
+						"pattern": "/bump",
+						"params": []
+					},
+					"cells": [
+						{
+							"id": "storage:ladder-kept-back",
+							"name": "kept",
+							"initial": "0",
+							"storage": {
+								"key": "ladder-kept-back"
+							}
+						}
+					],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "h1",
+							"parent": "h0",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Bump page"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h3",
+							"element": "p",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h3:text0",
+							"parent": "h3",
+							"parts": [
+								{
+									"text": "Bump kept "
+								},
+								{
+									"cell": "storage:ladder-kept-back"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h4",
+							"element": "button",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h4:text0",
+							"parent": "h4",
+							"parts": [
+								{
+									"text": "Bump it"
+								}
+							]
+						}
+					],
+					"events": [
+						{
+							"host": "h4",
+							"event": "activate",
+							"handler": "handler:event:0"
+						}
+					],
+					"handlers": [
+						{
+							"id": "handler:event:0",
+							"ops": [
+								{
+									"op": "assign",
+									"cell": "storage:ladder-kept-back",
+									"value": {
+										"call": "String",
+										"arguments": [
+											{
+												"binary": "+",
+												"left": {
+													"call": "Number",
+													"arguments": [
+														{
+															"cell": "storage:ladder-kept-back"
+														}
+													]
+												},
+												"right": {
+													"literal": 1
+												}
+											}
+										]
+									}
+								}
+							]
+						}
+					],
+					"title": [
+						{
+							"text": "Bump"
+						}
+					]
+				}
+			}
+		]
+	},
+	"open": "/",
+	"initial": {
+		"stack": [
+			"/"
+		],
+		"title": "Home",
+		"texts": [
+			[
+				"h2:text0",
+				"Home page"
+			],
+			[
+				"h3:text0",
+				"Home kept 0"
+			],
+			[
+				"h4:text0",
+				"Next is 1"
+			],
+			[
+				"h5:text0",
+				"Nothing kept yet"
+			],
+			[
+				"component-edge:0:text0",
+				"Open bump"
+			]
+		]
+	},
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0"
+			},
+			"journal": [
+				{
+					"op": "navigate",
+					"route": "/bump",
+					"params": {}
+				}
+			],
+			"stack": [
+				"/",
+				"/bump"
+			],
+			"title": "Bump",
+			"texts": [
+				[
+					"h2:text0",
+					"Bump page"
+				],
+				[
+					"h3:text0",
+					"Bump kept 0"
+				],
+				[
+					"h4:text0",
+					"Bump it"
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Bump kept 1"
+				}
+			],
+			"stack": [
+				"/",
+				"/bump"
+			],
+			"title": "Bump",
+			"texts": [
+				[
+					"h2:text0",
+					"Bump page"
+				],
+				[
+					"h3:text0",
+					"Bump kept 1"
+				],
+				[
+					"h4:text0",
+					"Bump it"
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "back"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Home kept 1"
+				},
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Next is 2"
+				},
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 1
+				}
+			],
+			"stack": [
+				"/"
+			],
+			"title": "Home",
+			"texts": [
+				[
+					"h2:text0",
+					"Home page"
+				],
+				[
+					"h3:text0",
+					"Home kept 1"
+				],
+				[
+					"h4:text0",
+					"Next is 2"
+				],
+				[
+					"component-edge:0:text0",
+					"Open bump"
+				]
+			]
+		}
+	]
+}

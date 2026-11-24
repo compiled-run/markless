@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s5-page-canvas
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - setDarkMode: disabled
 - assertVisible: Seed tray
 - assertVisible: Open notes
@@ -16,21 +20,21 @@ name: s5-page-canvas
 - assertVisible: Notes
 - setDarkMode: enabled
 - waitForAnimationToEnd:
-      timeout: 5000
+    timeout: 5000
 - assertVisible: Watering
 - assertVisible: Mist the tray each morning
 - assertVisible: Notes
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertNotVisible: Watering
 - assertVisible: Garden
 - assertVisible: Seed tray
@@ -39,7 +43,7 @@ name: s5-page-canvas
 - assertVisible: Garden
 - setDarkMode: disabled
 - waitForAnimationToEnd:
-      timeout: 5000
+    timeout: 5000
 - assertVisible: Seed tray
 - assertVisible: Open notes
 - assertVisible: Garden

@@ -1,0 +1,436 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "SharedOptions",
+		"cells": [
+			{
+				"id": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.open",
+				"name": "picker.open",
+				"initial": false,
+				"styled": true
+			},
+			{
+				"id": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.chosen",
+				"name": "picker.chosen",
+				"initial": "pear"
+			},
+			{
+				"id": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.counts",
+				"name": "picker.counts",
+				"initial": [
+					1,
+					2
+				]
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "main",
+				"parent": null,
+				"bindings": [
+					{
+						"attribute": "ui-open",
+						"value": {
+							"cell": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.open"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "button",
+				"parent": "h5"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h0:text0",
+				"parent": "component-edge:0/h0",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"cell": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.open"
+							},
+							"whenTrue": {
+								"literal": "Close"
+							},
+							"whenFalse": {
+								"literal": "Open"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h2",
+				"element": "div",
+				"parent": "h5"
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h3",
+				"element": "p",
+				"parent": "component-edge:1/h2"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h3:text0",
+				"parent": "component-edge:1/h3",
+				"parts": [
+					{
+						"expr": {
+							"script": "fn:0",
+							"bindings": {
+								"pickerState": {
+									"shared": {
+										"open": {
+											"cell": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.open"
+										},
+										"chosen": {
+											"cell": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.chosen"
+										},
+										"counts": {
+											"cell": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.counts"
+										}
+									}
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h4",
+				"element": "button",
+				"parent": "component-edge:1/h2"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h4:text0",
+				"parent": "component-edge:1/h4",
+				"parts": [
+					{
+						"text": "Add"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:2/h1",
+				"element": "button",
+				"parent": "h5",
+				"bindings": [
+					{
+						"attribute": "ui-chosen",
+						"value": {
+							"binary": "===",
+							"left": {
+								"cell": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.chosen"
+							},
+							"right": {
+								"literal": "apple"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:2/h1:text0",
+				"parent": "component-edge:2/h1",
+				"parts": [
+					{
+						"expr": {
+							"literal": "apple"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:3/h1",
+				"element": "button",
+				"parent": "h5",
+				"bindings": [
+					{
+						"attribute": "ui-chosen",
+						"value": {
+							"binary": "===",
+							"left": {
+								"cell": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.chosen"
+							},
+							"right": {
+								"literal": "pear"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:3/h1:text0",
+				"parent": "component-edge:3/h1",
+				"parts": [
+					{
+						"expr": {
+							"literal": "pear"
+						}
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:0/h0",
+				"event": "activate",
+				"handler": "handler:component-edge:0/event:0"
+			},
+			{
+				"host": "component-edge:1/h4",
+				"event": "activate",
+				"handler": "handler:component-edge:1/event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:0/event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:1",
+						"type": "click",
+						"bindings": {
+							"pickerState": {
+								"shared": {
+									"open": {
+										"cell": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.open"
+									},
+									"chosen": {
+										"cell": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.chosen"
+									},
+									"counts": {
+										"cell": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.counts"
+									},
+									"optionEls": {
+										"elements": {
+											"array": [
+												{
+													"spread": false,
+													"value": {
+														"literal": "component-edge:2/h1"
+													}
+												},
+												{
+													"spread": false,
+													"value": {
+														"literal": "component-edge:3/h1"
+													}
+												}
+											]
+										}
+									},
+									"setOpen": {
+										"method": "fn:2",
+										"bindings": {
+											"picker": {
+												"fields": {
+													"open": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.open",
+													"chosen": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.chosen",
+													"counts": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.counts"
+												}
+											}
+										}
+									},
+									"add": {
+										"method": "fn:3",
+										"bindings": {
+											"picker": {
+												"fields": {
+													"open": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.open",
+													"chosen": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.chosen",
+													"counts": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.counts"
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:1/event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.counts",
+						"value": {
+							"array": [
+								{
+									"spread": true,
+									"value": {
+										"cell": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.counts"
+									}
+								},
+								{
+									"spread": false,
+									"value": {
+										"literal": 3
+									}
+								}
+							]
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "e213444ab2d8ae50",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0,\"fn:2\":0,\"fn:3\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction focusOpening(options) {\n if (!options) return;\n let wanted;\n for (const option of options) {\n  if (wanted === undefined && option.getAttribute('ui-chosen') !== null) wanted = option;\n }\n wanted ??= options[0];\n wanted?.focus();\n}\nfunctions[\"fn:0\"] = function (__s) {\nconst picker = __s.pickerState();\nreturn (() => {\n let sum = 0;\n for (const count of picker.counts) sum += count;\n return `total ${sum}`;\n});\n};\nfunctions[\"fn:1\"] = function (__s) {\nconst picker = __s.pickerState();\nreturn (() => {\n const opening = picker.open !== true;\n picker.setOpen(opening);\n if (opening) focusOpening(picker.optionEls);\n});\n};\nfunctions[\"fn:2\"] = function (__s) {\nreturn (function(next) {\n __s.picker.open = next;\n});\n};\nfunctions[\"fn:3\"] = function (__s) {\nreturn (function(count) {\n __s.picker.counts = [...__s.picker.counts, count];\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"e213444ab2d8ae50\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"component-edge:0/h0:text0",
+			"Open"
+		],
+		[
+			"component-edge:1/h3:text0",
+			"total 3"
+		],
+		[
+			"component-edge:1/h4:text0",
+			"Add"
+		],
+		[
+			"component-edge:2/h1:text0",
+			"apple"
+		],
+		[
+			"component-edge:3/h1:text0",
+			"pear"
+		]
+	],
+	"initialAttributes": [
+		[
+			"h5",
+			"ui-open",
+			null
+		],
+		[
+			"component-edge:2/h1",
+			"ui-chosen",
+			null
+		],
+		[
+			"component-edge:3/h1",
+			"ui-chosen",
+			""
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h0"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.open",
+					"value": true
+				},
+				{
+					"op": "attribute",
+					"node": "h5",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h0:text0",
+					"value": "Close"
+				},
+				{
+					"op": "command",
+					"node": "component-edge:3/h1",
+					"command": "focus"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h0"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.open",
+					"value": false
+				},
+				{
+					"op": "attribute",
+					"node": "h5",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h0:text0",
+					"value": "Open"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h3:text0",
+					"value": "total 6"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h0"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "shared:src/element-proxies-shared.tsrx#pickerState/state:picker.open",
+					"value": true
+				},
+				{
+					"op": "attribute",
+					"node": "h5",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "text",
+					"node": "component-edge:0/h0:text0",
+					"value": "Close"
+				},
+				{
+					"op": "command",
+					"node": "component-edge:3/h1",
+					"command": "focus"
+				}
+			]
+		}
+	]
+}

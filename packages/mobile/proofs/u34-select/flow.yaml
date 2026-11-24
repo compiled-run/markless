@@ -1,0 +1,37 @@
+appId: ${APP_ID}
+name: u34-select
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Order
+- assertVisible: Favorite Fruit
+- assertVisible: Choose a Fruit
+- assertNotVisible: Apple
+- assertNotVisible: Banana
+- assertNotVisible: Cherry
+- tapOn: Choose a Fruit
+- assertVisible: Apple
+- assertVisible: Banana
+- assertVisible: Cherry
+- assertVisible: Apple
+- assertVisible: Banana
+- assertVisible: Cherry
+- tapOn: Banana
+- assertNotVisible: Apple
+- assertNotVisible: Banana
+- assertNotVisible: Cherry
+- assertVisible: Choose a Fruit
+- assertNotVisible: Apple
+- assertNotVisible: Banana
+- assertNotVisible: Cherry
+- tapOn: Choose a Fruit
+- assertVisible: Apple
+- assertVisible: Banana
+- assertVisible: Cherry
+- assertVisible: Apple
+- assertVisible: Banana
+- assertVisible: Cherry

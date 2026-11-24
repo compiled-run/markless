@@ -1,0 +1,46 @@
+appId: ${APP_ID}
+name: n5-not-found
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Account
+- assertVisible: Log out
+- assertVisible: Settings
+- assertNotVisible: Nothing here
+- assertVisible: Home
+- tapOn: Log out
+- assertVisible: Nothing here
+- assertNotVisible: Account
+- assertVisible: Not found
+- assertVisible: Nothing here
+- assertNotVisible: Account
+- assertVisible: Not found
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
+- assertVisible: Account
+- assertNotVisible: Nothing here
+- assertVisible: Home
+- assertVisible: Account
+- assertVisible: Settings
+- assertNotVisible: Nothing here
+- assertVisible: Home
+- tapOn: Settings
+- assertVisible: Nothing here
+- assertNotVisible: Account
+- assertVisible: Not found
+- assertVisible: Nothing here
+- assertNotVisible: Account
+- assertVisible: Not found

@@ -1,0 +1,28 @@
+appId: ${APP_ID}
+name: u86-click-detail
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Press here
+- assertVisible: Press by script
+- assertVisible: No click yet
+- assertNotVisible: Count 1 \*
+- assertNotVisible: Count 0, no press
+- tapOn: Press here
+- assertVisible: Count 1 \*
+- assertNotVisible: No click yet
+- assertVisible: Count 1 \*
+- assertNotVisible: No click yet
+- tapOn: Press by script
+- assertNotVisible: Count 1 \*
+- assertVisible: Count 0, no press
+- assertNotVisible: Count 1 \*
+- tapOn: Press here
+- assertVisible: Count 1 \*
+- assertNotVisible: Count 0, no press
+- assertVisible: Count 1 \*
+- assertNotVisible: Count 0, no press

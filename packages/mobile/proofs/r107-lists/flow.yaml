@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r107-lists
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Lists
 - assertVisible: Seeds
 - assertVisible: Soil
@@ -13,23 +17,23 @@ name: r107-lists
 - assertVisible: Mint
 - assertVisible: Likes shade
 - assertVisible:
-      text: Soil
-      below: Seeds
+    text: Soil
+    below: Seeds
 - assertVisible:
-      text: Sow
-      below: Soil
+    text: Sow
+    below: Soil
 - assertVisible:
-      text: Water
-      below: Sow
+    text: Water
+    below: Sow
 - assertVisible:
-      text: Basil
-      below: Water
+    text: Basil
+    below: Water
 - assertVisible:
-      text: Likes sun
-      below: Basil
+    text: Likes sun
+    below: Basil
 - assertVisible:
-      text: Mint
-      below: Likes sun
+    text: Mint
+    below: Likes sun
 - assertVisible:
-      text: Likes shade
-      below: Mint
+    text: Likes shade
+    below: Mint

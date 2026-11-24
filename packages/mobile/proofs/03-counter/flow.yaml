@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 03-counter
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Counter
 - assertVisible: Count 0
 - tapOn: Count 0

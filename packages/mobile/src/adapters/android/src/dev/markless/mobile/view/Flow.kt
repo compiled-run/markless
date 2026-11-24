@@ -1,11 +1,16 @@
 package dev.markless.mobile.view
 
 import android.content.Context
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
+import android.graphics.DashPathEffect
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RadialGradient
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.text.SpannableStringBuilder
 import android.text.Spanned
@@ -19,14 +24,18 @@ import android.text.style.SuperscriptSpan
 import android.text.style.TypefaceSpan
 import android.text.style.UnderlineSpan
 import android.view.View
+import dev.markless.mobile.core.Aspect
 import dev.markless.mobile.core.DefaultStyle
 import dev.markless.mobile.core.Drawing
+import dev.markless.mobile.core.DrawingText
 import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.Payload
+import dev.markless.mobile.core.Shape
 import dev.markless.mobile.core.ShapePaint
+import dev.markless.mobile.core.TextRun
 
 /** The text style a block gives the text inside it: its own default style and its ancestors', combined. */
-data class BlockText(val bold: Boolean, val italic: Boolean, val monospace: Boolean, val size: Double, val preformatted: Boolean)
+data class BlockText(val bold: Boolean, val italic: Boolean, val monospace: Boolean, val size: Double, val preformatted: Boolean, val centered: Boolean = false)
 
 /**
  * Text flow without a style export, as `nativeParagraphs` (packages/mobile/src/paragraphs.ts) defines it: among one parent's
@@ -73,16 +82,16 @@ class TextFlow(payload: Payload) {
 
 	/** The style text inherits inside [parent]: every non-flowing ancestor's default style, nearest last. */
 	fun blockText(parent: String?): BlockText {
-		var bold = false; var italic = false; var mono = false; var size = 1.0; var pre = false
+		var bold = false; var italic = false; var mono = false; var size = 1.0; var pre = false; var centered = false
 		var at = parent
 		while (at != null) {
 			val n = byId[at] ?: break
 			if (n is Node.Element && !flowing(n)) n.defaultStyle?.let { s ->
-				bold = bold || s.bold; italic = italic || s.italic; mono = mono || s.monospace; size *= s.size; pre = pre || s.preformatted
+				bold = bold || s.bold; italic = italic || s.italic; mono = mono || s.monospace; size *= s.size; pre = pre || s.preformatted; centered = centered || s.center
 			}
 			at = n.parent
 		}
-		return BlockText(bold, italic, mono, size, pre)
+		return BlockText(bold, italic, mono, size, pre, centered)
 	}
 
 	/**
@@ -150,35 +159,66 @@ class RuleView(context: Context) : View(context) {
  * An inline `<svg>`: draws the shapes the compiler compiled, its viewBox centred and fitted in the view (xMidYMid meet).
  * [emPx] is the font size of the text it sits in, in device px, which sizes a drawing measured in ems.
  */
-class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) : View(context) {
+/** [fillsBox]: an SVG file's image, which takes the size its `<img>` box is given. */
+class DrawingView(context: Context, private val drawing: Drawing, emPx: Double, private val fillsBox: Boolean = false) : View(context) {
 	private val density = context.resources.displayMetrics.density
 	/** Device px per unit of the drawing's width and height. */
 	private val unit: Double = if (drawing.em) emPx else density.toDouble()
 	/** What `currentColor` paints: the svg's text colour from a style export, else black. */
 	var currentColor: Int = Color.BLACK
 		set(value) { field = value; invalidate() }
-	private val paths = drawing.shapes.map { shape ->
-		Path().apply {
-			fillType = if (shape.evenOdd) Path.FillType.EVEN_ODD else Path.FillType.WINDING
-			val v = shape.path
-			var i = 0
-			while (i < v.size) {
-				when (v[i].toInt()) {
-					0 -> { moveTo(v[i + 1].toFloat(), v[i + 2].toFloat()); i += 3 }
-					1 -> { lineTo(v[i + 1].toFloat(), v[i + 2].toFloat()); i += 3 }
-					3 -> { cubicTo(v[i + 1].toFloat(), v[i + 2].toFloat(), v[i + 3].toFloat(), v[i + 4].toFloat(), v[i + 5].toFloat(), v[i + 6].toFloat()); i += 7 }
-					4 -> { close(); i += 1 }
-					else -> throw MarklessHostError("unknown path verb ${v[i]}")
-				}
+	private val clips = drawing.shapes.map { shape -> shape.clip.mapIndexed { i, clip -> pathOf(clip).apply { if (shape.clipEvenOdd.getOrElse(i) { false }) fillType = Path.FillType.EVEN_ODD } } }
+	private fun pathOf(shape: Shape, v: List<Double>) = pathOf(v).apply {
+		fillType = if (shape.evenOdd) Path.FillType.EVEN_ODD else Path.FillType.WINDING
+	}
+
+	/** A verb-coded outline: 0 move x y, 1 line x y, 3 cubic x1 y1 x2 y2 x y, 4 close. */
+	private fun pathOf(v: List<Double>) = Path().apply {
+		var i = 0
+		while (i < v.size) {
+			when (v[i].toInt()) {
+				0 -> { moveTo(v[i + 1].toFloat(), v[i + 2].toFloat()); i += 3 }
+				1 -> { lineTo(v[i + 1].toFloat(), v[i + 2].toFloat()); i += 3 }
+				3 -> { cubicTo(v[i + 1].toFloat(), v[i + 2].toFloat(), v[i + 3].toFloat(), v[i + 4].toFloat(), v[i + 5].toFloat(), v[i + 6].toFloat()); i += 7 }
+				4 -> { close(); i += 1 }
+				else -> throw MarklessHostError("unknown path verb ${v[i]}")
 			}
 		}
 	}
+	private val paths = drawing.shapes.map { pathOf(it, it.path) }
 	private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
+	/** min-x, min-y, width and height: the compiled one, or what a `viewBox` that follows state gives. */
+	var viewBox: List<Double>? = drawing.viewBox
+		private set
+	/** Shapes from inside it (a component's `<path>`), in tree order, each with the outline it has now. */
+	private val live = ArrayList<Triple<String, Shape, Path>>()
+	/** What the drawing's `<text>` says, read when the svg has no name. */
+	val label: String? get() = drawing.label
+
 	/** The width over the height the web gives it without a size: the viewBox's, else 300 by 150. */
-	private val ratio: Double = drawing.viewBox?.let { it[3] / it[2] } ?: 0.5
+	private val ratio: Double get() = viewBox?.let { it[3] / it[2] } ?: 0.5
+
+	fun addShape(id: String, shape: Shape, outline: String?) {
+		live.add(Triple(id, shape, pathOf(shape, if (shape.path.isEmpty()) numbers(outline) else shape.path)))
+		invalidate()
+	}
+
+	fun setOutline(id: String, outline: String?) {
+		val at = live.indexOfFirst { it.first == id }
+		if (at < 0) return
+		live[at] = Triple(id, live[at].second, pathOf(live[at].second, numbers(outline)))
+		invalidate()
+	}
+
+	fun setViewBox(text: String?) {
+		viewBox = numbers(text).takeIf { it.size == 4 }
+		requestLayout()
+		invalidate()
+	}
 
 	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+		if (fillsBox) return setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.getSize(heightMeasureSpec))
 		val available = MeasureSpec.getSize(widthMeasureSpec).toDouble()
 		val w = drawing.width?.let { it * unit } ?: drawing.height?.let { it * unit / ratio } ?: if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.UNSPECIFIED) 300.0 * density else available
 		val h = drawing.height?.let { it * unit } ?: (w * ratio)
@@ -187,41 +227,149 @@ class DrawingView(context: Context, private val drawing: Drawing, emPx: Double) 
 
 	override fun onDraw(canvas: Canvas) {
 		canvas.save()
-		drawing.viewBox?.let { (x, y, w, h) ->
-			val scale = minOf(width / w, height / h)
-			canvas.translate((-x * scale + (width - w * scale) / 2).toFloat(), (-y * scale + (height - h * scale) / 2).toFloat())
-			canvas.scale(scale.toFloat(), scale.toFloat())
+		viewBox?.let { (x, y, w, h) ->
+			// SVG 2 §8.5: the viewBox placed in the box by preserveAspectRatio, xMidYMid meet when it has none.
+			when (val aspect = drawing.aspect) {
+				Aspect.None -> {
+					canvas.scale((width / w).toFloat(), (height / h).toFloat())
+					canvas.translate(-x.toFloat(), -y.toFloat())
+				}
+				else -> {
+					val align = aspect as? Aspect.Align
+					val slice = align?.slice == true
+					val scale = if (slice) maxOf(width / w, height / h) else minOf(width / w, height / h)
+					fun place(at: String?, room: Double) = when (at) { "min" -> 0.0; "max" -> room; else -> room / 2 }
+					if (slice) canvas.clipRect(0f, 0f, width.toFloat(), height.toFloat())
+					canvas.translate((-x * scale + place(align?.x, width - w * scale)).toFloat(), (-y * scale + place(align?.y, height - h * scale)).toFloat())
+					canvas.scale(scale.toFloat(), scale.toFloat())
+				}
+			}
 		} ?: canvas.scale(density, density)
-		for ((index, shape) in drawing.shapes.withIndex()) {
+		for ((index, drawn) in (drawing.shapes.zip(paths) + live.map { it.second to it.third }).withIndex()) {
+			val (shape, path) = drawn
 			canvas.save()
-			shape.transform?.let { (a, b, c, d, e, f) ->
-				canvas.concat(Matrix().apply { setValues(floatArrayOf(a.toFloat(), c.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) })
+			for (clip in clips.getOrNull(index).orEmpty()) canvas.clipPath(clip)
+			val blur = shape.blur
+			val matrix = shape.transform?.let { (a, b, c, d, e, f) ->
+				Matrix().apply { setValues(floatArrayOf(a.toFloat(), c.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) }
+			}
+			// The blur's deviation is in the drawing's units, so a blurred path is transformed rather than the canvas.
+			if (blur != null) canvas.clipPath(pathOf(blur.region)) else matrix?.let { canvas.concat(it) }
+			val drawn = if (blur != null && matrix != null) Path().also { path.transform(matrix, it) } else path
+			// Skia's blur mask takes a radius it turns into a deviation of 0.57735 radius + 0.5, in the canvas's units.
+			val mask = blur?.let { BlurMaskFilter(maxOf(((it.deviation - 0.5) / 0.57735).toFloat(), 0.001f), BlurMaskFilter.Blur.NORMAL) }
+			shape.text?.let { text ->
+				draw(canvas, text)
+				canvas.restore()
+				continue
 			}
 			shape.fill?.let { fill ->
 				paint.reset(); paint.isAntiAlias = true
 				paint.style = Paint.Style.FILL
-				paint.color = colorOf(fill)
-				canvas.drawPath(paths[index], paint)
+				paintWith(fill)
+				paint.maskFilter = mask
+				canvas.drawPath(drawn, paint)
 			}
 			shape.stroke?.let { stroke ->
 				paint.reset(); paint.isAntiAlias = true
 				paint.style = Paint.Style.STROKE
-				paint.color = colorOf(stroke)
-				paint.strokeWidth = shape.width.toFloat()
+				paintWith(stroke)
+				paint.strokeWidth = shape.width.toFloat() * if (blur != null) shape.transform?.let { (a, b, c, d) -> kotlin.math.sqrt(kotlin.math.abs(a * d - b * c)).toFloat() } ?: 1f else 1f
 				paint.strokeCap = when (shape.cap) { "round" -> Paint.Cap.ROUND; "square" -> Paint.Cap.SQUARE; else -> Paint.Cap.BUTT }
 				paint.strokeJoin = when (shape.join) { "round" -> Paint.Join.ROUND; "bevel" -> Paint.Join.BEVEL; else -> Paint.Join.MITER }
 				paint.strokeMiter = shape.miterLimit.toFloat()
-				canvas.drawPath(paths[index], paint)
+				shape.dash?.let { paint.pathEffect = DashPathEffect(it.map(Double::toFloat).toFloatArray(), shape.dashOffset.toFloat()) }
+				paint.maskFilter = mask
+				canvas.drawPath(drawn, paint)
 			}
 			canvas.restore()
 		}
 		canvas.restore()
 	}
 
+	/** Lays out an SVG `<text>`'s runs from the pen, each chunk placed by its anchor, as the browser lays them out. */
+	private fun draw(canvas: Canvas, text: DrawingText) {
+		class Piece(val run: TextRun, val paint: Paint, val width: Float, val dy: Float)
+		class Chunk(val x: Float, val y: Float) { val pieces = ArrayList<Piece>() }
+		val chunks = ArrayList<Chunk>()
+		var penX = 0f
+		var penY = 0f
+		for (run in text.runs) {
+			val dx = (run.dx ?: 0.0).toFloat()
+			val dy = (run.dy ?: 0.0).toFloat()
+			if (run.x != null || run.y != null || chunks.isEmpty()) {
+				penX = run.x?.toFloat() ?: penX
+				penY = run.y?.toFloat() ?: penY
+				chunks.add(Chunk(penX + dx, penY + dy))
+			}
+			penX += dx
+			penY += dy
+			val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+				textSize = run.size.toFloat()
+				val family = when (run.family) { "serif" -> Typeface.SERIF; "monospace" -> Typeface.MONOSPACE; else -> Typeface.DEFAULT }
+				typeface = if (android.os.Build.VERSION.SDK_INT >= 28) Typeface.create(family, run.weight.toInt().coerceIn(1, 1000), false)
+				else Typeface.create(family, if (run.weight >= 600) Typeface.BOLD else Typeface.NORMAL)
+				// Android spaces letters in ems of the text size.
+				letterSpacing = if (run.size > 0) (run.letterSpacing / run.size).toFloat() else 0f
+				color = run.fill?.let(::colorOf) ?: Color.TRANSPARENT
+			}
+			val chunk = chunks.last()
+			val w = p.measureText(run.text)
+			chunk.pieces.add(Piece(run, p, w, penY - chunk.y))
+			penX += w
+		}
+		for (chunk in chunks) {
+			val total = chunk.pieces.sumOf { it.width.toDouble() }.toFloat()
+			var x = chunk.x - when (text.anchor) { "middle" -> total / 2; "end" -> total; else -> 0f }
+			for (piece in chunk.pieces) {
+				val m = piece.paint.fontMetrics
+				val bounds = android.graphics.Rect()
+				piece.paint.getTextBounds("x", 0, 1, bounds)
+				// Where the alphabetic baseline sits below the pen's y for each dominant-baseline, from the font's metrics.
+				val shift = when (text.baseline) {
+					"middle" -> bounds.height() / 2f
+					"central" -> -(m.ascent + m.descent) / 2f
+					"hanging" -> -m.ascent * 0.8f
+					"text-top" -> -m.ascent
+					"text-bottom", "ideographic" -> -m.descent
+					else -> 0f
+				}
+				canvas.drawText(piece.run.text, x, chunk.y + piece.dy + shift, piece.paint)
+				x += piece.width
+			}
+		}
+	}
+
 	private fun colorOf(paint: ShapePaint): Int = when (paint) {
 		is ShapePaint.Color -> paint.color.argb
 		ShapePaint.Current -> currentColor
+		is ShapePaint.Gradient -> Color.TRANSPARENT
+	}
+
+	private val shaders = HashMap<ShapePaint.Gradient, Shader>()
+
+	private fun paintWith(given: ShapePaint) {
+		if (given !is ShapePaint.Gradient) { paint.color = colorOf(given); return }
+		paint.color = Color.BLACK
+		paint.shader = shaders.getOrPut(given) { shaderOf(given) }
+	}
+
+	/** A gradient clamped past its ends (SVG's pad), its colours blended in sRGB as the browser blends them. */
+	private fun shaderOf(g: ShapePaint.Gradient): Shader {
+		val colors = g.colors.map { it.argb }.toIntArray()
+		val offsets = g.offsets.map { it.toFloat() }.toFloatArray()
+		val shader = g.linear?.let { (x1, y1, x2, y2) -> LinearGradient(x1.toFloat(), y1.toFloat(), x2.toFloat(), y2.toFloat(), colors, offsets, Shader.TileMode.CLAMP) }
+			?: g.radial!!.let { r ->
+				RadialGradient(r[0].toFloat(), r[1].toFloat(), r[2].toFloat(), r[3].toFloat(), r[4].toFloat(), r[5].toFloat(), colors.map { Color.pack(it) }.toLongArray(), offsets, Shader.TileMode.CLAMP)
+			}
+		g.transform?.let { (a, b, c, d, e, f) ->
+			shader.setLocalMatrix(Matrix().apply { setValues(floatArrayOf(a.toFloat(), c.toFloat(), e.toFloat(), b.toFloat(), d.toFloat(), f.toFloat(), 0f, 0f, 1f)) })
+		}
+		return shader
 	}
 }
 
 private operator fun <T> List<T>.component6(): T = this[5]
+
+/** The engine's numbers, space-separated, as the journal carries a drawing's outline or viewBox; nil or empty is none. */
+internal fun numbers(text: String?): List<Double> = text.orEmpty().split(' ').mapNotNull { it.toDoubleOrNull() }

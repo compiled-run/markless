@@ -1,0 +1,142 @@
+{
+ "gateDevicePx": 1,
+ "target": "android",
+ "browser": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Mobile Safari/537.36",
+ "compared": 7,
+ "failed": 0,
+ "rows": [
+  {
+   "target": "android",
+   "values": {},
+   "id": "html",
+   "maxDeltaDevicePx": 0.125,
+   "pass": true,
+   "web": {
+    "x": 0,
+    "y": 0,
+    "width": 1078.875,
+    "height": 401.9375
+   },
+   "dragon": {
+    "x": 0,
+    "y": 0,
+    "width": 1079,
+    "height": 401.9375
+   }
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "body",
+   "maxDeltaDevicePx": 0.125,
+   "pass": true,
+   "web": {
+    "x": 0,
+    "y": 0,
+    "width": 1078.875,
+    "height": 401.9375
+   },
+   "dragon": {
+    "x": 0,
+    "y": 0,
+    "width": 1079,
+    "height": 401.9375
+   }
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h0",
+   "maxDeltaDevicePx": 0.125,
+   "pass": true,
+   "web": {
+    "x": 0,
+    "y": 0,
+    "width": 1078.875,
+    "height": 401.9375
+   },
+   "dragon": {
+    "x": 0,
+    "y": 0,
+    "width": 1079,
+    "height": 401.9375
+   }
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h2",
+   "maxDeltaDevicePx": 0.125,
+   "pass": true,
+   "web": {
+    "x": 63,
+    "y": 108.7188,
+    "width": 952.875,
+    "height": 80
+   },
+   "dragon": {
+    "x": 63,
+    "y": 108.7188,
+    "width": 953,
+    "height": 80
+   }
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "h2:text0",
+   "maxDeltaDevicePx": 0.0469,
+   "pass": true,
+   "web": {
+    "x": 63,
+    "y": 108.7188,
+    "width": 255.0781,
+    "height": 80
+   },
+   "dragon": {
+    "x": 63,
+    "y": 108.7188,
+    "width": 255.125,
+    "height": 80
+   }
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "component-edge:0",
+   "maxDeltaDevicePx": 0.125,
+   "pass": true,
+   "web": {
+    "x": 63,
+    "y": 234.4375,
+    "width": 952.875,
+    "height": 104.5
+   },
+   "dragon": {
+    "x": 63,
+    "y": 234.4375,
+    "width": 953,
+    "height": 104.5
+   }
+  },
+  {
+   "target": "android",
+   "values": {},
+   "id": "component-edge:0:text0",
+   "maxDeltaDevicePx": 0.0625,
+   "pass": true,
+   "web": {
+    "x": 105,
+    "y": 260.6875,
+    "width": 274.5313,
+    "height": 52
+   },
+   "dragon": {
+    "x": 105,
+    "y": 260.6875,
+    "width": 274.5938,
+    "height": 52
+   }
+  }
+ ]
+}

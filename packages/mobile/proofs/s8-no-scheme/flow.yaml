@@ -1,0 +1,23 @@
+appId: ${APP_ID}
+name: s8-no-scheme
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- setDarkMode: disabled
+- assertVisible: Seeds by day
+- assertVisible: "No color-scheme: white in dark mode too"
+- assertVisible: Day page
+- setDarkMode: enabled
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible: Seeds by day
+- assertVisible: Day page
+- setDarkMode: disabled
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible: Seeds by day
+- assertVisible: Day page

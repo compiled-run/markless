@@ -4,6 +4,7 @@ import {
 	existsSync,
 	mkdirSync,
 	openSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
 	writeFileSync,
@@ -26,6 +27,7 @@ import {
 	PROOF_APP_NAME,
 	PROOF_LINK_SCHEME,
 	PROOF_PAYLOAD_PATH,
+	stylesShapeText,
 } from './proof-app.ts';
 import type { DeviceManifest } from '../permissions.ts';
 import type { ProofAssets } from './rung.ts';
@@ -37,6 +39,7 @@ import {
 	filesUnder,
 	SHELL_CACHE_FORMAT,
 } from './tools.ts';
+import { assertDragonPin, dragonDir } from '../style-export.ts';
 
 export type BootedEmulator = {
 	readonly serial: string;
@@ -221,8 +224,10 @@ export async function buildAndroidShell(
 ): Promise<AndroidShell> {
 	const hostLock = join(hostSources, '..', 'libraries.lock.json');
 	const libraries = await androidLibraries(tools, existsSync(hostLock) ? hostLock : undefined);
+	const dragon = dragonKotlin();
 	const sources = [...filesUnder(hostSources, '.kt'), ...filesUnder(shellDir, '.kt')];
 	const key = contentKey(hostSources, sources, [
+		dragon.key,
 		tools.buildTools,
 		tools.androidJar,
 		tools.kotlinStdlib,
@@ -261,7 +266,9 @@ export async function buildAndroidShell(
 			...filesUnder(generated, '.java'),
 		]);
 		const classpath = [tools.androidJar, classes, ...libraries.jars].join(':');
+		// kotlinc's launcher caps its heap at 512 MB unless JAVA_OPTS is set; the app and Dragon's engine together outgrew it.
 		await exec('kotlinc', [
+			'-J-Xmx2g',
 			'-classpath',
 			classpath,
 			'-jvm-target',
@@ -270,6 +277,7 @@ export async function buildAndroidShell(
 			'-d',
 			classes,
 			...sources,
+			...dragon.sources,
 		]);
 		await exec(join(tools.buildTools, 'd8'), [
 			'--min-api',
@@ -369,6 +377,47 @@ async function androidEngine(
 	]);
 	writeFileSync(join(root, 'done'), '');
 	return engine();
+}
+
+/**
+ * Dragon's translated layout engine and its Markless plan layout (the translated harness without its command-line `main`), from
+ * the Dragon checkout the styles come from; the host finds `dev.dragon.layout.HarnessKt` by name.
+ */
+function dragonKotlin() {
+	assertDragonPin();
+	const generated = join(dragonDir(), 'packages', 'layout', 'generated', 'kotlin');
+	const engine = filesUnder(join(generated, 'src', 'main', 'kotlin', 'dev', 'dragon', 'layout'), '.kt');
+	const harness = ['Harness.kt', 'Host.kt'].map((file) => join(generated, 'harness', 'dev', 'dragon', 'layout', file));
+	// Dragon's HarfBuzz shim's Kotlin side: a styled list's rows shape their text on the phone as the build shapes Android's faces.
+	const shim = join(dragonDir(), 'packages', 'text-shaper', 'kotlin', 'src', 'dev', 'dragon', 'text', 'DragonHB.kt');
+	if (engine.length === 0 || !harness.every((file) => existsSync(file)) || !existsSync(shim))
+		throw new Error(`${generated} has no translated engine and harness; set MARKLESS_DRAGON_DIR to a Dragon checkout`);
+	const sources = [...engine, ...harness, shim];
+	return { key: contentKey(generated, sources), sources };
+}
+
+
+/**
+ * Dragon's HarfBuzz shim for the emulator's ABI (`libdragon_hb.so`, with its JNI glue), built from the Dragon checkout with Zig
+ * 0.16 (MARKLESS_ZIG, else `zig` on the PATH) and the SDK's NDK, cached by the Dragon commit and the ABI.
+ */
+async function dragonHarfBuzz(tools: AndroidTools): Promise<string> {
+	assertDragonPin();
+	const shaper = join(dragonDir(), 'packages', 'text-shaper');
+	const abi = engineAbi();
+	const ndks = join(tools.sdk, 'ndk');
+	const ndk = existsSync(ndks)
+		? readdirSync(ndks).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0]
+		: undefined;
+	if (!ndk) throw new Error(`no NDK under ${ndks}: a styled list's rows need Dragon's HarfBuzz shim built for Android`);
+	const sources = [...filesUnder(join(shaper, 'src'), '.zig'), join(shaper, 'build.zig'), join(shaper, 'build.zig.zon')];
+	const key = contentKey(shaper, sources, [abi, ndk]);
+	const root = await cachedFolder(join(cacheRoot(), 'dragon-hb', key), async (scratch) => {
+		await exec(process.env.MARKLESS_ZIG ?? 'zig', ['build', 'android', `-Dandroid-ndk=${join(ndks, ndk)}`, '--prefix', scratch], { cwd: shaper });
+	});
+	const library = join(root, 'android', abi, 'libdragon_hb.so');
+	if (!existsSync(library)) throw new Error(`the Zig build of Dragon's shim made no ${library}`);
+	return library;
 }
 
 const androidManifest = (
@@ -480,6 +529,12 @@ export async function packProofApk(
 		assetDir,
 	]);
 	await exec('zip', ['-q', '-j', unsigned, ...shell.dex]);
+	if (stylesShapeText(assets)) {
+		const staged = join(workDir, 'shaper');
+		mkdirSync(join(staged, 'lib', engineAbi()), { recursive: true });
+		copyFileSync(await dragonHarfBuzz(tools), join(staged, 'lib', engineAbi(), 'libdragon_hb.so'));
+		await exec('zip', ['-q', '-r', unsigned, 'lib'], { cwd: staged });
+	}
 	if (scripts.length > 0) {
 		const engine = await androidEngine(tools);
 		const staged = join(workDir, 'engine');

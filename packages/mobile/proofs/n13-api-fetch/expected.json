@@ -1,0 +1,13 @@
+{
+	"rung": "N13",
+	"name": "A fetch of a URL from the root reaches the app's own origin: on the web the page's, on a phone the one app.json names",
+	"server": "echo",
+	"steps": [
+		{ "visible": ["Greeting", "Ask", "Answer: none"] },
+		{
+			"do": { "tap": "Ask" },
+			"visible": ["Answer: GET /api/greeting?name=ada -"],
+			"absent": ["Answer: none"]
+		}
+	]
+}

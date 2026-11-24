@@ -2,6 +2,7 @@ import type { DomJournalEntry, DomJournalResult, RuntimeGraphCommit } from '@mar
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer/async-boundary-arm';
 import { boundaryArmRecordSet, composedArmRecordQualifier } from './resume-arm-records.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
+import type { PaintSnapshot } from './resume-keyed-repeats.ts';
 import { asyncPlanes } from './reconcile-plane-slot.ts';
 import { setBoundaryBusy } from './resume-refresh-busy.ts';
 import { reaskOnReturn, registerWriteRefresh } from './resume-return-reask.ts';
@@ -481,8 +482,15 @@ async function prepareBoundarySettle(
 		ownRecords = true,
 	): Promise<RuntimeGraphCommit> => {
 		const rows = update.armRecords.keyedRepeats;
-		const moved = rows?.length
-			? (await import('./resume-keyed-repeats-lazy.ts')).movedSincePaint(input.graph, rows)
+		// Read before the first await, so a write landing while the arm loads is applied over these rows; the arm's own values are absent or stale until it registers.
+		const collections: PaintSnapshot['collections'] = new Map();
+		const owned = new Set([...(update.cells ?? []), ...(update.computed ?? [])].map((each) => each.graphNodeId));
+		for (const { id, collectionGraphNodeId: node, collectionPath, enclosingRow } of rows ?? []) {
+			const items = node && !enclosingRow && !owned.has(node) && input.graph.read(node, collectionPath);
+			if (Array.isArray(items)) collections.set(id, items);
+		}
+		const painted: PaintSnapshot | undefined = rows?.length
+			? { moved: (await import('./resume-keyed-repeats-lazy.ts')).movedSincePaint(input.graph, rows), collections }
 			: undefined;
 		// A failed refresh over shown @try content keeps it and draws the @catch in a range opened after it.
 		const after =
@@ -491,7 +499,7 @@ async function prepareBoundarySettle(
 				: undefined;
 		const land = await prepareArm(input, (after ?? boundary) as ResumeAsyncBoundaryRecord, {
 			...update,
-			...(moved && { moved }),
+			...(painted && { painted }),
 			arm,
 			...(after && { after: true }),
 		});
@@ -502,9 +510,7 @@ async function prepareBoundarySettle(
 			land,
 		);
 	};
-	// A composed child's arm records are minted in the child's own id space; the
-	// qualifier that re-spells them in page space is installed only by pages the
-	// bundler gave component edges (fns/composed-arm-records).
+	// A composed child's arm records arrive in its own id space; installMarklessComposedArmRecords re-spells them.
 	if (source === 'renderAsyncBoundary') {
 		const rendered = await input.renderAsyncBoundary!(boundary.id, status, input.graph);
 		if (newerRunPending() || claim?.() === false) return;

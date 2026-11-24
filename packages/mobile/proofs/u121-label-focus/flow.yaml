@@ -1,0 +1,36 @@
+appId: ${APP_ID}
+name: u121-label-focus
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: New note
+- assertVisible: Title
+- assertVisible: Body
+- assertVisible: Tag
+- assertVisible: Pin to top
+- assertVisible: Not editing
+- assertVisible: Pinned no
+- tapOn: Title
+- assertNotVisible: Not editing
+- assertVisible: Editing title
+- assertVisible: Pinned no
+- assertNotVisible: Not editing
+- tapOn: Body
+- assertNotVisible: Editing title
+- assertVisible: Editing body
+- assertVisible: Pinned no
+- assertNotVisible: Editing title
+- tapOn: Tag
+- assertNotVisible: Editing body
+- assertVisible: Left body
+- assertVisible: Pinned no
+- assertNotVisible: Editing body
+- tapOn: Pin to top
+- assertNotVisible: Pinned no
+- assertVisible: Pinned yes
+- assertVisible: Left body
+- assertNotVisible: Pinned no

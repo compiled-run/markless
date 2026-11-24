@@ -37,7 +37,7 @@ private func rejection(_ text: String) -> String? {
 	("\"component\":\"Counter\"", "\"component\":\"Counter\",\"script\":{\"id\":\"a\",\"source\":\"\",\"services\":[\"storage\"]}", "unknown script service \"storage\""),
 	("{\"literal\":1}", "{\"script\":\"fn:0\",\"bindings\":{\"n\":{\"slot\":\"state:count\"}}}", "a script binding is"),
 	("{\"op\":\"assign\"", "{\"op\":\"script\",\"fn\":\"fn:0\",\"bindings\":{},\"then\":[]},{\"op\":\"assign\"", "unknown field \"then\""),
-	("{\"literal\":1}", "{\"event\":\"detail\"}", "unknown event read \"detail\""),
+	("{\"literal\":1}", "{\"event\":\"wheel\"}", "unknown event read \"wheel\""),
 	("{\"literal\":1}", "{\"focused\":false}", "focused is only ever true"),
 	("{\"literal\":1}", "{\"contains\":{\"literal\":1}}", "unknown expression"),
 ])
@@ -98,8 +98,9 @@ private let sheet = """
 @Test(arguments: [
 	("\"snapPoints\":[0.5,1]", "\"snapPoints\":[1,0.5]", "a sheet rests at"),
 	("\"snapPoints\":[0.5,1]", "\"snapPoints\":[0.25,0.5,1]", "a sheet rests at"),
-	("\"snapPoints\":[0.5,1]", "\"snapPoints\":[0.5]", "a sheet rests at"),
-	("\"modal\":true}", "\"modal\":true,\"arm\":{\"branch\":\"b\",\"index\":0}}", "unknown field \"arm\""),
+	("\"snapPoints\":[0.5,1]", "\"snapPoints\":[0]", "a sheet rests at"),
+	("\"snapPoints\":[0.5,1]", "\"snapPoints\":[0.3,0.8]", "a sheet rests at"),
+	("\"modal\":true}", "\"modal\":true,\"arm\":{\"branch\":\"b\",\"index\":0}}", "which is not an earlier branch"),
 	("\"host\":\"sheet:0\"", "\"host\":\"h0\"", "which is not a sheet"),
 	("\"event\":\"activate\"", "\"event\":\"dismiss\"", "which is not a sheet"),
 	("\"host\":\"h0\"", "\"host\":\"sheet:0\"", "which is not an element"),
@@ -183,6 +184,22 @@ private let pad = """
 	_ = try runtime.dispatch(NativeAction(event: .pointercancel, host: "h2", pointerId: 7, x: 5, y: 50))
 	#expect(try runtime.value(of: "state:log") == .string(" move:true/40 leave:h2"))
 	#expect(throws: RuntimeError.self) { try runtime.dispatch(NativeAction(event: .pointerup, host: "h2", pointerId: 7)) }
+}
+
+private let held = """
+	{"version":"markless.native-view/0","component":"P","cells":[{"id":"state:log","name":"log","initial":""}],
+	"nodes":[{"kind":"element","id":"h0","element":"ul","parent":null},{"kind":"element","id":"h1","element":"li","parent":"h0"},
+	{"kind":"element","id":"h2","element":"span","parent":"h1"}],
+	"events":[{"host":"h0","event":"contextmenu","handler":"handler:list"},{"host":"h1","event":"contextmenu","handler":"handler:row"}],
+	"handlers":[{"id":"handler:list","ops":[{"op":"assign","cell":"state:log","value":{"binary":"+","left":{"cell":"state:log"},"right":{"template":[" list:",{"event":"target"},"/",{"event":"currentTarget"},"/",{"event":"timeStamp"}]}}}]},
+	{"id":"handler:row","ops":[{"op":"assign","cell":"state:log","value":{"binary":"+","left":{"cell":"state:log"},"right":{"template":[" row:",{"event":"clientX"},",",{"event":"clientY"}]}}}]}]}
+	"""
+
+@Test func runsALongPressOnTheElementPressedThenEachItIsInside() throws {
+	let runtime = NativeRuntime(payload: try decode(held))
+	_ = try runtime.dispatch(NativeAction(event: .contextmenu, host: "h2", x: 12.5, y: 30, time: 600))
+	#expect(try runtime.value(of: "state:log") == .string(" row:12.5,30 list:h2/h0/600"))
+	#expect(throws: RuntimeError.self) { try runtime.dispatch(NativeAction(event: .contextmenu, host: "h9")) }
 }
 
 @Test func decodesEveryPointerEventAndField() throws {

@@ -40,6 +40,11 @@ object DeviceConformance {
 			}
 		}
 		structure("initial")
+		for (node in host.payload.nodes) {
+			val live = (node as? Node.Element)?.live ?: continue
+			val wanted = if (live.assertive) android.view.View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE else android.view.View.ACCESSIBILITY_LIVE_REGION_POLITE
+			for (inst in host.runtime.instances(node)) if (host.view(inst.id).accessibilityLiveRegion != wanted) failures.add("initial: ${inst.id} is not ${if (live.assertive) "an assertive" else "a polite"} live region")
+		}
 		val initial = canonical(vector.field("initial", "vector"))
 		if (shownTexts() != initial) failures.add("initial: views show ${shownTexts()}, expected $initial")
 		for (item in vector["initialAttributes"]?.arr("initialAttributes").orEmpty()) {
@@ -69,11 +74,15 @@ object DeviceConformance {
 			val target by lazy { host.view(action.field("host", "action").str("host")) }
 			journal.clear()
 			when (val event = action.field("event", "action").str("event")) {
-				"activate" -> if (!target.performClick()) failures.add("steps[$n]: the view took no click")
+				"activate" -> {
+					val detail = (action["detail"] as? Json.Num)?.value?.toInt()
+					if (detail != null) host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Activate, detail = detail))
+					else if (!target.performClick()) failures.add("steps[$n]: the view took no click")
+				}
 				"cancel" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Cancel))
 				"dismiss" -> action["reason"]?.let { host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Dismiss, reason = it.str("reason"))) }
 					?: host.closedByPlatform(action.field("host", "action").str("host"))
-				"pointerdown", "pointermove", "pointerup", "pointercancel" -> {
+				"pointerdown", "pointermove", "pointerup", "pointercancel", "contextmenu" -> {
 					fun n(name: String, default: Double) = action[name]?.num("action.$name") ?: default
 					val point = TouchPoint(n("pointerId", 1.0), n("x", 0.0), n("y", 0.0), n("time", 0.0))
 					host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.entries.first { it.wire == event }, point = point))
@@ -82,6 +91,10 @@ object DeviceConformance {
 				"dismiss" -> host.closedByPlatform(action.field("host", "action").str("host"))
 				"enter" -> (target as? EditText ?: throw MarklessHostError("steps[$n] presses return in a view that is not an input")).onEditorAction(EditorInfo.IME_ACTION_GO)
 				"timer" -> host.apply(host.runtime.timer(action.field("timer", "action").str("timer")))
+				"focus" -> if (!target.requestFocus()) failures.add("steps[$n]: the field took no focus")
+				"keydown" -> (target as? MarklessField)?.onKey?.invoke(action.field("key", "action").str("key")) ?: throw MarklessHostError("steps[$n] presses a key in a view with no keydown handler")
+				"paste" -> (target as? MarklessField)?.onPaste?.invoke(action.field("text", "action").str("text")) ?: throw MarklessHostError("steps[$n] pastes into a view with no paste handler")
+				"blur" -> target.clearFocus()
 				"idle" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Idle))
 				"visible" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Visible))
 				else -> throw MarklessHostError("steps[$n] has an action this check cannot perform: $event")

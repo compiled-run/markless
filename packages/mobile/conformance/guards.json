@@ -17,12 +17,14 @@
 			{
 				"id": "component-edge:0/state:press.locked",
 				"name": "press.locked",
-				"initial": false
+				"initial": false,
+				"styled": true
 			},
 			{
 				"id": "component-edge:0/state:press.on",
 				"name": "press.on",
-				"initial": false
+				"initial": false,
+				"styled": true
 			}
 		],
 		"nodes": [
@@ -307,6 +309,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "component-edge:0/state:press.on",
+					"value": true
+				},
+				{
 					"op": "text",
 					"node": "component-edge:0/h1:text0",
 					"value": "Power on"
@@ -324,6 +331,11 @@
 				"host": "component-edge:0/h2"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/state:press.locked",
+					"value": true
+				},
 				{
 					"op": "text",
 					"node": "component-edge:0/h2:text0",
@@ -345,6 +357,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "component-edge:0/state:press.locked",
+					"value": false
+				},
+				{
 					"op": "text",
 					"node": "component-edge:0/h2:text0",
 					"value": "Lock"
@@ -357,6 +374,11 @@
 				"host": "component-edge:0/h1"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "component-edge:0/state:press.on",
+					"value": false
+				},
 				{
 					"op": "text",
 					"node": "component-edge:0/h1:text0",

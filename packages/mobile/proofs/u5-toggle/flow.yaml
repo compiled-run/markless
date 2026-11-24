@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u5-toggle
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Toggle
 - assertVisible: Wi-Fi
 - assertVisible: Join known networks

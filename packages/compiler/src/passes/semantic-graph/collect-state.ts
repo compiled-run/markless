@@ -292,6 +292,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 						? {
 								...(partialInitial ? { initialValue: partialInitial.value } : {}),
 								initializerSource: expressionSource(initial, state.source),
+								...(NATIVE_FACTS ? nativeInitializer(initial, state) : {}),
 							}
 						: {}),
 				...(classInstances.length > 0 ? { classInstances } : {}),
@@ -2049,7 +2050,22 @@ function objectPropertyKey(node: AnyNode | undefined): string | null {
 	return null;
 }
 
-function nativeComputed(fn: AnyNode | undefined, state: WalkState): Pick<SemanticGraphBinding, 'nativeExpression'> {
-	const nativeExpression = fn && state.nativeFacts && nativeCollectors(state.nativeFacts).computedValue(fn as never);
+function nativeInitializer(initial: AnyNode, state: WalkState): Pick<SemanticGraphBinding, 'nativeExpression'> {
+	const nativeExpression = state.nativeFacts && nativeCollectors(state.nativeFacts).expression(initial as never);
 	return nativeExpression ? { nativeExpression } : {};
+}
+
+function nativeComputed(
+	fn: AnyNode | undefined,
+	state: WalkState,
+): Pick<SemanticGraphBinding, 'nativeExpression' | 'nativeFunctionSpan' | 'nativeReturns'> {
+	if (!fn || !state.nativeFacts) return {};
+	const collectors = nativeCollectors(state.nativeFacts);
+	const nativeExpression = collectors.computedValue(fn as never);
+	const nativeReturns = collectors.returns(fn as never);
+	return {
+		...(nativeExpression ? { nativeExpression } : {}),
+		nativeFunctionSpan: sourceSpan(fn, state.filename),
+		...(nativeReturns.kind === 'unknown' ? {} : { nativeReturns }),
+	};
 }

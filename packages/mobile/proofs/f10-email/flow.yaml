@@ -1,0 +1,45 @@
+appId: ${APP_ID}
+name: f10-email
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Account
+- assertVisible: Nothing sent
+- assertVisible: ""
+- tapOn: Email
+- eraseText
+- inputText: abc
+- hideKeyboard
+- assertVisible: abc
+- assertVisible: Nothing sent
+- assertVisible: abc
+- tapOn: Send
+- assertVisible: Please include an '@' in the email address\. 'abc' is missing an '@'\.
+- assertVisible: Nothing sent
+- assertVisible: Please include an '@' in the email address\. 'abc' is missing an '@'\.
+- tapOn: Email
+- eraseText
+- inputText: a@b_c
+- hideKeyboard
+- assertVisible: a@b_c
+- assertVisible: Nothing sent
+- assertVisible: a@b_c
+- tapOn: Send
+- assertVisible: A part following '@' should not contain the symbol '_'\.
+- assertVisible: Nothing sent
+- assertVisible: A part following '@' should not contain the symbol '_'\.
+- tapOn: Email
+- eraseText
+- inputText: sam@example.com
+- hideKeyboard
+- assertVisible: sam@example\.com
+- assertVisible: Nothing sent
+- assertVisible: sam@example\.com
+- tapOn: Send
+- assertNotVisible: Nothing sent
+- assertVisible: Sent sam@example\.com
+- assertNotVisible: Nothing sent

@@ -1,0 +1,86 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Locate",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page mk-1k7r4k2"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "note mk-1k7r4k2"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Where you are"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "warning mk-1k7r4k2"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "",
+			"textByState": [
+				{
+					"when": {
+						"state:problem": ""
+					},
+					"value": ""
+				},
+				{
+					"when": {
+						"state:problem": "Location is off"
+					},
+					"value": "Location is off"
+				}
+			]
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"type": "button",
+				"class": "locate mk-1k7r4k2"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Locate"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.page.mk-1k7r4k2 {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #f8f9fa;\n\t\t\t}\n\t\t\t.note.mk-1k7r4k2 {\n\t\t\t\tmargin: 0 0 12px;\n\t\t\t\tcolor: #212529;\n\t\t\t\tfont-size: 16px;\n\t\t\t}\n\t\t\t.warning.mk-1k7r4k2 {\n\t\t\t\tmargin: 0 0 12px;\n\t\t\t\tpadding: 10px 14px;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #fde8e7;\n\t\t\t\tcolor: #b42318;\n\t\t\t\tfont-size: 16px;\n\t\t\t}\n\t\t\t.locate.mk-1k7r4k2 {\n\t\t\t\tdisplay: block;\n\t\t\t\tpadding: 10px 16px;\n\t\t\t\tborder: 0;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #264653;\n\t\t\t\tcolor: #ffffff;\n\t\t\t\tfont: inherit;\n\t\t\t\tfont-size: 16px;\n\t\t\t}",
+	"states": [
+		{
+			"cell": "state:problem",
+			"domain": [
+				"",
+				"Location is off"
+			],
+			"initial": ""
+		}
+	]
+}

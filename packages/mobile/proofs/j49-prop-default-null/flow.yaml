@@ -1,0 +1,26 @@
+appId: ${APP_ID}
+name: j49-prop-default-null
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Meters
+- assertVisible: "Left: no reading"
+- assertVisible: "Right: reading 42"
+- assertNotVisible: "Left: reading 5"
+- assertNotVisible: "Right: no reading"
+- tapOn: Toggle Left
+- assertVisible: "Left: reading 5"
+- assertNotVisible: "Left: no reading"
+- assertVisible: "Left: reading 5"
+- assertVisible: "Right: reading 42"
+- assertNotVisible: "Left: no reading"
+- assertNotVisible: "Right: no reading"
+- tapOn: Toggle Right
+- assertVisible: "Right: no reading"
+- assertNotVisible: "Right: reading 42"
+- assertVisible: "Right: no reading"
+- assertNotVisible: "Right: reading 42"

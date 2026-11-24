@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 07-child-component
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Basket
 - assertVisible: Apples 0
 - assertVisible: Pears 0

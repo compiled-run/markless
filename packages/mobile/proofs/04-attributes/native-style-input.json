@@ -90,6 +90,22 @@
 			"parent": "h0",
 			"attributes": {
 				"class": "mk-4pe35k"
+			},
+			"attributesByState": {
+				"disabled": [
+					{
+						"when": {
+							"state:liked": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"state:liked": true
+						},
+						"value": null
+					}
+				]
 			}
 		},
 		{

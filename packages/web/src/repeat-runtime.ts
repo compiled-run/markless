@@ -5,6 +5,9 @@ import {
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer/protocol';
 import type { RuntimeGraph } from '@markless/runtime';
 
+// False when no @for of the app joins its key from fields, so each joined-key branch folds away.
+declare const __MARKLESS_JOINED_KEYS__: boolean;
+
 export class KeyedRepeatRuntimeError extends Error {
 	readonly code = 'MARKLESS_REPEAT_KEY_DUPLICATE';
 	readonly severity = 'error';
@@ -85,8 +88,16 @@ export function readKeyedRepeatCollection(
 	return Array.from((value ?? []) as Iterable<unknown>);
 }
 
-export function repeatItemKey(item: unknown, repeat: RuntimeKeyedRepeatRecord): unknown {
-	return readPath(item, repeat.keyPath);
+export function repeatItemKey(
+	item: unknown,
+	repeat: RuntimeKeyedRepeatRecord,
+	index: number,
+): unknown {
+	return repeat.indexKey
+		? index
+		: (typeof __MARKLESS_JOINED_KEYS__ === 'undefined' || __MARKLESS_JOINED_KEYS__) && repeat.keyParts
+			? repeat.keyParts.map((p) => (typeof p == 'string' ? p : `${readPath(item, p)}`)).join('')
+			: readPath(item, repeat.keyPath);
 }
 
 function assertUniqueRepeatKeys(
@@ -94,8 +105,8 @@ function assertUniqueRepeatKeys(
 	items: ReadonlyArray<unknown>,
 ): void {
 	const seen = new Map<unknown, true>();
-	for (const item of items) {
-		const key = repeatItemKey(item, repeat);
+	for (const [index, item] of items.entries()) {
+		const key = repeatItemKey(item, repeat, index);
 		if (seen.has(key)) throw duplicateRepeatKeyError(repeat, key);
 		seen.set(key, true);
 	}

@@ -1,0 +1,31 @@
+appId: ${APP_ID}
+name: s40-arm-texts
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: No note open
+- assertVisible: Open note
+- assertVisible: Resting
+- assertVisible: Lift
+- assertNotVisible: Trip to Oslo
+- assertNotVisible: Lifted
+- tapOn: Open note
+- assertVisible: Trip to Oslo
+- assertNotVisible: No note open
+- assertVisible: Trip to Oslo
+- assertVisible: Resting
+- assertNotVisible: No note open
+- tapOn: Lift
+- assertNotVisible: Resting
+- assertVisible: Trip to Oslo
+- assertVisible: Lifted
+- assertNotVisible: Resting
+- tapOn: Lift
+- assertVisible: Resting
+- assertNotVisible: Lifted
+- assertVisible: Resting
+- assertNotVisible: Lifted

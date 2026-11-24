@@ -63,6 +63,7 @@ export type ResumeDomElement = ResumeDomNode & {
 	__marklessShownAsyncArm?: (boundaryId: string) => ShownAsyncArm | undefined;
 	// Set on a keyed row's root when its repeat wires the row: the items that row names, read at dispatch.
 	__marklessRowLocals?: () => Record<string, unknown>;
+	__marklessRepeatRows?: Map<string, () => ReadonlyArray<ResumeRowRoot>>;
 	// Resume reads the host document off the root element (streamed arm patch
 	// scripts, template rendering); the DOM guarantees it, so the surface does too.
 	readonly ownerDocument?: ResumeDomOwnerDocument;
@@ -175,6 +176,8 @@ export type ResumeRepeatRowHook = (
 	armHost?: (at: ResumeKeyedRepeatRecord['rowEvents'][number]) => ResumeDomElement | undefined,
 	/** Only the row's arms changed: rewire what sits in them. */
 	armsOnly?: true,
+	/** This runtime just built the row: the lists in it have no rows on the page yet. */
+	built?: true,
 ) => void;
 /** The app's own module installs this only when a repeat nests inside another's rows. */
 export type ResumeNestedRepeatsHost = {
@@ -259,6 +262,7 @@ export type ResumeArmBranchRecord = {
 	readonly takenArm?: number;
 	readonly symbolId?: string;
 	readonly armTests?: ReadonlyArray<unknown>;
+	readonly armSeeds?: ResumeBranchRecord['armSeeds'];
 	readonly armComponents?: ReadonlyArray<ReadonlyArray<string>>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
 	// A composed child's branch keeps the `dom-order-comment` anchors its own

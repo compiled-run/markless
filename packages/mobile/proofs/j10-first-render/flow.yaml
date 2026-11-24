@@ -1,46 +1,50 @@
 appId: ${APP_ID}
 name: j10-first-render
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Data only
 - assertVisible: Taps 0
 - assertVisible: Open words
 - assertVisible: Home
 - assertVisible:
-      id: markless-engine-starts
-      text: 'engine starts: 0'
+    id: markless-engine-starts
+    text: "engine starts: 0"
 - tapOn: Taps 0
 - assertNotVisible: Taps 0
 - assertVisible: Taps 1
 - assertNotVisible: Taps 0
 - assertVisible:
-      id: markless-engine-starts
-      text: 'engine starts: 0'
+    id: markless-engine-starts
+    text: "engine starts: 0"
 - tapOn: Open words
 - assertVisible:
-      text: kiwi
-      below: fig
+    text: kiwi
+    below: fig
 - assertVisible:
-      text: banana
-      below: kiwi
+    text: banana
+    below: kiwi
 - assertVisible: Words
 - assertVisible:
-      id: markless-engine-starts
-      text: 'engine starts: 1'
+    id: markless-engine-starts
+    text: "engine starts: 1"
 - assertVisible: Words page
-- assertVisible: 'Initials: KFB'
+- assertVisible: "Initials: KFB"
 - assertVisible: fig
 - assertVisible: kiwi
 - assertVisible: banana
 - assertNotVisible: Data only
 - assertVisible:
-      text: kiwi
-      below: fig
+    text: kiwi
+    below: fig
 - assertVisible:
-      text: banana
-      below: kiwi
+    text: banana
+    below: kiwi
 - assertVisible: Words
 - assertVisible:
-      id: markless-engine-starts
-      text: 'engine starts: 1'
+    id: markless-engine-starts
+    text: "engine starts: 1"

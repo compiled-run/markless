@@ -1,0 +1,52 @@
+appId: ${APP_ID}
+name: u30-text-keys
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Labels
+- assertVisible: "0 tags: none"
+- assertVisible: Removed 0
+- assertVisible: Sent nothing
+- tapOn: Tag
+- eraseText
+- inputText: red
+- hideKeyboard
+- assertVisible: red
+- assertVisible: "0 tags: none"
+- assertVisible: Removed 0
+- assertVisible: red
+- tapOn: Tag
+- pressKey: Enter
+- assertNotVisible: "0 tags: none"
+- assertVisible: ""
+- assertVisible: "1 tags: red"
+- assertVisible: Removed 0
+- assertNotVisible: "0 tags: none"
+- assertVisible: ""
+- tapOn: Tag
+- pressKey: Backspace
+- assertNotVisible: Removed 0
+- assertVisible: "1 tags: red"
+- assertVisible: Removed 1
+- assertNotVisible: Removed 0
+- assertVisible: ""
+- tapOn: Message
+- eraseText
+- inputText: hello
+- hideKeyboard
+- assertVisible: hello
+- assertVisible: Sent nothing
+- assertVisible: Removed 1
+- assertVisible: hello
+- tapOn: Message
+- pressKey: Enter
+- assertNotVisible: Sent nothing
+- assertVisible: ""
+- assertVisible: Sent hello
+- assertVisible: "1 tags: red"
+- assertNotVisible: Sent nothing
+- assertVisible: ""

@@ -1,0 +1,205 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Taps",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page mk-o7q83u"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "header mk-o7q83u"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Tally"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "tally mk-o7q83u"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "span",
+			"parent": "h2",
+			"attributes": {
+				"class": "mk-o7q83u"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Header taps 0 · Button taps 0 · Picked none"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "tally mk-o7q83u"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "span",
+			"parent": "h4",
+			"attributes": {
+				"class": "count mk-o7q83u"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "0"
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "tally mk-o7q83u"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h6:text0",
+			"parent": "h6",
+			"text": "Button total: "
+		},
+		{
+			"kind": "element",
+			"id": "h7",
+			"element": "span",
+			"parent": "h6",
+			"attributes": {
+				"class": "count mk-o7q83u"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h7:text0",
+			"parent": "h7",
+			"text": "0 by button"
+		},
+		{
+			"kind": "text",
+			"id": "h6:text1",
+			"parent": "h6",
+			"text": " so far"
+		},
+		{
+			"kind": "element",
+			"id": "h8",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "tally mk-o7q83u"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h8:text0",
+			"parent": "h8",
+			"text": "Picked "
+		},
+		{
+			"kind": "element",
+			"id": "h9",
+			"element": "span",
+			"parent": "h8",
+			"attributes": {
+				"class": "count mk-o7q83u"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h9:text0",
+			"parent": "h9",
+			"text": "none, the colour the last tap on Pick red chose for the rest of this page and every row",
+			"textByState": [
+				{
+					"when": {
+						"state:picked": "none"
+					},
+					"value": "none, the colour the last tap on Pick red chose for the rest of this page and every row"
+				},
+				{
+					"when": {
+						"state:picked": "red"
+					},
+					"value": "red, the colour the last tap on Pick red chose for the rest of this page and every row"
+				}
+			]
+		},
+		{
+			"kind": "text",
+			"id": "h8:text1",
+			"parent": "h8",
+			"text": " until it changes"
+		},
+		{
+			"kind": "element",
+			"id": "h10",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"class": "button mk-o7q83u"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h10:text0",
+			"parent": "h10",
+			"text": "Tap button"
+		},
+		{
+			"kind": "element",
+			"id": "h11",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"class": "button mk-o7q83u"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h11:text0",
+			"parent": "h11",
+			"text": "Pick red"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.page.mk-o7q83u {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #f8f9fa;\n\t\t\t}\n\t\t\t.header.mk-o7q83u {\n\t\t\t\tmargin: 0;\n\t\t\t\tpadding: 12px 16px;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #264653;\n\t\t\t\tcolor: #ffffff;\n\t\t\t\tfont-size: 22px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n\t\t\t.tally.mk-o7q83u {\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 12px 16px;\n\t\t\t\tborder: 1px solid #ced4da;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #212529;\n\t\t\t\tfont-size: 16px;\n\t\t\t}\n\t\t\t.count.mk-o7q83u {\n\t\t\t\tcolor: #2a9d8f;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n\t\t\t.button.mk-o7q83u {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tpadding: 10px 16px;\n\t\t\t\tborder: 1px solid #ced4da;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #212529;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 17px;\n\t\t\t}",
+	"states": [
+		{
+			"cell": "state:picked",
+			"domain": [
+				"none",
+				"red"
+			],
+			"initial": "none"
+		}
+	]
+}

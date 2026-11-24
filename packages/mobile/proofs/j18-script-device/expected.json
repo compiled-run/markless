@@ -1,0 +1,85 @@
+{
+	"rung": "J18",
+	"name": "Device calls from a handler's JavaScript: an awaited location, a tap, a camera object's photo, a refusal caught",
+	"location": {
+		"latitude": 51.5,
+		"longitude": -0.125
+	},
+	"permissions": {
+		"location": "unset",
+		"camera": "unset"
+	},
+	"steps": [
+		{
+			"prompt": "camera",
+			"visible": ["Field", "Nowhere yet", "No photo", "Camera starting"],
+			"absent": ["Camera ready", "Locating"]
+		},
+		{
+			"do": {
+				"answer": "allow"
+			},
+			"visible": ["Camera ready", "Nowhere yet"],
+			"absent": ["Camera starting"],
+			"camera": "on"
+		},
+		{
+			"do": {
+				"tap": "Where am I"
+			},
+			"prompt": "location",
+			"visible": ["Locating"],
+			"absent": ["Nowhere yet"]
+		},
+		{
+			"do": {
+				"answer": "allow"
+			},
+			"visible": ["At 51.50, -0.125"],
+			"absent": ["Locating"],
+			"calls": ["location.current", "haptics.tap"]
+		},
+		{
+			"do": {
+				"tap": "Take photo"
+			},
+			"visible": ["Photo taken", "At 51.50, -0.125"],
+			"absent": ["No photo"],
+			"calls": ["location.current", "haptics.tap", "camera.takePhoto"]
+		},
+		{
+			"do": {
+				"relaunch": true,
+				"permissions": {
+					"location": "unset"
+				}
+			},
+			"visible": ["Nowhere yet", "No photo"],
+			"absent": ["Photo taken", "At 51.50, -0.125"]
+		},
+		{
+			"do": {
+				"tap": "Where am I"
+			},
+			"prompt": "location",
+			"visible": ["Locating"],
+			"absent": ["Nowhere yet"]
+		},
+		{
+			"do": {
+				"answer": "deny"
+			},
+			"visible": ["Refused: NotAllowedError"],
+			"absent": ["Locating"]
+		}
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": ["Field", "No device here"],
+				"absent": ["Where am I", "Nowhere yet"]
+			}
+		],
+		"absentFromOutput": ["Where am I", "takePhoto", "@markless/device"]
+	}
+}

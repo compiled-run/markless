@@ -1,0 +1,37 @@
+appId: ${APP_ID}
+name: f12-fieldset
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Order
+- assertVisible: Who it is for
+- assertVisible: Where it goes
+- assertVisible: Send
+- assertVisible: Not sent
+- assertNotVisible: Sent to Ann in Oslo
+- tapOn: Name
+- eraseText
+- inputText: Ann
+- hideKeyboard
+- assertVisible: Ann
+- assertVisible: Not sent
+- assertNotVisible: Sent to Ann in Oslo
+- assertVisible: Ann
+- tapOn: City
+- eraseText
+- inputText: Oslo
+- hideKeyboard
+- assertVisible: Oslo
+- assertVisible: Not sent
+- assertNotVisible: Sent to Ann in Oslo
+- assertVisible: Oslo
+- tapOn: Send
+- assertVisible: Sent to Ann in Oslo
+- assertNotVisible: Not sent
+- assertVisible: Sent to Ann in Oslo
+- assertVisible: Who it is for
+- assertNotVisible: Not sent

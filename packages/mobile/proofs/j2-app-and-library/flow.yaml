@@ -1,24 +1,28 @@
 appId: ${APP_ID}
 name: j2-app-and-library
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Library
-- assertVisible: 'Heading: none'
-- assertVisible: 'Price: none'
+- assertVisible: "Heading: none"
+- assertVisible: "Price: none"
 - tapOn: Title case
-- assertNotVisible: 'Heading: none'
-- assertVisible: 'Heading: Native Script Handlers'
-- assertNotVisible: 'Heading: none'
+- assertNotVisible: "Heading: none"
+- assertVisible: "Heading: Native Script Handlers"
+- assertNotVisible: "Heading: none"
 - tapOn: Title case
-- assertNotVisible: 'Heading: Native Script Handlers'
-- assertVisible: 'Heading: Native Script Handlers Again'
-- assertVisible: 'Price: none'
-- assertNotVisible: 'Heading: Native Script Handlers'
+- assertNotVisible: "Heading: Native Script Handlers"
+- assertVisible: "Heading: Native Script Handlers Again"
+- assertVisible: "Price: none"
+- assertNotVisible: "Heading: Native Script Handlers"
 - tapOn: Format price
-- assertNotVisible: 'Price: none'
+- assertNotVisible: "Price: none"
 - assertVisible: "Price: \\$1,234\\.56"
-- assertNotVisible: 'Price: none'
+- assertNotVisible: "Price: none"
 - tapOn: Format price
 - assertNotVisible: "Price: \\$1,234\\.56"
 - assertVisible: "Price: \\$1,234,560\\.07"

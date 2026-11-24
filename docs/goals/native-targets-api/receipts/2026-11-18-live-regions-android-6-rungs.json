@@ -1,0 +1,42 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "u22-radio-group",
+			"failure": null,
+			"installSeconds": 1.7876269590000011,
+			"flowSeconds": 26.096698749999995
+		},
+		{
+			"name": "u25-textbox-textarea",
+			"failure": null,
+			"installSeconds": 1.7404837499999994,
+			"flowSeconds": 17.544626208
+		},
+		{
+			"name": "u13-accordion",
+			"failure": null,
+			"installSeconds": 1.7264268749999756,
+			"flowSeconds": 44.01803275000001
+		},
+		{
+			"name": "f4-required",
+			"failure": null,
+			"installSeconds": 1.5795339169999933,
+			"flowSeconds": 26.316268166999972
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 1.6623422080000163,
+			"flowSeconds": 16.97458583300002
+		},
+		{
+			"name": "u1-base",
+			"failure": null,
+			"installSeconds": 1.6107201249999925,
+			"flowSeconds": 14.312868084000016
+		}
+	]
+}

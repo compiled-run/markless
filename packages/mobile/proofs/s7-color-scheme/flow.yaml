@@ -1,0 +1,33 @@
+appId: ${APP_ID}
+name: s7-color-scheme
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- setDarkMode: disabled
+- assertVisible: Seeds at night
+- assertVisible: Plain text takes the scheme's colour
+- assertVisible: The accent has its own dark colour
+- assertVisible: Pressed 0
+- assertVisible: Night shelf
+- setDarkMode: enabled
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible: Seeds at night
+- assertVisible: Plain text takes the scheme's colour
+- assertVisible: Pressed 0
+- assertVisible: Night shelf
+- tapOn: Pressed 0
+- assertNotVisible: Pressed 0
+- assertVisible: Pressed 1
+- assertNotVisible: Pressed 0
+- assertVisible: Night shelf
+- setDarkMode: disabled
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible: Seeds at night
+- assertVisible: Pressed 1
+- assertVisible: Night shelf

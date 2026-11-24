@@ -1,0 +1,517 @@
+{
+	"version": "markless.native-app-conformance/0",
+	"app": {
+		"version": "markless.native-app/0",
+		"routes": [
+			{
+				"pattern": "/",
+				"params": [],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Home",
+					"route": {
+						"pattern": "/",
+						"params": []
+					},
+					"cells": [
+						{
+							"id": "state:next",
+							"name": "next",
+							"initial": 41
+						},
+						{
+							"id": "state:note",
+							"name": "note",
+							"initial": "Nothing yet"
+						}
+					],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "h1",
+							"parent": "h0",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Order desk"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h3",
+							"element": "p",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h3:text0",
+							"parent": "h3",
+							"parts": [
+								{
+									"cell": "state:note"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h4",
+							"element": "button",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h4:text0",
+							"parent": "h4",
+							"parts": [
+								{
+									"text": "Open next order"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h5",
+							"element": "button",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h5:text0",
+							"parent": "h5",
+							"parts": [
+								{
+									"text": "Stay here"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h6",
+							"element": "button",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h6:text0",
+							"parent": "h6",
+							"parts": [
+								{
+									"text": "Try a missing page"
+								}
+							]
+						}
+					],
+					"events": [
+						{
+							"host": "h4",
+							"event": "activate",
+							"handler": "handler:event:0"
+						},
+						{
+							"host": "h5",
+							"event": "activate",
+							"handler": "handler:event:1"
+						},
+						{
+							"host": "h6",
+							"event": "activate",
+							"handler": "handler:event:2"
+						}
+					],
+					"handlers": [
+						{
+							"id": "handler:event:0",
+							"ops": [
+								{
+									"op": "script",
+									"fn": "fn:0",
+									"type": "click",
+									"bindings": {
+										"next": {
+											"cell": "state:next"
+										}
+									}
+								}
+							]
+						},
+						{
+							"id": "handler:event:1",
+							"ops": [
+								{
+									"op": "script",
+									"fn": "fn:1",
+									"type": "click",
+									"bindings": {
+										"note": {
+											"cell": "state:note"
+										}
+									}
+								}
+							]
+						},
+						{
+							"id": "handler:event:2",
+							"ops": [
+								{
+									"op": "script",
+									"fn": "fn:2",
+									"type": "click",
+									"bindings": {
+										"note": {
+											"cell": "state:note"
+										}
+									}
+								}
+							]
+						}
+					],
+					"title": [
+						{
+							"text": "Home"
+						}
+					],
+					"script": {
+						"id": "91b849a7553d467f",
+						"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0,\"fn:2\":0};\nvar navigation = {\"here\":\"/\",\"routes\":[\"/\",\"/orders/[id]\"]};\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (async function() {\n __s.next++;\n await globalThis[\"__marklessHost\"][\"navigate\"](`/orders/${__s.next}`);\n}.bind(this));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (async function() {\n await globalThis[\"__marklessHost\"][\"navigate\"]('./');\n __s.note = 'Stayed on this page';\n}.bind(this));\n};\nfunctions[\"fn:2\"] = function (__s) {\nreturn (async function() {\n try {\n  await globalThis[\"__marklessHost\"][\"navigate\"]('/orders/../nowhere?from=desk');\n } catch (error) {\n  __s.note = (error).message;\n }\n}.bind(this));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"91b849a7553d467f\");\n",
+						"services": [
+							"navigate"
+						]
+					}
+				}
+			},
+			{
+				"pattern": "/orders/[id]",
+				"params": [
+					"id"
+				],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Order",
+					"route": {
+						"pattern": "/orders/[id]",
+						"params": [
+							"id"
+						]
+					},
+					"cells": [],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "h1",
+							"parent": "h0",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Details for order "
+								},
+								{
+									"expr": {
+										"member": {
+											"route": "params"
+										},
+										"property": "id"
+									}
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h3",
+							"element": "button",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h3:text0",
+							"parent": "h3",
+							"parts": [
+								{
+									"text": "Next one instead"
+								}
+							]
+						}
+					],
+					"events": [
+						{
+							"host": "h3",
+							"event": "activate",
+							"handler": "handler:event:0"
+						}
+					],
+					"handlers": [
+						{
+							"id": "handler:event:0",
+							"ops": [
+								{
+									"op": "script",
+									"fn": "fn:0",
+									"type": "click",
+									"bindings": {
+										"params": {
+											"value": {
+												"route": "params"
+											}
+										}
+									}
+								}
+							]
+						}
+					],
+					"title": [
+						{
+							"text": "Order "
+						},
+						{
+							"expr": {
+								"member": {
+									"route": "params"
+								},
+								"property": "id"
+							}
+						}
+					],
+					"script": {
+						"id": "f6ecf313424a800d",
+						"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = {\"here\":\"/orders/[id]\",\"routes\":[\"/\",\"/orders/[id]\"]};\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => globalThis[\"__marklessHost\"][\"navigate\"](String(Number(__s.params.id) + 1), { replace: true }));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"f6ecf313424a800d\");\n",
+						"services": [
+							"navigate"
+						]
+					}
+				}
+			}
+		]
+	},
+	"open": "/",
+	"initial": {
+		"stack": [
+			"/"
+		],
+		"title": "Home",
+		"texts": [
+			[
+				"h2:text0",
+				"Order desk"
+			],
+			[
+				"h3:text0",
+				"Nothing yet"
+			],
+			[
+				"h4:text0",
+				"Open next order"
+			],
+			[
+				"h5:text0",
+				"Stay here"
+			],
+			[
+				"h6:text0",
+				"Try a missing page"
+			]
+		]
+	},
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Stayed on this page"
+				}
+			],
+			"stack": [
+				"/"
+			],
+			"title": "Home",
+			"texts": [
+				[
+					"h2:text0",
+					"Order desk"
+				],
+				[
+					"h3:text0",
+					"Stayed on this page"
+				],
+				[
+					"h4:text0",
+					"Open next order"
+				],
+				[
+					"h5:text0",
+					"Stay here"
+				],
+				[
+					"h6:text0",
+					"Try a missing page"
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "navigate() to /orders/../nowhere?from=desk: /nowhere is not a page of this app"
+				}
+			],
+			"stack": [
+				"/"
+			],
+			"title": "Home",
+			"texts": [
+				[
+					"h2:text0",
+					"Order desk"
+				],
+				[
+					"h3:text0",
+					"navigate() to /orders/../nowhere?from=desk: /nowhere is not a page of this app"
+				],
+				[
+					"h4:text0",
+					"Open next order"
+				],
+				[
+					"h5:text0",
+					"Stay here"
+				],
+				[
+					"h6:text0",
+					"Try a missing page"
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "navigate",
+					"route": "/orders/[id]",
+					"params": {
+						"id": "42"
+					}
+				}
+			],
+			"stack": [
+				"/",
+				"/orders/42"
+			],
+			"title": "Order 42",
+			"texts": [
+				[
+					"h2:text0",
+					"Details for order 42"
+				],
+				[
+					"h3:text0",
+					"Next one instead"
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "navigate",
+					"route": "/orders/[id]",
+					"params": {
+						"id": "43"
+					},
+					"replace": true
+				}
+			],
+			"stack": [
+				"/",
+				"/orders/43"
+			],
+			"title": "Order 43",
+			"texts": [
+				[
+					"h2:text0",
+					"Details for order 43"
+				],
+				[
+					"h3:text0",
+					"Next one instead"
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "back"
+			},
+			"journal": [],
+			"stack": [
+				"/"
+			],
+			"title": "Home",
+			"texts": [
+				[
+					"h2:text0",
+					"Order desk"
+				],
+				[
+					"h3:text0",
+					"navigate() to /orders/../nowhere?from=desk: /nowhere is not a page of this app"
+				],
+				[
+					"h4:text0",
+					"Open next order"
+				],
+				[
+					"h5:text0",
+					"Stay here"
+				],
+				[
+					"h6:text0",
+					"Try a missing page"
+				]
+			]
+		}
+	]
+}

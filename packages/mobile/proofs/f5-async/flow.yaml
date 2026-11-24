@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: f5-async
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Username
 - assertVisible: Save
 - assertVisible: Nothing saved
@@ -18,11 +22,11 @@ name: f5-async
 - assertVisible: Saving
 - assertNotVisible: Nothing saved
 - assertVisible:
-      text: Save
-      enabled: false
+    text: Save
+    enabled: false
 - extendedWaitUntil:
-      visible: Saved ada
-      timeout: 18000
+    visible: Saved ada
+    timeout: 18000
 - assertNotVisible: Saving
 - assertVisible: Saved ada
 - assertVisible: Save
@@ -39,11 +43,11 @@ name: f5-async
 - assertVisible: Saving
 - assertNotVisible: Saved ada
 - assertVisible:
-      text: Save
-      enabled: false
+    text: Save
+    enabled: false
 - extendedWaitUntil:
-      visible: The name admin is taken
-      timeout: 18000
+    visible: The name admin is taken
+    timeout: 18000
 - assertNotVisible: Saving
 - assertVisible: The name admin is taken
 - assertVisible: Save

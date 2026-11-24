@@ -1,0 +1,24 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "u22-radio-group",
+			"failure": null,
+			"installSeconds": 3.0922257499999994,
+			"flowSeconds": 26.435125875000004
+		},
+		{
+			"name": "f7-tick",
+			"failure": null,
+			"installSeconds": 1.6188150000000023,
+			"flowSeconds": 30.991789666000013
+		},
+		{
+			"name": "f2-return-key",
+			"failure": null,
+			"installSeconds": 1.6557147090000217,
+			"flowSeconds": 42.186944291000025
+		}
+	]
+}

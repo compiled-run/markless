@@ -1,0 +1,73 @@
+appId: ${APP_ID}
+name: checkin
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Check-ins
+- assertVisible: New check-in
+- assertVisible: No check-ins yet\. Start one when you reach a site\.
+- assertVisible: Check-ins
+- tapOn: Settings
+- assertNotVisible: No check-ins yet\. Start one when you reach a site\.
+- assertVisible: Settings
+- assertVisible: Capture
+- assertVisible: Attach my location
+- assertVisible: End-of-day reminder
+- assertVisible: Photo size
+- assertVisible: Default site
+- assertVisible: North yard
+- assertNotVisible: No check-ins yet\. Start one when you reach a site\.
+- assertVisible: Settings
+- tapOn: Change▾
+- assertVisible: Pump house
+- assertVisible: East fence
+- assertVisible: Loading dock
+- tapOn: East fence
+- assertNotVisible: Loading dock
+- assertVisible: East fence
+- assertNotVisible: North yard
+- assertNotVisible: Loading dock
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
+- assertVisible: Check-ins
+- assertVisible: No check-ins yet\. Start one when you reach a site\.
+- assertNotVisible: Capture
+- assertVisible: Check-ins
+- tapOn: Settings
+- assertVisible: Default site
+- assertVisible: East fence
+- assertNotVisible: North yard
+- tapOn: Access
+- assertNotVisible: Default site
+- assertVisible: What Field notes may use on this device\.
+- assertVisible: Camera
+- assertVisible: Location
+- assertNotVisible: Default site
+- tapOn: Field notes
+- assertVisible: New check-in
+- assertVisible: No check-ins yet\. Start one when you reach a site\.
+- tapOn: New check-in
+- assertNotVisible: No check-ins yet\. Start one when you reach a site\.
+- assertVisible: Save check-in
+- assertVisible: Use my location
+- assertNotVisible: No check-ins yet\. Start one when you reach a site\.
+- tapOn: Note
+- eraseText
+- inputText: Gauge reads 4 bar
+- hideKeyboard
+- assertVisible: Gauge reads 4 bar
+- assertVisible: Save check-in
+- assertVisible: Gauge reads 4 bar

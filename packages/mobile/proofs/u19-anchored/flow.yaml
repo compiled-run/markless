@@ -1,0 +1,29 @@
+appId: ${APP_ID}
+name: u19-anchored
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Anchored
+- assertVisible: Details
+- assertVisible: Tap for details
+- assertVisible: Low anchor
+- assertVisible: Flipped above
+- assertVisible: Open no
+- assertNotVisible: Ships in two days
+- tapOn: Details
+- assertVisible: Ships in two days
+- assertNotVisible: Open no
+- assertVisible: Ships in two days
+- assertVisible: Open yes
+- assertNotVisible: Open no
+- tapOn: Details
+- assertVisible: Open no
+- assertNotVisible: Ships in two days
+- assertNotVisible: Open yes
+- assertVisible: Open no
+- assertNotVisible: Ships in two days
+- assertNotVisible: Open yes

@@ -1,0 +1,31 @@
+appId: ${APP_ID}
+name: j15-submit-helper
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Site log
+- assertVisible: Add
+- assertVisible: "Last: none"
+- assertVisible: "Log: empty"
+- assertVisible: North yard
+- tapOn: Add
+- assertNotVisible: "Last: none"
+- assertVisible: "Last: z"
+- assertVisible: "Log: z North yard"
+- assertNotVisible: "Last: none"
+- tapOn: Site
+- eraseText
+- inputText: Pump house
+- hideKeyboard
+- assertVisible: Pump house
+- assertVisible: "Last: z"
+- assertVisible: Pump house
+- tapOn: Add
+- assertNotVisible: "Last: z"
+- assertVisible: "Last: 10"
+- assertVisible: "Log: z North yard, 10 Pump house"
+- assertNotVisible: "Last: z"

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 08-text-input
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Greeting
 - assertVisible: Hello Sam
 - assertVisible: Sam

@@ -1,0 +1,22 @@
+appId: ${APP_ID}
+name: r163-radio-follows
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Photo size
+- assertVisible: Pick small
+- assertVisible: Pick medium
+- assertVisible: "Size: medium"
+- tapOn: Pick small
+- assertNotVisible: "Size: medium"
+- assertVisible: "Size: small"
+- assertNotVisible: "Size: medium"
+- tapOn: Pick medium
+- assertVisible: "Size: medium"
+- assertNotVisible: "Size: small"
+- assertVisible: "Size: medium"
+- assertNotVisible: "Size: small"

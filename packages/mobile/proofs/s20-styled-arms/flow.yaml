@@ -1,0 +1,56 @@
+appId: ${APP_ID}
+name: s20-styled-arms
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Order 1024
+- assertVisible: Details are hidden
+- assertVisible: Packed
+- assertVisible: Thanks for ordering
+- assertNotVisible: Shipping
+- assertNotVisible: Shipped
+- assertNotVisible: Running late
+- assertVisible: Order
+- tapOn: Toggle details
+- assertVisible: Shipping
+- assertNotVisible: Details are hidden
+- assertVisible: Shipping
+- assertVisible: Two days
+- assertVisible: Packed
+- assertVisible: Thanks for ordering
+- assertNotVisible: Details are hidden
+- tapOn: Next step
+- assertNotVisible: Packed
+- assertVisible: Shipping
+- assertVisible: Shipped
+- assertVisible: Thanks for ordering
+- assertNotVisible: Packed
+- assertNotVisible: Running late
+- tapOn: Next step
+- assertVisible: Running late
+- assertNotVisible: Shipped
+- assertVisible: Shipping
+- assertVisible: Running late
+- assertVisible: Thanks for ordering
+- assertNotVisible: Shipped
+- assertNotVisible: Packed
+- tapOn: Toggle details
+- assertNotVisible: Shipping
+- assertNotVisible: Running late
+- assertVisible: Details are hidden
+- assertVisible: Thanks for ordering
+- assertNotVisible: Shipping
+- assertNotVisible: Running late
+- assertNotVisible: Packed
+- assertNotVisible: Shipped
+- tapOn: Next step
+- assertVisible: Packed
+- assertVisible: Details are hidden
+- assertVisible: Packed
+- assertVisible: Thanks for ordering
+- assertNotVisible: Shipping
+- assertNotVisible: Shipped

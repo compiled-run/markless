@@ -54,6 +54,9 @@ import type {
 	ResumeRowRoot,
 } from '../resume-types.ts';
 
+// False when no @for of the app joins its key from fields, so each joined-key branch folds away.
+declare const __MARKLESS_JOINED_KEYS__: boolean;
+
 /**
  * The row a resumed client builds when the row IS a component.
  *
@@ -420,6 +423,10 @@ function loadInstanceScope(): Awaitable<InstanceScopeModule> {
 }
 
 function rowKeyOf(item: unknown, repeat: ResumeKeyedRepeatRecord): unknown {
+	if ((typeof __MARKLESS_JOINED_KEYS__ === 'undefined' || __MARKLESS_JOINED_KEYS__) && repeat.keyParts)
+		return repeat.keyParts
+			.map((p) => (typeof p == 'string' ? p : `${rowKeyOf(item, { keyPath: p } as ResumeKeyedRepeatRecord)}`))
+			.join('');
 	let cursor = item as Record<string, unknown> | null | undefined;
 	for (const key of repeat.keyPath) {
 		if (cursor == null) return undefined;
@@ -859,6 +866,7 @@ function ownerProjectionView(
 }
 
 // A minted row has no render above it to qualify ids spelled in its owner's module, so they take its prefix here.
+// Branches pass through unprefixed: an owner's list in an @if arm makes the row unbuildable; a row component's own arm list is unverified (such rows ignore their handlers).
 function ownerRecordsInPageSpace<R extends { readonly state: ProtocolStatePayload; readonly view: ProtocolViewPayload }>(
 	rendered: R,
 	owner: { readonly symbolPrefix: string; readonly edge?: OwningSurfaceEdge; readonly edgePrefix?: string },
@@ -966,7 +974,7 @@ function ownerRecordsInPageSpace<R extends { readonly state: ProtocolStatePayloa
 				? {
 						keyedRepeats: view.keyedRepeats.map((repeat) => ({
 							...repeat,
-							id: ownerHostPrefix + repeat.id,
+							...instanceScope.marklessPrefixedRepeatId(repeat, ownerHostPrefix),
 							parentHostNodeId: ownerHostPrefix + repeat.parentHostNodeId,
 							rowEvents: repeat.rowEvents.map((event) => ({
 								...event,

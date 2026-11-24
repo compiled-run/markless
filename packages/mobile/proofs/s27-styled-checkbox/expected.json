@@ -1,0 +1,29 @@
+{
+	"rung": "S27",
+	"name": "A styled checkbox drawn as Chrome draws it, tinted by accent-color: the notes form's pinned field (a 22px checkbox in a flex label), toggled by a tap on its label",
+	"steps": [
+		{
+			"visible": [
+				"Pin to the top",
+				"Pinned: no"
+			],
+			"absent": [
+				"Pinned: yes"
+			],
+			"title": "Pinning"
+		},
+		{
+			"do": {
+				"tap": "Pin to the top"
+			},
+			"visible": [
+				"Pin to the top",
+				"Pinned: yes"
+			],
+			"absent": [
+				"Pinned: no"
+			],
+			"title": "Pinning"
+		}
+	]
+}

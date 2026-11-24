@@ -1,0 +1,33 @@
+appId: ${APP_ID}
+name: 21-form-opens
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Search the web
+- assertVisible: Search
+- assertVisible: ""
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: none"
+- tapOn: Query
+- eraseText
+- inputText: phone apps & more
+- hideKeyboard
+- assertVisible: phone apps & more
+- assertVisible: Search
+- assertVisible: phone apps & more
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: none"
+- tapOn: Search
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: browser\\.open"
+- assertVisible: Search the web
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: browser\\.open"

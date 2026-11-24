@@ -1,0 +1,34 @@
+appId: ${APP_ID}
+name: u16-button-disabled
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Disabled
+- assertVisible: Send
+- assertVisible: Lock
+- assertVisible: Sent 0
+- assertVisible: Send is open
+- tapOn: Send
+- assertNotVisible: Sent 0
+- assertVisible: Sent 1
+- assertVisible: Send is open
+- assertNotVisible: Sent 0
+- tapOn: Lock
+- assertNotVisible: Send is open
+- assertVisible: Send is locked
+- assertVisible: Sent 1
+- assertNotVisible: Send is open
+- tapOn: Lock
+- assertVisible: Send is open
+- assertNotVisible: Send is locked
+- assertVisible: Send is open
+- assertVisible: Sent 1
+- assertNotVisible: Send is locked
+- tapOn: Send
+- assertNotVisible: Sent 1
+- assertVisible: Sent 2
+- assertNotVisible: Sent 1

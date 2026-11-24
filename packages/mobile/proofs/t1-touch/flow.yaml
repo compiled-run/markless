@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: t1-touch
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Drag me
 - assertVisible: Idle
 - assertVisible: Pointer none

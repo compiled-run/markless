@@ -1,0 +1,17 @@
+appId: ${APP_ID}
+name: u126-carousel
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Cities
+- assertVisible: Paris
+- assertVisible: Next
+- assertVisible: Showing paris
+- tapOn: Next
+- assertNotVisible: Showing paris
+- assertVisible: Showing oslo
+- assertNotVisible: Showing paris

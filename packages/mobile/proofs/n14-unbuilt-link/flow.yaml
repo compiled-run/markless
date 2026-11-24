@@ -1,0 +1,18 @@
+appId: ${APP_ID}
+name: n14-unbuilt-link
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Home
+- assertVisible: Open report
+- assertNotVisible: Page not found
+- assertNotVisible: Report page
+- tapOn: Open report
+- assertVisible: Page not found
+- assertNotVisible: Home
+- assertVisible: Page not found
+- assertNotVisible: Home

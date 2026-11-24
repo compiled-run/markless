@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r141-for-in-arm
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Show list
 - assertVisible: List hidden
 - assertVisible: 1 in the list

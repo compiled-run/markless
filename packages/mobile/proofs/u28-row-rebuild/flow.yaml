@@ -1,0 +1,37 @@
+appId: ${APP_ID}
+name: u28-row-rebuild
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Fruit
+- assertVisible: Apple tapped 0
+- assertVisible: Size 1
+- assertNotVisible: Apple tapped 1
+- assertNotVisible: Apricot tapped 0
+- tapOn: Apple tapped 0
+- assertVisible: Apple tapped 1
+- assertNotVisible: Apple tapped 0
+- assertVisible: Apple tapped 1
+- assertNotVisible: Apple tapped 0
+- tapOn: Rename
+- assertNotVisible: Apple tapped 1
+- assertVisible: Apricot tapped 0
+- assertVisible: Size 1
+- assertNotVisible: Apple tapped 1
+- assertNotVisible: Apricot tapped 1
+- tapOn: Apricot tapped 0
+- assertVisible: Apricot tapped 1
+- assertNotVisible: Apricot tapped 0
+- assertVisible: Apricot tapped 1
+- assertVisible: Size 1
+- assertNotVisible: Apricot tapped 0
+- tapOn: Grow
+- assertNotVisible: Size 1
+- assertVisible: Apricot tapped 1
+- assertVisible: Size 2
+- assertNotVisible: Apricot tapped 0
+- assertNotVisible: Size 1

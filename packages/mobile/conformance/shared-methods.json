@@ -1,0 +1,446 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "SharedMonth",
+		"cells": [
+			{
+				"id": "shared:src/shared-methods.tsrx#monthState/state:month.at",
+				"name": "month.at",
+				"initial": "2026-11"
+			},
+			{
+				"id": "shared:src/shared-methods.tsrx#monthState/state:month.open",
+				"name": "month.open",
+				"initial": false,
+				"styled": true
+			},
+			{
+				"id": "shared:src/shared-methods.tsrx#monthState/state:month.peek",
+				"name": "month.peek",
+				"initial": ""
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "main",
+				"parent": null,
+				"bindings": [
+					{
+						"attribute": "ui-open",
+						"value": {
+							"cell": "shared:src/shared-methods.tsrx#monthState/state:month.open"
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h3"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"cell": "shared:src/shared-methods.tsrx#monthState/state:month.at"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "p",
+				"parent": "h3"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"cell": "shared:src/shared-methods.tsrx#monthState/state:month.peek"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "button",
+				"parent": "h3"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h0:text0",
+				"parent": "component-edge:0/h0",
+				"parts": [
+					{
+						"text": "Next"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h1",
+				"element": "button",
+				"parent": "h3"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h1:text0",
+				"parent": "component-edge:1/h1",
+				"parts": [
+					{
+						"text": "Back"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:2/h2",
+				"element": "button",
+				"parent": "h3"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:2/h2:text0",
+				"parent": "component-edge:2/h2",
+				"parts": [
+					{
+						"text": "Peek"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:0/h0",
+				"event": "activate",
+				"handler": "handler:component-edge:0/event:0"
+			},
+			{
+				"host": "component-edge:1/h1",
+				"event": "activate",
+				"handler": "handler:component-edge:1/event:1"
+			},
+			{
+				"host": "component-edge:2/h2",
+				"event": "activate",
+				"handler": "handler:component-edge:2/event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:0/event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"monthState": {
+								"shared": {
+									"at": {
+										"cell": "shared:src/shared-methods.tsrx#monthState/state:month.at"
+									},
+									"open": {
+										"cell": "shared:src/shared-methods.tsrx#monthState/state:month.open"
+									},
+									"peek": {
+										"cell": "shared:src/shared-methods.tsrx#monthState/state:month.peek"
+									},
+									"next": {
+										"method": "fn:1",
+										"bindings": {
+											"month": {
+												"fields": {
+													"at": "shared:src/shared-methods.tsrx#monthState/state:month.at",
+													"open": "shared:src/shared-methods.tsrx#monthState/state:month.open",
+													"peek": "shared:src/shared-methods.tsrx#monthState/state:month.peek"
+												}
+											}
+										}
+									},
+									"go": {
+										"method": "fn:2",
+										"bindings": {
+											"month": {
+												"fields": {
+													"at": "shared:src/shared-methods.tsrx#monthState/state:month.at",
+													"open": "shared:src/shared-methods.tsrx#monthState/state:month.open",
+													"peek": "shared:src/shared-methods.tsrx#monthState/state:month.peek"
+												}
+											}
+										}
+									},
+									"setOpen": {
+										"method": "fn:3",
+										"bindings": {
+											"month": {
+												"fields": {
+													"at": "shared:src/shared-methods.tsrx#monthState/state:month.at",
+													"open": "shared:src/shared-methods.tsrx#monthState/state:month.open",
+													"peek": "shared:src/shared-methods.tsrx#monthState/state:month.peek"
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:1/event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:4",
+						"type": "click",
+						"bindings": {
+							"monthState": {
+								"shared": {
+									"at": {
+										"cell": "shared:src/shared-methods.tsrx#monthState/state:month.at"
+									},
+									"open": {
+										"cell": "shared:src/shared-methods.tsrx#monthState/state:month.open"
+									},
+									"peek": {
+										"cell": "shared:src/shared-methods.tsrx#monthState/state:month.peek"
+									},
+									"next": {
+										"method": "fn:1",
+										"bindings": {
+											"month": {
+												"fields": {
+													"at": "shared:src/shared-methods.tsrx#monthState/state:month.at",
+													"open": "shared:src/shared-methods.tsrx#monthState/state:month.open",
+													"peek": "shared:src/shared-methods.tsrx#monthState/state:month.peek"
+												}
+											}
+										}
+									},
+									"go": {
+										"method": "fn:2",
+										"bindings": {
+											"month": {
+												"fields": {
+													"at": "shared:src/shared-methods.tsrx#monthState/state:month.at",
+													"open": "shared:src/shared-methods.tsrx#monthState/state:month.open",
+													"peek": "shared:src/shared-methods.tsrx#monthState/state:month.peek"
+												}
+											}
+										}
+									},
+									"setOpen": {
+										"method": "fn:3",
+										"bindings": {
+											"month": {
+												"fields": {
+													"at": "shared:src/shared-methods.tsrx#monthState/state:month.at",
+													"open": "shared:src/shared-methods.tsrx#monthState/state:month.open",
+													"peek": "shared:src/shared-methods.tsrx#monthState/state:month.peek"
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:2/event:2",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:5",
+						"type": "click",
+						"bindings": {
+							"monthState": {
+								"shared": {
+									"at": {
+										"cell": "shared:src/shared-methods.tsrx#monthState/state:month.at"
+									},
+									"open": {
+										"cell": "shared:src/shared-methods.tsrx#monthState/state:month.open"
+									},
+									"peek": {
+										"cell": "shared:src/shared-methods.tsrx#monthState/state:month.peek"
+									},
+									"next": {
+										"method": "fn:1",
+										"bindings": {
+											"month": {
+												"fields": {
+													"at": "shared:src/shared-methods.tsrx#monthState/state:month.at",
+													"open": "shared:src/shared-methods.tsrx#monthState/state:month.open",
+													"peek": "shared:src/shared-methods.tsrx#monthState/state:month.peek"
+												}
+											}
+										}
+									},
+									"go": {
+										"method": "fn:2",
+										"bindings": {
+											"month": {
+												"fields": {
+													"at": "shared:src/shared-methods.tsrx#monthState/state:month.at",
+													"open": "shared:src/shared-methods.tsrx#monthState/state:month.open",
+													"peek": "shared:src/shared-methods.tsrx#monthState/state:month.peek"
+												}
+											}
+										}
+									},
+									"setOpen": {
+										"method": "fn:3",
+										"bindings": {
+											"month": {
+												"fields": {
+													"at": "shared:src/shared-methods.tsrx#monthState/state:month.at",
+													"open": "shared:src/shared-methods.tsrx#monthState/state:month.open",
+													"peek": "shared:src/shared-methods.tsrx#monthState/state:month.peek"
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "10ce56097cc3cb6f",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0,\"fn:2\":0,\"fn:3\":0,\"fn:4\":0,\"fn:5\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction addMonths(month, step) {\n const parts = month.split('-');\n const at = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1 + step, 1));\n return `${at.getUTCFullYear()}-${`${at.getUTCMonth() + 1}`.padStart(2, '0')}`;\n}\nfunctions[\"fn:0\"] = function (__s) {\nconst month = __s.monthState();\nreturn (() => {\n month.next();\n});\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (function() {\n __s.month.at = addMonths(__s.month.at, 1);\n});\n};\nfunctions[\"fn:2\"] = function (__s) {\nreturn (function(step) {\n __s.month.at = addMonths(__s.month.at, step);\n});\n};\nfunctions[\"fn:3\"] = function (__s) {\nreturn (function(next) {\n __s.month.open = next;\n});\n};\nfunctions[\"fn:4\"] = function (__s) {\nconst month = __s.monthState();\nreturn (() => month.go(-13));\n};\nfunctions[\"fn:5\"] = function (__s) {\nconst month = __s.monthState();\nreturn (() => {\n const opening = month.open !== true;\n month.setOpen(opening);\n month.peek = opening ? addMonths(month.at, 1) : '';\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"10ce56097cc3cb6f\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h4:text0",
+			"2026-11"
+		],
+		[
+			"h5:text0",
+			""
+		],
+		[
+			"component-edge:0/h0:text0",
+			"Next"
+		],
+		[
+			"component-edge:1/h1:text0",
+			"Back"
+		],
+		[
+			"component-edge:2/h2:text0",
+			"Peek"
+		]
+	],
+	"initialAttributes": [
+		[
+			"h3",
+			"ui-open",
+			null
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h0"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "2026-12"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h1"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "2025-11"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:2/h2"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "shared:src/shared-methods.tsrx#monthState/state:month.open",
+					"value": true
+				},
+				{
+					"op": "attribute",
+					"node": "h3",
+					"name": "ui-open",
+					"value": ""
+				},
+				{
+					"op": "text",
+					"node": "h5:text0",
+					"value": "2025-12"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h0"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "2025-12"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:2/h2"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "shared:src/shared-methods.tsrx#monthState/state:month.open",
+					"value": false
+				},
+				{
+					"op": "attribute",
+					"node": "h3",
+					"name": "ui-open",
+					"value": null
+				},
+				{
+					"op": "text",
+					"node": "h5:text0",
+					"value": ""
+				}
+			]
+		}
+	]
+}

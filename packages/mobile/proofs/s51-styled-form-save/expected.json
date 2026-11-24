@@ -1,0 +1,49 @@
+{
+	"rung": "S51",
+	"name": "On styled pages, a note typed into a text field and a textarea is saved and shows in the list, as the web does",
+	"steps": [
+		{
+			"visible": ["All notes", "Write a note"]
+		},
+		{
+			"do": {
+				"tap": "Write a note"
+			},
+			"visible": ["Title", "Note", "Save note"],
+			"absent": ["All notes"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Title",
+					"text": "Groceries"
+				}
+			},
+			"visible": ["Save note"],
+			"fields": {
+				"Title": "Groceries"
+			}
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Note",
+					"text": "Milk and bread"
+				}
+			},
+			"visible": ["Save note"],
+			"fields": {
+				"Title": "Groceries",
+				"Note": "Milk and bread"
+			}
+		},
+		{
+			"do": {
+				"tap": "Save note"
+			},
+			"visible": ["All notes", "Groceries", "Milk and bread", "Write a note"],
+			"absent": ["Save note"],
+			"order": ["All notes", "Groceries", "Milk and bread", "Write a note"]
+		}
+	]
+}

@@ -1,0 +1,28 @@
+appId: ${APP_ID}
+name: u78-roster-place
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Bus route
+- assertVisible: Harbour is stop 1
+- assertVisible: Market is stop 2
+- assertVisible: Station is stop 3
+- assertVisible: Harbour is next
+- assertNotVisible: Market is next
+- assertNotVisible: Station is next
+- tapOn: Next stop
+- assertVisible: Market is next
+- assertNotVisible: Harbour is next
+- assertVisible: Market is next
+- assertNotVisible: Harbour is next
+- assertNotVisible: Station is next
+- tapOn: Next stop
+- assertVisible: Station is next
+- assertNotVisible: Market is next
+- assertVisible: Station is next
+- assertNotVisible: Harbour is next
+- assertNotVisible: Market is next

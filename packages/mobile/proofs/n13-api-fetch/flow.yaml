@@ -1,0 +1,16 @@
+appId: ${APP_ID}
+name: n13-api-fetch
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Greeting
+- assertVisible: Ask
+- assertVisible: "Answer: none"
+- tapOn: Ask
+- assertNotVisible: "Answer: none"
+- assertVisible: "Answer: GET /api/greeting\\?name=ada -"
+- assertNotVisible: "Answer: none"

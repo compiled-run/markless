@@ -1,0 +1,38 @@
+appId: ${APP_ID}
+name: u96-style-chosen
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Chosen style
+- assertVisible: Middle row
+- assertVisible: Marker
+- assertVisible: Swap
+- assertVisible: High
+- assertVisible:
+    text: Middle row
+    below: Marker
+- tapOn: Swap
+- assertNotVisible: High
+- assertVisible:
+    text: Marker
+    below: Middle row
+- assertVisible: Low
+- assertNotVisible: High
+- assertVisible:
+    text: Marker
+    below: Middle row
+- tapOn: Swap
+- assertVisible: High
+- assertNotVisible: Low
+- assertVisible:
+    text: Middle row
+    below: Marker
+- assertVisible: High
+- assertNotVisible: Low
+- assertVisible:
+    text: Middle row
+    below: Marker

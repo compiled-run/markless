@@ -1,20 +1,24 @@
 appId: ${APP_ID}
 name: u23-textbox
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Profile
 - assertVisible: As it appears on your card
-- assertVisible: 'Typed: nothing yet'
-- assertVisible: 'Changes: 0'
+- assertVisible: "Typed: nothing yet"
+- assertVisible: "Changes: 0"
 - assertVisible: Sam
 - tapOn: Full name
 - eraseText
 - inputText: Ada
 - hideKeyboard
-- assertNotVisible: 'Typed: nothing yet'
+- assertNotVisible: "Typed: nothing yet"
 - assertVisible: Ada
-- assertVisible: 'Typed: Ada'
-- assertNotVisible: 'Typed: nothing yet'
-- assertNotVisible: 'Typed: Sam'
+- assertVisible: "Typed: Ada"
+- assertNotVisible: "Typed: nothing yet"
+- assertNotVisible: "Typed: Sam"
 - assertVisible: Ada

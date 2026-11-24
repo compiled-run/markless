@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r110-document-elements
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Metadata
 - assertVisible: Visits 0
 - assertNotVisible: Template content

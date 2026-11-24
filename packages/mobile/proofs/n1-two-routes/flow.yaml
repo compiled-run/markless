@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: n1-two-routes
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Start here
 - assertVisible: Taps 0
 - assertVisible: Open about
@@ -25,9 +29,9 @@ name: n1-two-routes
 - assertNotVisible: Taps 2
 - assertVisible: About
 - swipe:
-      start: 1%, 50%
-      end: 85%, 50%
-      duration: 400
+    start: 1%, 50%
+    end: 85%, 50%
+    duration: 400
 - assertVisible: Start here
 - assertVisible: Taps 2
 - assertNotVisible: About this app
@@ -46,16 +50,16 @@ name: n1-two-routes
 - assertNotVisible: Taps 2
 - assertVisible: About
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertVisible: Start here
 - assertVisible: Taps 2
 - assertNotVisible: About this app

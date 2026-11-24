@@ -1,0 +1,16 @@
+{
+	"rung": "J49",
+	"name": "a prop left out takes its default, so a shared field seeded from it is null, not undefined",
+	"steps": [
+		{
+			"visible": ["Meters", "Left: no reading", "Right: reading 42"],
+			"absent": ["Left: reading 5", "Right: no reading"]
+		},
+		{
+			"do": { "tap": "Toggle Left" },
+			"visible": ["Left: reading 5", "Right: reading 42"],
+			"absent": ["Left: no reading", "Right: no reading"]
+		},
+		{ "do": { "tap": "Toggle Right" }, "visible": ["Right: no reading"], "absent": ["Right: reading 42"] }
+	]
+}

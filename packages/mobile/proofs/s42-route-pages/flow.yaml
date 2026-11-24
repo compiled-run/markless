@@ -1,0 +1,27 @@
+appId: ${APP_ID}
+name: s42-route-pages
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Shelf
+- assertVisible: Personal tag
+- assertVisible: Trip note
+- assertNotVisible: Notes tagged here
+- tapOn: Personal tag
+- assertVisible: Notes tagged here
+- assertNotVisible: Trip note
+- assertVisible: Personal
+- assertVisible: Notes tagged here
+- assertVisible: Open trip
+- assertVisible: Filed under Personal
+- assertNotVisible: Trip note
+- tapOn: Open trip
+- assertNotVisible: Notes tagged here
+- assertVisible: Trip
+- assertVisible: Pack the warm coat\.
+- assertVisible: Book the ferry to Bergen before Friday\.
+- assertNotVisible: Notes tagged here

@@ -1,0 +1,18 @@
+appId: ${APP_ID}
+name: u76-svg-clip
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Moon phase
+- assertVisible: Next phase
+- assertVisible: Half moon
+- assertNotVisible: Full moon
+- tapOn: Next phase
+- assertVisible: Full moon
+- assertNotVisible: Half moon
+- assertVisible: Full moon
+- assertNotVisible: Half moon

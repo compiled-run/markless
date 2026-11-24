@@ -1,0 +1,31 @@
+appId: ${APP_ID}
+name: r153-range
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Speaker
+- assertVisible: Volume 5
+- assertVisible: Quiet
+- assertVisible: Saved nothing
+- assertNotVisible: Volume 10
+- swipe:
+    from:
+      text: Volume
+    direction: RIGHT
+    duration: 800
+- assertVisible: Volume 10
+- assertNotVisible: Volume 5
+- assertNotVisible: Saved nothing
+- assertVisible: Volume 10
+- assertVisible: Saved 10
+- assertNotVisible: Volume 5
+- assertNotVisible: Saved nothing
+- tapOn: Quiet
+- assertNotVisible: Volume 10
+- assertVisible: Volume 3
+- assertVisible: Saved 10
+- assertNotVisible: Volume 10

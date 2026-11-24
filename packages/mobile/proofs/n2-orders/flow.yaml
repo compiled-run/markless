@@ -1,38 +1,42 @@
 appId: ${APP_ID}
 name: n2-orders
 ---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
 - launchApp:
-      clearState: true
-      arguments:
-          route: /orders
+    arguments:
+      route: /orders
 - assertVisible: Your orders
 - assertVisible: Desk lamp
 - assertVisible: Oak chair
 - assertVisible: Wool rug
 - assertVisible:
-      text: Oak chair
-      below: Desk lamp
+    text: Oak chair
+    below: Desk lamp
 - assertVisible:
-      text: Wool rug
-      below: Oak chair
+    text: Wool rug
+    below: Oak chair
 - assertVisible: Orders
 - tapOn: Reverse order
 - assertVisible:
-      text: Oak chair
-      below: Wool rug
+    text: Oak chair
+    below: Wool rug
 - assertVisible:
-      text: Desk lamp
-      below: Oak chair
+    text: Desk lamp
+    below: Oak chair
 - assertVisible: Your orders
 - assertVisible: Desk lamp
 - assertVisible: Oak chair
 - assertVisible: Wool rug
 - assertVisible:
-      text: Oak chair
-      below: Wool rug
+    text: Oak chair
+    below: Wool rug
 - assertVisible:
-      text: Desk lamp
-      below: Oak chair
+    text: Desk lamp
+    below: Oak chair
 - assertVisible: Orders
 - tapOn: Oak chair
 - assertNotVisible: Your orders
@@ -43,35 +47,35 @@ name: n2-orders
 - assertNotVisible: Wool rug
 - assertVisible: Order 42
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertVisible: Your orders
 - assertVisible: Wool rug
 - assertNotVisible: Details for order 42
 - assertVisible:
-      text: Oak chair
-      below: Wool rug
+    text: Oak chair
+    below: Wool rug
 - assertVisible:
-      text: Desk lamp
-      below: Oak chair
+    text: Desk lamp
+    below: Oak chair
 - assertVisible: Orders
 - assertVisible: Your orders
 - assertVisible: Wool rug
 - assertNotVisible: Details for order 42
 - assertVisible:
-      text: Oak chair
-      below: Wool rug
+    text: Oak chair
+    below: Wool rug
 - assertVisible:
-      text: Desk lamp
-      below: Oak chair
+    text: Desk lamp
+    below: Oak chair
 - assertVisible: Orders
 - tapOn: Wool rug
 - assertNotVisible: Your orders

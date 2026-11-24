@@ -1,33 +1,37 @@
 appId: ${APP_ID}
 name: j3-await-catch
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Lookup
-- assertVisible: 'Result: none'
-- assertVisible: 'Steps: 0'
+- assertVisible: "Result: none"
+- assertVisible: "Steps: 0"
 - tapOn: Look up
-- assertNotVisible: 'Steps: 0'
-- assertVisible: 'Result: none'
-- assertVisible: 'Steps: 1'
-- assertNotVisible: 'Steps: 0'
+- assertNotVisible: "Steps: 0"
+- assertVisible: "Result: none"
+- assertVisible: "Steps: 1"
+- assertNotVisible: "Steps: 0"
 - extendedWaitUntil:
-      visible: 'Result: FOUND'
-      timeout: 17000
-- assertNotVisible: 'Result: none'
-- assertVisible: 'Result: FOUND'
-- assertVisible: 'Steps: 2'
-- assertNotVisible: 'Result: none'
+    visible: "Result: FOUND"
+    timeout: 17000
+- assertNotVisible: "Result: none"
+- assertVisible: "Result: FOUND"
+- assertVisible: "Steps: 2"
+- assertNotVisible: "Result: none"
 - tapOn: Look up a missing word
-- assertNotVisible: 'Steps: 2'
-- assertVisible: 'Result: FOUND'
-- assertVisible: 'Steps: 3'
-- assertNotVisible: 'Steps: 2'
-- assertNotVisible: 'Failed: No entry for missing'
+- assertNotVisible: "Steps: 2"
+- assertVisible: "Result: FOUND"
+- assertVisible: "Steps: 3"
+- assertNotVisible: "Steps: 2"
+- assertNotVisible: "Failed: No entry for missing"
 - extendedWaitUntil:
-      visible: 'Failed: No entry for missing'
-      timeout: 17000
-- assertVisible: 'Failed: No entry for missing'
-- assertVisible: 'Failed: No entry for missing'
-- assertVisible: 'Result: FOUND'
-- assertVisible: 'Steps: 3'
+    visible: "Failed: No entry for missing"
+    timeout: 17000
+- assertVisible: "Failed: No entry for missing"
+- assertVisible: "Failed: No entry for missing"
+- assertVisible: "Result: FOUND"
+- assertVisible: "Steps: 3"

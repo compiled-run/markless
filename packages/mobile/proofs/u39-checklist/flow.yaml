@@ -1,0 +1,30 @@
+appId: ${APP_ID}
+name: u39-checklist
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Sandwich
+- assertVisible: Ticked 0
+- assertVisible: All
+- assertVisible: Lettuce
+- assertVisible: Tomato
+- tapOn: Lettuce
+- assertNotVisible: Ticked 0
+- assertVisible: Ticked 1
+- assertNotVisible: Ticked 0
+- tapOn: All
+- assertNotVisible: Ticked 1
+- assertVisible: Ticked 2
+- assertNotVisible: Ticked 1
+- tapOn: All
+- assertNotVisible: Ticked 2
+- assertVisible: Ticked 0
+- assertNotVisible: Ticked 2
+- tapOn: Tomato
+- assertNotVisible: Ticked 0
+- assertVisible: Ticked 1
+- assertNotVisible: Ticked 0

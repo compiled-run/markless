@@ -1,0 +1,21 @@
+appId: ${APP_ID}
+name: u127-file-store
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Files
+- assertVisible: Box
+- assertVisible: Add
+- assertVisible: none
+- tapOn: Add
+- assertNotVisible: none
+- assertVisible: note-1\.txt 5 text/plain
+- assertNotVisible: none
+- tapOn: Add
+- assertNotVisible: note-1\.txt 5 text/plain
+- assertVisible: note-1\.txt 5 text/plain, note-2\.txt 5 text/plain
+- assertNotVisible: note-1\.txt 5 text/plain

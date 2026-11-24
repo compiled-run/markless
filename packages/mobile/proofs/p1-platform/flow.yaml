@@ -1,16 +1,20 @@
 appId: ${APP_ID}
 name: p1-platform
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Platform
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - assertVisible: Built for iOS
+    when:
+      platform: iOS
+    commands:
+      - assertVisible: Built for iOS
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - assertVisible: Built for Android
+    when:
+      platform: Android
+    commands:
+      - assertVisible: Built for Android

@@ -1,0 +1,25 @@
+appId: ${APP_ID}
+name: j17-script-prop
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Tally
+- assertVisible: Add two
+- assertVisible: Rename
+- assertNotVisible: "Items: 0"
+- assertNotVisible: "Items: 2"
+- tapOn: Add two
+- assertVisible: "Items: 2"
+- assertVisible: "Items: 2"
+- tapOn: Add two
+- assertNotVisible: "Items: 2"
+- assertVisible: "Items: 4"
+- assertNotVisible: "Items: 2"
+- tapOn: Rename
+- assertNotVisible: "Items: 4"
+- assertVisible: "Boxes: 4"
+- assertNotVisible: "Items: 4"

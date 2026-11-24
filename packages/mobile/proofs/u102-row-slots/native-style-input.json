@@ -1,0 +1,103 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "App",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "mk-1qvhcwu"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-1qvhcwu"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Row numbers"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "ul",
+			"parent": "h0",
+			"attributes": {
+				"class": "list mk-1qvhcwu"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "li",
+			"parent": "h2",
+			"attributes": {
+				"class": "item mk-1qvhcwu"
+			},
+			"styleTemplate": [
+				"order: ",
+				{
+					"slot": "slot:h3#0"
+				},
+				";"
+			],
+			"row": "repeat:0"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "span",
+			"parent": "h3",
+			"attributes": {
+				"class": "name mk-1qvhcwu"
+			},
+			"row": "repeat:0"
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Alpha row",
+			"row": "repeat:0"
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"class": "tap mk-1qvhcwu"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Lift beta"
+		}
+	],
+	"css": ".list.mk-1qvhcwu {\n\t\t\t\tdisplay: flex;\n\t\t\t\tflex-direction: column;\n\t\t\t\tmargin: 0 12px;\n\t\t\t\tpadding: 0;\n\t\t\t\tlist-style: none;\n\t\t\t}\n\t\t\t.item.mk-1qvhcwu {\n\t\t\t\theight: 40px;\n\t\t\t\tfont-size: 16px;\n\t\t\t\tbackground: #edf2f4;\n\t\t\t}\n\t\t\t.name.mk-1qvhcwu {\n\t\t\t\tdisplay: block;\n\t\t\t}\n\t\t\t.tap.mk-1qvhcwu {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin: 12px;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tpadding: 10px 18px;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffd166;\n\t\t\t\tcolor: #22223b;\n\t\t\t}",
+	"states": [],
+	"slots": [
+		{
+			"id": "slot:h3#0",
+			"initial": 0,
+			"integer": true
+		}
+	],
+	"repeats": [
+		{
+			"id": "repeat:0",
+			"parent": "h2"
+		}
+	]
+}

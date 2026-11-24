@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: s28-rehosted-stacking
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Re-hosted
+- assertVisible: Lifted 0
+- assertVisible: Card footer
+- assertVisible: Later 0
+- assertVisible: Re-hosted
+- tapOn: Lifted 0
+- assertNotVisible: Lifted 0
+- assertVisible: Lifted 1
+- assertVisible: Later 0
+- assertNotVisible: Lifted 0
+- tapOn: Later 0
+- assertNotVisible: Later 0
+- assertVisible: Lifted 1
+- assertVisible: Later 1
+- assertNotVisible: Later 0

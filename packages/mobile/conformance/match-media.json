@@ -1,0 +1,188 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:motion",
+				"name": "motion",
+				"initial": "Motion unknown"
+			},
+			{
+				"id": "state:scheme",
+				"name": "scheme",
+				"initial": "Scheme unknown"
+			},
+			{
+				"id": "state:checks",
+				"name": "checks",
+				"initial": 0
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Settings check"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Checked ",
+								{
+									"cell": "state:checks"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"cell": "state:motion"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"cell": "state:scheme"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"motion": {
+								"cell": "state:motion"
+							},
+							"scheme": {
+								"cell": "state:scheme"
+							},
+							"checks": {
+								"cell": "state:checks"
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "2a9b14c31a2e7e45",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => {\n __s.motion = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'Motion reduced' : 'Motion full';\n __s.scheme = matchMedia('screen and (prefers-color-scheme: dark)').matches ? 'Scheme dark' : 'Scheme light';\n __s.checks = __s.checks + 1;\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"2a9b14c31a2e7e45\");\n",
+			"services": [
+				"media"
+			]
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Settings check"
+		],
+		[
+			"h2:text0",
+			"Checked 0"
+		],
+		[
+			"h3:text0",
+			"Motion unknown"
+		],
+		[
+			"h4:text0",
+			"Scheme unknown"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Checked 1"
+				},
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "Motion full"
+				},
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Scheme light"
+				}
+			]
+		}
+	]
+}

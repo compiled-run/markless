@@ -1,0 +1,26 @@
+appId: ${APP_ID}
+name: u62-pointer-elements
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Pointer
+- assertVisible: Title
+- assertVisible: Body
+- assertVisible: Last none
+- tapOn: Title
+- assertNotVisible: Last none
+- assertVisible: Last Title in Card from outside
+- assertNotVisible: Last none
+- tapOn: Reset
+- assertVisible: Last none
+- assertNotVisible: Last Title in Card from outside
+- assertVisible: Last none
+- assertNotVisible: Last Title in Card from outside
+- tapOn: Body
+- assertNotVisible: Last none
+- assertVisible: Last Body in Card from outside
+- assertNotVisible: Last none

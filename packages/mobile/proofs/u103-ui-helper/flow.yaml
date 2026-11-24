@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: u103-ui-helper
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Library helper
+- assertVisible: Save
+- assertVisible: Copy
+- assertVisible: Messages 0
+- tapOn: Save
+- assertNotVisible: Messages 0
+- assertVisible: Messages 1
+- assertVisible: Said Saved
+- assertNotVisible: Messages 0
+- tapOn: Copy
+- assertNotVisible: Messages 1
+- assertVisible: Messages 2
+- assertVisible: Said Copied
+- assertVisible: Said Saved
+- assertNotVisible: Messages 1

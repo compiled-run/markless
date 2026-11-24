@@ -1,10 +1,38 @@
-import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { loadProjectGraph, type ProjectGraph } from '../../analyzer/test-support/project-graph.ts';
 import { allRungFolders } from '../proofs/ladder.ts';
 import { affectedRungs } from '../src/runner/affected.ts';
 import { repoRoot } from '../src/runner/bundle.ts';
 import { parsePhone, transitionPhone, type PhoneState } from '../src/runner/pool.ts';
-import { rerunAfterPhoneLoss, transitionChunk, type Chunk } from '../src/runner/store.ts';
+import {
+	checkoutFacts,
+	jobStarted,
+	describeCheckout,
+	planRefresh,
+	transitionRefresh,
+	type CheckoutFacts,
+	type RefreshState,
+} from '../src/runner/refresh.ts';
+import {
+	earlierPass,
+	findReused,
+	hostFingerprint,
+	recordPass,
+	rungFingerprint,
+} from '../src/runner/reuse.ts';
+import { pickChunk, standsBy, type QueuedJob } from '../src/runner/schedule.ts';
+import {
+	JOB_VERSION,
+	type JobSpec,
+	rerunAfterPhoneLoss,
+	transitionChunk,
+	type Chunk,
+} from '../src/runner/store.ts';
+import { simctl, SimulatorStuck, simulatorAnswers } from '../src/harness/simctl.ts';
 
 const queued: Chunk = {
 	state: 'queued',
@@ -100,6 +128,44 @@ describe('a chunk', () => {
 	});
 });
 
+describe('a simulator that stops answering simctl', () => {
+	// A stand-in xcrun: the simulator reads Booted, and `simctl ui … appearance` never returns while STUCK is set, as measured.
+	const bin = mkdtempSync(join(tmpdir(), 'markless-xcrun-'));
+	writeFileSync(
+		join(bin, 'xcrun'),
+		`#!/bin/sh
+if [ "$2" = list ]; then echo '{"devices":{"ios":[{"udid":"U","name":"n","state":"Booted"}]}}'; exit 0; fi
+if [ "$2" = ui ] && [ -n "$STUCK" ]; then exec sleep 30; fi
+echo light
+`,
+	);
+	chmodSync(join(bin, 'xcrun'), 0o755);
+	const path = process.env.PATH;
+	beforeAll(() => {
+		process.env.PATH = `${bin}:${path}`;
+	});
+	afterAll(() => {
+		process.env.PATH = path;
+		delete process.env.STUCK;
+		rmSync(bin, { recursive: true, force: true });
+	});
+	it('fails the call by name once its time is up', async () => {
+		process.env.STUCK = '1';
+		const call = simctl(['ui', 'U', 'appearance', 'light'], { timeoutMs: 300 });
+		await expect(call).rejects.toBeInstanceOf(SimulatorStuck);
+		await expect(call).rejects.toThrow(
+			'simctl ui U appearance light did not answer in 0.3 s: the simulator is stuck',
+		);
+	});
+
+	it('does not answer the health check though it reads Booted, so the runner restarts it', async () => {
+		process.env.STUCK = '1';
+		expect(await simulatorAnswers('U', 300)).toBe(false);
+		delete process.env.STUCK;
+		expect(await simulatorAnswers('U', 300)).toBe(true);
+	});
+});
+
 describe('a phone', () => {
 	const booting: PhoneState = { state: 'booting', since: 0 };
 
@@ -151,6 +217,61 @@ describe('a phone', () => {
 		);
 		expect(() => parsePhone('android', 'markless_runner@5584')).not.toThrow();
 	});
+
+	it('reads an emulator on another machine as <avd>@<port>@<ssh host>', () => {
+		expect(parsePhone('android', 'markless_pc1@5570@pc-phones')).toEqual({
+			platform: 'android',
+			avd: 'markless_pc1',
+			port: 5570,
+			remote: 'pc-phones',
+		});
+		expect(() => parsePhone('android', 'markless_pc1@5570@')).toThrow();
+		expect(() => parsePhone('android', 'markless_pc1@5570@pc@x')).toThrow();
+	});
+
+	it('is away while its machine does not take work, from any state but broken, and comes back by booting', () => {
+		const away = transitionPhone(booting, { type: 'away', reason: 'paused' }, 1);
+		expect(away).toEqual({ state: 'away', since: 1, reason: 'paused' });
+		// Asked again a minute later and still away: it has been away since the first time.
+		expect(transitionPhone(away, { type: 'away', reason: 'unreachable' }, 9)).toEqual({
+			state: 'away',
+			since: 1,
+			reason: 'unreachable',
+		});
+		const busy = transitionPhone(
+			transitionPhone(away, { type: 'booted', device: 'emulator-5570' }, 2),
+			{ type: 'take', chunk: 'job/android-000' },
+			3,
+		);
+		expect(transitionPhone(busy, { type: 'away', reason: 'gone mid-chunk' }, 4)).toMatchObject({
+			state: 'away',
+		});
+		const broken = transitionPhone(booting, { type: 'give-up', reason: 'x' });
+		expect(() => transitionPhone(broken, { type: 'away', reason: 'y' })).toThrow();
+	});
+});
+
+describe("this machine's own phone", () => {
+	const local = parsePhone('android', 'markless_runner@5570');
+	const remote = parsePhone('android', 'markless_pc1@5570@pc-phones');
+	const ios = parsePhone('ios', 'markless-runner');
+	const ready: PhoneState = { state: 'ready', device: 'd', since: 0, driverInstalled: true };
+	const away: PhoneState = { state: 'away', since: 0, reason: 'paused' };
+
+	it('stands by while a remote phone of its platform is ready or busy', () => {
+		expect(standsBy(local, [{ spec: remote, state: ready }])).toBe(true);
+		expect(
+			standsBy(local, [
+				{ spec: remote, state: { ...ready, state: 'busy', chunk: 'job/android-000' } },
+			]),
+		).toBe(true);
+	});
+
+	it('takes the work while every remote phone is away, and never stands by for another platform or itself', () => {
+		expect(standsBy(local, [{ spec: remote, state: away }])).toBe(false);
+		expect(standsBy(ios, [{ spec: remote, state: ready }])).toBe(false);
+		expect(standsBy(remote, [{ spec: remote, state: ready }])).toBe(false);
+	});
 });
 
 describe('the rungs a change affects, from the project graph', () => {
@@ -185,4 +306,294 @@ describe('the rungs a change affects, from the project graph', () => {
 			rungs: [],
 		});
 	}, 60_000);
+});
+
+describe("the runner's checkout", () => {
+	// Inside the commit hook git exports GIT_DIR and GIT_INDEX_FILE, which would point these git calls at the real repository.
+	const hookEnv = Object.entries(process.env).filter(([key]) => key.startsWith('GIT_'));
+	beforeAll(() => {
+		for (const [key] of hookEnv) delete process.env[key];
+	});
+	afterAll(() => {
+		for (const [key, value] of hookEnv) process.env[key] = value;
+	});
+	const behind: CheckoutFacts = {
+		head: 'a'.repeat(40),
+		upstream: 'b'.repeat(40),
+		branch: null,
+		dirty: false,
+		headInUpstream: true,
+	};
+	const plan = planRefresh(behind);
+
+	it('moves to origin/main when it is a clean detached or main checkout behind it', () => {
+		expect(plan).toEqual({
+			kind: 'refresh',
+			from: behind.head,
+			to: behind.upstream,
+			branch: null,
+		});
+		expect(planRefresh({ ...behind, branch: 'main' })).toMatchObject({
+			kind: 'refresh',
+			branch: 'main',
+		});
+		expect(planRefresh({ ...behind, upstream: behind.head })).toEqual({ kind: 'current' });
+	});
+
+	it("says in the runner's status whether its checkout follows origin/main, and why one is kept behind", () => {
+		expect(describeCheckout({ ...behind, upstream: behind.head }, 0)).toBe(
+			'runner checkout aaaaaaaaa: on origin/main',
+		);
+		expect(describeCheckout(behind, 3)).toBe(
+			'runner checkout aaaaaaaaa: 3 commits behind origin/main; the runner moves there between jobs',
+		);
+		expect(describeCheckout({ ...behind, headInUpstream: false }, 120)).toBe(
+			'runner checkout aaaaaaaaa: 120 commits behind origin/main and stays there (aaaaaaaaa has commits origin/main does not); jobs build with this harness, so move it by hand',
+		);
+	});
+
+	it("never moves a checkout that is somebody's work", () => {
+		expect(planRefresh({ ...behind, branch: 'cw/runner-change' }).kind).toBe('kept');
+		expect(planRefresh({ ...behind, dirty: true }).kind).toBe('kept');
+		expect(planRefresh({ ...behind, headInUpstream: false }).kind).toBe('kept');
+	});
+
+	it('counts a job as under way once one of its chunks left the queue', () => {
+		const claimed = transitionChunk(queued, { type: 'claim', phone: 'ios:a', at: 0 });
+		expect(jobStarted([queued, queued])).toBe(false);
+		expect(jobStarted([queued, claimed])).toBe(true);
+	});
+
+	it('checks, waits while behind, moves, and checks again after a failed move', () => {
+		let refresh: RefreshState = { state: 'idle', checkedAt: 0, kept: null };
+		refresh = transitionRefresh(refresh, { type: 'check' });
+		expect(refresh.state).toBe('checking');
+		refresh = transitionRefresh(refresh, { type: 'checked', plan }, 5);
+		expect(refresh).toEqual({ state: 'pending', plan });
+		refresh = transitionRefresh(refresh, { type: 'move' });
+		expect(refresh.state).toBe('moving');
+		refresh = transitionRefresh(refresh, { type: 'move-failed' }, 9);
+		expect(refresh).toEqual({ state: 'idle', checkedAt: 9, kept: null });
+
+		const checking = transitionRefresh(refresh, { type: 'check' });
+		const kept = planRefresh({ ...behind, dirty: true });
+		expect(transitionRefresh(checking, { type: 'checked', plan: kept }, 12)).toEqual({
+			state: 'idle',
+			checkedAt: 12,
+			kept: kept.kind === 'kept' ? kept.reason : null,
+		});
+		expect(transitionRefresh(checking, { type: 'check-failed' }, 13)).toEqual({
+			state: 'idle',
+			checkedAt: 13,
+			kept: null,
+		});
+	});
+
+	it('refuses every other move', () => {
+		const idle: RefreshState = { state: 'idle', checkedAt: 0, kept: null };
+		const pending = transitionRefresh(transitionRefresh(idle, { type: 'check' }), {
+			type: 'checked',
+			plan,
+		});
+		expect(() => transitionRefresh(idle, { type: 'move' })).toThrow('cannot take move');
+		expect(() => transitionRefresh(pending, { type: 'check' })).toThrow('cannot take check');
+		expect(() => transitionRefresh(pending, { type: 'move-failed' })).toThrow();
+	});
+
+	it('reads a checkout behind origin/main from git, after fetching it', async () => {
+		// Inside a git hook GIT_DIR and GIT_INDEX_FILE name the repository being committed; every git here must use its own.
+		const inherited = Object.entries(process.env).filter(([name]) => name.startsWith('GIT_'));
+		for (const [name] of inherited) delete process.env[name];
+		const scratch = mkdtempSync(join(tmpdir(), 'runner-refresh-'));
+		// A pre-commit hook exports GIT_DIR and GIT_INDEX_FILE, which would aim git, here and in checkoutFacts, at the real repository.
+		const hookGit = Object.entries(process.env).filter(([key]) => key.startsWith('GIT_'));
+		for (const [key] of hookGit) delete process.env[key];
+		const git = (cwd: string, ...args: string[]) =>
+			execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
+				cwd,
+				encoding: 'utf8',
+			}).trim();
+		try {
+			const upstream = join(scratch, 'upstream');
+			const runner = join(scratch, 'runner');
+			git(scratch, 'init', '--quiet', '--initial-branch=main', upstream);
+			git(upstream, 'commit', '--quiet', '--allow-empty', '-m', 'one');
+			git(scratch, 'clone', '--quiet', upstream, runner);
+			const first = git(runner, 'rev-parse', 'HEAD');
+			git(runner, 'checkout', '--quiet', '--detach');
+			git(upstream, 'commit', '--quiet', '--allow-empty', '-m', 'two');
+			const second = git(upstream, 'rev-parse', 'HEAD');
+
+			expect(await checkoutFacts(runner)).toEqual({
+				head: first,
+				upstream: second,
+				branch: null,
+				dirty: false,
+				headInUpstream: true,
+			});
+			writeFileSync(join(runner, 'note.txt'), 'local work');
+			expect(planRefresh(await checkoutFacts(runner)).kind).toBe('kept');
+		} finally {
+			Object.assign(process.env, Object.fromEntries(hookGit));
+			rmSync(scratch, { recursive: true, force: true });
+			for (const [name, value] of inherited) process.env[name] = value;
+		}
+	});
+});
+
+describe('the chunk a free phone takes', () => {
+	const job = (id: string, ios: number, android = 0, started = false): QueuedJob => ({
+		id,
+		chunks: [
+			...Array.from({ length: ios }, (_, at) => ({
+				name: `ios-${at}`,
+				chunk: { ...queued, platform: 'ios' as const },
+			})),
+			...Array.from({ length: android }, (_, at) => ({
+				name: `android-${at}`,
+				chunk: { ...queued, platform: 'android' as const },
+			})),
+			...(started
+				? [
+						{
+							name: 'ios-done',
+							chunk: transitionChunk(queued, {
+								type: 'claim',
+								phone: 'ios:a',
+								at: 0,
+							}),
+						},
+					]
+				: []),
+		],
+	});
+
+	it('goes to a short job before an older long one', () => {
+		expect(pickChunk([job('long', 14), job('short', 1)], 'ios', true)).toMatchObject({
+			job: 'short',
+			name: 'ios-0',
+		});
+	});
+
+	it('takes the oldest short job, and the oldest long job when no short one waits', () => {
+		expect(pickChunk([job('long', 14), job('a', 2), job('b', 1)], 'ios', true)?.job).toBe('a');
+		expect(pickChunk([job('old', 14), job('new', 9)], 'ios', true)?.job).toBe('old');
+	});
+
+	it("counts a long job's last chunks as short, and only the chunks on the phone's platform", () => {
+		expect(pickChunk([job('tail', 2), job('short', 1)], 'ios', true)?.job).toBe('tail');
+		expect(pickChunk([job('ios-only', 1), job('both', 3, 1)], 'android', true)?.job).toBe(
+			'both',
+		);
+		expect(pickChunk([job('ios-only', 1)], 'android', true)).toBeUndefined();
+	});
+
+	it('starts no new job while the runner waits to restart, but finishes started ones', () => {
+		expect(pickChunk([job('started', 14, 0, true), job('new', 1)], 'ios', false)?.job).toBe(
+			'started',
+		);
+		expect(pickChunk([job('new', 1)], 'ios', false)).toBeUndefined();
+	});
+});
+
+describe('a pass an earlier job already ran', () => {
+	const write = (path: string, text: string) => {
+		mkdirSync(join(path, '..'), { recursive: true });
+		writeFileSync(path, text);
+	};
+	const bundle = (job: string, rungs: Record<string, string>, iosHost: string) => {
+		write(join(job, 'bundle/mobile/src/adapters/ios/Sources/Host.swift'), iosHost);
+		write(join(job, 'bundle/mobile/src/adapters/android/src/Host.kt'), 'kotlin host');
+		write(join(job, 'bundle/mobile/conformance/counter.json'), '{}');
+		for (const [rung, payload] of Object.entries(rungs)) {
+			write(join(job, 'bundle/rungs', rung, 'rung.json'), JSON.stringify({ name: rung }));
+			for (const platform of ['ios', 'android'])
+				write(join(job, 'bundle/rungs', rung, 'assets', platform, 'payload.json'), payload);
+		}
+	};
+	const spec = (id: string, rungs: string[]): JobSpec => ({
+		version: JOB_VERSION,
+		id,
+		createdAt: 0,
+		worktree: '/w',
+		head: 'h',
+		dirty: false,
+		rungs,
+		platforms: ['ios', 'android'],
+		host: 'adapters',
+	});
+
+	it('is reused only on a platform whose host sources and the rung bundle are byte-identical', () => {
+		const home = mkdtempSync(join(tmpdir(), 'runner-reuse-'));
+		const before = process.env.MARKLESS_PHONES_HOME;
+		process.env.MARKLESS_PHONES_HOME = home;
+		try {
+			const first = join(home, 'jobs', 'first');
+			bundle(first, { '01-a': 'payload a', '02-b': 'payload b' }, 'swift host');
+			const firstSpec = spec('first', ['01-a', '02-b']);
+			for (const platform of ['ios', 'android'] as const) {
+				const host = hostFingerprint(first, firstSpec, platform);
+				recordPass(platform, rungFingerprint(first, '01-a', platform, host), {
+					job: 'first',
+					rung: '01-a',
+					at: 1,
+				});
+			}
+
+			const second = join(home, 'jobs', 'second');
+			bundle(second, { '01-a': 'payload a', '02-b': 'payload b' }, 'swift host');
+			expect(
+				findReused(second, spec('second', ['01-a', '02-b']), ['ios', 'android']),
+			).toEqual([
+				{
+					platform: 'ios',
+					result: {
+						name: '01-a',
+						failure: null,
+						installSeconds: 0,
+						flowSeconds: 0,
+						reusedFrom: 'first',
+					},
+				},
+				{
+					platform: 'android',
+					result: {
+						name: '01-a',
+						failure: null,
+						installSeconds: 0,
+						flowSeconds: 0,
+						reusedFrom: 'first',
+					},
+				},
+			]);
+
+			const iosChanged = join(home, 'jobs', 'ios-changed');
+			bundle(iosChanged, { '01-a': 'payload a' }, 'swift host, edited');
+			expect(
+				findReused(iosChanged, spec('ios-changed', ['01-a']), ['ios', 'android']).map(
+					(pass) => pass.platform,
+				),
+			).toEqual(['android']);
+
+			const recompiled = join(home, 'jobs', 'recompiled');
+			bundle(recompiled, { '01-a': 'payload a, compiled differently' }, 'swift host');
+			expect(
+				findReused(recompiled, spec('recompiled', ['01-a']), ['ios', 'android']),
+			).toEqual([]);
+
+			const host = hostFingerprint(second, spec('second', ['01-a']), 'ios');
+			recordPass('ios', rungFingerprint(second, '01-a', 'ios', host), {
+				job: 'second',
+				rung: '01-a',
+				at: 2,
+			});
+			expect(earlierPass('ios', rungFingerprint(second, '01-a', 'ios', host))?.job).toBe(
+				'first',
+			);
+		} finally {
+			if (before === undefined) delete process.env.MARKLESS_PHONES_HOME;
+			else process.env.MARKLESS_PHONES_HOME = before;
+			rmSync(home, { recursive: true, force: true });
+		}
+	});
 });

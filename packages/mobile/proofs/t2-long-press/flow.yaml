@@ -1,0 +1,38 @@
+appId: ${APP_ID}
+name: t2-long-press
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Milk
+- assertVisible: Bread
+- assertVisible: Not touched
+- assertVisible: Nothing held
+- assertVisible: Count 0
+- assertNotVisible: Touched Bread
+- longPressOn:
+    text: Bread
+- assertVisible: Touched Bread
+- assertNotVisible: Not touched
+- assertVisible: Touched Bread
+- assertVisible: Count 0
+- assertNotVisible: Not touched
+- assertNotVisible: Count 1
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertVisible: Nothing held
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible: Held Bread
+- tapOn: Count 0
+- assertVisible: Count 1
+- assertNotVisible: Count 0
+- assertVisible: Count 1
+- assertNotVisible: Count 0

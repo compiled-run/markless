@@ -1,0 +1,185 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:report",
+				"name": "report",
+				"initial": "Not checked"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Clone"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Check"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Clone a function"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"cell": "state:report"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"report": {
+								"cell": "state:report"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:1",
+						"type": "click",
+						"bindings": {
+							"report": {
+								"cell": "state:report"
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "0585d4f0aaa067b4",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [load(1)];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => {\n const values = { name: 'Ada', tags: ['draft'], when: new Date(0) };\n const copy = __i[0][\"withCheck\"](values);\n __s.report = `${copy.name}: ${copy.tags.join('+')}, original ${values.tags.join('+')}, ${copy.when instanceof Date && copy.when !== values.when ? 'date copied' : 'date lost'}`;\n});\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => {\n try {\n  structuredClone({ run: () => 1 });\n  __s.report = 'cloned a function';\n } catch (error) {\n  __s.report = `Refused: ${(error).name}`;\n }\n});\n};\n};\nmodules[1] = function (exports) {\n\"use strict\";\nvar __i = [];\n__export(exports, {\n\"withCheck\": function () { return withCheck; }\n});\nfunction withCheck(values) {\n const own = structuredClone(values);\n own.tags.push('checked');\n return own;\n}\n};\n/*markless-engine:entries*/\n})(globalThis, \"0585d4f0aaa067b4\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Clone"
+		],
+		[
+			"h2:text0",
+			"Check"
+		],
+		[
+			"h3:text0",
+			"Clone a function"
+		],
+		[
+			"h4:text0",
+			"Not checked"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Ada: draft+checked, original draft, date copied"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h4:text0",
+					"value": "Refused: DataCloneError"
+				}
+			]
+		}
+	]
+}

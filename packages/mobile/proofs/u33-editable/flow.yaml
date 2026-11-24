@@ -1,0 +1,33 @@
+appId: ${APP_ID}
+name: u33-editable
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Documents
+- assertVisible: Document name
+- assertVisible: Quarterly plan
+- tapOn: Quarterly plan
+- assertVisible: Quarterly plan
+- assertVisible: Document name
+- assertVisible: Quarterly plan
+- tapOn: Document name
+- eraseText
+- inputText: Annual plan
+- assertVisible: Annual plan
+- assertVisible: Document name
+- assertNotVisible: Quarterly plan
+- assertVisible: Annual plan
+- tapOn: Document name
+- pressKey: Enter
+- assertVisible:
+    text: Annual plan
+    below: Documents
+- assertVisible: Annual plan
+- assertNotVisible: Quarterly plan
+- assertVisible:
+    text: Annual plan
+    below: Documents

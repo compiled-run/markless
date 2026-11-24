@@ -1,0 +1,27 @@
+appId: ${APP_ID}
+name: u27-table-rows
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Folder
+- assertVisible: notes\.txt
+- assertVisible: photo\.png
+- assertVisible: Chosen none
+- assertNotVisible: Chosen notes
+- assertNotVisible: Chosen photo
+- tapOn: photo\.png
+- assertVisible: Chosen photo
+- assertNotVisible: Chosen none
+- assertVisible: Chosen photo
+- assertNotVisible: Chosen none
+- assertNotVisible: Chosen notes
+- tapOn: notes\.txt
+- assertVisible: Chosen notes
+- assertNotVisible: Chosen photo
+- assertVisible: Chosen notes
+- assertNotVisible: Chosen none
+- assertNotVisible: Chosen photo

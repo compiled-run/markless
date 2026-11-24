@@ -1,0 +1,20 @@
+appId: ${APP_ID}
+name: r164-class-accessors
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Class accessors
+- assertVisible: Not turned
+- assertVisible: Turn half
+- tapOn: Turn half
+- assertNotVisible: Not turned
+- assertVisible: 2 turns, half 1, not full, keys turns
+- assertNotVisible: Not turned
+- tapOn: Turn half
+- assertNotVisible: 2 turns, half 1, not full, keys turns
+- assertVisible: 4 turns, half 2, full, keys turns
+- assertNotVisible: 2 turns, half 1, not full, keys turns

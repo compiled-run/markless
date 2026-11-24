@@ -1,0 +1,23 @@
+appId: ${APP_ID}
+name: u74-svg-text
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Sales chart
+- assertVisible: Next quarter
+- assertVisible: Sales up 12%
+- assertNotVisible: Q4 forecast
+- tapOn: Next quarter
+- assertVisible: Q4 forecast
+- assertNotVisible: Sales up 12%
+- assertVisible: Q4 forecast
+- assertNotVisible: Sales up 12%
+- tapOn: Next quarter
+- assertVisible: Sales up 12%
+- assertNotVisible: Q4 forecast
+- assertVisible: Sales up 12%
+- assertNotVisible: Q4 forecast

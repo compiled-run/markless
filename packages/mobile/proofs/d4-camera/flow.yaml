@@ -1,20 +1,24 @@
 appId: ${APP_ID}
 name: d4-camera
 ---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
 - launchApp:
-      clearState: true
-      permissions:
-          camera: unset
+    permissions:
+      camera: unset
 - assertVisible:
-      text: Allow .?Proof.? to (access your camera|take pictures and record video)\?
+    text: Allow .?Proof.? to (access your camera|take pictures and record video)\?
 - tapOn:
-      text: Allow While Using App|While using the app|Allow
+    text: Allow While Using App|While using the app|Allow
 - assertVisible: Camera ready
 - assertNotVisible: Camera starting
 - assertNotVisible: Access unknown
 - assertVisible:
-      id: markless-camera
-      text: camera on
+    id: markless-camera
+    text: camera on
 - assertVisible: Access granted
 - assertVisible: Camera ready
 - assertVisible: Facing back
@@ -22,55 +26,55 @@ name: d4-camera
 - assertNotVisible: Camera starting
 - assertNotVisible: Access unknown
 - assertVisible:
-      id: markless-camera
-      text: camera on
+    id: markless-camera
+    text: camera on
 - tapOn: Take photo
 - assertNotVisible: Photos 0
 - assertVisible:
-      id: markless-device-calls
-      text: "calls: camera\\.takePhoto"
+    id: markless-device-calls
+    text: "calls: camera\\.takePhoto"
 - assertVisible: Photos 1
 - assertVisible: Last photo
 - assertNotVisible: Photos 0
 - assertVisible:
-      id: markless-device-calls
-      text: "calls: camera\\.takePhoto"
+    id: markless-device-calls
+    text: "calls: camera\\.takePhoto"
 - tapOn: Hide preview
 - assertVisible:
-      id: markless-camera
-      text: camera off
+    id: markless-camera
+    text: camera off
 - assertVisible: Show preview
 - assertVisible: Photos 1
 - assertNotVisible: Hide preview
 - assertVisible:
-      id: markless-camera
-      text: camera off
+    id: markless-camera
+    text: camera off
 - tapOn: Show preview
 - assertVisible: Hide preview
 - assertNotVisible: Show preview
 - assertVisible:
-      id: markless-camera
-      text: camera on
+    id: markless-camera
+    text: camera on
 - assertVisible: Hide preview
 - assertVisible: Camera ready
 - assertNotVisible: Show preview
 - assertVisible:
-      id: markless-camera
-      text: camera on
+    id: markless-camera
+    text: camera on
 - tapOn: Flip
 - assertVisible:
-      id: markless-device-calls
-      text: "calls: camera\\.takePhoto, camera\\.facing"
+    id: markless-device-calls
+    text: "calls: camera\\.takePhoto, camera\\.facing"
 - assertVisible:
-      id: markless-device-calls
-      text: "calls: camera\\.takePhoto, camera\\.facing"
+    id: markless-device-calls
+    text: "calls: camera\\.takePhoto, camera\\.facing"
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - assertVisible: Facing front
+    when:
+      platform: iOS
+    commands:
+      - assertVisible: Facing front
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - assertVisible: Facing back
+    when:
+      platform: Android
+    commands:
+      - assertVisible: Facing back

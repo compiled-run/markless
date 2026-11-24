@@ -1,0 +1,40 @@
+{
+	"rung": 22,
+	"name": "A <select>'s change handler runs with the new value when a person picks another option, as data and as JavaScript",
+	"steps": [
+		{
+			"visible": ["Pick a car", "Audi", "small", "Make none", "Changes 0", "Size none"],
+			"absent": ["Make toyota", "Size LARGE"]
+		},
+		{
+			"do": {
+				"choose": {
+					"field": "Make",
+					"option": "Toyota"
+				}
+			},
+			"visible": ["Toyota", "Make toyota", "Changes 1"],
+			"absent": ["Make none", "Changes 0"]
+		},
+		{
+			"do": {
+				"choose": {
+					"field": "Make",
+					"option": "BMW"
+				}
+			},
+			"visible": ["BMW", "Make bmw", "Changes 2"],
+			"absent": ["Make toyota", "Changes 1", "Size LARGE"]
+		},
+		{
+			"do": {
+				"choose": {
+					"field": "Size",
+					"option": "large"
+				}
+			},
+			"visible": ["large", "Size LARGE", "Changes 2"],
+			"absent": ["Size none"]
+		}
+	]
+}

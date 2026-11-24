@@ -1,0 +1,27 @@
+appId: ${APP_ID}
+name: n10-await-navigate
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Unsaved draft
+- assertVisible: Save
+- assertVisible: Draft
+- tapOn: Save
+- assertNotVisible: Unsaved draft
+- assertVisible: Saved
+- assertVisible: Draft saved
+- assertVisible: New draft
+- assertNotVisible: Unsaved draft
+- assertVisible: Saved
+- tapOn: New draft
+- assertVisible: Unsaved draft
+- assertNotVisible: Draft saved
+- assertVisible: Draft
+- assertVisible: Unsaved draft
+- assertVisible: Save
+- assertNotVisible: Draft saved
+- assertVisible: Draft

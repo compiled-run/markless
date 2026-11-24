@@ -1,0 +1,37 @@
+appId: ${APP_ID}
+name: j48-readonly-field
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Coupon
+- assertVisible: Nothing sent
+- assertVisible: Unlock code
+- assertNotVisible: Lock code
+- tapOn: Send
+- assertNotVisible: Nothing sent
+- assertVisible: Sent ada@example\.com code \[\]
+- assertNotVisible: Nothing sent
+- assertNotVisible: Lock code
+- tapOn: Unlock code
+- assertVisible: Lock code
+- assertVisible: Lock code
+- assertNotVisible: Unlock code
+- tapOn: Send
+- assertVisible: Please fill out this field\.
+- assertVisible: Sent ada@example\.com code \[\]
+- assertVisible: Please fill out this field\.
+- tapOn: Code
+- eraseText
+- inputText: SAVE10
+- hideKeyboard
+- assertVisible: SAVE10
+- assertVisible: Sent ada@example\.com code \[\]
+- assertVisible: SAVE10
+- tapOn: Send
+- assertNotVisible: Sent ada@example\.com code \[\]
+- assertVisible: Sent ada@example\.com code \[SAVE10\]
+- assertNotVisible: Sent ada@example\.com code \[\]

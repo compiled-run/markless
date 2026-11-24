@@ -1,0 +1,45 @@
+appId: ${APP_ID}
+name: f13-fieldset-disabled
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Gift
+- assertVisible: Message
+- assertVisible: Send
+- assertVisible: Lock
+- assertVisible: Not sent
+- assertNotVisible: Unlock
+- assertNotVisible: Sent with note Red
+- tapOn: Note
+- eraseText
+- inputText: Red
+- hideKeyboard
+- assertVisible: Red
+- assertVisible: Not sent
+- assertVisible: Lock
+- assertNotVisible: Sent with note Red
+- assertVisible: Red
+- tapOn: Lock
+- assertNotVisible: Lock
+- assertVisible: Unlock
+- assertVisible: Not sent
+- assertNotVisible: Lock
+- tapOn: Send
+- assertNotVisible: Not sent
+- assertVisible: Sent with note null
+- assertVisible: Unlock
+- assertNotVisible: Not sent
+- tapOn: Unlock
+- assertNotVisible: Unlock
+- assertVisible: Lock
+- assertVisible: Sent with note null
+- assertNotVisible: Unlock
+- tapOn: Send
+- assertNotVisible: Sent with note null
+- assertVisible: Sent with note Red
+- assertVisible: Lock
+- assertNotVisible: Sent with note null

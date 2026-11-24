@@ -1,0 +1,271 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:picked",
+				"name": "picked",
+				"initial": "nothing"
+			},
+			{
+				"id": "component-edge:0/state:presses",
+				"name": "presses",
+				"initial": 0
+			},
+			{
+				"id": "component-edge:1/state:presses",
+				"name": "presses",
+				"initial": 0
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Chips"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:0/h0",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:0/h0:text0",
+				"parent": "component-edge:0/h0",
+				"parts": [
+					{
+						"expr": {
+							"literal": "Red"
+						}
+					},
+					{
+						"text": " "
+					},
+					{
+						"cell": "component-edge:0/state:presses"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "component-edge:1/h0",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "component-edge:1/h0:text0",
+				"parent": "component-edge:1/h0",
+				"parts": [
+					{
+						"expr": {
+							"literal": "Blue"
+						}
+					},
+					{
+						"text": " "
+					},
+					{
+						"cell": "component-edge:1/state:presses"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Picked "
+					},
+					{
+						"cell": "state:picked"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "component-edge:0/h0",
+				"event": "activate",
+				"handler": "handler:component-edge:0/event:0"
+			},
+			{
+				"host": "component-edge:1/h0",
+				"event": "activate",
+				"handler": "handler:component-edge:1/event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:component-edge:0/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "component-edge:0/state:presses",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "component-edge:0/state:presses"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					},
+					{
+						"op": "assign",
+						"cell": "state:picked",
+						"value": {
+							"literal": "red"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:component-edge:1/event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "component-edge:1/state:presses",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "component-edge:1/state:presses"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					},
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"picked": {
+								"cell": "state:picked"
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "867ad5bfa57ea917",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [null];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => (__s.picked = JSON.stringify({ blue: __s.picked })));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"867ad5bfa57ea917\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Chips"
+		],
+		[
+			"component-edge:0/h0:text0",
+			"Red 0"
+		],
+		[
+			"component-edge:1/h0:text0",
+			"Blue 0"
+		],
+		[
+			"h2:text0",
+			"Picked nothing"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h0"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h0:text0",
+					"value": "Red 1"
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Picked red"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h0"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h0:text0",
+					"value": "Blue 1"
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Picked {\"blue\":\"red\"}"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:1/h0"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:1/h0:text0",
+					"value": "Blue 2"
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Picked {\"blue\":\"{\\\"blue\\\":\\\"red\\\"}\"}"
+				}
+			]
+		}
+	]
+}

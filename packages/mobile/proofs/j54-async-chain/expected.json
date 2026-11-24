@@ -1,0 +1,88 @@
+{
+	"rung": "J54",
+	"name": "an async value that reads another waits for it, takes its new answer and fails with its error, though only the reader is shown",
+	"steps": [
+		{
+			"visible": [
+				"Chain",
+				"Asked: 1",
+				"Waiting for second"
+			],
+			"absent": [
+				"Second: B2"
+			],
+			"onWeb": {
+				"why": "The web's server render waits for both values before it sends the page; a phone renders on the device, so it shows @pending first.",
+				"visible": [
+					"Chain",
+					"Asked: 1",
+					"Second: B2"
+				],
+				"absent": [
+					"Waiting for second"
+				]
+			}
+		},
+		{
+			"do": {
+				"wait": 9000
+			},
+			"visible": [
+				"Asked: 1",
+				"Second: B2"
+			],
+			"absent": [
+				"Waiting for second"
+			]
+		},
+		{
+			"do": {
+				"tap": "Bump"
+			},
+			"visible": [
+				"Asked: 2",
+				"Second: B2"
+			],
+			"absent": [
+				"Asked: 1",
+				"Second: B3"
+			]
+		},
+		{
+			"do": {
+				"wait": 9000
+			},
+			"visible": [
+				"Asked: 2",
+				"Second: B3"
+			],
+			"absent": [
+				"Second: B2"
+			]
+		},
+		{
+			"do": {
+				"tap": "Break"
+			},
+			"visible": [
+				"Asked: -1",
+				"Second: B3"
+			],
+			"absent": [
+				"Asked: 2",
+				"Second failed: No A for -1"
+			]
+		},
+		{
+			"do": {
+				"wait": 9000
+			},
+			"visible": [
+				"Second failed: No A for -1"
+			],
+			"absent": [
+				"Waiting for second"
+			]
+		}
+	]
+}

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 05-if
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Details
 - assertVisible: Show details
 - assertVisible: Nothing shown yet

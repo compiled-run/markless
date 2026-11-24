@@ -1,0 +1,217 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:where",
+				"name": "where",
+				"initial": "not checked"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Focus"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "div",
+				"parent": "h0"
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h2"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Check inside"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Check outside"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Focus is "
+					},
+					{
+						"cell": "state:where"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"card": {
+								"elements": {
+									"literal": "h2"
+								}
+							},
+							"where": {
+								"cell": "state:where"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"card": {
+								"elements": {
+									"literal": "h2"
+								}
+							},
+							"where": {
+								"cell": "state:where"
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "5678724fd92e36e7",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => {\n let held = false;\n for (const box of [__s.card]) if (box !== undefined && box.contains(document.activeElement)) held = true;\n __s.where = held ? 'inside the card' : 'outside the card';\n});\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"5678724fd92e36e7\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Focus"
+		],
+		[
+			"h3:text0",
+			"Check inside"
+		],
+		[
+			"h4:text0",
+			"Check outside"
+		],
+		[
+			"h5:text0",
+			"Focus is not checked"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h5:text0",
+					"value": "Focus is inside the card"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h5:text0",
+					"value": "Focus is outside the card"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h5:text0",
+					"value": "Focus is inside the card"
+				}
+			]
+		}
+	]
+}

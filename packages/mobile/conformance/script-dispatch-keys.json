@@ -1,0 +1,212 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "ScriptKeys",
+		"cells": [
+			{
+				"id": "state:heard",
+				"name": "heard",
+				"initial": "No key yet"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "div",
+				"parent": "h0",
+				"bindings": [
+					{
+						"attribute": "tabindex",
+						"value": {
+							"unary": "-",
+							"value": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h1"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"cell": "state:heard"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Send Home"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Send End"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "keydown",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:2"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:heard",
+						"value": {
+							"template": [
+								"Script sent ",
+								{
+									"event": "key"
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"panel": {
+								"elements": {
+									"literal": "h1"
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:1",
+						"type": "click",
+						"bindings": {
+							"panel": {
+								"elements": {
+									"literal": "h1"
+								}
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "859c0be9ae6c0e83",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\n\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => __s.panel?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true })));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => __s.panel?.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true })));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"859c0be9ae6c0e83\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h2:text0",
+			"No key yet"
+		],
+		[
+			"h3:text0",
+			"Send Home"
+		],
+		[
+			"h4:text0",
+			"Send End"
+		]
+	],
+	"initialAttributes": [
+		[
+			"h1",
+			"tabindex",
+			"-1"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Script sent Home"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Script sent End"
+				}
+			]
+		}
+	]
+}

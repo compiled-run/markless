@@ -1,5 +1,5 @@
 import type { AnyNode } from '../../ast/nodes.ts';
-import { asNodes, getIdentifierName } from '../../ast/nodes.ts';
+import { asNodes, getIdentifierName, isNode } from '../../ast/nodes.ts';
 import type {
 	NativeFactCollectors,
 	SemanticComponentNativeFacts,
@@ -9,6 +9,7 @@ import type {
 	SemanticModuleConstant,
 	SemanticModuleFunction,
 } from '../../artifacts.ts';
+import { returnsOf } from './value-set.ts';
 import { sourceSpan } from '../../ast/source.ts';
 import type { SourceSpan } from '../../diagnostics.ts';
 
@@ -77,6 +78,19 @@ function calleeName(node: AnyNode | undefined): string | null {
 		return object && typeof property === 'string' ? `${object}.${property}` : null;
 	}
 	return null;
+}
+
+/**
+ * Whether a member read is at or after a `?.` of its chain (`a?.b`, the `.c` of `a?.b.c`): JavaScript ends the whole
+ * chain with undefined at a nullish link. A parenthesized chain (`(a?.b).c`) is its own chain and ends that walk.
+ */
+function inOptionalChain(node: AnyNode): boolean {
+	let link: AnyNode | undefined = node;
+	while (link && (link.type === 'MemberExpression' || link.type === 'CallExpression')) {
+		if (link.optional === true) return true;
+		link = (link.type === 'MemberExpression' ? link.object : link.callee) as AnyNode | undefined;
+	}
+	return false;
 }
 
 /** A template value, test or assigned value as a tree a native host evaluates; names are the component's bindings. */
@@ -173,6 +187,7 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 					kind: 'member',
 					object: expressionTreeOf(node.object as AnyNode),
 					property,
+					...(inOptionalChain(node) ? { optional: true as const } : {}),
 				};
 			return node.computed && key && key.type !== 'Literal'
 				? {
@@ -244,7 +259,13 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 			};
 		case 'ObjectExpression': {
 			const entries: (readonly [string, SemanticExpression])[] = [];
+			const parts: SemanticExpression[] = [];
 			for (const property of asNodes(node.properties)) {
+				if (property.type === 'SpreadElement') {
+					if (entries.length > 0) parts.push({ kind: 'object', entries: entries.splice(0) });
+					parts.push(expressionTreeOf(property.argument as AnyNode));
+					continue;
+				}
 				const key = property.key as AnyNode | undefined;
 				const name =
 					key?.type === 'Identifier'
@@ -261,7 +282,9 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 					return unsupported('an object with a spread, computed key or method');
 				entries.push([name, expressionTreeOf(property.value as AnyNode)]);
 			}
-			return { kind: 'object', entries };
+			if (parts.length === 0) return { kind: 'object', entries };
+			if (entries.length > 0) parts.push({ kind: 'object', entries });
+			return { kind: 'merge', parts };
 		}
 		default:
 			return unsupported(`a ${String(node.type)}`);
@@ -535,6 +558,8 @@ function readsName(tree: SemanticExpression, name: string): boolean {
 			return tree.items.some((item) => readsName(item.value, name));
 		case 'object':
 			return tree.entries.some(([, value]) => readsName(value, name));
+		case 'merge':
+			return tree.parts.some((part) => readsName(part, name));
 		case 'lambda':
 			return !tree.parameters.includes(name) && readsName(tree.body, name);
 		case 'let':
@@ -906,6 +931,14 @@ export function componentNativeFactsOf(
 					}
 					continue;
 				}
+				if (id?.type === 'ArrayPattern' && statement.kind === 'const') {
+					const value = expressionTreeOf(init);
+					(Array.isArray(id.elements) ? id.elements : []).forEach((element: unknown, index) => {
+						if (isNode(element) && element.type === 'Identifier' && typeof element.name === 'string')
+							locals[element.name] = { kind: 'member', object: value, property: String(index) };
+					});
+					continue;
+				}
 				if (id?.type !== 'Identifier' || typeof id.name !== 'string') continue;
 				if (init.type === 'CallExpression' && isFrameworkCall(init, 'state'))
 					stateInitializers[id.name] = expressionTreeOf(asNodes(init.arguments)[0]);
@@ -916,6 +949,9 @@ export function componentNativeFactsOf(
 		if (statement.type !== 'ExpressionStatement') continue;
 		const expression = statement.expression as AnyNode | undefined;
 		if (expression?.type?.startsWith('JSX')) continue;
+		// `void name;` (marking a prop used) reads a name and does nothing else, so rendering has nothing to run for it.
+		const voided = expression?.type === 'UnaryExpression' && expression.operator === 'void' ? (expression.argument as AnyNode | undefined) : undefined;
+		if (voided?.type === 'Identifier' || voided?.type === 'Literal') continue;
 		renderStatements.push(statementOf(expression ?? null));
 	}
 	return {
@@ -968,6 +1004,7 @@ function moduleFunctionsOf(
 			exportNames: exportNames.get(name) ?? [],
 			native: functionBodyOf(node),
 			...(effects ? { effects } : {}),
+			returns: returnsOf(node),
 		};
 	});
 }
@@ -1064,6 +1101,7 @@ function parameterNamesOf(node: AnyNode): ReadonlyArray<string> {
 export const NATIVE_FACT_COLLECTORS: NativeFactCollectors = {
 	expression: expressionTreeOf as NativeFactCollectors['expression'],
 	computedValue: computedValueOf as NativeFactCollectors['computedValue'],
+	returns: returnsOf as NativeFactCollectors['returns'],
 	functionBody: functionBodyOf as NativeFactCollectors['functionBody'],
 	moduleFunctions: moduleFunctionsOf as NativeFactCollectors['moduleFunctions'],
 	moduleConstants: moduleConstantsOf as NativeFactCollectors['moduleConstants'],

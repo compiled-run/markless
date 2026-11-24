@@ -1,0 +1,317 @@
+import { describe, expect, it } from 'vitest';
+import type { SemanticGraphArtifact } from '../src/artifacts.ts';
+import { createNativeViewPayload, NATIVE_FACT_COLLECTORS } from '../src/native.ts';
+import { buildSemanticGraph } from '../src/passes/semantic-graph/index.ts';
+
+const analyze = (filename: string, source: string) =>
+	buildSemanticGraph({ filename, source, nativeFacts: NATIVE_FACT_COLLECTORS });
+
+/** The build of src/App.tsrx with other modules: `files` by name, resolved from `./name`. */
+const build = async (source: string, files: Record<string, string> = {}) => {
+	const graphs = new Map<string, SemanticGraphArtifact>();
+	for (const [name, text] of Object.entries(files))
+		graphs.set(`src/${name}`, await analyze(`src/${name}`, text));
+	return createNativeViewPayload(await analyze('src/App.tsrx', source), {
+		readSource: (file) => (file === 'src/App.tsrx' ? source : files[file.replace('src/', '')]),
+		modules: { graphs, resolve: (specifier) => `src/${specifier.replace('./', '')}` },
+	});
+};
+
+const styled = (payload: Awaited<ReturnType<typeof build>>['payload']) =>
+	payload?.nodes.flatMap((node) =>
+		node.kind === 'element' && node.style ? [[node.id, node.style] as const] : [],
+	);
+
+describe('a style that follows state', () => {
+	it('is its text with each number a slot of state, in the order the text reads them', async () => {
+		const { payload, diagnostics } =
+			await build(`import { computed, state } from '@markless/core';
+export default function App() @{
+	let at = state(25);
+	const thumb = computed(() => \`--at: \${at}%; order: \${Math.round(at / 10)}\`);
+	<main>
+		<div style={thumb}>Thumb</div>
+		<button onClick={() => (at = at + 12.5)}>Move</button>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(styled(payload)).toEqual([
+			['h1', ['--at: ', { slot: 'slot:h1#0' }, '%; order: ', { slot: 'slot:h1#1' }]],
+		]);
+		expect(payload?.slots).toEqual([
+			{ id: 'slot:h1#0', value: { cell: 'state:at' } },
+			{
+				id: 'slot:h1#1',
+				value: {
+					call: 'Math.round',
+					arguments: [
+						{ binary: '/', left: { cell: 'state:at' }, right: { literal: 10 } },
+					],
+				},
+				integer: true,
+			},
+		]);
+	});
+
+	it('reads through a helper module as the web runs it, so a number it formats is still a hole', async () => {
+		const { payload, diagnostics } = await build(
+			`import { computed, state } from '@markless/core';
+import { offsetStyle } from './geometry.ts';
+export default function App() @{
+	let value = state(3);
+	const offset = computed(() => offsetStyle(value, 0, 8));
+	<main><span style={offset}>Knob</span></main>
+}`,
+			{
+				'geometry.ts': `function percentOf(value: number, min: number, max: number): string {
+	return \`\${Math.round(((value - min) / (max - min)) * 10000) / 100}%\`;
+}
+export function offsetStyle(value: number, min: number, max: number): string {
+	return \`--offset: \${percentOf(value, min, max)}\`;
+}
+`,
+			},
+		);
+		expect(diagnostics).toEqual([]);
+		expect(styled(payload)).toEqual([['h1', ['--offset: ', { slot: 'slot:h1#0' }, '%']]]);
+		expect(payload?.slots?.length).toBe(1);
+	});
+
+	describe('through a helper that returns one template', () => {
+		const app = `import { computed, state } from '@markless/core';
+import { offsetText } from './swipe.ts';
+export default function App() @{
+	let hidden = state(0.25);
+	const offset = computed(() => {
+		const now = hidden;
+		return offsetText(now);
+	});
+	<main><div style={offset}>Sheet</div><button onClick={() => (hidden = hidden + 0.5)}>Move</button></main>
+}`;
+		const clamp = `function clampFraction(value: number): number {
+	if (!Number.isFinite(value)) return 0;
+	if (value < 0) return 0;
+	if (value > 1) return 1;
+	return value;
+}
+`;
+		const refusal =
+			'a `style` that follows state whose text is not known when the app is built (only numbers in it may follow state)';
+
+		it('has the slots the template written inline has, its parameter bound to the argument', async () => {
+			const inline = await build(`import { computed, state } from '@markless/core';
+export default function App() @{
+	let hidden = state(0.25);
+	const offset = computed(() => \`--offset: \${Math.round(hidden * 10000) / 10000}\`);
+	<main><div style={offset}>Sheet</div><button onClick={() => (hidden = hidden + 0.5)}>Move</button></main>
+}`);
+			const helped = await build(app, {
+				'swipe.ts': `export function offsetText(hidden: number): string {
+	return \`--offset: \${Math.round(hidden * 10000) / 10000}\`;
+}
+`,
+			});
+			expect(helped.diagnostics).toEqual([]);
+			expect(styled(helped.payload)).toEqual(styled(inline.payload));
+			expect(helped.payload?.slots).toEqual(inline.payload?.slots);
+		});
+
+		it('keeps its text when a call in a hole runs as JavaScript, the hole still a number slot', async () => {
+			const { payload, diagnostics } = await build(app, {
+				'swipe.ts': `${clamp}export function offsetText(hidden: number): string {
+	return \`--offset: \${Math.round(clampFraction(hidden) * 10000) / 10000}\`;
+}
+`,
+			});
+			expect(diagnostics).toEqual([]);
+			expect(styled(payload)).toEqual([['h1', ['--offset: ', { slot: 'slot:h1#0' }]]]);
+			const [slot, ...more] = payload?.slots ?? [];
+			expect(more).toEqual([]);
+			expect(slot).toMatchObject({
+				id: 'slot:h1#0',
+				value: {
+					binary: '/',
+					left: {
+						call: 'Math.round',
+						arguments: [
+							{
+								binary: '*',
+								left: {
+									script: expect.any(String),
+									bindings: {
+										args: { value: { array: [{ spread: false, value: { cell: 'state:hidden' } }] } },
+									},
+								},
+								right: { literal: 10000 },
+							},
+						],
+					},
+					right: { literal: 10000 },
+				},
+			});
+		});
+
+		it.each([
+			[
+				'more than one return',
+				`${clamp}export function offsetText(hidden: number): string {
+	if (hidden > 1) return '--offset: 1';
+	return \`--offset: \${Math.round(clampFraction(hidden) * 10000) / 10000}\`;
+}
+`,
+			],
+			[
+				'a return that is not a template',
+				`${clamp}export function offsetText(hidden: number): string {
+	return '--offset: ' + Math.round(clampFraction(hidden) * 10000) / 10000;
+}
+`,
+			],
+			[
+				'an array joined',
+				`${clamp}export function offsetText(hidden: number): string {
+	return [\`--offset: \${clampFraction(hidden)}\`, 'opacity: 1'].join('; ');
+}
+`,
+			],
+			[
+				'a hole that is not a number',
+				`function spelled(value: number): string {
+	return Number.isFinite(value) ? 'near' : 'far';
+}
+export function offsetText(hidden: number): string {
+	return \`--offset: \${spelled(hidden)}\`;
+}
+`,
+			],
+		])('stays refused by name for %s', async (_, helper) => {
+			const { payload, diagnostics } = await build(app, { 'swipe.ts': helper });
+			expect(payload).toBeNull();
+			expect(diagnostics.map((d) => d.message)).toContain(refusal);
+		});
+	});
+
+	it('is a style attribute that follows a styled state when it is one of fixed texts', async () => {
+		const { payload, diagnostics } =
+			await build(`import { computed, state } from '@markless/core';
+export default function App() @{
+	let wide = state(false);
+	const size = computed(() => (wide ? 'width: 100%' : 'width: 50%'));
+	<main><div style={size}>Box</div><button onClick={() => (wide = !wide)}>Toggle</button></main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const box = payload?.nodes.find((node) => node.id === 'h1');
+		expect(box?.kind === 'element' && box.bindings).toEqual([
+			{
+				attribute: 'style',
+				value: {
+					if: { cell: 'state:wide' },
+					whenTrue: { literal: 'width: 100%' },
+					whenFalse: { literal: 'width: 50%' },
+				},
+			},
+		]);
+		expect(payload?.cells.find((cell) => cell.id === 'state:wide')?.styled).toBe(true);
+	});
+
+	it('is a style case when it is a template while a condition holds and empty text otherwise', async () => {
+		const { payload, diagnostics } =
+			await build(`import { computed, state } from '@markless/core';
+export default function App() @{
+	let point = state<{ x: number } | null>(null);
+	const place = computed(() => (point === null ? '' : \`--x: \${point.x}px\`));
+	<main><div style={place}>Box</div><button onClick={() => (point = { x: 4 })}>Open</button></main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const box = payload?.nodes.find((node) => node.kind === 'element' && node.style);
+		expect(box).toMatchObject({
+			style: ['--x: ', { slot: 'slot:h1#0' }, 'px'],
+			styleWhen: { case: 'case:h1', value: false },
+		});
+		expect(payload?.styleCases).toEqual([
+			{
+				id: 'case:h1',
+				value: { binary: '===', left: { cell: 'state:point' }, right: { literal: null } },
+			},
+		]);
+		expect(payload?.slots).toEqual([
+			{
+				id: 'slot:h1#0',
+				value: { member: { cell: 'state:point' }, property: 'x' },
+				when: { case: 'case:h1', value: false },
+			},
+		]);
+	});
+
+	it('is an attribute by state when it is a fixed text or absent, or a template of fixed texts chosen by state', async () => {
+		const { payload, diagnostics } =
+			await build(`import { computed, state } from '@markless/core';
+export default function App() @{
+	let low = state(false);
+	const place = computed(() => (low ? 'top: 240px;' : undefined));
+	const second = computed(() => \`\${low ? 'top: 270px; ' : ''}left: 8px;\`);
+	<main><div style={place}>A</div><div style={second}>B</div><button onClick={() => (low = !low)}>Swap</button></main>
+}`);
+		expect(diagnostics).toEqual([]);
+		const styled = payload!.nodes.flatMap((node) =>
+			node.kind === 'element'
+				? (node.bindings ?? []).filter(
+						(binding) => 'attribute' in binding && binding.attribute === 'style',
+					)
+				: [],
+		);
+		expect(styled).toHaveLength(2);
+		expect(payload!.slots).toBeUndefined();
+		expect(payload!.cells.find((cell) => cell.id === 'state:low')?.styled).toBe(true);
+	});
+
+	it('is refused by name when its text, not only its numbers, follows state', async () => {
+		const { payload, diagnostics } =
+			await build(`import { computed, state } from '@markless/core';
+export default function App() @{
+	let at = state(0);
+	const size = computed(() => (at > 3 ? \`width: \${at}px\` : \`height: \${at}px\`));
+	<main><div style={size}>Box</div><button onClick={() => (at = at + 1)}>Grow</button></main>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toContain(
+			'a `style` that follows state whose text is not known when the app is built (only numbers in it may follow state)',
+		);
+	});
+
+	it('inside a @for row is a slot of that row: one value per row copy, from the row item', async () => {
+		const { payload, diagnostics } = await build(`import { state } from '@markless/core';
+export default function App() @{
+	let rows = state([{ id: 'a', at: 10 }]);
+	<main>
+		@for (const row of rows; key row.id) {
+			<div style={\`--at: \${row.at}%\`}>Row</div>
+		}
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload!.slots).toEqual([
+			{
+				id: 'slot:h1#0',
+				value: { member: { item: 'repeat:0' }, property: 'at' },
+				row: 'repeat:0',
+			},
+		]);
+	});
+
+	it('is refused by name inside a @for row when it is a template or empty text by a condition', async () => {
+		const { payload, diagnostics } = await build(`import { state } from '@markless/core';
+export default function App() @{
+	let rows = state([{ id: 'a', at: null as number | null }]);
+	<main>
+		@for (const row of rows; key row.id) {
+			<div style={row.at === null ? '' : \`--at: \${row.at}%\`}>Row</div>
+		}
+	</main>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toContain(
+			'a `style` inside a @for row that is a template or empty text by a condition; Dragon lays each row out from one template',
+		);
+	});
+});

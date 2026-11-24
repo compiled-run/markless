@@ -1214,7 +1214,7 @@ function composedBoundaryArmRecords(
 		})),
 		keyedRepeats: set.keyedRepeats?.map((repeat) => ({
 			...repeat,
-			id: prefix + repeat.id,
+			...marklessPrefixedRepeatId(repeat, prefix),
 			parentHostNodeId: prefix + repeat.parentHostNodeId,
 			...(repeat.ownerHostNodeId ? { ownerHostNodeId: prefix + repeat.ownerHostNodeId } : {}),
 			...(repeat.collectionGraphNodeId &&
@@ -1238,6 +1238,9 @@ function composedBoundaryArmRecords(
 						id: prefix + branch.id,
 						sourceId: branch.sourceId ?? branch.id,
 						testReads: branch.testReads.map(qualifyRead),
+						...(branch.armSeeds && {
+							armSeeds: branch.armSeeds.map((seed) => ({ ...seed, graphNodeId: node(seed.graphNodeId) })),
+						}),
 						...(contentReadsOf(branch)
 							? { contentReads: contentReadsOf(branch)!.map(qualifyRead) }
 							: {}),
@@ -1246,9 +1249,7 @@ function composedBoundaryArmRecords(
 							? {
 									armRecords: branch.armRecords.map((arm) => ({
 										...arm,
-										...(arm.repeatParents && {
-											repeatParents: arm.repeatParents.map((list) => ({ ...list, repeatId: prefix + list.repeatId })),
-										}),
+										...marklessPrefixedRepeatParents(arm, prefix),
 										events: (arm.events ?? []).map((event) => ({
 											...event,
 											symbolIds: (event.symbolIds ?? []).map(
@@ -1436,14 +1437,7 @@ function composedBoundaryGraph(
 	};
 }
 
-/**
- * Teaches this app's settle path to re-spell a composed child's arm records in
- * page space. The bundler emits a call to it in the generated source/resume
- * module when, and only when, the page has component edges (the same gate that
- * emits its symbol routes), so a non-composing page never loads this module and
- * its settle path registers arm records untouched. The call is explicit because
- * `@markless/web` declares `sideEffects: false`.
- */
+/** Re-spells a composed child's arm records in page space; a page with component edges and each MDX island's loader call it. */
 export function installMarklessComposedArmRecords(): void {
 	liveRoute = (page, instancePath, graphNodeId, path) =>
 		marklessPropRoute(liveProps.get(page)?.get(instancePath)?.routes, graphNodeId, path);
@@ -1463,4 +1457,21 @@ export function installMarklessComposedArmRecords(): void {
 			marklessGraphWidgetRegistry(graph as RuntimeGraph | undefined),
 		),
 	);
+}
+
+/** A record's id under a composition prefix, with its enclosing list's id prefixed alike: one never moves without the other. */
+export function marklessPrefixedRepeatId<R extends { readonly id: string; readonly enclosingRow?: { readonly prefix?: string } }>(
+	repeat: R,
+	prefix: string,
+): Pick<R, 'id' | 'enclosingRow'> {
+	const at = repeat.enclosingRow;
+	return { id: prefix + repeat.id, ...(at && { enclosingRow: { ...at, prefix: prefix + (at.prefix ?? '') } }) } as Pick<R, 'id' | 'enclosingRow'>;
+}
+
+/** An arm record set's references to the lists it renders the parent of, under the same prefix their records take. */
+export function marklessPrefixedRepeatParents<A extends { readonly repeatParents?: ReadonlyArray<{ readonly repeatId: string }> }>(
+	arm: A,
+	prefix: string,
+): Pick<A, 'repeatParents'> {
+	return (arm.repeatParents ? { repeatParents: arm.repeatParents.map((list) => ({ ...list, repeatId: prefix + list.repeatId })) } : {}) as Pick<A, 'repeatParents'>;
 }

@@ -1,0 +1,49 @@
+appId: ${APP_ID}
+name: r160-textarea-submit
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Postcard
+- assertVisible: Draft Hello
+- assertVisible: Nothing sent
+- assertVisible: Hello
+- assertVisible: Ada
+- tapOn: Suggest
+- assertNotVisible: Draft Hello
+- assertVisible: Suggested
+- assertVisible: Draft Suggested
+- assertVisible: Nothing sent
+- assertNotVisible: Draft Hello
+- assertVisible: Suggested
+- assertVisible: Ada
+- tapOn: Send
+- assertNotVisible: Nothing sent
+- assertVisible: Sent Suggested and Ada
+- assertNotVisible: Nothing sent
+- tapOn: Note
+- eraseText
+- inputText: Mine
+- hideKeyboard
+- assertVisible: Mine
+- assertVisible: Ada
+- assertVisible: Draft Suggested
+- assertVisible: Sent Suggested and Ada
+- assertNotVisible: Draft Other
+- assertVisible: Mine
+- assertVisible: Ada
+- tapOn: Suggest
+- assertVisible: Draft Other
+- assertNotVisible: Draft Suggested
+- assertVisible: Draft Other
+- assertVisible: Sent Suggested and Ada
+- assertNotVisible: Draft Suggested
+- assertVisible: Mine
+- assertVisible: Ada
+- tapOn: Send
+- assertNotVisible: Sent Suggested and Ada
+- assertVisible: Sent Mine and Ada
+- assertNotVisible: Sent Suggested and Ada

@@ -1,0 +1,20 @@
+appId: ${APP_ID}
+name: u70-custom-elements
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Conduit
+- assertVisible: Read the feed
+- assertVisible: Like 0
+- assertNotVisible: Like 1
+- tapOn: Like 0
+- assertVisible: Like 1
+- assertNotVisible: Like 0
+- assertVisible: Like 1
+- assertVisible: Conduit
+- assertVisible: Read the feed
+- assertNotVisible: Like 0

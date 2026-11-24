@@ -1,0 +1,31 @@
+appId: ${APP_ID}
+name: u64-active-element
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Focus
+- assertVisible: Check inside
+- assertVisible: Check outside
+- assertVisible: Focus is not checked
+- assertNotVisible: Focus is inside the card
+- assertNotVisible: Focus is outside the card
+- tapOn: Check inside
+- assertVisible: Focus is inside the card
+- assertNotVisible: Focus is not checked
+- assertVisible: Focus is inside the card
+- assertNotVisible: Focus is not checked
+- assertNotVisible: Focus is outside the card
+- tapOn: Check outside
+- assertVisible: Focus is outside the card
+- assertNotVisible: Focus is inside the card
+- assertVisible: Focus is outside the card
+- assertNotVisible: Focus is inside the card
+- tapOn: Check inside
+- assertVisible: Focus is inside the card
+- assertNotVisible: Focus is outside the card
+- assertVisible: Focus is inside the card
+- assertNotVisible: Focus is outside the card

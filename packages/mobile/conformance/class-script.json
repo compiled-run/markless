@@ -1,0 +1,229 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:shown.loud",
+				"name": "shown.loud",
+				"initial": false,
+				"styled": true
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null,
+				"attributes": {
+					"class": "screen mk-dyjz6b"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"attributes": {
+					"class": "mk-dyjz6b"
+				},
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Helper classes"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0",
+				"bindings": [
+					{
+						"attribute": "class",
+						"value": {
+							"if": {
+								"script": "fn:0",
+								"bindings": {
+									"shown": {
+										"fields": {
+											"loud": "state:shown.loud"
+										}
+									}
+								}
+							},
+							"whenTrue": {
+								"template": [
+									{
+										"script": "fn:0",
+										"bindings": {
+											"shown": {
+												"fields": {
+													"loud": "state:shown.loud"
+												}
+											}
+										}
+									},
+									" mk-dyjz6b"
+								]
+							},
+							"whenFalse": {
+								"literal": "mk-dyjz6b"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"cell": "state:shown.loud"
+							},
+							"whenTrue": {
+								"literal": "Loud note"
+							},
+							"whenFalse": {
+								"literal": "Quiet note"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0",
+				"attributes": {
+					"class": "tap mk-dyjz6b"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Toggle loud"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:shown.loud",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:shown.loud"
+							}
+						}
+					}
+				]
+			}
+		],
+		"script": {
+			"id": "02fbbd83bcc1c92f",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction cn(...parts) {\n return parts.filter(Boolean).join(' ');\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn function () {\nreturn (cn('note', __s.shown.loud && 'loud'));\n};\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"02fbbd83bcc1c92f\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Helper classes"
+		],
+		[
+			"h2:text0",
+			"Quiet note"
+		],
+		[
+			"h3:text0",
+			"Toggle loud"
+		]
+	],
+	"initialAttributes": [
+		[
+			"h2",
+			"class",
+			"note mk-dyjz6b"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:shown.loud",
+					"value": true
+				},
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "class",
+					"value": "note loud mk-dyjz6b"
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Loud note"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:shown.loud",
+					"value": false
+				},
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "class",
+					"value": "note mk-dyjz6b"
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Quiet note"
+				}
+			]
+		}
+	]
+}

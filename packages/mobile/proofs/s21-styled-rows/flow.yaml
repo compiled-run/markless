@@ -1,0 +1,36 @@
+appId: ${APP_ID}
+name: s21-styled-rows
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Notes
+- assertVisible: Groceries
+- assertVisible: Call the plumber about the kitchen tap before Friday
+- assertVisible: End of list
+- assertNotVisible: No notes yet
+- assertNotVisible: Water the plants
+- assertVisible: Notes
+- tapOn: Add note
+- assertVisible: Water the plants
+- assertVisible: Groceries
+- assertVisible: Water the plants
+- assertVisible: End of list
+- assertNotVisible: No notes yet
+- tapOn: Clear notes
+- assertVisible: No notes yet
+- assertNotVisible: Groceries
+- assertNotVisible: Water the plants
+- assertVisible: No notes yet
+- assertVisible: End of list
+- assertNotVisible: Groceries
+- assertNotVisible: Water the plants
+- tapOn: Add note
+- assertVisible: Water the plants
+- assertNotVisible: No notes yet
+- assertVisible: Water the plants
+- assertVisible: End of list
+- assertNotVisible: No notes yet

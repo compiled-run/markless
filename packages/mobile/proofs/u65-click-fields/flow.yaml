@@ -1,0 +1,31 @@
+appId: ${APP_ID}
+name: u65-click-fields
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Clicks
+- assertVisible: Tap here
+- assertVisible: Click it by script
+- assertVisible: No click yet
+- assertNotVisible: Tapped at a point, no key held
+- assertNotVisible: Scripted at 0, 0, no key held
+- tapOn: Tap here
+- assertVisible: Tapped at a point, no key held
+- assertNotVisible: No click yet
+- assertVisible: Tapped at a point, no key held
+- assertNotVisible: No click yet
+- assertNotVisible: Scripted at 0, 0, no key held
+- tapOn: Click it by script
+- assertVisible: Scripted at 0, 0, no key held
+- assertNotVisible: Tapped at a point, no key held
+- assertVisible: Scripted at 0, 0, no key held
+- assertNotVisible: Tapped at a point, no key held
+- tapOn: Tap here
+- assertVisible: Tapped at a point, no key held
+- assertNotVisible: Scripted at 0, 0, no key held
+- assertVisible: Tapped at a point, no key held
+- assertNotVisible: Scripted at 0, 0, no key held

@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: r159-infinite-bounds
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Bounds
+- assertVisible: max Infinity
+- assertVisible: low -Infinity
+- assertVisible: huge unbounded
+- tapOn: Cap
+- assertNotVisible: max Infinity
+- assertVisible: max 100
+- assertVisible: small bounded
+- assertNotVisible: max Infinity
+- tapOn: Uncap
+- assertVisible: max Infinity
+- assertNotVisible: max 100
+- assertVisible: max Infinity
+- assertVisible: huge unbounded
+- assertNotVisible: max 100

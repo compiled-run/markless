@@ -1,16 +1,20 @@
 appId: ${APP_ID}
 name: d1-network
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Connection
 - assertVisible: Online
 - assertNotVisible: Offline
 - assertNotVisible: Changes will sync later
 - openLink: markless-proof://device/network.online?value=false
 - tapOn:
-      text: Open
-      optional: true
+    text: Open
+    optional: true
 - assertVisible: Offline
 - assertVisible: Changes will sync later
 - assertNotVisible: Online
@@ -19,8 +23,8 @@ name: d1-network
 - assertNotVisible: Online
 - openLink: markless-proof://device/network.online?value=true
 - tapOn:
-      text: Open
-      optional: true
+    text: Open
+    optional: true
 - assertVisible: Online
 - assertNotVisible: Offline
 - assertNotVisible: Changes will sync later

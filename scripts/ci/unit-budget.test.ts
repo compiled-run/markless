@@ -3,7 +3,18 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { attribute, describePeak, processLabel, suiteKey } from './unit-budget.mjs';
+import { holdsSlotForFile } from './in-worker-builds.ts';
+import {
+	attribute,
+	describePeak,
+	processLabel,
+	readSlots,
+	recordSample,
+	SLOT_HELD_SHARE,
+	SLOT_HOLDER_FAIL_MB,
+	SLOT_HOLDER_STALE_MB,
+	suiteKey,
+} from './unit-budget.mjs';
 
 const script = resolve(import.meta.dirname, 'unit-budget.mjs');
 const scratch: string[] = [];
@@ -23,6 +34,10 @@ type Shard = {
 	exitCode?: number;
 	platform?: string;
 	fileMs?: Record<string, number>;
+	fileUnslottedPeaksMb?: Record<string, number>;
+	filePeaksMb?: Record<string, number>;
+	wallS?: number;
+	wholeFileSlotS?: number;
 };
 
 const measurementsDir = (shards: Shard[]) => {
@@ -120,13 +135,15 @@ describe('check', () => {
 		expect(result.output).toContain('over budget: largest shard peak RSS 2300 MB');
 	});
 
-	test('fails loudly when the suite got lighter than the band: the anchor is stale', () => {
+	test('a suite lighter than the band warns and does not fail: the change did not make it so', () => {
 		const result = check(anchored, [
 			{ shard: '1/2', cpuS: 80, peakRssMb: 2000 },
 			{ shard: '2/2', cpuS: 190, peakRssMb: 1500 },
 		]);
-		expect(result.status).toBe(1);
-		expect(result.output).toContain("stale anchor: total CPU at the anchors' speed 270 CPU-s");
+		expect(result.status).toBe(0);
+		expect(result.output).toContain(
+			"::warning::lighter: total CPU at the anchors' speed 270 CPU-s",
+		);
 	});
 
 	test('fails when the shards differ from the anchored ones', () => {
@@ -256,6 +273,197 @@ describe('check', () => {
 		]);
 		expect(empty.status).toBe(1);
 		expect(empty.output).toContain('no anchors');
+	});
+});
+
+const mainDir = (runs: Shard[][]) => {
+	const dir = mkdtempSync(join(tmpdir(), 'unit-budget-main-'));
+	scratch.push(dir);
+	runs.forEach((shards, order) => {
+		const id = String(100 + order);
+		shards.forEach((shard, index) => {
+			const folder = join(
+				dir,
+				`${String(order).padStart(2, '0')}-${id}`,
+				`unit-budget-shard${index}`,
+			);
+			mkdirSync(folder, { recursive: true });
+			writeFileSync(
+				join(folder, 'measurement.json'),
+				JSON.stringify({
+					version: 2,
+					platform: 'linux-x64',
+					cpuModel: 'test cpu',
+					cpus: 4,
+					sha: null,
+					run: id,
+					command: [],
+					exitCode: 0,
+					wallS: 100,
+					attempt: 1,
+					calibrationS: 1,
+					...shard,
+				}),
+			);
+		});
+	});
+	return dir;
+};
+
+// Ten landed runs of main, each with these two shards.
+const mainAt = (one: number, two: number, rss = 2000, runs = 10) =>
+	mainDir(
+		Array.from({ length: runs }, () => [
+			{ shard: '1/2', cpuS: one, peakRssMb: rss },
+			{ shard: '2/2', cpuS: two, peakRssMb: 1500 },
+		]),
+	);
+
+const checkAgainstMain = (budget: object, shards: Shard[], main: string) =>
+	run(
+		'check',
+		'--budget',
+		budgetFile(budget),
+		'--measurements',
+		measurementsDir(shards),
+		'--main',
+		main,
+	);
+
+describe("check against main's last landed runs", () => {
+	test("a run more than the margin above main's median fails, though inside the anchor's band", () => {
+		const result = checkAgainstMain(
+			anchored,
+			[
+				{ shard: '1/2', cpuS: 95, peakRssMb: 2000 },
+				{ shard: '2/2', cpuS: 195, peakRssMb: 1500 },
+			],
+			mainAt(90, 180),
+		);
+		expect(result.status).toBe(1);
+		expect(result.output).toContain(
+			"over budget: total CPU at the anchors' speed 290 CPU-s against main's median of 270 CPU-s (+7.4%",
+		);
+		expect(result.output).toContain('more than the margin above main');
+	});
+
+	test("memory is held to main's median the same way", () => {
+		const result = checkAgainstMain(
+			anchored,
+			[
+				{ shard: '1/2', cpuS: 100, peakRssMb: 2000 },
+				{ shard: '2/2', cpuS: 200, peakRssMb: 1500 },
+			],
+			mainAt(100, 200, 1800),
+		);
+		expect(result.status).toBe(1);
+		expect(result.output).toContain(
+			"over budget: largest shard peak RSS 2000 MB against main's median of 1800 MB (+11.1%",
+		);
+	});
+
+	test('the committed anchor plus the margin stays a ceiling, however far main has moved', () => {
+		const result = checkAgainstMain(
+			anchored,
+			[
+				{ shard: '1/2', cpuS: 107, peakRssMb: 2000 },
+				{ shard: '2/2', cpuS: 213, peakRssMb: 1500 },
+			],
+			mainAt(110, 220),
+		);
+		expect(result.status).toBe(1);
+		expect(result.output).toContain(
+			"over budget: total CPU at the anchors' speed 320 CPU-s against main's median of 330 CPU-s (-3%",
+		);
+		expect(result.output).toContain('ceiling 315 CPU-s');
+		expect(result.output).toContain('over the ceiling no run may pass');
+	});
+
+	test("a run inside main's band passes, and one under it only warns", () => {
+		const inside = checkAgainstMain(
+			anchored,
+			[
+				{ shard: '1/2', cpuS: 92, peakRssMb: 1900 },
+				{ shard: '2/2', cpuS: 184, peakRssMb: 1500 },
+			],
+			mainAt(90, 180, 1900),
+		);
+		expect(inside.status).toBe(0);
+		const under = checkAgainstMain(
+			anchored,
+			[
+				{ shard: '1/2', cpuS: 80, peakRssMb: 1600 },
+				{ shard: '2/2', cpuS: 160, peakRssMb: 1500 },
+			],
+			mainAt(100, 200),
+		);
+		expect(under.status).toBe(0);
+		expect(under.output).toContain(
+			"::warning::lighter: total CPU at the anchors' speed 240 CPU-s",
+		);
+		expect(under.output).toContain('::warning::lighter: largest shard peak RSS 1600 MB');
+	});
+
+	test('warns when main has moved more than half the margin from the committed anchor', () => {
+		const result = checkAgainstMain(
+			anchored,
+			[
+				{ shard: '1/2', cpuS: 103, peakRssMb: 2000 },
+				{ shard: '2/2', cpuS: 206, peakRssMb: 1500 },
+			],
+			mainAt(103, 206),
+		);
+		expect(result.status).toBe(0);
+		expect(result.output).toContain(
+			"::warning::main moved: total CPU at the anchors' speed on main's last 10 landed runs is 309 CPU-s, +3% from the committed anchor of 300 CPU-s, more than half the ±5% margin",
+		);
+		expect(result.output).toContain('accept --from 100 101 102 103 104 105 106 107 108 109');
+		expect(result.output).not.toContain('main moved: largest shard peak RSS');
+	});
+
+	test('with fewer than 10 usable landed runs the run is held to the committed anchors alone', () => {
+		const main = mainDir([
+			...Array.from({ length: 9 }, () => [
+				{ shard: '1/2', cpuS: 90, peakRssMb: 2000 },
+				{ shard: '2/2', cpuS: 180, peakRssMb: 1500 },
+			]),
+			[
+				{ shard: '1/2', cpuS: 90, peakRssMb: 2000, exitCode: 1 },
+				{ shard: '2/2', cpuS: 180, peakRssMb: 1500 },
+			],
+		]);
+		const result = checkAgainstMain(
+			anchored,
+			[
+				{ shard: '1/2', cpuS: 95, peakRssMb: 2000 },
+				{ shard: '2/2', cpuS: 195, peakRssMb: 1500 },
+			],
+			main,
+		);
+		expect(result.status).toBe(0);
+		expect(result.output).toContain(
+			"main's last landed runs gave 9 of 10 usable unit budget measurements",
+		);
+		expect(result.output).toContain(
+			"total CPU at the anchors' speed: 290 CPU-s against an anchor of 300 CPU-s",
+		);
+	});
+
+	test('drift reports main against the anchors and warns past half the margin', () => {
+		const quiet = run('drift', '--budget', budgetFile(anchored), '--main', mainAt(101, 201));
+		expect(quiet.status).toBe(0);
+		expect(quiet.output).not.toContain('::warning::');
+		const moved = run(
+			'drift',
+			'--budget',
+			budgetFile(anchored),
+			'--main',
+			mainAt(100, 200, 2150),
+		);
+		expect(moved.status).toBe(0);
+		expect(moved.output).toContain(
+			"::warning::main moved: largest shard peak RSS on main's last 10 landed runs is 2150 MB, +7.5% from the committed anchor of 2000 MB",
+		);
 	});
 });
 
@@ -643,5 +851,139 @@ describe('peak attribution', () => {
 		expect(
 			processLabel(['/usr/bin/node', '/repo/test/support/fixture-build-child.ts', '{}']),
 		).toBe('node fixture-build-child.ts');
+	});
+});
+
+describe('memory held outside the build slot', () => {
+	const big = 'packages/a/test/big.test.ts';
+	const heavyFile = (slotHolders: { test: string }[]) => {
+		const dir = mkdtempSync(join(tmpdir(), 'unit-budget-heavy-'));
+		scratch.push(dir);
+		const path = join(dir, 'heavy-tests.json');
+		writeFileSync(
+			path,
+			JSON.stringify({ inWorkerBuilds: { tests: [] }, slotHolders: { tests: slotHolders } }),
+		);
+		return path;
+	};
+	const changedFile = (files: string[]) => {
+		const dir = mkdtempSync(join(tmpdir(), 'unit-budget-changed-'));
+		scratch.push(dir);
+		const path = join(dir, 'changed.txt');
+		writeFileSync(path, files.join('\n'));
+		return path;
+	};
+	const checkWith = (
+		shard1: Partial<Shard>,
+		{ holders = [], changed }: { holders?: { test: string }[]; changed?: string[] } = {},
+	) =>
+		run(
+			'check',
+			'--budget',
+			budgetFile(anchored),
+			'--measurements',
+			measurementsDir([
+				{ shard: '1/2', cpuS: 100, peakRssMb: 2000, ...shard1 },
+				{ shard: '2/2', cpuS: 200, peakRssMb: 1500 },
+			]),
+			'--heavy',
+			heavyFile(holders),
+			...(changed ? ['--changed', changedFile(changed)] : []),
+		);
+	const over = { fileUnslottedPeaksMb: { [big]: SLOT_HOLDER_FAIL_MB + 1 } };
+
+	test('fails for a file the change touches when it is over the line, naming it and both ways out', () => {
+		const result = checkWith(over, { changed: [big] });
+		expect(result.status).toBe(1);
+		expect(result.output).toContain(
+			`::error::${big} held ${SLOT_HOLDER_FAIL_MB + 1} MB outside the build slot (shard 1/2, run 42)`,
+		);
+		expect(result.output).toContain('list it under "slotHolders"');
+		expect(result.output).toContain('or make it keep less outside the slot');
+	});
+
+	test('only reports a file the change did not touch, however far over', () => {
+		const result = checkWith(over, { changed: ['packages/other/src/x.ts'] });
+		expect(result.status).toBe(0);
+		expect(result.output).toContain(`::warning::${big} held ${SLOT_HOLDER_FAIL_MB + 1} MB`);
+		expect(result.output).toContain('files over the 1024 MB slot line without holding the slot: 1');
+	});
+
+	test('fails nothing without a changed-file set', () => {
+		expect(checkWith(over).status).toBe(0);
+	});
+
+	test('a touched file between the line and the noise margin is reported, not failed', () => {
+		const result = checkWith(
+			{ fileUnslottedPeaksMb: { [big]: SLOT_HOLDER_FAIL_MB } },
+			{ changed: [big] },
+		);
+		expect(result.status).toBe(0);
+		expect(result.output).toContain(`::warning::${big} held ${SLOT_HOLDER_FAIL_MB} MB`);
+	});
+
+	test('a listed file passes', () => {
+		expect(checkWith(over, { holders: [{ test: big }], changed: [big] }).status).toBe(0);
+	});
+
+	test('a listed file far under the line is stale: reported, and failed when touched', () => {
+		const light = { fileMs: { [big]: 1000 }, filePeaksMb: { [big]: SLOT_HOLDER_STALE_MB - 1 } };
+		const untouched = checkWith(light, { holders: [{ test: big }], changed: [] });
+		expect(untouched.status).toBe(0);
+		expect(untouched.output).toContain(`::warning::stale: ${big} is listed under "slotHolders"`);
+		expect(checkWith(light, { holders: [{ test: big }], changed: [big] }).status).toBe(1);
+	});
+
+	test('reports the share of a shard under whole-file holds, and fails a list change past the ceiling', () => {
+		const serial = { wallS: 100, wholeFileSlotS: 100 * SLOT_HELD_SHARE + 1 };
+		const result = checkWith(serial, { changed: [] });
+		expect(result.status).toBe(0);
+		expect(result.output).toContain('shard 1/2 ran 51 s of its 100 s under a whole-file slot hold (51%, ceiling 50%)');
+		expect(checkWith(serial, { changed: ['scripts/ci/heavy-tests.json'] }).status).toBe(1);
+	});
+
+	test('reads which files hold a slot and whether one is held for a whole file', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'unit-budget-slots-'));
+		scratch.push(dir);
+		mkdirSync(join(dir, '0'));
+		writeFileSync(join(dir, '0', 'pid'), '20');
+		writeFileSync(join(dir, '0', 'held'), 'file');
+		mkdirSync(join(dir, '1'));
+		const fileOf = new Map([
+			[10, 'packages/a/test/a.test.ts'],
+			[20, 'packages/b/test/b.test.ts'],
+		]);
+		const reading = readSlots(dir, fileOf);
+		expect([...reading.holding]).toEqual(['packages/b/test/b.test.ts']);
+		expect(reading.wholeFile).toBe(true);
+		expect(readSlots(join(dir, 'missing'), fileOf)).toEqual({ holding: new Set(), wholeFile: false });
+	});
+
+	test('a file that held a slot at either read of a sample is not charged with memory outside it', () => {
+		const state = { filePeaks: new Map(), unslottedPeaks: new Map(), wholeFileHeldSamples: 0 };
+		const groups = [
+			{ file: 'packages/a/test/build.test.ts', mb: 1500, parts: {} },
+			{ file: 'packages/b/test/sweep.test.ts', mb: 1200, parts: {} },
+			{ file: '(no test file: vitest main process, pnpm, the wrapper)', mb: 900, parts: {} },
+		];
+		const none = { holding: new Set<string>(), wholeFile: false };
+		recordSample(state, groups, { holding: new Set(['packages/a/test/build.test.ts']), wholeFile: false }, none);
+		recordSample(state, groups, none, { holding: new Set(), wholeFile: true });
+		expect(state.filePeaks.get('packages/a/test/build.test.ts')).toBe(1500);
+		expect([...state.unslottedPeaks]).toEqual([
+			['packages/b/test/sweep.test.ts', 1200],
+			['packages/a/test/build.test.ts', 1500],
+		]);
+		expect(state.wholeFileHeldSamples).toBe(1);
+	});
+
+	test('the setup file holds the slot for files under inWorkerBuilds and slotHolders', () => {
+		const manifest = {
+			inWorkerBuilds: { scope: [], tests: [{ test: 'a.test.ts', why: '' }] },
+			slotHolders: { why: '', tests: [{ test: 'b.test.ts', peakMb: 2000, run: '1', why: '' }] },
+		};
+		expect(holdsSlotForFile(manifest, 'a.test.ts')).toBe(true);
+		expect(holdsSlotForFile(manifest, 'b.test.ts')).toBe(true);
+		expect(holdsSlotForFile(manifest, 'c.test.ts')).toBe(false);
 	});
 });

@@ -1,0 +1,39 @@
+appId: ${APP_ID}
+name: u81-arm-handles
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Toggle
+- assertVisible: Count
+- assertNotVisible: Extra
+- assertNotVisible: 2 no extra
+- tapOn: Count
+- assertVisible: 2 no extra
+- assertVisible: 2 no extra
+- assertNotVisible: Extra
+- tapOn: Toggle
+- assertVisible: Extra
+- assertVisible: Extra
+- assertVisible: 2 no extra
+- assertNotVisible: 3 with extra
+- tapOn: Count
+- assertVisible: 3 with extra
+- assertNotVisible: 2 no extra
+- assertVisible: 3 with extra
+- assertVisible: Extra
+- assertNotVisible: 2 no extra
+- tapOn: Toggle
+- assertNotVisible: Extra
+- assertVisible: 3 with extra
+- assertNotVisible: Extra
+- assertNotVisible: 2 no extra
+- tapOn: Count
+- assertVisible: 2 no extra
+- assertNotVisible: 3 with extra
+- assertVisible: 2 no extra
+- assertNotVisible: Extra
+- assertNotVisible: 3 with extra

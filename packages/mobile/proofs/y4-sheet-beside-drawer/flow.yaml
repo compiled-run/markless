@@ -1,10 +1,14 @@
 appId: ${APP_ID}
 name: y4-sheet-beside-drawer
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Two sheets
-- assertVisible: 'Last closed: nothing'
+- assertVisible: "Last closed: nothing"
 - assertVisible: Open the drawer
 - assertVisible: Open the system sheet
 - assertNotVisible: Drawn by the app
@@ -15,18 +19,18 @@ name: y4-sheet-beside-drawer
 - assertVisible: Close the drawer
 - tapOn: Close the drawer
 - assertNotVisible: Drawn by the app
-- assertVisible: 'Last closed: the drawer'
+- assertVisible: "Last closed: the drawer"
 - assertNotVisible: Drawn by the app
-- assertNotVisible: 'Last closed: nothing'
+- assertNotVisible: "Last closed: nothing"
 - assertNotVisible: Drawn by the platform
 - tapOn: Open the system sheet
 - assertVisible: Drawn by the platform
 - assertVisible: Drawn by the platform
 - swipe:
-      start: 50%, 56%
-      end: 50%, 96%
-      duration: 150
+    start: 50%, 56%
+    end: 50%, 96%
+    duration: 150
 - assertNotVisible: Drawn by the platform
-- assertVisible: 'Last closed: the system sheet'
+- assertVisible: "Last closed: the system sheet"
 - assertNotVisible: Drawn by the platform
-- assertNotVisible: 'Last closed: the drawer'
+- assertNotVisible: "Last closed: the drawer"

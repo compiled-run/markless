@@ -1,0 +1,476 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "OptionFocus",
+		"cells": [
+			{
+				"id": "state:chosen",
+				"name": "chosen",
+				"initial": "pear",
+				"styled": true,
+				"domain": [
+					"pear",
+					"none"
+				]
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "First or chosen"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Last or chosen"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Clear"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Outside"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "div",
+				"parent": "h0",
+				"attributes": {
+					"role": "listbox"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "button",
+				"parent": "h5",
+				"attributes": {
+					"role": "option"
+				},
+				"bindings": [
+					{
+						"attribute": "aria-selected",
+						"value": {
+							"if": {
+								"binary": "===",
+								"left": {
+									"cell": "state:chosen"
+								},
+								"right": {
+									"literal": "apple"
+								}
+							},
+							"whenTrue": {
+								"literal": "true"
+							},
+							"whenFalse": {
+								"literal": "false"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "Apple"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "button",
+				"parent": "h5",
+				"attributes": {
+					"role": "option",
+					"aria-disabled": "true"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Fig"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "button",
+				"parent": "h5",
+				"attributes": {
+					"role": "option"
+				},
+				"bindings": [
+					{
+						"attribute": "aria-selected",
+						"value": {
+							"if": {
+								"binary": "===",
+								"left": {
+									"cell": "state:chosen"
+								},
+								"right": {
+									"literal": "pear"
+								}
+							},
+							"whenTrue": {
+								"literal": "true"
+							},
+							"whenFalse": {
+								"literal": "false"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h8:text0",
+				"parent": "h8",
+				"parts": [
+					{
+						"text": "Pear"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h9",
+				"element": "button",
+				"parent": "h5",
+				"attributes": {
+					"role": "option"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h9:text0",
+				"parent": "h9",
+				"parts": [
+					{
+						"text": "Plum"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:3"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:0",
+						"type": "click",
+						"bindings": {
+							"options": {
+								"elements": {
+									"array": [
+										{
+											"spread": false,
+											"value": {
+												"literal": "h6"
+											}
+										},
+										{
+											"spread": false,
+											"value": {
+												"literal": "h7"
+											}
+										},
+										{
+											"spread": false,
+											"value": {
+												"literal": "h8"
+											}
+										},
+										{
+											"spread": false,
+											"value": {
+												"literal": "h9"
+											}
+										}
+									]
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "script",
+						"fn": "fn:1",
+						"type": "click",
+						"bindings": {
+							"options": {
+								"elements": {
+									"array": [
+										{
+											"spread": false,
+											"value": {
+												"literal": "h6"
+											}
+										},
+										{
+											"spread": false,
+											"value": {
+												"literal": "h7"
+											}
+										},
+										{
+											"spread": false,
+											"value": {
+												"literal": "h8"
+											}
+										},
+										{
+											"spread": false,
+											"value": {
+												"literal": "h9"
+											}
+										}
+									]
+								}
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:chosen",
+						"value": {
+							"literal": "none"
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": []
+			}
+		],
+		"script": {
+			"id": "5777ff6e589fe07c",
+			"source": "(function (g, id) {\n/*markless-engine:services*/\ng.__markless = g.__markless || {};\nvar modules = [];\nvar origin = null;\nvar owners = {\"fn:0\":0,\"fn:1\":0};\nvar navigation = null;\nmodules[0] = function (exports) {\n\"use strict\";\nvar __i = [];\nfunction focusChosen(options, fromEnd) {\n if (!options) return;\n let wanted;\n let end;\n for (const option of options) {\n  if (option.getAttribute('aria-disabled') === 'true') continue;\n  if (wanted === undefined && option.getAttribute('aria-selected') === 'true') wanted = option;\n  if (fromEnd) end = option; else if (end === undefined) end = option;\n }\n wanted ??= end;\n wanted?.focus();\n}\nfunctions[\"fn:0\"] = function (__s) {\nreturn (() => focusChosen(__s.options, false));\n};\nfunctions[\"fn:1\"] = function (__s) {\nreturn (() => focusChosen(__s.options, true));\n};\n};\n/*markless-engine:entries*/\n})(globalThis, \"5777ff6e589fe07c\");\n",
+			"services": []
+		}
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"First or chosen"
+		],
+		[
+			"h2:text0",
+			"Last or chosen"
+		],
+		[
+			"h3:text0",
+			"Clear"
+		],
+		[
+			"h4:text0",
+			"Outside"
+		],
+		[
+			"h6:text0",
+			"Apple"
+		],
+		[
+			"h7:text0",
+			"Fig"
+		],
+		[
+			"h8:text0",
+			"Pear"
+		],
+		[
+			"h9:text0",
+			"Plum"
+		]
+	],
+	"initialAttributes": [
+		[
+			"h6",
+			"aria-selected",
+			"false"
+		],
+		[
+			"h8",
+			"aria-selected",
+			"true"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "command",
+					"node": "h8",
+					"command": "focus"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "command",
+					"node": "h8",
+					"command": "focus"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "state",
+					"cell": "state:chosen",
+					"value": "none"
+				},
+				{
+					"op": "attribute",
+					"node": "h8",
+					"name": "aria-selected",
+					"value": "false"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "command",
+					"node": "h6",
+					"command": "focus"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "command",
+					"node": "h9",
+					"command": "focus"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": []
+		}
+	]
+}

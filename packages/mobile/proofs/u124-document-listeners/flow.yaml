@@ -1,0 +1,21 @@
+appId: ${APP_ID}
+name: u124-document-listeners
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Document listeners
+- assertVisible: Drag here
+- assertVisible: Idle
+- swipe:
+    from:
+      text: Drag here
+    direction: RIGHT
+    duration: 800
+- assertNotVisible: Idle
+- assertVisible: Released after moving
+- assertNotVisible: Idle
+- assertNotVisible: Moving

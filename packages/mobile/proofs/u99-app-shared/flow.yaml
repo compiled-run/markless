@@ -1,0 +1,27 @@
+appId: ${APP_ID}
+name: u99-app-shared
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: App-wide state
+- assertVisible: Top 0
+- assertVisible: Bump
+- assertVisible: Side 0
+- tapOn: Bump
+- assertNotVisible: Top 0
+- assertNotVisible: Side 0
+- assertVisible: Top 1
+- assertVisible: Side 1
+- assertNotVisible: Top 0
+- assertNotVisible: Side 0
+- tapOn: Bump
+- assertNotVisible: Top 1
+- assertNotVisible: Side 1
+- assertVisible: Top 2
+- assertVisible: Side 2
+- assertNotVisible: Top 1
+- assertNotVisible: Side 1
