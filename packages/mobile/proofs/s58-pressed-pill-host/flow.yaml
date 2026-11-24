@@ -1,0 +1,22 @@
+appId: ${APP_ID}
+name: s58-pressed-pill-host
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Notes
+- assertVisible: New note
+- assertVisible: A pressed pill paints in the bar it sits in
+- assertVisible: Made 0
+- assertVisible: Pill host
+- tapOn: New note
+- assertNotVisible: Made 0
+- assertVisible: Made 1
+- assertNotVisible: Made 0
+- tapOn: New note
+- assertNotVisible: Made 1
+- assertVisible: Made 2
+- assertNotVisible: Made 1

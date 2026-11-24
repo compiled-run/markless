@@ -1,0 +1,94 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Home",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "component-edge:0/h0",
+			"element": "div",
+			"parent": null,
+			"attributes": {
+				"class": "shell mk-17s9si0"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0/h2",
+			"element": "header",
+			"parent": "component-edge:0/h0",
+			"attributes": {
+				"class": "bar mk-17s9si0"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0/h3",
+			"element": "span",
+			"parent": "component-edge:0/h2",
+			"attributes": {
+				"class": "brand mk-17s9si0"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:0/h3:text0",
+			"parent": "component-edge:0/h3",
+			"text": "Notes"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0/h4",
+			"element": "button",
+			"parent": "component-edge:0/h2",
+			"attributes": {
+				"type": "button",
+				"class": "pill mk-17s9si0"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:0/h4:text0",
+			"parent": "component-edge:0/h4",
+			"text": "New note"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0/h5",
+			"element": "main",
+			"parent": "component-edge:0/h0",
+			"attributes": {
+				"class": "content mk-17s9si0"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "p",
+			"parent": "component-edge:0/h5",
+			"attributes": {}
+		},
+		{
+			"kind": "text",
+			"id": "h0:text0",
+			"parent": "h0",
+			"text": "A pressed pill paints in the bar it sits in"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0/h6",
+			"element": "p",
+			"parent": "component-edge:0/h5",
+			"attributes": {
+				"class": "made mk-17s9si0"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:0/h6:text0",
+			"parent": "component-edge:0/h6",
+			"text": "Made 0"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n\tcolor: #2b2620;\n\tbackground: #fbf8f1;\n}\n\n.shell.mk-17s9si0 {\n\t\t\t\tmin-height: 100vh;\n\t\t\t\tdisplay: flex;\n\t\t\t\tflex-direction: column;\n\t\t\t}\n\t\t\t.bar.mk-17s9si0 {\n\t\t\t\tposition: sticky;\n\t\t\t\ttop: 0;\n\t\t\t\tdisplay: flex;\n\t\t\t\talign-items: center;\n\t\t\t\tjustify-content: space-between;\n\t\t\t\tgap: 12px;\n\t\t\t\tpadding: 12px 20px;\n\t\t\t\tborder-bottom: 1px solid #e4ddd0;\n\t\t\t\tbackground: #fbf8f1;\n\t\t\t}\n\t\t\t.brand.mk-17s9si0 {\n\t\t\t\tfont-size: 20px;\n\t\t\t\tfont-weight: 600;\n\t\t\t}\n\t\t\t.pill.mk-17s9si0 {\n\t\t\t\tdisplay: inline-flex;\n\t\t\t\talign-items: center;\n\t\t\t\tjustify-content: center;\n\t\t\t\tmin-height: 44px;\n\t\t\t\tpadding: 10px 18px;\n\t\t\t\tborder: 1px solid #2f6f5e;\n\t\t\t\tborder-radius: 999px;\n\t\t\t\tbackground: #2f6f5e;\n\t\t\t\tcolor: #ffffff;\n\t\t\t\tfont: inherit;\n\t\t\t\tfont-weight: 600;\n\t\t\t}\n\t\t\t.pill.mk-17s9si0:active {\n\t\t\t\ttransform: scale(0.97);\n\t\t\t\topacity: 0.85;\n\t\t\t}\n\t\t\t.content.mk-17s9si0 {\n\t\t\t\tpadding: 20px;\n\t\t\t}",
+	"states": []
+}

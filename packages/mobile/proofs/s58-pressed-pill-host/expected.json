@@ -1,0 +1,20 @@
+{
+	"rung": "S58",
+	"name": "A pill in a shared component's sticky bar that becomes a stacking context only while pressed (transform and opacity on :active) draws styled and takes the press, its paint order hosted by the bar under the page's own id",
+	"steps": [
+		{
+			"visible": ["Notes", "New note", "A pressed pill paints in the bar it sits in", "Made 0"],
+			"title": "Pill host"
+		},
+		{
+			"do": { "tap": "New note" },
+			"visible": ["Made 1"],
+			"absent": ["Made 0"]
+		},
+		{
+			"do": { "tap": "New note" },
+			"visible": ["Made 2"],
+			"absent": ["Made 1"]
+		}
+	]
+}
