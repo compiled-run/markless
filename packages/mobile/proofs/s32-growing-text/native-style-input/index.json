@@ -8,7 +8,7 @@
 			"element": "main",
 			"parent": null,
 			"attributes": {
-				"class": "mk-1wg9ee7"
+				"class": "mk-vtyz91"
 			}
 		},
 		{
@@ -17,7 +17,7 @@
 			"element": "h1",
 			"parent": "h0",
 			"attributes": {
-				"class": "mk-1wg9ee7"
+				"class": "mk-vtyz91"
 			}
 		},
 		{
@@ -32,7 +32,7 @@
 			"element": "p",
 			"parent": "h0",
 			"attributes": {
-				"class": "tag mk-1wg9ee7"
+				"class": "tag mk-vtyz91"
 			}
 		},
 		{
@@ -47,7 +47,7 @@
 			"element": "p",
 			"parent": "h0",
 			"attributes": {
-				"class": "after mk-1wg9ee7"
+				"class": "after mk-vtyz91"
 			}
 		},
 		{
@@ -62,7 +62,7 @@
 			"element": "button",
 			"parent": "h0",
 			"attributes": {
-				"class": "grow mk-1wg9ee7"
+				"class": "grow mk-vtyz91"
 			}
 		},
 		{
@@ -72,6 +72,6 @@
 			"text": "Grow tag"
 		}
 	],
-	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\nmain.mk-1wg9ee7 { padding: 16px; }\n\t\t\t.tag.mk-1wg9ee7 { margin: 0; padding: 8px; background: #eef; font-size: 18px; }\n\t\t\t.after.mk-1wg9ee7 { margin: 8px 0 0; color: #555; }\n\t\t\t.grow.mk-1wg9ee7 {\n\t\t\t\tdisplay: block;\n\t\t\t\twidth: 100%;\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tpadding: 10px 16px;\n\t\t\t\tborder: 2px solid #264653;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #264653;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 16px;\n\t\t\t}",
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\nmain.mk-vtyz91 { padding: 16px; }\n\t\t\t.tag.mk-vtyz91 { margin: 0; padding: 8px; background: #eef; font-size: 18px; }\n\t\t\t.after.mk-vtyz91 { margin: 8px 0 0; color: #555; }\n\t\t\t.grow.mk-vtyz91 {\n\t\t\t\tdisplay: block;\n\t\t\t\twidth: 100%;\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tpadding: 10px 16px;\n\t\t\t\tborder: 2px solid #264653;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #264653;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 16px;\n\t\t\t}",
 	"states": []
 }

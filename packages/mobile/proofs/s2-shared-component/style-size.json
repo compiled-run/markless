@@ -1,9 +1,9 @@
 {
 	"perPage": {
-		"/": 64882,
-		"/basil": 43189
+		"/": 64872,
+		"/basil": 43179
 	},
-	"perPageTotal": 108071,
+	"perPageTotal": 108051,
 	"app": 100777,
 	"targets": {
 		"ios": {
