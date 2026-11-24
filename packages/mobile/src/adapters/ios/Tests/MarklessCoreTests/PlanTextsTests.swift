@@ -35,6 +35,18 @@ private func answer(height: Double) -> String {
 	#expect(relaid.assignments[0].nodes.first { $0.id == "h0" }?.frame?.height == 30)
 }
 
+@Test func anEntryThePageDoesNotShowKeepsTheBoxesItHadUntilItIsLaidOut() throws {
+	let style = try StyleExport.decode(textExport())
+	let height = { (export: StyleExport) in export.assignments[0].nodes.first { $0.id == "h0" }?.frame?.height }
+	let first = try style.laidOut(width: 100, height: 100, scale: 1, layout: { _ in answer(height: 10) }, texts: ["h0:text0": "Home"])
+	let kept = try style.laidOut(
+		width: 200, height: 100, scale: 1, layout: { _ in Issue.record("laid out an entry the page does not show"); return answer(height: 20) },
+		texts: ["h0:text0": "Home"], entries: [], previous: first)
+	#expect(height(kept) == height(first))
+	let shown = try style.laidOut(width: 200, height: 100, scale: 1, layout: { _ in answer(height: 20) }, texts: ["h0:text0": "Home"], entries: [0], previous: first)
+	#expect(height(shown) == 20)
+}
+
 @Test func aPageTextAtItsLaidOutStringKeepsTheRecordedLayout() throws {
 	let style = try StyleExport.decode(textExport())
 	var replayed = 0

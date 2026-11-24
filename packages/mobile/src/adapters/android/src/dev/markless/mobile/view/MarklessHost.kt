@@ -47,6 +47,7 @@ import dev.markless.mobile.core.MemoryStore
 import dev.markless.mobile.core.arr
 import dev.markless.mobile.core.text
 import dev.markless.mobile.style.Bands
+import dev.markless.mobile.core.Js
 import dev.markless.mobile.core.ScrollAlignment
 import dev.markless.mobile.core.ScrollBox
 import dev.markless.mobile.core.ScrollRange
@@ -197,6 +198,10 @@ class MarklessHost(
 	private var rowShaper: RowShaper? = null
 	/** The page size in device px and the slot values (export order) the page was last laid out at. */
 	private var laidOutFor: Triple<Int, Int, Pair<List<Double>, Map<String, String>>>? = null
+	/** The entries Dragon has laid out at [laidOutFor], and the export holding them: a page lays out only the entries it shows. */
+	private val laidEntries = mutableSetOf<Int>()
+	private var laidExport: StyleExport? = null
+	private var layingOut = false
 	private val fonts: FontSource = if (style?.systemFaces.isNullOrEmpty()) bundledFonts else SystemFonts(style!!.systemFaces, bundledFonts)
 	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine, search = search).apply {
 		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
@@ -695,6 +700,12 @@ class MarklessHost(
 
 	/** The entry [l] shows: the state `rt-interaction` selects over the steps in its assignment's level, or the assignment. */
 	private fun reselect(l: Layout) {
+		pickShown(l)
+		// A state that shows an entry not yet laid out at this size lays it out first.
+		if (l === page && !layingOut) laidOutFor?.let { (w, h) -> layOutAt(w, h) }
+	}
+
+	private fun pickShown(l: Layout) {
 		l.shown = l.assignment
 		val level = l.export.interaction.getOrNull(l.assignment) ?: return
 		val library = Bands.library ?: return
@@ -854,6 +865,14 @@ class MarklessHost(
 	 * area. Chrome on Android lays a page out at a whole CSS px width, the screen's width in dp rounded up. Returns whether it
 	 * laid out again.
 	 */
+	/** The page's assignment and shown entry, at every @media band: the band a size selects is only decided once the page is laid out at it. */
+	private fun entriesShown(p: Layout, export: StyleExport): Set<Int> = listOf(p.assignment, p.shown).flatMap { entry ->
+		val values = export.assignments.getOrNull(entry)?.values ?: return@flatMap listOf(entry)
+		export.assignments.indices.filter { k ->
+			k == entry || export.assignments[k].values.all { (key, value) -> key == BAND_KEY || values[key]?.let { Js.strictEquals(it, value) } == true }
+		}
+	}.toSet()
+
 	fun layOutAt(widthPx: Int, heightPx: Int, rowsMoved: Boolean = false): Boolean {
 		val p = page ?: return false
 		val layout = planLayout ?: return false
@@ -861,7 +880,14 @@ class MarklessHost(
 		val pageTextNodes = payload.nodes.filterIsInstance<Node.Text>().filter { it.row == null }.map { it.id }.toSet()
 		val texts = runtime.texts().filter { it.first in pageTextNodes }.toMap()
 		val at = Triple(widthPx, heightPx, planned.slots.map { slotValues.getValue(it.id) } to texts)
-		if (!rowsMoved && laidOutFor == at) return false
+		val same = !rowsMoved && laidOutFor == at
+		val needed = entriesShown(p, planned)
+		if (layingOut || (same && laidEntries.containsAll(needed))) return false
+		if (!same) {
+			laidEntries.clear()
+			laidExport = null
+		}
+		val entries = needed - laidEntries
 		val withRows = planned.planRepeats.isNotEmpty()
 		val live: (String) -> String = { line ->
 			val shaper = rowShaper ?: RowShaper(planned.systemFaces) { id -> fonts.bytes(id) }.also { rowShaper = it }
@@ -869,7 +895,7 @@ class MarklessHost(
 		}
 		val rows = if (withRows) planned.shownRows(payload, runtime) else null
 		val lay = { shown: Map<String, String> ->
-			planned.laidOut(Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout, at.third.first, rows = rows, rowsLayout = live, texts = shown)
+			planned.laidOut(Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout, at.third.first, rows = rows, rowsLayout = live, texts = shown, entries = entries, previous = laidExport)
 		}
 		// Page texts in a face this host cannot shape keep the boxes the build laid them out in, as before they followed state.
 		rowShaper?.unshapedFace = false
@@ -880,8 +906,15 @@ class MarklessHost(
 			lay(emptyMap())
 		}
 		style = next
-		p.relaid(next)
+		laidEntries += entries
+		laidExport = next
 		laidOutFor = at
+		layingOut = true
+		try {
+			p.relaid(next)
+		} finally {
+			layingOut = false
+		}
 		followBand(isDark(context.resources.configuration))
 		repaint()
 		Log.i(TAG, "laid out at ${next.viewportWidth}x${next.viewportHeight} dp, style assignment ${p.assignment}")
