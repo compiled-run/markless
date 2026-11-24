@@ -410,6 +410,17 @@ public struct StyleExport: Sendable {
 		interaction.firstIndex { $0.entries.contains(entry) } ?? entry
 	}
 
+	/// `entry` and each assignment that differs from it only in its @media band; an interaction state is laid out only when shown.
+	public func bandTwins(of entry: Int) -> Set<Int> {
+		guard assignments.indices.contains(entry) else { return [entry] }
+		let values = assignments[entry].values
+		return Set(next.indices.filter { k in
+			assignments[k].values.allSatisfy { key, value in
+				key == StyleBands.state || values[key].map { $0.strictlyEquals(value) } ?? false
+			}
+		}).union([entry])
+	}
+
 	/// Reads the target this host renders, by Dragon target name (`ios`) and the backend it must have been lowered for.
 	public static func decode(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> StyleExport {
 		let root = try Reader(JSONValue.parse(data), at: "style")

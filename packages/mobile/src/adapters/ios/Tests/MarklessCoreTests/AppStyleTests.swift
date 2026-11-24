@@ -192,3 +192,25 @@ private func pooledS3(_ edit: (inout [String: Any]) -> Void = { _ in }) throws -
 	let data = try pooledS3 { ios in ios["nodes"] = [] }
 	#expect(throws: PayloadError.self) { try StyleExport.decodeApp(data) }
 }
+
+// Each S3 assignment given one interaction state with its own values: a state is laid out when shown, never as a band twin.
+@Test func anAssignmentsBandTwinsAreAssignmentsNotItsInteractionStates() throws {
+	var root = try #require(try JSONSerialization.jsonObject(with: try fixture("s3-state-styles.native-app-style")) as? [String: Any])
+	var targets = try #require(root["targets"] as? [String: Any])
+	var ios = try #require(targets["ios"] as? [String: Any])
+	let match: [String: Any] = ["active": [Any](), "focus": NSNull(), "hover": [Any]()]
+	ios["routes"] = try #require(ios["routes"] as? [[String: Any]]).map { route in
+		var route = route
+		let assignments = route["assignments"] as? [Any] ?? []
+		route["interaction"] = ["levels": assignments.map { ["tables": [String: Any](), "addresses": [Any](), "states": [$0], "matches": [match]] }]
+		return route
+	}
+	targets["ios"] = ios
+	root["targets"] = targets
+	let style = try #require(try StyleExport.decodeApp(try JSONSerialization.data(withJSONObject: root))["/settings"])
+	let twins = style.bandTwins(of: style.initial)
+	#expect(style.assignments.count == 2 * style.next.count)
+	#expect(twins.count == 2 && twins.contains(style.initial) && twins.allSatisfy { $0 < style.next.count })
+	let pressed = try #require(style.interaction[style.initial].entries.first)
+	#expect(style.bandTwins(of: pressed) == twins.union([pressed]))
+}
