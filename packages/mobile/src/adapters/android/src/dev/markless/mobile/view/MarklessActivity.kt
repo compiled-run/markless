@@ -296,9 +296,18 @@ abstract class MarklessActivity : Activity() {
 			content.invalidate()
 		}
 		// With Dragon's plan the page lays out at the area inside the bars before it is measured: at first show and after a rotation.
+		// The keyboard leaves that layout viewport as it is, as Chrome's does (interactive-widget=resizes-visual): only what the
+		// page shows shrinks, and the page scrolls under it.
 		val screen = object : FrameLayout(this) {
+			/** The width and height of the area inside the bars with no keyboard up, which the page lays out at. */
+			private var layoutViewport: Pair<Int, Int>? = null
+
 			override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-				host.layOutAt(MeasureSpec.getSize(widthMeasureSpec) - bars.left - bars.right, MeasureSpec.getSize(heightMeasureSpec) - bars.top - bars.bottom)
+				val width = MeasureSpec.getSize(widthMeasureSpec) - bars.left - bars.right
+				val shown = MeasureSpec.getSize(heightMeasureSpec) - bars.top - bars.bottom
+				val keyboard = Build.VERSION.SDK_INT >= 30 && rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == true
+				val height = layoutViewport?.takeIf { keyboard && it.first == width }?.second ?: shown.also { layoutViewport = width to it }
+				host.layOutAt(width, height)
 				super.onMeasure(widthMeasureSpec, heightMeasureSpec)
 			}
 		}
