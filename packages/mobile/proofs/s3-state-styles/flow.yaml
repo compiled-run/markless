@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s3-state-styles
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - setDarkMode: disabled
 - assertVisible: Account
 - assertVisible: Open settings

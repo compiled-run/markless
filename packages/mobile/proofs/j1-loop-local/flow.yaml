@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j1-loop-local
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Slugs
 - assertVisible: "Title: Hello, Native World!"
 - assertVisible: "Slug: none"

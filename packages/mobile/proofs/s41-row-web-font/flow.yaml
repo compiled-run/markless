@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s41-row-web-font
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Notes
 - assertVisible: Groceries
 - assertVisible: Call the plumber about the kitchen tap before Friday

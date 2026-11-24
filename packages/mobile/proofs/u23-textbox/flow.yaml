@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u23-textbox
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Profile
 - assertVisible: As it appears on your card
 - assertVisible: "Typed: nothing yet"

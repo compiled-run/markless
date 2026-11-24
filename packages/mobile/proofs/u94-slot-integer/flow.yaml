@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u94-slot-integer
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Integer slot
 - assertVisible: Item one
 - assertVisible: Item two
@@ -10,24 +14,24 @@ name: u94-slot-integer
 - assertVisible: Later
 - assertVisible: Rank -1
 - assertVisible:
-      text: Item one
-      below: Moving item
+    text: Item one
+    below: Moving item
 - assertVisible:
-      text: Item two
-      below: Item one
+    text: Item two
+    below: Item one
 - tapOn: Later
 - assertNotVisible: Rank -1
 - assertVisible:
-      text: Item two
-      below: Item one
+    text: Item two
+    below: Item one
 - assertVisible:
-      text: Moving item
-      below: Item two
+    text: Moving item
+    below: Item two
 - assertVisible: Rank 1
 - assertNotVisible: Rank -1
 - assertVisible:
-      text: Item two
-      below: Item one
+    text: Item two
+    below: Item one
 - assertVisible:
-      text: Moving item
-      below: Item two
+    text: Moving item
+    below: Item two

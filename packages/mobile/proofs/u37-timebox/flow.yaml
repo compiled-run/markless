@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u37-timebox
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Meeting
 - assertVisible: Start time
 - assertVisible: "2"

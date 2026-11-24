@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: f7-tick
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Order
 - assertVisible: Place order
 - assertVisible: Newsletter off

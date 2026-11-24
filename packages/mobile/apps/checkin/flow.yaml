@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: checkin
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Check-ins
 - assertVisible: New check-in
 - assertVisible: No check-ins yet\. Start one when you reach a site\.
@@ -28,16 +32,16 @@ name: checkin
 - assertNotVisible: North yard
 - assertNotVisible: Loading dock
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertVisible: Check-ins
 - assertVisible: No check-ins yet\. Start one when you reach a site\.
 - assertNotVisible: Capture

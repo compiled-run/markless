@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 04-attributes
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Attributes
 - assertVisible: Like
 - assertNotVisible: Unlike

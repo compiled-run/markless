@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: f13-fieldset-disabled
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Gift
 - assertVisible: Message
 - assertVisible: Send

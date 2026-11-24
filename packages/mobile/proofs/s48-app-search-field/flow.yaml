@@ -1,11 +1,15 @@
 appId: ${APP_ID}
 name: s48-app-search-field
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Title or tag
 - assertVisible: Nothing searched
-- assertVisible: ''
+- assertVisible: ""
 - assertVisible: Groceries
 - assertVisible: Search field
 - tapOn: Search notes
@@ -18,21 +22,21 @@ name: s48-app-search-field
 - assertVisible: milk
 - assertVisible: Groceries
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - assertVisible: Clear text
+    when:
+      platform: iOS
+    commands:
+      - assertVisible: Clear text
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - assertVisible: Clear text
+    when:
+      platform: Android
+    commands:
+      - assertVisible: Clear text
 - tapOn: Clear text
 - assertVisible: Nothing searched
 - assertNotVisible: Searched
-- assertVisible: ''
+- assertVisible: ""
 - assertVisible: Title or tag
 - assertVisible: Nothing searched
 - assertNotVisible: Searched
-- assertVisible: ''
+- assertVisible: ""
 - assertVisible: Groceries

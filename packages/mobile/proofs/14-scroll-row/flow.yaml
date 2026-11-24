@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 14-scroll-row
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Scroll row
 - assertVisible: Card 1
 - assertVisible: Below the row

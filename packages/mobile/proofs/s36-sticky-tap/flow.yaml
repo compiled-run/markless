@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s36-sticky-tap
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Sticky header
 - assertVisible: Header taps 0
 - assertVisible: Button taps 0
@@ -10,13 +14,13 @@ name: s36-sticky-tap
 - assertVisible: Row 1
 - assertVisible: Sticky tap
 - repeat:
-      times: 80
-      while:
-          notVisible: Row 30
-      commands:
-          - swipe:
-                start: 50%, 80%
-                end: 50%, 25%
+    times: 80
+    while:
+      notVisible: Row 30
+    commands:
+      - swipe:
+          start: 50%, 80%
+          end: 50%, 25%
 - assertNotVisible: Row 1
 - assertVisible: Sticky header
 - assertVisible: Header taps 0
@@ -33,7 +37,7 @@ name: s36-sticky-tap
 - assertNotVisible: Header taps 0
 - assertNotVisible: Button taps 0
 - tapOn:
-      point: 80%,15%
+    point: 80%,15%
 - assertNotVisible: Header taps 1
 - assertVisible: Header taps 2
 - assertVisible: Button taps 1

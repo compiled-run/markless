@@ -30,7 +30,8 @@ describe('instrumentFlow', () => {
 		const [config, commands] = documents(instrumented.yaml);
 		expect(config).toEqual({ appId: '${APP_ID}', name: '03-counter' });
 		expect(commands).toEqual([
-			{ launchApp: { clearState: true } },
+			{ runFlow: { when: { platform: 'Android' }, commands: ['clearState'] } },
+			'launchApp',
 			{ assertVisible: 'Counter' },
 			{ assertVisible: 'Count 0' },
 			{ takeScreenshot: '00-launch-after' },
@@ -50,7 +51,7 @@ describe('instrumentFlow', () => {
 		expect(
 			instrumented.commands.filter((command) => command.role === 'screenshot'),
 		).toHaveLength(5);
-		expect(instrumented.commands[11]).toEqual({ step: 2, role: 'flow' });
+		expect(instrumented.commands[12]).toEqual({ step: 2, role: 'flow' });
 	});
 
 	it('refuses a flow.yaml that drifted from its expected.json', () => {
@@ -86,7 +87,8 @@ describe('a text named by how it starts', () => {
 	it('writes an anchored selector that runs on across the rest of the label', () => {
 		expect(flowSteps(prefixed)).toEqual([
 			[
-				{ launchApp: { clearState: true } },
+				{ runFlow: { when: { platform: 'Android' }, commands: ['clearState'] } },
+			'launchApp',
 				{ assertVisible: 'All notes' },
 				{ assertVisible: '^Groceries.*' },
 			],

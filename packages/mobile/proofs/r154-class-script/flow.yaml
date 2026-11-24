@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r154-class-script
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Helper classes
 - assertVisible: Quiet note
 - assertVisible: Toggle loud

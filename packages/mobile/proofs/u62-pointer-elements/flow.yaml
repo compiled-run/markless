@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u62-pointer-elements
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Pointer
 - assertVisible: Title
 - assertVisible: Body

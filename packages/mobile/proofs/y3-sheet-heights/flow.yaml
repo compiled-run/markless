@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: y3-sheet-heights
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Catalog
 - assertVisible: Browse
 - assertNotVisible: All items

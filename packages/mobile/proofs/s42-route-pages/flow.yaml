@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s42-route-pages
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Shelf
 - assertVisible: Personal tag
 - assertVisible: Trip note

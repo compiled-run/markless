@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: n11-app-shared
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Home page
 - assertVisible: Home sees 0
 - assertVisible: Bump at home
@@ -22,16 +26,16 @@ name: n11-app-shared
 - assertVisible: Other sees 2
 - assertNotVisible: Other sees 1
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertVisible: Home
 - assertVisible: Home page
 - assertVisible: Home sees 2

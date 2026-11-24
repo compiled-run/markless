@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: n4-deep-link
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - stopApp
 - openLink: markless-proof://app/orders/42
 - runFlow:

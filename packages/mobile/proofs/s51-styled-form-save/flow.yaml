@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s51-styled-form-save
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: All notes
 - assertVisible: Write a note
 - tapOn: Write a note

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u132-device-pixel-ratio
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Screen check
 - assertVisible: Check screen
 - assertVisible: Ratio unknown

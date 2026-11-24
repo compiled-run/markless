@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u89-pointer-pressure
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Drag across this whole line to read the pressure
 - assertVisible: No press
 - assertVisible: No move

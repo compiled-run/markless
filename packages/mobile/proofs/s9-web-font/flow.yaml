@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s9-web-font
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Tide almanac
 - assertVisible: Lato for the body, regular weight
 - assertVisible: Waffles, quays and fjords

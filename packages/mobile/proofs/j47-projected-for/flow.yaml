@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j47-projected-for
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Help
 - assertVisible: When does it ship\?
 - assertVisible: How do I return it\?

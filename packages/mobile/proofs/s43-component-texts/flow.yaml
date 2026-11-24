@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s43-component-texts
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Pantry
 - assertVisible: Open groceries
 - assertNotVisible: Delete this note\?

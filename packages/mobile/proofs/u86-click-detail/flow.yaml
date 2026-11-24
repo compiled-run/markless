@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u86-click-detail
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Press here
 - assertVisible: Press by script
 - assertVisible: No click yet

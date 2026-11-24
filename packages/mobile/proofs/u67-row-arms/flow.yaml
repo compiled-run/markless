@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u67-row-arms
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Errands
 - assertVisible: Finish Apples
 - assertVisible: Bread done

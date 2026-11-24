@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r167-svg-mask
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Masked mark
 - assertVisible: Half disc
 - assertVisible: Toggle mark

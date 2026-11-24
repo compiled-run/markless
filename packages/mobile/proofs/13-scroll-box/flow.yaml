@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 13-scroll-box
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Scroll box
 - assertVisible: Box row 1
 - assertNotVisible: Tapped 1

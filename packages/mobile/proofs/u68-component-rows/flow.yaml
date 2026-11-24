@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u68-component-rows
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Guide
 - assertVisible: "START: 2 pages"
 - assertVisible: "GUIDES: 3 pages"

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r101-inline-text
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Inline text
 - assertVisible: Plain, strong, em, b and i text
 - assertVisible: An abbr, a cite, a dfn and a var

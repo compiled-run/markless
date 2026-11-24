@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u77-svg-markers
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Route map
 - assertVisible: Turn route
 - assertVisible: Both ways

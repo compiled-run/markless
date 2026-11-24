@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r159-infinite-bounds
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Bounds
 - assertVisible: max Infinity
 - assertVisible: low -Infinity

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 18-for-index-key
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Lines
 - assertVisible: Same line
 - assertVisible: Last line

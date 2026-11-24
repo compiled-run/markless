@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: f12-fieldset
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Order
 - assertVisible: Who it is for
 - assertVisible: Where it goes

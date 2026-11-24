@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s31-rounded-clip
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Garden cards
 - assertVisible: Basil, rounded at the top
 - assertVisible: Opened 0

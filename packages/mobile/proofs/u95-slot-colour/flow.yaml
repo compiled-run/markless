@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u95-slot-colour
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Colour slot
 - assertVisible: Swatch
 - assertVisible: Warmer

@@ -1,10 +1,14 @@
 appId: ${APP_ID}
 name: u137-fileupload
 ---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
 - launchApp:
-      clearState: true
-      arguments:
-          pick: '[{"name":"note.txt","text":"hello","type":"text/plain"}]'
+    arguments:
+      pick: '[{"name":"note.txt","text":"hello","type":"text/plain"}]'
 - assertVisible: Upload
 - assertVisible: Attachments
 - assertVisible: Browse

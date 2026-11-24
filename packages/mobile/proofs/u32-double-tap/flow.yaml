@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u32-double-tap
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Photo
 - assertVisible: Not pressed
 - assertVisible: Presses 0

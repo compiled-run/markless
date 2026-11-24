@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: z5-sheet-state-style
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Delivery
 - assertVisible: Delivery options
 - assertNotVisible: Express off

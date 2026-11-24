@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: d6-sharesheet
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Share
 - assertVisible: Share link
 - assertVisible: Closed 0

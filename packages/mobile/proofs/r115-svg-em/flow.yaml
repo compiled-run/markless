@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r115-svg-em
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Heading star
 - assertVisible: Text star
 - assertVisible: Stars sized in ems

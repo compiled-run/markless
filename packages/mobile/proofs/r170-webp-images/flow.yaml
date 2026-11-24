@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r170-webp-images
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: WebP images
 - assertVisible: Orange photo
 - assertVisible: Badge as stored

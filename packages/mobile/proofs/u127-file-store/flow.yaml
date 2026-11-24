@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u127-file-store
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Files
 - assertVisible: Box
 - assertVisible: Add

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u82-by-id
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Pick a
 - assertVisible: Pick b
 - assertVisible: Pick c

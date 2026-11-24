@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: n6-plain-links
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Start page
 - assertVisible: About us
 - assertVisible: Item seven

@@ -272,24 +272,28 @@ test.each(allRungFolders())('%s: flow.yaml is the flow its expected.json describ
 	);
 	const [header, commands] = committed;
 	expect(header).toEqual({ appId: '${APP_ID}', name: folder });
-	// Before the launch only the device's place and a cold Settings app are set; the launch always clears the app's state.
+	// Before the launch only the device's place and a cold Settings app are set; Android clears the app's state right before it, iOS runs a fresh install.
 	const launch = commands.findIndex(
 		(command: unknown) =>
-			typeof command === 'object' && command !== null && 'launchApp' in command,
+			command === 'launchApp' ||
+			(typeof command === 'object' && command !== null && 'launchApp' in command),
 	);
 	const coldSettings = {
 		runFlow: { when: { platform: 'iOS' }, commands: [{ stopApp: 'com.apple.Preferences' }] },
 	};
 	expect(
 		commands
-			.slice(0, launch)
+			.slice(0, launch - 1)
 			.every(
 				(command: object) =>
 					'setLocation' in command ||
 					JSON.stringify(command) === JSON.stringify(coldSettings),
 			),
 	).toBe(true);
-	expect(commands[launch]).toMatchObject({ launchApp: { clearState: true } });
+	expect(commands[launch - 1]).toEqual({
+		runFlow: { when: { platform: 'Android' }, commands: ['clearState'] },
+	});
+	expect(JSON.stringify(commands[launch])).not.toContain('clearState');
 });
 
 test('the navigation ladder has one app folder per rung, in rung order', () => {

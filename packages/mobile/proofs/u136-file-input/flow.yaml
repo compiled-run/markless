@@ -1,10 +1,14 @@
 appId: ${APP_ID}
 name: u136-file-input
 ---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
 - launchApp:
-      clearState: true
-      arguments:
-          pick: '[{"name":"note.txt","text":"hello","type":"text/plain"},{"name":"list.txt","text":"a,b","type":"text/plain"}]'
+    arguments:
+      pick: '[{"name":"note.txt","text":"hello","type":"text/plain"},{"name":"list.txt","text":"a,b","type":"text/plain"}]'
 - assertVisible: Pick
 - assertVisible: Choose
 - assertVisible: none

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s46-row-field-class
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Tasks
 - assertVisible: 1 finished
 - assertVisible: Buy milk

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j15-submit-helper
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Site log
 - assertVisible: Add
 - assertVisible: "Last: none"

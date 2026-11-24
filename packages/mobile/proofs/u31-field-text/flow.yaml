@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u31-field-text
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Trip
 - assertVisible: Nothing saved
 - tapOn: Save

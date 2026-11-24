@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 17-into-view
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Into view
 - assertVisible: Show target
 - assertVisible: Focus field

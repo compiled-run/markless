@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u100-style-absent
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Absent style
 - assertVisible: Middle row
 - assertVisible: Marker
@@ -10,41 +14,41 @@ name: u100-style-absent
 - assertVisible: Swap
 - assertVisible: High
 - assertVisible:
-      text: Second
-      below: Marker
+    text: Second
+    below: Marker
 - assertVisible:
-      text: Middle row
-      below: Second
+    text: Middle row
+    below: Second
 - tapOn: Swap
 - assertNotVisible: High
 - assertVisible:
-      text: Marker
-      below: Middle row
+    text: Marker
+    below: Middle row
 - assertVisible:
-      text: Second
-      below: Marker
+    text: Second
+    below: Marker
 - assertVisible: Low
 - assertNotVisible: High
 - assertVisible:
-      text: Marker
-      below: Middle row
+    text: Marker
+    below: Middle row
 - assertVisible:
-      text: Second
-      below: Marker
+    text: Second
+    below: Marker
 - tapOn: Swap
 - assertVisible: High
 - assertNotVisible: Low
 - assertVisible:
-      text: Second
-      below: Marker
+    text: Second
+    below: Marker
 - assertVisible:
-      text: Middle row
-      below: Second
+    text: Middle row
+    below: Second
 - assertVisible: High
 - assertNotVisible: Low
 - assertVisible:
-      text: Second
-      below: Marker
+    text: Second
+    below: Marker
 - assertVisible:
-      text: Middle row
-      below: Second
+    text: Middle row
+    below: Second

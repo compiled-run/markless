@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s35-app-shadow
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Groceries
 - assertVisible: Plumber
 - assertVisible: Resting

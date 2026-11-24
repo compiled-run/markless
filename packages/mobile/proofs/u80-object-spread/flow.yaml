@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u80-object-spread
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: a Ada x
 - assertVisible: b Bo y
 - assertVisible: first Ada x
