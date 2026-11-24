@@ -1,10 +1,10 @@
 {
 	"perPage": {
-		"/": 42987,
-		"/help": 41249,
-		"/settings": 146202
+		"/": 42990,
+		"/help": 41252,
+		"/settings": 146205
 	},
-	"perPageTotal": 230438,
+	"perPageTotal": 230447,
 	"app": 201419,
 	"targets": {
 		"ios": {

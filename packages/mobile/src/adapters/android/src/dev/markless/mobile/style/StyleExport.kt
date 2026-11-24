@@ -113,7 +113,7 @@ data class StyledNode(val id: String, val parent: String?, val kind: String, val
  * body's own background in its box when html's background is the canvas (null: body paints none), and [pageScroll] in device px,
  * null when Dragon leaves it undecided.
  */
-data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNode>, val canvas: Rgba? = null, val body: Rgba? = null, val pageScroll: ScrollRange? = null, val sticky: List<StickyRow> = emptyList()) {
+data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNode>, val canvas: Rgba? = null, val body: Rgba? = null, val pageScroll: ScrollRange? = null, val sticky: List<StickyRow> = emptyList(), val textAreas: Map<String, TextAreaLines> = emptyMap()) {
 	val byId: Map<String, StyledNode> = nodes.associateBy { it.id }
 }
 
@@ -328,14 +328,14 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val relaidTexts = changed.associate { it.key to it.value }
 			val live = lists != null || changed.isNotEmpty()
 			val textsText = if (changed.isEmpty()) "" else (if (lists == null) ",\"rows\":[]" else "") + ",\"texts\":" + Json.Arr(changed.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }).text()
-			val line = "{\"assignment\":$k,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":$plan$slotsText${if (lists != null) ",\"rows\":$lists" else ""}$textsText,\"sticky\":true}"
+			val line = "{\"assignment\":$k,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":$plan$slotsText${if (lists != null) ",\"rows\":$lists" else ""}$textsText,\"sticky\":true,\"textAreas\":true}"
 			if (live && rowsLayout == null) throw MarklessDecodeError("a page whose rows or texts follow state needs Dragon's live layout")
 			val result = Json.parse(if (live) rowsLayout!!(line) else layout(line))
 			val parts = result.arr("plan layout")
 			val slotted = slots.isNotEmpty()
 			// Dragon's live layout answers a slotted page with each row's write numbers, an empty list when it lays out texts and no rows.
 			val fixed = if (!slotted) 3 else if (live) 5 else 4
-			if (parts.size < fixed || parts.size > fixed + 3 || parts[0] != Json.Str("ok")) throw MarklessDecodeError("Dragon's layout at $width x $height dp and ${scale}x failed: ${result.text()}")
+			if (parts.size < fixed || parts.size > fixed + 4 || parts[0] != Json.Str("ok")) throw MarklessDecodeError("Dragon's layout at $width x $height dp and ${scale}x failed: ${result.text()}")
 			// A row's copy is named "<Dragon id>@<key>": the export names it by the template's export id and the key.
 			fun exportId(id: String): String {
 				val at = id.indexOf('@')
@@ -344,6 +344,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val arrows = HashMap<String, SelectArrow>()
 			val marks = HashMap<String, CheckboxMarks>()
 			val sticky = ArrayList<StickyRow>()
+			val areas = HashMap<String, TextAreaLines>()
 			val tags = HashSet<String>()
 			for (tagged in parts.drop(fixed)) {
 				val suffix = tagged.arr("plan layout suffix")
@@ -355,6 +356,16 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 						val f = e.arr("plan layout sticky box")
 						if (f.size != 15) throw MarklessDecodeError("plan layout sticky box: expected an id and 14 numbers")
 						sticky.add(StickyRow(exportId(f[0].str("plan layout sticky id")), e))
+					}
+					continue
+				}
+				if (tag == "text-areas") {
+					for (e in suffix[1].arr("plan layout text areas")) {
+						val t = e.arr("plan layout text area")
+						if (t.size != 4) throw MarklessDecodeError("plan layout text area: expected id, pitch, above and insets")
+						val insets = t[3].arr("plan layout text area insets").map { planNumber(it) }
+						if (insets.size != 4) throw MarklessDecodeError("plan layout text area insets: expected top, right, bottom and left")
+						areas[exportId(t[0].str("plan layout text area id"))] = TextAreaLines(planNumber(t[1]), planNumber(t[2]), insets)
 					}
 					continue
 				}
@@ -441,7 +452,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					withRows.add(rowMoved[row.key]?.get(node.id)?.let { copy.copy(writes = slotWrites(copy, it)) } ?: copy)
 				}
 			}
-			assignment.copy(pageScroll = pageScroll, sticky = sticky, nodes = withRows.map { slotted ->
+			assignment.copy(pageScroll = pageScroll, sticky = sticky, textAreas = areas, nodes = withRows.map { slotted ->
 				val node = moved[slotted.id]?.let { slotted.copy(writes = slotWrites(slotted, it)) } ?: slotted
 				if (node.frame == null) return@map node
 				// A text whose state emptied it has no box, as on the web.
@@ -1040,6 +1051,9 @@ data class PlanRepeat(val id: String, val parent: String, val template: List<Str
 
 /** A row a page shows now: its key, the assignment its own states reach from the page's, and its texts by text node id. */
 data class LaidOutRow(val key: String, val assignment: Int, val texts: Map<String, String>, val slots: Map<String, Double> = emptyMap())
+
+/** A textarea's line pitch, its first baseline below a line's top, and its padding (top, right, bottom, left), in device px. */
+data class TextAreaLines(val pitch: Double, val above: Double, val insets: List<Double>)
 
 /** A sticky box of a laid-out assignment: its export id, and its row as Dragon's plan layout wrote it (with Dragon's own id). */
 data class StickyRow(val id: String, val row: Json)

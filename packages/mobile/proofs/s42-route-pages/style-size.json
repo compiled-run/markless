@@ -1,10 +1,10 @@
 {
 	"perPage": {
-		"/": 56035,
-		"/notes/[id]": 41657,
-		"/tags/[tag]": 66129
+		"/": 56038,
+		"/notes/[id]": 41660,
+		"/tags/[tag]": 66132
 	},
-	"perPageTotal": 163821,
+	"perPageTotal": 163830,
 	"app": 146734,
 	"targets": {
 		"ios": {

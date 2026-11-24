@@ -85,6 +85,14 @@ public struct ResolvedStyle: Equatable, Sendable {
 		public let color: RGBA?
 		public let placeholder: Placeholder?
 		public var clear: Frame? = nil
+		/// Only on a textarea: its line pitch and first baseline below a line's top, and its padding (top, right, bottom, left), in points.
+		public var lines: Lines? = nil
+
+		public struct Lines: Equatable, Sendable {
+			public let pitch: Double
+			public let above: Double
+			public let insets: [Double]
+		}
 
 		public struct Placeholder: Equatable, Sendable {
 			public let frame: Frame
@@ -330,6 +338,7 @@ extension StyleExport {
 		}
 		let isInput = { (id: String) -> Bool in
 			if case .element("input", _, _)? = payloadById[id]?.kind { return true }
+			if case .element("textarea", _, _)? = payloadById[id]?.kind { return true }
 			return false
 		}
 		let postOrder = StyleExport.postOrder(nodes)
@@ -538,9 +547,11 @@ extension StyleExport {
 			placeholder = .init(frame: points(frame), text: words, fontFamily: drawn.font.family, fontSize: drawn.font.size, color: drawn.color)
 		}
 		let cancel = byId[field.id + "::cancel"].flatMap { $0.parent == field.id ? $0.frame : nil }
-		return ResolvedStyle.TextFieldPaint(
+		var paint = ResolvedStyle.TextFieldPaint(
 			editor: points(box), fontFamily: value.font.family, fontSize: value.font.size, color: value.color, placeholder: placeholder,
 			clear: cancel.map(points))
+		paint.lines = field.textAreaLines.map { .init(pitch: $0.pitch / dpr, above: $0.above / dpr, insets: $0.insets.map { $0 / dpr }) }
+		return paint
 	}
 
 	private func reHostOf(_ writes: [StyleWrite]) -> String? {
