@@ -26,4 +26,10 @@ name: s57-see-through
 - assertVisible: New note
 - assertVisible: Edit note
 - assertVisible: Release
+- assertVisible: Pill taps 0
 - assertNotVisible: Press
+- tapOn: Tap the pill
+- assertNotVisible: Pill taps 0
+- assertVisible: Pill taps 1
+- assertVisible: Release
+- assertNotVisible: Pill taps 0
