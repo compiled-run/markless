@@ -3,7 +3,10 @@
 	"name": "a styled textarea draws its placeholder while empty, takes typing in the host's own text view laid out at Dragon's padding, line pitch and baseline, and draws a readonly value, as the web does",
 	"steps": [
 		{
-			"visible": ["Write the note", "Nothing written"],
+			"visible": [
+				"Write the note",
+				"Nothing written"
+			],
 			"fields": {
 				"Body": "",
 				"Saved body": "Milk and eggs"
@@ -17,8 +20,12 @@
 					"text": "milk"
 				}
 			},
-			"visible": ["Written"],
-			"absent": ["Nothing written"],
+			"visible": [
+				"Written"
+			],
+			"absent": [
+				"Nothing written"
+			],
 			"fields": {
 				"Body": "milk",
 				"Saved body": "Milk and eggs"
