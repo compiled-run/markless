@@ -304,6 +304,13 @@ export type LadderRung = {
 
 export const proofsDir = import.meta.dirname;
 
+/** Rungs no phone runs: the compiler refuses the page on purpose (`compiler`), or Dragon refuses its styles (`dragon`). */
+export const PHONE_REFUSED_RUNGS: Readonly<Record<string, 'compiler' | 'dragon'>> = {
+	'j7-page-refused': 'compiler',
+	'y4-sheet-beside-drawer': 'dragon',
+	'u102-drawer-swipe': 'dragon',
+};
+
 export const rungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
 		.filter(

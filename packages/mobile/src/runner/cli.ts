@@ -2,7 +2,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { allRungFolders } from '../../proofs/ladder.ts';
+import { allRungFolders, PHONE_REFUSED_RUNGS } from '../../proofs/ladder.ts';
 import { PROOF_PLATFORMS, type ProofPlatform } from '../harness/proof-app.ts';
 import type { ProofReport } from '../harness/report.ts';
 import { affectedRungs, changedPaths, defaultBase } from './affected.ts';
@@ -32,8 +32,7 @@ import {
 import { checkoutFacts, commitsBehind, describeCheckout } from './refresh.ts';
 import { spawnRunner } from './spawn-runner.ts';
 
-/** Rungs the ladder lists that no phone build exists for yet: Dragon refuses the drawer's styles (`:dir(rtl)`, `overlay`). */
-const REFUSED = new Set(['y4-sheet-beside-drawer', 'u102-drawer-swipe']);
+const REFUSED = new Set(Object.keys(PHONE_REFUSED_RUNGS));
 const USAGE = `usage: phones <command>
 
   start [--ios <simulator>]... [--android <avd>@<port>[@<ssh host>]]...
