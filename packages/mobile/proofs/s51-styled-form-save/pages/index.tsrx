@@ -46,6 +46,7 @@ export default function AllNotes() @{
 			@for (const note of readNotes(saved); key note.id) {
 				<li class="row">
 					<span class="title">{note.title}</span>
+					<span>{note.body}</span>
 				</li>
 			}
 		</ul>
