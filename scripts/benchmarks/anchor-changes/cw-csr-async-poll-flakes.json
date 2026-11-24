@@ -81,6 +81,64 @@
 			"delta": 641,
 			"reason": "a press on content whose arm is still registering waits for an earlier press on it to start, so a submit never overtakes the input it reads",
 			"date": "2026-11-24"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 641,
+			"reason": "a press on content whose arm is still registering waits for an earlier press on it to start, so a submit never overtakes the input it reads",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 115,
+			"reason": "a press on content whose arm is still registering waits for an earlier press on it to start, so a submit never overtakes the input it reads",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 641,
+			"reason": "a press on content whose arm is still registering waits for an earlier press on it to start, so a submit never overtakes the input it reads",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 98,
+			"reason": "a press on content whose arm is still registering waits for an earlier press on it to start, so a submit never overtakes the input it reads",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 101,
+			"reason": "a press on content whose arm is still registering waits for an earlier press on it to start, so a submit never overtakes the input it reads",
+			"date": "2026-11-24"
 		}
 	]
 }
