@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u65-click-fields
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Clicks
 - assertVisible: Tap here
 - assertVisible: Click it by script

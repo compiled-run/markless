@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u25-textbox-textarea
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Feedback
 - assertVisible: Tell us what you think
 - assertVisible: "Sent: nothing yet"

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: f10-email
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Account
 - assertVisible: Nothing sent
 - assertVisible: ""

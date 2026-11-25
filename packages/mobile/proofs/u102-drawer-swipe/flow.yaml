@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u102-drawer-swipe
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Side drawer
 - assertVisible: Closed 0 times
 - assertVisible: Open the panel

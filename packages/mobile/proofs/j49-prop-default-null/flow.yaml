@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: j49-prop-default-null
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Meters
 - assertVisible: "Left: no reading"
 - assertVisible: "Right: reading 42"

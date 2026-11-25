@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: d5-recorder
 ---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
 - launchApp:
-    clearState: true
     permissions:
       microphone: unset
 - assertVisible: Recorder

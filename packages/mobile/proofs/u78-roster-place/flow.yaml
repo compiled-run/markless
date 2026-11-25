@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u78-roster-place
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Bus route
 - assertVisible: Harbour is stop 1
 - assertVisible: Market is stop 2

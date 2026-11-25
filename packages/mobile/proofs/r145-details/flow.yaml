@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r145-details
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Help
 - assertVisible: Shipping
 - assertVisible: Returns, peeked 0

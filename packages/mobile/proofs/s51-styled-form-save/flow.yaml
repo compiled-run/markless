@@ -1,13 +1,18 @@
 appId: ${APP_ID}
 name: s51-styled-form-save
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: All notes
 - assertVisible: Write a note
 - tapOn: Write a note
 - assertNotVisible: All notes
 - assertVisible: Title
+- assertVisible: Note
 - assertVisible: Save note
 - assertNotVisible: All notes
 - tapOn: Title
@@ -17,21 +22,36 @@ name: s51-styled-form-save
 - assertVisible: Groceries
 - assertVisible: Save note
 - assertVisible: Groceries
+- tapOn: Note
+- eraseText
+- inputText: Milk and bread
+- hideKeyboard
+- assertVisible: Milk and bread
+- assertVisible: Save note
+- assertVisible: Groceries
+- assertVisible: Milk and bread
 - tapOn: Save note
 - assertNotVisible: Save note
 - assertVisible:
     text: Groceries
     below: All notes
 - assertVisible:
-    text: Write a note
+    text: Milk and bread
     below: Groceries
+- assertVisible:
+    text: Write a note
+    below: Milk and bread
 - assertVisible: All notes
 - assertVisible: Groceries
+- assertVisible: Milk and bread
 - assertVisible: Write a note
 - assertNotVisible: Save note
 - assertVisible:
     text: Groceries
     below: All notes
 - assertVisible:
-    text: Write a note
+    text: Milk and bread
     below: Groceries
+- assertVisible:
+    text: Write a note
+    below: Milk and bread

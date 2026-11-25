@@ -1,0 +1,109 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "NotesBody",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page mk-1pt8y4l"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "textarea",
+			"parent": "h0",
+			"attributes": {
+				"class": "body notes mk-1pt8y4l",
+				"aria-label": "Body",
+				"rows": "8",
+				"placeholder": "Write the note"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": ""
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-1pt8y4l"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Nothing written",
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-1pt8y4l"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 1
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Written",
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 1
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "textarea",
+			"parent": "h0",
+			"attributes": {
+				"class": "body mk-1pt8y4l",
+				"aria-label": "Saved body",
+				"rows": "3",
+				"readonly": ""
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Milk and eggs"
+		}
+	],
+	"css": "* {\n\tbox-sizing: border-box;\n}\n\nbody {\n\tmargin: 0;\n\tfont-family: sans-serif;\n\tfont-size: 16px;\n}\n\ntextarea {\n\tfont: inherit;\n\tfont-family: Ahem;\n\tcolor: inherit;\n}\n\n.page.mk-1pt8y4l {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #fbf8f1;\n\t\t\t\tcolor: #1f1d1a;\n\t\t\t}\n\t\t\t.body.mk-1pt8y4l {\n\t\t\t\tdisplay: block;\n\t\t\t\twidth: 100%;\n\t\t\t\tmargin-bottom: 18px;\n\t\t\t\tpadding: 12px 14px;\n\t\t\t\tborder: 1px solid #e4ddcf;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tline-height: 1.45;\n\t\t\t}\n\t\t\t/* The notes form's /new field: a phone draws no resize grip, and the textarea keeps its default scrollbar width. */\n\t\t\t.body.notes.mk-1pt8y4l {\n\t\t\t\tmin-height: 180px;\n\t\t\t\tresize: vertical;\n\t\t\t}",
+	"states": [],
+	"branches": [
+		{
+			"id": "branch-site:0",
+			"domain": [
+				"0",
+				"1"
+			],
+			"initial": "0"
+		}
+	]
+}

@@ -1,55 +1,59 @@
 appId: ${APP_ID}
 name: s47-row-inline-text
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Stock
 - assertVisible: 12 crates
 - assertVisible: 4 sacks
 - assertVisible: 30 boxes of the large ceramic dinner plates kept on the top shelf
-      of the back storeroom
+    of the back storeroom
 - assertVisible: Add row
 - assertVisible: Remove first row
 - assertVisible: Sell a sack of flour
 - assertNotVisible: 7 trays
 - assertNotVisible: 3 sacks
 - assertVisible:
-      text: 4 sacks
-      below: 12 crates
+    text: 4 sacks
+    below: 12 crates
 - assertVisible:
-      text: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
-          back storeroom
-      below: 4 sacks
+    text: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
+      back storeroom
+    below: 4 sacks
 - tapOn: Add row
 - assertVisible: 7 trays
 - assertVisible:
-      text: 4 sacks
-      below: 12 crates
+    text: 4 sacks
+    below: 12 crates
 - assertVisible:
-      text: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
-          back storeroom
-      below: 4 sacks
+    text: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
+      back storeroom
+    below: 4 sacks
 - assertVisible:
-      text: 7 trays
-      below: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
-          back storeroom
+    text: 7 trays
+    below: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
+      back storeroom
 - assertVisible: 12 crates
 - assertVisible: 4 sacks
 - assertVisible: 30 boxes of the large ceramic dinner plates kept on the top shelf
-      of the back storeroom
+    of the back storeroom
 - assertVisible: 7 trays
 - assertNotVisible: 3 sacks
 - assertVisible:
-      text: 4 sacks
-      below: 12 crates
+    text: 4 sacks
+    below: 12 crates
 - assertVisible:
-      text: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
-          back storeroom
-      below: 4 sacks
+    text: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
+      back storeroom
+    below: 4 sacks
 - assertVisible:
-      text: 7 trays
-      below: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
-          back storeroom
+    text: 7 trays
+    below: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
+      back storeroom
 - tapOn: Sell a sack of flour
 - assertVisible: 3 sacks
 - assertNotVisible: 4 sacks
@@ -57,21 +61,21 @@ name: s47-row-inline-text
 - assertNotVisible: 4 sacks
 - tapOn: Remove first row
 - assertVisible:
-      text: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
-          back storeroom
-      below: 3 sacks
+    text: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
+      back storeroom
+    below: 3 sacks
 - assertVisible:
-      text: 7 trays
-      below: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
-          back storeroom
+    text: 7 trays
+    below: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
+      back storeroom
 - assertVisible: 3 sacks
 - assertVisible: 7 trays
 - assertNotVisible: 12 crates
 - assertVisible:
-      text: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
-          back storeroom
-      below: 3 sacks
+    text: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
+      back storeroom
+    below: 3 sacks
 - assertVisible:
-      text: 7 trays
-      below: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
-          back storeroom
+    text: 7 trays
+    below: 30 boxes of the large ceramic dinner plates kept on the top shelf of the
+      back storeroom

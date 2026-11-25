@@ -1,6 +1,10 @@
 appId: ${APP_ID}
 name: r109-page-text
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: A page that is only text\.

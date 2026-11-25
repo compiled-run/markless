@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: z1-sheet-scoped-styles
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Ship to nowhere yet
 - assertVisible: Choose city
 - assertNotVisible: Choose a city

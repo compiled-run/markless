@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u1-base
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Base parts
 - assertVisible: Save
 - assertVisible: Not saved

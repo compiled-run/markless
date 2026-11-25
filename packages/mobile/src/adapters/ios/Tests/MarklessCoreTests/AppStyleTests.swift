@@ -145,3 +145,72 @@ private func styledSheet(_ rung: String) throws -> (StyleExport, NativeViewPaylo
 	let runtime = NativeRuntime(payload: page)
 	#expect(throws: PayloadError.self) { try style.resolve(for: page, initialTexts: try runtime.texts(), value: runtime.value(of:)) }
 }
+
+// The S3 app style with every iOS node moved into the target's pool, each assignment naming its nodes by index.
+private func pooledS3(_ edit: (inout [String: Any]) -> Void = { _ in }) throws -> Data {
+	var root = try #require(try JSONSerialization.jsonObject(with: try fixture("s3-state-styles.native-app-style")) as? [String: Any])
+	var targets = try #require(root["targets"] as? [String: Any])
+	var ios = try #require(targets["ios"] as? [String: Any])
+	var pool: [Any] = []
+	func pooled(_ value: Any) -> Any {
+		if let object = value as? [String: Any] {
+			var out: [String: Any] = [:]
+			for (key, inner) in object {
+				if key == "nodes", let nodes = inner as? [Any] {
+					out[key] = nodes.map { node in pool.append(node); return pool.count - 1 }
+				} else {
+					out[key] = pooled(inner)
+				}
+			}
+			return out
+		}
+		if let array = value as? [Any] { return array.map(pooled) }
+		return value
+	}
+	ios["routes"] = pooled(ios["routes"]!)
+	ios["nodes"] = pool
+	edit(&ios)
+	targets["ios"] = ios
+	root["targets"] = targets
+	return try JSONSerialization.data(withJSONObject: root)
+}
+
+@Test func aTargetsNodePoolDecodesToTheNodesItReplaces() throws {
+	let inline = try StyleExport.decodeApp(try fixture("s3-state-styles.native-app-style"))
+	let pooled = try StyleExport.decodeApp(try pooledS3())
+	#expect(Set(pooled.keys) == Set(inline.keys))
+	for (pattern, style) in inline {
+		#expect(pooled[pattern]?.assignments.map { $0.nodes.map(\.id) } == style.assignments.map { $0.nodes.map(\.id) })
+	}
+	let page = try settings().1
+	let runtime = NativeRuntime(payload: page)
+	let dark = try #require(pooled["/settings"]).resolve(for: page, initialTexts: try runtime.texts(), value: runtime.value(of:), dark: true)
+	#expect(dark.styles["h0"]?.background == RGBA(r: 29, g: 27, b: 22, alpha: 255))
+}
+
+@Test func aNodeIndexOutsideThePoolIsRefused() throws {
+	let data = try pooledS3 { ios in ios["nodes"] = [] }
+	#expect(throws: PayloadError.self) { try StyleExport.decodeApp(data) }
+}
+
+// Each S3 assignment given one interaction state with its own values: a state is laid out when shown, never as a band twin.
+@Test func anAssignmentsBandTwinsAreAssignmentsNotItsInteractionStates() throws {
+	var root = try #require(try JSONSerialization.jsonObject(with: try fixture("s3-state-styles.native-app-style")) as? [String: Any])
+	var targets = try #require(root["targets"] as? [String: Any])
+	var ios = try #require(targets["ios"] as? [String: Any])
+	let match: [String: Any] = ["active": [Any](), "focus": NSNull(), "hover": [Any]()]
+	ios["routes"] = try #require(ios["routes"] as? [[String: Any]]).map { route in
+		var route = route
+		let assignments = route["assignments"] as? [Any] ?? []
+		route["interaction"] = ["levels": assignments.map { ["tables": [String: Any](), "addresses": [Any](), "states": [$0], "matches": [match]] }]
+		return route
+	}
+	targets["ios"] = ios
+	root["targets"] = targets
+	let style = try #require(try StyleExport.decodeApp(try JSONSerialization.data(withJSONObject: root))["/settings"])
+	let twins = style.bandTwins(of: style.initial)
+	#expect(style.assignments.count == 2 * style.next.count)
+	#expect(twins.count == 2 && twins.contains(style.initial) && twins.allSatisfy { $0 < style.next.count })
+	let pressed = try #require(style.interaction[style.initial].entries.first)
+	#expect(style.bandTwins(of: pressed) == twins.union([pressed]))
+}

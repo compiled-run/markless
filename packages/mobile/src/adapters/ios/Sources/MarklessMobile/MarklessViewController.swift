@@ -21,6 +21,10 @@ public final class MarklessViewController: UIViewController {
 	private let style: StyleExport?
 	/// The page area in points and the slot values the views were last laid out for by Dragon's plan; nil until then.
 	private var laidOutFor: (size: CGSize, slots: [Double], texts: [String: String])?
+	/// The entries Dragon has laid out at `laidOutFor`, and the export holding them: a page lays out only the entries it shows.
+	private var laidEntries: Set<Int> = []
+	private var laidExport: StyleExport?
+	private var layingOut = false
 	/// Each style slot's current number, by slot id: what Dragon's plan lays the page out with.
 	private var slotValues: [String: Double] = [:]
 	/// The texts at mount, which the style export laid out: a later layout checks the export against them, not the texts now.
@@ -94,6 +98,15 @@ public final class MarklessViewController: UIViewController {
 			let frame = { (at: Int) in Frame(x: r[at], y: r[at + 1], width: r[at + 2], height: r[at + 3]) }
 			return (frame(0), frame(4), r[8].isNaN ? nil : frame(8))
 		}
+		DragonPaint.transformMatrix = { transform, width, height in
+			let length = { (l: TransformLength) in (kind: l.kind, px: l.px, percent: l.percent) }
+			return try DragonPlan.transformMatrix(
+				transform.functions.map { (fn: $0.fn, x: length($0.x), y: length($0.y), angle: $0.angle, sx: $0.sx, sy: $0.sy) },
+				originX: length(transform.originX), originY: length(transform.originY), width: width, height: height)
+		}
+		DragonPaint.opacityAlpha8 = DragonPlan.opacityAlpha8
+		DragonPaint.groupComposite = { try DragonPlan.groupComposite($0, $1, $2, $3, $4, $5, $6, $7, $8, fold: false) }
+		DragonPaint.groupCompositeLayered = DragonPlan.groupCompositeLayered
 		#endif
 	}
 
@@ -210,6 +223,7 @@ public final class MarklessViewController: UIViewController {
 		tree?.presenter = self
 		#if canImport(DragonPlan)
 		tree?.library = DragonPlan.library
+		tree?.onEntries = { [weak self] in self?.layOutAtScreenSize() }
 		tree?.onShown = { [weak self] in
 			self?.paintCanvas()
 			self?.writeLayoutDump()
@@ -425,7 +439,16 @@ public final class MarklessViewController: UIViewController {
 			}
 			let pageRows = Dictionary(payload.nodes.map { ($0.id, $0.row) }, uniquingKeysWith: { a, _ in a })
 			let texts = Dictionary(try runtime.texts().filter { pageRows[$0.node] != nil && pageRows[$0.node]! == nil }.map { ($0.node, $0.text) }, uniquingKeysWith: { a, _ in a })
-			guard size.width > 0, size.height > 0, rowsMoved || size != laidOutFor?.size || slots.map(\.bitPattern) != laidOutFor?.slots.map(\.bitPattern) || texts != laidOutFor?.texts else { return }
+			guard size.width > 0, size.height > 0, !layingOut else { return }
+			let same = !rowsMoved && size == laidOutFor?.size && slots.map(\.bitPattern) == laidOutFor?.slots.map(\.bitPattern) && texts == laidOutFor?.texts
+			// The shown entries, at every @media band: the band this size selects is only decided once the page is laid out at it.
+			let needed = style.bandTwins(of: tree.assignment).union(style.bandTwins(of: tree.shown))
+			if same && needed.isSubset(of: laidEntries) { return }
+			if !same {
+				laidEntries = []
+				laidExport = nil
+			}
+			let entries = needed.subtracting(laidEntries)
 			let scale = Double(traitCollection.displayScale)
 			let shaper = coreTextRowShaper(faces: style.systemFaces, authored: fonts, dpr: scale)
 			var unshaped = false
@@ -437,7 +460,7 @@ public final class MarklessViewController: UIViewController {
 			let lay = { (texts: [String: String]) in
 				try style.laidOut(
 					width: Double(size.width), height: Double(size.height), scale: scale, slots: slots, layout: DragonPlan.layout,
-					rows: rows, rowsLayout: { DragonPlan.rowsLayout($0, shape: shape) }, texts: texts)
+					rows: rows, rowsLayout: { DragonPlan.rowsLayout($0, shape: shape) }, texts: texts, entries: entries, previous: self.laidExport)
 			}
 			// Page texts in a face this host cannot shape keep the boxes the build laid them out in, as before they followed state.
 			let relaid: StyleExport
@@ -448,10 +471,15 @@ public final class MarklessViewController: UIViewController {
 				laidTexts = mountTexts
 			}
 			let now = try relaid.resolve(
-				for: payload, initialTexts: laidTexts, value: runtime.value(of:), dark: traitCollection.userInterfaceStyle == .dark)
+				for: payload, initialTexts: laidTexts, value: runtime.value(of:), arm: runtime.styleArm(of:),
+				dark: traitCollection.userInterfaceStyle == .dark)
+			laidEntries.formUnion(entries)
+			laidExport = relaid
+			laidOutFor = (size, slots, texts)
+			layingOut = true
+			defer { layingOut = false }
 			try tree.relayout(now)
 			layout = now
-			laidOutFor = (size, slots, texts)
 			applyBand()
 			layoutMilliseconds = (CFAbsoluteTimeGetCurrent() - started) * 1000
 		} catch {

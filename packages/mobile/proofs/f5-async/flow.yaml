@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: f5-async
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Username
 - assertVisible: Save
 - assertVisible: Nothing saved

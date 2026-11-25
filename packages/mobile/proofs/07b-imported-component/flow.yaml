@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 07b-imported-component
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Imported parts
 - assertVisible: "Plums: 1"
 - assertVisible: "Figs: 0"

@@ -59,6 +59,46 @@ public enum StyleWrite: Sendable {
 	case checkbox(CheckboxColors)
 	/// `outline`: drawn after its stacking context's flow content, in the view of its paint layer (`Outline.layer`).
 	case outline(Outline)
+	/// `transform`: the functions and origin as Dragon wrote them, lengths in CSS px; Dragon's translated paint math resolves them at the box size.
+	case transform(StyleTransform)
+	/// `opacity` below 1 that Dragon pre-composites: the box keeps alpha 1 and shows the group composited over what paints before it.
+	case opacityGroup(OpacityGroup)
+	/// `opacity` below 1 that the platform composites: the view's alpha is Chrome's alpha byte / 255, its subtree drawn as one group.
+	case opacity(Double)
+}
+
+/// A transform length: CSS px (`px`), a percentage of the border box (`percent`), or both (`calc`).
+public struct TransformLength: Equatable, Sendable {
+	public let kind: String
+	public let px: Double
+	public let percent: Double
+}
+
+/// One transform function: `fn` is translate, translateX, translateY, rotate, scale, scaleX or scaleY; `angle` in degrees.
+public struct TransformFunction: Equatable, Sendable {
+	public let fn: String
+	public let x: TransformLength
+	public let y: TransformLength
+	public let angle: Double
+	public let sx: Double
+	public let sy: Double
+}
+
+public struct StyleTransform: Equatable, Sendable {
+	public let functions: [TransformFunction]
+	public let originX: TransformLength
+	public let originY: TransformLength
+}
+
+/// A pre-composited opacity group: its opacity, the box whose background holds it (nil: the canvas), the earlier groups its
+/// backdrop shows (Dragon ids), the sticky box it paints after, when there is one, and the earlier paint whose platform capture
+/// may differ from the screen (`unstable`).
+public struct OpacityGroup: Equatable, Sendable {
+	public let opacity: Double
+	public let backdrop: String?
+	public let painters: [String]
+	public let after: String?
+	public var unstable: [String] = []
 }
 
 /// An outline as Dragon lowers it: its style, width and offset in CSS px, its colour, a 3D style's lighter and darker colours,
@@ -189,6 +229,8 @@ public struct TextLine: Sendable, Equatable {
 	public let baseline: Double
 	public let runs: [GlyphRun]
 }
+
+private let transformFunctions = ["translate", "translateX", "translateY", "rotate", "scale", "scaleX", "scaleY"]
 
 public struct StyleNode: Sendable {
 	public let id: String
@@ -410,6 +452,17 @@ public struct StyleExport: Sendable {
 		interaction.firstIndex { $0.entries.contains(entry) } ?? entry
 	}
 
+	/// `entry` and each assignment that differs from it only in its @media band; an interaction state is laid out only when shown.
+	public func bandTwins(of entry: Int) -> Set<Int> {
+		guard assignments.indices.contains(entry) else { return [entry] }
+		let values = assignments[entry].values
+		return Set(next.indices.filter { k in
+			assignments[k].values.allSatisfy { key, value in
+				key == StyleBands.state || values[key].map { $0.strictlyEquals(value) } ?? false
+			}
+		}).union([entry])
+	}
+
 	/// Reads the target this host renders, by Dragon target name (`ios`) and the backend it must have been lowered for.
 	public static func decode(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> StyleExport {
 		let root = try Reader(JSONValue.parse(data), at: "style")
@@ -473,18 +526,25 @@ public struct StyleExport: Sendable {
 		}
 		let fonts = try decodeFonts(fields["fonts"])
 		let chosen = try fields["targets"].field(target)
-		let targetFields = try chosen.object(["backend", "viewport", "dpr", "writes", "routes"])
+		let targetFields = try chosen.object(required: ["backend", "viewport", "dpr", "writes", "routes"], optional: ["nodes"])
 		let writes = try targetFields["writes"].array().map { list in _ = try list.array(); return list.value }
+		let withWrites = { (node: Reader) throws -> JSONValue in
+			guard case let .object(entries) = node.value else { throw node.fail("expected an object") }
+			let index = Int(try node.field("writes").number())
+			guard writes.indices.contains(index) else { throw node.fail("writes \(index) is not in the target's writes") }
+			return .object(entries.map { $0.0 == "writes" ? ("writes", writes[index]) : $0 })
+		}
+		let pool: [JSONValue] = targetFields.has("nodes") ? try targetFields["nodes"].array().map(withWrites) : []
 		var routes: [String: StyleExport] = [:]
 		let raw = { (fields: Fields, key: String) throws -> (String, JSONValue) in (key, try fields[key].value) }
 		let expanded = { (reader: Reader, f: Fields, viewport: (String, JSONValue)) throws -> StyleExport in
 			let expandAssignment = { (assignment: Reader) throws -> JSONValue in
 				let a = try assignment.object(required: ["values", "nodes", "canvas"], optional: ["bodyBackground"])
 				let nodes: [JSONValue] = try a["nodes"].array().map { node in
-					guard case let .object(entries) = node.value else { throw node.fail("expected an object") }
-					let index = Int(try node.field("writes").number())
-					guard writes.indices.contains(index) else { throw node.fail("writes \(index) is not in the target's writes") }
-					return .object(entries.map { $0.0 == "writes" ? ("writes", writes[index]) : $0 })
+					guard case .number = node.value else { return try withWrites(node) }
+					let index = Int(try node.number())
+					guard pool.indices.contains(index) else { throw node.fail("node \(index) is not in the target's nodes") }
+					return pool[index]
 				}
 				let body: [(String, JSONValue)] = a.has("bodyBackground") ? [("bodyBackground", try a["bodyBackground"].value)] : []
 				return .object([("values", try a["values"].value), ("nodes", .array(nodes)), ("canvas", try a["canvas"].value)] + body)
@@ -791,7 +851,7 @@ public struct StyleExport: Sendable {
 	public func laidOut(
 		width: Double, height: Double, scale: Double, slots values: [Double] = [], layout: (String) -> String,
 		rows: ((Int) throws -> [String: [LaidOutRow]])? = nil, rowsLayout: ((String) -> String)? = nil,
-		texts: [String: String] = [:]
+		texts: [String: String] = [:], entries: Set<Int>? = nil, previous: StyleExport? = nil
 	) throws -> StyleExport {
 		guard let plan else { return self }
 		guard values.count == slots.count else {
@@ -805,6 +865,14 @@ public struct StyleExport: Sendable {
 		var stickies: [[StickyRow]] = []
 		var undecided: String?
 		out.assignments = try assignments.indices.map { k in
+			// An entry the page does not show yet keeps the boxes it had; the host lays it out when a state first shows it.
+			if let entries, !entries.contains(k) {
+				let kept = previous ?? self
+				pages.append(k < kept.pageScrolls.count ? kept.pageScrolls[k] : nil)
+				stickies.append(k < kept.pageSticky.count ? kept.pageSticky[k] : [])
+				let a = kept.assignments[k]
+				return (a.values, a.nodes, a.canvas, a.body)
+			}
 			let names = k < planNames.count ? planNames[k] : [:]
 			let dragonId = Dictionary(names.map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
 			// An interaction state's rows are its assignment's; laid out in the state, a row of that assignment takes the state's look
@@ -977,6 +1045,11 @@ public struct StyleExport: Sendable {
 						isText: own.isText, isAnonymous: own.isAnonymous, text: own.isText ? (row.texts[node.id] ?? own.text) : own.text,
 						frame: own.frame, borderWidths: own.borderWidths, writes: own.writes, borderOps: own.borderOps, scrollRange: own.scrollRange,
 						lines: own.lines)
+					// A row's text its item empties has no box, as on the web.
+					if copy.isText, copy.text == "" {
+						withRows.append(copy.hidden())
+						continue
+					}
 					withRows.append(try (rowWrites[row.key]?[node.id] ?? []).reduce(copy) { try StyleExport.patched($0, kind: $1.kind, path: $1.path, value: $1.value) })
 				}
 			}
@@ -987,7 +1060,11 @@ public struct StyleExport: Sendable {
 				try (slotWrites[node.id] ?? []).reduce(node) { try StyleExport.patched($0, kind: $1.kind, path: $1.path, value: $1.value) }
 			}.map { node -> StyleNode in
 				guard node.frame != nil else { return node }
-				guard let g = geometry[node.id] else { throw PayloadError(path: "plan layout", reason: "Dragon's layout has no box for \(node.id)") }
+				guard let g = geometry[node.id] else {
+					// A text whose state emptied it has no box, as on the web.
+					if node.isText, relaidTexts[node.id] == "" { return node.hidden() }
+					throw PayloadError(path: "plan layout", reason: "Dragon's layout has no box for \(node.id)")
+				}
 				let f = try g.array()
 				guard f.count == 6 else { throw g.fail("expected id, frame, border widths, lines, border operations and scroll range") }
 				let frame = try f[1].array().map { try planNumber($0.value) }
@@ -1379,9 +1456,43 @@ public struct StyleExport: Sendable {
 			return .outline(Outline(
 				style: style, width: width, offset: offset, color: try decodeColor(try f["color"]), tones: tones, radii: radii,
 				layer: try f["layer"].string()))
+		case "transform":
+			let f = try write.object(["kind", "ops", "origin", "key"])
+			try expectKey(f, "dragonTransform")
+			let functions = try f["ops"].array().map { op -> TransformFunction in
+				let o = try op.object(["fn", "x", "y", "angle", "sx", "sy"])
+				let fn = try o["fn"].string()
+				guard transformFunctions.contains(fn) else { throw PayloadError(path: op.path + ".fn", reason: "transform function \"\(fn)\" is not one of \(transformFunctions)") }
+				return TransformFunction(
+					fn: fn, x: try decodeLength(try o["x"]), y: try decodeLength(try o["y"]), angle: try o["angle"].number(), sx: try o["sx"].number(),
+					sy: try o["sy"].number())
+			}
+			let origin = try f["origin"].object(["x", "y"])
+			return .transform(StyleTransform(functions: functions, originX: try decodeLength(try origin["x"]), originY: try decodeLength(try origin["y"])))
+		case "opacity":
+			let f = try write.object(["kind", "opacity", "key"])
+			try expectKey(f, "alpha")
+			let opacity = try f["opacity"].number()
+			guard opacity >= 0, opacity < 1 else { throw PayloadError(path: write.path + ".opacity", reason: "opacity \(opacity) is not in [0, 1)") }
+			return .opacity(opacity)
+		case "opacity-group":
+			let f = try write.object(required: ["kind", "opacity", "backdrop", "painters", "key"], optional: ["after", "unstable"])
+			try expectKey(f, "dragonGroup")
+			let opacity = try f["opacity"].number()
+			guard opacity > 0, opacity < 1 else { throw PayloadError(path: write.path + ".opacity", reason: "opacity-group opacity \(opacity) is not in (0, 1)") }
+			return .opacityGroup(OpacityGroup(
+				opacity: opacity, backdrop: try f["backdrop"].optionalString(), painters: try f["painters"].array().map { try $0.string() },
+				after: f.has("after") ? try f["after"].string() : nil, unstable: f.has("unstable") ? try f["unstable"].array().map { try $0.string() } : []))
 		default:
 			throw PayloadError(path: write.path + ".kind", reason: "unknown style write kind \"\(kind)\"")
 		}
+	}
+
+	private static func decodeLength(_ reader: Reader) throws -> TransformLength {
+		let l = try reader.object(["kind", "px", "percent"])
+		let kind = try l["kind"].string()
+		guard ["px", "percent", "calc"].contains(kind) else { throw PayloadError(path: reader.path + ".kind", reason: "transform length kind \"\(kind)\" is not px, percent or calc") }
+		return TransformLength(kind: kind, px: try l["px"].number(), percent: try l["percent"].number())
 	}
 
 	private static func sides(_ reader: Reader) throws -> [Reader] {

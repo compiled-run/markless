@@ -1,0 +1,28 @@
+{
+	"rung": "S56",
+	"name": "The notes form's textarea on phones: resize: vertical (a phone draws no grip), the default scrollbar width Chrome adds to its default size, and a 10px rounded clip on the scrolling field; it draws its placeholder while empty, takes typing, and draws a readonly value, as the web does",
+	"steps": [
+		{
+			"visible": ["Write the note", "Nothing written"],
+			"fields": {
+				"Body": "",
+				"Saved body": "Milk and eggs"
+			},
+			"title": "Note body"
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Body",
+					"text": "milk"
+				}
+			},
+			"visible": ["Written"],
+			"absent": ["Nothing written"],
+			"fields": {
+				"Body": "milk",
+				"Saved body": "Milk and eggs"
+			}
+		}
+	]
+}

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 15-long-list
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Long list
 - assertVisible: Row 1
 - assertNotVisible: Reached 1

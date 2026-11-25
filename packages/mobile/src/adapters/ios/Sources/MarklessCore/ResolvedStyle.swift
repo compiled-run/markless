@@ -36,6 +36,12 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var hidden = false
 	/// An `<img>` whose src the app sets as it runs: how and where the image it loads is drawn, at `scale` device px per point.
 	public var runtimeImage: (image: RuntimeImage, place: RuntimeImagePlace, scale: Double)?
+	/// The box's `transform`, resolved at its size when the host applies it.
+	public var transform: StyleTransform?
+	/// Set when Dragon pre-composites the box's opacity: the host draws the composite over the box.
+	public var group: OpacityGroup?
+	/// `opacity` the platform composites as the view's alpha.
+	public var opacity: Double?
 	/// A select's drop-down arrow, once Dragon's plan has laid the page out.
 	public var selectArrow: SelectArrowPaint?
 	/// A themed checkbox's marks and colours, once Dragon's plan has laid the page out.
@@ -54,6 +60,7 @@ public struct ResolvedStyle: Equatable, Sendable {
 			&& a.clipsChildren == b.clipsChildren && a.childClip == b.childClip && a.clipRect == b.clipRect
 			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank && a.stackingParent == b.stackingParent && a.shadow == b.shadow
 			&& a.runtimeImage?.image == b.runtimeImage?.image && a.runtimeImage?.place == b.runtimeImage?.place && a.runtimeImage?.scale == b.runtimeImage?.scale
+			&& a.transform == b.transform && a.group == b.group && a.opacity == b.opacity
 			&& a.selectArrow == b.selectArrow && a.selectLabel == b.selectLabel && a.textField == b.textField && a.checkbox == b.checkbox && a.outline == b.outline
 	}
 
@@ -354,7 +361,11 @@ extension StyleExport {
 			if case .branch = node.kind { continue }
 			if case .repeat = node.kind { continue }
 			if case .sheet = node.kind { throw styleError("\(node.id): a system sheet inside another sheet's content is not styled on iOS") }
-			guard let styled = byId[node.id] else { throw styleError("no style export node for \(node.id)") }
+			guard let styled = byId[node.id] else {
+				// Dragon, as the web, lays out no box for an empty text; only a text the build knows is not empty must have one.
+				if case .text = node.kind, (texts?[node.id] ?? "").isEmpty { continue }
+				throw styleError("no style export node for \(node.id)")
+			}
 			switch node.kind {
 			case .element:
 				guard !styled.isText, !styled.isAnonymous else { throw styleError("\(node.id) is an element in the payload but not in the style export") }
@@ -650,6 +661,9 @@ extension StyleExport {
 			case let .checkbox(colors):
 				if let marks = node.checkboxMarks { style.checkbox = ResolvedStyle.CheckboxPaint(marks: marks, colors: colors, scale: dpr) }
 			case .outline: break
+			case let .transform(transform): style.transform = transform
+			case let .opacityGroup(group): style.group = group
+			case let .opacity(opacity): style.opacity = opacity
 			}
 		}
 		// Radii that overlap scale down until they fit (css-backgrounds-3 §5.5); Core Animation draws no background past half the box.

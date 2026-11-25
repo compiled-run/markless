@@ -415,6 +415,8 @@ final class ViewTree {
 	var library: ((String) -> String)?
 	/// Called after a touch shows another entry, so the screen repaints its canvas and the layout dump follows.
 	var onShown: (() -> Void)?
+	/// Called after the page moves to another assignment or entry, so the host lays it out if it has not yet.
+	var onEntries: (() -> Void)?
 	/// The pointer steps since the page opened, by the node each names, replayed through the current level's tables.
 	private var interactionSteps: [(op: String, node: String?)] = []
 	/// The list row (`@<key>` of its copies) the finger is pressing, and the one the focused element is in: an interaction state
@@ -422,6 +424,10 @@ final class ViewTree {
 	private var pressedRow: String?
 	private var focusedRow: String?
 	private var interactionWatcher: InteractionWatcher?
+	/// A finger is on the page: a restack moves no view until it lifts (`restack`).
+	private var fingerDown = false
+	/// A restack waited for the finger to lift, and runs once the touch is over.
+	private var restackAfterTouch = false
 	private let bodyLayer = CALayer()
 	/// Each styled sheet's layout per resting height, the height it rests at, and each height's current assignment.
 	private var sheetStyles: [String: (heights: [(snapPoint: Double, layout: StyleLayout)], height: Int, assignments: [Int])] = [:]
@@ -475,6 +481,8 @@ final class ViewTree {
 	/// Each drawn checkbox (false) or radio button (true) and whether it is checked.
 	private var ticks: [String: (radio: Bool, checked: Bool)] = [:]
 	private(set) var overlays: OverlayHost!
+	/// Each shown pre-composited opacity group's overlay, by instance id.
+	private var groups: [String: GroupOverlayView] = [:]
 	/// Each box moved into its stacking parent's view, by instance id: the view it was built in and the view that followed it there.
 	private var restacked: [String: Restacked] = [:]
 
@@ -942,6 +950,7 @@ final class ViewTree {
 		refreshSelects()
 		if layout == nil { alignTables() }
 		restackShadows()
+		markGroupsDirty()
 		overlays.flush()
 		announce(liveChanges)
 	}
@@ -1074,14 +1083,27 @@ final class ViewTree {
 
 	/// Paints a view and puts it at its frame; inside a scroll container, frames count from the scroll view's padding box.
 	private func place(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws {
-		try restack(id, view, style)
+		let frameSpace = try restack(id, view, style)
+		// UIKit leaves frame undefined under a transform: the box is placed untransformed, then transformed at its new size.
+		if !CATransform3DIsIdentity(view.layer.transform) { view.layer.setAffineTransform(.identity) }
 		try paint(view, style, faces: faces)
+		if let frameSpace, let superview = view.superview { view.frame = frameSpace.convert(view.frame, to: superview) }
 		if let label = view as? UILabel { drawLines(label, style) }
 		if let clip = clipViews[id] { clip.shape(style.childClip, in: view.bounds) }
 		else if style.childClip != nil, !(view is TextField), !(view is TextArea) { throw HostError("\(id) began clipping overflow past its borders after it was built") }
-		if let host = view.superview as? ContainerScrollView { view.frame.origin = CGPoint(x: view.frame.minX - host.inset.left, y: view.frame.minY - host.inset.top) }
+		if frameSpace == nil, let host = view.superview as? ContainerScrollView { view.frame.origin = CGPoint(x: view.frame.minX - host.inset.left, y: view.frame.minY - host.inset.top) }
 		try paintShadow(id, view, style)
 		try paintOutline(id, style)
+		let shown = style.frame != nil && !(view is AbsentField)
+		try applyTransform(id, view, shown ? style.transform : nil)
+		try paintGroup(id, view, shown ? style.group : nil)
+		if let opacity = shown ? style.opacity : nil {
+			guard let alpha8 = DragonPaint.opacityAlpha8 else { throw HostError("\(id): opacity needs Dragon's alpha byte, which this host does not link") }
+			view.alpha = CGFloat(try alpha8(opacity) / 255)
+		} else {
+			view.alpha = 1
+		}
+		markGroupsDirty()
 		guard let scroll = scrollViews[id] else {
 			if style.scroll != nil { throw HostError("\(id) became a scroll container after it was built") }
 			return
@@ -1089,6 +1111,55 @@ final class ViewTree {
 		guard let s = style.scroll else { throw HostError("\(id) stopped being a scroll container after it was built") }
 		scroll.configure(s, in: view.bounds.size, cornerRadius: style.cornerRadius)
 	}
+
+	/// Shows a pre-composited opacity group's composite over its view, or takes it away.
+	private func paintGroup(_ id: String, _ view: UIView, _ group: OpacityGroup?) throws {
+		let shown = view.subviews.lazy.compactMap { $0 as? GroupOverlayView }.first
+		guard let group else {
+			shown?.removeFromSuperview()
+			groups[id] = nil
+			return
+		}
+		guard let alpha8 = DragonPaint.opacityAlpha8, DragonPaint.groupComposite != nil, DragonPaint.groupCompositeLayered != nil else {
+			throw HostError("\(id): an opacity group needs Dragon's composite, which this host does not link")
+		}
+		let a8 = try alpha8(group.opacity)
+		if let shown, shown.group == group, shown.alpha8 == a8 {
+			shown.takeBorder(from: view)
+			return
+		}
+		shown?.removeFromSuperview()
+		let overlay = GroupOverlayView(id: id, group: group, alpha8: a8, context: groupContext)
+		overlay.takeBorder(from: view)
+		view.addSubview(overlay)
+		groups[id] = overlay
+	}
+
+	/// A box or text changed its layout or paint: every group's composite is stale and recomputes in the next layout pass.
+	private func markGroupsDirty() {
+		for (id, overlay) in groups {
+			if overlay.superview == nil { groups[id] = nil } else { overlay.markDirty() }
+		}
+	}
+
+	private lazy var groupContext = GroupContext(
+		pageRoot: root,
+		canvas: { [unowned self] in self.canvas ?? .white },
+		scale: { [unowned self] in self.layout?.dpr ?? Double(self.root.traitCollection.displayScale) },
+		rootOverflows: { [unowned self] in
+			guard let layout = self.layout, let range = layout.pageScrolls[self.assignment] else { return false }
+			return range.maxX > 0 || range.maxY > 0
+		},
+		overlay: { [unowned self] painter, from in
+			// A painter in the same list row as the group is that row's copy.
+			let suffix = from.firstIndex(of: "@").map { String(from[$0...]) } ?? ""
+			return (self.groups[painter + suffix] ?? self.groups[painter]).flatMap { $0.superview == nil ? nil : $0 }
+		},
+		view: { [unowned self] id, from in
+			let suffix = from.firstIndex(of: "@").map { String(from[$0...]) } ?? ""
+			return self.elements[id + suffix] ?? self.elements[id]
+		},
+		overlays: { [unowned self] in Array(self.groups.values) })
 
 	private func paintOutline(_ id: String, _ style: ResolvedStyle) throws {
 		guard let outline = style.outline else {
@@ -1119,11 +1190,17 @@ final class ViewTree {
 
 	/// Moves a box whose stacking context paints it past ancestors with later siblings into the view of its `stackingParent`, where
 	/// its zPosition orders it among that context's boxes, and back to the view it was built in when it no longer is.
-	private func restack(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws {
-		guard style.frame != nil else { return }
+	/// Returns the view the style's frame is given in when the move waits for the finger to lift: UIKit cancels a touch whose
+	/// view leaves its window, so a box restacked by a pressed state stays where it is until the touch is over.
+	private func restack(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws -> UIView? {
+		guard style.frame != nil else { return nil }
 		if let parent = style.stackingParent {
 			guard let target = scrollViews[parent] ?? clipViews[parent] ?? elements[parent] else { throw HostError("\(id) paints in the order of \(parent), which has no view") }
-			if view.superview === target { return }
+			if view.superview === target { return nil }
+			if fingerDown {
+				restackAfterTouch = true
+				return target
+			}
 			if restacked[id] == nil, let home = view.superview, let at = home.subviews.firstIndex(of: view) {
 				restacked[id] = Restacked(home: home, next: at + 1 < home.subviews.count ? home.subviews[at + 1] : nil)
 			}
@@ -1136,11 +1213,20 @@ final class ViewTree {
 			} else {
 				target.addSubview(view)
 			}
-		} else if let place = restacked.removeValue(forKey: id) {
-			guard let home = place.home else { return }
+		} else if let place = restacked[id] {
+			guard let home = place.home else {
+				restacked[id] = nil
+				return nil
+			}
+			if fingerDown {
+				restackAfterTouch = true
+				return home
+			}
+			restacked[id] = nil
 			view.removeFromSuperview()
 			if let next = place.next, next.superview === home { home.insertSubview(view, belowSubview: next) } else { home.addSubview(view) }
 		}
+		return nil
 	}
 
 	/// Draws Dragon's lines over a label while its text is the one Dragon laid out; otherwise the label draws its own.
@@ -1206,6 +1292,7 @@ final class ViewTree {
 		let node = phase == .cancelled ? nil : touchedNode(at: point)
 		switch phase {
 		case .began:
+			fingerDown = true
 			pressedRow = node?.row
 			interactionSteps.append(("touch-down", node?.id))
 		case .ended:
@@ -1216,9 +1303,22 @@ final class ViewTree {
 			pressedRow = nil
 			interactionSteps.append(("touch-cancel", nil))
 		}
+		// The views take the lift in this pass; the boxes a pressed state left in place move once it is over.
+		if phase != .began { DispatchQueue.main.async { [weak self] in self?.touchOver() } }
 		let before = shown
 		reselect()
 		guard shown != before else { return }
+		repaintShown()
+	}
+
+	private func touchOver() {
+		fingerDown = false
+		guard restackAfterTouch else { return }
+		restackAfterTouch = false
+		repaintShown()
+	}
+
+	private func repaintShown() {
 		do {
 			try repaint { _ in true }
 			paintBody()
@@ -1245,6 +1345,7 @@ final class ViewTree {
 
 	/// The entry to show: the state `rt-interaction` selects over the steps in the assignment's level, or the assignment.
 	private func reselect() {
+		defer { onEntries?() }
 		shown = assignment
 		guard let layout, let library, layout.interaction.indices.contains(assignment) else { return }
 		let level = layout.interaction[assignment]

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s34-animation-end
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Notice
 - assertVisible: Your changes were saved
 - assertVisible: Notice open

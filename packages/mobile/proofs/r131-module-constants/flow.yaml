@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r131-module-constants
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Plans
 - assertVisible: Basic \$5
 - assertVisible: Team \$12\.5

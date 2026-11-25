@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u61-overlay-hint
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Hints
 - assertVisible: Saves a draft
 - assertVisible: "Tip closed: not yet"

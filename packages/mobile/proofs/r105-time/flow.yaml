@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: r105-time
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Time
 - assertVisible: Posted November 18
 - assertVisible: Due November 18

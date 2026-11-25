@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 07d-children
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Wrapped
 - assertVisible: Coffee
 - assertVisible: Cups 0

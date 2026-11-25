@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: d4b-photo-refused
 ---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
 - launchApp:
-    clearState: true
     permissions:
       camera: unset
 - assertVisible:

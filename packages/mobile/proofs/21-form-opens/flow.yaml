@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: 21-form-opens
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Search the web
 - assertVisible: Search
 - assertVisible: ""

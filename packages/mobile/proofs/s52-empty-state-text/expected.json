@@ -1,0 +1,14 @@
+{
+	"rung": "S52",
+	"name": "A styled text that shows a state, empty at mount, has no box until a tap gives it a value, and then shows where Chrome puts it",
+	"steps": [
+		{
+			"visible": ["Where you are", "Locate"],
+			"absent": ["Location is off"]
+		},
+		{
+			"do": { "tap": "Locate" },
+			"visible": ["Location is off", "Where you are"]
+		}
+	]
+}

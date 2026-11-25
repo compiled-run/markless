@@ -3,10 +3,15 @@
 	"name": "a styled search field draws its placeholder while empty, takes typing in its editor box, empties on its clear control with an input event, and draws a fixed value, as the web does",
 	"steps": [
 		{
-			"visible": ["Title or tag", "Nothing searched"],
+			"visible": [
+				"Title or tag",
+				"Nothing searched",
+				"Name or date"
+			],
 			"fields": {
 				"Search notes": "",
-				"Saved search": "Groceries"
+				"Saved search": "Groceries",
+				"Tall search": ""
 			},
 			"title": "Search field"
 		},
@@ -18,23 +23,36 @@
 					"keepKeyboard": true
 				}
 			},
-			"visible": ["Searched"],
-			"absent": ["Nothing searched"],
+			"visible": [
+				"Searched"
+			],
+			"absent": [
+				"Nothing searched"
+			],
 			"fields": {
 				"Search notes": "milk",
 				"Saved search": "Groceries"
 			},
 			"visibleOn": {
-				"ios": ["Clear text"],
-				"android": ["Clear text"]
+				"ios": [
+					"Clear text"
+				],
+				"android": [
+					"Clear text"
+				]
 			}
 		},
 		{
 			"do": {
 				"clear": "Search notes"
 			},
-			"visible": ["Title or tag", "Nothing searched"],
-			"absent": ["Searched"],
+			"visible": [
+				"Title or tag",
+				"Nothing searched"
+			],
+			"absent": [
+				"Searched"
+			],
 			"fields": {
 				"Search notes": "",
 				"Saved search": "Groceries"

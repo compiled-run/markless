@@ -37,6 +37,7 @@ import dev.markless.mobile.core.str
 import dev.markless.mobile.core.text
 import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.Edges
+import dev.markless.mobile.style.LaidOutRow
 import dev.markless.mobile.style.PaddingBox
 import dev.markless.mobile.style.paddingBox
 import dev.markless.mobile.style.BandAtom
@@ -61,6 +62,8 @@ import dev.markless.mobile.style.stackingParent
 import dev.markless.mobile.style.checkFlattenedInline
 import dev.markless.mobile.style.rowCopyOf
 import dev.markless.mobile.style.SelectArrow
+import dev.markless.mobile.style.TransformFunction
+import dev.markless.mobile.style.TransformLength
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -412,6 +415,40 @@ private fun styleExport(fixtures: File) {
 	val hidden = runCatching { StyleExport.decode(withVisibility("hidden").toByteArray()) }
 	check("decodes a visibility write", hidden.getOrNull()?.assignments?.get(0)?.byId?.get("h2")?.writes?.contains(StyleWrite.Visibility("hidden")) == true) { "${hidden.exceptionOrNull() ?: hidden.getOrNull()?.assignments?.get(0)?.byId?.get("h2")}" }
 	refusesStyle("a visibility it does not know", withVisibility("gone"), "visibility")
+	pressedStyles(text, ::refusesStyle)
+}
+
+/** A pressed button's `transform: scale(0.97)` and pre-composited `opacity: 0.85`, as Dragon writes them. */
+private fun pressedStyles(text: String, refusesStyle: (String, String, String) -> Unit) {
+	val writes = """{ "kind": "transform", "ops": [{ "fn": "scale", "x": { "kind": "px", "px": 0, "percent": 0 }, "y": { "kind": "px", "px": 0, "percent": 0 }, "angle": 0, "sx": 0.97, "sy": 0.97 }], "origin": { "x": { "kind": "percent", "px": 0, "percent": 50 }, "y": { "kind": "calc", "px": 2, "percent": 50 } }, "key": "dragonTransform" },
+		{ "kind": "opacity-group", "opacity": 0.85, "backdrop": null, "painters": ["h1"], "after": "h0", "key": "dragonGroup" },"""
+	fun pressed(edit: (String) -> String = { it }) = text.replace("\"writes\": [\n      {", "\"writes\": [\n      ${edit(writes)}\n      {")
+	check("the fixture gains a pressed state's writes", pressed() != text) { "" }
+	val decoded = runCatching { StyleExport.decode(pressed().toByteArray()) }
+	val h2 = decoded.getOrNull()?.assignments?.get(0)?.byId?.get("h2")?.writes.orEmpty()
+	val zero = TransformLength("px", 0.0, 0.0)
+	check("decodes a transform write", StyleWrite.Transform(listOf(TransformFunction("scale", zero, zero, 0.0, 0.97, 0.97)), TransformLength("percent", 0.0, 50.0), TransformLength("calc", 2.0, 50.0)) in h2) { "${decoded.exceptionOrNull() ?: h2}" }
+	check("decodes an opacity-group write", StyleWrite.OpacityGroup(0.85, null, listOf("h1"), "h0") in h2) { "${decoded.exceptionOrNull() ?: h2}" }
+	val backdrop = runCatching { StyleExport.decode(pressed { it.replace("\"backdrop\": null", "\"backdrop\": \"h0\"").replace(", \"after\": \"h0\"", "") }.toByteArray()) }
+	check("decodes a group's backdrop box, with no after", backdrop.getOrNull()?.assignments?.get(0)?.byId?.get("h2")?.writes?.contains(StyleWrite.OpacityGroup(0.85, "h0", listOf("h1"), null)) == true) { "${backdrop.exceptionOrNull() ?: backdrop.getOrNull()?.assignments?.get(0)?.byId?.get("h2")}" }
+	refusesStyle("a transform function it does not draw", pressed { it.replace("\"fn\": \"scale\"", "\"fn\": \"skewX\"") }, "transform function \"skewX\"")
+	refusesStyle("a transform length kind it does not know", pressed { it.replace("\"kind\": \"calc\"", "\"kind\": \"em\"") }, "transform length kind \"em\"")
+	refusesStyle("a transform under another key", pressed { it.replace("\"key\": \"dragonTransform\"", "\"key\": \"transform\"") }, "expected dragonTransform")
+	refusesStyle("an opaque opacity group", pressed { it.replace("\"opacity\": 0.85", "\"opacity\": 1") }, "opacity-group opacity 1.0 is not in (0, 1)")
+	refusesStyle("a painter that is not an id", pressed { it.replace("\"painters\": [\"h1\"]", "\"painters\": [1]") }, "painters")
+	refusesStyle("a filter group", pressed { it.replace("\"kind\": \"opacity-group\"", "\"kind\": \"filter-group\"") }, "unknown style write kind \"filter-group\"")
+	val alpha = { edit: (String) -> String -> pressed { edit(it.replace("{ \"kind\": \"opacity-group\", \"opacity\": 0.85, \"backdrop\": null, \"painters\": [\"h1\"], \"after\": \"h0\", \"key\": \"dragonGroup\" }", "{ \"kind\": \"opacity\", \"opacity\": 0.85, \"key\": \"alpha\" }")) } }
+	check("the fixture's group becomes a plain opacity", alpha { it } != pressed()) { "" }
+	val plain = runCatching { StyleExport.decode(alpha { it }.toByteArray()) }
+	check("decodes a plain opacity write", plain.getOrNull()?.assignments?.get(0)?.byId?.get("h2")?.writes?.contains(StyleWrite.Opacity(0.85)) == true) { "${plain.exceptionOrNull() ?: plain.getOrNull()?.assignments?.get(0)?.byId?.get("h2")}" }
+	refusesStyle("an opaque plain opacity", alpha { it.replace("\"opacity\": 0.85, \"key\": \"alpha\"", "\"opacity\": 1, \"key\": \"alpha\"") }, "opacity 1.0 is not in [0, 1)")
+	refusesStyle("a plain opacity under another key", alpha { it.replace("\"key\": \"alpha\"", "\"key\": \"opacity\"") }, "alpha")
+	check("a group without unstable paint lists none", (h2.firstOrNull { it is StyleWrite.OpacityGroup } as? StyleWrite.OpacityGroup)?.unstable == emptyList<String>()) { "$h2" }
+	val unstable = runCatching { StyleExport.decode(pressed { it.replace("\"after\": \"h0\",", "\"after\": \"h0\", \"unstable\": [\"h1\", \"h0\"],") }.toByteArray()) }
+	check("decodes a group's unstable earlier paint", unstable.getOrNull()?.assignments?.get(0)?.byId?.get("h2")?.writes?.contains(StyleWrite.OpacityGroup(0.85, null, listOf("h1"), "h0", listOf("h1", "h0"))) == true) { "${unstable.exceptionOrNull() ?: unstable.getOrNull()?.assignments?.get(0)?.byId?.get("h2")}" }
+	refusesStyle("unstable paint that is not ids", pressed { it.replace("\"after\": \"h0\",", "\"after\": \"h0\", \"unstable\": [3],") }, "unstable")
+	refusesStyle("unstable paint that is not a list", pressed { it.replace("\"after\": \"h0\",", "\"after\": \"h0\", \"unstable\": \"h1\",") }, "unstable")
+	refusesStyle("a group field it does not know", pressed { it.replace("\"after\": \"h0\",", "\"after\": \"h0\", \"stable\": [],") }, "stable")
 }
 
 private fun dashedBorders(fixtures: File) {
@@ -751,6 +788,36 @@ private fun appStyle(fixtures: File) {
 	refusesApp("slots on a route without a plan", text.replace("\"pattern\":", "\"slots\":[{\"id\":\"slot:h0#0\",\"initial\":25}],\"pattern\":"), "has slots but no layout plan")
 	refusesApp("a write index out of range", text.replace(Regex("\"writes\":\\s*\\d+(\\s*)}"), "\"writes\":99999$1}"), "not an index of the app's write lists")
 	refusesApp("an unknown route field", text.replace(Regex("\"pattern\":\\s*\"/help\""), "\"pattern\":\"/help\",\"extra\":1"), "unknown field \"extra\"")
+	// Each assignment given one interaction state with its own values: a state is laid out when shown, never as a band twin.
+	val staged = Json.parse(bytes) as Json.Obj
+	val stagedTarget = ((staged.fields.getValue("targets") as Json.Obj).fields.getValue("android") as Json.Obj)
+	for (route in (stagedTarget.fields.getValue("routes") as Json.Arr).items) {
+		val r = (route as Json.Obj).fields
+		val match = Json.Obj(linkedMapOf<String, Json>("active" to Json.Arr(emptyList()), "focus" to Json.Null, "hover" to Json.Arr(emptyList())))
+		r["interaction"] = Json.Obj(linkedMapOf<String, Json>("levels" to Json.Arr((r.getValue("assignments") as Json.Arr).items.map { a ->
+			Json.Obj(linkedMapOf<String, Json>("tables" to Json.Obj(linkedMapOf()), "addresses" to Json.Arr(emptyList()), "states" to Json.Arr(listOf(a)), "matches" to Json.Arr(listOf(match))))
+		})))
+	}
+	val withStates = StyleExport.decodeApp(canonical(staged).toByteArray()).getValue("/settings")
+	val twins = withStates.bandTwins(withStates.initial)
+	check("an assignment's band twins are assignments, not its interaction states", withStates.assignments.size == 2 * withStates.next.size && twins.size == 2 && withStates.initial in twins && twins.all { it < withStates.next.size }) { "$twins of ${withStates.assignments.size}" }
+	val pressed = withStates.interaction[withStates.initial].entries.single()
+	check("a shown interaction state is laid out beside its assignment's band twins", withStates.bandTwins(pressed) == twins + pressed) { "${withStates.bandTwins(pressed)}" }
+	// The same style with every node moved into the target's pool, each assignment naming its nodes by index.
+	val pooledRoot = Json.parse(bytes) as Json.Obj
+	val target = ((pooledRoot.fields.getValue("targets") as Json.Obj).fields.getValue("android") as Json.Obj).fields
+	val pool = ArrayList<Json>()
+	fun pooled(j: Json): Json = when (j) {
+		is Json.Obj -> Json.Obj(LinkedHashMap(j.fields.mapValues { (k, v) -> if (k == "nodes" && v is Json.Arr) Json.Arr(v.items.map { n -> Json.Num(pool.size.toDouble()).also { pool.add(n) } }) else pooled(v) }))
+		is Json.Arr -> Json.Arr(j.items.map(::pooled))
+		else -> j
+	}
+	target["routes"] = pooled(target.getValue("routes"))
+	target["nodes"] = Json.Arr(pool)
+	val pooledText = canonical(pooledRoot)
+	val fromPool = runCatching { StyleExport.decodeApp(pooledText.toByteArray()) }
+	check("a target's node pool decodes to the nodes it replaces", fromPool.getOrNull()?.let { p -> p.keys == routes.keys && routes.all { (k, s) -> p.getValue(k).assignments.map { it.nodes } == s.assignments.map { it.nodes } } } == true) { fromPool.exceptionOrNull().toString() }
+	refusesApp("a node index out of range", pooledText.replace("\"nodes\":[0,", "\"nodes\":[99999,"), "not an index of the app's nodes")
 }
 
 /** A system sheet's styled content: its own layout per resting height, and state that reaches it. */
@@ -838,6 +905,23 @@ private fun planTexts() {
 	var replayed: String? = null
 	style.laidOut(100.0, 100.0, 2.0, { line -> replayed = line; answer(10.0) }, rowsLayout = { throw AssertionError("used the live layout") }, texts = mapOf("h0:text0" to "Home"))
 	check("a page text at its laid-out string keeps the recorded layout", replayed != null && "texts" !in replayed!!) { "$replayed" }
+}
+
+/** A row's text its item empties has no box, as on the web: Dragon's layout gives it none, and the row's other boxes keep theirs. */
+private fun emptyRowText() {
+	fun hex(v: Double) = "\"${java.lang.Long.toHexString(v.toRawBits()).padStart(16, '0')}\""
+	val frame = "{\"x\":0,\"y\":0,\"width\":10,\"height\":10}"
+	val export = """{"schema":"dragon.native-style-export/1","targets":{"android":{"backend":"android-views","viewport":{"width":100,"height":100},"dpr":2,"states":[],"initial":0,"next":[[]],"assignments":[{"values":{},"nodes":[{"id":"h0","parent":null,"kind":"element","frame":$frame,"writes":[]},{"id":"h1","parent":"h0","kind":"element","frame":$frame,"writes":[]},{"id":"h1:text0","parent":"h1","kind":"text","text":"x","frame":$frame,"writes":[]}]}],"plan":{"version":"dragon.markless-plan/1"},"planRepeats":[{"id":"repeat:0","parent":"h0","template":["h1"]}]}}}"""
+	val style = StyleExport.decode(export.toByteArray())
+	val zero = hex(0.0)
+	val box = "[$zero,$zero,${hex(10.0)},${hex(10.0)}]"
+	val answer = """["ok",[$zero,$zero,$zero,$zero],[["h0",$box,null,null,null,null],["h1@a",$box,null,null,null,null],["h1@b",$box,null,null,null,null],["h1:text0@b",$box,null,null,null,null]]]"""
+	val rows = { _: Int -> mapOf("repeat:0" to listOf(LaidOutRow("a", 0, mapOf("h1:text0" to "")), LaidOutRow("b", 0, mapOf("h1:text0" to "Milk")))) }
+	val laid = runCatching { style.laidOut(100.0, 100.0, 2.0, { answer }, rows = rows, rowsLayout = { answer }) }
+	check("a row whose text its item empties lays out", laid.isSuccess) { laid.exceptionOrNull().toString() }
+	val nodes = laid.getOrNull()?.assignments?.get(0)?.byId ?: return
+	check("a row's emptied text has no box", nodes["h1:text0@a"]?.frame == null && nodes["h1@a"]?.frame != null) { "${nodes["h1:text0@a"]}" }
+	check("a row's text with a string keeps its box", nodes["h1:text0@b"]?.frame != null && nodes["h1:text0@b"]?.text == "Milk") { "${nodes["h1:text0@b"]}" }
 }
 
 /** A style slot journals its new value; the plan's layout gets slot values and its moved write numbers patch the export. */
@@ -1153,6 +1237,7 @@ fun main(args: Array<String>) {
 	flattenedInline(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	rowFlattenedInline(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	planTexts()
+	emptyRowText()
 	val dirs = args.map(::File)
 	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)
 	val files = dirs.flatMap { d -> d.listFiles { f -> f.name.endsWith(".json") }?.sortedBy { it.name } ?: error("no vector directory $d") }

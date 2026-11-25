@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u20-modal
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Modal
 - assertVisible: Delete draft
 - assertVisible: Sign out

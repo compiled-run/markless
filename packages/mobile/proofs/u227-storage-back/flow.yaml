@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u227-storage-back
 ---
-- launchApp:
-      clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Home page
 - assertVisible: Home kept 0
 - assertVisible: Next is 1
@@ -20,16 +24,16 @@ name: u227-storage-back
 - assertVisible: Bump kept 1
 - assertNotVisible: Bump kept 0
 - runFlow:
-      when:
-          platform: iOS
-      commands:
-          - tapOn:
-                id: BackButton
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: BackButton
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - pressKey: back
+    when:
+      platform: Android
+    commands:
+      - pressKey: back
 - assertVisible: Home
 - assertVisible: Home page
 - assertVisible: Home kept 1

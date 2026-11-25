@@ -47,6 +47,7 @@ import dev.markless.mobile.core.MemoryStore
 import dev.markless.mobile.core.arr
 import dev.markless.mobile.core.text
 import dev.markless.mobile.style.Bands
+import dev.markless.mobile.core.Js
 import dev.markless.mobile.core.ScrollAlignment
 import dev.markless.mobile.core.ScrollBox
 import dev.markless.mobile.core.ScrollRange
@@ -197,6 +198,10 @@ class MarklessHost(
 	private var rowShaper: RowShaper? = null
 	/** The page size in device px and the slot values (export order) the page was last laid out at. */
 	private var laidOutFor: Triple<Int, Int, Pair<List<Double>, Map<String, String>>>? = null
+	/** The entries Dragon has laid out at [laidOutFor], and the export holding them: a page lays out only the entries it shows. */
+	private val laidEntries = mutableSetOf<Int>()
+	private var laidExport: StyleExport? = null
+	private var layingOut = false
 	private val fonts: FontSource = if (style?.systemFaces.isNullOrEmpty()) bundledFonts else SystemFonts(style!!.systemFaces, bundledFonts)
 	val runtime = Runtime(payload, store, params, preferredLanguages, now, AppScriptEngine, search = search).apply {
 		onScriptLog = { level, text -> Log.i(AppScriptEngine.TAG, "$level: $text") }
@@ -316,6 +321,10 @@ class MarklessHost(
 	private val interactionSteps = mutableListOf<Pair<String, String?>>()
 	/** The list row (`@<key>` of its copies) the finger is pressing, and the one the focused element is in. */
 	private var pressedRow: String? = null
+	/** A finger is on the page: no view changes parent until it lifts, since a view that leaves its parent loses the touch. */
+	private var fingerDown = false
+	/** A restack waited for the finger to lift, and runs once the touch is over. */
+	private var restackAfterTouch = false
 	private var focusedRow: String? = null
 	/** Where the current touch began, to tell a tap from a scroll. */
 	private var touchStart: Pair<Float, Float>? = null
@@ -391,6 +400,24 @@ class MarklessHost(
 
 	/** Inputs with no visible view (a checkbox or hidden input): GONE and outside the accessibility tree. */
 	private val inert = HashSet<String>()
+
+	/** Each shown pre-composited opacity group's overlay, by instance id. */
+	private val groups = HashMap<String, GroupOverlay>()
+	/** Declared before the init block that builds the page, whose first place reads it. */
+	private val groupContext = GroupContext(
+		backdropRoot = ::backdropRoot,
+		rootOverflows = { page?.let { p -> p.export.assignments[p.assignment].pageScroll?.let { it.maxX > 0 || it.maxY > 0 } } ?: false },
+		overlay = { painter, from ->
+			// A painter in the same list row as the group is that row's copy.
+			val suffix = from.indexOf('@').let { if (it < 0) "" else from.substring(it) }
+			(groups[painter + suffix] ?: groups[painter])?.takeIf { views[it.id] === it.view }
+		},
+		view = { id, from ->
+			val suffix = from.indexOf('@').let { if (it < 0) "" else from.substring(it) }
+			views[id + suffix] ?: views[id]
+		},
+		overlays = { groups.values.toList() },
+	)
 
 	/** The layer showing an `invalid` entry's message until the next action. */
 	private var message: View? = null
@@ -640,6 +667,7 @@ class MarklessHost(
 		if (p.export.interaction.isEmpty()) return
 		when (e.actionMasked) {
 			android.view.MotionEvent.ACTION_DOWN -> {
+				fingerDown = true
 				val at = touchedNode(e.rawX, e.rawY)
 				pressedRow = at?.second
 				touchStart = e.rawX to e.rawY
@@ -673,6 +701,15 @@ class MarklessHost(
 			}
 			else -> return
 		}
+		val lifted = e.actionMasked == android.view.MotionEvent.ACTION_UP || e.actionMasked == android.view.MotionEvent.ACTION_CANCEL
+		// The views take the lift first; the boxes a pressed state left in place move once it is over.
+		if (lifted) root.post {
+			fingerDown = false
+			if (restackAfterTouch && page === p) {
+				restackAfterTouch = false
+				repaint()
+			}
+		}
 		val before = p.shown
 		reselect(p)
 		// repaint lays the page out again, which takes the shown entry's page range (pageSize).
@@ -695,6 +732,12 @@ class MarklessHost(
 
 	/** The entry [l] shows: the state `rt-interaction` selects over the steps in its assignment's level, or the assignment. */
 	private fun reselect(l: Layout) {
+		pickShown(l)
+		// A state that shows an entry not yet laid out at this size lays it out first.
+		if (l === page && !layingOut) laidOutFor?.let { (w, h) -> layOutAt(w, h) }
+	}
+
+	private fun pickShown(l: Layout) {
 		l.shown = l.assignment
 		val level = l.export.interaction.getOrNull(l.assignment) ?: return
 		val library = Bands.library ?: return
@@ -816,6 +859,7 @@ class MarklessHost(
 		if (planned?.planRepeats?.isNotEmpty() == true && journal.any { it is JournalEntry.Rows || it is JournalEntry.Arm || ((it is JournalEntry.Text || it is JournalEntry.Attribute) && '@' in it.node) }) {
 			laidOutFor?.let { (w, h) -> layOutAt(w, h, rowsMoved = true) }
 		}
+		markGroupsDirty()
 		onJournal?.invoke(journal)
 		page?.let { animation?.moved(it.assignment) }
 		runAnimation()
@@ -854,6 +898,9 @@ class MarklessHost(
 	 * area. Chrome on Android lays a page out at a whole CSS px width, the screen's width in dp rounded up. Returns whether it
 	 * laid out again.
 	 */
+	/** The page's assignment and shown entry, at every @media band: the band a size selects is only decided once the page is laid out at it. */
+	private fun entriesShown(p: Layout, export: StyleExport): Set<Int> = export.bandTwins(p.assignment) + export.bandTwins(p.shown)
+
 	fun layOutAt(widthPx: Int, heightPx: Int, rowsMoved: Boolean = false): Boolean {
 		val p = page ?: return false
 		val layout = planLayout ?: return false
@@ -861,7 +908,14 @@ class MarklessHost(
 		val pageTextNodes = payload.nodes.filterIsInstance<Node.Text>().filter { it.row == null }.map { it.id }.toSet()
 		val texts = runtime.texts().filter { it.first in pageTextNodes }.toMap()
 		val at = Triple(widthPx, heightPx, planned.slots.map { slotValues.getValue(it.id) } to texts)
-		if (!rowsMoved && laidOutFor == at) return false
+		val same = !rowsMoved && laidOutFor == at
+		val needed = entriesShown(p, planned)
+		if (layingOut || (same && laidEntries.containsAll(needed))) return false
+		if (!same) {
+			laidEntries.clear()
+			laidExport = null
+		}
+		val entries = needed - laidEntries
 		val withRows = planned.planRepeats.isNotEmpty()
 		val live: (String) -> String = { line ->
 			val shaper = rowShaper ?: RowShaper(planned.systemFaces) { id -> fonts.bytes(id) }.also { rowShaper = it }
@@ -869,7 +923,7 @@ class MarklessHost(
 		}
 		val rows = if (withRows) planned.shownRows(payload, runtime) else null
 		val lay = { shown: Map<String, String> ->
-			planned.laidOut(Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout, at.third.first, rows = rows, rowsLayout = live, texts = shown)
+			planned.laidOut(Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout, at.third.first, rows = rows, rowsLayout = live, texts = shown, entries = entries, previous = laidExport)
 		}
 		// Page texts in a face this host cannot shape keep the boxes the build laid them out in, as before they followed state.
 		rowShaper?.unshapedFace = false
@@ -880,8 +934,15 @@ class MarklessHost(
 			lay(emptyMap())
 		}
 		style = next
-		p.relaid(next)
+		laidEntries += entries
+		laidExport = next
 		laidOutFor = at
+		layingOut = true
+		try {
+			p.relaid(next)
+		} finally {
+			layingOut = false
+		}
 		followBand(isDark(context.resources.configuration))
 		repaint()
 		Log.i(TAG, "laid out at ${next.viewportWidth}x${next.viewportHeight} dp, style assignment ${p.assignment}")
@@ -1633,7 +1694,7 @@ class MarklessHost(
 			val parent = view.parent as ViewGroup
 			val index = parent.indexOfChild(view)
 			parent.removeView(view)
-			val layer = FrameLayout(context).apply {
+			val layer = TopLayer(context).apply {
 				// Chrome's ::backdrop default, rgba(0, 0, 0, 0.1); a press on it is the page's, so it is consumed here.
 				setBackgroundColor(0x1A000000)
 				isClickable = true
@@ -1714,6 +1775,10 @@ class MarklessHost(
 			view.visibility = View.GONE
 			removeOutline(inst.id)
 			return
+		} else if (node is Node.Text && view is TextView && view.text.isEmpty()) {
+			// Dragon, as the web, lays out no box for an empty text: it shows once a state gives it text and the page is laid out again.
+			view.visibility = View.GONE
+			return
 		} else throw MarklessHostError("style export has no node \"${inst.id}\"")
 		if (s.kind != (if (node is Node.Text) "text" else "element")) throw MarklessHostError("style node \"${inst.id}\" is a ${s.kind}")
 		val absolute = layout.absolutes[entry]
@@ -1753,7 +1818,19 @@ class MarklessHost(
 			)
 		} else {
 			// A box its stacking context paints past ancestors with later siblings sits in that context's view, in its order.
-			val stackParent = paintOrder?.let { stackingParent(s, it, styled, { id -> id.substringBefore('@') in nodeIds }, parentId) }
+			var stackParent = paintOrder?.let { stackingParent(s, it, styled, { id -> id.substringBefore('@') in nodeIds }, parentId) }
+			if (fingerDown) {
+				val current = view.parent
+				val wanted = (stackParent ?: parentId)?.let { scrollers[it]?.second ?: views[it] }
+				if (current != null && wanted != null && current !== wanted) {
+					// Placed in the view it is in until the finger lifts.
+					val holder = views.entries.firstOrNull { it.value === current }?.key ?: scrollers.entries.firstOrNull { it.value.second === current }?.key
+					if (holder != null) {
+						restackAfterTouch = true
+						stackParent = holder.takeIf { it != parentId }
+					}
+				}
+			}
 			val frameParent = stackParent ?: parentId
 			// A sheet's top-level content sits in the sheet's content box, which is its document's origin.
 			var (ox, oy) = frameParent?.takeIf { it != sheet }?.let { absolute.getValue(it) }?.let { it.first.roundToInt() to it.second.roundToInt() } ?: (0 to 0)
@@ -1781,6 +1858,16 @@ class MarklessHost(
 			lineSources[view] = s to inView
 			drawLines(view)
 		}
+		// A button's text is the button's own view: only the element's writes transform it or group it.
+		if (s.kind != "text") {
+			applyTransform(inst.id, view, s.writes.filterIsInstance<StyleWrite.Transform>().lastOrNull(), frame.width, frame.height, dpr, stickyApplied[inst.id])
+			paintGroup(inst.id, view, s.writes.filterIsInstance<StyleWrite.OpacityGroup>().lastOrNull())
+			view.alpha = s.writes.filterIsInstance<StyleWrite.Opacity>().lastOrNull()?.let { o ->
+				val composite = DragonComposite.linked ?: throw MarklessHostError("\"${inst.id}\": opacity needs Dragon's alpha byte, which this app does not link")
+				(composite.alpha8(o.opacity) / 255.0).toFloat()
+			} ?: 1f
+		}
+		markGroupsDirty()
 		// A box that paints nothing (an empty clip) has no order to keep.
 		val paintsNothing = (view as? MarklessBox)?.clip?.isEmpty == true
 		// A button's text is the button's own view, whose order its element keeps.
@@ -1872,6 +1959,60 @@ class MarklessHost(
 			at = around
 		}
 	}
+
+	/** Shows a pre-composited opacity group's composite over its view, or takes it away. */
+	private fun paintGroup(id: String, view: View, group: StyleWrite.OpacityGroup?) {
+		val shown = groups[id]
+		if (group == null) {
+			shown?.remove()
+			groups.remove(id)
+			return
+		}
+		val composite = DragonComposite.linked ?: throw MarklessHostError("\"$id\": an opacity group needs Dragon's composite, which this app does not link")
+		val alpha8 = composite.alpha8(group.opacity)
+		if (shown != null && shown.view === view && shown.group == group && shown.alpha8 == alpha8) return
+		shown?.remove()
+		groups[id] = GroupOverlay(id, view, group, alpha8, composite, groupContext)
+	}
+
+	/** A box or text changed its layout or paint: every group's composite is stale and recomputes in the next pre-draw pass. */
+	private fun markGroupsDirty() {
+		val gone = groups.filter { (id, g) -> views[id] !== g.view }
+		for ((id, g) in gone) { g.remove(); groups.remove(id) }
+		for (g in groups.values) g.markDirty()
+	}
+
+	/** The view a group's backdrop is drawn from, and what shows under it: the page's root over the canvas and body, a top layer over the page, or a sheet's content. */
+	private fun backdropRoot(group: View): Pair<View, (android.graphics.Canvas) -> Unit> {
+		val canvas = canvasColor ?: Color.WHITE
+		val pageUnder: (android.graphics.Canvas) -> Unit = { c ->
+			c.drawColor(canvas)
+			val f = rootFrame
+			bodyBox?.let { (r, color) -> c.drawRect(Rect(r).apply { if (f != null) offset(-f.left, -f.top) }, Paint().apply { this.color = color }) }
+		}
+		if (group === root) return root to pageUnder
+		var at: View = group
+		while (true) {
+			val p = at.parent as? View ?: break
+			if (p === root) return root to pageUnder
+			if (p is TopLayer) return p to { c ->
+				c.drawColor(canvas)
+				val parent = p.parent as? ViewGroup
+				if (parent != null) for (i in 0 until parent.indexOfChild(p)) {
+					val sibling = parent.getChildAt(i)
+					if (sibling.visibility != View.VISIBLE) continue
+					val saved = c.save()
+					c.translate((sibling.left - p.left - sibling.scrollX).toFloat(), (sibling.top - p.top - sibling.scrollY).toFloat())
+					sibling.draw(c)
+					c.restoreToCount(saved)
+				}
+			}
+			if (sheets.keys.any { views[it] === p }) return p to { c -> c.drawColor(Color.WHITE) }
+			at = p
+		}
+		throw MarklessHostError("an opacity group outside the page, a sheet and a top layer has no backdrop to draw from")
+	}
+
 
 	/** Draws Dragon's lines over a text view whose text is still the one Dragon laid out; otherwise the view draws its own text. */
 	private fun drawLines(view: TextView) {
@@ -1977,6 +2118,8 @@ class MarklessHost(
 			is StyleWrite.RuntimeImage -> {}
 			is StyleWrite.SelectArrow -> if (view !is SelectBox) throw MarklessHostError("\"${s.id}\" draws a drop-down arrow but is not a select")
 			is StyleWrite.Outline -> {}
+			// Applied once the view is placed: at its frame's size, and over what it paints.
+			is StyleWrite.Transform, is StyleWrite.OpacityGroup, is StyleWrite.Opacity -> if (s.kind == "text") throw MarklessHostError("\"${s.id}\" is text with a ${w.javaClass.simpleName} write")
 		}
 		if (s.kind != "text") {
 			val edges = s.borderWidths ?: Edges(0.0, 0.0, 0.0, 0.0)
@@ -2122,8 +2265,11 @@ class MarklessHost(
 			view.hint = null
 			return
 		}
-		if (shown.frame != box || absolute[shown.id] != absolute[editor.id])
-			throw MarklessHostError("\"${s.id}\": a placeholder box other than the editor box is not implemented on Android")
+		// The hint is drawn where the value is: a single-line field centres it in the editor box, so a placeholder line Dragon centres there matches.
+		val (px, py) = absolute.getValue(shown.id)
+		val hinted = shown.frame == box && absolute[shown.id] == absolute[editor.id] ||
+			styled.textAreas[s.id] == null && px == ex && shown.frame!!.width == box.width && Math.abs((py + shown.frame!!.height / 2) - (ey + box.height / 2)) <= 1.0
+		if (!hinted) throw MarklessHostError("\"${s.id}\": a placeholder box other than the editor box is not implemented on Android")
 		val (hintFont, hintColor) = look(words)
 		if (hintFont.family != font.family || hintFont.size != font.size)
 			throw MarklessHostError("\"${s.id}\": a placeholder in another font than the value's is not implemented on Android")

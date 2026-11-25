@@ -1,0 +1,48 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Note",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "note mk-f1v2b2"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h2",
+			"parent": "h0",
+			"attributes": {
+				"class": "title mk-f1v2b2"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "The ring note"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0",
+			"element": "a",
+			"parent": "h0",
+			"attributes": {
+				"class": "back mk-f1v2b2",
+				"href": "/"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:0:text0",
+			"parent": "component-edge:0",
+			"text": "Back home"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n/* The notes app's page-wide focus ring: it reaches html and body too, which a phone never focuses. */\n:focus-visible {\n\toutline: 2px solid #1d4ed8;\n\toutline-offset: 2px;\n}\n\na {\n\tcolor: #1d4ed8;\n\ttext-decoration: none;\n}\n\n.note.mk-f1v2b2 {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #1d1b16;\n\t\t\t\tfont-size: 18px;\n\t\t\t}\n\t\t\t.title.mk-f1v2b2 {\n\t\t\t\tmargin: 0 0 12px;\n\t\t\t\tfont-size: 24px;\n\t\t\t}\n\t\t\t.back.mk-f1v2b2 {\n\t\t\t\tdisplay: block;\n\t\t\t\tpadding: 8px 0;\n\t\t\t}",
+	"states": []
+}

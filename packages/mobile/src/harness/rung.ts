@@ -418,6 +418,14 @@ function checkPageScroll(
 	return bytes;
 }
 
+/** A style file with only one phone's target, so each phone parses its own layout and not the other's. */
+function styleFor(bytes: Uint8Array, platform: ProofPlatform, name: string): Uint8Array {
+	const style = JSON.parse(new TextDecoder().decode(bytes)) as { readonly targets: Record<string, unknown> };
+	const target = style.targets[platform];
+	if (target === undefined) throw new Error(`${name}: the style export has no ${platform} target`);
+	return new TextEncoder().encode(JSON.stringify({ ...style, targets: { [platform]: target } }));
+}
+
 /**
  * The style file and every font face it names, checked against the face's `sha256:` id: a face `from` the input is a file of
  * the rung, relative to `dir`; any other is in the Dragon checkout.
@@ -538,9 +546,8 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 					const fonts =
 						(JSON.parse(new TextDecoder().decode(style)) as StyleExportFonts).fonts ??
 						[];
-					const styled = styleAssets(style, fonts, name, dir);
-					assets.ios.push(...styled);
-					assets.android.push(...styled);
+					for (const phone of PROOF_PLATFORMS)
+						assets[phone].push(...styleAssets(styleFor(style, phone, name), fonts, name, dir));
 				}
 			}
 		}
@@ -574,9 +581,10 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 						`${name}: a styled app whose views differ per phone has no single style export yet`,
 					);
 				const style = await appStyle(dir, name, build.styleInputs);
-				const styled = styleAssets(style.bytes, style.fonts, name, dir);
-				assets.ios.push(...styled);
-				assets.android.push(...styled);
+				for (const phone of PROOF_PLATFORMS)
+					assets[phone].push(
+						...styleAssets(styleFor(style.bytes, phone, name), style.fonts, name, dir),
+					);
 			}
 		}
 	} else if (existsSync(join(dir, HAND_MADE_PAYLOAD))) {

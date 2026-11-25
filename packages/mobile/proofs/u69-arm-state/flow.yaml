@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u69-arm-state
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Counters
 - assertVisible: Kept 0
 - assertVisible: Hide

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: s15-orientation
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - setOrientation: PORTRAIT
 - assertVisible: "Held upright: one day at a time"
 - assertNotVisible: "Turned on its side: the whole week"

@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: y4-sheet-beside-drawer
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Two sheets
 - assertVisible: "Last closed: nothing"
 - assertVisible: Open the drawer

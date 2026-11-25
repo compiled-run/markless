@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u4-dialog
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Dialog
 - assertVisible: Delete draft
 - assertVisible: Deleted 0

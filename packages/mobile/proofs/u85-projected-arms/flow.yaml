@@ -1,8 +1,12 @@
 appId: ${APP_ID}
 name: u85-projected-arms
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
 - assertVisible: Narrow box
 - assertVisible: Volume
 - assertVisible: Check

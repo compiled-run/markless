@@ -1,0 +1,23 @@
+appId: ${APP_ID}
+name: s59-keyboard-low-field
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: New note
+- assertVisible: Body
+- assertVisible: Nothing typed
+- assertVisible: Title
+- assertVisible: ""
+- tapOn: Title
+- eraseText
+- inputText: Groceries
+- assertNotVisible: Nothing typed
+- assertVisible: Groceries
+- assertVisible: Typed
+- assertVisible: Title
+- assertNotVisible: Nothing typed
+- assertVisible: Groceries

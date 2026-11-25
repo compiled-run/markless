@@ -1,0 +1,15 @@
+body {
+	margin: 0;
+	font-family: sans-serif;
+}
+
+/* The notes app's page-wide focus ring: it reaches html and body too, which a phone never focuses. */
+:focus-visible {
+	outline: 2px solid #1d4ed8;
+	outline-offset: 2px;
+}
+
+a {
+	color: #1d4ed8;
+	text-decoration: none;
+}

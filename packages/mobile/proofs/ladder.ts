@@ -304,6 +304,13 @@ export type LadderRung = {
 
 export const proofsDir = import.meta.dirname;
 
+/** Rungs no phone runs: the compiler refuses the page on purpose (`compiler`), or Dragon refuses its styles (`dragon`). */
+export const PHONE_REFUSED_RUNGS: Readonly<Record<string, 'compiler' | 'dragon'>> = {
+	'j7-page-refused': 'compiler',
+	'y4-sheet-beside-drawer': 'dragon',
+	'u102-drawer-swipe': 'dragon',
+};
+
 export const rungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
 		.filter(
@@ -642,28 +649,30 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 
 /** The Maestro commands of each step in order: step 0 launches the app, every later step is its action then its checks. */
 export function flowSteps(rung: LadderRung): unknown[][] {
+	// iOS's clearState reinstalls the app and launches it before FrontBoard knows it; the runner installs each rung's app fresh.
+	const cleared = onPlatform('Android', ['clearState']);
+	const options = {
+		...((rung.start || rung.pick) && {
+			arguments: {
+				...(rung.start && { route: rung.start }),
+				...(rung.pick && { pick: JSON.stringify(rung.pick) }),
+			},
+		}),
+		...(rung.permissions && { permissions: rung.permissions }),
+	};
 	const launch =
 		rung.open === 'link'
 			? [
-					{ launchApp: { clearState: true } },
+					cleared,
+					'launchApp',
 					'stopApp',
 					{ openLink: `${PROOF_URL_SCHEME}://app${rung.start ?? '/'}` },
 					// iOS asks before an outside caller opens an app by its URL scheme, until the simulator remembers the answer.
 					onPlatform('iOS', [{ tapOn: { text: 'Open', optional: true } }]),
 				]
 			: [
-					{
-						launchApp: {
-							clearState: true,
-							...((rung.start || rung.pick) && {
-								arguments: {
-									...(rung.start && { route: rung.start }),
-									...(rung.pick && { pick: JSON.stringify(rung.pick) }),
-								},
-							}),
-							...(rung.permissions && { permissions: rung.permissions }),
-						},
-					},
+					cleared,
+					Object.keys(options).length > 0 ? { launchApp: options } : 'launchApp',
 				];
 	// A rung that switches the appearance starts in light, whatever the device was left in.
 	const appearance = rung.steps.some((step) => looksOnly(step.do))
