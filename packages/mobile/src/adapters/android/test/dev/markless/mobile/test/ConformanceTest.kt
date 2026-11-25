@@ -37,6 +37,7 @@ import dev.markless.mobile.core.str
 import dev.markless.mobile.core.text
 import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.Edges
+import dev.markless.mobile.style.LaidOutRow
 import dev.markless.mobile.style.PaddingBox
 import dev.markless.mobile.style.paddingBox
 import dev.markless.mobile.style.BandAtom
@@ -905,6 +906,23 @@ private fun planTexts() {
 	check("a page text at its laid-out string keeps the recorded layout", replayed != null && "texts" !in replayed!!) { "$replayed" }
 }
 
+/** A row's text its item empties has no box, as on the web: Dragon's layout gives it none, and the row's other boxes keep theirs. */
+private fun emptyRowText() {
+	fun hex(v: Double) = "\"${java.lang.Long.toHexString(v.toRawBits()).padStart(16, '0')}\""
+	val frame = "{\"x\":0,\"y\":0,\"width\":10,\"height\":10}"
+	val export = """{"schema":"dragon.native-style-export/1","targets":{"android":{"backend":"android-views","viewport":{"width":100,"height":100},"dpr":2,"states":[],"initial":0,"next":[[]],"assignments":[{"values":{},"nodes":[{"id":"h0","parent":null,"kind":"element","frame":$frame,"writes":[]},{"id":"h1","parent":"h0","kind":"element","frame":$frame,"writes":[]},{"id":"h1:text0","parent":"h1","kind":"text","text":"x","frame":$frame,"writes":[]}]}],"plan":{"version":"dragon.markless-plan/1"},"planRepeats":[{"id":"repeat:0","parent":"h0","template":["h1"]}]}}}"""
+	val style = StyleExport.decode(export.toByteArray())
+	val zero = hex(0.0)
+	val box = "[$zero,$zero,${hex(10.0)},${hex(10.0)}]"
+	val answer = """["ok",[$zero,$zero,$zero,$zero],[["h0",$box,null,null,null,null],["h1@a",$box,null,null,null,null],["h1@b",$box,null,null,null,null],["h1:text0@b",$box,null,null,null,null]]]"""
+	val rows = { _: Int -> mapOf("repeat:0" to listOf(LaidOutRow("a", 0, mapOf("h1:text0" to "")), LaidOutRow("b", 0, mapOf("h1:text0" to "Milk")))) }
+	val laid = runCatching { style.laidOut(100.0, 100.0, 2.0, { answer }, rows = rows, rowsLayout = { answer }) }
+	check("a row whose text its item empties lays out", laid.isSuccess) { laid.exceptionOrNull().toString() }
+	val nodes = laid.getOrNull()?.assignments?.get(0)?.byId ?: return
+	check("a row's emptied text has no box", nodes["h1:text0@a"]?.frame == null && nodes["h1@a"]?.frame != null) { "${nodes["h1:text0@a"]}" }
+	check("a row's text with a string keeps its box", nodes["h1:text0@b"]?.frame != null && nodes["h1:text0@b"]?.text == "Milk") { "${nodes["h1:text0@b"]}" }
+}
+
 /** A style slot journals its new value; the plan's layout gets slot values and its moved write numbers patch the export. */
 private fun styleSlots() {
 	val payload = """{"version":"markless.native-view/0","component":"C","cells":[{"id":"c","name":"c","initial":1}],"slots":[{"id":"slot:x","value":{"binary":"*","left":{"cell":"c"},"right":{"literal":10}},"integer":true}],"nodes":[{"kind":"element","id":"h0","element":"div","parent":null,"style":["--x: ",{"slot":"slot:x"},"%"]},{"kind":"element","id":"h1","element":"button","parent":"h0"},{"kind":"element","id":"h2","element":"button","parent":"h0"},{"kind":"element","id":"h3","element":"button","parent":"h0"}],"events":[{"host":"h1","event":"activate","handler":"up"},{"host":"h2","event":"activate","handler":"same"},{"host":"h3","event":"activate","handler":"half"}],"handlers":[{"id":"up","ops":[{"op":"assign","cell":"c","value":{"binary":"+","left":{"cell":"c"},"right":{"literal":1}}}]},{"id":"same","ops":[{"op":"assign","cell":"c","value":{"cell":"c"}}]},{"id":"half","ops":[{"op":"assign","cell":"c","value":{"literal":0.25}}]}]}"""
@@ -1185,6 +1203,7 @@ fun main(args: Array<String>) {
 	flattenedInline(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	rowFlattenedInline(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	planTexts()
+	emptyRowText()
 	val dirs = args.map(::File)
 	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)
 	val files = dirs.flatMap { d -> d.listFiles { f -> f.name.endsWith(".json") }?.sortedBy { it.name } ?: error("no vector directory $d") }
