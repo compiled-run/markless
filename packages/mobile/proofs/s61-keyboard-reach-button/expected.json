@@ -1,0 +1,38 @@
+{
+	"rung": "S61",
+	"name": "With the keyboard up after typing into a field on a styled page, the page scrolls so a button the keyboard covered can be reached and tapped, as in Safari and Chrome",
+	"steps": [
+		{
+			"visible": ["New note", "Title", "Note", "Not saved yet", "Save note"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Title",
+					"text": "Groceries",
+					"keepKeyboard": true
+				}
+			},
+			"visible": ["Save note"],
+			"fields": {
+				"Title": "Groceries"
+			}
+		},
+		{
+			"do": {
+				"swipe": {
+					"from": [50, 59],
+					"to": [50, 15]
+				}
+			},
+			"visible": ["Not saved yet", "Save note"]
+		},
+		{
+			"do": {
+				"tap": "Save note"
+			},
+			"visible": ["Saved"],
+			"absent": ["Not saved yet"]
+		}
+	]
+}
