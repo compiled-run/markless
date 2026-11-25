@@ -1,24 +1,40 @@
 {
 	"rung": "S65",
-	"name": "A styled page whose component renders two top-level boxes, a header and a main, opens on phones as in a browser: Android lays out both from the page's origin, and iOS draws the page-wide focus ring of a link in the first box above the second, as the root stacking context paints outlines last",
+	"name": "A styled page whose component renders two top-level boxes, a header and a main, opens on phones as in a browser: Android lays out both from the page's origin, and iOS draws the page-wide focus ring of a link in the first box, and a link the root stacking context paints late while pressed, in the page's own view above both boxes, as Chrome paints them",
 	"steps": [
 		{
-			"visible": ["Two boxes", "Field notes", "Open the note"],
-			"absent": ["The first note"]
+			"visible": [
+				"Two boxes",
+				"Field notes",
+				"Open the note"
+			],
+			"absent": [
+				"The first note"
+			]
 		},
 		{
 			"do": {
 				"tap": "Open the note"
 			},
-			"visible": ["Two boxes", "The first note"],
-			"absent": ["Field notes"]
+			"visible": [
+				"Two boxes",
+				"The first note"
+			],
+			"absent": [
+				"Field notes"
+			]
 		},
 		{
 			"do": {
 				"tap": "Two boxes"
 			},
-			"visible": ["Field notes", "Open the note"],
-			"absent": ["The first note"]
+			"visible": [
+				"Field notes",
+				"Open the note"
+			],
+			"absent": [
+				"The first note"
+			]
 		}
 	]
 }

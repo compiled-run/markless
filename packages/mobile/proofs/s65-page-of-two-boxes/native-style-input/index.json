@@ -66,6 +66,6 @@
 			"text": "Open the note"
 		}
 	],
-	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n:focus-visible {\n\toutline: 3px solid #1d4ed8;\n\toutline-offset: 2px;\n}\n\n.bar {\n\tdisplay: flex;\n\talign-items: center;\n\tjustify-content: space-between;\n\tpadding: 12px 16px;\n\tborder-bottom: 1px solid #ced4da;\n\tbackground: #ffffff;\n}\n\n.brand {\n\tfont-size: 19px;\n\tfont-weight: 600;\n\tcolor: #1d1b16;\n\ttext-decoration: none;\n}\n\n.content {\n\tdisplay: grid;\n\tgap: 18px;\n\tpadding: 20px 16px 40px;\n\tbackground: #f4f1ea;\n}\n\n.open {\n\tcolor: #1d4ed8;\n\ttext-decoration: none;\n}\n",
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n:focus-visible {\n\toutline: 3px solid #1d4ed8;\n\toutline-offset: 2px;\n}\n\n.bar {\n\tdisplay: flex;\n\talign-items: center;\n\tjustify-content: space-between;\n\tpadding: 12px 16px;\n\tborder-bottom: 1px solid #ced4da;\n\tbackground: #ffffff;\n}\n\n.brand {\n\tfont-size: 19px;\n\tfont-weight: 600;\n\tcolor: #1d1b16;\n\ttext-decoration: none;\n}\n\n.content {\n\tdisplay: grid;\n\tgap: 18px;\n\tpadding: 20px 16px 40px;\n\tbackground: #f4f1ea;\n}\n\n.open {\n\tcolor: #1d4ed8;\n\ttext-decoration: none;\n}\n\n.open:active {\n\ttransform: scale(0.97);\n}\n",
 	"states": []
 }

@@ -1196,7 +1196,7 @@ final class ViewTree {
 	private func restack(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws -> UIView? {
 		guard style.frame != nil else { return nil }
 		if let parent = style.stackingParent {
-			guard let target = scrollViews[parent] ?? clipViews[parent] ?? elements[parent] else { throw HostError("\(id) paints in the order of \(parent), which has no view") }
+			guard let target = parent == OutlinePaint.page ? root : scrollViews[parent] ?? clipViews[parent] ?? elements[parent] else { throw HostError("\(id) paints in the order of \(parent), which has no view") }
 			if view.superview === target { return nil }
 			if fingerDown {
 				restackAfterTouch = true

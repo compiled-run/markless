@@ -35,3 +35,7 @@ body {
 	color: #1d4ed8;
 	text-decoration: none;
 }
+
+.open:active {
+	transform: scale(0.97);
+}

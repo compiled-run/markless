@@ -35,7 +35,8 @@ public struct OutlinePaint: Equatable, Sendable {
 extension StyleExport {
 	/// The outline of `node`, drawn in its layer's view or the page's top view; one that view would clip or misorder is refused.
 	func outline(
-		of node: StyleNode, byId: [String: StyleNode], nodes: [StyleNode], isView: (String) -> Bool, postOrder: [String: Int]
+		of node: StyleNode, byId: [String: StyleNode], nodes: [StyleNode], isView: (String) -> Bool, postOrder: [String: Int],
+		pageHoldsMany: Bool
 	) throws -> OutlinePaint? {
 		guard let write = node.writes.lazy.compactMap({ write -> Outline? in
 			if case let .outline(o) = write { return o }
@@ -52,16 +53,14 @@ extension StyleExport {
 		}
 		// Where `stackingParent` places a box the layer paints later.
 		func layerView(above n: StyleNode) -> String? {
-			isView(write.layer) ? write.layer : ancestors(n).last(where: { isView($0.id) })?.id
+			isView(write.layer) ? write.layer : pageHoldsMany ? OutlinePaint.page : ancestors(n).last(where: { isView($0.id) })?.id
 		}
 		let chain = [node] + ancestors(node)
 		guard var host = isView(write.layer) ? write.layer : chain.last(where: { isView($0.id) })?.id else {
 			throw styleError("\(node.id): its outline has no view to be drawn in")
 		}
 		guard var hostIndex = chain.firstIndex(where: { $0.id == host }) else { throw styleError("\(node.id): its outline's layer \(write.layer) is not around it") }
-		if !isView(write.layer), let at = nodes.firstIndex(where: { $0.id == host }),
-			nodes[(at + 1)...].contains(where: { n in n.frame != nil && isView(n.id) && !ancestors(n).contains { isView($0.id) } })
-		{
+		if !isView(write.layer), pageHoldsMany {
 			// The root stacking context paints its outlines after all its boxes, so a later top-level box does not cover it.
 			host = OutlinePaint.page
 			hostIndex = chain.count - 1
