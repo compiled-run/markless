@@ -1167,7 +1167,7 @@ final class ViewTree {
 			outlines.removeValue(forKey: id)?.removeFromSuperview()
 			return
 		}
-		guard let host = elements[outline.host] else { throw HostError("\(id): its outline is drawn in \(outline.host), which has no view") }
+		guard let host = outline.host == OutlinePaint.page ? root : elements[outline.host] else { throw HostError("\(id): its outline is drawn in \(outline.host), which has no view") }
 		let view = outlines[id] ?? OutlineView()
 		outlines[id] = view
 		try view.apply(outline, in: host)
@@ -1196,7 +1196,7 @@ final class ViewTree {
 	private func restack(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws -> UIView? {
 		guard style.frame != nil else { return nil }
 		if let parent = style.stackingParent {
-			guard let target = scrollViews[parent] ?? clipViews[parent] ?? elements[parent] else { throw HostError("\(id) paints in the order of \(parent), which has no view") }
+			guard let target = parent == OutlinePaint.page ? root : scrollViews[parent] ?? clipViews[parent] ?? elements[parent] else { throw HostError("\(id) paints in the order of \(parent), which has no view") }
 			if view.superview === target { return nil }
 			if fingerDown {
 				restackAfterTouch = true
