@@ -289,6 +289,35 @@
 					}
 				]
 			}
+		],
+		"styleCases": [
+			{
+				"id": "case:h4#hidden",
+				"value": {
+					"unary": "!",
+					"value": {
+						"cell": "details:h2"
+					}
+				}
+			},
+			{
+				"id": "case:h7#hidden",
+				"value": {
+					"unary": "!",
+					"value": {
+						"cell": "details:h5"
+					}
+				}
+			},
+			{
+				"id": "case:h8#hidden",
+				"value": {
+					"unary": "!",
+					"value": {
+						"cell": "details:h5"
+					}
+				}
+			}
 		]
 	},
 	"initial": [
@@ -362,6 +391,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "case:h4#hidden",
+					"value": false
+				},
+				{
 					"op": "attribute",
 					"node": "h2",
 					"name": "open",
@@ -387,6 +421,16 @@
 				"host": "h6"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "case:h7#hidden",
+					"value": true
+				},
+				{
+					"op": "state",
+					"cell": "case:h8#hidden",
+					"value": true
+				},
 				{
 					"op": "attribute",
 					"node": "h5",
@@ -425,6 +469,16 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "case:h7#hidden",
+					"value": false
+				},
+				{
+					"op": "state",
+					"cell": "case:h8#hidden",
+					"value": false
+				},
+				{
 					"op": "attribute",
 					"node": "h5",
 					"name": "open",
@@ -461,6 +515,11 @@
 				"host": "h3"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "case:h4#hidden",
+					"value": true
+				},
 				{
 					"op": "attribute",
 					"node": "h2",

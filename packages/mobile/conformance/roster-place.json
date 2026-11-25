@@ -333,6 +333,62 @@
 					}
 				]
 			}
+		],
+		"styleCases": [
+			{
+				"id": "case:component-edge:3/component-edge:0/h2#hidden",
+				"value": {
+					"binary": "!==",
+					"left": {
+						"binary": "===",
+						"left": {
+							"cell": "component-edge:3/shared:src/roster-place.tsrx#trackState/state:track.current"
+						},
+						"right": {
+							"literal": 0
+						}
+					},
+					"right": {
+						"literal": true
+					}
+				}
+			},
+			{
+				"id": "case:component-edge:3/component-edge:1/h2#hidden",
+				"value": {
+					"binary": "!==",
+					"left": {
+						"binary": "===",
+						"left": {
+							"cell": "component-edge:3/shared:src/roster-place.tsrx#trackState/state:track.current"
+						},
+						"right": {
+							"literal": 1
+						}
+					},
+					"right": {
+						"literal": true
+					}
+				}
+			},
+			{
+				"id": "case:component-edge:3/component-edge:2/h2#hidden",
+				"value": {
+					"binary": "!==",
+					"left": {
+						"binary": "===",
+						"left": {
+							"cell": "component-edge:3/shared:src/roster-place.tsrx#trackState/state:track.current"
+						},
+						"right": {
+							"literal": 2
+						}
+					},
+					"right": {
+						"literal": true
+					}
+				}
+			}
 		]
 	},
 	"initial": [
@@ -394,6 +450,16 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "case:component-edge:3/component-edge:0/h2#hidden",
+					"value": true
+				},
+				{
+					"op": "state",
+					"cell": "case:component-edge:3/component-edge:1/h2#hidden",
+					"value": false
+				},
+				{
 					"op": "attribute",
 					"node": "component-edge:3/component-edge:0/h2",
 					"name": "hidden",
@@ -413,6 +479,16 @@
 				"host": "component-edge:3/h4"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "case:component-edge:3/component-edge:1/h2#hidden",
+					"value": true
+				},
+				{
+					"op": "state",
+					"cell": "case:component-edge:3/component-edge:2/h2#hidden",
+					"value": false
+				},
 				{
 					"op": "attribute",
 					"node": "component-edge:3/component-edge:1/h2",
