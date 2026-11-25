@@ -1,0 +1,65 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Cards",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page mk-1z0xch3"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "card pressed mk-1z0xch3"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "div",
+			"parent": "h2",
+			"attributes": {
+				"class": "photo mk-1z0xch3"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Groceries"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "card lifted mk-1z0xch3"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "div",
+			"parent": "h4",
+			"attributes": {
+				"class": "photo mk-1z0xch3"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Plumber"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.page.mk-1z0xch3 {\n\t\t\t\tdisplay: flex;\n\t\t\t\tgap: 28px;\n\t\t\t\tpadding: 32px 24px;\n\t\t\t\tbackground: #f3f1ea;\n\t\t\t}\n\t\t\t.card.mk-1z0xch3 {\n\t\t\t\twidth: 120px;\n\t\t\t\theight: 90px;\n\t\t\t\toverflow: hidden;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tfont-size: 17px;\n\t\t\t\tcolor: #2b2620;\n\t\t\t}\n\t\t\t.pressed.mk-1z0xch3 {\n\t\t\t\tborder: 1px solid #c9c1b0;\n\t\t\t\tborder-radius: 14px;\n\t\t\t\ttransform: scale(0.97);\n\t\t\t\toutline: 3px solid #1f6feb;\n\t\t\t\toutline-offset: 2px;\n\t\t\t}\n\t\t\t.lifted.mk-1z0xch3 {\n\t\t\t\tposition: relative;\n\t\t\t\toutline: 4px solid #d1495b;\n\t\t\t\toutline-offset: 3px;\n\t\t\t}\n\t\t\t.photo.mk-1z0xch3 {\n\t\t\t\twidth: 180px;\n\t\t\t\theight: 50px;\n\t\t\t\tbackground: #e9a23b;\n\t\t\t}",
+	"states": []
+}

@@ -57,9 +57,12 @@ extension StyleExport {
 		}
 		guard let hostIndex = chain.firstIndex(where: { $0.id == host }) else { throw styleError("\(node.id): its outline's layer \(write.layer) is not around it") }
 		for box in chain[(hostIndex == 0 ? 0 : 1)...hostIndex] {
+			// A box drawing its own outline clips its children in a clip view beside it, so only its clip-path or scroll view would cut it.
+			let own = box.id == node.id && host == node.id
 			let clips = box.writes.contains {
 				switch $0 {
-				case .paddingBoxClip, .clipPathInset, .scrollContainer: return true
+				case .paddingBoxClip: return !own
+				case .clipPathInset, .scrollContainer: return true
 				default: return false
 				}
 			}

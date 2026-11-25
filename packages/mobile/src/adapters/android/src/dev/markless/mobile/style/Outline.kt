@@ -31,7 +31,9 @@ data class OutlinePaint(
 			val hostIndex = chain.indexOfFirst { it.id == host }
 			if (hostIndex < 0) throw MarklessDecodeError("\"${node.id}\": its outline's layer ${write.layer} is not around it")
 			for (box in chain.subList(if (hostIndex == 0) 0 else 1, hostIndex + 1)) {
-				if (box.writes.any { it == StyleWrite.PaddingBoxClip || it is StyleWrite.ClipPathInset || it is StyleWrite.ScrollContainer })
+				// A box drawing its own outline clips each child but that outline, so only its clip-path or scroll view would cut it.
+				val own = box.id == node.id && host == node.id
+				if (box.writes.any { (it == StyleWrite.PaddingBoxClip && !own) || it is StyleWrite.ClipPathInset || it is StyleWrite.ScrollContainer })
 					throw MarklessDecodeError("\"${node.id}\": its outline is drawn in $host, past ${box.id}, which clips or scrolls; not implemented on Android")
 			}
 			if (!isView(write.layer)) {

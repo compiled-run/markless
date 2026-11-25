@@ -1,0 +1,10 @@
+{
+	"rung": "S64",
+	"name": "a card that clips its overflow and is scaled or positioned draws its own outline outside its clip, as the web does",
+	"steps": [
+		{
+			"visible": ["Groceries", "Plumber"],
+			"title": "Outlined cards"
+		}
+	]
+}
