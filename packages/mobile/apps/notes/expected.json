@@ -17,13 +17,23 @@
 			"do": {
 				"type": {
 					"field": "Title",
-					"text": "Groceries"
+					"text": "Groceries",
+					"keepKeyboard": true
 				}
 			},
 			"visible": ["Save note"],
 			"fields": {
 				"Title": "Groceries"
 			}
+		},
+		{
+			"do": {
+				"swipe": {
+					"from": [50, 36],
+					"to": [50, 4]
+				}
+			},
+			"visible": ["Save note"]
 		},
 		{
 			"do": {
@@ -43,12 +53,19 @@
 			"do": {
 				"back": "button"
 			},
-			"visible": ["All notes", { "startsWith": "Groceries" }],
+			"visible": [
+				"All notes",
+				{
+					"startsWith": "Groceries"
+				}
+			],
 			"absent": ["Save note"]
 		},
 		{
 			"do": {
-				"tap": { "startsWith": "Groceries" }
+				"tap": {
+					"startsWith": "Groceries"
+				}
 			},
 			"visible": ["Edit"],
 			"absent": ["Search notes"]
@@ -57,7 +74,12 @@
 			"do": {
 				"back": "button"
 			},
-			"visible": ["All notes", { "startsWith": "Groceries" }],
+			"visible": [
+				"All notes",
+				{
+					"startsWith": "Groceries"
+				}
+			],
 			"absent": ["Edit"]
 		},
 		{
@@ -68,7 +90,11 @@
 				}
 			},
 			"visible": ["No notes match “zzz”"],
-			"absent": [{ "startsWith": "Groceries" }]
+			"absent": [
+				{
+					"startsWith": "Groceries"
+				}
+			]
 		}
 	]
 }
