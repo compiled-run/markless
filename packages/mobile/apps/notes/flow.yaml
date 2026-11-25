@@ -19,7 +19,7 @@ name: notes
 - eraseText
 - inputText: Groceries
 - assertVisible: Groceries
-- assertVisible: Save note
+- assertVisible: Title
 - assertVisible: Groceries
 - swipe:
     start: 50%, 36%

@@ -21,7 +21,7 @@
 					"keepKeyboard": true
 				}
 			},
-			"visible": ["Save note"],
+			"visible": ["Title"],
 			"fields": {
 				"Title": "Groceries"
 			}
