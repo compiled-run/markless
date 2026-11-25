@@ -177,6 +177,22 @@ class CameraPreview(context: Context, private val onWindow: (attached: Boolean, 
 
 	init {
 		addView(texture, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+		// The picture is clipped to the box's rounded outline, as CSS clips a replaced element's content.
+		clipToOutline = true
+	}
+
+	/** A styled page gives the box its exact size; 240 by 180 dp is only the size of an unstyled one. */
+	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+		if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.EXACTLY && MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.EXACTLY)
+			measureExactly(widthMeasureSpec, heightMeasureSpec)
+		else super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+	}
+
+	private fun measureExactly(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+		val w = MeasureSpec.getSize(widthMeasureSpec)
+		val h = MeasureSpec.getSize(heightMeasureSpec)
+		texture.measure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY))
+		setMeasuredDimension(w, h)
 	}
 
 	override fun onAttachedToWindow() {

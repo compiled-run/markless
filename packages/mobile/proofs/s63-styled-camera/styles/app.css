@@ -1,0 +1,36 @@
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	font-family: sans-serif;
+	font-size: 16px;
+}
+
+.page {
+	padding: 24px;
+	background: #fbf8f1;
+	color: #1f1d1a;
+}
+.capture {
+	display: grid;
+	gap: 12px;
+}
+.preview {
+	display: block;
+	width: 100%;
+	aspect-ratio: 4 / 3;
+	border-radius: 12px;
+	background: #000000;
+}
+.take {
+	display: block;
+	width: 100%;
+	padding: 10px 16px;
+	border: 0;
+	border-radius: 12px;
+	background: #c2410c;
+	color: #ffffff;
+	font: inherit;
+}

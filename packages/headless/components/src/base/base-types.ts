@@ -60,4 +60,6 @@ export type VisuallyHiddenProps = Pick<PropsOf<'span'>, 'children'>;
 export type CameraProps = {
 	/** The device object whose picture this shows: `const cam = camera()`. */
 	readonly el?: object;
+	/** Classes for the picture's box on a phone, which styles size and paint; the web renders no camera. */
+	readonly class?: string;
 };
