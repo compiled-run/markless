@@ -18,10 +18,13 @@ name: notes
 - tapOn: Title
 - eraseText
 - inputText: Groceries
-- hideKeyboard
 - assertVisible: Groceries
+- assertVisible: Title
+- assertVisible: Groceries
+- swipe:
+    start: 50%, 36%
+    end: 50%, 4%
 - assertVisible: Save note
-- assertVisible: Groceries
 - tapOn: Save note
 - assertNotVisible: Save note
 - assertVisible: Groceries
