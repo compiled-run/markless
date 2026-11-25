@@ -537,6 +537,7 @@ final class ViewTree {
 		// A tap outside a field blurs it, as on the web; a drag scrolls and keeps the keyboard up.
 		for gesture in dismissGestures {
 			gesture.cancelsTouchesInView = false
+			gesture.delegate = keyboard
 			gesture.addTarget(keyboard, action: #selector(KeyboardDismisser.dismiss))
 			page.addGestureRecognizer(gesture)
 		}
@@ -1801,7 +1802,11 @@ final class ViewTree {
 				let taps = TapCount()
 				control.addAction(UIAction { _ in taps.value = 1 }, for: .touchDown)
 				control.addAction(UIAction { _ in taps.value += 1 }, for: .touchDownRepeat)
-				control.addAction(UIAction { _ in onAction(NativeAction(event: .activate, host: id, detail: taps.value)) }, for: .touchUpInside)
+				control.addAction(UIAction { [weak self] _ in
+					// As Safari does: the press blurs the focused field, then the click lands on the button.
+					self?.page.endEditing(true)
+					onAction(NativeAction(event: .activate, host: id, detail: taps.value))
+				}, for: .touchUpInside)
 			case (.activate, _) where !(view is UITextField || view is TextArea):
 				// An element that is not a button (a list row): a tap anywhere in it, its text included, presses it.
 				view.isUserInteractionEnabled = true
@@ -2677,10 +2682,20 @@ final class LabelForward: NSObject {
 
 /// A tap or drag outside a field puts the keyboard away, as a scrolling screen does.
 @MainActor
-final class KeyboardDismisser: NSObject {
+final class KeyboardDismisser: NSObject, UIGestureRecognizerDelegate {
 	private weak var root: UIView?
 	init(_ root: UIView) { self.root = root }
 	@objc func dismiss() { root?.endEditing(true) }
+
+	/// A tap on a control is that control's: it blurs the field itself as it acts, after its touch has ended in place.
+	func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+		var view = touch.view
+		while let v = view, v !== root {
+			if v is UIControl { return false }
+			view = v.superview
+		}
+		return true
+	}
 }
 
 @MainActor
@@ -2697,7 +2712,8 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	view.layer.borderWidth = style.borderWidth
 	view.layer.borderColor = style.borderColor.map(uiColor)?.cgColor
 	view.layer.cornerRadius = style.cornerRadius
-	view.clipsToBounds = style.clipsChildren && style.childClip == nil
+	// A replaced element's content is clipped to its (rounded) box, as CSS clips a camera's or an image's picture.
+	view.clipsToBounds = (style.clipsChildren && style.childClip == nil) || view is CameraPreviewView
 	// Siblings draw by zPosition: in-flow boxes at 0, negative z-index below them, positioned boxes above in their context's order.
 	view.layer.zPosition = style.paintOrder.map { CGFloat($0.bucket) * 100_000 + CGFloat($0.rank) + 1 } ?? 0
 	// A layer mask clips the box and its subviews without touching their accessibility, as Chrome keeps clipped text exposed.

@@ -924,6 +924,31 @@ private fun emptyRowText() {
 	check("a row's text with a string keeps its box", nodes["h1:text0@b"]?.frame != null && nodes["h1:text0@b"]?.text == "Milk") { "${nodes["h1:text0@b"]}" }
 }
 
+/** A page shaped like the notes note page: Dragon parses the whole plan it is sent, so a layout sends only the assignment it lays out. */
+private fun planPerAssignment() {
+	val assignmentCount = 16
+	val statesEach = 64
+	val node = """{"id":"h0","parent":null,"kind":"element","frame":null,"writes":[]}"""
+	fun assignment(a: Int) = """{"values":{"c":$a},"nodes":[$node]}"""
+	val next = (0 until assignmentCount).joinToString(",") { "[[${(0 until assignmentCount).joinToString(",")}]]" }
+	val levels = (0 until assignmentCount).joinToString(",") { a ->
+		"""{"tables":{},"addresses":[],"states":[${(0 until statesEach).joinToString(",") { assignment(a) }}],"matches":[${(0 until statesEach).joinToString(",") { """{"active":[],"focus":null,"hover":[]}""" }}]}"""
+	}
+	val entries = assignmentCount * (1 + statesEach)
+	// Each plan assignment about the size of the notes page's, named by its entry.
+	val planAssignments = (0 until entries).joinToString(",") { k -> """{"variant":0,"entry":$k,"dashed":"${"x".repeat(2400)}"}""" }
+	val export = """{"schema":"dragon.native-style-export/1","targets":{"android":{"backend":"android-views","viewport":{"width":100,"height":100},"dpr":2,"states":[{"key":"c","domain":[${(0 until assignmentCount).joinToString(",")}]}],"initial":0,"next":[$next],"assignments":[${(0 until assignmentCount).joinToString(",") { assignment(it) }}],"interaction":{"levels":[$levels]},"plan":{"version":"dragon.markless-plan/1","assignments":[$planAssignments]}}}}"""
+	val style = StyleExport.decode(export.toByteArray())
+	val zero = "\"${"0".repeat(16)}\""
+	val pressed = style.interaction[3].entries[40]
+	var line: String? = null
+	style.laidOut(100.0, 100.0, 2.0, { l -> line = l; """["ok",[$zero,$zero,$zero,$zero],[]]""" }, entries = setOf(pressed))
+	val sent = (Json.parse(line!!) as Json.Obj).fields
+	val plan = (sent.getValue("plan") as Json.Obj).fields.getValue("assignments").arr("plan.assignments")
+	check("a layout sends Dragon only the assignment it lays out, as assignment 0", plan.size == 1 && (plan[0] as Json.Obj).fields["entry"] == Json.Num(pressed.toDouble()) && sent["assignment"] == Json.Num(0.0)) { "${plan.size} of $entries assignments, assignment ${sent["assignment"]}" }
+	check("a layout's line is about one assignment's size, not the whole plan's", line!!.length < 4000) { "${line!!.length} chars" }
+}
+
 /** A style slot journals its new value; the plan's layout gets slot values and its moved write numbers patch the export. */
 private fun styleSlots() {
 	val payload = """{"version":"markless.native-view/0","component":"C","cells":[{"id":"c","name":"c","initial":1}],"slots":[{"id":"slot:x","value":{"binary":"*","left":{"cell":"c"},"right":{"literal":10}},"integer":true}],"nodes":[{"kind":"element","id":"h0","element":"div","parent":null,"style":["--x: ",{"slot":"slot:x"},"%"]},{"kind":"element","id":"h1","element":"button","parent":"h0"},{"kind":"element","id":"h2","element":"button","parent":"h0"},{"kind":"element","id":"h3","element":"button","parent":"h0"}],"events":[{"host":"h1","event":"activate","handler":"up"},{"host":"h2","event":"activate","handler":"same"},{"host":"h3","event":"activate","handler":"half"}],"handlers":[{"id":"up","ops":[{"op":"assign","cell":"c","value":{"binary":"+","left":{"cell":"c"},"right":{"literal":1}}}]},{"id":"same","ops":[{"op":"assign","cell":"c","value":{"cell":"c"}}]},{"id":"half","ops":[{"op":"assign","cell":"c","value":{"literal":0.25}}]}]}"""
@@ -1238,6 +1263,7 @@ fun main(args: Array<String>) {
 	rowFlattenedInline(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	planTexts()
 	emptyRowText()
+	planPerAssignment()
 	val dirs = args.map(::File)
 	for (d in dirs) if (File(d, "scroll").isDirectory) scrollVectors(d)
 	val files = dirs.flatMap { d -> d.listFiles { f -> f.name.endsWith(".json") }?.sortedBy { it.name } ?: error("no vector directory $d") }

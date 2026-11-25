@@ -3,8 +3,10 @@ import { fontFaceSources, selectorAttributes } from '@markless/compiler/native';
 import {
 	isNativeStyleStateAttribute,
 	NATIVE_NO_ARM,
+	nativeAttributeStyleCaseId,
 	nativeExprCells,
 } from '@markless/serializer/native-view';
+import { DEVICE_ELEMENT_BOX } from '@markless/serializer/native-device';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeBuild, NativeStylesheet } from './compile.ts';
 import { createNativeRuntime, evaluateWithScript, formatNativeValue } from './runtime.ts';
@@ -456,9 +458,23 @@ export function nativeStyleInput(
 			);
 		},
 	);
+	const payloadCases = new Set((payload.styleCases ?? []).map((styleCase) => styleCase.id));
+	// A presence attribute a test over unlisted state decides has its own style case (the compiler's), named by node and attribute.
+	const attributeCase = (node: string, attribute: string): string | undefined => {
+		const id = nativeAttributeStyleCaseId(node, attribute);
+		return payloadCases.has(id) ? id : undefined;
+	};
 	const caseIds = new Set(
 		nodes.flatMap((node) =>
-			node.kind === 'element' && node.styleWhen ? [node.styleWhen.case] : [],
+			node.kind === 'element'
+				? [
+						...(node.styleWhen ? [node.styleWhen.case] : []),
+						...(node.bindings ?? []).flatMap((binding) => {
+							const id = 'attribute' in binding ? attributeCase(node.id, binding.attribute) : undefined;
+							return id ? [id] : [];
+						}),
+					]
+				: [],
 		),
 	);
 	const caseAtMount = new Map(mounted.styleCases());
@@ -710,10 +726,15 @@ export function nativeStyleInput(
 				const byState = combinations.map((when) => {
 					// A row's own value, absent (null) included: the binding reads a row's item, which no page state gives.
 					const row = byRow(binding.attribute, when);
+					const styleCase = attributeCase(node.id, binding.attribute);
 					return {
 						when,
-						value: row
-							? row.value
+						value: styleCase
+							? when[styleCase] === true
+								? ''
+								: null
+							: row
+								? row.value
 							: (marklessAttributeValue(
 									binding.attribute,
 									evaluate(binding.value, when),
@@ -753,13 +774,15 @@ export function nativeStyleInput(
 				delete attributes['value'];
 				delete attributesByState['value'];
 			}
+			// A device element's part renders a plain box on a phone; styles lay that box out, and the host's view fills it.
+			const deviceBox = node.object ? DEVICE_ELEMENT_BOX[node.element] : undefined;
 			return [
 				{
 					kind: 'element',
 					id: node.id,
-					element: node.element,
+					element: deviceBox?.element ?? node.element,
 					parent: sheet && node.parent === sheet.id ? sheet.parent : node.parent,
-					attributes,
+					attributes: deviceBox ? { ...attributes, [deviceBox.attribute]: '' } : attributes,
 					...(classByState ? { classByState } : {}),
 					...(Object.keys(attributesByState).length > 0 ? { attributesByState } : {}),
 					...(sheet?.boxless.has(node.id) ? { boxless: true as const } : {}),

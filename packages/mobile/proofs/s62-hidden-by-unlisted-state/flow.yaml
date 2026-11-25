@@ -1,0 +1,30 @@
+appId: ${APP_ID}
+name: s62-hidden-by-unlisted-state
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: No items yet
+- assertVisible: Add item
+- assertNotVisible: No items match
+- tapOn: Add item
+- assertNotVisible: No items yet
+- assertVisible: Apples
+- assertVisible: Add item
+- assertNotVisible: No items yet
+- assertNotVisible: No items match
+- tapOn: Search items
+- eraseText
+- inputText: zzz
+- assertVisible: No items match
+- assertNotVisible: Apples
+- assertVisible: No items match
+- assertNotVisible: Apples
+- tapOn: Clear text
+- assertVisible: Apples
+- assertNotVisible: No items match
+- assertVisible: Apples
+- assertNotVisible: No items match

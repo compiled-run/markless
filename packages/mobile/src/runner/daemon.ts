@@ -18,6 +18,7 @@ import {
 	withAdmission,
 } from './phones.ts';
 import { parsePhone, phoneId, type PhoneSpec, type PhoneState, transitionPhone } from './pool.ts';
+import { withChunkTempDir } from './chunk-temp.ts';
 import { RemoteAway, remoteBoot, runRemoteChunk } from './remote.ts';
 import {
 	checkoutFacts,
@@ -396,19 +397,24 @@ async function run(phone: Phone, job: string, name: string, queued: Chunk): Prom
 				driverInstalled ? 'keep-driver' : 'reinstall-driver',
 			];
 			const heavy = heavyCommand();
-			const child = spawn(heavy ?? command[0]!, heavy ? command : command.slice(1), {
-				// Never give up: a chunk that the queue refuses to admit would end without a result.
-				env: {
+			await withChunkTempDir(
+				{
 					...process.env,
+					// Never give up: a chunk that the queue refuses to admit would end without a result.
 					HEAVY_GB: String(CHUNK_GB),
 					HEAVY_CORES: String(CHUNK_CORES),
 					HEAVY_MAX_WAIT: '0',
 				},
-				stdio: ['ignore', out, out],
-			});
-			children.add(child);
-			await new Promise<void>((resolve) => child.on('exit', () => resolve()));
-			children.delete(child);
+				async (env) => {
+					const child = spawn(heavy ?? command[0]!, heavy ? command : command.slice(1), {
+						env,
+						stdio: ['ignore', out, out],
+					});
+					children.add(child);
+					await new Promise<void>((resolve) => child.on('exit', () => resolve()));
+					children.delete(child);
+				},
+			);
 		}
 		if (stopping) return;
 		const running = readJson<Chunk>(chunkFile(job, name))!;

@@ -21,6 +21,8 @@ import { PROTOCOL_IDLE_EVENT_NAME, PROTOCOL_VISIBLE_EVENT_NAME } from '@markless
 import {
 	nativeNonFiniteSplit,
 	isNativeStyleStateAttribute,
+	NATIVE_PRESENCE_STYLE_ATTRIBUTES,
+	nativeAttributeStyleCaseId,
 	NATIVE_NUMBER_MESSAGES_BY_LOCALE,
 	NATIVE_EMAIL_MISMATCH_BY_LOCALE,
 	nativeExprCells,
@@ -6545,19 +6547,34 @@ export function createNativeViewPayload(
 					if (
 						!object ||
 						object.device !== deviceElement.device ||
-						edge.props.some((prop) => prop.name !== 'el')
+						edge.props.some(
+							(prop) =>
+								prop.name !== 'el' &&
+								(prop.name !== 'class' || prop.kind === 'callback' || prop.kind === 'spread'),
+						)
 					) {
 						refuse(
-							`<${edge.childComponentName}> needs el={…} naming a ${deviceElement.device} the component made, and no other props`,
+							`<${edge.childComponentName}> needs el={…} naming a ${deviceElement.device} the component made, and takes no other props but class`,
 						);
 						continue;
 					}
+					// The part's own box takes `class`, as on the web: styles size and paint the box the platform's view fills.
+					const deviceClass = edge.props.find((prop) => prop.name === 'class');
+					const classValue = deviceClass ? linkAttribute(deviceClass, edge, scope) : undefined;
+					if (deviceClass && !classValue) continue;
 					nodes.push({
 						kind: 'element',
 						id: scope.prefix + edge.id,
 						element: deviceElement.element,
 						object: object.id,
 						parent,
+						...(classValue && 'literal' in classValue
+							? typeof classValue.literal === 'string'
+								? { attributes: { class: classValue.literal } }
+								: {}
+							: classValue
+								? { bindings: [{ attribute: 'class', value: classValue }] }
+								: {}),
 						...place,
 					});
 					continue;
@@ -9595,6 +9612,12 @@ export function createNativeViewPayload(
 	};
 	const styledDomains = new Map<string, string[]>();
 	const styledCells = new Set<string>();
+	// Cells whose value when the page opens the build cannot know (kept, device, async, clock), written by this page or not.
+	const unknownAtBuild = new Set(
+		cells.flatMap((cell) =>
+			cell.storage || cell.device || cell.async || cell.task || cell.clock ? [cell.id] : [],
+		),
+	);
 	// A row's state has a value per row, which one style assignment per combination of states cannot follow.
 	const rowCells = new Set(cells.flatMap((cell) => (cell.row ? [cell.id] : [])));
 	for (const node of nodes)
@@ -9602,6 +9625,18 @@ export function createNativeViewPayload(
 			for (const binding of node.bindings ?? []) {
 				if (!('attribute' in binding)) continue;
 				if (binding.attribute === 'class') cellsOf(binding.value, styledCells);
+				else if (
+					NATIVE_PRESENCE_STYLE_ATTRIBUTES.has(binding.attribute) &&
+					!node.row &&
+					[...cellsOf(binding.value)].some(
+						(cell) =>
+							written.has(cell)
+								? typeof initialOf(cell) !== 'boolean' && !stringDomain(cell)
+								: unknownAtBuild.has(cell),
+					)
+				)
+					// Present or absent by a test over written state no domain lists: Dragon lays the element out both ways, chosen as the test holds.
+					styleCases.push({ id: nativeAttributeStyleCaseId(node.id, binding.attribute), value: binding.value });
 				else if (isNativeStyleStateAttribute(binding.attribute))
 					for (const cell of cellsOf(binding.value))
 						if (written.has(cell) && typeof initialOf(cell) === 'boolean')

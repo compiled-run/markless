@@ -1,0 +1,29 @@
+appId: ${APP_ID}
+name: s61-keyboard-reach-button
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: New note
+- assertVisible: Title
+- assertVisible: Note
+- assertVisible: Not saved yet
+- assertVisible: Save note
+- tapOn: Title
+- eraseText
+- inputText: Groceries
+- assertVisible: Groceries
+- assertVisible: Save note
+- assertVisible: Groceries
+- swipe:
+    start: 50%, 59%
+    end: 50%, 15%
+- assertVisible: Not saved yet
+- assertVisible: Save note
+- tapOn: Save note
+- assertNotVisible: Not saved yet
+- assertVisible: Saved
+- assertNotVisible: Not saved yet

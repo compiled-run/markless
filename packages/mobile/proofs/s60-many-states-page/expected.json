@@ -1,0 +1,31 @@
+{
+	"rung": "S60",
+	"name": "a page as heavy as the notes app's note page (16 style assignments, each with 55 to 74 pressed and focused states, about 1,000 in all) opens on Android within the app's default memory, and a dialog opened over it and closed again draws as the web does",
+	"steps": [
+		{
+			"visible": ["Groceries", "Milk and eggs", "Delete", "Shopping · Deleted 0 times"],
+			"absent": ["Delete this note?"],
+			"title": "Many states"
+		},
+		{
+			"do": {
+				"tap": "Delete"
+			},
+			"visible": ["Delete this note?", "Keep it", "Delete note"]
+		},
+		{
+			"do": {
+				"tap": "Delete note"
+			},
+			"visible": ["Groceries", "Shopping · Deleted 1 times"],
+			"absent": ["Delete this note?"]
+		},
+		{
+			"do": {
+				"tap": "Hide note"
+			},
+			"visible": ["Note not found", "Show note"],
+			"absent": ["Groceries"]
+		}
+	]
+}
