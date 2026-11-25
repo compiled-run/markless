@@ -16,7 +16,7 @@ import { element, shared, state } from '@markless/core';
 
 export const select = shared(() => {
 	const s = state({ open: false });
-	const triggerEl = element<HTMLButtonElement>();
+	const triggerEl = element<HTMLButtonElement | undefined>();
 	return { ...s, triggerEl };
 }, { scope: 'subtree' });
 
@@ -81,7 +81,7 @@ test('an anchor attribute on a component tag is refused the same way', async () 
 	const graph = await graphOf(`import { element } from '@markless/core';
 export function Inner() @{ <div>x</div> }
 export function App() @{
-	const triggerEl = element<HTMLButtonElement>();
+	const triggerEl = element<HTMLButtonElement | undefined>();
 	<section>
 		<button el={triggerEl}>open</button>
 		<Inner positionAnchor={triggerEl} />

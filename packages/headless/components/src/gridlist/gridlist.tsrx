@@ -40,8 +40,8 @@ export const gridlistState = shared(
 			typed: '',
 			typedAt: 0,
 		});
-		const gridEl = element<HTMLDivElement>();
-		const labelEl = element<HTMLSpanElement>();
+		const gridEl = element<HTMLDivElement | undefined>();
+		const labelEl = element<HTMLSpanElement | undefined>();
 		// The array type argument is what makes a handle plural: bound on every part
 		// of its kind, read back as the live elements in document order. Walking them
 		// is how the family reaches another part without ever looking one up.

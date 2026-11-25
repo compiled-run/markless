@@ -57,10 +57,10 @@ export const numberboxState = shared(
 			repeats: 0,
 			repeatUp: true,
 		});
-		const inputEl = element<HTMLInputElement>();
-		const labelEl = element<HTMLLabelElement>();
-		const descriptionEl = element<HTMLDivElement>();
-		const errorEl = element<HTMLDivElement>();
+		const inputEl = element<HTMLInputElement | undefined>();
+		const labelEl = element<HTMLLabelElement | undefined>();
+		const descriptionEl = element<HTMLDivElement | undefined>();
+		const errorEl = element<HTMLDivElement | undefined>();
 
 		const value = computed(() =>
 			heldNumber(

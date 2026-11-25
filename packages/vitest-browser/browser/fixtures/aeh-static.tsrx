@@ -7,7 +7,7 @@ import { reportCount, reportValues } from './aeh-report.ts';
 export const aeh = shared(
 	() => {
 		const s = state({ order: '', count: '' });
-		const contentEl = element<HTMLDivElement>();
+		const contentEl = element<HTMLDivElement | undefined>();
 		const optionEls = element<HTMLDivElement[]>();
 
 		return { ...s, contentEl, optionEls };

@@ -13,8 +13,8 @@ export const collapsibleState = shared(
 			disabled: false,
 			disableUntilFound: false,
 		});
-		const triggerEl = element<HTMLButtonElement>();
-		const contentEl = element<HTMLDivElement>();
+		const triggerEl = element<HTMLButtonElement | undefined>();
+		const contentEl = element<HTMLDivElement | undefined>();
 
 		return {
 			...collapsible,

@@ -503,7 +503,7 @@ export function spreadNode(argument: EmissionNode): EmissionNode {
  * `<operator><argument>` — the prefix operators emission builds, which today is
  * only `!` in front of a call.
  */
-export function unaryNode(operator: '!' | '-' | 'typeof', argument: EmissionNode): EmissionNode {
+export function unaryNode(operator: '!' | '-' | 'typeof' | 'void', argument: EmissionNode): EmissionNode {
 	return { type: 'UnaryExpression', operator, prefix: true, argument };
 }
 

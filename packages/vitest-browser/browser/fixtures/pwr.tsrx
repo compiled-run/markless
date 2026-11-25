@@ -6,7 +6,7 @@ import { element, shared, state } from '@markless/core';
 export const pwr = shared(
 	() => {
 		const s = state({ label: '', on: false });
-		const triggerEl = element<HTMLButtonElement>();
+		const triggerEl = element<HTMLButtonElement | undefined>();
 
 		return {
 			...s,

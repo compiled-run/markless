@@ -8,8 +8,8 @@ import { widthOf } from './report.ts';
 export const widthFamily = shared(
 	() => {
 		const s = state({ measuring: false, probed: '' });
-		const trackEl = element<HTMLDivElement>();
-		const rootEl = element<HTMLDivElement>();
+		const trackEl = element<HTMLDivElement | undefined>();
+		const rootEl = element<HTMLDivElement | undefined>();
 
 		return { ...s, trackEl, rootEl };
 	},

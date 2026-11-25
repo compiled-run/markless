@@ -3177,7 +3177,7 @@ import { attach, element, state } from '@markless/core';
 
 export function App() @{
 	let open = state(true);
-	const box = element();
+	const box = element<Element | undefined>();
 
 	<main>
 		@if (open) {
@@ -5385,7 +5385,7 @@ function Field(inputProps: { input: unknown }) @{
 }
 
 export function App() @{
-	const field = element<HTMLInputElement>();
+	const field = element<HTMLInputElement | undefined>();
 
 	<section>
 		<Field input={field} />

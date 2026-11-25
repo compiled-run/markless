@@ -45,12 +45,12 @@ export const comboboxState = shared(
 			pressGraceUntil: 0,
 			closed: true,
 		});
-		const labelEl = element<HTMLLabelElement>();
-		const inputEl = element<HTMLInputElement>();
-		const triggerEl = element<HTMLButtonElement>();
-		const contentEl = element<HTMLDivElement>();
-		const descriptionEl = element<HTMLDivElement>();
-		const errorEl = element<HTMLDivElement>();
+		const labelEl = element<HTMLLabelElement | undefined>();
+		const inputEl = element<HTMLInputElement | undefined>();
+		const triggerEl = element<HTMLButtonElement | undefined>();
+		const contentEl = element<HTMLDivElement | undefined>();
+		const descriptionEl = element<HTMLDivElement | undefined>();
+		const errorEl = element<HTMLDivElement | undefined>();
 		// The array type argument is what makes this handle plural: one handle bound on every option, read back in document order.
 		const optionEls = element<HTMLDivElement[]>();
 

@@ -1076,7 +1076,7 @@ const PHOTO =
 	);
 
 function PhotoCrop() @{
-	const picture = element<HTMLImageElement>();
+	const picture = element<HTMLImageElement | undefined>();
 	const sheet = element<HTMLCanvasElement>();
 	let cut = state('');
 

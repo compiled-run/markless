@@ -10,7 +10,7 @@ test('optional handle calls retain owning records for object arguments after sto
 import { element, storage } from '@markless/core';
 export function Preference() @{
  let choice = storage('preference', 'first');
- let selected = element<HTMLButtonElement>();
+ let selected = element<HTMLButtonElement | undefined>();
  <button el={selected} onClick={() => { choice = 'second'; selected?.focus({ preventScroll: true }); }}>Choose</button>
 }
 `);
@@ -57,7 +57,7 @@ import { element, storage, state } from '@markless/core';
 export function Preference() @{
  let choice = storage('preference', 'first');
  let distance = state(8);
- let viewport = element<HTMLElement>();
+ let viewport = element<HTMLElement | undefined>();
  <>
   <div el={viewport} />
   <button onClick={(event) => { const offset = 3; choice = 'next'; viewport?.scrollTo({ top: event.mark('top') + distance + offset, behavior: 'auto', left: event.mark('left') }); }}>Move</button>
@@ -110,7 +110,7 @@ test('nested callbacks lower the owning handle and preserve a shadowed local rec
 	const { run } = await emittedHandler(`
 import { element } from '@markless/core';
 export function Preference() @{
- let button = element<HTMLButtonElement>();
+ let button = element<HTMLButtonElement | undefined>();
  <button el={button} onClick={(event) => {
   [1].forEach(() => button?.focus({ preventScroll: event.flag }));
   [event.other].forEach(button => button?.focus({ preventScroll: event.flag }));
@@ -148,7 +148,7 @@ test('a computed optional method reads the handle and keeps the authored call', 
 	const { run } = await emittedHandler(`
 import { element } from '@markless/core';
 export function Preference() @{
- let control = element<HTMLButtonElement>();
+ let control = element<HTMLButtonElement | undefined>();
  <button el={control} onClick={(event) => control?.[event.method]({ preventScroll: true })}>Choose</button>
 }
 `);

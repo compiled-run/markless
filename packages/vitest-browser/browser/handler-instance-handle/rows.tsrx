@@ -6,7 +6,7 @@ import { element, shared, state } from '@markless/core';
 export const rowsState = shared(
 	() => {
 		const box = state({ name: '', rows: ['a', 'b'] });
-		const boxEl = element<HTMLDivElement>();
+		const boxEl = element<HTMLDivElement | undefined>();
 
 		return { ...box, boxEl };
 	},

@@ -28,8 +28,8 @@ export const cblk = shared(
 			anchor: '',
 			hits: 0,
 		});
-		const titleEl = element<HTMLHeadingElement>();
-		const contentEl = element<HTMLDivElement>();
+		const titleEl = element<HTMLHeadingElement | undefined>();
+		const contentEl = element<HTMLDivElement | undefined>();
 
 		// Written out of platform globals only: a consumer module that reads one
 		// cell of this factory takes the whole derived set without this module's

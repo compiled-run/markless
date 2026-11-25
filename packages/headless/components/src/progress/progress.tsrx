@@ -16,7 +16,7 @@ export const progressState = shared(
 			max: 100,
 			ownText: '' as Children,
 		});
-		const labelEl = element<HTMLSpanElement>();
+		const labelEl = element<HTMLSpanElement | undefined>();
 
 		return {
 			...progress,

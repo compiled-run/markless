@@ -13,7 +13,7 @@ export default function MbEventsPage() @{
 	const page = state({ trail: '', named: '' });
 	// A consumer handle riding `{...rest}` onto a part element. It registers
 	// ALONGSIDE whatever the part binds there, and reads back as that element.
-	const consumerEl = element<HTMLButtonElement>();
+	const consumerEl = element<HTMLButtonElement | undefined>();
 
 	<section data-mb-events-page data-trail={page.trail} data-named={page.named}>
 		<MbEventsRoot>

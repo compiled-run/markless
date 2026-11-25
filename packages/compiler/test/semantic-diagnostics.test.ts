@@ -85,7 +85,7 @@ import { state, element } from '@markless/core';
 
 export function Handles() @{
 	const menu = state({ open: false });
-	let input = element<HTMLInputElement>();
+	let input = element<HTMLInputElement | undefined>();
 
 	<section>
 		<input el={menu} />
@@ -99,7 +99,7 @@ const elementHandleInStateSource = `
 import { state, element } from '@markless/core';
 
 export function Handles() @{
-	let input = element<HTMLInputElement>();
+	let input = element<HTMLInputElement | undefined>();
 	const saved = state(input);
 
 	<input el={input} />
@@ -116,8 +116,8 @@ function Field(props: { forwarded: unknown }) @{
 }
 
 export function Handles() @{
-	let input = element<HTMLInputElement>();
-	let unbound = element<HTMLButtonElement>();
+	let input = element<HTMLInputElement | undefined>();
+	let unbound = element<HTMLButtonElement | undefined>();
 	const saved = state({ current: null });
 	saved.current = input;
 
@@ -1483,7 +1483,7 @@ test('B918 reports honest element handle guard diagnostics', async () => {
 
 	const nestedGraph = await buildSemanticGraph({
 		filename: 'src/NestedHandles.tsrx',
-		source: `import { element } from '@markless/core'; function ObjectField(props: { forwarded: unknown }) @{ <input el={props.forwarded.current} /> } function ArrayField(props: { forwarded: unknown }) @{ <input el={props.forwarded[0]} /> } export function App() @{ const input = element<HTMLInputElement>(); <section><ObjectField forwarded={{ current: input }} /><ArrayField forwarded={[input]} /></section> }`,
+		source: `import { element } from '@markless/core'; function ObjectField(props: { forwarded: unknown }) @{ <input el={props.forwarded.current} /> } function ArrayField(props: { forwarded: unknown }) @{ <input el={props.forwarded[0]} /> } export function App() @{ const input = element<HTMLInputElement | undefined>(); <section><ObjectField forwarded={{ current: input }} /><ArrayField forwarded={[input]} /></section> }`,
 	});
 	expect(nestedGraph.diagnostics).toEqual(
 		expect.arrayContaining([
@@ -1504,7 +1504,7 @@ test('B918 allows suppressing unbound handle warnings at the read site', async (
 import { element } from '@markless/core';
 
 export function Handles() @{
-	let unbound = element<HTMLButtonElement>();
+	let unbound = element<HTMLButtonElement | undefined>();
 
 	<section>
 		// markless-allow MARKLESS_ELEMENT_HANDLE_UNBOUND: read intentionally observes undefined before binding

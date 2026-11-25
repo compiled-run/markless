@@ -23,8 +23,8 @@ export const panelState = shared(
 			grabX: 0,
 			grabY: 0,
 		});
-		const areaEl = element<HTMLDivElement>();
-		const selectionEl = element<HTMLDivElement>();
+		const areaEl = element<HTMLDivElement | undefined>();
+		const selectionEl = element<HTMLDivElement | undefined>();
 
 		const held = computed(() => {
 			const given = panel.given;

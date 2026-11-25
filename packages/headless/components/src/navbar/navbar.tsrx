@@ -32,7 +32,7 @@ export const navbarState = shared(
 			from: '',
 			previous: '',
 		});
-		const navEl = element<HTMLElement>();
+		const navEl = element<HTMLElement | undefined>();
 		// The array type argument makes a handle plural: bound on every trigger and
 		// every link, read back as the live controls in document order.
 		const controlEls = element<HTMLElement[]>();
@@ -85,9 +85,9 @@ export const navbarItemState = shared(
 			restingUntil: 0,
 			graceUntil: 0,
 		});
-		const contentEl = element<HTMLDivElement>();
-		const boxEl = element<HTMLDivElement>();
-		const triggerEl = element<HTMLButtonElement>();
+		const contentEl = element<HTMLDivElement | undefined>();
+		const boxEl = element<HTMLDivElement | undefined>();
+		const triggerEl = element<HTMLButtonElement | undefined>();
 
 		return { ...item, contentEl, boxEl, triggerEl };
 	},

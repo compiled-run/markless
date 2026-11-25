@@ -26,6 +26,7 @@ import type {
 	SemanticComponentEdge,
 	SemanticComponentPropBinding,
 	SemanticElementHandleBinding,
+	ElementHandleAbsence,
 	SemanticEvent,
 	SemanticGraphDiagnostic,
 	SemanticGraphBinding,
@@ -86,6 +87,8 @@ import {
 	attributeObjectValueDiagnostic,
 	duplicateAttributeDiagnostic,
 	duplicateElementHandleDiagnostic,
+	elementHandleMaybeAbsentDiagnostic,
+	type ElementHandleMaybeAbsentReason,
 	elementHandleRequiredDiagnostic,
 	elementHandleDeriveReadDiagnostic,
 	elementHandlePropUnsupportedDiagnostic,
@@ -107,6 +110,7 @@ import {
 	handlerReadsRenderLocalDiagnostic,
 	stateClassMethodUnboundDiagnostic,
 } from './diagnostics.ts';
+import type { ChildrenAlwaysFacts } from './children-always.ts';
 import { stateClassValueAt } from './state-class-instance.ts';
 import { acceptsIdrefList, isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
@@ -923,7 +927,8 @@ export function collectConditionalBranchText(node: AnyNode, state: WalkState): v
 export function collectElementHandleDiagnostics(
 	graph: MutableSemanticGraphArtifact,
 	pendingIdrefs: ReadonlyArray<PendingElementHandleIdref> = [],
-): void {
+	source = '',
+): MaybeAbsentElementHandleFacts {
 	const bindings = graphBindingMap(graph);
 	const aliases = semanticAliasMap(graph);
 	const scopeOf = componentGraphScopes(graph, { bindings, aliases });
@@ -931,10 +936,13 @@ export function collectElementHandleDiagnostics(
 	// A handle's identity is its declaring scope plus its name: sibling parts each
 	// declaring `boxEl` share one graph node id but bind two different handles.
 	const declaringScopeByBinding = new Map<SemanticElementHandleBinding, string>();
+	const declarationByBinding = new Map<SemanticElementHandleBinding, SemanticGraphBinding>();
+	const reachedDeclarations = new Set<SemanticGraphBinding>();
 	const recordValid = (
 		bound: SemanticElementHandleBinding,
 		declaredBy: SemanticGraphBinding | undefined,
 	): void => {
+		if (declaredBy) declarationByBinding.set(bound, declaredBy);
 		declaringScopeByBinding.set(
 			bound,
 			declaredBy?.sharedDefinitionId ?? declaredBy?.componentName ?? '',
@@ -959,6 +967,7 @@ export function collectElementHandleDiagnostics(
 				resolveSharedInstanceGraphPath(binding.handleName, graph, binding.componentName),
 			) ?? resolveGraphPath(binding.handleName, scope.bindings, scope.aliases);
 		const graphBinding = resolved?.binding;
+		if (graphBinding?.kind === 'element') reachedDeclarations.add(graphBinding);
 		if (moduleElementNames.has(binding.handleName)) continue;
 		if (binding.keyedRepeatScopeIds.length > 0) {
 			const repeatId = binding.keyedRepeatScopeIds[0];
@@ -997,6 +1006,7 @@ export function collectElementHandleDiagnostics(
 			? resolvePropForwardedElementHandle(binding, resolved, graph)
 			: null;
 		if (forwarded) {
+			reachedDeclarations.add(forwarded.handle);
 			recordValid({ ...binding, handleName: forwarded.name }, forwarded.handle);
 			continue;
 		}
@@ -1080,6 +1090,116 @@ export function collectElementHandleDiagnostics(
 		firstBindingByScopedHandle,
 		pluralHandleNames,
 	);
+	return {
+		validBindings: validElementHandleBindings,
+		declarationByBinding,
+		reachedDeclarations,
+		source,
+	};
+}
+
+export type MaybeAbsentElementHandleFacts = {
+	readonly validBindings: ReadonlyArray<SemanticElementHandleBinding>;
+	readonly declarationByBinding: ReadonlyMap<SemanticElementHandleBinding, SemanticGraphBinding>;
+	readonly reachedDeclarations: ReadonlySet<SemanticGraphBinding>;
+	readonly source: string;
+};
+
+/** A singular handle declared without `| undefined` must be bound once, always rendered, in the component that declares it. */
+export function collectMaybeAbsentElementHandles(
+	graph: MutableSemanticGraphArtifact,
+	facts: MaybeAbsentElementHandleFacts,
+	children: ChildrenAlwaysFacts,
+): void {
+	const lineOf = (span: SourceSpan | undefined): number | undefined =>
+		span && facts.source ? facts.source.slice(0, span.start).split('\n').length : undefined;
+	const childOf = new Map(graph.componentEdges.map((edge) => [edge.id, edge.childComponentName]));
+	const region = (absence: ElementHandleAbsence): ElementHandleMaybeAbsentReason => {
+		if (absence.kind !== 'children') return { kind: 'region', region: `@${absence.kind}` };
+		const child = childOf.get(absence.componentEdgeId);
+		return child
+			? { kind: 'region', region: `children passed to <${child}>`, decidedBy: `<${child}>` }
+			: { kind: 'region', region: 'children passed to another component', decidedBy: 'that component' };
+	};
+	const report = (
+		declaration: SemanticGraphBinding,
+		reason: ElementHandleMaybeAbsentReason,
+		span: SourceSpan | undefined,
+	): void => {
+		graph.diagnostics.push(
+			elementHandleMaybeAbsentDiagnostic({
+				handleName: declaration.name,
+				elementType: declaration.elementType,
+				reason,
+				line: lineOf(span),
+				span,
+			}),
+		);
+	};
+	const bindingsByDeclaration = new Map<SemanticGraphBinding, SemanticElementHandleBinding[]>();
+	for (const binding of facts.validBindings) {
+		const declaration = facts.declarationByBinding.get(binding);
+		if (!declaration) continue;
+		const list = bindingsByDeclaration.get(declaration) ?? [];
+		list.push(binding);
+		bindingsByDeclaration.set(declaration, list);
+	}
+
+	for (const declaration of graph.graphBindings) {
+		if (declaration.kind !== 'element' || declaration.plural || declaration.optional) continue;
+		// A factory adopted from another module is checked where it is written.
+		if (declaration.sourceSpan?.filename !== graph.filename) continue;
+		if (declaration.sharedDefinitionId) {
+			report(declaration, { kind: 'shared' }, declaration.sourceSpan);
+			continue;
+		}
+		if (!declaration.componentName) continue;
+		const bindings = bindingsByDeclaration.get(declaration) ?? [];
+		if (bindings.length === 0) {
+			if (facts.reachedDeclarations.has(declaration)) continue;
+			const handedTo = graph.componentEdges.find(
+				(edge) =>
+					edge.parentComponentName === declaration.componentName &&
+					edge.props.some(
+						(prop) =>
+							prop.kind === 'graph-reference' &&
+							prop.graphNodeId === declaration.id &&
+							prop.path.length === 0,
+					),
+			);
+			const prop = handedTo?.props.find(
+				(candidate) => candidate.kind === 'graph-reference' && candidate.graphNodeId === declaration.id,
+			);
+			report(
+				declaration,
+				handedTo
+					? {
+							kind: 'other-component',
+							boundIn: `<${handedTo.childComponentName}>`,
+							declaredIn: declaration.componentName,
+						}
+					: { kind: 'never-bound' },
+				prop?.sourceSpan ?? declaration.sourceSpan,
+			);
+			continue;
+		}
+		for (const binding of bindings) {
+			const absence = binding.absentWhen;
+			if (absence && !(absence.kind === 'children' && children.projectedThrough(absence.componentEdgeId))) {
+				report(declaration, region(absence), binding.sourceSpan);
+			} else if (binding.componentName !== declaration.componentName) {
+				report(
+					declaration,
+					{
+						kind: 'other-component',
+						boundIn: binding.componentName ?? 'another component',
+						declaredIn: declaration.componentName,
+					},
+					binding.sourceSpan,
+				);
+			}
+		}
+	}
 }
 
 /**
@@ -1141,6 +1261,27 @@ function isRosterQueryRead(
 			record.componentName === binding.componentName &&
 			record.rosterGraphNodeId === graphNodeId,
 	);
+}
+
+function elementHandleAbsence(state: WalkState): { readonly absentWhen?: ElementHandleAbsence } {
+	if (state.currentBranchScopeIds.length > 0) {
+		const branchSiteId = state.currentBranchSiteIds.at(-1);
+		const site = branchSiteId
+			? state.graph.branchSites.find((candidate) => candidate.id === branchSiteId)
+			: undefined;
+		return {
+			absentWhen: { kind: site?.kind ?? 'if', ...(branchSiteId ? { branchSiteId } : {}) },
+		};
+	}
+	if (state.currentAsyncBoundaryId !== null) {
+		const kind = (['try', 'pending', 'catch'] as const)[state.currentAsyncBoundaryArm ?? 0] ?? 'try';
+		return { absentWhen: { kind, asyncBoundaryId: state.currentAsyncBoundaryId } };
+	}
+	if (state.currentProjectionScope)
+		return {
+			absentWhen: { kind: 'children', componentEdgeId: state.currentProjectionScope.componentEdgeId },
+		};
+	return {};
 }
 
 /**
@@ -1501,6 +1642,7 @@ function collectAttribute(
 					componentName: state.currentComponentName ?? undefined,
 					sourceSpan: sourceSpan(entry, state.filename),
 					keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds],
+					...elementHandleAbsence(state),
 					...(NATIVE_FACTS && state.nativeFacts
 						? { nativeHandle: nativeCollectors(state.nativeFacts).expression(entry as never) }
 						: {}),

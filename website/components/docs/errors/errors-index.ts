@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 340,
+	total: 342,
 	guided: 55,
 	groups: [
 		{
@@ -308,6 +308,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'an element named by an idref cannot also declare an id markless_element_handle_idref_id_conflict an element named by an idref cannot also declare an id: a markless build error.',
 				},
 				{
+					code: 'MARKLESS_ELEMENT_HANDLE_ARRAY_OPTIONAL',
+					title: 'An element() array handle cannot be undefined',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'an element() array handle cannot be undefined markless_element_handle_array_optional an element() array handle cannot be undefined: a markless build error.',
+				},
+				{
 					code: 'MARKLESS_ELEMENT_HANDLE_INSTANCE_AMBIGUOUS',
 					title: 'An element() handle belongs to more than one widget',
 					chip: 'error',
@@ -370,6 +378,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile error',
 					guided: false,
 					words: 'element() handle is referenced but never bound markless_element_handle_idref_unbound element() handle is referenced but never bound: a markless build error.',
+				},
+				{
+					code: 'MARKLESS_ELEMENT_HANDLE_MAYBE_ABSENT',
+					title: 'Element() handle may not be on the page',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'element() handle may not be on the page markless_element_handle_maybe_absent element() handle may not be on the page: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',

@@ -7,7 +7,7 @@ import { element, shared, state } from '@markless/core';
 export const deep = shared(
 	() => {
 		const s = state({ open: false, probe: '' });
-		const closeEl = element<HTMLButtonElement>();
+		const closeEl = element<HTMLButtonElement | undefined>();
 		return { ...s, closeEl };
 	},
 	{ scope: 'subtree' },

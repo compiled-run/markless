@@ -48,12 +48,12 @@ export const inkState = shared(
 			boxTop: 0,
 			pointerId: -1,
 		});
-		const areaEl = element<SVGSVGElement>();
-		const labelEl = element<HTMLSpanElement>();
-		const descriptionEl = element<HTMLDivElement>();
-		const errorEl = element<HTMLDivElement>();
-		const countEl = element<HTMLOutputElement>();
-		const fieldEl = element<HTMLInputElement>();
+		const areaEl = element<SVGSVGElement | undefined>();
+		const labelEl = element<HTMLSpanElement | undefined>();
+		const descriptionEl = element<HTMLDivElement | undefined>();
+		const errorEl = element<HTMLDivElement | undefined>();
+		const countEl = element<HTMLOutputElement | undefined>();
+		const fieldEl = element<HTMLInputElement | undefined>();
 
 		const paths = computed(() => {
 			const given = pad.given;

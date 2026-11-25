@@ -6,7 +6,7 @@ export const staticControlDial = shared(
 	() => {
 		const d = state({ tag: '', roster: '', sole: '' });
 		const markEls = element<HTMLButtonElement[]>();
-		const headEl = element<HTMLElement>();
+		const headEl = element<HTMLElement | undefined>();
 
 		return { ...d, markEls, headEl };
 	},

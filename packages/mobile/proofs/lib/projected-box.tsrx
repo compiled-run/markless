@@ -3,7 +3,7 @@ import { element, shared, state } from '@markless/core';
 export const boxState = shared(
 	() => {
 		const box = state({ wide: false, seen: '' });
-		const labelEl = element<HTMLSpanElement>();
+		const labelEl = element<HTMLSpanElement | undefined>();
 		return { ...box, labelEl };
 	},
 	{ scope: 'subtree' },

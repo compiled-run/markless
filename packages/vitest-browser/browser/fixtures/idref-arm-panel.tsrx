@@ -4,7 +4,7 @@ import { element, state } from '@markless/core';
 // the reference outside the arm is the one position naming it on first render.
 export default function IdrefArmPanel() @{
 	let shown = state(false);
-	const sheet = element<HTMLElement>();
+	const sheet = element<HTMLElement | undefined>();
 	<div data-idref-arm>
 		<button type="button" data-arm-trigger aria-controls={sheet} onClick={() => (shown = !shown)}>
 			Details

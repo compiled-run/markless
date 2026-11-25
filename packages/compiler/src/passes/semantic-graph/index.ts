@@ -51,8 +51,10 @@ import {
 	collectConditionalBranchText,
 	collectElement,
 	collectElementHandleDiagnostics,
+	collectMaybeAbsentElementHandles,
 	collectTemplateExpression,
 } from './collect-elements.ts';
+import { childrenAlwaysFacts } from './children-always.ts';
 import {
 	collectAssignment,
 	collectCollectionCall,
@@ -255,7 +257,11 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	// are a roster question, and the refusal below reads that answer.
 	collectElementRosterPositions(state);
 	collectElementRosterCounts(state);
-	collectElementHandleDiagnostics(graph, state.pendingElementHandleIdrefs);
+	const elementHandleFacts = collectElementHandleDiagnostics(
+		graph,
+		state.pendingElementHandleIdrefs,
+		state.source,
+	);
 	collectAsyncBoundaryDiagnostics(graph, state.repeatCollectionSpans);
 	collectAsyncInputBesideValueDiagnostics(graph);
 	markControlWrittenInputs(graph, state.hostParents);
@@ -279,6 +285,15 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		foldedTexts: state.foldedTexts,
 		absentComponents,
 	});
+	const childrenAlways = childrenAlwaysFacts({
+		chunks: graph.markup.chunks,
+		componentEdges: graph.componentEdges,
+		componentNames: new Set(graph.components.map((component) => component.name)),
+		...(input.importedModuleInterfaces
+			? { importedModuleInterfaces: input.importedModuleInterfaces }
+			: {}),
+	});
+	collectMaybeAbsentElementHandles(graph, elementHandleFacts, childrenAlways);
 	// Needs the chunks, so it runs after them: a repeat inside a child's
 	// `{children}` renders into that child's markup, not the enclosing element of
 	// the tag that projected it.
@@ -402,6 +417,9 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 							? { relayedProps: [...relayedProps.get(component.name)!].sort() }
 							: {}),
 						...callbackSlotPropsField(graph.sharedCallbackBindings, component.name),
+						...(childrenAlways.component(component.name)
+							? { childrenAlwaysRendered: true as const }
+							: {}),
 						...projectionPlacementFields({
 							chunks: graph.markup.chunks,
 							branchSites: graph.branchSites,

@@ -48,10 +48,10 @@ export const carouselState = shared(
 			hoverPaused: false,
 			reducedMotion: false,
 		});
-		const rootEl = element<HTMLDivElement>();
-		const titleEl = element<HTMLDivElement>();
-		const scrollEl = element<HTMLDivElement>();
-		const viewportEl = element<HTMLDivElement>();
+		const rootEl = element<HTMLDivElement | undefined>();
+		const titleEl = element<HTMLDivElement | undefined>();
+		const scrollEl = element<HTMLDivElement | undefined>();
+		const viewportEl = element<HTMLDivElement | undefined>();
 		const slideEls = element<HTMLDivElement[]>();
 		const navEls = element<HTMLButtonElement[]>();
 

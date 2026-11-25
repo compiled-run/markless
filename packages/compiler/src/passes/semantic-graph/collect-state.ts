@@ -41,6 +41,7 @@ import {
 } from './collect-expressions.ts';
 import {
 	computedDependencyCycleDiagnostic,
+	elementHandleArrayOptionalDiagnostic,
 	computedReadsRenderLocalDiagnostic,
 	crossModuleHelperStateReturnUnsupportedDiagnostic,
 	crossModuleStateImportDiagnostic,
@@ -325,6 +326,15 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 		}
 
 		if (frameworkApi === 'element') {
+			const arrayOrUndefined = optionalArrayTypeArgument(init);
+			if (arrayOrUndefined)
+				state.graph.diagnostics.push(
+					elementHandleArrayOptionalDiagnostic({
+						handleName: name,
+						arrayType: expressionSource(arrayOrUndefined, state.source),
+						span: sourceSpan(init, state.filename),
+					}),
+				);
 			state.graph.graphBindings.push({
 				id: graphBindingId('element', name, state),
 				name,
@@ -334,6 +344,9 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				declarationKind,
 				writable: false,
 				...(pluralElementTypeArgument(init) ? { plural: true } : {}),
+				...(optionalElementTypeArgument(init) ? { optional: true } : {}),
+				...elementTypeSource(init, state),
+				sourceSpan: sourceSpan(id, state.filename),
 			});
 		}
 	}
@@ -354,6 +367,26 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 function pluralElementTypeArgument(init: AnyNode): boolean {
 	const declared = asNodes((init.typeArguments as AnyNode | undefined)?.params)[0];
 	return declared ? isArrayTypeNode(declared) : false;
+}
+
+function elementTypeSource(init: AnyNode, state: WalkState): { readonly elementType?: string } {
+	const declared = asNodes((init.typeArguments as AnyNode | undefined)?.params)[0];
+	return declared ? { elementType: expressionSource(declared, state.source) } : {};
+}
+
+function optionalArrayTypeArgument(init: AnyNode): AnyNode | undefined {
+	const declared = asNodes((init.typeArguments as AnyNode | undefined)?.params)[0];
+	if (!optionalElementTypeArgument(init) || !declared) return undefined;
+	return asNodes(declared.types).find(isArrayTypeNode);
+}
+
+// Read from the spelling like `plural`, so an alias of `T | undefined` reads as required.
+function optionalElementTypeArgument(init: AnyNode): boolean {
+	const declared = asNodes((init.typeArguments as AnyNode | undefined)?.params)[0];
+	return (
+		declared?.type === 'TSUnionType' &&
+		asNodes(declared.types).some((member) => member.type === 'TSUndefinedKeyword')
+	);
 }
 
 function isArrayTypeNode(node: AnyNode): boolean {

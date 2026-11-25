@@ -31,9 +31,9 @@ export const radiogroupState = shared(
 		});
 		// The array type argument makes the handle plural: bound on every option's input, read back live and in document order.
 		const fieldEls = element<HTMLInputElement[]>();
-		const labelEl = element<HTMLLabelElement>();
-		const descriptionEl = element<HTMLDivElement>();
-		const errorEl = element<HTMLDivElement>();
+		const labelEl = element<HTMLLabelElement | undefined>();
+		const descriptionEl = element<HTMLDivElement | undefined>();
+		const errorEl = element<HTMLDivElement | undefined>();
 
 		return {
 			...group,
@@ -58,7 +58,7 @@ export const radiogroupState = shared(
 export const radiogroupItemState = shared(
 	() => {
 		const item: RadioGroupItemInstanceState = state({ value: '', disabled: false });
-		const fieldEl = element<HTMLInputElement>();
+		const fieldEl = element<HTMLInputElement | undefined>();
 
 		return { ...item, fieldEl };
 	},

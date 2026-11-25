@@ -31,7 +31,7 @@ export const buttongroupState = shared(
 		});
 		// The array type argument makes the handle plural: bound on every item, read back as the live buttons in document order.
 		const itemEls = element<HTMLButtonElement[]>();
-		const labelEl = element<HTMLLabelElement>();
+		const labelEl = element<HTMLLabelElement | undefined>();
 
 		return {
 			...group,
@@ -63,7 +63,7 @@ export const buttongroupState = shared(
 export const buttongroupItemState = shared(
 	() => {
 		const item: ButtonGroupItemInstanceState = state({ value: '', disabled: false });
-		const el = element<HTMLButtonElement>();
+		const el = element<HTMLButtonElement | undefined>();
 
 		return { ...item, el };
 	},

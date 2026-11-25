@@ -5,7 +5,7 @@ import { element, shared, state } from '@markless/core';
 export const widgetState = shared(
 	() => {
 		const widget = state({ label: '' });
-		const triggerEl = element<HTMLButtonElement>();
+		const triggerEl = element<HTMLButtonElement | undefined>();
 		return { ...widget, triggerEl };
 	},
 	{ scope: 'subtree' },
