@@ -34,9 +34,9 @@ export const selectState = shared(
 			search: '',
 			searchAt: 0,
 		});
-		const labelEl = element<HTMLLabelElement>();
-		const contentEl = element<HTMLDivElement>();
-		const triggerEl = element<HTMLButtonElement>();
+		const labelEl = element<HTMLLabelElement | undefined>();
+		const contentEl = element<HTMLDivElement | undefined>();
+		const triggerEl = element<HTMLButtonElement | undefined>();
 		const optionEls = element<HTMLDivElement[]>();
 		const optionLabelEls = element<HTMLSpanElement[]>();
 

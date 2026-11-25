@@ -5,7 +5,7 @@ import { element, shared, state } from '@markless/core';
 export const barState = shared(
 	() => {
 		const bar = state({ label: '' });
-		const barEl = element<HTMLDivElement>();
+		const barEl = element<HTMLDivElement | undefined>();
 
 		return { ...bar, barEl };
 	},
@@ -15,8 +15,8 @@ export const barState = shared(
 export const itemState = shared(
 	() => {
 		const item = state({ label: '' });
-		const itemEl = element<HTMLDivElement>();
-		const contentEl = element<HTMLDivElement>();
+		const itemEl = element<HTMLDivElement | undefined>();
+		const contentEl = element<HTMLDivElement | undefined>();
 
 		return { ...item, itemEl, contentEl };
 	},

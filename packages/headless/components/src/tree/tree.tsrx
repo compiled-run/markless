@@ -18,7 +18,7 @@ import type {
 export const treeState = shared(
 	() => {
 		const tree: TreeInstanceState = state({ disabled: false, inside: false });
-		const rootEl = element<HTMLDivElement>();
+		const rootEl = element<HTMLDivElement | undefined>();
 		// The array type argument makes a handle plural: bound on every part of its
 		// kind, read back as the live elements in document order.
 		const rowEls = element<HTMLDivElement[]>();
@@ -40,7 +40,7 @@ export const treeItemState = shared(
 			level: 1,
 			disabled: false,
 		});
-		const labelEl = element<HTMLSpanElement>();
+		const labelEl = element<HTMLSpanElement | undefined>();
 
 		return {
 			...item,

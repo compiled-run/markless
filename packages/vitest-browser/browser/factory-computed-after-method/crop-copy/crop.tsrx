@@ -90,13 +90,13 @@ export const cropState = shared(
 			dragBlockStart: false,
 			dragBlockEnd: false,
 		});
-		const areaEl = element<HTMLDivElement>();
-		const labelEl = element<HTMLSpanElement>();
-		const descriptionEl = element<HTMLDivElement>();
-		const errorEl = element<HTMLDivElement>();
-		const readoutEl = element<HTMLOutputElement>();
-		const fieldEl = element<HTMLInputElement>();
-		const selectionEl = element<HTMLDivElement>();
+		const areaEl = element<HTMLDivElement | undefined>();
+		const labelEl = element<HTMLSpanElement | undefined>();
+		const descriptionEl = element<HTMLDivElement | undefined>();
+		const errorEl = element<HTMLDivElement | undefined>();
+		const readoutEl = element<HTMLOutputElement | undefined>();
+		const fieldEl = element<HTMLInputElement | undefined>();
+		const selectionEl = element<HTMLDivElement | undefined>();
 		const thumbEls = element<HTMLDivElement[]>();
 
 		const held = computed(() => {

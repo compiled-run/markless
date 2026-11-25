@@ -11,7 +11,7 @@ export const tallyState = shared(
 			own: null as readonly string[] | null,
 			busy: false,
 		});
-		const areaEl = element<HTMLDivElement>();
+		const areaEl = element<HTMLDivElement | undefined>();
 
 		const marks = computed(() => {
 			const own = board.own;

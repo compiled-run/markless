@@ -93,7 +93,7 @@ import { element, shared, state } from '@markless/core';
 export const widget = shared(
 	() => {
 		const w = state({ tick: 0 });
-		const trackEl = element<HTMLDivElement>();
+		const trackEl = element<HTMLDivElement | undefined>();
 		return { ...w, trackEl };
 	},
 	{ scope: 'subtree' },

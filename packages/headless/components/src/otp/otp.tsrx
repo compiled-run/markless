@@ -14,7 +14,7 @@ export const otpState = shared(
 			disabled: false,
 			shiftPWManagers: true,
 		});
-		const fieldEl = element<HTMLInputElement>();
+		const fieldEl = element<HTMLInputElement | undefined>();
 		const itemEls = element<HTMLDivElement[]>();
 		// The last code handed to the consumer. `onInput` writes the field's text into `otp.value` before `commit` runs, so this is the only thing left to compare a repeat against.
 		const reported = state({ code: '' });

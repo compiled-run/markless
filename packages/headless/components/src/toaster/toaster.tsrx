@@ -37,7 +37,7 @@ export const toasterState = shared(
 			minted: 0,
 			ticker: 0,
 		});
-		const regionEl = element<HTMLDivElement>();
+		const regionEl = element<HTMLDivElement | undefined>();
 
 		return {
 			...toaster,

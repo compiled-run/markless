@@ -10,11 +10,11 @@ const familyModule = `import { element, shared, state } from '@markless/core';
 export const groupState = shared(() => {
 	const group = state({ value: '' });
 	const fieldEls = element<HTMLElement[]>();
-	const labelEl = element<HTMLLabelElement>();
+	const labelEl = element<HTMLLabelElement | undefined>();
 	return { ...group, fieldEls, labelEl };
 }, { scope: 'subtree' });
 export const itemState = shared(() => {
-	const fieldEl = element<HTMLInputElement>();
+	const fieldEl = element<HTMLInputElement | undefined>();
 	return { fieldEl };
 }, { scope: 'subtree' });
 export function Field({ children, ...rest }) @{
@@ -34,7 +34,7 @@ export const groupState = shared(() => {
 	return { ...group, fieldEls };
 }, { scope: 'subtree' });
 export const itemState = shared(() => {
-	const fieldEl = element<HTMLInputElement>();
+	const fieldEl = element<HTMLInputElement | undefined>();
 	return { fieldEl };
 }, { scope: 'subtree' });
 export function Field() @{
@@ -63,7 +63,7 @@ test('a non-handle inside the el= list is refused by name, not swallowed', async
 	const source = `import { element, state } from '@markless/core';
 export function Field() @{
 	const menu = state({ open: false });
-	const fieldEl = element<HTMLInputElement>();
+	const fieldEl = element<HTMLInputElement | undefined>();
 	<input el={[fieldEl, menu]} />
 }
 `;
@@ -244,7 +244,7 @@ test('a consumer el riding the spread registers alongside the part own list bind
 			source: `import { element } from '@markless/core';
 import { Field } from './Parts.tsrx';
 export function App() @{
-	const mineEl = element<HTMLInputElement>();
+	const mineEl = element<HTMLInputElement | undefined>();
 	<main>
 		<Field el={mineEl} />
 	</main>

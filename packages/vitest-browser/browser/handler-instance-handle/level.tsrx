@@ -5,7 +5,7 @@ import { element, shared, state } from '@markless/core';
 export const levelState = shared(
 	() => {
 		const level = state({ hits: 0, name: '' });
-		const contentEl = element<HTMLDivElement>();
+		const contentEl = element<HTMLDivElement | undefined>();
 
 		return { ...level, contentEl };
 	},

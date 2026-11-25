@@ -6,8 +6,8 @@ import { element, shared, state } from '@markless/core';
 export const disclosureState = shared(
 	() => {
 		const disclosure = state({ open: false, label: '' });
-		const rootEl = element<HTMLDivElement>();
-		const panelEl = element<HTMLDivElement>();
+		const rootEl = element<HTMLDivElement | undefined>();
+		const panelEl = element<HTMLDivElement | undefined>();
 
 		return { ...disclosure, rootEl, panelEl };
 	},

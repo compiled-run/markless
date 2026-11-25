@@ -1,8 +1,12 @@
 export type AsyncComputedValue<T> = T extends Promise<infer Value> ? Awaited<Value> : T;
 
-// An array-typed handle is an ordered collection: empty before anything renders,
-// never absent - so the array case carries no undefined.
-export type ElementHandle<T extends Element | readonly Element[] = Element> = T extends readonly (infer E extends Element)[] ? E[] : T | undefined;
+/**
+ * What `element<T>()` gives a handler: the element itself when `T` is one element type, which the
+ * compiler holds to being on the page whenever its component is; `T | undefined` when written so;
+ * an ordered `E[]` when `T` is an array, empty before anything renders and never undefined.
+ */
+export type ElementHandle<T extends Element | readonly Element[] | undefined = Element> =
+	T extends readonly (infer E extends Element)[] ? E[] : T;
 
 /**
  * - `'app'` (the default): one copy per request on the server and per document in the browser, kept across in-place navigation.
@@ -86,7 +90,13 @@ export function computed<T>(derive: (recipe: AsyncComputedRecipe) => T): AsyncCo
 	return frameworkApi<AsyncComputedValue<T>>('computed', derive);
 }
 
-export function element<T extends Element | Element[] = Element>(): ElementHandle<T> {
+/**
+ * A handle on one element the markup binds with `el={handle}`. `element<HTMLVideoElement>()` must be
+ * bound once, outside any `@if`, `@switch`, `@try` arm or conditionally rendered children, and is
+ * read as `clip.play()`. Write `element<HTMLDivElement | undefined>()` for one that may be missing,
+ * and `element<HTMLLIElement[]>()` for many.
+ */
+export function element<T extends Element | Element[] | undefined = Element>(): ElementHandle<T> {
 	return frameworkApi<ElementHandle<T>>('element');
 }
 

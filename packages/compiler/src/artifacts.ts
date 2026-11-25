@@ -527,6 +527,10 @@ export type SemanticGraphBinding = {
 	// element() only: the declared type argument was written as an array, so this
 	// handle names an ordered SET of elements rather than one.
 	readonly plural?: boolean;
+	// element() only: the type argument was written `T | undefined`, so the element may be off the page.
+	readonly optional?: boolean;
+	// element() only: the type argument as written, so a diagnostic can quote the fix.
+	readonly elementType?: string;
 	// state() in an @if/@switch arm body: written back to `initialValue` each time that arm opens.
 	readonly armScope?: SemanticBranchArm;
 	// The arms around `armScope`'s site, outermost first: opening any of them rebuilds this arm, so it restarts the cell too.
@@ -670,6 +674,8 @@ export type ModuleGraphInterfaceArtifact = {
 			/** A @try stands at the component's top level, outside every element it renders. */
 			readonly rootBoundary?: true;
 			readonly projection?: ModuleGraphInterfaceProjection;
+			/** The component renders its `{children}` whenever it renders; absent reads as not always. */
+			readonly childrenAlwaysRendered?: true;
 			readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost>;
 			/** Props the component hands to an event as is, in its own markup or through a child it passes them on to. */
 			readonly relayedProps?: ReadonlyArray<string>;
@@ -1264,6 +1270,8 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED'
 		| 'MARKLESS_ELEMENT_HANDLE_UNBOUND'
 		| 'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED'
+		| 'MARKLESS_ELEMENT_HANDLE_MAYBE_ABSENT'
+		| 'MARKLESS_ELEMENT_HANDLE_ARRAY_OPTIONAL'
 		| 'MARKLESS_ELEMENT_MODULE_SCOPE'
 		| 'MARKLESS_DEVICE_WEB_ABSENT'
 		| 'MARKLESS_ELEMENT_HANDLE_RENDER_READ'
@@ -1756,7 +1764,14 @@ export type SemanticElementHandleBinding = {
 		readonly repeatId: string;
 		readonly keyPath: ReadonlyArray<string>;
 	};
+	/** The innermost region that can leave this element off the page while its component is rendered. */
+	readonly absentWhen?: ElementHandleAbsence;
 };
+
+export type ElementHandleAbsence =
+	| { readonly kind: 'if' | 'switch'; readonly branchSiteId?: string }
+	| { readonly kind: 'try' | 'pending' | 'catch'; readonly asyncBoundaryId: string }
+	| { readonly kind: 'children'; readonly componentEdgeId: string };
 
 /**
  * One authored relationship between an element that carries an IDREF attribute
@@ -2368,6 +2383,8 @@ export type LoweredElementHandleRead = {
 	 * `measure(box.tagName.length)` shipped as `measure(<the element>)`.
 	 */
 	readonly path?: ReadonlyArray<string>;
+	/** Declared without `| undefined`: a read that finds nothing warns in development. */
+	readonly required?: true;
 };
 
 export type LoweredStateWrite = {
@@ -2626,6 +2643,7 @@ export type PlannedSymbol =
 				readonly argumentSources: ReadonlyArray<string>;
 				readonly offset: number;
 				readonly endOffset: number;
+				readonly required?: true;
 			}>;
 			readonly elementHandleReads?: ReadonlyArray<LoweredElementHandleRead>;
 			// Reads that answer as the screen shows them while an async value they pair with refreshes.

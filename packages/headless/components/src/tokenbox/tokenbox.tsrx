@@ -54,10 +54,10 @@ export const tokenboxState = shared(
 			trigger: undefined as TokenBoxInstanceState['trigger'],
 			composing: false,
 		});
-		const labelEl = element<HTMLLabelElement>();
-		const surfaceEl = element<HTMLDivElement>();
-		const descriptionEl = element<HTMLDivElement>();
-		const errorEl = element<HTMLDivElement>();
+		const labelEl = element<HTMLLabelElement | undefined>();
+		const surfaceEl = element<HTMLDivElement | undefined>();
+		const descriptionEl = element<HTMLDivElement | undefined>();
+		const errorEl = element<HTMLDivElement | undefined>();
 		// The array type argument is what makes these plural: one handle bound on
 		// every rendered run, read back in document order. A segment's place in its
 		// own kind's roster IS its model position, which is how a caret reaches an

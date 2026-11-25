@@ -3,7 +3,7 @@ import { element, state } from '@markless/core';
 export default function ArmHandles() @{
 	let open = state(false);
 	let seen = state('');
-	const extra = element<HTMLButtonElement>();
+	const extra = element<HTMLButtonElement | undefined>();
 	const presses = element<HTMLButtonElement[]>();
 	<main>
 		<button el={presses} onClick={() => (open = !open)}>Toggle</button>

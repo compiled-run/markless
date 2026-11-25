@@ -21,11 +21,11 @@ export const popoverState = shared(
 		const popover: PopoverInstanceState = state({
 			open: false,
 		});
-		const triggerEl = element<HTMLButtonElement>();
-		const contentEl = element<HTMLDivElement>();
-		const titleEl = element<HTMLHeadingElement>();
-		const descriptionEl = element<HTMLParagraphElement>();
-		const closeEl = element<HTMLButtonElement>();
+		const triggerEl = element<HTMLButtonElement | undefined>();
+		const contentEl = element<HTMLDivElement | undefined>();
+		const titleEl = element<HTMLHeadingElement | undefined>();
+		const descriptionEl = element<HTMLParagraphElement | undefined>();
+		const closeEl = element<HTMLButtonElement | undefined>();
 
 		return {
 			...popover,

@@ -29,8 +29,8 @@ const idSlots = (graph: Awaited<ReturnType<typeof buildSemanticGraph>>) =>
 
 const twoDescriptions = `import { element } from '@markless/core';
 export function App() @{
-	const errorEl = element<HTMLParagraphElement>();
-	const descriptionEl = element<HTMLParagraphElement>();
+	const errorEl = element<HTMLParagraphElement | undefined>();
+	const descriptionEl = element<HTMLParagraphElement | undefined>();
 	<div>
 		<input aria-describedby={[errorEl, descriptionEl]} />
 		<p el={errorEl}>Too short</p>
@@ -207,8 +207,8 @@ test('an unbound handle inside a list is the unbound refusal, per element', asyn
 		'UnboundInList',
 		`import { element } from '@markless/core';
 export function App() @{
-	const errorEl = element<HTMLParagraphElement>();
-	const descriptionEl = element<HTMLParagraphElement>();
+	const errorEl = element<HTMLParagraphElement | undefined>();
+	const descriptionEl = element<HTMLParagraphElement | undefined>();
 	<div>
 		<input aria-describedby={[errorEl, descriptionEl]} />
 		<p el={errorEl}>Too short</p>
@@ -236,8 +236,8 @@ import { element, shared, state } from '@markless/core';
 
 export const field = shared(() => {
 	const s = state({ invalid: false });
-	const errorEl = element<HTMLParagraphElement>();
-	const descriptionEl = element<HTMLParagraphElement>();
+	const errorEl = element<HTMLParagraphElement | undefined>();
+	const descriptionEl = element<HTMLParagraphElement | undefined>();
 	return { ...s, errorEl, descriptionEl };
 }, { scope: 'subtree' });
 

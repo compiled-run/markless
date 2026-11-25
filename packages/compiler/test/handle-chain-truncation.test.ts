@@ -30,7 +30,7 @@ import { element } from '@markless/core';
 import { measure } from './measure.ts';
 
 export function Page() @{
-	const box = element<HTMLDivElement>();
+	const box = element<HTMLDivElement | undefined>();
 
 	<div>
 		<div el={box}>box</div>
@@ -57,7 +57,7 @@ import { element } from '@markless/core';
 import { measure } from './measure.ts';
 
 export function Page() @{
-	const box = element<HTMLDivElement>();
+	const box = element<HTMLDivElement | undefined>();
 
 	<div>
 		<div el={box}>box</div>
@@ -149,7 +149,7 @@ test('a chain on the right-hand side of a state write keeps its tail', async () 
 import { element, state } from '@markless/core';
 
 export function Page() @{
-	const box = element<HTMLDivElement>();
+	const box = element<HTMLDivElement | undefined>();
 	const s = state({ width: 0 });
 
 	<div>
@@ -172,7 +172,7 @@ test('a chain inside a template literal keeps its tail', async () => {
 import { element, state } from '@markless/core';
 
 export function Page() @{
-	const box = element<HTMLDivElement>();
+	const box = element<HTMLDivElement | undefined>();
 	const s = state({ label: '' });
 
 	<div>
@@ -203,7 +203,7 @@ import { measure } from './measure.ts';
 export const tabs = shared(
 	() => {
 		const t = state({ hits: 0 });
-		const panelEl = element<HTMLDivElement>();
+		const panelEl = element<HTMLDivElement | undefined>();
 		return { ...t, panelEl };
 	},
 	{ scope: 'subtree' },
@@ -236,7 +236,7 @@ import { element } from '@markless/core';
 import { openOverlay } from './overlay.ts';
 
 export function Page() @{
-	const contentEl = element<HTMLDivElement>();
+	const contentEl = element<HTMLDivElement | undefined>();
 
 	<div>
 		<div el={contentEl}>content</div>

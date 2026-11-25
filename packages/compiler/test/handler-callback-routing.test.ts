@@ -47,7 +47,7 @@ import { openOverlay } from './overlay.ts';
 
 export const modalState = shared(() => {
 	const modal = state({ open: false });
-	const contentEl = element<HTMLDivElement>();
+	const contentEl = element<HTMLDivElement | undefined>();
 	return {
 		...modal,
 		contentEl,
@@ -71,7 +71,7 @@ import { openOverlay } from './overlay.ts';
 
 export const modalState = shared(() => {
 	const modal = state({ open: false });
-	const contentEl = element<HTMLDivElement>();
+	const contentEl = element<HTMLDivElement | undefined>();
 	return {
 		...modal,
 		contentEl,

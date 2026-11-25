@@ -37,9 +37,9 @@ export const fileuploadState = shared(
 			name: '',
 			dragging: false,
 		});
-		const fieldEl = element<HTMLInputElement>();
-		const labelEl = element<HTMLLabelElement>();
-		const dropEl = element<HTMLDivElement>();
+		const fieldEl = element<HTMLInputElement | undefined>();
+		const labelEl = element<HTMLLabelElement | undefined>();
+		const dropEl = element<HTMLDivElement | undefined>();
 
 		return {
 			...upload,

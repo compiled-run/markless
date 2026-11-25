@@ -3,7 +3,7 @@ import { element, shared, state } from '@markless/core';
 export const groupState = shared(
 	() => {
 		const group = state({ disabled: false });
-		const rootEl = element<HTMLDivElement>();
+		const rootEl = element<HTMLDivElement | undefined>();
 		const thumbEls = element<HTMLDivElement[]>();
 
 		return { ...group, rootEl, thumbEls };
@@ -14,7 +14,7 @@ export const groupState = shared(
 // Rooted by every thumb, and nothing but an element() handle: no cell to own.
 export const thumbState = shared(
 	() => {
-		const labelEl = element<HTMLSpanElement>();
+		const labelEl = element<HTMLSpanElement | undefined>();
 
 		return { labelEl };
 	},
@@ -25,7 +25,7 @@ export const thumbState = shared(
 export const cellThumbState = shared(
 	() => {
 		const thumb = state({ name: '' });
-		const labelEl = element<HTMLSpanElement>();
+		const labelEl = element<HTMLSpanElement | undefined>();
 
 		return { ...thumb, labelEl };
 	},

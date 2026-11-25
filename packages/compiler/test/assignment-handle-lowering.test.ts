@@ -42,7 +42,7 @@ import { openOverlay } from './overlay.ts';
 
 export function Page() @{
 	const modal = state({ opened: null });
-	const contentEl = element<HTMLDivElement>();
+	const contentEl = element<HTMLDivElement | undefined>();
 
 	<div>
 		<div el={contentEl}>content</div>
@@ -71,7 +71,7 @@ import { widthOf } from './measure.ts';
 
 export function Page() @{
 	let total = state(0);
-	const box = element<HTMLDivElement>();
+	const box = element<HTMLDivElement | undefined>();
 
 	<div>
 		<div el={box}>box</div>
@@ -95,7 +95,7 @@ import { measure } from './measure.ts';
 
 export function Page() @{
 	let hits = state(0);
-	const box = element<HTMLDivElement>();
+	const box = element<HTMLDivElement | undefined>();
 
 	<div>
 		<div el={box}>box</div>
@@ -121,7 +121,7 @@ import { openOverlay } from './overlay.ts';
 
 export function Page() @{
 	let dismissals = state(0);
-	const contentEl = element<HTMLDivElement>();
+	const contentEl = element<HTMLDivElement | undefined>();
 
 	<div>
 		<div el={contentEl}>content</div>
@@ -151,7 +151,7 @@ import { openOverlay } from './overlay.ts';
 
 export function Page() @{
 	const modalDismissals = state(0);
-	const contentEl = element<HTMLDivElement>();
+	const contentEl = element<HTMLDivElement | undefined>();
 
 	<div>
 		<div el={contentEl}>content</div>
@@ -206,7 +206,7 @@ import { element, state } from '@markless/core';
 
 export function Page() @{
 	let hits = state(0);
-	const box = element<HTMLDivElement>();
+	const box = element<HTMLDivElement | undefined>();
 
 	<div>
 		<div el={box}>box</div>

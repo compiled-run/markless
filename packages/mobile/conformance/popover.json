@@ -73,7 +73,7 @@
 				"element": "div",
 				"parent": "h0",
 				"attributes": {
-					"class": "mk-1e25sqt"
+					"class": "mk-dgm7dr"
 				},
 				"bindings": [
 					{
@@ -102,7 +102,7 @@
 				"element": "button",
 				"parent": "component-edge:0/h0",
 				"attributes": {
-					"class": "mk-xhmnfn",
+					"class": "mk-3in9ip",
 					"type": "button",
 					"aria-haspopup": "dialog"
 				},
@@ -163,7 +163,7 @@
 				"element": "div",
 				"parent": "component-edge:0/h0",
 				"attributes": {
-					"class": "mk-as9gn3",
+					"class": "mk-asul8p",
 					"role": "dialog",
 					"overlay": ""
 				},

@@ -43,7 +43,7 @@ import { measure } from './measure.ts';
 
 export function Page() @{
 	const rows = state([{ id: 'a', label: 'Alpha' }]);
-	const box = element<HTMLDivElement>();
+	const box = element<HTMLDivElement | undefined>();
 
 	<div>
 		<div el={box}>box</div>
@@ -108,7 +108,7 @@ import { measure } from './measure.ts';
 export function Page() @{
 	const rows = state([{ id: 'a' }]);
 	let label = state('none');
-	const box = element<HTMLDivElement>();
+	const box = element<HTMLDivElement | undefined>();
 
 	<div>
 		<div el={box}>box</div>

@@ -25,8 +25,8 @@ const idSlots = (graph: Awaited<ReturnType<typeof buildSemanticGraph>>) =>
 const ROOT_AND_PART = `import { element, shared, state } from '@markless/core';
 export const wid = shared(() => {
 	const w = state({ open: false });
-	const rootEl = element<HTMLDivElement>();
-	const panelEl = element<HTMLDivElement>();
+	const rootEl = element<HTMLDivElement | undefined>();
+	const panelEl = element<HTMLDivElement | undefined>();
 	return { ...w, rootEl, panelEl };
 }, { scope: 'subtree' });
 export function Root({ children }: { children?: unknown }) @{
@@ -63,7 +63,7 @@ test('a page-wide shared() handle is still refused: one element per page is not 
 		`import { element, shared, state } from '@markless/core';
 export const wid = shared(() => {
 	const w = state({ open: false });
-	const panelEl = element<HTMLDivElement>();
+	const panelEl = element<HTMLDivElement | undefined>();
 	return { ...w, panelEl };
 });
 export function Root({ children }: { children?: unknown }) @{
@@ -86,7 +86,7 @@ test('an IDREF naming a handle nothing binds is still refused', async () => {
 		`import { element, shared, state } from '@markless/core';
 export const wid = shared(() => {
 	const w = state({ open: false });
-	const panelEl = element<HTMLDivElement>();
+	const panelEl = element<HTMLDivElement | undefined>();
 	return { ...w, panelEl };
 }, { scope: 'subtree' });
 export function Root({ children }: { children?: unknown }) @{

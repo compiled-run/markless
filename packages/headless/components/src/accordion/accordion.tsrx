@@ -74,8 +74,8 @@ export const accordionState = shared(
 export const accordionItemState = shared(
 	() => {
 		const item: AccordionItemInstanceState = state({ value: '', disabled: false });
-		const labelEl = element<HTMLHeadingElement>();
-		const contentEl = element<HTMLDivElement>();
+		const labelEl = element<HTMLHeadingElement | undefined>();
+		const contentEl = element<HTMLDivElement | undefined>();
 
 		return { ...item, labelEl, contentEl };
 	},
