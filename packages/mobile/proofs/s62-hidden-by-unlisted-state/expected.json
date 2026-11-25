@@ -1,0 +1,54 @@
+{
+	"rung": "S62",
+	"name": "A styled element hidden by a test over state the build cannot list (a filtered list's length) is hidden and shown as the test changes, also in an arm that opens later, as the web's [hidden] rule does",
+	"steps": [
+		{
+			"visible": [
+				"No items yet",
+				"Add item"
+			],
+			"absent": [
+				"No items match"
+			]
+		},
+		{
+			"do": {
+				"tap": "Add item"
+			},
+			"visible": [
+				"Apples",
+				"Add item"
+			],
+			"absent": [
+				"No items yet",
+				"No items match"
+			]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Search items",
+					"text": "zzz",
+					"keepKeyboard": true
+				}
+			},
+			"visible": [
+				"No items match"
+			],
+			"absent": [
+				"Apples"
+			]
+		},
+		{
+			"do": {
+				"clear": "Search items"
+			},
+			"visible": [
+				"Apples"
+			],
+			"absent": [
+				"No items match"
+			]
+		}
+	]
+}

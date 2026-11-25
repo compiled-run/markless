@@ -382,6 +382,26 @@
 								"property": "topic"
 							}
 						}
+					],
+					"styleCases": [
+						{
+							"id": "case:component-edge:0/component-edge:0/h6#hidden",
+							"value": {
+								"binary": "===",
+								"left": {
+									"binary": "*",
+									"left": {
+										"cell": "state:picks"
+									},
+									"right": {
+										"literal": 2
+									}
+								},
+								"right": {
+									"literal": 0
+								}
+							}
+						}
 					]
 				}
 			}
@@ -457,6 +477,11 @@
 				"host": "h0"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "case:component-edge:0/component-edge:0/h6#hidden",
+					"value": false
+				},
 				{
 					"op": "attribute",
 					"node": "component-edge:0/component-edge:0/h6",

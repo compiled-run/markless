@@ -217,6 +217,32 @@
 					}
 				]
 			}
+		],
+		"styleCases": [
+			{
+				"id": "case:h2#hidden",
+				"value": {
+					"binary": "===",
+					"left": {
+						"cell": "state:count"
+					},
+					"right": {
+						"literal": 0
+					}
+				}
+			},
+			{
+				"id": "case:h6#hidden",
+				"value": {
+					"binary": "===",
+					"left": {
+						"cell": "state:count"
+					},
+					"right": {
+						"literal": 0
+					}
+				}
+			}
 		]
 	},
 	"initial": [
@@ -269,6 +295,16 @@
 				"host": "h1"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "case:h2#hidden",
+					"value": false
+				},
+				{
+					"op": "state",
+					"cell": "case:h6#hidden",
+					"value": false
+				},
 				{
 					"op": "attribute",
 					"node": "h2",
@@ -329,6 +365,16 @@
 				"host": "h3"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "case:h2#hidden",
+					"value": true
+				},
+				{
+					"op": "state",
+					"cell": "case:h6#hidden",
+					"value": true
+				},
 				{
 					"op": "attribute",
 					"node": "h2",

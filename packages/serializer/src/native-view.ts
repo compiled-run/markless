@@ -1613,6 +1613,13 @@ export type NativeFetchResponse =
 	  }
 	| { readonly error: string };
 
+/**
+ * A presence attribute (`hidden`, `disabled`) whose binding reads state the build cannot enumerate becomes a style case of its
+ * own: the payload's `styleCases` entry with this id holds while the attribute is present.
+ */
+export const NATIVE_PRESENCE_STYLE_ATTRIBUTES: ReadonlySet<string> = new Set(['hidden', 'disabled']);
+export const nativeAttributeStyleCaseId = (node: string, attribute: string): string => `case:${node}#${attribute}`;
+
 /** The package and export that name the platform's own pieces (`<native.sheet>`); one place, so the name is cheap to change. */
 export const PLATFORM_PIECES_PACKAGE = DEVICE_MODULE;
 export const PLATFORM_PIECES_NAMESPACE = 'native';
