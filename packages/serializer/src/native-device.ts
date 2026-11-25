@@ -144,3 +144,8 @@ export const DEVICE_ELEMENTS = [
 	{ module: '@markless/ui', export: 'native', member: 'camera', element: 'camera', device: 'camera' },
 	{ module: '@markless/ui', export: 'base', member: 'camera', element: 'camera', device: 'camera' },
 ] as const;
+
+/** The box a device element's part renders on a phone (`<div ui-camera>`), which styles lay out and the host's view fills. */
+export const DEVICE_ELEMENT_BOX: Readonly<Record<string, { readonly element: string; readonly attribute: string }>> = {
+	camera: { element: 'div', attribute: 'ui-camera' },
+};

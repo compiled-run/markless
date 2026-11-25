@@ -472,12 +472,17 @@ function walkApp(
 		const runtime = screen.runtime;
 		for (const cell of pageOf(screen.route).cells) {
 			if (!cell.device) continue;
-			if (cell.device !== 'location.access')
-				throw new Error(`no fake ${cell.device} in an app`);
+			const granted: Readonly<Record<string, NativeValue>> = {
+				'location.access': 'granted',
+				'camera.access': 'granted',
+				'camera.ready': true,
+				'camera.facing': 'back',
+			};
+			if (!(cell.device in granted)) throw new Error(`no fake ${cell.device} in an app`);
 			for (const entry of runtime.dispatch({
 				event: 'device',
 				cell: cell.id,
-				value: 'granted',
+				value: granted[cell.device]!,
 			}))
 				shown.apply(entry, -1);
 		}
@@ -572,6 +577,13 @@ function walkApp(
 				for (const entry of entries) {
 					const answer = services.answer(entry);
 					if (answer) answered.push(answer);
+					// The camera is granted in an app's walk: a photo is taken.
+					if (entry.op === 'call' && entry.call === 'camera.takePhoto' && entry.resume)
+						answered.push({
+							event: 'resume',
+							continuation: entry.resume,
+							value: { url: 'file:///proof/photo.png', width: 640, height: 480 },
+						});
 					if (entry.op !== 'navigate') {
 						stack.at(-1)!.apply(entry, index);
 						continue;
