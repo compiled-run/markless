@@ -6547,19 +6547,34 @@ export function createNativeViewPayload(
 					if (
 						!object ||
 						object.device !== deviceElement.device ||
-						edge.props.some((prop) => prop.name !== 'el')
+						edge.props.some(
+							(prop) =>
+								prop.name !== 'el' &&
+								(prop.name !== 'class' || prop.kind === 'callback' || prop.kind === 'spread'),
+						)
 					) {
 						refuse(
-							`<${edge.childComponentName}> needs el={…} naming a ${deviceElement.device} the component made, and no other props`,
+							`<${edge.childComponentName}> needs el={…} naming a ${deviceElement.device} the component made, and takes no other props but class`,
 						);
 						continue;
 					}
+					// The part's own box takes `class`, as on the web: styles size and paint the box the platform's view fills.
+					const deviceClass = edge.props.find((prop) => prop.name === 'class');
+					const classValue = deviceClass ? linkAttribute(deviceClass, edge, scope) : undefined;
+					if (deviceClass && !classValue) continue;
 					nodes.push({
 						kind: 'element',
 						id: scope.prefix + edge.id,
 						element: deviceElement.element,
 						object: object.id,
 						parent,
+						...(classValue && 'literal' in classValue
+							? typeof classValue.literal === 'string'
+								? { attributes: { class: classValue.literal } }
+								: {}
+							: classValue
+								? { bindings: [{ attribute: 'class', value: classValue }] }
+								: {}),
 						...place,
 					});
 					continue;
