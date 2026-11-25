@@ -477,6 +477,11 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				for (row in shown[place.first.id] ?: emptyList()) {
 					val own = assignments[rowEntry(row.assignment)].byId[node.id] ?: throw MarklessDecodeError("assignment ${row.assignment} has no node ${node.id} for row ${row.key}")
 					val copy = own.copy(id = "${node.id}@${row.key}", parent = if (place.second) node.parent else node.parent?.let { "$it@${row.key}" }, text = if (own.kind == "text") (row.texts[node.id] ?: own.text) else own.text)
+					// A row's text its item empties has no box, as on the web.
+					if (copy.kind == "text" && copy.text == "") {
+						withRows.add(copy.copy(frame = null, borderWidths = null, borderOps = null, scrollRange = null, lines = null))
+						continue
+					}
 					withRows.add(rowMoved[row.key]?.get(node.id)?.let { copy.copy(writes = slotWrites(copy, it)) } ?: copy)
 				}
 			}

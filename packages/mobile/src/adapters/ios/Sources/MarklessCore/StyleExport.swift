@@ -1003,6 +1003,11 @@ public struct StyleExport: Sendable {
 						isText: own.isText, isAnonymous: own.isAnonymous, text: own.isText ? (row.texts[node.id] ?? own.text) : own.text,
 						frame: own.frame, borderWidths: own.borderWidths, writes: own.writes, borderOps: own.borderOps, scrollRange: own.scrollRange,
 						lines: own.lines)
+					// A row's text its item empties has no box, as on the web.
+					if copy.isText, copy.text == "" {
+						withRows.append(copy.hidden())
+						continue
+					}
 					withRows.append(try (rowWrites[row.key]?[node.id] ?? []).reduce(copy) { try StyleExport.patched($0, kind: $1.kind, path: $1.path, value: $1.value) })
 				}
 			}
