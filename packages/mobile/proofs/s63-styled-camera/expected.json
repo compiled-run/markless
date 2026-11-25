@@ -1,0 +1,31 @@
+{
+	"rung": "S63",
+	"name": "A styled page's camera preview takes the part's class: its box is sized and painted by the page's styles, and the platform's preview fills it",
+	"permissions": {
+		"camera": "allow"
+	},
+	"steps": [
+		{
+			"visible": ["New photo", "Camera ready", "Take photo", "Photos 0"],
+			"absent": ["Camera starting"],
+			"camera": "on"
+		},
+		{
+			"do": {
+				"tap": "Take photo"
+			},
+			"visible": ["Photos 1"],
+			"absent": ["Photos 0"],
+			"calls": ["camera.takePhoto"]
+		}
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": ["New photo", "No camera here"],
+				"absent": ["Take photo", "Camera starting", "Camera ready"]
+			}
+		],
+		"absentFromOutput": ["Take photo", "takePhoto", "Camera starting", "@markless/device"]
+	}
+}

@@ -2707,7 +2707,8 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	view.layer.borderWidth = style.borderWidth
 	view.layer.borderColor = style.borderColor.map(uiColor)?.cgColor
 	view.layer.cornerRadius = style.cornerRadius
-	view.clipsToBounds = style.clipsChildren && style.childClip == nil
+	// A replaced element's content is clipped to its (rounded) box, as CSS clips a camera's or an image's picture.
+	view.clipsToBounds = (style.clipsChildren && style.childClip == nil) || view is CameraPreviewView
 	// Siblings draw by zPosition: in-flow boxes at 0, negative z-index below them, positioned boxes above in their context's order.
 	view.layer.zPosition = style.paintOrder.map { CGFloat($0.bucket) * 100_000 + CGFloat($0.rank) + 1 } ?? 0
 	// A layer mask clips the box and its subviews without touching their accessibility, as Chrome keeps clipped text exposed.
