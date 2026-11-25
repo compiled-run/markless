@@ -36,7 +36,7 @@ class AnimationRun(private val style: StyleExport, private val initial: Int, pri
 	fun next(dpr: Double, width: Double, height: Double): Pair<List<AnimationEvent>, Boolean> {
 		val plan = style.plan ?: return emptyList<AnimationEvent>() to false
 		val anim = style.anim ?: return emptyList<AnimationEvent>() to false
-		val line = "{\"dpr\":${jsonNumber(dpr)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"plan\":$plan,\"anim\":$anim,\"initial\":$initial,\"steps\":[${steps.joinToString(",")}]}"
+		val line = "{\"dpr\":${jsonNumber(dpr)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"plan\":${plan.text},\"anim\":$anim,\"initial\":$initial,\"steps\":[${steps.joinToString(",")}]}"
 		val result = Json.parse(run(line))
 		val answer = result.arr("animation")
 		if (answer.size != 6 || answer[0] != Json.Str("ok")) throw MarklessDecodeError("Dragon's animator failed: ${result.text().take(300)}")

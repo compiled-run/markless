@@ -1,0 +1,30 @@
+appId: ${APP_ID}
+name: s60-many-states-page
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Groceries
+- assertVisible: Milk and eggs
+- assertVisible: Delete
+- assertVisible: Shopping · Deleted 0 times
+- assertNotVisible: Delete this note\?
+- assertVisible: Many states
+- tapOn: Delete
+- assertVisible: Delete this note\?
+- assertVisible: Delete this note\?
+- assertVisible: Keep it
+- assertVisible: Delete note
+- tapOn: Delete note
+- assertNotVisible: Delete this note\?
+- assertVisible: Groceries
+- assertVisible: Shopping · Deleted 1 times
+- assertNotVisible: Delete this note\?
+- tapOn: Hide note
+- assertNotVisible: Groceries
+- assertVisible: Note not found
+- assertVisible: Show note
+- assertNotVisible: Groceries

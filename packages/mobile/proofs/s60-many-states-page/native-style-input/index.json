@@ -1,0 +1,590 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "ManyStates",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "div",
+			"parent": null,
+			"attributes": {
+				"class": "shell mk-4t2dcw"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "header",
+			"parent": "h0",
+			"attributes": {
+				"class": "bar mk-4t2dcw"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "button",
+			"parent": "h2",
+			"attributes": {
+				"type": "button",
+				"class": "link brand mk-4t2dcw"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Notes"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "nav",
+			"parent": "h2",
+			"attributes": {
+				"class": "links mk-4t2dcw",
+				"aria-label": "Sections"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "button",
+			"parent": "h4",
+			"attributes": {
+				"type": "button",
+				"class": "link mk-4t2dcw"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Tags"
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "button",
+			"parent": "h4",
+			"attributes": {
+				"type": "button",
+				"class": "button primary mk-4t2dcw"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h6:text0",
+			"parent": "h6",
+			"text": "New note"
+		},
+		{
+			"kind": "element",
+			"id": "h7",
+			"element": "main",
+			"parent": "h0",
+			"attributes": {
+				"class": "content mk-4t2dcw"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h8",
+			"element": "article",
+			"parent": "h7",
+			"attributes": {
+				"class": "note mk-4t2dcw"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h9",
+			"element": "div",
+			"parent": "h8",
+			"attributes": {
+				"class": "mk-4t2dcw"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h10",
+			"element": "h1",
+			"parent": "h9",
+			"attributes": {
+				"class": "mk-4t2dcw"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h10:text0",
+			"parent": "h10",
+			"text": "Groceries",
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h11",
+			"element": "p",
+			"parent": "h9",
+			"attributes": {
+				"class": "meta mk-4t2dcw"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h11:text0",
+			"parent": "h11",
+			"text": "Shopping · Deleted 0 times",
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h12",
+			"element": "div",
+			"parent": "h8",
+			"attributes": {
+				"class": "body mk-4t2dcw"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h13",
+			"element": "p",
+			"parent": "h12",
+			"attributes": {
+				"class": "mk-4t2dcw"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h13:text0",
+			"parent": "h13",
+			"text": "Milk and eggs",
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h14",
+			"element": "p",
+			"parent": "h12",
+			"attributes": {
+				"class": "mk-4t2dcw"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h14:text0",
+			"parent": "h14",
+			"text": "Bread",
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h15",
+			"element": "p",
+			"parent": "h12",
+			"attributes": {
+				"class": "mk-4t2dcw"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h15:text0",
+			"parent": "h15",
+			"text": "Coffee beans",
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h16",
+			"element": "div",
+			"parent": "h8",
+			"attributes": {
+				"class": "actions mk-4t2dcw"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h17",
+			"element": "button",
+			"parent": "h16",
+			"attributes": {
+				"type": "button",
+				"class": "button mk-4t2dcw"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h17:text0",
+			"parent": "h17",
+			"text": "Hide note",
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h18",
+			"element": "button",
+			"parent": "h16",
+			"attributes": {
+				"type": "button",
+				"class": "button danger mk-4t2dcw"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h18:text0",
+			"parent": "h18",
+			"text": "Delete",
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h19",
+			"element": "section",
+			"parent": "h7",
+			"attributes": {
+				"class": "missing mk-4t2dcw"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 1
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h20",
+			"element": "h1",
+			"parent": "h19",
+			"attributes": {
+				"class": "mk-4t2dcw"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 1
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h20:text0",
+			"parent": "h20",
+			"text": "Note not found",
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 1
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h21",
+			"element": "button",
+			"parent": "h19",
+			"attributes": {
+				"type": "button",
+				"class": "button mk-4t2dcw"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 1
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h21:text0",
+			"parent": "h21",
+			"text": "Show note",
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 1
+			}
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0/h0",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {},
+			"attributesByState": {
+				"ui-open": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": true
+						},
+						"value": ""
+					}
+				],
+				"ui-closed": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": true
+						},
+						"value": null
+					}
+				]
+			}
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:1/h2",
+			"element": "div",
+			"parent": "component-edge:0/h0",
+			"attributes": {
+				"class": "backdrop mk-4t2dcw",
+				"overlay": ""
+			},
+			"attributesByState": {
+				"hidden": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": true
+						},
+						"value": null
+					}
+				],
+				"ui-open": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": true
+						},
+						"value": ""
+					}
+				],
+				"ui-closed": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": true
+						},
+						"value": null
+					}
+				]
+			}
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:2/h3",
+			"element": "div",
+			"parent": "component-edge:1/h2",
+			"attributes": {
+				"class": "dialog mk-4t2dcw",
+				"aria-modal": "true",
+				"role": "dialog",
+				"aria-labelledby": "component-edge:3/h4",
+				"aria-describedby": "component-edge:4/h5"
+			},
+			"attributesByState": {
+				"ui-open": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": true
+						},
+						"value": ""
+					}
+				],
+				"ui-closed": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open": true
+						},
+						"value": null
+					}
+				]
+			}
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:3/h4",
+			"element": "h2",
+			"parent": "component-edge:2/h3",
+			"attributes": {
+				"class": "dialog-title mk-4t2dcw"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:3/h4:text0",
+			"parent": "component-edge:3/h4",
+			"text": "Delete this note?"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:4/h5",
+			"element": "p",
+			"parent": "component-edge:2/h3",
+			"attributes": {}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:4/h5:text0",
+			"parent": "component-edge:4/h5",
+			"text": "“Groceries” will be gone for good."
+		},
+		{
+			"kind": "element",
+			"id": "h22",
+			"element": "div",
+			"parent": "component-edge:2/h3",
+			"attributes": {
+				"class": "dialog-actions mk-4t2dcw"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:5/h6",
+			"element": "button",
+			"parent": "h22",
+			"attributes": {
+				"class": "button mk-4t2dcw",
+				"type": "button"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:5/h6:text0",
+			"parent": "component-edge:5/h6",
+			"text": "Keep it"
+		},
+		{
+			"kind": "element",
+			"id": "h23",
+			"element": "button",
+			"parent": "h22",
+			"attributes": {
+				"type": "button",
+				"class": "button danger solid mk-4t2dcw"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h23:text0",
+			"parent": "h23",
+			"text": "Delete note"
+		}
+	],
+	"css": ":root {\n\t--paper: #fbf8f1;\n\t--card: #ffffff;\n\t--ink: #1f1d1a;\n\t--muted: #6b665c;\n\t--line: #e4ddcf;\n\t--accent: #c2410c;\n\t--accent-ink: #ffffff;\n\t--danger: #b91c1c;\n\t--radius: 14px;\n\t--shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 4px 14px rgb(0 0 0 / 0.05);\n}\n\n@media (prefers-color-scheme: dark) {\n\t:root {\n\t\t--paper: #171614;\n\t\t--card: #23211e;\n\t\t--ink: #f3efe6;\n\t\t--muted: #a8a196;\n\t\t--line: #3a3732;\n\t\t--accent: #fb923c;\n\t\t--accent-ink: #1f1d1a;\n\t\t--danger: #f87171;\n\t\t--shadow: none;\n\t}\n}\n\n* {\n\tbox-sizing: border-box;\n}\n\nbody {\n\tmargin: 0;\n\tbackground: var(--paper);\n\tcolor: var(--ink);\n\tfont-family: system-ui, sans-serif;\n\tfont-size: 16px;\n\tline-height: 1.45;\n}\n\na {\n\tcolor: inherit;\n}\n\nh1 {\n\tmargin: 0 0 16px;\n\tfont-size: 28px;\n\tfont-weight: 600;\n\tletter-spacing: -0.01em;\n}\n\nbutton,\ninput,\nselect,\ntextarea {\n\tfont: inherit;\n\tcolor: inherit;\n}\n\n:focus-visible {\n\toutline: 3px solid var(--accent);\n\toutline-offset: 2px;\n}\n\n.button {\n\tdisplay: inline-flex;\n\talign-items: center;\n\tjustify-content: center;\n\tgap: 6px;\n\tmin-height: 44px;\n\tpadding: 10px 18px;\n\tborder: 1px solid var(--line);\n\tborder-radius: 999px;\n\tbackground: var(--card);\n\ttext-decoration: none;\n\tfont-weight: 600;\n\tcursor: pointer;\n}\n\n.button:active {\n\ttransform: scale(0.97);\n\topacity: 0.85;\n}\n\n.button.primary {\n\tborder-color: var(--accent);\n\tbackground: var(--accent);\n\tcolor: var(--accent-ink);\n}\n\n.button.danger {\n\tborder-color: var(--danger);\n\tcolor: var(--danger);\n}\n\n.button.danger.solid {\n\tbackground: var(--danger);\n\tcolor: #ffffff;\n}\n\n.shell.mk-4t2dcw {\n\t\t\t\tmin-height: 100vh;\n\t\t\t\tdisplay: flex;\n\t\t\t\tflex-direction: column;\n\t\t\t}\n\t\t\t.bar.mk-4t2dcw {\n\t\t\t\tposition: sticky;\n\t\t\t\ttop: 0;\n\t\t\t\tdisplay: flex;\n\t\t\t\talign-items: center;\n\t\t\t\tjustify-content: space-between;\n\t\t\t\tgap: 12px;\n\t\t\t\tpadding: 12px 20px;\n\t\t\t\tborder-bottom: 1px solid var(--line);\n\t\t\t\tbackground: var(--paper);\n\t\t\t}\n\t\t\t.brand.mk-4t2dcw {\n\t\t\t\tfont-size: 20px;\n\t\t\t\tfont-weight: 600;\n\t\t\t}\n\t\t\t.links.mk-4t2dcw {\n\t\t\t\tdisplay: flex;\n\t\t\t\tgap: 8px;\n\t\t\t}\n\t\t\t.link.mk-4t2dcw {\n\t\t\t\tpadding: 8px 12px;\n\t\t\t\tborder: 0;\n\t\t\t\tborder-radius: 999px;\n\t\t\t\tbackground: transparent;\n\t\t\t\tcolor: var(--muted);\n\t\t\t}\n\t\t\t.link.mk-4t2dcw:active {\n\t\t\t\tbackground: var(--line);\n\t\t\t}\n\t\t\t.content.mk-4t2dcw {\n\t\t\t\twidth: 100%;\n\t\t\t\tmax-width: 880px;\n\t\t\t\tmargin: 0 auto;\n\t\t\t\tpadding: 20px;\n\t\t\t}\n\t\t\t@media (min-width: 700px) {\n\t\t\t\t.content.mk-4t2dcw {\n\t\t\t\t\tpadding: 32px 40px;\n\t\t\t\t}\n\t\t\t}\n\t\t\t.note.mk-4t2dcw {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgap: 16px;\n\t\t\t\tpadding: 24px;\n\t\t\t\tborder: 1px solid var(--line);\n\t\t\t\tborder-radius: var(--radius);\n\t\t\t\tbackground: var(--card);\n\t\t\t\tbox-shadow: var(--shadow);\n\t\t\t}\n\t\t\t.meta.mk-4t2dcw {\n\t\t\t\tcolor: var(--muted);\n\t\t\t\tfont-size: 14px;\n\t\t\t}\n\t\t\t.body p.mk-4t2dcw {\n\t\t\t\tmargin: 0 0 12px;\n\t\t\t}\n\t\t\t.actions.mk-4t2dcw {\n\t\t\t\tdisplay: flex;\n\t\t\t\tflex-wrap: wrap;\n\t\t\t\tgap: 10px;\n\t\t\t}\n\t\t\t.backdrop.mk-4t2dcw:not([hidden]) {\n\t\t\t\tdisplay: grid;\n\t\t\t\tplace-items: center;\n\t\t\t\tpadding: 20px;\n\t\t\t\tbackground: rgb(0 0 0 / 0.45);\n\t\t\t}\n\t\t\t.dialog.mk-4t2dcw {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgap: 12px;\n\t\t\t\twidth: min(420px, 100%);\n\t\t\t\tpadding: 24px;\n\t\t\t\tborder-radius: var(--radius);\n\t\t\t\tbackground: var(--card);\n\t\t\t}\n\t\t\t.dialog-title.mk-4t2dcw {\n\t\t\t\tmargin: 0;\n\t\t\t\tfont-size: 20px;\n\t\t\t\tfont-weight: 600;\n\t\t\t}\n\t\t\t.dialog-actions.mk-4t2dcw {\n\t\t\t\tdisplay: flex;\n\t\t\t\tjustify-content: flex-end;\n\t\t\t\tgap: 10px;\n\t\t\t}\n\t\t\t.missing.mk-4t2dcw {\n\t\t\t\tdisplay: grid;\n\t\t\t\tjustify-items: center;\n\t\t\t\tpadding: 48px 0;\n\t\t\t\ttext-align: center;\n\t\t\t}",
+	"states": [
+		{
+			"cell": "component-edge:0/shared:packages/headless/components/src/modal/modal.tsrx#modalState/state:modal.open",
+			"domain": [
+				false,
+				true
+			],
+			"initial": false
+		}
+	],
+	"branches": [
+		{
+			"id": "branch-site:0",
+			"domain": [
+				"0",
+				"1"
+			],
+			"initial": "0"
+		}
+	]
+}
