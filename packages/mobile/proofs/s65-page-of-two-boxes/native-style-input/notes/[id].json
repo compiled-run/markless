@@ -1,0 +1,68 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Note",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "component-edge:0/h0",
+			"element": "header",
+			"parent": null,
+			"attributes": {
+				"class": "bar"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0/component-edge:0",
+			"element": "a",
+			"parent": "component-edge:0/h0",
+			"attributes": {
+				"class": "brand",
+				"href": "/"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:0/component-edge:0:text0",
+			"parent": "component-edge:0/component-edge:0",
+			"text": "Two boxes"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0/h1",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "content"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "h2",
+			"parent": "component-edge:0/h1",
+			"attributes": {}
+		},
+		{
+			"kind": "text",
+			"id": "h0:text0",
+			"parent": "h0",
+			"text": "The first note"
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "p",
+			"parent": "component-edge:0/h1",
+			"attributes": {}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Tap the name at the top to go home."
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n:focus-visible {\n\toutline: 3px solid #1d4ed8;\n\toutline-offset: 2px;\n}\n\n.bar {\n\tdisplay: flex;\n\talign-items: center;\n\tjustify-content: space-between;\n\tpadding: 12px 16px;\n\tborder-bottom: 1px solid #ced4da;\n\tbackground: #ffffff;\n}\n\n.brand {\n\tfont-size: 19px;\n\tfont-weight: 600;\n\tcolor: #1d1b16;\n\ttext-decoration: none;\n}\n\n.content {\n\tdisplay: grid;\n\tgap: 18px;\n\tpadding: 20px 16px 40px;\n\tbackground: #f4f1ea;\n}\n\n.open {\n\tcolor: #1d4ed8;\n\ttext-decoration: none;\n}\n",
+	"states": []
+}

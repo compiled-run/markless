@@ -1167,7 +1167,7 @@ final class ViewTree {
 			outlines.removeValue(forKey: id)?.removeFromSuperview()
 			return
 		}
-		guard let host = elements[outline.host] else { throw HostError("\(id): its outline is drawn in \(outline.host), which has no view") }
+		guard let host = outline.host == OutlinePaint.page ? root : elements[outline.host] else { throw HostError("\(id): its outline is drawn in \(outline.host), which has no view") }
 		let view = outlines[id] ?? OutlineView()
 		outlines[id] = view
 		try view.apply(outline, in: host)

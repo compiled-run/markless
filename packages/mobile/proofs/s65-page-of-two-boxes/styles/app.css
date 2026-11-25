@@ -1,0 +1,37 @@
+body {
+	margin: 0;
+	font-family: sans-serif;
+}
+
+:focus-visible {
+	outline: 3px solid #1d4ed8;
+	outline-offset: 2px;
+}
+
+.bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 16px;
+	border-bottom: 1px solid #ced4da;
+	background: #ffffff;
+}
+
+.brand {
+	font-size: 19px;
+	font-weight: 600;
+	color: #1d1b16;
+	text-decoration: none;
+}
+
+.content {
+	display: grid;
+	gap: 18px;
+	padding: 20px 16px 40px;
+	background: #f4f1ea;
+}
+
+.open {
+	color: #1d4ed8;
+	text-decoration: none;
+}

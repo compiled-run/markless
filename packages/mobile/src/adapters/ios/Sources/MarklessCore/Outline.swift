@@ -19,7 +19,7 @@ public struct OutlinePaint: Equatable, Sendable {
 	public let size: [Double]
 	public let borders: [Double]
 	public let radii: [RadiusLength]
-	/// The view node it is drawn in, and that node's unsnapped page device px origin, which its view sits at.
+	/// The view node it is drawn in, or `OutlinePaint.page`, and that node's unsnapped page device px origin, which its view sits at.
 	public let host: String
 	public let hostX: Double, hostY: Double
 	/// Its place among the outlines drawn in `host`: each box's descendants' outlines before its own, boxes in tree order.
@@ -27,6 +27,9 @@ public struct OutlinePaint: Equatable, Sendable {
 	public let dpr: Double
 
 	public var color: RGBA { tones[0] }
+
+	/// The host of an outline the page's root stacking context paints over every top-level box: the page's own view.
+	public static let page = ""
 }
 
 extension StyleExport {
@@ -52,10 +55,17 @@ extension StyleExport {
 			isView(write.layer) ? write.layer : ancestors(n).last(where: { isView($0.id) })?.id
 		}
 		let chain = [node] + ancestors(node)
-		guard let host = isView(write.layer) ? write.layer : chain.last(where: { isView($0.id) })?.id else {
+		guard var host = isView(write.layer) ? write.layer : chain.last(where: { isView($0.id) })?.id else {
 			throw styleError("\(node.id): its outline has no view to be drawn in")
 		}
-		guard let hostIndex = chain.firstIndex(where: { $0.id == host }) else { throw styleError("\(node.id): its outline's layer \(write.layer) is not around it") }
+		guard var hostIndex = chain.firstIndex(where: { $0.id == host }) else { throw styleError("\(node.id): its outline's layer \(write.layer) is not around it") }
+		if !isView(write.layer), let at = nodes.firstIndex(where: { $0.id == host }),
+			nodes[(at + 1)...].contains(where: { n in n.frame != nil && isView(n.id) && !ancestors(n).contains { isView($0.id) } })
+		{
+			// The root stacking context paints its outlines after all its boxes, so a later top-level box does not cover it.
+			host = OutlinePaint.page
+			hostIndex = chain.count - 1
+		}
 		for box in chain[(hostIndex == 0 ? 0 : 1)...hostIndex] {
 			let clips = box.writes.contains {
 				switch $0 {
@@ -65,16 +75,11 @@ extension StyleExport {
 			}
 			if clips { throw styleError("\(node.id): its outline is drawn in \(host), past \(box.id), which clips or scrolls; not implemented on iOS") }
 		}
-		if !isView(write.layer), let at = nodes.firstIndex(where: { $0.id == host }),
-			let next = nodes[(at + 1)...].first(where: { n in n.frame != nil && isView(n.id) && !ancestors(n).contains { isView($0.id) } })
-		{
-			throw styleError("\(node.id): its outline is drawn in \(host), and \(next.id), a later box at the top of the page, would cover it; not implemented on iOS")
-		}
 		for item in nodes where item.frame != nil && item.writes.contains(where: {
 			if case let .paintOrder(h, bucket, _) = $0 { return h == write.layer && bucket >= 1 } else { return false }
 		}) {
 			let parent = item.id.contains("@") ? ancestors(item).first(where: { isView($0.id) })?.id : layerView(above: item)
-			if parent != host {
+			if (parent ?? OutlinePaint.page) != host {
 				throw styleError("\(node.id): its outline is drawn in \(host), but \(item.id), which \(write.layer) paints over outlines, is placed in \(parent ?? "the page"); not implemented on iOS")
 			}
 		}

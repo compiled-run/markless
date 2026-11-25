@@ -1,0 +1,25 @@
+appId: ${APP_ID}
+name: s65-page-of-two-boxes
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Two boxes
+- assertVisible: Field notes
+- assertVisible: Open the note
+- assertNotVisible: The first note
+- tapOn: Open the note
+- assertVisible: The first note
+- assertNotVisible: Field notes
+- assertVisible: Two boxes
+- assertVisible: The first note
+- assertNotVisible: Field notes
+- tapOn: Two boxes
+- assertVisible: Field notes
+- assertNotVisible: The first note
+- assertVisible: Field notes
+- assertVisible: Open the note
+- assertNotVisible: The first note
