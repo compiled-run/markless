@@ -294,6 +294,13 @@ export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): Native
 	};
 }
 
+/** The font an entry rebuilds: a Core Text cascade face is its PostScript name, whichever base and text found it. */
+function rebuilt(face: StyleSystemFont): string {
+	const inner = (face["ios"] as { readonly face?: { readonly kind?: unknown; readonly postScriptName?: unknown } } | undefined)?.face;
+	if (inner?.kind !== "cascade") return JSON.stringify(face);
+	return JSON.stringify({ ...face, ios: { face: { kind: "cascade", postScriptName: inner.postScriptName } } });
+}
+
 /** Every system face the pages' exports name, once each by id; two exports that rebuild one id differently are an error. */
 export function appStyleSystemFonts(pages: ReadonlyArray<NativeAppStylePage>): StyleSystemFont[] {
 	const faces = new Map<string, StyleSystemFont>();
@@ -302,9 +309,9 @@ export function appStyleSystemFonts(pages: ReadonlyArray<NativeAppStylePage>): S
 			(e) => e.systemFonts ?? [],
 		)) {
 			const seen = faces.get(face.id);
-			if (seen !== undefined && JSON.stringify(seen) !== JSON.stringify(face))
+			if (seen !== undefined && rebuilt(seen) !== rebuilt(face))
 				throw new Error(`system face ${face.id} is rebuilt two ways`);
-			faces.set(face.id, face);
+			if (seen === undefined) faces.set(face.id, face);
 		}
 	return [...faces.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
 }

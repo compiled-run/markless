@@ -178,6 +178,8 @@ public enum SystemFace: Sendable, Equatable {
 	case system(weight: Double, design: String)
 	/// `CTFontCreateWithName` by PostScript name.
 	case named(postScriptName: String)
+	/// The font Core Text's cascade gives `base` for `text` (`CTFontCreateForString`), which Dragon measured as `postScriptName`.
+	indirect case cascade(base: SystemFace, text: String, postScriptName: String)
 }
 
 /// Consecutive glyphs of a text line in one face at one size (device px); each x is a pen origin in device px from the node's frame.
@@ -551,34 +553,49 @@ public struct StyleExport: Sendable {
 		return routes
 	}
 
-	/// `systemFonts`: each system face with this target's face; an entry without this target, or a face of an unknown kind, is an error.
+	/// `systemFonts`: each system face with this target's face; an entry without this target, or a face of an unknown kind, is an error,
+	/// except another platform's fallback face (`fallback: true`), which this target's runs never name.
 	private static func decodeSystemFonts(_ reader: Reader, target: String) throws -> [String: SystemFace] {
 		var out: [String: SystemFace] = [:]
 		for entry in try reader.array() {
-			let f = try entry.object(required: ["id"], optional: ["ios", "android"])
+			let f = try entry.object(required: ["id"], optional: ["fallback", "ios", "android"])
 			let id = try f["id"].string()
 			guard id.hasPrefix("system:") else { throw entry.fail("\(id) is not a system face id") }
 			guard out[id] == nil else { throw entry.fail("\(id) is listed twice") }
-			guard f.has(target) else { throw entry.fail("\(id) has no \(target) face") }
-			let face = try f[target].object(["face"])["face"]
-			switch try face.field("kind").string() {
-			case "system":
-				let s = try face.object(["kind", "weight", "design"])
-				let weight = try s["weight"].number()
-				guard weight >= -1, weight <= 1 else { throw face.fail("weight \(weight) is not a UIFont.Weight value") }
-				let design = try s["design"].string()
-				guard ["default", "serif", "monospaced"].contains(design) else { throw face.fail("unknown system design \"\(design)\"") }
-				out[id] = .system(weight: weight, design: design)
-			case "name":
-				let n = try face.object(["kind", "postScriptName"])
-				let name = try n["postScriptName"].string()
-				guard !name.isEmpty else { throw face.fail("an empty PostScript name") }
-				out[id] = .named(postScriptName: name)
-			case let kind:
-				throw face.fail("unknown system face kind \"\(kind)\"")
+			let fallback = f.has("fallback")
+			if fallback, try !f["fallback"].bool() { throw entry.fail("\(id): fallback must be true") }
+			guard f.has(target) else {
+				if fallback { continue }
+				throw entry.fail("\(id) has no \(target) face")
 			}
+			out[id] = try decodeSystemFace(try f[target].object(["face"])["face"])
 		}
 		return out
+	}
+
+	private static func decodeSystemFace(_ face: Reader) throws -> SystemFace {
+		switch try face.field("kind").string() {
+		case "system":
+			let s = try face.object(["kind", "weight", "design"])
+			let weight = try s["weight"].number()
+			guard weight >= -1, weight <= 1 else { throw face.fail("weight \(weight) is not a UIFont.Weight value") }
+			let design = try s["design"].string()
+			guard ["default", "serif", "monospaced"].contains(design) else { throw face.fail("unknown system design \"\(design)\"") }
+			return .system(weight: weight, design: design)
+		case "name":
+			let n = try face.object(["kind", "postScriptName"])
+			let name = try n["postScriptName"].string()
+			guard !name.isEmpty else { throw face.fail("an empty PostScript name") }
+			return .named(postScriptName: name)
+		case "cascade":
+			let c = try face.object(["kind", "base", "text", "postScriptName"])
+			let text = try c["text"].string()
+			let name = try c["postScriptName"].string()
+			guard !text.isEmpty, !name.isEmpty else { throw face.fail("a cascade face needs its text and PostScript name") }
+			return .cascade(base: try decodeSystemFace(c["base"]), text: text, postScriptName: name)
+		case let kind:
+			throw face.fail("unknown system face kind \"\(kind)\"")
+		}
 	}
 
 	fileprivate static func decodeLines(_ reader: Reader) throws -> [TextLine] {
