@@ -34,6 +34,8 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var shadow: BoxShadow?
 	/// `visibility` other than visible (a text takes its element's): the view keeps its place, but paints nothing of its own.
 	public var hidden = false
+	/// An `<img>` whose src the app sets as it runs: how and where the image it loads is drawn, at `scale` device px per point.
+	public var runtimeImage: (image: RuntimeImage, place: RuntimeImagePlace, scale: Double)?
 	/// The box's `transform`, resolved at its size when the host applies it.
 	public var transform: StyleTransform?
 	/// Set when Dragon pre-composites the box's opacity: the host draws the composite over the box.
@@ -57,6 +59,7 @@ public struct ResolvedStyle: Equatable, Sendable {
 			&& a.textColor == b.textColor && a.lines == b.lines && a.linesText == b.linesText && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll && a.hidden == b.hidden
 			&& a.clipsChildren == b.clipsChildren && a.childClip == b.childClip && a.clipRect == b.clipRect
 			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank && a.stackingParent == b.stackingParent && a.shadow == b.shadow
+			&& a.runtimeImage?.image == b.runtimeImage?.image && a.runtimeImage?.place == b.runtimeImage?.place && a.runtimeImage?.scale == b.runtimeImage?.scale
 			&& a.transform == b.transform && a.group == b.group && a.opacity == b.opacity
 			&& a.selectArrow == b.selectArrow && a.selectLabel == b.selectLabel && a.textField == b.textField && a.checkbox == b.checkbox && a.outline == b.outline
 	}
@@ -679,6 +682,10 @@ extension StyleExport {
 			case let .paintOrder(_, bucket, rank, _, _): style.paintOrder = (bucket, rank)
 			case .boxShadow: break
 			case let .visibility(value): style.hidden = value != "visible"
+			case let .runtimeImage(image):
+				guard node.frame != nil else { break }
+				guard let place = node.runtimeImagePlace else { throw styleError("\(node.id) draws an image its app loads, but has no content box") }
+				style.runtimeImage = (image, place, dpr)
 			case let .selectArrow(color):
 				if let arrow = node.selectArrow { style.selectArrow = ResolvedStyle.SelectArrowPaint(arrow: arrow, color: color, scale: dpr) }
 			case let .checkbox(colors):

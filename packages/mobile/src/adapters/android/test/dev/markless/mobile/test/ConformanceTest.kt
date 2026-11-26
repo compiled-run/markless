@@ -45,6 +45,7 @@ import dev.markless.mobile.style.BandComparison
 import dev.markless.mobile.style.Bands
 import dev.markless.mobile.style.OutlinePaint
 import dev.markless.mobile.style.Rgba
+import dev.markless.mobile.style.Frame
 import dev.markless.mobile.style.Shadow
 import dev.markless.mobile.style.ShadowPaint
 import dev.markless.mobile.style.CheckboxColors
@@ -1082,6 +1083,38 @@ private fun rowPressedStyles(fixtures: File) {
 	check("only the picked row takes the pressed assignment", rows.getOrNull()?.map { it.assignment == k } == listOf(false, true, false)) { "${rows.getOrNull()?.map { it.key to it.assignment }} from $k" }
 }
 
+/** The S30 rung's app style (proofs/s30-runtime-image): a card template whose img src follows its row, and a thumbnail whose src can be absent. */
+private fun runtimeImages(fixtures: File) {
+	val bytes = File(fixtures, "s30-runtime-image.native-app-style.json").readBytes()
+	val style = StyleExport.decodeApp(bytes).getValue("/")
+	val nodes = style.assignments[style.initial].nodes
+	val card = nodes.single { it.id == "h5" }.runtimeImage
+	val thumb = nodes.single { it.id == "h8" }.runtimeImage
+	check("a runtime-image write keeps its fit and position", card?.fit == "cover" && card.position == listOf(true to 50.0, true to 50.0) && thumb?.fit == "contain" && thumb.position == listOf(true to 0.0, true to 100.0)) { "$card $thumb" }
+	check("only an img whose src can be absent has a no-image outline", card?.outline == null && thumb?.outline == Rgba(192, 192, 192, 255)) { "${card?.outline} ${thumb?.outline}" }
+	check("each img whose src the app sets has a write", nodes.filter { it.runtimeImage != null }.map { it.id } == listOf("h5", "h8")) { "${nodes.filter { it.runtimeImage != null }.map { it.id }}" }
+	val place = nodes.single { it.id == "h8" }.runtimeImagePlace
+	check("a runtime image is placed at its write's content box", place?.content == Frame(47.0, 34111.0 / 64, 189.0, 189.0) && place.originX == 42.0) { "$place" }
+	// Every box 30 device px further right, its frame as the export's, at a phone 2 dp narrower.
+	val k = style.initial
+	val dragonId = style.planNames[k].entries.associate { (d, m) -> m to d }
+	val framed = HashSet<String>()
+	fun bits(v: Double) = "\"${java.lang.Long.toHexString(v.toRawBits()).padStart(16, '0')}\""
+	val rows = nodes.mapNotNull { n ->
+		val f = n.frame ?: return@mapNotNull null
+		val top = n.parent == null || n.parent !in framed
+		framed.add(n.id)
+		val w = n.borderWidths?.let { listOf(it.top, it.right, it.bottom, it.left).joinToString(",", "[", "]") { x -> bits(x) } } ?: "null"
+		"[\"${dragonId[n.id] ?: n.id}\",[${listOf(if (top) f.x + 30 else f.x, f.y, f.width, f.height).joinToString(",") { bits(it) }}],$w,null,null,null]"
+	}
+	val answer = "[\"ok\",[${List(4) { bits(0.0) }.joinToString(",")}],[${rows.joinToString(",")}]]"
+	val laid = style.laidOut(409.0, 818.0, 2.625, { answer })
+	val moved = laid.assignments[k].byId["h8"]?.runtimeImagePlace
+	check("a phone layout places the content box from its own frame and the export's padding", moved != null && Math.abs(moved.content.x - 77.0) < 1e-9 && moved.content.width == 189.0 && moved.originX == 72.0) { "$moved" }
+	val wide = String(bytes).replace("\"alpha\":255},\"width\":1}", "\"alpha\":255},\"width\":2}")
+	check("a runtime-image write with another outline width is refused", runCatching { StyleExport.decodeApp(wide.toByteArray()) }.isFailure) { "decoded" }
+}
+
 /** The S28 rung's: a z-index box in .actions in .card, both with later siblings, which Dragon paints in html's stacking order. */
 private fun rehostedStacking(fixtures: File) {
 	val text = File(fixtures, "s28-rehosted-stacking.native-app-style.json").readText()
@@ -1278,6 +1311,7 @@ fun main(args: Array<String>) {
 	sheetStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	rowStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	rowPressedStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	runtimeImages(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	selectArrows(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	slottedSelectArrows(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	checkboxMarks(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))

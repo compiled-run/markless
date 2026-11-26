@@ -69,6 +69,8 @@ sealed interface StyleWrite {
 	 * lengths (percent, value; null: square) and the node whose paint layer paints it, after that layer's flow content.
 	 */
 	data class Outline(val style: String, val width: Double, val offset: Double, val color: Rgba, val tones: Pair<Rgba, Rgba>?, val radii: List<Pair<Boolean, Double>>?, val layer: String) : StyleWrite
+	/** An `<img>` whose src the app sets as it runs: the host draws whatever image loads into its content box, as Chrome does. */
+	data class RuntimeImage(val image: LoadedImageSpec) : StyleWrite
 	/** `opacity` below 1 that the platform composites: the view's alpha is Chrome's alpha byte / 255, its subtree drawn as one group. */
 	data class Opacity(val opacity: Double) : StyleWrite
 	/** `transform`: the functions and origin as Dragon wrote them, lengths in CSS px; Dragon's translated paint math resolves them at the box size. */
@@ -79,6 +81,52 @@ sealed interface StyleWrite {
 	 * the sticky box it paints after, [unstable] the earlier paint whose platform capture may differ from the screen.
 	 */
 	data class OpacityGroup(val opacity: Double, val backdrop: String?, val painters: List<String>, val after: String?, val unstable: List<String> = emptyList()) : StyleWrite
+}
+
+/** Dragon's layout unit, which the runtime-image write's content box counts in: 1/64 px, as Blink's LayoutUnit. */
+const val DRAGON_LAYOUT_UNITS_PER_PX = 64.0
+
+/**
+ * An `<img>` whose src the app sets as it runs: its object-fit, object-position (x then y: a percent, or CSS px), whether
+ * image-rendering is pixelated, the no-image outline's colour when its src can be absent (null: it always has one), and its content
+ * box at the export's layout, absolute, in Dragon's layout units.
+ */
+data class LoadedImageSpec(val fit: String, val position: List<Pair<Boolean, Double>>, val pixelated: Boolean, val outline: Rgba?, val content: Frame?)
+
+/** Where a runtime image is painted from, in absolute device px: its content box, and the origin of its node's frame. */
+data class RuntimeImagePlace(val content: Frame, val originX: Double, val originY: Double)
+
+/**
+ * Dragon's translated paint of an img whose src the app sets as it runs (layout paint.ts runtimeImagePaint), when the app is built
+ * with Dragon's engine: from object-fit, object-position, the content box in absolute layout units, the image's size in CSS px and
+ * the zoom, the destination rect, the snapped content box and the drawn part (null: none), each in absolute device px.
+ */
+object RuntimeImagePaint {
+	var engine: ((fit: String, position: List<Pair<Boolean, Double>>, content: Frame, width: Double, height: Double, zoom: Double) -> Triple<Frame, Frame, Frame?>)? = try {
+		val run = Class.forName("dev.dragon.layout.MarklessPaintKt").getMethod(
+			"marklessRuntimeImagePaint", String::class.java, BooleanArray::class.java, DoubleArray::class.java, DoubleArray::class.java,
+			Double::class.javaPrimitiveType, Double::class.javaPrimitiveType, Double::class.javaPrimitiveType,
+		)
+		({ fit, position, content, width, height, zoom ->
+			val r = try {
+				run.invoke(null, fit, position.map { it.first }.toBooleanArray(), position.map { it.second }.toDoubleArray(), doubleArrayOf(content.x, content.y, content.width, content.height), width, height, zoom) as DoubleArray
+			} catch (e: java.lang.reflect.InvocationTargetException) {
+				throw e.cause ?: e
+			}
+			fun frame(at: Int) = Frame(r[at], r[at + 1], r[at + 2], r[at + 3])
+			Triple(frame(0), frame(4), if (r[8].isNaN()) null else frame(8))
+		})
+	} catch (_: ClassNotFoundException) {
+		null
+	}
+
+	/** Where an image [width] x [height] CSS px is drawn in [place], at [scale] device px per CSS px. */
+	fun paint(image: LoadedImageSpec, place: RuntimeImagePlace, width: Double, height: Double, scale: Double): Triple<Frame, Frame, Frame?> {
+		val run = engine ?: throw MarklessDecodeError("an image the app loads is placed by Dragon's paint, which this host does not link")
+		val u = DRAGON_LAYOUT_UNITS_PER_PX
+		val c = place.content
+		return run(image.fit, image.position, Frame(Math.rint(c.x * u), Math.rint(c.y * u), Math.rint(c.width * u), Math.rint(c.height * u)), width, height, scale)
+	}
 }
 
 /** A transform length: CSS px (`px`), a percentage of the border box (`percent`), or both (`calc`). */
@@ -122,9 +170,53 @@ data class GlyphRun(val face: String, val size: Double, val glyphs: List<Int>, v
 data class TextLine(val top: Double, val baseline: Double, val runs: List<GlyphRun>)
 
 /** [scrollRange], device px, only on a scroll container; [lines], only on a framed text node, the glyphs Dragon draws for its [text]. */
-data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val scrollRange: ScrollRange? = null, val borderOps: BorderOps? = null, val lines: List<TextLine>? = null, val text: String? = null, val selectArrow: SelectArrow? = null, val checkboxMarks: CheckboxMarks? = null) {
+data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val scrollRange: ScrollRange? = null, val borderOps: BorderOps? = null, val lines: List<TextLine>? = null, val text: String? = null, val selectArrow: SelectArrow? = null, val checkboxMarks: CheckboxMarks? = null, val runtimeImagePlace: RuntimeImagePlace? = null) {
 	val drawsSelectArrow: Boolean get() = writes.any { it is StyleWrite.SelectArrow }
 	val drawsCheckbox: Boolean get() = writes.any { it is StyleWrite.Checkbox }
+	val runtimeImage: LoadedImageSpec? get() = writes.firstNotNullOfOrNull { (it as? StyleWrite.RuntimeImage)?.image }
+}
+
+/**
+ * Each runtime image's padding at the export's layout, in CSS px (top, right, bottom, left): its content box less its frame and
+ * borders. A phone lays the page out at its own size and keeps these, as px padding does not follow the layout.
+ */
+fun runtimeImagePadding(nodes: List<StyledNode>, dpr: Double): Map<String, List<Double>> =
+	placingRuntimeImages(nodes, exported = true).mapNotNull { node ->
+		val place = node.runtimeImagePlace ?: return@mapNotNull null
+		val frame = node.frame ?: return@mapNotNull null
+		val w = node.borderWidths ?: Edges(0.0, 0.0, 0.0, 0.0)
+		val left = place.content.x - place.originX - w.left
+		val top = place.content.y - place.originY - w.top
+		val right = frame.width - w.left - w.right - left - place.content.width
+		val bottom = frame.height - w.top - w.bottom - top - place.content.height
+		node.id to listOf(top, right, bottom, left).map { it / dpr }
+	}.toMap()
+
+/**
+ * [nodes] with each framed runtime image placed: at the export's layout ([exported]), its write's content box; at a phone's, its
+ * frame less its borders and the export's [padding] for it (device px, top, right, bottom, left).
+ */
+fun placingRuntimeImages(nodes: List<StyledNode>, exported: Boolean, padding: (String) -> List<Double>? = { null }): List<StyledNode> {
+	val absolute = HashMap<String, Pair<Double, Double>>()
+	return nodes.map { node ->
+		val frame = node.frame ?: return@map node
+		val parent = if (node.parent == null) 0.0 to 0.0 else absolute[node.parent] ?: return@map node
+		val at = parent.first + frame.x to parent.second + frame.y
+		absolute[node.id] = at
+		val image = node.runtimeImage ?: return@map node
+		val content = if (exported) {
+			val lu = image.content ?: throw MarklessDecodeError("\"${node.id}\" draws an image its app loads, but the export gives it no content box")
+			val u = DRAGON_LAYOUT_UNITS_PER_PX
+			Frame(lu.x / u, lu.y / u, lu.width / u, lu.height / u)
+		} else {
+			val p = padding(node.id) ?: throw MarklessDecodeError("\"${node.id}\" draws an image its app loads, but the export has no content box for it")
+			val w = node.borderWidths ?: Edges(0.0, 0.0, 0.0, 0.0)
+			val left = w.left + p[3]
+			val top = w.top + p[0]
+			Frame(at.first + left, at.second + top, maxOf(0.0, frame.width - left - w.right - p[1]), maxOf(0.0, frame.height - top - w.bottom - p[2]))
+		}
+		node.copy(runtimeImagePlace = RuntimeImagePlace(content, at.first, at.second))
+	}
 }
 
 /**
@@ -487,7 +579,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					withRows.add(rowMoved[row.key]?.get(node.id)?.let { copy.copy(writes = slotWrites(copy, it)) } ?: copy)
 				}
 			}
-			return assignment.copy(pageScroll = pageScroll, sticky = sticky, textAreas = areas, nodes = withRows.map { slotted ->
+			val padding = runtimeImagePadding(assignment.nodes, dpr)
+			return assignment.copy(pageScroll = pageScroll, sticky = sticky, textAreas = areas, nodes = placingRuntimeImages(withRows.map { slotted ->
 				val node = moved[slotted.id]?.let { slotted.copy(writes = slotWrites(slotted, it)) } ?: slotted
 				if (node.frame == null) return@map node
 				// A text whose state emptied it has no box, as on the web.
@@ -517,7 +610,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					borderOps = ops, scrollRange = scroll, lines = if (node.kind == "text") lines else null, selectArrow = arrow, checkboxMarks = mark,
 					text = if (node.kind == "text") (relaidTexts[node.id] ?: node.text) else node.text,
 				)
-			}).also {
+			}, exported = false) { id -> padding[id.substringBefore('@')]?.map { it * scale } }).also {
 				if (arrows.isNotEmpty()) throw MarklessDecodeError("Dragon's layout gives an arrow for ${arrows.keys.sorted().first()}, which it shows no box for")
 				if (marks.isNotEmpty()) throw MarklessDecodeError("Dragon's layout gives checkbox marks for ${marks.keys.sorted().first()}, which it shows no box for")
 			}
@@ -755,7 +848,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				if (canvas != null && canvas.alpha != 255) throw MarklessDecodeError("assignments[$a].canvas is not opaque")
 				val body = o["bodyBackground"]?.takeIf { it != Json.Null }?.let { color(it, "assignments[$a].bodyBackground") }
 				if (body != null && body.alpha != 255) throw MarklessDecodeError("assignments[$a].bodyBackground is not opaque")
-				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> nodeOf(x, "assignments[$a].nodes[$n]") }, canvas, body, o["pageScroll"]?.let { range(it, "assignments[$a].pageScroll") })
+				Assignment(values, placingRuntimeImages(o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> nodeOf(x, "assignments[$a].nodes[$n]") }, exported = true), canvas, body, o["pageScroll"]?.let { range(it, "assignments[$a].pageScroll") })
 			}
 			val assignments = t.field("assignments", target).arr("assignments").mapIndexed(decode).toMutableList()
 			val initial = t.field("initial", target).num("initial").toInt()
@@ -1178,6 +1271,32 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					StyleWrite.Visibility(value)
 				}
 				"select-arrow" -> StyleWrite.SelectArrow(color(o.field("color", what), "$what.color"))
+				"runtime-image" -> {
+					o.only(setOf("kind", "fit", "position", "layer", "pixelated", "absent", "key", "content"), what)
+					if (o.field("key", what).str("$what.key") != "dragonRuntimeImage") throw MarklessDecodeError("$what: a runtime-image write's key is dragonRuntimeImage")
+					val fit = o.field("fit", what).str("$what.fit")
+					if (fit !in setOf("fill", "contain", "cover", "none", "scale-down")) throw MarklessDecodeError("$what: object-fit $fit is not a keyword Chrome has")
+					val position = o.field("position", what).arr("$what.position").map {
+						val p = it.obj("$what.position[]")
+						p.only(setOf("kind", "value"), "$what.position[]")
+						val unit = p.field("kind", what).str("$what.position[].kind")
+						if (unit != "px" && unit != "percent") throw MarklessDecodeError("$what: object-position $unit is not px or percent")
+						(unit == "percent") to p.field("value", what).num("$what.position[].value")
+					}
+					if (position.size != 2) throw MarklessDecodeError("$what: object-position is x and y")
+					if (o.field("layer", what) !is Json.Bool) throw MarklessDecodeError("$what.layer must be a boolean")
+					val pixelated = (o.field("pixelated", what) as? Json.Bool ?: throw MarklessDecodeError("$what.pixelated must be a boolean")).value
+					val outline = o.field("absent", what).takeIf { it != Json.Null }?.obj("$what.absent")?.let { a ->
+						a.only(setOf("color", "width"), "$what.absent")
+						if (a.field("width", what).num("$what.absent.width") != 1.0) throw MarklessDecodeError("$what: only a 1 device px no-image outline is drawn")
+						color(a.field("color", what), "$what.absent.color")
+					}
+					val content = o.field("content", what).takeIf { it != Json.Null }?.obj("$what.content")?.let { c ->
+						c.only(setOf("x", "y", "width", "height"), "$what.content")
+						Frame(c.field("x", what).num("x"), c.field("y", what).num("y"), c.field("width", what).num("width"), c.field("height", what).num("height"))
+					}
+					StyleWrite.RuntimeImage(LoadedImageSpec(fit, position, pixelated, outline, content))
+				}
 				"outline" -> {
 					if (o.field("key", what) != Json.Str("dragonOutline.rings")) throw MarklessDecodeError("$what: an outline write's key is dragonOutline.rings")
 					val style = o.field("style", what).str("$what.style")

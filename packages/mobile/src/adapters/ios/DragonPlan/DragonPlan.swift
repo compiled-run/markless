@@ -43,6 +43,25 @@ public enum DragonPlan {
 		return out
 	}
 
+	/// `runtimeImagePaint` for an img whose src is set at run time, without its leaf, which it reads only for object-fit and
+	/// object-position: `position` x then y (a percent, or CSS px zoomed as the zoomed leaf's), `content` the content box in
+	/// absolute layout units. Gives the destination, the snapped content box and the drawn part (NaN when none), device px.
+	public static func runtimeImagePaint(
+		fit: String, position: [(percent: Bool, value: Double)], content: [Double], width: Double, height: Double, zoom: Double
+	) throws -> [Double] {
+		let axis = { (p: (percent: Bool, value: Double)) throws -> any U_LengthCalc_Percent_Px in
+			p.percent ? Percent(JsString("percent"), p.value) : try environment_lengthPx(Px(JsString("px"), p.value), zoom)
+		}
+		let w = try units_fromCssPx(units_zoomCssPx(width, zoom))
+		let h = try units_fromCssPx(units_zoomCssPx(height, zoom))
+		let natural = NaturalSizing(w, h, w > 0 && h > 0 ? LayoutRatio(w, h) : nil)
+		let box = ObjectRect(content[0], content[1], content[2], content[3])
+		let dest = try replaced_objectFitRect(box, natural, JsString(fit), ObjectPosition(try axis(position[0]), try axis(position[1])), block_NO_ENGINE_FAULTS)
+		let rect = { (r: PixelRect) in [r.x, r.y, r.width, r.height] }
+		return rect(try replaced_pixelSnappedRect(dest)) + rect(try replaced_pixelSnappedRect(box))
+			+ (try replaced_drawnObjectRect(dest, box).map(rect) ?? [.nan, .nan, .nan, .nan])
+	}
+
 	/// `runMarklessAnimation`: a page's animation events and frame from its export's animator tables, over every step so far.
 	public static func animation(_ line: String) -> String {
 		do {

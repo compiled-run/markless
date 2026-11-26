@@ -13,7 +13,7 @@ import { createRequire, findPackageJSON } from 'node:module';
 import { availableParallelism } from 'node:os';
 import type { NativeScriptEngine } from '@markless/compiler/native';
 import { pathToFileURL } from 'node:url';
-import { basename, dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { APP_SERVER_PORT, type LadderRung } from '../../proofs/ladder.ts';
 import {
 	appStyleFonts,
@@ -119,6 +119,18 @@ export function servedFileReader(appRoot: string) {
 	};
 }
 
+/** The path of every file in an app's public folder, as Vite serves it (`/images/lamp.svg`). */
+export function servedFiles(appRoot: string) {
+	const publicDir = resolve(appRoot, 'public');
+	return () =>
+		existsSync(publicDir)
+			? readdirSync(publicDir, { recursive: true, withFileTypes: true })
+					.filter((entry) => entry.isFile())
+					.map((entry) => `/${relative(publicDir, join(entry.parentPath, entry.name)).split(sep).join('/')}`)
+					.sort()
+			: [];
+}
+
 /** A stylesheet an app serves at a path (`/static/news.css`): the file in its public folder, as Vite serves it. */
 export function servedReader(appRoot: string) {
 	const read = servedFileReader(appRoot);
@@ -201,6 +213,7 @@ export function compileRungApp(
 		readStylesheet: readRelativeStylesheet,
 		readServedStylesheet: servedReader(dir),
 		readServedFile: servedFileReader(dir),
+		listServedFiles: servedFiles(dir),
 		readAsset: assetReader,
 	});
 }
@@ -484,6 +497,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				readModule: readWorkspaceModule,
 				readServedStylesheet: servedReader(dir),
 				readServedFile: servedFileReader(dir),
+				listServedFiles: servedFiles(dir),
 				readAsset: assetReader,
 				...(appConfig.device ? { device: appConfig.device } : {}),
 				...(appConfig.origin !== undefined ? { origin: appConfig.origin } : {}),

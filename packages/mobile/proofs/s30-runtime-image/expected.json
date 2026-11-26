@@ -1,0 +1,25 @@
+{
+	"rung": "S30",
+	"name": "Styled <img>s whose src follows state, in cards as a shop lays them out and one that starts with no src: each picture drawn where Chrome draws it, laid out by Dragon",
+	"steps": [
+		{
+			"visible": ["Gallery", "Desk lamp", "Arm chair", "Tall mug", "No photo yet"],
+			"absent": ["Photo added"],
+			"title": "Gallery"
+		},
+		{
+			"do": {
+				"tap": "Light the lamp"
+			},
+			"visible": ["Lit lamp", "Arm chair", "Tall mug"],
+			"absent": ["Desk lamp", "Photo added"]
+		},
+		{
+			"do": {
+				"tap": "Add a photo"
+			},
+			"visible": ["Photo added"],
+			"absent": ["No photo yet"]
+		}
+	]
+}

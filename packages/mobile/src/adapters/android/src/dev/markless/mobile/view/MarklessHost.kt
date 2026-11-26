@@ -1300,7 +1300,10 @@ class MarklessHost(
 				val device = payload.objects.firstOrNull { it.id == obj }?.device ?: throw MarklessHostError("<camera> \"${node.id}\" names unknown object \"$obj\"")
 				needDevice().view(obj, device).also { named(it, inst.id) }
 			}
-			"img" -> SizedImage(context, packaged, sized = style == null).also { named(it, inst.id) }
+			"img" -> SizedImage(context, packaged, sized = style == null).also {
+				named(it, inst.id)
+				if (style != null && node.bindings.any { b -> !b.property && b.name == "src" }) it.loadsImages()
+			}
 			"iframe" -> EmbeddedPage(
 				context,
 				node.attributes["src"] ?: throw MarklessHostError("<iframe> ${inst.id} has no src"),
@@ -2130,6 +2133,7 @@ class MarklessHost(
 			is StyleWrite.BoxShadow -> {}
 			is StyleWrite.Checkbox -> if (view !is CheckBox) throw MarklessHostError("\"${s.id}\" draws a themed checkbox but is not a checkbox")
 			is StyleWrite.Visibility -> {}
+			is StyleWrite.RuntimeImage -> {}
 			is StyleWrite.SelectArrow -> if (view !is SelectBox) throw MarklessHostError("\"${s.id}\" draws a drop-down arrow but is not a select")
 			is StyleWrite.Outline -> {}
 			// Applied once the view is placed: at its frame's size, and over what it paints.
@@ -2160,6 +2164,12 @@ class MarklessHost(
 			return
 		}
 		val bw = s.borderWidths ?: if (inline) Edges(0.0, 0.0, 0.0, 0.0) else throw MarklessHostError("element \"${s.id}\" has no border widths")
+		(view as? SizedImage)?.loaded?.let { loaded ->
+			val image = s.runtimeImage ?: throw MarklessHostError("\"${s.id}\" draws the images its app loads, but the style export gives it no runtime-image write")
+			val place = s.runtimeImagePlace ?: throw MarklessHostError("\"${s.id}\" draws an image its app loads, but has no content box")
+			loaded.spec = Triple(image, place, dpr)
+			loaded.edge = paddingBox(bw, radii)
+		}
 		val checkbox = s.checkboxMarks?.let { ThemedCheckbox(it, s.writes.filterIsInstance<StyleWrite.Checkbox>().last().colors) }
 		if (checkbox != null) (view as CheckBox).buttonDrawable = null
 		val arrow = s.selectArrow?.let { MenuListArrow(it, s.writes.filterIsInstance<StyleWrite.SelectArrow>().last().color.argb) } ?: checkbox
