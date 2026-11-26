@@ -62,12 +62,12 @@ export const calendarState = shared(
 			name: '',
 			landing: false,
 		});
-		const titleEl = element<HTMLHeadingElement>();
-		const contentEl = element<HTMLDivElement>();
-		const triggerEl = element<HTMLButtonElement>();
-		const labelEl = element<HTMLLabelElement>();
-		const descriptionEl = element<HTMLDivElement>();
-		const errorEl = element<HTMLDivElement>();
+		const titleEl = element<HTMLHeadingElement | undefined>();
+		const contentEl = element<HTMLDivElement | undefined>();
+		const triggerEl = element<HTMLButtonElement | undefined>();
+		const labelEl = element<HTMLLabelElement | undefined>();
+		const descriptionEl = element<HTMLDivElement | undefined>();
+		const errorEl = element<HTMLDivElement | undefined>();
 		// Plural handle: bound on every day, read back as the live day buttons in document order.
 		const dayEls = element<HTMLButtonElement[]>();
 

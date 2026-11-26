@@ -153,14 +153,14 @@ import { shared, state, element } from '@markless/core';
 
 export const alpha = shared(() => {
 	const cell = state({ label: 'alpha' });
-	const markEl = element();
+	const markEl = element<Element | undefined>();
 
 	return { ...cell, markEl };
 }, { scope: 'subtree' });
 
 export const beta = shared(() => {
 	const cell = state({ label: 'beta' });
-	const spotEl = element();
+	const spotEl = element<Element | undefined>();
 
 	return { ...cell, spotEl };
 }, { scope: 'subtree' });

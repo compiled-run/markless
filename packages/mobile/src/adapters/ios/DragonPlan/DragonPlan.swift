@@ -21,7 +21,7 @@ public enum DragonPlan {
 	) -> String {
 		// The translated harness turns any error into ["threw"]; the shaper's own reason is kept to report it by name.
 		var refused: String?
-		let shaper = GlyphShaper { face, size, text, start, end, _, rtl, language, features in
+		let shaper = GlyphShaper({ face, size, text, start, end, _, rtl, language, features in
 			do {
 				if rtl { throw RowShapingError(description: "right-to-left text in a row is not shaped on iOS yet") }
 				return JsArray(try shape(face.description, size, text.description, Int(start), Int(end), language.description, features.items))
@@ -29,7 +29,7 @@ public enum DragonPlan {
 				refused = "\(error)"
 				throw error
 			}
-		}
+		}, { _, _, _, _, _, _ in JsString("") })
 		let out: String
 		do {
 			out = try harness_runMarklessRowsLayout(JsString(line), shaper).description

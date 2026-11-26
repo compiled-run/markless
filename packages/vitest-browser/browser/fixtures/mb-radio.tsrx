@@ -23,7 +23,7 @@ export const mbItem = shared(
 	() => {
 		const s = state({ hit: '' });
 		// Singular, so it stays IDREF-capable: the label's `for=` resolves to it.
-		const fieldEl = element<HTMLInputElement>();
+		const fieldEl = element<HTMLInputElement | undefined>();
 
 		return { ...s, fieldEl };
 	},

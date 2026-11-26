@@ -7,7 +7,7 @@ import { element, shared } from '@markless/core';
 // `contentEl` beside it still takes exactly one because it was not.
 const eh = shared(
 	() => {
-		const contentEl = element<HTMLDivElement>();
+		const contentEl = element<HTMLDivElement | undefined>();
 		const optionEls = element<HTMLDivElement[]>();
 
 		return { contentEl, optionEls };

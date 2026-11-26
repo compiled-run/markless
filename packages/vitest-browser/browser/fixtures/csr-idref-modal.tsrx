@@ -7,7 +7,7 @@ import { element, shared, state } from '@markless/core';
 export const modal = shared(
 	() => {
 		const s = state({ open: false, labelled: false });
-		const titleEl = element<HTMLHeadingElement>();
+		const titleEl = element<HTMLHeadingElement | undefined>();
 		return { ...s, titleEl };
 	},
 	{ scope: 'subtree' },

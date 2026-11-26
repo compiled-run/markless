@@ -109,9 +109,9 @@ export const tourItemState = shared(
 		const item: TourItemInstanceState = state({
 			target: undefined as HTMLElement | undefined,
 		});
-		const el = element<HTMLDivElement>();
-		const titleEl = element<HTMLHeadingElement>();
-		const descriptionEl = element<HTMLParagraphElement>();
+		const el = element<HTMLDivElement | undefined>();
+		const titleEl = element<HTMLHeadingElement | undefined>();
+		const descriptionEl = element<HTMLParagraphElement | undefined>();
 
 		return { ...item, el, titleEl, descriptionEl };
 	},

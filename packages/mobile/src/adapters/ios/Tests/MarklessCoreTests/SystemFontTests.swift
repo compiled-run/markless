@@ -29,6 +29,12 @@ private func borders(faces: String? = faces, lines: String? = #"[{ "top": -0.75,
 	#expect(layout.styles["h2:text0"]?.lines == nil)
 }
 
+@Test func decodesCascadeFacesAndSkipsAnotherPlatformsFallback() throws {
+	let cascade = #"{ "kind": "cascade", "base": { "kind": "system", "weight": 0.4, "design": "default" }, "text": "◎", "postScriptName": ".CJKSymbolsFallbackSC-Bold" }"#
+	let layout = try borders(faces: #"[{ "id": "system:fallback:.CJKSymbolsFallbackSC-Bold", "fallback": true, "ios": { "face": \#(cascade) } }, { "id": "system:fallback:NotoSansSymbols-Regular-Subsetted.ttf#0", "fallback": true, "android": { "file": "NotoSansSymbols-Regular-Subsetted.ttf", "index": 0, "axes": {}, "sha256": "a" } }]"#, lines: nil)
+	#expect(layout.systemFaces == ["system:fallback:.CJKSymbolsFallbackSC-Bold": .cascade(base: .system(weight: 0.4, design: "default"), text: "◎", postScriptName: ".CJKSymbolsFallbackSC-Bold")])
+}
+
 @Test func anExportWithoutSystemFontsHasNone() throws {
 	#expect(try borders(faces: nil, lines: nil).systemFaces.isEmpty)
 }
@@ -44,6 +50,8 @@ private func borders(faces: String? = faces, lines: String? = #"[{ "top": -0.75,
 		#"[{ "id": "system:serif:400", "ios": { "face": { "kind": "name", "postScriptName": "" } } }]"#,
 		#"[{ "id": "system:serif:400", "ios": { "face": { "kind": "name", "postScriptName": "X", "size": 3 } } }]"#,
 		#"[{ "id": "system:serif:400", "ios": { "face": { "kind": "name", "postScriptName": "X" } } }, { "id": "system:serif:400", "ios": { "face": { "kind": "name", "postScriptName": "X" } } }]"#,
+		#"[{ "id": "system:serif:400", "fallback": false, "android": {} }]"#,
+		#"[{ "id": "system:serif:400", "ios": { "face": { "kind": "cascade", "base": { "kind": "name", "postScriptName": "X" }, "text": "", "postScriptName": "Y" } } }]"#,
 	] {
 		#expect(throws: PayloadError.self, "\(bad)") { try borders(faces: bad, lines: nil) }
 	}

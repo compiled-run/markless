@@ -21,9 +21,9 @@ export const checkboxState = shared(
 			name: '',
 			value: '',
 		});
-		const triggerEl = element<HTMLButtonElement>();
-		const descriptionEl = element<HTMLDivElement>();
-		const errorEl = element<HTMLDivElement>();
+		const triggerEl = element<HTMLButtonElement | undefined>();
+		const descriptionEl = element<HTMLDivElement | undefined>();
+		const errorEl = element<HTMLDivElement | undefined>();
 
 		return {
 			...checkbox,

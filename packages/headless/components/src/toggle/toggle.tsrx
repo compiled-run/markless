@@ -22,10 +22,10 @@ export const toggleState = shared(
 			name: '',
 			value: '',
 		});
-		const triggerEl = element<HTMLButtonElement>();
-		const descriptionEl = element<HTMLDivElement>();
-		const errorEl = element<HTMLDivElement>();
-		const labelEl = element<HTMLLabelElement>();
+		const triggerEl = element<HTMLButtonElement | undefined>();
+		const descriptionEl = element<HTMLDivElement | undefined>();
+		const errorEl = element<HTMLDivElement | undefined>();
+		const labelEl = element<HTMLLabelElement | undefined>();
 
 		return {
 			...toggle,

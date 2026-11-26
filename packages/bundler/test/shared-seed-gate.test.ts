@@ -51,7 +51,7 @@ import { element, shared, state } from '@markless/core';
 export const wgField = shared(
 	() => {
 		const s = state({ hit: '' });
-		const inputEl = element<HTMLInputElement>();
+		const inputEl = element<HTMLInputElement | undefined>();
 
 		return { ...s, inputEl };
 	},

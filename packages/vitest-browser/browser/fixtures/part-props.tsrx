@@ -6,7 +6,7 @@ import * as checkbox from '../../../headless/components/src/checkbox/index.ts';
 export function App() @{
 	let clicks = state(0);
 	let hovers = state(0);
-	const consumerEl = element<HTMLButtonElement>();
+	const consumerEl = element<HTMLButtonElement | undefined>();
 
 	<section data-testid="part-props">
 		<div data-case="handler">

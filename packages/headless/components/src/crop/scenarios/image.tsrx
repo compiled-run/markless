@@ -23,7 +23,7 @@ const SOURCE =
  * that into the picture's own pixels and cut it out with a canvas.
  */
 export default function Image() @{
-	const picture = element<HTMLImageElement>();
+	const picture = element<HTMLImageElement | undefined>();
 	const sheet = element<HTMLCanvasElement>();
 	let cut = state('');
 

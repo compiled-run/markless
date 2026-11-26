@@ -798,17 +798,18 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			}
 		}
 
-		/** `systemFonts`: each system face with this target's file, face index and axes; an entry without this target is an error. */
+		/** `systemFonts`: each system face with this target's file, face index and axes; an entry without this target is an error, except another platform's fallback face (`fallback: true`), which this target's runs never name. */
 		private fun systemFaces(v: Json, target: String): Map<String, SystemFace> {
 			val out = LinkedHashMap<String, SystemFace>()
 			for ((n, e) in v.arr("systemFonts").withIndex()) {
 				val what = "systemFonts[$n]"
 				val o = e.obj(what)
-				o.only(setOf("id", "ios", "android"), what)
+				o.only(setOf("id", "fallback", "ios", "android"), what)
 				val id = o.field("id", what).str("$what.id")
 				if (!id.startsWith("system:")) throw MarklessDecodeError("$what.id \"$id\" is not a system face id")
 				if (id in out) throw MarklessDecodeError("$what lists $id twice")
-				val f = (o[target] ?: throw MarklessDecodeError("$what ($id) has no $target face")).obj("$what.$target")
+				val fallback = o["fallback"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.fallback must be true") else true } ?: false
+				val f = (o[target] ?: if (fallback) continue else throw MarklessDecodeError("$what ($id) has no $target face")).obj("$what.$target")
 				f.only(setOf("file", "index", "axes", "sha256"), "$what.$target")
 				val file = f.field("file", what).str("$what.$target.file")
 				if (file.isEmpty() || file.contains('/') || file.startsWith(".")) throw MarklessDecodeError("$what.$target.file \"$file\" is not a file name in /system/fonts")

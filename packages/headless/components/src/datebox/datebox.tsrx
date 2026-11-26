@@ -51,9 +51,9 @@ export const dateboxState = shared(
 			invalid: false,
 			name: '',
 		});
-		const descriptionEl = element<HTMLDivElement>();
-		const errorEl = element<HTMLDivElement>();
-		const labelEl = element<HTMLLabelElement>();
+		const descriptionEl = element<HTMLDivElement | undefined>();
+		const errorEl = element<HTMLDivElement | undefined>();
+		const labelEl = element<HTMLLabelElement | undefined>();
 		const segmentEls = element<HTMLSpanElement[]>();
 
 		const value = computed(() =>

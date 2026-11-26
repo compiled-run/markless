@@ -22,9 +22,9 @@ export const hovercardState = shared(
 			closeTimer: 0,
 			closingUntil: 0,
 		});
-		const rootEl = element<HTMLDivElement>();
-		const triggerEl = element<HTMLAnchorElement>();
-		const contentEl = element<HTMLDivElement>();
+		const rootEl = element<HTMLDivElement | undefined>();
+		const triggerEl = element<HTMLAnchorElement | undefined>();
+		const contentEl = element<HTMLDivElement | undefined>();
 
 		return {
 			...hovercard,

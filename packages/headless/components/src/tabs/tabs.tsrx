@@ -40,7 +40,7 @@ export const tabsState = shared(
 export const tabsPartState = shared(
 	() => {
 		const part: TabsPartInstanceState = state({ value: '' });
-		const el = element<HTMLButtonElement>();
+		const el = element<HTMLButtonElement | undefined>();
 
 		return { ...part, el };
 	},

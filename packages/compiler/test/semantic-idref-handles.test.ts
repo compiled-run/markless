@@ -44,7 +44,7 @@ test('the IDREF positions are one named constant', () => {
 test('a handle in an IDREF position records the relationship, not a templateRead', async () => {
 	const source = `import { element } from '@markless/core';
 export function App() @{
-	const label = element<HTMLSpanElement>();
+	const label = element<HTMLSpanElement | undefined>();
 	<div>
 		<span el={label}>Notifications</span>
 		<div role="group" aria-labelledby={label}>Body</div>
@@ -90,7 +90,7 @@ test('every IDREF position resolves its handle', async () => {
 export function App() @{
 	const panel = element<HTMLDivElement>();
 	const hint = element<HTMLParagraphElement>();
-	const field = element<HTMLInputElement>();
+	const field = element<HTMLInputElement | undefined>();
 	const sheet = element<HTMLDivElement>();
 	<div>
 		<button aria-controls={panel}>Toggle</button>
@@ -126,7 +126,7 @@ test('a dangling IDREF handle is an error, not the suppressible unbound warning'
 	// relation is simply absent. It has to stop the build.
 	const source = `import { element } from '@markless/core';
 export function App() @{
-	const label = element<HTMLSpanElement>();
+	const label = element<HTMLSpanElement | undefined>();
 	<div role="group" aria-labelledby={label}>Body</div>
 }`;
 	const graph = await graphOf('Dangling', source);
@@ -161,7 +161,7 @@ test('a dangling IDREF handle cannot be suppressed with markless-allow', async (
 		'DanglingAllow',
 		`import { element } from '@markless/core';
 export function App() @{
-	const label = element<HTMLSpanElement>();
+	const label = element<HTMLSpanElement | undefined>();
 	// markless-allow MARKLESS_ELEMENT_HANDLE_IDREF_UNBOUND: intentional
 	<div aria-labelledby={label}>Body</div>
 }`,
@@ -187,7 +187,7 @@ test('the unbound read warning keeps its severity for non-IDREF reads', async ()
 		'UnboundText',
 		`import { element } from '@markless/core';
 export function App() @{
-	const label = element<HTMLSpanElement>();
+	const label = element<HTMLSpanElement | undefined>();
 	<p>{label}</p>
 }`,
 	);
@@ -259,7 +259,7 @@ test('the reference resolves when the referencing element sits inside an @if arm
 		'BranchedReference',
 		`import { element, state } from '@markless/core';
 export function App() @{
-	const label = element<HTMLSpanElement>();
+	const label = element<HTMLSpanElement | undefined>();
 	const open = state(true);
 	<main>
 		<span el={label}>Notifications</span>
@@ -279,7 +279,7 @@ test('the reference resolves when the bound element sits inside an @if arm', asy
 		'BranchedBinding',
 		`import { element, state } from '@markless/core';
 export function App() @{
-	const label = element<HTMLSpanElement>();
+	const label = element<HTMLSpanElement | undefined>();
 	const open = state(true);
 	<main>
 		@if (open) { <span el={label}>Notifications</span> }
@@ -461,7 +461,7 @@ test('two references to one handle each record their own relationship', async ()
 		'SharedHandle',
 		`import { element } from '@markless/core';
 export function App() @{
-	const label = element<HTMLSpanElement>();
+	const label = element<HTMLSpanElement | undefined>();
 	<div>
 		<span el={label}>Notifications</span>
 		<div aria-labelledby={label}>One</div>
@@ -518,7 +518,7 @@ test('a widget part mints its shared() handle id; the widget root cannot', async
 		`import { element, shared, state } from '@markless/core';
 export const wid = shared(() => {
 	const w = state({ open: false });
-	const triggerEl = element<HTMLButtonElement>();
+	const triggerEl = element<HTMLButtonElement | undefined>();
 	return { ...w, triggerEl };
 }, { scope: 'subtree' });
 export function Root({ children }: { children?: unknown }) @{
@@ -553,7 +553,7 @@ test('a page-wide shared() handle is refused: one element per page is not one pe
 		`import { element, shared, state } from '@markless/core';
 export const wid = shared(() => {
 	const w = state({ open: false });
-	const triggerEl = element<HTMLButtonElement>();
+	const triggerEl = element<HTMLButtonElement | undefined>();
 	return { ...w, triggerEl };
 });
 export function Trigger() @{

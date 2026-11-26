@@ -15,7 +15,7 @@ export const nestState = shared(
 export const nestLevelState = shared(
 	() => {
 		const level = state({ hits: 0, name: '' });
-		const contentEl = element<HTMLDivElement>();
+		const contentEl = element<HTMLDivElement | undefined>();
 
 		return { ...level, contentEl };
 	},

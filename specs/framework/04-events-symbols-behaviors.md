@@ -17,16 +17,47 @@ export function SearchBox() @{
 
   <>
     <input el={input} />
-    <button onClick={() => input?.focus()}>Focus</button>
+    <button onClick={() => input.focus()}>Focus</button>
   </>
 }
 ```
 
 `element()` creates an element handle, not reactive data. `el={handle}` binds that
-handle to exactly one host element in the current graph scope. During initial
-render, and after the element is removed, reading the handle produces
-`undefined`. When a lazy event or visibility handler runs in the browser, the
-resumer resolves the handle's serialized DOM locator to the current element.
+handle to exactly one host element in the current graph scope. When a lazy event
+or visibility handler runs in the browser, the resumer resolves the handle's
+serialized DOM locator to the current element.
+
+#### Required and optional handles
+
+The declaration says whether the element can be missing, and the compiler holds
+it to that:
+
+- `element<T>()` is typed `T`. It must be bound exactly once, in the component
+  that declares it, on an element that renders whenever that component does:
+  not inside an `@if`/`@switch` arm, an `@try`/`@pending`/`@catch` arm, or
+  children passed to a component that does not always render its `{children}`.
+  A handle created in a `shared()` factory, bound by another component, or never
+  bound cannot keep that promise. Each of these is the build error
+  `MARKLESS_ELEMENT_HANDLE_MAYBE_ABSENT`, which names the variable, the line and
+  the exact declaration to write.
+- `element<T | undefined>()` is typed `T | undefined` and may be bound anywhere
+  a singular handle may. Reads use `?.`.
+- `element<T[]>()` is an ordered set, never `undefined`; `element<T[] | undefined>()`
+  is refused (`MARKLESS_ELEMENT_HANDLE_ARRAY_OPTIONAL`).
+
+`| undefined` is read from the written type argument, like the array form, so an
+alias of `T | undefined` reads as required and the diagnostic names the literal
+spelling.
+
+Whether a component always renders its `{children}` is a fact on its module
+interface (`childrenAlwaysRendered`): its `{children}` hole sits in its root
+markup, or in children it passes to a component that always renders them. A
+component the build has no interface for counts as not always.
+
+A handler can still run after the whole component is gone (a late click, a
+timer, code after an `await`). A required handle then reads `undefined` as
+before, and a method call or property read through it does nothing. In a
+development build the read also warns on the console, naming the handle.
 
 This covers the common design-system cases: focus registries, item navigation,
 measurement, pointer capture, popover/dialog/file-picker APIs, and cross-event

@@ -1,0 +1,10 @@
+{
+	"rung": "S66",
+	"name": "Font fallback: a symbol the system face lacks (◎ in San Francisco; ◎, ▾ and ✓ in Roboto) is measured at build time in the face the platform falls back to and drawn by it, under a line height that is not normal",
+	"steps": [
+		{
+			"visible": ["◎ Shop", "Theme ▾", "✓ Saved"],
+			"title": "Symbols"
+		}
+	]
+}

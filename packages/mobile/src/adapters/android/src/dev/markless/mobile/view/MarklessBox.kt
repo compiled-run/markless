@@ -67,11 +67,6 @@ open class MarklessBox(context: Context) : FrameLayout(context), SkipsBackdrop {
 			field = value
 		}
 
-	override fun drawChild(canvas: Canvas, child: View, drawingTime: Long): Boolean {
-		if (child in Backdrop.skip) return false
-		childShadows[child]?.let { (bitmap, dx, dy) -> canvas.drawBitmap(bitmap, (child.left + dx).toFloat(), (child.top + dy).toFloat(), null) }
-		return super.drawChild(canvas, child, drawingTime)
-	}
 
 	override fun onDraw(canvas: Canvas) {
 		super.onDraw(canvas)
@@ -221,17 +216,24 @@ open class MarklessBox(context: Context) : FrameLayout(context), SkipsBackdrop {
 	private fun disclosureInset(): Int =
 		kotlin.math.ceil(maxOf(markerPaint.measureText(DISCLOSURE_CLOSED), markerPaint.measureText(DISCLOSURE_OPEN)) + gap).toInt()
 
-	override fun dispatchDraw(canvas: Canvas) {
-		val box = childClip
-		if (box == null) super.dispatchDraw(canvas)
-		else {
-			val saved = canvas.save()
+	// A box that clips draws its own outline outside the clip: Dragon refuses any other outline under an overflow clip.
+	override fun drawChild(canvas: Canvas, child: View, drawingTime: Long): Boolean {
+		if (child in Backdrop.skip) return false
+		val box = childClip?.takeIf { child !is OutlineView }
+		val saved = canvas.save()
+		if (box != null) {
 			val inner = RectF(box.left.toFloat(), box.top.toFloat(), width - box.right.toFloat(), height - box.bottom.toFloat())
 			if (box.rounded) canvas.clipPath(Path().apply { addRoundRect(inner, box.radii.map { it.toFloat() }.toFloatArray(), Path.Direction.CW) })
 			else canvas.clipRect(inner)
-			super.dispatchDraw(canvas)
-			canvas.restoreToCount(saved)
 		}
+		childShadows[child]?.let { (bitmap, dx, dy) -> canvas.drawBitmap(bitmap, (child.left + dx).toFloat(), (child.top + dy).toFloat(), null) }
+		val drawn = super.drawChild(canvas, child, drawingTime)
+		canvas.restoreToCount(saved)
+		return drawn
+	}
+
+	override fun dispatchDraw(canvas: Canvas) {
+		super.dispatchDraw(canvas)
 		disclosure?.let { open ->
 			val first = (0 until childCount).map(::getChildAt).firstOrNull { it.visibility != View.GONE }
 			val baseline = first?.let { (it.top + (baselineIn(it) ?: markerPaint.textSize.toInt())).toFloat() } ?: markerPaint.textSize

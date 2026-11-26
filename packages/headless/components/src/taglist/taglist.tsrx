@@ -47,10 +47,10 @@ export const taglistState = shared(
 			editing: '',
 			spoken: '',
 		});
-		const labelEl = element<HTMLLabelElement>();
-		const inputEl = element<HTMLInputElement>();
-		const descriptionEl = element<HTMLDivElement>();
-		const errorEl = element<HTMLDivElement>();
+		const labelEl = element<HTMLLabelElement | undefined>();
+		const inputEl = element<HTMLInputElement | undefined>();
+		const descriptionEl = element<HTMLDivElement | undefined>();
+		const errorEl = element<HTMLDivElement | undefined>();
 		// The array type argument is what makes these handles plural: one handle
 		// bound on every tag, read back in document order. Walking them is how the
 		// family reaches another part's element without ever looking one up.

@@ -16,7 +16,7 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var linesText: String?
 	/// A dashed or dotted border: Dragon's operations, the four side colours and the device scale they are drawn at.
 	public var dashedBorder: DashedBorder?
-	/// Overflow other than visible: the children are clipped to the box, or to `childClip` when it has borders.
+	/// Overflow other than visible: the children are clipped to the box, or to `childClip` when it has borders or draws its own outline.
 	public var clipsChildren = false
 	/// Overflow clipping on a box with borders: the padding box its children are clipped to.
 	public var childClip: PaddingBox?
@@ -354,6 +354,15 @@ extension StyleExport {
 		let postOrder = StyleExport.postOrder(nodes)
 		let base = { (id: String) -> String in id.firstIndex(of: "@").map { String(id[..<$0]) } ?? id }
 		let isView = { (id: String) in payloadIds.contains(id) || (id.contains("@") && payloadIds.contains(base(id))) }
+		let pageHoldsMany = nodes.filter { n in
+			guard n.frame != nil, isView(n.id) else { return false }
+			var cursor = n.parent
+			while let id = cursor {
+				if isView(id) { return false }
+				cursor = byId[id]?.parent
+			}
+			return true
+		}.count > 1
 		var styles: [String: ResolvedStyle] = [:]
 		for node in payloadNodes {
 			// Dragon lays out no box for what shows only in a select's picker.
@@ -400,12 +409,12 @@ extension StyleExport {
 			}
 			var style = try resolve(styled, styled.writes)
 			style.shadow = try BoxShadow.of(styled, byId: byId, canvas: canvas, body: body, dpr: dpr)
-			style.outline = try outline(of: styled, byId: byId, nodes: nodes, isView: isView, postOrder: postOrder)
+			style.outline = try outline(of: styled, byId: byId, nodes: nodes, isView: isView, postOrder: postOrder, pageHoldsMany: pageHoldsMany)
 			if styled.isText, let parent = styled.parent, hiddenBoxes.contains(parent) { style.hidden = true }
 			// A box that paints nothing (an empty clip) has no order to keep.
 			if style.clipRect.map({ $0.width == 0 || $0.height == 0 }) ?? false { style.paintOrder = nil }
 			if style.paintOrder != nil, let host = reHostOf(styled.writes),
-				let lifted = try stackingParent(styled, host: host, payloadParent: cursor, byId: byId, payloadIds: payloadIds)
+				let lifted = try stackingParent(styled, host: host, payloadParent: cursor, byId: byId, payloadIds: payloadIds, pageHoldsMany: pageHoldsMany)
 			{
 				style.stackingParent = lifted.parent
 				offset = lifted.offset
@@ -448,7 +457,7 @@ extension StyleExport {
 			}
 			var style = try resolve(styled, styled.writes)
 			style.shadow = try BoxShadow.of(styled, byId: byId, canvas: canvas, body: body, dpr: dpr)
-			style.outline = try outline(of: styled, byId: byId, nodes: nodes, isView: isView, postOrder: postOrder)
+			style.outline = try outline(of: styled, byId: byId, nodes: nodes, isView: isView, postOrder: postOrder, pageHoldsMany: pageHoldsMany)
 			if styled.isText, let parent = styled.parent, hiddenBoxes.contains(parent) { style.hidden = true }
 			if let frame = style.frame {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
@@ -570,11 +579,11 @@ extension StyleExport {
 	}
 
 	/// Where a box Dragon paints in its stacking context's order (`host`) is placed so its view's siblings are that order: the host
-	/// when it is a payload node, else the page's top node; nil when that is its parent already. Its frame there adds every box
+	/// when it is a payload node, else the page's top node, or the page's own view when it holds several; nil when that is its parent already. Its frame there adds every box
 	/// in between (device px). A box in between that clips, scrolls or keeps an order of its own would have to carry the box
 	/// with it, and is refused by name, as is a box below the flow (a negative z-index) placed past its parent.
 	private func stackingParent(
-		_ node: StyleNode, host: String, payloadParent: String?, byId: [String: StyleNode], payloadIds: Set<String>
+		_ node: StyleNode, host: String, payloadParent: String?, byId: [String: StyleNode], payloadIds: Set<String>, pageHoldsMany: Bool
 	) throws -> (parent: String, offset: (x: Double, y: Double))? {
 		guard case let .paintOrder(_, bucket, _)? = node.writes.first(where: { if case .paintOrder = $0 { return true } else { return false } }) else { return nil }
 		var chain: [StyleNode] = []
@@ -585,7 +594,7 @@ extension StyleExport {
 			cursor = between.parent
 		}
 		if cursor == nil { throw styleError("\(node.id)'s stacking context \(host) is not an ancestor") }
-		let target = payloadIds.contains(host) ? host : chain.last(where: { payloadIds.contains($0.id) })?.id
+		let target = payloadIds.contains(host) ? host : pageHoldsMany ? OutlinePaint.page : chain.last(where: { payloadIds.contains($0.id) })?.id
 		let between = chain.prefix { $0.id != target }
 		for box in between {
 			let clips = box.writes.contains {
@@ -599,7 +608,7 @@ extension StyleExport {
 				throw styleError("\(node.id): painting in \(host)'s stacking order past \(box.id), which keeps an order of its own, is not implemented on iOS")
 			}
 		}
-		guard let target, target != payloadParent else { return nil }
+		guard let target, target != (payloadParent ?? OutlinePaint.page) else { return nil }
 		guard bucket >= 0 else { throw styleError("\(node.id): painting below the flow of \(host) past \(payloadParent ?? "the page") is not implemented on iOS") }
 		return (target, between.reduce((x: 0.0, y: 0.0)) { ($0.x + ($1.frame?.x ?? 0), $0.y + ($1.frame?.y ?? 0)) })
 	}
@@ -679,6 +688,11 @@ extension StyleExport {
 				indicators: indicators, bounceX: bounce.x, bounceY: bounce.y)
 		} else if node.scrollRange != nil || !indicators || bounce != (true, true) {
 			throw styleError("\(node.id) has scroll view writes but no scroll-container write")
+		}
+		// A box that clips and draws its own outline hosts its children in a clip view, so the outline beside that view stays unclipped.
+		let ownOutline = node.writes.contains { if case let .outline(o) = $0 { return o.layer == node.id } else { return false } }
+		if style.clipsChildren, ownOutline, (node.borderWidths.map { [$0.top, $0.right, $0.bottom, $0.left].allSatisfy { $0 == 0 } } ?? true) {
+			style.childClip = PaddingBox(radius: style.cornerRadius, top: 0, right: 0, bottom: 0, left: 0)
 		}
 		if let ops = node.borderOps {
 			guard borderColors.count == 4, style.cornerRadius == 0, !style.clipsChildren else {

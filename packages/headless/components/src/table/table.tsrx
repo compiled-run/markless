@@ -34,7 +34,7 @@ export const tableState = shared(
 			typed: '',
 			typedAt: 0,
 		});
-		const tableEl = element<HTMLTableElement>();
+		const tableEl = element<HTMLTableElement | undefined>();
 		// The array type argument is what makes a handle plural: bound on every part
 		// of its kind, read back as the live elements in document order. Walking them
 		// is how the family reaches another part without ever looking one up.

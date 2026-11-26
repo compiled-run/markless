@@ -57,7 +57,7 @@ export const resizableState = shared(
 			groupSize: 0,
 			isFlipped: false,
 		});
-		const rootEl = element<HTMLDivElement>();
+		const rootEl = element<HTMLDivElement | undefined>();
 		const itemEls = element<HTMLDivElement[]>();
 		const thumbEls = element<HTMLDivElement[]>();
 

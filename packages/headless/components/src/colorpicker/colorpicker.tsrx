@@ -76,18 +76,18 @@ export const colorpickerState = shared(
 			boundsHeight: 0,
 			boundsFlipped: false,
 		});
-		const labelEl = element<HTMLLabelElement>();
-		const descriptionEl = element<HTMLDivElement>();
-		const errorEl = element<HTMLDivElement>();
-		const areaEl = element<HTMLDivElement>();
+		const labelEl = element<HTMLLabelElement | undefined>();
+		const descriptionEl = element<HTMLDivElement | undefined>();
+		const errorEl = element<HTMLDivElement | undefined>();
+		const areaEl = element<HTMLDivElement | undefined>();
 		const axisEls = element<HTMLDivElement[]>();
 		// Every focusable element the family owns, bound rather than found: the
 		// family never queries the DOM for its own parts.
 		const thumbEls = element<HTMLDivElement[]>();
 		const inputEls = element<HTMLInputElement[]>();
 		const itemEls = element<HTMLButtonElement[]>();
-		const contentEl = element<HTMLDivElement>();
-		const triggerEl = element<HTMLButtonElement>();
+		const contentEl = element<HTMLDivElement | undefined>();
+		const triggerEl = element<HTMLButtonElement | undefined>();
 
 		const value = computed(() => {
 			const held = colorOf(picker.text, picker.seed);
@@ -372,7 +372,7 @@ export const colorpickerState = shared(
 export const colorpickerRailState = shared(
 	() => {
 		const rail = state({ channel: 'hue' as ColorChannel });
-		const el = element<HTMLDivElement>();
+		const el = element<HTMLDivElement | undefined>();
 
 		return { ...rail, el };
 	},

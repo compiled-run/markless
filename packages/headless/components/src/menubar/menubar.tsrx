@@ -55,8 +55,8 @@ export const menubarState = shared(
 			typeahead: '',
 			typeaheadAt: 0,
 		});
-		const barEl = element<HTMLDivElement>();
-		const labelEl = element<HTMLSpanElement>();
+		const barEl = element<HTMLDivElement | undefined>();
+		const labelEl = element<HTMLSpanElement | undefined>();
 		const itemEls = element<HTMLElement[]>();
 
 		return {
@@ -88,8 +88,8 @@ export const menubarItemState = shared(
 			typeaheadAt: 0,
 			graceUntil: 0,
 		});
-		const itemEl = element<HTMLDivElement>();
-		const itemContentEl = element<HTMLDivElement>();
+		const itemEl = element<HTMLDivElement | undefined>();
+		const itemContentEl = element<HTMLDivElement | undefined>();
 
 		return { ...level, itemEl, itemContentEl };
 	},

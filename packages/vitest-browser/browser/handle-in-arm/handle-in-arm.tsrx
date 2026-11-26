@@ -6,7 +6,7 @@ import { element, shared, state } from '@markless/core';
 export const widgetState = shared(
 	() => {
 		const widget = state({ open: false, mark: 'never', probes: 0 });
-		const panelEl = element<HTMLDivElement>();
+		const panelEl = element<HTMLDivElement | undefined>();
 
 		return { ...widget, panelEl };
 	},

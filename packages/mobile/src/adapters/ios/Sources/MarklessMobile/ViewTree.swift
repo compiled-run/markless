@@ -1167,7 +1167,7 @@ final class ViewTree {
 			outlines.removeValue(forKey: id)?.removeFromSuperview()
 			return
 		}
-		guard let host = elements[outline.host] else { throw HostError("\(id): its outline is drawn in \(outline.host), which has no view") }
+		guard let host = outline.host == OutlinePaint.page ? root : elements[outline.host] else { throw HostError("\(id): its outline is drawn in \(outline.host), which has no view") }
 		let view = outlines[id] ?? OutlineView()
 		outlines[id] = view
 		try view.apply(outline, in: host)
@@ -1196,7 +1196,7 @@ final class ViewTree {
 	private func restack(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws -> UIView? {
 		guard style.frame != nil else { return nil }
 		if let parent = style.stackingParent {
-			guard let target = scrollViews[parent] ?? clipViews[parent] ?? elements[parent] else { throw HostError("\(id) paints in the order of \(parent), which has no view") }
+			guard let target = parent == OutlinePaint.page ? root : scrollViews[parent] ?? clipViews[parent] ?? elements[parent] else { throw HostError("\(id) paints in the order of \(parent), which has no view") }
 			if view.superview === target { return nil }
 			if fingerDown {
 				restackAfterTouch = true
@@ -1234,7 +1234,7 @@ final class ViewTree {
 	private func drawLines(_ label: UILabel, _ given: ResolvedStyle? = nil) {
 		let drawn = label.layer.sublayers?.first { $0 is GlyphLinesLayer } as? GlyphLinesLayer
 		guard let id = label.accessibilityIdentifier, let style = given ?? self.style(of: id), let lines = style.lines,
-			style.linesText == label.text, lines.allSatisfy({ $0.runs.allSatisfy { systemFaces[$0.face] != nil || faces[$0.face] != nil } })
+			style.linesText == label.text, lines.allSatisfy({ $0.runs.allSatisfy { systemFaces[$0.face].map(drawsAsMeasured) ?? (faces[$0.face] != nil) } })
 		else {
 			if let drawn {
 				drawn.removeFromSuperlayer()
@@ -2809,7 +2809,15 @@ func systemFont(_ face: SystemFace, size: Double) -> CTFont {
 		return UIFont(descriptor: d, size: size) as CTFont
 	case let .named(name):
 		return CTFontCreateWithName(name as CFString, size, nil)
+	case let .cascade(base, text, _):
+		return CTFontCreateForString(systemFont(base, size: size), text as CFString, CFRange(location: 0, length: text.utf16.count))
 	}
+}
+
+/// Whether this phone builds the face Dragon measured: a cascade can give another font than the build Mac's.
+func drawsAsMeasured(_ face: SystemFace) -> Bool {
+	guard case let .cascade(_, _, name) = face else { return true }
+	return CTFontCopyPostScriptName(systemFont(face, size: 17)) as String == name
 }
 
 private func uiColor(_ color: RGBA) -> UIColor {

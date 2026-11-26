@@ -7,7 +7,7 @@ import { hasElementGlobal, tagOf } from './report.ts';
 export const single = shared(
 	() => {
 		const s = state({ tick: 0, probed: '' });
-		const boxEl = element<HTMLDivElement>();
+		const boxEl = element<HTMLDivElement | undefined>();
 
 		return { ...s, boxEl };
 	},

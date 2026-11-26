@@ -28,8 +28,8 @@ export const toolbarState = shared(
 			// single stop for the bar, and it hands focus straight on.
 			entered: false,
 		});
-		const barEl = element<HTMLDivElement>();
-		const labelEl = element<HTMLSpanElement>();
+		const barEl = element<HTMLDivElement | undefined>();
+		const labelEl = element<HTMLSpanElement | undefined>();
 		// The array type argument makes the handle plural. Every control in the bar
 		// binds it - `toolbar.item`, and any other family's control that reads this
 		// instance - so it reads back as the live roster.
@@ -43,7 +43,7 @@ export const toolbarState = shared(
 export const toolbarItemState = shared(
 	() => {
 		const item: ToolbarItemInstanceState = state({ disabled: false });
-		const el = element<HTMLButtonElement>();
+		const el = element<HTMLButtonElement | undefined>();
 
 		return { ...item, el };
 	},

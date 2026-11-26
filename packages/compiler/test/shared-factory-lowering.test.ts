@@ -238,7 +238,7 @@ import { shared, state, element } from '@markless/core';
 
 export const spike = shared(() => {
 	const s = state({ checked: false });
-	const triggerEl = element();
+	const triggerEl = element<Element | undefined>();
 	return { ...s, triggerEl, toggle() { s.checked = true; } };
 }, { scope: 'subtree' });
 
@@ -271,7 +271,7 @@ import { shared, state, element } from '@markless/core';
 
 export const gate = shared(() => {
 	const cell = state({ open: false });
-	const panelEl = element();
+	const panelEl = element<Element | undefined>();
 	return { ...cell, panelEl, flip() { cell.open = true; } };
 }, { scope: 'subtree' });
 

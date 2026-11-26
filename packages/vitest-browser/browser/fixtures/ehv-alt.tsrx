@@ -8,7 +8,7 @@ import { focusTarget } from './ehv-focus.ts';
 export const altWidget = shared(
 	() => {
 		const w = state({ label: '' });
-		const surfaceRef = element<HTMLElement>();
+		const surfaceRef = element<HTMLElement | undefined>();
 
 		return { ...w, surfaceRef };
 	},

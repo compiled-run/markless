@@ -20,9 +20,9 @@ export const tooltipState = shared(
 			pointerDown: false,
 			heldByFocus: false,
 		});
-		const rootEl = element<HTMLDivElement>();
-		const triggerEl = element<HTMLButtonElement>();
-		const contentEl = element<HTMLDivElement>();
+		const rootEl = element<HTMLDivElement | undefined>();
+		const triggerEl = element<HTMLButtonElement | undefined>();
+		const contentEl = element<HTMLDivElement | undefined>();
 
 		return {
 			...tooltip,

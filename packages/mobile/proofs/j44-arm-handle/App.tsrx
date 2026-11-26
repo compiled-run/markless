@@ -3,7 +3,7 @@ import { element, state } from '@markless/core';
 export default function App() @{
 	let editing = state(false);
 	let note = state('Not focused');
-	const field = element<HTMLInputElement>();
+	const field = element<HTMLInputElement | undefined>();
 	<main>
 		<h1>Rename</h1>
 		<button onClick={() => { editing = true; note = 'Editing'; field?.focus(); }}>Edit and focus</button>
