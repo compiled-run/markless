@@ -1,0 +1,12 @@
+appId: ${APP_ID}
+name: s64-clip-layer-outline
+---
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - clearState
+- launchApp
+- assertVisible: Groceries
+- assertVisible: Plumber
+- assertVisible: Outlined cards

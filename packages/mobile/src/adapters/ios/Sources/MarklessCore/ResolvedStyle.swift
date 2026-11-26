@@ -16,7 +16,7 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var linesText: String?
 	/// A dashed or dotted border: Dragon's operations, the four side colours and the device scale they are drawn at.
 	public var dashedBorder: DashedBorder?
-	/// Overflow other than visible: the children are clipped to the box, or to `childClip` when it has borders.
+	/// Overflow other than visible: the children are clipped to the box, or to `childClip` when it has borders or draws its own outline.
 	public var clipsChildren = false
 	/// Overflow clipping on a box with borders: the padding box its children are clipped to.
 	public var childClip: PaddingBox?
@@ -681,6 +681,11 @@ extension StyleExport {
 				indicators: indicators, bounceX: bounce.x, bounceY: bounce.y)
 		} else if node.scrollRange != nil || !indicators || bounce != (true, true) {
 			throw styleError("\(node.id) has scroll view writes but no scroll-container write")
+		}
+		// A box that clips and draws its own outline hosts its children in a clip view, so the outline beside that view stays unclipped.
+		let ownOutline = node.writes.contains { if case let .outline(o) = $0 { return o.layer == node.id } else { return false } }
+		if style.clipsChildren, ownOutline, (node.borderWidths.map { [$0.top, $0.right, $0.bottom, $0.left].allSatisfy { $0 == 0 } } ?? true) {
+			style.childClip = PaddingBox(radius: style.cornerRadius, top: 0, right: 0, bottom: 0, left: 0)
 		}
 		if let ops = node.borderOps {
 			guard borderColors.count == 4, style.cornerRadius == 0, !style.clipsChildren else {

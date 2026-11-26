@@ -1901,13 +1901,14 @@ class MarklessHost(
 		host.frames[view] = Rect(ring.left - hx, ring.top - hy, ring.right - hx, ring.bottom - hy)
 		host.order(view, OUTLINE_ORDER + outline.order)
 		host.requestLayout()
-		// The ring reaches past its host: each box around it up to one that clips its overflow lets its children draw outside them.
+		// The ring reaches past its host: the host, then each box around it up to one that clips its overflow, lets its children draw outside them.
+		host.clipChildren = false
 		var at: MarklessBox = host
-		while (at.childClip == null) {
+		do {
 			val around = at.parent as? MarklessBox ?: break
 			around.clipChildren = false
 			at = around
-		}
+		} while (at.childClip == null)
 	}
 
 	private fun removeOutline(id: String) {

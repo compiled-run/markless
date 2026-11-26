@@ -92,3 +92,35 @@ private func bordered(_ widths: [Double], colors: [[String: Int]]? = nil, radius
 	#expect(throws: PayloadError.self) { try bordered([6, 30, 6, 30], colors: colors) }
 	do { _ = try bordered([6, 30, 6, 30], colors: colors) } catch { #expect("\(error)".contains("border sides of different colours, with rounded corners")) }
 }
+
+/// u18's export with the clipping span given an outline drawn in `layer`'s view.
+private func outlined(layer: String) throws -> StyleLayout {
+	try resolved { text in
+		var root = try! JSONSerialization.jsonObject(with: Data(text.utf8)) as! [String: Any]
+		var targets = root["targets"] as! [String: Any]
+		var ios = targets["ios"] as! [String: Any]
+		ios["assignments"] = (ios["assignments"] as! [[String: Any]]).map { assignment in
+			var assignment = assignment
+			assignment["nodes"] = (assignment["nodes"] as! [[String: Any]]).map { node in
+				guard node["id"] as? String == "component-edge:0/h0" else { return node }
+				var node = node
+				node["writes"] = (node["writes"] as! [[String: Any]]).filter { $0["kind"] as? String != "clip-path-inset" } + [[
+					"kind": "outline", "style": "solid", "width": 3, "offset": 2, "color": ["r": 0, "g": 0, "b": 0, "alpha": 255],
+					"tones": NSNull(), "radii": NSNull(), "layer": layer, "key": "dragonOutline.rings",
+				]]
+				return node
+			}
+			return assignment
+		}
+		targets["ios"] = ios
+		root["targets"] = targets
+		return String(decoding: try! JSONSerialization.data(withJSONObject: root), as: UTF8.self)
+	}
+}
+
+@Test func aBoxThatClipsAndDrawsItsOwnOutlineClipsItsChildrenInAClipViewSoTheOutlineBesideItStaysWhole() throws {
+	let own = try #require(try outlined(layer: "component-edge:0/h0").styles["component-edge:0/h0"])
+	#expect(own.clipsChildren)
+	#expect(own.childClip == PaddingBox(radius: own.cornerRadius, top: 0, right: 0, bottom: 0, left: 0))
+	#expect(try outlined(layer: "h0").styles["component-edge:0/h0"]?.childClip == nil)
+}

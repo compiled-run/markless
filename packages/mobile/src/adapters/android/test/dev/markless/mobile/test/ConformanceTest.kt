@@ -522,6 +522,13 @@ private fun outlines(fixtures: File) {
 	}
 	refuses("a later layer box placed outside its view", adding("""{ "kind": "paint-order", "host": "html", "bucket": 1, "rank": 0, "index": 0, "key": "dragonStacking.order" }""", "h0"), "which html paints over outlines, is placed in the page")
 	refuses("an outline inside a clip", adding("""{ "kind": "padding-box-clip", "key": "dragonClip.frame" }""", "h6"), "past h6, which clips or scrolls")
+	val ownClip = editing("h2") { node ->
+		node["writes"] = Json.Arr((node.getValue("writes") as Json.Arr).items.map { w ->
+			val f = (w as Json.Obj).fields
+			if (f["kind"] == Json.Str("outline")) Json.Obj(LinkedHashMap(f).apply { put("layer", Json.Str("h2")) }) else w
+		} + Json.parse("""{ "kind": "padding-box-clip", "key": "dragonClip.frame" }"""))
+	}
+	check("a box that clips draws its own outline, outside its clip", refusal(ownClip) == null) { "error was: ${refusal(ownClip)}" }
 	refuses("another key", outlineWrite("h2") { it["key"] = Json.Str("dragonOutline.frame") }, "an outline write's key is dragonOutline.rings")
 	refuses("auto", outlineWrite("h2") { it["style"] = Json.Str("auto") }, "outline style auto has no native paint")
 	refuses("a groove outline without tones", outlineWrite("h5") { it["tones"] = Json.Null }, "a groove outline needs lighter and darker colours")
