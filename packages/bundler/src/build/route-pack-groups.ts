@@ -89,6 +89,8 @@ export function planRoutePackGroups(input: {
 	readonly eagerLazyRoutes?: Map<string, ReadonlyArray<string>>;
 	// The largest file a navigation or deferred pack may become; a bigger one splits by source.
 	readonly maxPackBytes?: number;
+	// Filled with the routes whose closure reaches each module; a route importing another route's root counts as reaching what that route reaches.
+	readonly moduleRoutes?: Map<string, ReadonlySet<string>>;
 }): Map<string, string> {
 	const sources = new Map<string, string[]>();
 	for (const [id, module] of input.modules) {
@@ -104,6 +106,7 @@ export function planRoutePackGroups(input: {
 		}
 	}
 	const owners = new Map<string, Set<string>>();
+	const entered = new Map<string, Set<string>>();
 	const walk = (route: string, start: Iterable<string>, visited: Set<string>) => {
 		const reached: string[] = [];
 		const pending = [...start];
@@ -111,7 +114,10 @@ export function planRoutePackGroups(input: {
 			const id = pending.pop()!;
 			if (visited.has(id)) continue;
 			visited.add(id);
-			if (roots.has(id) && roots.get(id) !== route) continue;
+			if (roots.has(id) && roots.get(id) !== route) {
+				add(entered, roots.get(id)!, route);
+				continue;
+			}
 			const module = input.modules.get(id);
 			if (!module) continue;
 			add(owners, id, route);
@@ -143,6 +149,26 @@ export function planRoutePackGroups(input: {
 				next.push(...walk(route, siblings, visited));
 			}
 			frontier = next;
+		}
+	}
+	if (input.moduleRoutes) {
+		const enteredBy = new Map<string, ReadonlySet<string>>();
+		for (const route of entered.keys()) {
+			const reaching = new Set<string>();
+			const pending = [route];
+			while (pending.length)
+				for (const importer of entered.get(pending.pop()!) ?? []) {
+					if (reaching.has(importer)) continue;
+					reaching.add(importer);
+					pending.push(importer);
+				}
+			enteredBy.set(route, reaching);
+		}
+		for (const [id, routes] of owners) {
+			const reaching = new Set(routes);
+			for (const route of routes)
+				for (const importer of enteredBy.get(route) ?? []) reaching.add(importer);
+			input.moduleRoutes.set(id, reaching);
 		}
 	}
 	// Code outside every route closure runs on any route, so it must never statically import a route-specific pack.

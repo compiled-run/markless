@@ -7,6 +7,7 @@ import type {
 	ViteBuilder,
 	ViteDevServer,
 } from 'vite';
+import { isCSSRequest } from 'vite';
 import type { OutputOptions } from 'rolldown';
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'pathe';
@@ -215,6 +216,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				() => chunkSizeWarningBytes,
 				(files, roots, importers) =>
 					basePlugin.api.unreachableChildren(files, roots, importers),
+				isCSSRequest,
 			)
 		: undefined;
 	const packOwnership = packingPlugins?.[0]?.api;

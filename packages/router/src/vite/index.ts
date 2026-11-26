@@ -35,6 +35,7 @@ import {
 	isRouteNavigationSourceRequest,
 	isSymbolOnlySourceRequest,
 	plannedLandingFiles,
+	plannedStylesheetRoutes,
 	resolverVirtualModuleSourceFile,
 	warmEvaluatedImports,
 	symbolVirtualModuleSourceFile,
@@ -1709,6 +1710,7 @@ function routeModulePreloadsFromBundle(input: {
 	const everyChunk = new Map(allChunks.map((chunk) => [chunk.fileName, chunk]));
 	// With the pack planner on: each route's landing files, from its first-use closures.
 	const plannedLanding = plannedLandingFiles(input.bundle);
+	const stylesheetRoutes = plannedStylesheetRoutes(input.bundle);
 	const deferredFileNames = new Set(deferredChunks.map((chunk) => chunk.fileName));
 	const resumeRuntimeFileNames = new Set<string>();
 	for (const entry of [input.resumeChunk, input.prerenderWakeChunk])
@@ -1923,6 +1925,7 @@ function routeModulePreloadsFromBundle(input: {
 			styleFileNames,
 			chunksByFileName,
 			input.base,
+			(stylesheet) => stylesheetRoutes.get(stylesheet)?.has(routeFile) ?? true,
 		);
 	}
 	return { navigation, ssr, styles };
@@ -1932,11 +1935,13 @@ function routeModulePreloadsFromBundle(input: {
 // component chunks and symbol chunks — so harvest over the route's planned
 // closure, not just the chunks the route source owns. Visiting a chunk's
 // dependencies before the chunk keeps cascade order stable across builds.
+// A pack can carry another route's styles, so `rendered` drops a sheet none of whose style modules this route reaches.
 function routeStylesheetsForChunks(
 	routeFileChunks: readonly OutputChunkLike[],
 	closureFileNames: ReadonlySet<string>,
 	chunksByFileName: ReadonlyMap<string, OutputChunkLike>,
 	base: string,
+	rendered: (stylesheet: string) => boolean = () => true,
 ): readonly string[] {
 	const styles = new Set<string>();
 	const visited = new Set<string>();
@@ -1948,7 +1953,7 @@ function routeStylesheetsForChunks(
 			if (dependency) visit(dependency);
 		}
 		for (const stylesheet of chunk.viteMetadata?.importedCss ?? []) {
-			styles.add(joinURL(base, stylesheet));
+			if (rendered(stylesheet)) styles.add(joinURL(base, stylesheet));
 		}
 	};
 	for (const fileName of closureFileNames) {
