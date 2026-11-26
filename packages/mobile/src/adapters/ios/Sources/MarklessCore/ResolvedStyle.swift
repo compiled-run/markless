@@ -168,12 +168,12 @@ public struct ResolvedScroll: Equatable, Sendable {
 }
 
 public struct StyleLayout: Sendable {
-	/// Each assignment's look per payload node.
-	public let assignments: [[String: ResolvedStyle]]
+	/// Each assignment's look per payload node; a factored page's are resolved when first read.
+	public let assignments: LazyList<[String: ResolvedStyle]>
 	/// Each assignment's canvas: the colour behind the page and the system bars; nil when the export names none (white).
-	public let canvases: [RGBA?]
+	public let canvases: LazyList<RGBA?>
 	/// Each assignment's body box in points, when body paints its own background there (under an html background).
-	public let bodies: [(frame: Frame, color: RGBA)?]
+	public let bodies: LazyList<(frame: Frame, color: RGBA)?>
 	/// The assignment matching the cells' values at mount.
 	public let start: Int
 	/// For each export state, the payload cell it follows, or `@env#band` for the `@media` band.
@@ -195,12 +195,20 @@ public struct StyleLayout: Sendable {
 	public let systemFaces: [String: SystemFace]
 	public let bands: StyleBands?
 	/// Each assignment's document height in points: how far the laid-out content reaches down.
-	public let extents: [Double]
+	public let extents: LazyList<Double>
 	/// Per assignment, its interaction states, whose entries follow the assignments in every per-entry list here.
 	public let interaction: [StyleInteractionLevel]
+	/// Only for a factored page: each node that clips its children past its borders in some entry, read from its tables' nodes.
+	let clipping: Set<String>?
 }
 
 extension StyleLayout {
+	/// Whether any entry clips `id`'s children past its borders (`childClip`), `template`'s for a row copy the entry lacks.
+	public func clipsPastBordersInAnyEntry(_ id: String, template: String) -> Bool {
+		if let clipping { return clipping.contains(id) || clipping.contains(template) }
+		return assignments.contains { ($0[id] ?? $0[template])?.childClip != nil }
+	}
+
 	/// The assignment reached from `current` when `cell` takes `value`.
 	public func next(from current: Int, cell: String, value: NativeValue) throws -> Int {
 		guard let state = stateCells.firstIndex(of: cell) else { throw styleError("\(cell) changed but has no style state") }
@@ -294,16 +302,27 @@ extension StyleExport {
 			throw styleError("no assignment of the style export matches the cells' values \(current.map(\.jsonText))")
 		}
 		let picker = payload.pickerContent
+		let grouped = groupedPlan != nil
+		// A factored page's entries are composed and resolved only when shown; the starting one now, so its errors are thrown here.
+		func perEntry<T>(_ make: @escaping (Int) throws -> T) throws -> LazyList<T> {
+			guard grouped else { return LazyList(try assignments.indices.map(make)) }
+			let list = LazyList(count: assignments.count, make)
+			_ = try list.element(start)
+			return list
+		}
+		let styles = try perEntry { index in
+			try self.resolveNodes(
+				try self.assignments.element(index).nodes, for: nodes, picker: picker, root: root, initialTexts: index == start ? initialTexts : nil,
+				canvas: try self.assignments.element(index).canvas, body: try self.assignments.element(index).body,
+				inline: index < self.inlineBoxes.count
+					? Set(self.inlineBoxes[index].map { (index < self.planNames.count ? self.planNames[index][$0] : nil) ?? $0 }) : [])
+		}
+		let dpr = self.dpr
 		return StyleLayout(
-			assignments: try assignments.indices.map { index in
-				try resolveNodes(
-					assignments[index].nodes, for: nodes, picker: picker, root: root, initialTexts: index == start ? initialTexts : nil,
-					canvas: assignments[index].canvas, body: assignments[index].body,
-					inline: index < inlineBoxes.count
-						? Set(inlineBoxes[index].map { (index < planNames.count ? planNames[index][$0] : nil) ?? $0 }) : [])
-			},
-			canvases: assignments.map(\.canvas),
-			bodies: try assignments.map { assignment in
+			assignments: styles,
+			canvases: try perEntry { try self.assignments.element($0).canvas },
+			bodies: try perEntry { (index: Int) throws -> (frame: Frame, color: RGBA)? in
+				let assignment = try self.assignments.element(index)
 				guard let color = assignment.body else { return nil }
 				let frame = { (id: String) throws -> Frame in
 					guard let frame = assignment.nodes.first(where: { $0.id == id })?.frame else { throw styleError("body paints a background, but the export gives \(id) no box") }
@@ -314,9 +333,10 @@ extension StyleExport {
 			},
 			start: start, stateCells: stateCells, domains: states.map(\.domain), next: next,
 			viewport: viewport, pageScrolls: try pageScrolls.map { try $0.map(points) }, pageScrollUndecided: pageScrollUndecided,
-			pageSticky: pageSticky.isEmpty ? assignments.map { _ in [] } : pageSticky,
+			pageSticky: pageSticky.isEmpty ? Array(repeating: [], count: assignments.count) : pageSticky,
 			dpr: dpr, fontFiles: fonts, systemFaces: systemFaces, bands: bands,
-			extents: assignments.map { assignment in
+			extents: try perEntry { index in
+				let assignment = try self.assignments.element(index)
 				let byId = Dictionary(uniqueKeysWithValues: assignment.nodes.map { ($0.id, $0) })
 				func top(_ id: String?) -> Double {
 					guard let id, let node = byId[id] else { return 0 }
@@ -324,7 +344,8 @@ extension StyleExport {
 				}
 				return (assignment.nodes.compactMap { node in node.frame.map { top(node.parent) + $0.y + $0.height } }.max() ?? 0) / dpr
 			},
-			interaction: interaction)
+			interaction: interaction,
+			clipping: grouped ? Set(groupNodes.compactMap { node in (try? resolve(node, node.writes))?.childClip != nil ? node.id : nil }) : nil)
 	}
 
 	private func resolveNodes(
@@ -571,7 +592,7 @@ extension StyleExport {
 	}
 
 	private func reHostOf(_ writes: [StyleWrite]) -> String? {
-		for case let .paintOrder(host, _, _) in writes { return host }
+		for case let .paintOrder(host, _, _, _, _) in writes { return host }
 		return nil
 	}
 
@@ -582,7 +603,7 @@ extension StyleExport {
 	private func stackingParent(
 		_ node: StyleNode, host: String, payloadParent: String?, byId: [String: StyleNode], payloadIds: Set<String>, pageHoldsMany: Bool
 	) throws -> (parent: String, offset: (x: Double, y: Double))? {
-		guard case let .paintOrder(_, bucket, _)? = node.writes.first(where: { if case .paintOrder = $0 { return true } else { return false } }) else { return nil }
+		guard case let .paintOrder(_, bucket, _, _, _)? = node.writes.first(where: { if case .paintOrder = $0 { return true } else { return false } }) else { return nil }
 		var chain: [StyleNode] = []
 		var cursor = node.parent
 		while let id = cursor, id != host {
@@ -655,7 +676,7 @@ extension StyleExport {
 				let r = frame.width - edge(1, frame.width), b = frame.height - edge(2, frame.height)
 				style.clipRect = r <= l || b <= t ? Frame(x: 0, y: 0, width: 0, height: 0) : Frame(x: l, y: t, width: r - l, height: b - t)
 			case .clipText: break
-			case let .paintOrder(_, bucket, rank): style.paintOrder = (bucket, rank)
+			case let .paintOrder(_, bucket, rank, _, _): style.paintOrder = (bucket, rank)
 			case .boxShadow: break
 			case let .visibility(value): style.hidden = value != "visible"
 			case let .selectArrow(color):

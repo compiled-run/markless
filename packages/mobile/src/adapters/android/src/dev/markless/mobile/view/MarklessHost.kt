@@ -46,6 +46,7 @@ import dev.markless.mobile.core.Json
 import dev.markless.mobile.core.MemoryStore
 import dev.markless.mobile.core.arr
 import dev.markless.mobile.core.text
+import dev.markless.mobile.style.LazyList
 import dev.markless.mobile.style.Bands
 import dev.markless.mobile.core.Js
 import dev.markless.mobile.core.ScrollAlignment
@@ -290,17 +291,20 @@ class MarklessHost(
 			val key = id.substringAfter('@')
 			return if (key == pressedRow || key == focusedRow) shown else assignment
 		}
-		var absolutes: List<Map<String, Pair<Double, Double>>> = export.assignments.map { a -> absoluteOrigins(a.nodes) }
+		// Made per entry when read: a factored page's entries are composed only when shown.
+		var absolutes: List<Map<String, Pair<Double, Double>>> = originsOf(export)
 			private set
 
 		init {
 			if ((export.plan == null || planLayout == null) && Math.abs(dpr - export.dpr) > 1e-3) throw MarklessHostError("style export is for pixel ratio ${export.dpr}; this device is $dpr")
 		}
 
+		private fun originsOf(e: StyleExport): List<Map<String, Pair<Double, Double>>> = LazyList(e.assignments.size) { k -> absoluteOrigins(e.assignments[k].nodes) }
+
 		/** The same document laid out at another size: the same assignments, new geometry. */
 		fun relaid(next: StyleExport) {
 			export = next
-			absolutes = next.assignments.map { a -> absoluteOrigins(a.nodes) }
+			absolutes = originsOf(next)
 			reselect(this)
 		}
 

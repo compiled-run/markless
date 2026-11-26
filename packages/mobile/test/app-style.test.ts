@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { nativeAppStyle, nativeAppStyleSize, type DragonStyleExport } from '../src/app-style.ts';
 
@@ -200,4 +201,37 @@ test("a page's slots ride on its route, and a page without them has none", () =>
 	const [home, about] = style.targets['ios']!.routes;
 	expect(home!.slots).toEqual(slots);
 	expect(about).not.toHaveProperty('slots');
+});
+
+test("a factored page's route keeps each table, its states written once, and the product, its nodes in the app's pool", () => {
+	const exported = JSON.parse(
+		readFileSync(new URL('../src/adapters/android/test/fixtures/state-groups.native-style.json', import.meta.url), 'utf8'),
+	) as DragonStyleExport;
+	const style = nativeAppStyle([{ pattern: '/', exported }]);
+	for (const name of ['ios', 'android']) {
+		const app = style.targets[name]!;
+		const route = app.routes[0]! as unknown as {
+			readonly groups: ReadonlyArray<{ readonly assignments: ReadonlyArray<{ readonly nodes: ReadonlyArray<number> }>; readonly interaction?: { readonly states: ReadonlyArray<{ readonly nodes: ReadonlyArray<number> }> } }>;
+			readonly product: unknown;
+			readonly plan: unknown;
+		} & { readonly assignments: ReadonlyArray<{ readonly nodes: ReadonlyArray<number> }>; readonly interaction?: { readonly states: ReadonlyArray<{ readonly nodes: ReadonlyArray<number> }> } };
+		const source = exported.targets[name]! as unknown as {
+			readonly groups: ReadonlyArray<{ readonly assignments: ReadonlyArray<{ readonly nodes: ReadonlyArray<{ readonly writes: unknown }> }>; readonly interaction?: { readonly states: ReadonlyArray<{ readonly nodes: ReadonlyArray<{ readonly writes: unknown }> }> } }>;
+			readonly product: unknown;
+			readonly plan: unknown;
+		} & { readonly assignments: ReadonlyArray<{ readonly nodes: ReadonlyArray<{ readonly writes: unknown }> }>; readonly interaction?: { readonly states: ReadonlyArray<{ readonly nodes: ReadonlyArray<{ readonly writes: unknown }> }> } };
+		expect(route.product).toEqual(source.product);
+		expect(route.plan).toEqual(source.plan);
+		// Every node of every table, and of each table's interaction states, is the export's, through the app's pools.
+		const expand = (index: number) => {
+			const { writes, ...node } = app.nodes[index]!;
+			return { ...node, writes: app.writes[writes as number] };
+		};
+		const tables = [[route, source] as const, ...route.groups.map((g, k) => [g, source.groups[k]!] as const)];
+		expect(tables).toHaveLength(4);
+		for (const [interned, original] of tables) {
+			expect(interned.assignments.map((a) => a.nodes.map(expand))).toEqual(original.assignments.map((a) => a.nodes));
+			expect((interned.interaction?.states ?? []).map((s) => s.nodes.map(expand))).toEqual((original.interaction?.states ?? []).map((s) => s.nodes));
+		}
+	}
 });

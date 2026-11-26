@@ -1,0 +1,3528 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "App",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "mk-1jewfs"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-1jewfs"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "State groups"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "toggles mk-1jewfs"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "button",
+			"parent": "h3",
+			"attributes": {},
+			"classByState": [
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				}
+			]
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "A off",
+			"textByState": [
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "A off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "A off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "A off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "A off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "A off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "A off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "A off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "A off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "A off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "A off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "A off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "A off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "A off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "A off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "A off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "A off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "A on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "A on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "A on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "A on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "A on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "A on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "A on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "A on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "A on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "A on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "A on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "A on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "A on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "A on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "A on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "A on"
+				}
+			]
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "button",
+			"parent": "h3",
+			"attributes": {},
+			"classByState": [
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				}
+			]
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "B off",
+			"textByState": [
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "B off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "B off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "B off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "B off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "B off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "B off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "B off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "B off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "B on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "B on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "B on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "B on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "B on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "B on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "B on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "B on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "B off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "B off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "B off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "B off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "B off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "B off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "B off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "B off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "B on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "B on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "B on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "B on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "B on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "B on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "B on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "B on"
+				}
+			]
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "button",
+			"parent": "h3",
+			"attributes": {},
+			"classByState": [
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				}
+			]
+		},
+		{
+			"kind": "text",
+			"id": "h6:text0",
+			"parent": "h6",
+			"text": "C off",
+			"textByState": [
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "C off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "C off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "C off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "C off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "C on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "C on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "C on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "C on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "C off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "C off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "C off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "C off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "C on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "C on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "C on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "C on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "C off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "C off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "C off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "C off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "C on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "C on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "C on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "C on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "C off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "C off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "C off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "C off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "C on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "C on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "C on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "C on"
+				}
+			]
+		},
+		{
+			"kind": "element",
+			"id": "h7",
+			"element": "button",
+			"parent": "h3",
+			"attributes": {},
+			"classByState": [
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				}
+			]
+		},
+		{
+			"kind": "text",
+			"id": "h7:text0",
+			"parent": "h7",
+			"text": "D off",
+			"textByState": [
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "D off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "D off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "D on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "D on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "D off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "D off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "D on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "D on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "D off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "D off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "D on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "D on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "D off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "D off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "D on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "D on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "D off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "D off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "D on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "D on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "D off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "D off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "D on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "D on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "D off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "D off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "D on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "D on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "D off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "D off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "D on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "D on"
+				}
+			]
+		},
+		{
+			"kind": "element",
+			"id": "h8",
+			"element": "button",
+			"parent": "h3",
+			"attributes": {},
+			"classByState": [
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "t mk-1jewfs"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "t on mk-1jewfs"
+				}
+			]
+		},
+		{
+			"kind": "text",
+			"id": "h8:text0",
+			"parent": "h8",
+			"text": "E off",
+			"textByState": [
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "E off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "E on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "E off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "E on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "E off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "E on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "E off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "E on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "E off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "E on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "E off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "E on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "E off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "E on"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "E off"
+				},
+				{
+					"when": {
+						"state:a": false,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "E on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "E off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "E on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "E off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "E on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "E off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "E on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "E off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": false,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "E on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "E off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "E on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "E off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": false,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "E on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": false
+					},
+					"value": "E off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": false,
+						"state:e": true
+					},
+					"value": "E on"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": false
+					},
+					"value": "E off"
+				},
+				{
+					"when": {
+						"state:a": true,
+						"state:b": true,
+						"state:c": true,
+						"state:d": true,
+						"state:e": true
+					},
+					"value": "E on"
+				}
+			]
+		},
+		{
+			"kind": "element",
+			"id": "h9",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "status mk-1jewfs"
+			},
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h9:text0",
+			"parent": "h9",
+			"text": "Note tapped",
+			"arm": {
+				"branch": "branch-site:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h10",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "status mk-1jewfs"
+			},
+			"arm": {
+				"branch": "branch-site:1",
+				"index": 0
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h10:text0",
+			"parent": "h10",
+			"text": "Panel tapped",
+			"arm": {
+				"branch": "branch-site:1",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h11",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "stage mk-1jewfs"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h12",
+			"element": "div",
+			"parent": "h11",
+			"attributes": {
+				"class": "panel mk-1jewfs"
+			},
+			"arm": {
+				"branch": "branch-site:2",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h13",
+			"element": "button",
+			"parent": "h12",
+			"attributes": {
+				"class": "fill mk-1jewfs"
+			},
+			"arm": {
+				"branch": "branch-site:2",
+				"index": 0
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h13:text0",
+			"parent": "h13",
+			"text": "Panel",
+			"arm": {
+				"branch": "branch-site:2",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h14",
+			"element": "div",
+			"parent": "h11",
+			"attributes": {
+				"class": "note mk-1jewfs"
+			},
+			"arm": {
+				"branch": "branch-site:3",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h15",
+			"element": "button",
+			"parent": "h14",
+			"attributes": {
+				"class": "fill mk-1jewfs"
+			},
+			"arm": {
+				"branch": "branch-site:3",
+				"index": 0
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h15:text0",
+			"parent": "h15",
+			"text": "Note",
+			"arm": {
+				"branch": "branch-site:3",
+				"index": 0
+			}
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\nmain.mk-1jewfs { padding: 16px; }\n\t\t\t.toggles.mk-1jewfs { display: flex; flex-wrap: wrap; gap: 8px; }\n\t\t\t.t.mk-1jewfs { padding: 8px 12px; border: 2px solid #44403c; border-radius: 8px; background: #f5f5f4; color: #1c1917; font-family: inherit; font-size: 16px; }\n\t\t\t.t.on.mk-1jewfs { border-color: #166534; background: #dcfce7; color: #14532d; }\n\t\t\t.status.mk-1jewfs { margin: 8px 0 0; color: #44403c; }\n\t\t\t.stage.mk-1jewfs { height: 160px; margin-top: 16px; }\n\t\t\t.panel.mk-1jewfs { position: absolute; left: 16px; top: 220px; width: 240px; height: 120px; z-index: 2; background: #bfdbfe; }\n\t\t\t.note.mk-1jewfs { position: absolute; left: 96px; top: 260px; width: 200px; height: 64px; z-index: 3; background: #fde68a; }\n\t\t\t.fill.mk-1jewfs { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; font-family: inherit; font-size: 16px; }\n\t\t\t.panel .fill.mk-1jewfs { color: #1e3a8a; text-align: left; }\n\t\t\t.note .fill.mk-1jewfs { color: #78350f; }",
+	"states": [
+		{
+			"cell": "state:a",
+			"domain": [
+				false,
+				true
+			],
+			"initial": false
+		},
+		{
+			"cell": "state:b",
+			"domain": [
+				false,
+				true
+			],
+			"initial": false
+		},
+		{
+			"cell": "state:c",
+			"domain": [
+				false,
+				true
+			],
+			"initial": false
+		},
+		{
+			"cell": "state:d",
+			"domain": [
+				false,
+				true
+			],
+			"initial": false
+		},
+		{
+			"cell": "state:e",
+			"domain": [
+				false,
+				true
+			],
+			"initial": false
+		}
+	],
+	"branches": [
+		{
+			"id": "branch-site:0",
+			"domain": [
+				"0",
+				"1"
+			],
+			"initial": "1"
+		},
+		{
+			"id": "branch-site:1",
+			"domain": [
+				"0",
+				"1"
+			],
+			"initial": "1"
+		},
+		{
+			"id": "branch-site:2",
+			"domain": [
+				"0",
+				"1"
+			],
+			"initial": "1"
+		},
+		{
+			"id": "branch-site:3",
+			"domain": [
+				"0",
+				"1"
+			],
+			"initial": "1"
+		}
+	]
+}

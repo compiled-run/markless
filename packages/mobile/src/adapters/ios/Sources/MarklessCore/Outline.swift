@@ -78,7 +78,7 @@ extension StyleExport {
 			if clips { throw styleError("\(node.id): its outline is drawn in \(host), past \(box.id), which clips or scrolls; not implemented on iOS") }
 		}
 		for item in nodes where item.frame != nil && item.writes.contains(where: {
-			if case let .paintOrder(h, bucket, _) = $0 { return h == write.layer && bucket >= 1 } else { return false }
+			if case let .paintOrder(h, bucket, _, _, _) = $0 { return h == write.layer && bucket >= 1 } else { return false }
 		}) {
 			let parent = item.id.contains("@") ? ancestors(item).first(where: { isView($0.id) })?.id : layerView(above: item)
 			if (parent ?? OutlinePaint.page) != host {

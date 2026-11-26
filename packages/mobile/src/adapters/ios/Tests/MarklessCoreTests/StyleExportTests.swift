@@ -64,7 +64,7 @@ private func exportText(_ edit: (String) -> String = { $0 }) -> Data { Data(edit
 
 @Test(arguments: [
 	("\"kind\": \"font\"", "\"kind\": \"letter-spacing\"", "unknown style write kind \"letter-spacing\""),
-	("dragon.native-style-export/0", "dragon.native-style-export/2", "unsupported schema"),
+	("dragon.native-style-export/0", "dragon.native-style-export/3", "unsupported schema"),
 	("\"text\": \"Count 0\"", "\"text\": \"Count 9\"", "laid out \"Count 9\""),
 	("\"id\": \"h1:text0\"", "\"id\": \"h1:text9\"", "no style export node for h1:text0"),
 	("\"styles\": [\n        \"solid\"", "\"styles\": [\n        \"dashed\"", "border styles"),

@@ -4,6 +4,9 @@ export const NATIVE_APP_STYLE_VERSION = 'markless.native-app-style/0';
 /** The Dragon export schema an app style is built from; hosts read its node and write shapes unchanged. */
 export const DRAGON_STYLE_EXPORT_SCHEMA = 'dragon.native-style-export/1';
 
+/** Dragon's export of a page whose states it factors into groups: the page's table, each group's, and their product. */
+export const DRAGON_STYLE_EXPORT_SCHEMA_GROUPS = 'dragon.native-style-export/2';
+
 type Json = unknown;
 
 const fail = (reason: string): never => {
@@ -43,6 +46,28 @@ type DragonTarget = {
 			{ readonly states: DragonTarget['assignments'] } & { readonly [field: string]: Json }
 		>;
 	};
+	/**
+	 * Only in a factored export (DRAGON_STYLE_EXPORT_SCHEMA_GROUPS): each group's table, whose assignments hold only the nodes
+	 * it owns, and the product a host steps through. Each table's interaction states are written once (`interaction.states`),
+	 * each holding only what it changes, and its levels name them by index.
+	 */
+	readonly groups?: ReadonlyArray<DragonGroup>;
+	readonly product?: Json;
+};
+
+type SlimState = {
+	readonly nodes: ReadonlyArray<DragonNode>;
+	readonly [field: string]: Json;
+};
+
+type DragonGroup = {
+	readonly assignments: DragonTarget['assignments'];
+	readonly interaction?: {
+		readonly levels: ReadonlyArray<{ readonly [field: string]: Json }>;
+		readonly states: ReadonlyArray<SlimState>;
+		readonly matches: ReadonlyArray<Json>;
+	};
+	readonly [field: string]: Json;
 };
 
 /** A face by its `sha256:` id: `file` is in the Dragon checkout, or with `from: 'input'` beside the style input. */
@@ -76,13 +101,28 @@ type InternedAssignment = {
 	readonly bodyBackground?: Json;
 };
 
-type InternedTarget = Omit<DragonTarget, 'backend' | 'viewport' | 'dpr' | 'assignments' | 'interaction'> & {
+/** A slim interaction state: only the fields it does not share with its assignment, its nodes indices into `nodes`. */
+type InternedState = { readonly nodes: ReadonlyArray<number>; readonly [field: string]: Json };
+
+/** A factored table (the page's or a group's): its assignments interned, its interaction states once each. */
+type InternedTable = {
+	readonly assignments: ReadonlyArray<InternedAssignment>;
+	readonly interaction?: {
+		readonly levels: ReadonlyArray<{ readonly [field: string]: Json }>;
+		readonly states: ReadonlyArray<InternedState>;
+		readonly matches: ReadonlyArray<Json>;
+	};
+	readonly [field: string]: Json;
+};
+
+type InternedTarget = Omit<DragonTarget, 'backend' | 'viewport' | 'dpr' | 'assignments' | 'interaction' | 'groups'> & {
 	readonly assignments: ReadonlyArray<InternedAssignment>;
 	readonly interaction?: {
 		readonly levels: ReadonlyArray<
 			{ readonly states: ReadonlyArray<InternedAssignment> } & { readonly [field: string]: Json }
 		>;
 	};
+	readonly groups?: ReadonlyArray<InternedTable>;
 };
 
 /** A page's styles inside the app file: Dragon's target fields, each node's `writes` an index into the target's `writes`. */
@@ -164,9 +204,9 @@ export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): Native
 		})),
 	]);
 	for (const { pattern, exported } of exports) {
-		if (exported.schema !== DRAGON_STYLE_EXPORT_SCHEMA)
+		if (exported.schema !== DRAGON_STYLE_EXPORT_SCHEMA && exported.schema !== DRAGON_STYLE_EXPORT_SCHEMA_GROUPS)
 			throw new Error(
-				`${pattern}: style export is ${exported.schema}, not ${DRAGON_STYLE_EXPORT_SCHEMA}`,
+				`${pattern}: style export is ${exported.schema}, not ${DRAGON_STYLE_EXPORT_SCHEMA} or ${DRAGON_STYLE_EXPORT_SCHEMA_GROUPS}`,
 			);
 		if (exported.units !== first.units)
 			throw new Error(
@@ -214,8 +254,31 @@ export function nativeAppStyle(pages: ReadonlyArray<NativeAppStylePage>): Native
 				: { bodyBackground: assignment.bodyBackground }),
 			nodes: assignment.nodes.map(internNode),
 		});
+		const internedState = (state: SlimState): InternedState => ({ ...state, nodes: state.nodes.map(internNode) });
+		// A factored table: its levels name its states, which are written once each and hold only what they change.
+		const internedTable = <T extends { readonly assignments: DragonTarget['assignments']; readonly interaction?: unknown }>(table: T, what: string): InternedTable => {
+			const { assignments, interaction, ...rest } = table;
+			const pooled = interaction as DragonGroup['interaction'];
+			return {
+				...(rest as Record<string, Json>),
+				assignments: assignments.map((a, index) => ({
+					...internedAssignment(a, `${what}'s assignment ${index}`),
+					...(a['order' as keyof typeof a] === undefined ? {} : { order: a['order' as keyof typeof a] }),
+				})),
+				...(pooled === undefined
+					? {}
+					: { interaction: { levels: pooled.levels, states: pooled.states.map(internedState), matches: pooled.matches } }),
+			};
+		};
 		const interned = (target: DragonTarget, what: string): InternedTarget => {
-			const { backend: _b, viewport: _v, dpr: _d, assignments, interaction, ...rest } = target;
+			if (target.groups !== undefined) {
+				const { backend: _b, viewport: _v, dpr: _d, groups, ...page } = target;
+				return {
+					...(internedTable(page, what) as unknown as InternedTarget),
+					groups: groups.map((g, k) => internedTable(g, `${what}'s group ${k}`)),
+				};
+			}
+			const { backend: _b, viewport: _v, dpr: _d, assignments, interaction, groups: _g, ...rest } = target;
 			return {
 				...rest,
 				assignments: assignments.map((assignment, index) =>

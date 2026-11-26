@@ -1,6 +1,6 @@
 import Foundation
 
-public let dragonStyleExportSchemas = ["dragon.native-style-export/0", "dragon.native-style-export/1"]
+public let dragonStyleExportSchemas = ["dragon.native-style-export/0", "dragon.native-style-export/1", dragonStyleExportGroupsSchema]
 private let dragonStyleExportUnits = [
 	"device px; frames relative to the parent box",
 	"frames and borderWidths in device px, frames relative to the parent box; lengths inside writes in CSS px",
@@ -36,8 +36,9 @@ public enum StyleWrite: Sendable {
 	case clipPathInset([(value: Double, percent: Bool)])
 	/// The text a clip-path leaves exposed to the screen reader; a clip does not change accessibility, so nothing to apply.
 	case clipText
-	/// The box paints in another stacking context's order (Dragon's re-hosting); `host` is that context's node.
-	case paintOrder(host: String, bucket: Int, rank: Int)
+	/// The box paints in another stacking context's order (Dragon's re-hosting); `host` is that context's node. `layer` and `z`:
+	/// only in a factored page's tables, which a combination sorts its layer items by (`composedNodes`).
+	case paintOrder(host: String, bucket: Int, rank: Int, layer: String? = nil, z: Double? = nil)
 	/// box-shadow: the computed shadows in list order.
 	case boxShadow([BoxShadow.Shadow])
 	/// `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own.
@@ -365,7 +366,30 @@ public struct SheetStyle: Sendable {
 	public let heights: [(snapPoint: Double, style: StyleExport)]
 }
 
-/// One target of a decoded `dragon.native-style-export/0` or `/1` file; `/0` reads as one assignment and no states.
+/// One entry of an export: its states' values, its nodes and its root paint.
+public typealias StyleAssignment = (values: [String: NativeValue], nodes: [StyleNode], canvas: RGBA?, body: RGBA?)
+
+/// A factored page's plan: the plan without its entries and groups, each plan entry as JSON text, the plan entries each entry
+/// is laid out from (the page's, then each group's), and each group's `owned` and `nodes` fields.
+public struct GroupedPlan: Sendable {
+	let rest: String
+	let entries: [String]
+	let parts: @Sendable (Int) -> [Int]
+	let groups: [String]
+
+	/// The plan an entry is laid out from: the page's plan entry and each group's, each group's entries the one after the page's.
+	public func plan(ofEntry entry: Int) -> String {
+		let sent = parts(entry).map { entries[$0] }.joined(separator: ",")
+		let groupsText = groups.enumerated().map { g, owned in "{\"first\":\(g + 1),\"count\":1,\(owned)}" }.joined(separator: ",")
+		return "\(rest.dropLast())\(rest.count > 2 ? "," : "")\"assignments\":[\(sent)],\"groups\":[\(groupsText)]}"
+	}
+
+	/// What a layout line of a factored page adds after its plan: each group's entry, the one `plan(ofEntry:)` sends it.
+	public var line: String { ",\"groups\":[\(groups.map { _ in "0" }.joined(separator: ","))]" }
+}
+
+/// One target of a decoded `dragon.native-style-export/0`, `/1` or `/2` file; `/0` reads as one assignment and no states, `/2`
+/// as the combinations of its tables, each composed when first read.
 public struct StyleExport: Sendable {
 	public let fonts: [(id: String, file: String)]
 	public private(set) var viewport: (width: Double, height: Double)
@@ -373,7 +397,7 @@ public struct StyleExport: Sendable {
 	public let states: [StyleState]
 	public let initial: Int
 	/// Every reachable combination of states, each a complete node list, with each state's value in it.
-	public private(set) var assignments: [(values: [String: NativeValue], nodes: [StyleNode], canvas: RGBA?, body: RGBA?)]
+	public private(set) var assignments: LazyList<StyleAssignment>
 	/// `next[a][s][v]`: the assignment reached from `a` by setting state `s` to its `v`-th value; -1 when unreachable.
 	public let next: [[[Int]]]
 	/// Why Dragon does not call this target shipping output yet; nil when it is `ready`.
@@ -393,10 +417,10 @@ public struct StyleExport: Sendable {
 	/// Dragon's layout plan (`dragon.markless-plan/1`) as JSON text: with it the page lays out at the screen's own size.
 	public var plan: String?
 	/// Per assignment: each Dragon id the plan's geometry names, with the export's id for it (empty: no ids differ).
-	public var planNames: [[String: String]] = []
+	public var planNames: LazyList<[String: String]> = []
 	/// Per assignment: the Dragon ids of the inline boxes in the plan's layout tree, whose texts and boxes the export parents to
 	/// their block container (empty without a plan).
-	public var inlineBoxes: [Set<String>] = []
+	public var inlineBoxes: LazyList<Set<String>> = []
 	/// The slots `laidOut` takes values for, in the order it takes them; empty when no style follows a slot.
 	public var slots: [StyleSlot] = []
 	/// Each list whose rows the phone lays out: the box its rows hang from and the Dragon ids of one row's top boxes, in order.
@@ -406,6 +430,10 @@ public struct StyleExport: Sendable {
 	/// Per assignment, its interaction states (`:hover`, `:active`, `:focus`): the runtime tables and the entries the states are,
 	/// after the assignments in `assignments`, `pageScrolls` and the plan. Empty when the page has none.
 	public var interaction: [StyleInteractionLevel] = []
+	/// Only for a factored page: its plan, which lays an entry out from each table's.
+	public var groupedPlan: GroupedPlan?
+	/// Only for a factored page: every node its tables hold, of which its entries are composed.
+	public var groupNodes: [StyleNode] = []
 
 	/// The assignment an entry belongs to: itself, or for an interaction state the assignment whose level holds it.
 	public func assignmentOf(entry: Int) -> Int {
@@ -435,7 +463,7 @@ public struct StyleExport: Sendable {
 		guard dragonStyleExportSchemas.contains(schema) else {
 			throw PayloadError(path: "style.schema", reason: "unsupported schema \"\(schema)\", this host reads \(dragonStyleExportSchemas)")
 		}
-		let perState = schema == dragonStyleExportSchemas[1]
+		let perState = schema != dragonStyleExportSchemas[0]
 		let units = try fields["units"].string()
 		guard dragonStyleExportUnits.contains(units) else { throw PayloadError(path: "style.units", reason: "unsupported units \"\(units)\"") }
 		// Dragon's reason, for this target, when it leaves the page's scroll range undecided.
@@ -449,9 +477,24 @@ public struct StyleExport: Sendable {
 				}
 			}
 		}
+		let chosen = try fields["targets"].field(target)
+		if try chosen.keys().contains("groups") {
+			guard schema == dragonStyleExportGroupsSchema else { throw chosen.fail("has groups, which only a \(dragonStyleExportGroupsSchema) export has") }
+			guard !fields.has("slots") else { throw chosen.fail("a factored page has no slots yet") }
+			let t = try chosen.object(
+				required: ["backend", "viewport", "dpr", "states", "initial", "assignments", "next", "plan", "groups", "product"],
+				optional: ["readiness", "bands", "interaction", "planNames", "planRepeats", "anim"])
+			let actualBackend = try t["backend"].string()
+			guard actualBackend == backend else { throw PayloadError(path: chosen.path + ".backend", reason: "expected backend \(backend), found \(actualBackend)") }
+			let viewport = try t["viewport"].object(["width", "height"])
+			var style = try grouped(
+				t, fonts: try decodeFonts(fields["fonts"]), viewport: (try viewport["width"].number(), try viewport["height"].number()),
+				dpr: try t["dpr"].number(), notReady: try readiness(t), pageScrollUndecided: pageScrollUndecided, nodeOf: decodeNode)
+			if fields.has("systemFonts") { style.systemFaces = try decodeSystemFonts(fields["systemFonts"], target: target) }
+			return style
+		}
 		var style = try decodeTarget(
-			try fields["targets"].field(target), perState: perState, fonts: try decodeFonts(fields["fonts"]), backend: backend,
-			pageScrollUndecided: pageScrollUndecided)
+			chosen, perState: perState, fonts: try decodeFonts(fields["fonts"]), backend: backend, pageScrollUndecided: pageScrollUndecided)
 		if fields.has("systemFonts") { style.systemFaces = try decodeSystemFonts(fields["systemFonts"], target: target) }
 		if fields.has("slots") { style.slots = try decodeSlots(fields["slots"], plan: style.plan) }
 		return style
@@ -529,10 +572,27 @@ public struct StyleExport: Sendable {
 		for route in try targetFields["routes"].array() {
 			let f = try route.object(
 				required: ["pattern", "component", "compiler", "readiness", "states", "initial", "next", "assignments"],
-				optional: ["bands", "sheets", "plan", "planNames", "planRepeats", "slots", "anim", "interaction"])
+				optional: ["bands", "sheets", "plan", "planNames", "planRepeats", "slots", "anim", "interaction", "groups", "product"])
 			let pattern = try f["pattern"].string()
 			_ = (try f["component"].string(), try f["compiler"].string())
 			guard routes[pattern] == nil else { throw route.fail("route \(pattern) is listed twice") }
+			if f.has("groups") {
+				guard !f.has("sheets"), !f.has("slots") else { throw route.fail("\(pattern): a factored page has no system sheets or slots yet") }
+				guard try targetFields["backend"].string() == backend else { throw PayloadError(path: chosen.path + ".backend", reason: "expected backend \(backend)") }
+				let viewport = try targetFields["viewport"].object(["width", "height"])
+				let listed = { (node: Reader) throws -> StyleNode in
+					guard case .number = node.value else { return try decodeNode(try Reader(try withWrites(node), at: node.path)) }
+					let index = Int(try node.number())
+					guard pool.indices.contains(index) else { throw node.fail("node \(index) is not in the target's nodes") }
+					return try decodeNode(try Reader(pool[index], at: node.path))
+				}
+				var style = try grouped(
+					f, fonts: fonts, viewport: (try viewport["width"].number(), try viewport["height"].number()), dpr: try targetFields["dpr"].number(),
+					notReady: try readiness(f), pageScrollUndecided: nil, nodeOf: listed)
+				style.systemFaces = systemFaces
+				routes[pattern] = style
+				continue
+			}
 			var style = try expanded(route, f, try raw(targetFields, "viewport"))
 			style.systemFaces = systemFaces
 			if f.has("slots") { style.slots = try decodeSlots(f["slots"], plan: style.plan) }
@@ -632,15 +692,7 @@ public struct StyleExport: Sendable {
 		let targetFields = try chosen.object(
 			required: perState ? ["backend", "viewport", "dpr", "states", "initial", "assignments", "next"] : ["backend", "viewport", "dpr", "nodes"],
 			optional: perState ? ["readiness", "bands", "plan", "planNames", "planRepeats", "anim", "interaction"] : [])
-		var notReady: String?
-		if targetFields.has("readiness") {
-			let readiness = try targetFields["readiness"]
-			switch try readiness.field("kind").string() {
-			case "ready": _ = try readiness.object(["kind"])
-			case "analysis-only": notReady = try readiness.object(["kind", "reason"])["reason"].string()
-			case let kind: throw PayloadError(path: readiness.path + ".kind", reason: "unknown readiness \"\(kind)\"")
-			}
-		}
+		let notReady = try readiness(targetFields)
 		let actualBackend = try targetFields["backend"].string()
 		guard actualBackend == backend else {
 			throw PayloadError(path: chosen.path + ".backend", reason: "expected backend \(backend), found \(actualBackend)")
@@ -728,6 +780,72 @@ public struct StyleExport: Sendable {
 			assignments = [([:], try checkedNodes(try targetFields["nodes"]), nil, nil)]
 			pageScrolls = [nil]
 		}
+		let bands = try decodeBands(targetFields, states: states, at: chosen.path)
+		var style = StyleExport(
+			fonts: fonts, viewport: (try viewport["width"].number(), try viewport["height"].number()),
+			dpr: try targetFields["dpr"].number(), states: states, initial: initial, assignments: LazyList(assignments), next: next, notReady: notReady,
+			bands: bands, pageScrolls: pageScrolls, pageScrollUndecided: pageScrollUndecided)
+		style.interaction = interaction
+		if targetFields.has("plan") {
+			let plan = try targetFields["plan"]
+			guard try plan.field("version").string() == dragonMarklessPlanVersion else {
+				throw PayloadError(path: plan.path + ".version", reason: "this host reads \(dragonMarklessPlanVersion)")
+			}
+			style.plan = plan.value.jsonText
+			style.inlineBoxes = LazyList(try inlineBoxes(ofPlan: plan))
+		} else if let node = assignments.lazy.flatMap(\.nodes).first(where: \.drawsSelectArrow) {
+			throw PayloadError(
+				path: chosen.path, reason: "\(node.id) draws a drop-down arrow, whose geometry only Dragon's plan layout gives, and the export has no plan")
+		} else if let node = assignments.lazy.flatMap(\.nodes).first(where: \.drawsCheckbox) {
+			throw PayloadError(
+				path: chosen.path, reason: "\(node.id) draws a themed checkbox, whose marks only Dragon's plan layout gives, and the export has no plan")
+		}
+		if targetFields.has("planNames") {
+			let perAssignment = try targetFields["planNames"]
+			style.planNames = LazyList(try decodeNames(perAssignment))
+			guard style.planNames.count == assignments.count else {
+				throw perAssignment.fail("names \(style.planNames.count) assignments; the export has \(assignments.count)")
+			}
+		}
+		if targetFields.has("anim") {
+			guard style.plan != nil else { throw try targetFields["anim"].fail("animator tables need a layout plan") }
+			style.anim = try targetFields["anim"].value.jsonText
+		}
+		if targetFields.has("planRepeats") {
+			style.planRepeats = try targetFields["planRepeats"].array().map { r in
+				let f = try r.object(required: ["id", "parent", "template"], optional: [])
+				let template = try f["template"].array().map { try $0.string() }
+				guard !template.isEmpty else { throw r.fail("a row has at least one box") }
+				return PlanRepeat(id: try f["id"].string(), parent: try f["parent"].string(), template: template)
+			}
+		}
+		return style
+	}
+
+	private static func readiness(_ fields: Fields) throws -> String? {
+		guard fields.has("readiness") else { return nil }
+		let readiness = try fields["readiness"]
+		switch try readiness.field("kind").string() {
+		case "ready": _ = try readiness.object(["kind"]); return nil
+		case "analysis-only": return try readiness.object(["kind", "reason"])["reason"].string()
+		case let kind: throw PayloadError(path: readiness.path + ".kind", reason: "unknown readiness \"\(kind)\"")
+		}
+	}
+
+	/// Per assignment, each Dragon id the plan names with the export's id for it.
+	private static func decodeNames(_ reader: Reader) throws -> [[String: String]] {
+		try reader.array().map { assignment in
+			var map: [String: String] = [:]
+			for pair in try assignment.array() {
+				let names = try pair.array()
+				guard names.count == 2 else { throw pair.fail("expected a Dragon id and the export's id") }
+				map[try names[0].string()] = try names[1].string()
+			}
+			return map
+		}
+	}
+
+	private static func decodeBands(_ targetFields: Fields, states: [StyleState], at path: String) throws -> StyleBands? {
 		var bands: StyleBands?
 		if targetFields.has("bands") {
 			let reader = try targetFields["bands"]
@@ -747,54 +865,205 @@ public struct StyleExport: Sendable {
 			else { throw PayloadError(path: reader.path, reason: "the bands do not match the atoms and the \(StyleBands.state) state") }
 			bands = StyleBands(atoms: atoms, bands: rows)
 		} else if states.contains(where: { $0.key == StyleBands.state }) {
-			throw PayloadError(path: chosen.path, reason: "\(StyleBands.state) is a state, but there are no bands")
+			throw PayloadError(path: path, reason: "\(StyleBands.state) is a state, but there are no bands")
+		}
+		return bands
+	}
+
+	private static func decodeOrder(_ fields: Fields, _ key: String) throws -> [String: [String]] {
+		guard fields.has(key) else { return [:] }
+		let reader = try fields[key]
+		var order: [String: [String]] = [:]
+		for parent in try reader.keys() { order[parent] = try reader.field(parent).array().map { try $0.string() } }
+		return order
+	}
+
+	private static func decodeOpaque(_ fields: Fields, _ key: String) throws -> RGBA? {
+		guard fields.has(key) else { return nil }
+		let reader = try fields[key]
+		if reader.isNull { return nil }
+		let color = try decodeColor(reader)
+		guard color.alpha == 255 else { throw reader.fail("is not opaque") }
+		return color
+	}
+
+	/// A factored page (`dragon.native-style-export/2`): the page's table, each group's and their `product`, read as one export
+	/// whose entries are the product's combinations and then each combination's interaction states. An entry's nodes are composed
+	/// from the table that owns each node (`composedNodes`) when it is first read; it lays out from the page's plan entry with each group's.
+	private static func grouped(
+		_ t: Fields, fonts: [(id: String, file: String)], viewport: (width: Double, height: Double), dpr: Double, notReady: String?,
+		pageScrollUndecided: String?, nodeOf: (Reader) throws -> StyleNode
+	) throws -> StyleExport {
+		let at = t.reader.path
+		if t.has("anim") { throw t.reader.fail("a factored page runs no transitions or animations yet") }
+		if t.has("planRepeats"), try !t["planRepeats"].array().isEmpty { throw t.reader.fail("a factored page has no list rows yet") }
+		let plan = try t["plan"]
+		guard try plan.field("version").string() == dragonMarklessPlanVersion else {
+			throw PayloadError(path: plan.path + ".version", reason: "this host reads \(dragonMarklessPlanVersion)")
+		}
+		let groupReaders = try t["groups"].array()
+		let tables = [t] + (try groupReaders.map { try $0.object(
+			required: ["groupStates", "owned", "assignments"], optional: ["states", "initial", "next", "interaction", "planNames"]) })
+		// Each table's entries: an assignment (a group's holds only the nodes it owns) and its children's order.
+		let entries = try tables.map { table in
+			try table["assignments"].array().map { entry -> (assignment: StyleAssignment, order: [String: [String]]) in
+				let f = try entry.object(required: ["values", "nodes", "canvas"], optional: ["bodyBackground", "pageScroll", "colorScheme", "order"])
+				let valuesReader = try f["values"]
+				var values: [String: NativeValue] = [:]
+				for key in try valuesReader.keys() { values[key] = NativeValue(json: try valuesReader.field(key).value) }
+				guard let canvas = try decodeOpaque(f, "canvas") else { throw entry.fail("has no canvas") }
+				return ((values, try f["nodes"].array().map(nodeOf), canvas, try decodeOpaque(f, "bodyBackground")), try decodeOrder(f, "order"))
+			}
+		}
+		// Each table's interaction: per entry its states (indices into the table's pool), their plan entries, and the pool.
+		let interactions = try tables.map { table -> (levels: [[Int]], plans: [[Int]], pool: [SlimState])? in
+			guard table.has("interaction") else { return nil }
+			let i = try table["interaction"].object(required: ["levels", "states"], optional: ["matches"])
+			let pool = try i["states"].array().map { state -> SlimState in
+				let s = try state.object(required: ["nodes"], optional: ["removed", "order", "canvas", "bodyBackground", "values", "pageScroll", "colorScheme"])
+				return SlimState(
+					nodes: try s["nodes"].array().map(nodeOf), removed: s.has("removed") ? Set(try s["removed"].array().map { try $0.string() }) : [],
+					order: try decodeOrder(s, "order"), canvas: try decodeOpaque(s, "canvas"), body: try decodeOpaque(s, "bodyBackground"),
+					ownBody: s.has("bodyBackground"))
+			}
+			let levels = try i["levels"].array()
+			let states = try levels.map { level in
+				try level.field("states").array().map { s in
+					let k = Int(try s.number())
+					guard pool.indices.contains(k) else { throw s.fail("names state \(k) of \(pool.count)") }
+					return k
+				}
+			}
+			let plans = try levels.map { level in
+				try level.keys().contains("planAssignments") ? try level.field("planAssignments").array().map { Int(try $0.number()) } : []
+			}
+			return (states, plans, pool)
+		}
+		let names = try tables.map { $0.has("planNames") ? try decodeNames($0["planNames"]) : [] }
+		var owner: [String: Int] = [:]
+		for (k, g) in tables.dropFirst().enumerated() {
+			for o in try g["owned"].array() {
+				let id = try o.string()
+				if id.hasPrefix("node:") { owner[String(id.dropFirst(5))] = k + 1 }
+			}
+		}
+		let groupStates = try tables.dropFirst().map { try $0["groupStates"].array().map { try $0.string() } }
+		// The plan: every table's entries; a group's start at its `first`, and it gives the boxes it owns.
+		guard case let .object(planFields) = plan.value else { throw plan.fail("expected an object") }
+		let planEntries = try plan.field("assignments").array().map(\.value.jsonText)
+		let planGroups = try plan.field("groups").array()
+		guard planGroups.count == groupReaders.count else {
+			throw plan.fail("the plan has \(planGroups.count) groups; the export has \(groupReaders.count)")
+		}
+		let firsts = [0] + (try planGroups.map { Int(try $0.field("first").number()) })
+		let planOwned = try planGroups.map { g in "\"owned\":\(try g.field("owned").value.jsonText),\"nodes\":\(try g.field("nodes").value.jsonText)" }
+		var boxOwner: [String: Int] = [:]
+		for (k, g) in planGroups.enumerated() { for id in try g.field("owned").array() { boxOwner[try id.string()] = k + 1 } }
+		// The product: each combination's entry per table, its transitions, and per combination its interaction level.
+		let product = try t["product"].object(required: ["states", "initial", "assignments", "next", "rootPaint"], optional: ["interaction"])
+		let states = try product["states"].array().map { state in
+			let f = try state.object(["key", "domain"])
+			return StyleState(key: try f["key"].string(), domain: try f["domain"].array().map { NativeValue(json: $0.value) })
+		}
+		let tuples = try product["assignments"].array().map { try $0.array().map { Int(try $0.number()) } }
+		guard tuples.allSatisfy({ $0.count == tables.count && $0.enumerated().allSatisfy { entries[$0].indices.contains($1) } }) else {
+			throw PayloadError(path: at + ".product.assignments", reason: "a combination names an entry its table does not have")
+		}
+		let initial = Int(try product["initial"].number())
+		let next = try product["next"].array().map { row in try row.array().map { column in try column.array().map { Int(try $0.number()) } } }
+		let shapeIsRight = next.count == tuples.count && next.allSatisfy { row in
+			row.count == states.count && zip(row, states).allSatisfy { column, state in
+				column.count == state.domain.count && column.allSatisfy { $0 == -1 || tuples.indices.contains($0) }
+			}
+		}
+		guard shapeIsRight, tuples.indices.contains(initial) else {
+			throw PayloadError(path: at + ".product", reason: "its initial combination or next table names no combination")
+		}
+		let rootPaint = Int(try product["rootPaint"].number())
+		guard tables.indices.contains(rootPaint) else { throw PayloadError(path: at + ".product.rootPaint", reason: "names no table") }
+		let levelReaders = product.has("interaction") ? try product["interaction"].object(["levels"])["levels"].array() : nil
+		if let levelReaders, levelReaders.count != tuples.count {
+			throw PayloadError(path: at + ".product.interaction", reason: "\(levelReaders.count) levels for \(tuples.count) combinations")
+		}
+		// Each flat entry: a combination, or one of its interaction states as the state each table shows (-1: its entry).
+		var flat: [(combination: Int, states: [Int]?)] = tuples.indices.map { ($0, nil) }
+		var interaction: [StyleInteractionLevel] = []
+		for (a, level) in (levelReaders ?? []).enumerated() {
+			let l = try level.object(required: ["tables", "addresses", "states"], optional: ["rows", "matches"])
+			let shown = try l["states"].array().map { try $0.array().map { Int(try $0.number()) } }
+			guard shown.allSatisfy({ $0.count == tables.count }) else { throw level.fail("a state names no state of a table") }
+			var rows: [String: String] = [:]
+			if l.has("rows") { let r = try l["rows"]; for key in try r.keys() { rows[key] = try r.field(key).string() } }
+			let ids = shown.map { st in
+				flat.append((a, st))
+				return flat.count - 1
+			}
+			interaction.append(StyleInteractionLevel(
+				tables: try l["tables"].value.jsonText, addresses: try l["addresses"].array().map { try $0.string() }, rows: rows, entries: ids))
+		}
+		let flatEntries = flat
+		let noInteraction = { (k: Int) in PayloadError(path: at, reason: "table \(k) has no interaction states") }
+		// What table k shows at entry e and state s (-1: the entry), and its plan entry for that.
+		let shownOf = { (k: Int, e: Int, s: Int) throws -> TableShown in
+			let (a, order) = entries[k][e]
+			let base = TableShown(nodes: a.nodes, order: order, canvas: a.canvas, body: a.body)
+			if s < 0 { return base }
+			guard let ti = interactions[k], ti.levels.indices.contains(e), ti.levels[e].indices.contains(s) else { throw noInteraction(k) }
+			return shownState(base, ti.pool[ti.levels[e][s]])
+		}
+		let planOf: @Sendable (Int, Int, Int) -> Int = { k, e, s in
+			if s < 0 { return firsts[k] + e }
+			guard let ti = interactions[k], ti.plans.indices.contains(e), ti.plans[e].indices.contains(s) else { return -1 }
+			return ti.plans[e][s]
+		}
+		let tableCount = tables.count
+		let parts: @Sendable (Int) -> [Int] = { entry in
+			let tuple = tuples[flatEntries[entry].combination]
+			let st = flatEntries[entry].states ?? Array(repeating: -1, count: tableCount)
+			return tuple.indices.map { planOf($0, tuple[$0], st[$0]) }
+		}
+		for entry in flatEntries.indices where parts(entry).contains(where: { !planEntries.indices.contains($0) }) {
+			throw PayloadError(path: at + ".plan", reason: "entry \(entry) is laid out from a plan entry the plan does not have")
+		}
+		let valuesOf = LazyList(count: tuples.count) { (a: Int) -> [String: NativeValue] in
+			var values = entries[0][tuples[a][0]].assignment.values
+			for (g, keys) in groupStates.enumerated() {
+				let own = entries[g + 1][tuples[a][g + 1]].assignment.values
+				for key in keys { if let v = own[key] { values[key] = v } }
+			}
+			return values
+		}
+		let assignments = LazyList(count: flatEntries.count) { (entry: Int) throws -> StyleAssignment in
+			let (a, st) = flatEntries[entry]
+			let tuple = tuples[a]
+			let shown = try tuple.indices.map { k in try shownOf(k, tuple[k], st?[k] ?? -1) }
+			let nodes = try composedNodes(shown) { owner[$0] ?? 0 }
+			return (try valuesOf.element(a), nodes, shown[rootPaint].canvas, shown[rootPaint].body)
+		}
+		// A combination's names: the page's entry's, then each group's where it names a box otherwise.
+		let planNames = LazyList(count: flatEntries.count) { (entry: Int) -> [String: String] in
+			let p = parts(entry)
+			var out = names[0].indices.contains(p[0]) ? names[0][p[0]] : [:]
+			for g in 1..<p.count where names[g].indices.contains(p[g] - firsts[g]) { out.merge(names[g][p[g] - firsts[g]]) { _, b in b } }
+			return out
+		}
+		let perPlanEntry = try inlineBoxes(ofPlan: plan)
+		let inline = LazyList(count: flatEntries.count) { (entry: Int) -> Set<String> in
+			let p = parts(entry)
+			return Set(p.indices.flatMap { k in (perPlanEntry.indices.contains(p[k]) ? perPlanEntry[p[k]] : []).filter { (boxOwner[$0] ?? 0) == k } })
 		}
 		var style = StyleExport(
-			fonts: fonts, viewport: (try viewport["width"].number(), try viewport["height"].number()),
-			dpr: try targetFields["dpr"].number(), states: states, initial: initial, assignments: assignments, next: next, notReady: notReady,
-			bands: bands, pageScrolls: pageScrolls, pageScrollUndecided: pageScrollUndecided)
+			fonts: fonts, viewport: viewport, dpr: dpr, states: states, initial: initial, assignments: assignments, next: next, notReady: notReady,
+			bands: try decodeBands(t, states: states, at: at), pageScrolls: Array(repeating: nil, count: flatEntries.count),
+			pageScrollUndecided: pageScrollUndecided)
 		style.interaction = interaction
-		if targetFields.has("plan") {
-			let plan = try targetFields["plan"]
-			guard try plan.field("version").string() == dragonMarklessPlanVersion else {
-				throw PayloadError(path: plan.path + ".version", reason: "this host reads \(dragonMarklessPlanVersion)")
-			}
-			style.plan = plan.value.jsonText
-			style.inlineBoxes = try inlineBoxes(ofPlan: plan)
-		} else if let node = assignments.lazy.flatMap(\.nodes).first(where: \.drawsSelectArrow) {
-			throw PayloadError(
-				path: chosen.path, reason: "\(node.id) draws a drop-down arrow, whose geometry only Dragon's plan layout gives, and the export has no plan")
-		} else if let node = assignments.lazy.flatMap(\.nodes).first(where: \.drawsCheckbox) {
-			throw PayloadError(
-				path: chosen.path, reason: "\(node.id) draws a themed checkbox, whose marks only Dragon's plan layout gives, and the export has no plan")
-		}
-		if targetFields.has("planNames") {
-			let perAssignment = try targetFields["planNames"]
-			style.planNames = try perAssignment.array().map { assignment in
-				var map: [String: String] = [:]
-				for pair in try assignment.array() {
-					let names = try pair.array()
-					guard names.count == 2 else { throw pair.fail("expected a Dragon id and the export's id") }
-					map[try names[0].string()] = try names[1].string()
-				}
-				return map
-			}
-			guard style.planNames.count == assignments.count else {
-				throw perAssignment.fail("names \(style.planNames.count) assignments; the export has \(assignments.count)")
-			}
-		}
-		if targetFields.has("anim") {
-			guard style.plan != nil else { throw try targetFields["anim"].fail("animator tables need a layout plan") }
-			style.anim = try targetFields["anim"].value.jsonText
-		}
-		if targetFields.has("planRepeats") {
-			style.planRepeats = try targetFields["planRepeats"].array().map { r in
-				let f = try r.object(required: ["id", "parent", "template"], optional: [])
-				let template = try f["template"].array().map { try $0.string() }
-				guard !template.isEmpty else { throw r.fail("a row has at least one box") }
-				return PlanRepeat(id: try f["id"].string(), parent: try f["parent"].string(), template: template)
-			}
-		}
+		style.plan = plan.value.jsonText
+		style.groupedPlan = GroupedPlan(
+			rest: JSONValue.object(planFields.filter { $0.0 != "assignments" && $0.0 != "groups" }).jsonText, entries: planEntries, parts: parts,
+			groups: planOwned)
+		style.planNames = planNames
+		style.inlineBoxes = inline
+		style.groupNodes = entries.flatMap { $0.flatMap(\.assignment.nodes) } + interactions.flatMap { $0?.pool.flatMap(\.nodes) ?? [] }
 		return style
 	}
 
@@ -836,25 +1105,17 @@ public struct StyleExport: Sendable {
 		let hex = { (list: [Double]) -> JSONValue in .array(list.map { .string(String($0.bitPattern, radix: 16).leftPadded(16)) }) }
 		let slotLine = slotted ? ",\"slots\":\(hex(values).jsonText)" : ""
 		var out = self
-		var pages: [ScrollOffsetRange?] = []
-		var stickies: [[StickyRow]] = []
 		var undecided: String?
-		out.assignments = try assignments.indices.map { k in
-			// An entry the page does not show yet keeps the boxes it had; the host lays it out when a state first shows it.
-			if let entries, !entries.contains(k) {
-				let kept = previous ?? self
-				pages.append(k < kept.pageScrolls.count ? kept.pageScrolls[k] : nil)
-				stickies.append(k < kept.pageSticky.count ? kept.pageSticky[k] : [])
-				let a = kept.assignments[k]
-				return (a.values, a.nodes, a.canvas, a.body)
-			}
+		func lay(_ k: Int) throws -> (assignment: StyleAssignment, page: ScrollOffsetRange?, sticky: [StickyRow]) {
 			let names = k < planNames.count ? planNames[k] : [:]
 			let dragonId = Dictionary(names.map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
 			// An interaction state's rows are its assignment's; laid out in the state, a row of that assignment takes the state's look
 			// (the host shows it on the touched copy only).
 			let shown = !planRepeats.isEmpty ? try rows?(assignmentOf(entry: k)) : nil
 			let rowEntry = { (a: Int) in a == self.assignmentOf(entry: k) ? k : a }
-			var line = "{\"assignment\":\(k),\"dpr\":\(JSONValue.number(scale).jsonText),\"viewport\":{\"width\":\(JSONValue.number(width).jsonText),\"height\":\(JSONValue.number(height).jsonText)},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":\(plan)\(slotLine)"
+			// A factored page sends only the plan entries an entry is laid out from.
+			let planText = groupedPlan.map { "\($0.plan(ofEntry: k))\($0.line)" } ?? plan
+			var line = "{\"assignment\":\(groupedPlan == nil ? k : 0),\"dpr\":\(JSONValue.number(scale).jsonText),\"viewport\":{\"width\":\(JSONValue.number(width).jsonText),\"height\":\(JSONValue.number(height).jsonText)},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":\(planText)\(slotLine)"
 			if let shown {
 				let lists = planRepeats.map { r -> JSONValue in
 					// A list an arm hides at this assignment has no box to hold rows: its rows are not laid out there.
@@ -960,12 +1221,11 @@ public struct StyleExport: Sendable {
 					arrows[id] = (try planNumber(a[1].value), points)
 				}
 			}
-			stickies.append(sticky)
 			let bits = { (reader: Reader) throws -> JSONValue in try planNumbers(reader.value) }
 			let page = try parts[1].array()
 			// Dragon's ["undecided", node, reason] when it could not decide the page's range at this size.
 			if page.count == 3 { undecided = "\(try page[1].string()): \(try page[2].string())" }
-			pages.append(page.count == 3 ? nil : try StyleExport.decodeRange(Reader(.object(zip(["minX", "maxX", "minY", "maxY"], try page.map { try bits($0) }).map { ($0, $1) }), at: parts[1].path)))
+			let pageRange = page.count == 3 ? nil : try StyleExport.decodeRange(Reader(.object(zip(["minX", "maxX", "minY", "maxY"], try page.map { try bits($0) }).map { ($0, $1) }), at: parts[1].path))
 			var geometry: [String: Reader] = [:]
 			for node in try parts[2].array() { geometry[exportId(try node.array()[0].string())] = node }
 			var slotWrites: [String: [(kind: String, path: Reader, value: Double)]] = [:]
@@ -1097,10 +1357,43 @@ public struct StyleExport: Sendable {
 			if let stray = marks.keys.sorted().first {
 				throw PayloadError(path: "plan layout", reason: "Dragon's layout gives checkbox marks for \(stray), which it shows no box for")
 			}
-			return (assignment.values, nodes, assignment.canvas, assignment.body)
+			return ((assignment.values, nodes, assignment.canvas, assignment.body), pageRange, sticky)
 		}
-		out.pageScrolls = pages
-		out.pageSticky = stickies
+		// An entry the page does not show yet keeps the boxes it had; the host lays it out when a state first shows it.
+		let kept = previous ?? self
+		if groupedPlan != nil {
+			guard let entries else { throw PayloadError(path: "plan layout", reason: "a factored page lays out only the entries it shows") }
+			var done: [Int: StyleAssignment] = [:]
+			var pages = kept.pageScrolls
+			var stickies = kept.pageSticky.isEmpty ? Array(repeating: [], count: assignments.count) : kept.pageSticky
+			for k in entries.sorted() {
+				let laid = try lay(k)
+				done[k] = laid.assignment
+				pages[k] = laid.page
+				stickies[k] = laid.sticky
+			}
+			let before = kept.assignments
+			let laid = done
+			out.assignments = LazyList(count: assignments.count) { k in try laid[k] ?? before.element(k) }
+			out.pageScrolls = pages
+			out.pageSticky = stickies
+		} else {
+			var pages: [ScrollOffsetRange?] = []
+			var stickies: [[StickyRow]] = []
+			out.assignments = LazyList(try assignments.indices.map { k in
+				if let entries, !entries.contains(k) {
+					pages.append(k < kept.pageScrolls.count ? kept.pageScrolls[k] : nil)
+					stickies.append(k < kept.pageSticky.count ? kept.pageSticky[k] : [])
+					return kept.assignments[k]
+				}
+				let laid = try lay(k)
+				pages.append(laid.page)
+				stickies.append(laid.sticky)
+				return laid.assignment
+			})
+			out.pageScrolls = pages
+			out.pageSticky = stickies
+		}
 		if let undecided { out.pageScrollUndecided = undecided }
 		out.viewport = (width, height)
 		out.dpr = scale
@@ -1289,10 +1582,13 @@ public struct StyleExport: Sendable {
 			_ = try f["texts"].array().map { try $0.string() }
 			return .clipText
 		case "paint-order":
-			let f = try write.object(["kind", "host", "bucket", "rank", "index", "key"])
+			let f = try write.object(required: ["kind", "host", "bucket", "rank", "index", "key"], optional: ["layer", "z"])
 			try expectKey(f, "dragonStacking.order")
 			_ = try f["index"].number()
-			return .paintOrder(host: try f["host"].string(), bucket: Int(try f["bucket"].number()), rank: Int(try f["rank"].number()))
+			let z = f.has("z") ? try f["z"] : nil
+			return .paintOrder(
+				host: try f["host"].string(), bucket: Int(try f["bucket"].number()), rank: Int(try f["rank"].number()),
+				layer: f.has("layer") ? try f["layer"].string() : nil, z: try z.flatMap { $0.isNull ? nil : try $0.number() })
 		case "box-shadow":
 			let f = try write.object(["kind", "shadows", "key"])
 			try expectKey(f, "dragonShadow.shadows")
