@@ -23,7 +23,7 @@ while IFS= read -r archive; do [ -n "$archive" ] && set -- "$@" -R "$archive"; d
 "$bt/aapt2" link --manifest "$here/shell/AndroidManifest.xml" -I "$jar" -A "$w/assets" --min-sdk-version 31 --target-sdk-version 36 --auto-add-overlay "$@" --extra-packages "$(cat "$w/libraries/packages.txt")" --java "$w/r-java" -o "$w/base.apk"
 javac --release 11 -nowarn -d "$w/r-classes" $(find "$w/r-java" -name '*.java')
 libs=$(tr '\n' ':' < "$w/libraries/classpath.txt")
-kotlinc -cp "$jar:$w/r-classes:$libs" -jvm-target 1.8 -nowarn -d "$w/classes.jar" $(find "$here/src" "$here/shell" -name '*.kt')
+kotlinc -cp "$jar:$w/r-classes:$libs" -jvm-target 1.8 -nowarn -d "$w/classes.jar" $(find "$here/src" "$here/shell" -name '*.kt' -not -path '*/src/dev/dragon/*')
 "$bt/d8" --release --min-api 31 --lib "$jar" --output "$w/dex" "$w/classes.jar" "$stdlib" $(find "$w/r-classes" -name '*.class') $(cat "$w/libraries/classpath.txt") 2>"$w/d8.log" || { cat "$w/d8.log" >&2; exit 1; }
 (cd "$w/dex" && LC_ALL=C zip -q -j ../base.apk classes*.dex)
 "$bt/zipalign" -p -f 4 "$w/base.apk" "$w/aligned.apk"

@@ -2,14 +2,14 @@ appId: ${APP_ID}
 name: s56-notes-textarea
 ---
 - runFlow:
-      when:
-          platform: Android
-      commands:
-          - clearState
+    when:
+      platform: Android
+    commands:
+      - clearState
 - launchApp
 - assertVisible: Write the note
 - assertVisible: Nothing written
-- assertVisible: ''
+- assertVisible: ""
 - assertVisible: Milk and eggs
 - assertVisible: Note body
 - tapOn: Body

@@ -8,7 +8,7 @@
 			"element": "main",
 			"parent": null,
 			"attributes": {
-				"class": "symbols mk-1wgiohd"
+				"class": "symbols mk-1jnakf3"
 			}
 		},
 		{
@@ -17,7 +17,7 @@
 			"element": "p",
 			"parent": "h0",
 			"attributes": {
-				"class": "tab mk-1wgiohd"
+				"class": "tab mk-1jnakf3"
 			}
 		},
 		{
@@ -32,7 +32,7 @@
 			"element": "p",
 			"parent": "h0",
 			"attributes": {
-				"class": "setting mk-1wgiohd"
+				"class": "setting mk-1jnakf3"
 			}
 		},
 		{
@@ -47,7 +47,7 @@
 			"element": "p",
 			"parent": "h0",
 			"attributes": {
-				"class": "setting mk-1wgiohd"
+				"class": "setting mk-1jnakf3"
 			}
 		},
 		{
@@ -57,6 +57,6 @@
 			"text": "✓ Saved"
 		}
 	],
-	"css": "body {\n\tmargin: 0;\n}\n\n.symbols.mk-1wgiohd {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\t.tab.mk-1wgiohd {\n\t\t\t\tfont-family: system-ui;\n\t\t\t\tfont-size: 20px;\n\t\t\t\tline-height: 1;\n\t\t\t}\n\t\t\t.setting.mk-1wgiohd {\n\t\t\t\tfont-family: system-ui;\n\t\t\t\tfont-size: 17px;\n\t\t\t\tline-height: 1.45;\n\t\t\t}",
+	"css": "body {\n\tmargin: 0;\n}\n\n.symbols.mk-1jnakf3 {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\t.tab.mk-1jnakf3 {\n\t\t\t\tfont-family: system-ui;\n\t\t\t\tfont-size: 20px;\n\t\t\t\tline-height: 1;\n\t\t\t}\n\t\t\t.setting.mk-1jnakf3 {\n\t\t\t\tfont-family: system-ui;\n\t\t\t\tfont-size: 17px;\n\t\t\t\tline-height: 1.45;\n\t\t\t}",
 	"states": []
 }

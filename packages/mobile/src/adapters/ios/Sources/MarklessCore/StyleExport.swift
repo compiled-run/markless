@@ -12,6 +12,13 @@ public struct RGBA: Equatable, Sendable {
 
 public struct Frame: Equatable, Sendable {
 	public let x: Double, y: Double, width: Double, height: Double
+
+	public init(x: Double, y: Double, width: Double, height: Double) {
+		self.x = x
+		self.y = y
+		self.width = width
+		self.height = height
+	}
 }
 
 /// Frames and border widths are device pixels; the lengths inside writes (font size, radius) are CSS pixels.
@@ -42,6 +49,8 @@ public enum StyleWrite: Sendable {
 	case boxShadow([BoxShadow.Shadow])
 	/// `visibility`: visible, hidden or collapse; a box not visible keeps its space and its children, and paints none of its own.
 	case visibility(String)
+	/// An `<img>` whose src the app sets as it runs: the host draws whatever image loads into its content box, as Chrome does.
+	case runtimeImage(RuntimeImage)
 	/// A select whose appearance devolves to menulist-button: its drop-down arrow is stroked in this colour, along the path
 	/// Dragon's plan layout gives (`StyleNode.selectArrow`).
 	case selectArrow(RGBA)
@@ -109,6 +118,32 @@ public struct Outline: Equatable, Sendable {
 			&& a.tones?.light == b.tones?.light && a.tones?.dark == b.tones?.dark
 			&& a.radii?.map(\.percent) == b.radii?.map(\.percent) && a.radii?.map(\.value) == b.radii?.map(\.value)
 	}
+}
+
+/// Dragon's layout unit, which the runtime-image write's content box counts in: 1/64 px, as Blink's LayoutUnit.
+public let dragonLayoutUnitsPerPx = 64.0
+
+/// An `<img>` whose src the app sets as it runs: its object-fit and object-position, whether image-rendering is pixelated, the
+/// no-image outline's colour when its src can be absent (nil: it always has one), and its content box at the export's layout,
+/// absolute, in Dragon's layout units.
+public struct RuntimeImage: Equatable, Sendable {
+	/// One axis of object-position: CSS px, or a percent of the room the image leaves.
+	public struct Position: Equatable, Sendable {
+		public let percent: Bool
+		public let value: Double
+	}
+	public let fit: String
+	public let position: [Position]
+	public let pixelated: Bool
+	public let outline: RGBA?
+	public let content: Frame?
+}
+
+/// Where a runtime image is painted from, in absolute device px: its content box, and the origin of its node's frame.
+public struct RuntimeImagePlace: Equatable, Sendable {
+	public let content: Frame
+	public let originX: Double
+	public let originY: Double
 }
 
 /// A themed checkbox's colours, as Chrome's theme gives them for its accent-color.
@@ -213,6 +248,13 @@ public struct StyleNode: Sendable {
 	public let scrollRange: ScrollOffsetRange?
 	/// Only on a framed text node: its lines as Dragon laid them out, glyph for glyph.
 	public let lines: [TextLine]?
+	/// Only on a framed node with a runtime-image write, once its place is known.
+	public var runtimeImagePlace: RuntimeImagePlace? = nil
+
+	public var runtimeImage: RuntimeImage? {
+		for case let .runtimeImage(image) in writes { return image }
+		return nil
+	}
 	/// Only on a select with a `selectArrow` write, once Dragon's plan has laid the page out.
 	public var selectArrow: SelectArrow? = nil
 	/// Only on a checkbox with a `checkbox` write, once Dragon's plan has laid the page out.
@@ -685,7 +727,7 @@ public struct StyleExport: Sendable {
 				let bodyReader: Reader? = f.has("bodyBackground") ? try f["bodyBackground"] : nil
 				let body = try bodyReader.flatMap { $0.isNull ? nil : try decodeColor($0) }
 				if let body, body.alpha != 255 { throw PayloadError(path: assignment.path + ".bodyBackground", reason: "body's background is not opaque") }
-				return (values, try checkedNodes(try f["nodes"]), canvas, body)
+				return (values, try StyleExport.placingRuntimeImages(try checkedNodes(try f["nodes"]), exported: true), canvas, body)
 			}
 			assignments = try targetFields["assignments"].array().map(decodeAssignment)
 			initial = Int(try targetFields["initial"].number())
@@ -725,7 +767,7 @@ public struct StyleExport: Sendable {
 				}
 			}
 		} else {
-			assignments = [([:], try checkedNodes(try targetFields["nodes"]), nil, nil)]
+			assignments = [([:], try StyleExport.placingRuntimeImages(try checkedNodes(try targetFields["nodes"]), exported: true), nil, nil)]
 			pageScrolls = [nil]
 		}
 		var bands: StyleBands?
@@ -1097,6 +1139,10 @@ public struct StyleExport: Sendable {
 			if let stray = marks.keys.sorted().first {
 				throw PayloadError(path: "plan layout", reason: "Dragon's layout gives checkbox marks for \(stray), which it shows no box for")
 			}
+			let padding = StyleExport.runtimeImagePadding(assignment.nodes, dpr: dpr)
+			nodes = try StyleExport.placingRuntimeImages(nodes, exported: false) { id in
+				padding[id.firstIndex(of: "@").map { String(id[..<$0]) } ?? id].map { $0.map { $0 * scale } }
+			}
 			return (assignment.values, nodes, assignment.canvas, assignment.body)
 		}
 		out.pageScrolls = pages
@@ -1104,6 +1150,55 @@ public struct StyleExport: Sendable {
 		if let undecided { out.pageScrollUndecided = undecided }
 		out.viewport = (width, height)
 		out.dpr = scale
+		return out
+	}
+
+	/// Each runtime image's padding at the export's layout, in CSS px (top, right, bottom, left): its content box less its frame and
+	/// borders. A phone lays the page out at its own size and keeps these, as px padding does not follow the layout.
+	static func runtimeImagePadding(_ nodes: [StyleNode], dpr: Double) -> [String: [Double]] {
+		var out: [String: [Double]] = [:]
+		_ = try? placingRuntimeImages(nodes, exported: true) { _ in nil }.forEach { node in
+			guard let place = node.runtimeImagePlace, let frame = node.frame else { return }
+			let w = node.borderWidths ?? (0, 0, 0, 0)
+			let left = place.content.x - place.originX - w.left, top = place.content.y - place.originY - w.top
+			let right = frame.width - w.left - w.right - left - place.content.width
+			let bottom = frame.height - w.top - w.bottom - top - place.content.height
+			out[node.id] = [top, right, bottom, left].map { $0 / dpr }
+		}
+		return out
+	}
+
+	/// `nodes` with each framed runtime image placed: at the export's layout, its write's content box; at a phone's, its frame
+	/// less its borders and the export's `padding` for it (device px, top, right, bottom, left).
+	static func placingRuntimeImages(
+		_ nodes: [StyleNode], exported: Bool, padding: (String) -> [Double]? = { _ in nil }
+	) throws -> [StyleNode] {
+		var absolute: [String: (x: Double, y: Double)] = [:]
+		var out = nodes
+		for (index, node) in nodes.enumerated() {
+			guard let frame = node.frame else { continue }
+			var parent = (x: 0.0, y: 0.0)
+			if let id = node.parent {
+				guard let at = absolute[id] else { continue }
+				parent = at
+			}
+			let at = (x: parent.x + frame.x, y: parent.y + frame.y)
+			absolute[node.id] = at
+			guard let image = node.runtimeImage else { continue }
+			let content: Frame
+			if exported {
+				guard let lu = image.content else { throw PayloadError(path: "style", reason: "\(node.id) draws an image its app loads, but the export gives it no content box") }
+				let u = dragonLayoutUnitsPerPx
+				content = Frame(x: lu.x / u, y: lu.y / u, width: lu.width / u, height: lu.height / u)
+			} else {
+				guard let p = padding(node.id) else { throw PayloadError(path: "plan layout", reason: "\(node.id) draws an image its app loads, but the export has no content box for it") }
+				let w = node.borderWidths ?? (0, 0, 0, 0)
+				let left = w.left + p[3], top = w.top + p[0]
+				content = Frame(
+					x: at.x + left, y: at.y + top, width: max(0, frame.width - left - w.right - p[1]), height: max(0, frame.height - top - w.bottom - p[2]))
+			}
+			out[index].runtimeImagePlace = RuntimeImagePlace(content: content, originX: at.x, originY: at.y)
+		}
 		return out
 	}
 
@@ -1320,6 +1415,33 @@ public struct StyleExport: Sendable {
 			guard ["visible", "hidden", "collapse"].contains(value) else { throw PayloadError(path: write.path + ".value", reason: "visibility \(value) is not visible, hidden or collapse") }
 			_ = try f["canvas"].bool()
 			return .visibility(value)
+		case "runtime-image":
+			let f = try write.object(["kind", "fit", "position", "layer", "pixelated", "absent", "key", "content"])
+			try expectKey(f, "dragonRuntimeImage")
+			let fit = try f["fit"].string()
+			guard ["fill", "contain", "cover", "none", "scale-down"].contains(fit) else { throw PayloadError(path: write.path + ".fit", reason: "object-fit \(fit) is not a keyword Chrome has") }
+			let axes = try f["position"].array()
+			guard axes.count == 2 else { throw PayloadError(path: write.path + ".position", reason: "expected x and y") }
+			let position = try axes.map { axis -> RuntimeImage.Position in
+				let a = try axis.object(["kind", "value"])
+				let kind = try a["kind"].string()
+				guard kind == "px" || kind == "percent" else { throw PayloadError(path: axis.path + ".kind", reason: "\(kind) is not px or percent") }
+				return RuntimeImage.Position(percent: kind == "percent", value: try a["value"].number())
+			}
+			_ = try f["layer"].bool()
+			let absent = try f["absent"]
+			var outline: RGBA?
+			if !absent.isNull {
+				let a = try absent.object(["color", "width"])
+				guard try a["width"].number() == 1 else { throw PayloadError(path: absent.path + ".width", reason: "only a 1 device px no-image outline is drawn") }
+				outline = try decodeColor(try a["color"])
+			}
+			let box = try f["content"]
+			let content: Frame? = try box.isNull ? nil : {
+				let c = try box.object(["x", "y", "width", "height"])
+				return Frame(x: try c["x"].number(), y: try c["y"].number(), width: try c["width"].number(), height: try c["height"].number())
+			}()
+			return .runtimeImage(RuntimeImage(fit: fit, position: position, pixelated: try f["pixelated"].bool(), outline: outline, content: content))
 		case "select-arrow":
 			let f = try write.object(["kind", "color", "key"])
 			try expectKey(f, "dragonSelectArrow")
@@ -1422,6 +1544,26 @@ public struct LaidOutRow: Sendable, Equatable {
 		self.assignment = assignment
 		self.texts = texts
 		self.slots = slots
+	}
+}
+
+/// Dragon's translated paint of an img whose src the app sets as it runs (layout paint.ts runtimeImagePaint), when the host links
+/// Dragon: from object-fit, object-position, the content box in absolute layout units, the image's size in CSS px and the zoom, the
+/// destination rect, the snapped content box and the part of the destination drawn (nil: none), each in absolute device px.
+public enum RuntimeImagePaint {
+	nonisolated(unsafe) public static var engine:
+		((_ fit: String, _ position: [RuntimeImage.Position], _ content: Frame, _ width: Double, _ height: Double, _ zoom: Double) throws -> (dest: Frame, content: Frame, drawn: Frame?))?
+
+	/// Where an image `width` x `height` CSS px is drawn in `place`, at `scale` device px per point.
+	public static func paint(
+		_ image: RuntimeImage, at place: RuntimeImagePlace, width: Double, height: Double, scale: Double
+	) throws -> (dest: Frame, content: Frame, drawn: Frame?) {
+		guard let engine else { throw PayloadError(path: "style", reason: "an image the app loads is placed by Dragon's paint, which this host does not link") }
+		let u = dragonLayoutUnitsPerPx
+		let c = place.content
+		return try engine(
+			image.fit, image.position, Frame(x: (c.x * u).rounded(), y: (c.y * u).rounded(), width: (c.width * u).rounded(), height: (c.height * u).rounded()),
+			width, height, scale)
 	}
 }
 

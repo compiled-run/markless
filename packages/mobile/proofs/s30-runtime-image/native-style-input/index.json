@@ -1,0 +1,182 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Gallery",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page mk-gn0ga6"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "heading mk-gn0ga6"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Gallery"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "grid mk-gn0ga6"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "div",
+			"parent": "h3",
+			"attributes": {
+				"class": "card mk-gn0ga6"
+			},
+			"row": "repeat:0"
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "img",
+			"parent": "h4",
+			"attributes": {
+				"alt": "",
+				"width": "400",
+				"height": "300",
+				"class": "mk-gn0ga6"
+			},
+			"runtimeSrc": {
+				"absent": false
+			},
+			"row": "repeat:0"
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "span",
+			"parent": "h4",
+			"attributes": {
+				"class": "name mk-gn0ga6"
+			},
+			"row": "repeat:0"
+		},
+		{
+			"kind": "text",
+			"id": "h6:text0",
+			"parent": "h6",
+			"text": "Desk lamp",
+			"row": "repeat:0"
+		},
+		{
+			"kind": "element",
+			"id": "h7",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"class": "photo mk-gn0ga6"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h8",
+			"element": "img",
+			"parent": "h7",
+			"attributes": {
+				"class": "thumb mk-gn0ga6",
+				"alt": ""
+			},
+			"runtimeSrc": {
+				"absent": true
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h9",
+			"element": "span",
+			"parent": "h7",
+			"attributes": {
+				"class": "status mk-gn0ga6"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h9:text0",
+			"parent": "h9",
+			"text": "No photo yet",
+			"textByState": [
+				{
+					"when": {
+						"state:photo": ""
+					},
+					"value": "No photo yet"
+				},
+				{
+					"when": {
+						"state:photo": "/images/photo.png"
+					},
+					"value": "Photo added"
+				}
+			]
+		},
+		{
+			"kind": "element",
+			"id": "h10",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"type": "button",
+				"class": "action mk-gn0ga6"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h10:text0",
+			"parent": "h10",
+			"text": "Light the lamp"
+		},
+		{
+			"kind": "element",
+			"id": "h11",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"type": "button",
+				"class": "action mk-gn0ga6"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h11:text0",
+			"parent": "h11",
+			"text": "Add a photo"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.page.mk-gn0ga6 {\n\t\t\t\tpadding: 16px;\n\t\t\t\tbackground: #e9ecef;\n\t\t\t}\n\t\t\t.heading.mk-gn0ga6 {\n\t\t\t\tmargin: 0 0 12px;\n\t\t\t\tfont-size: 26px;\n\t\t\t\tfont-weight: 700;\n\t\t\t\tcolor: #212529;\n\t\t\t}\n\t\t\t.grid.mk-gn0ga6 {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgrid-template-columns: repeat(3, minmax(0, 1fr));\n\t\t\t\tgap: 8px;\n\t\t\t}\n\t\t\t.card.mk-gn0ga6 {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgrid-template-columns: minmax(0, 1fr);\n\t\t\t\toverflow: hidden;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t}\n\t\t\t.card img.mk-gn0ga6 {\n\t\t\t\tdisplay: block;\n\t\t\t\twidth: 100%;\n\t\t\t\theight: auto;\n\t\t\t\taspect-ratio: 4 / 3;\n\t\t\t\tobject-fit: cover;\n\t\t\t}\n\t\t\t.name.mk-gn0ga6 {\n\t\t\t\tpadding: 8px 10px 10px;\n\t\t\t\tfont-size: 15px;\n\t\t\t\tcolor: #212529;\n\t\t\t}\n\t\t\t.photo.mk-gn0ga6 {\n\t\t\t\tdisplay: flex;\n\t\t\t\talign-items: center;\n\t\t\t\tgap: 12px;\n\t\t\t\tmargin-top: 16px;\n\t\t\t}\n\t\t\t.thumb.mk-gn0ga6 {\n\t\t\t\twidth: 72px;\n\t\t\t\tmin-width: 72px;\n\t\t\t\theight: 72px;\n\t\t\t\tborder: 2px solid #264653;\n\t\t\t\tborder-radius: 16px;\n\t\t\t\tobject-fit: contain;\n\t\t\t\tobject-position: 0% 100%;\n\t\t\t}\n\t\t\t.status.mk-gn0ga6 {\n\t\t\t\tfont-size: 15px;\n\t\t\t\tcolor: #495057;\n\t\t\t}\n\t\t\t.action.mk-gn0ga6 {\n\t\t\t\tdisplay: block;\n\t\t\t\twidth: 100%;\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tpadding: 10px 16px;\n\t\t\t\tborder: 2px solid #264653;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #264653;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 17px;\n\t\t\t\ttext-align: left;\n\t\t\t}",
+	"states": [
+		{
+			"cell": "state:photo",
+			"domain": [
+				"",
+				"/images/photo.png"
+			],
+			"initial": ""
+		}
+	],
+	"repeats": [
+		{
+			"id": "repeat:0",
+			"parent": "h3"
+		}
+	]
+}
