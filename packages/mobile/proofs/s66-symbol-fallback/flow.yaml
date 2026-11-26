@@ -1,0 +1,13 @@
+appId: ${APP_ID}
+name: s66-symbol-fallback
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: ◎ Shop
+- assertVisible: Theme ▾
+- assertVisible: ✓ Saved
+- assertVisible: Symbols

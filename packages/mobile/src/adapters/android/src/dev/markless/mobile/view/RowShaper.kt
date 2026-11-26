@@ -120,7 +120,9 @@ class RowShaper(private val faces: Map<String, SystemFace>, private val authored
 			val run = Class.forName("dev.dragon.layout.HarnessKt").getMethod("harness_runMarklessRowsLayout", String::class.java, glyphShaper)
 			val shape: (String, Double, String, Double, Double, String, Boolean, String, ArrayList<Double>) -> ArrayList<Double> =
 				{ face, size, text, start, end, script, rtl, language, features -> ArrayList(shaper.shape(face, size, text, start.toInt(), end.toInt(), script, rtl, language, features)) }
-			val instance = glyphShaper.constructors.first().newInstance(shape)
+			// A row's text the build did not record falls back nowhere: its code point stays refused by name.
+			val fallback: (String, String, Double, Double, String, String) -> String = { _, _, _, _, _, _ -> "" }
+			val instance = glyphShaper.constructors.first().newInstance(shape, fallback)
 			({ line: String ->
 				shaper.refused = null
 				val out = try {
