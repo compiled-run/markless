@@ -192,6 +192,7 @@
 		"packages/router/test/vite/shared-navigation.test.ts",
 		"packages/router/test/vite/shared-request-isolation.test.ts",
 		"packages/router/test/vite/static-prop-arm-build.test.ts",
+		"packages/router/test/vite/static-prop-rows.test.ts",
 		"packages/router/test/vite/storage-child-production.test.ts",
 		"packages/router/test/vite/storage-key-across-modules.test.ts",
 		"packages/router/test/vite/stream-arm-adopted.test.ts",

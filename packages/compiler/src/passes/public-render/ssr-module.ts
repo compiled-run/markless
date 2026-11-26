@@ -86,6 +86,7 @@ import {
 	spreadsAttributes,
 } from './shared.ts';
 import { ssrComposeStateExpression } from './prop-cell-seed.ts';
+import { staticPropsField, staticRowsComposition } from './static-rows.ts';
 import {
 	armBoundHandleReadSource,
 	armBoundIdrefHandles,
@@ -357,7 +358,7 @@ export function emitPublicSsrRenderModule(
 		),
 		...rootDataLines.serveComputed,
 		'	const marklessSsrHtml = marklessSsrRendered.html;',
-		`	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, ${ssrComposedPayloadView(input, rootInfo.componentName)}, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);`,
+		`	const marklessSsrComposition = ${staticRowsComposition(input, rootInfo.componentName, `marklessSsrComposeView(marklessSsrRendered.structure, ${ssrComposedPayloadView(input, rootInfo.componentName)}, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix)`)};`,
 		`	const marklessSsrState = ${ssrComposeStateExpression(input, rootInfo.component, rootInfo.componentName)};`,
 		'	return {',
 		'		html: marklessSsrHtml,',
@@ -452,6 +453,8 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrPlacedWidgetRoots',
 					'marklessSsrChildrenWidgetRoot',
 					'marklessSsrChildInstancePath',
+					'marklessSsrStaticProps',
+					'marklessSsrStaticRows',
 					'marklessSsrWidgetBoundary',
 					// Keep the emitted SSR helper distinct from authored bindings.
 					'marklessSsrComposeState',
@@ -1249,7 +1252,7 @@ function emitSsrDataLines(
 			? `if(marklessSsrRowSegment(marklessSsrDataContext)===undefined){marklessAssertPresentationalRowChild(marklessSsrChildOutput,${JSON.stringify(edge.childComponentName)});return marklessSsrChildOutput;}`
 			: `if(marklessSsrDataContext.repeatItem!==undefined){marklessAssertPresentationalRowChild(marklessSsrChildOutput,${JSON.stringify(edge.childComponentName)});return marklessSsrChildOutput;}`;
 		return [
-			`case ${JSON.stringify(edge.id)}:{const marklessSsrPlacedChild=${placement};const marklessSsrChildProps={${props.join(',')}};const marklessSsrChildOutput=await ${childSurface}?.renderSsr?.(marklessSsrChildProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+marklessSsrPlacedChild.hostPrefix,instancePath:marklessSsrChildInstancePath(marklessSsrRenderContext,marklessSsrPlacedChild)${
+			`case ${JSON.stringify(edge.id)}:{const marklessSsrPlacedChild=${placement};const marklessSsrChildProps={${props.join(',')}};const marklessSsrChildOutput=await ${childSurface}?.renderSsr?.(marklessSsrChildProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+marklessSsrPlacedChild.hostPrefix,instancePath:marklessSsrChildInstancePath(marklessSsrRenderContext,marklessSsrPlacedChild)${staticPropsField(input, edge)}${
 					// A widget ROOT reads its own instance's seeds too: the parts placed
 					// inside it wrote them before it rendered, and its consume line
 					// merges them over its statics. Not the child THIS component

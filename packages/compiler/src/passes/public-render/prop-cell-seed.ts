@@ -7,6 +7,7 @@ import type { AnyNode } from '../../ast/nodes.ts';
 import { componentDeriveGraphNodeIds, computedDependencyEdges } from './derive-set.ts';
 import { PROJECTION_PROP_NAME } from './shared-seed-pass.ts';
 import { componentPropCellId } from './shared.ts';
+import { staticRowRepeats } from './static-rows.ts';
 
 /**
  * A prop cell the served payload has to carry, and which of its properties.
@@ -16,8 +17,10 @@ import { componentPropCellId } from './shared.ts';
  * `derivePaths` when the derives read only some of it; `scalarKeys`
  * is projected children a derive reads, carried only as a scalar, since markup
  * is already in the served HTML. `rowKeys` names properties a minted row's slots
- * or a behavior's inputs read, carried whatever their value. An arm or derive key
- * is dropped when the composer routes it to its own node, which then carries it.
+ * or a behavior's inputs read, carried whatever their value. `staticRowKeys` are
+ * row keys only a static-row repeat reads, left out where the caller fixed them.
+ * An arm or derive key is dropped when the composer routes it to its own node,
+ * which then carries it.
  */
 export type SsrPropCellSeed = {
 	readonly graphNodeId: string;
@@ -26,6 +29,7 @@ export type SsrPropCellSeed = {
 	readonly deriveKeys?: ReadonlyArray<string>;
 	readonly derivePaths?: Readonly<Record<string, ReadonlyArray<ReadonlyArray<string>>>>;
 	readonly rowKeys?: ReadonlyArray<string>;
+	readonly staticRowKeys?: ReadonlyArray<string>;
 };
 
 type PropRead = {
@@ -297,13 +301,18 @@ function rowTemplatePropKeys(
 }
 
 // The props this component's own `@for` iterates: resume matches each served row
-// to its item, and a row handler reads its binding, from the collection.
+// to its item, and a row handler reads its binding, from the collection. A key
+// only static-row repeats iterate is also in `staticKeys`.
 function repeatCollectionPropKeys(
 	input: PublicRenderModuleInput,
 	componentName: string,
 	bagCellId: string,
-): Set<string> {
+): { readonly keys: Set<string>; readonly staticKeys: Set<string> } {
 	const keys = new Set<string>();
+	const live = new Set<string>();
+	const fixable = new Set(
+		staticRowRepeats(input, componentName).map((repeat) => repeat.repeatId),
+	);
 	for (const chunk of input.renderData.chunks) {
 		if (chunk.componentName !== componentName) continue;
 		for (const slot of chunk.slots) {
@@ -317,11 +326,13 @@ function repeatCollectionPropKeys(
 				key !== '*' &&
 				(repeat.collectionGraphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID ||
 					repeat.collectionGraphNodeId === bagCellId)
-			)
+			) {
 				keys.add(key);
+				if (!fixable.has(repeat.repeatId)) live.add(key);
+			}
 		}
 	}
-	return keys;
+	return { keys, staticKeys: new Set([...keys].filter((key) => !live.has(key))) };
 }
 
 /**
@@ -348,26 +359,38 @@ export function ssrPropCellSeedsForCell(
 	componentName: string,
 	symbolReads = true,
 ): ReadonlyArray<SsrPropCellSeed> {
-	const { armKeysByCell, deriveKeysByCell, rowKeysByCell } = propCellKeys(
+	const { armKeysByCell, deriveKeysByCell, rowKeysByCell, staticRowKeysByCell } = propCellKeys(
 		input,
 		bagCellId,
 		componentName,
 		symbolReads,
 	);
 	return [
-		...new Set([...armKeysByCell.keys(), ...deriveKeysByCell.keys(), ...rowKeysByCell.keys()]),
+		...new Set([
+			...armKeysByCell.keys(),
+			...deriveKeysByCell.keys(),
+			...rowKeysByCell.keys(),
+			...staticRowKeysByCell.keys(),
+		]),
 	].flatMap((graphNodeId): SsrPropCellSeed[] => {
 		const armKeys = armKeysByCell.has(graphNodeId)
 			? (armKeysByCell.get(graphNodeId) ?? null)
 			: new Set<string>();
 		const rowKeys = [...(rowKeysByCell.get(graphNodeId) ?? [])];
+		const staticRowKeys = [...(staticRowKeysByCell.get(graphNodeId) ?? [])];
 		// A row key is carried whatever its value, which already covers a derive read of it.
 		const derivePaths = [...(deriveKeysByCell.get(graphNodeId) ?? [])].filter(
 			([key]) => !rowKeys.includes(key),
 		);
 		const deriveKeys = derivePaths.map(([key]) => key);
 		if (armKeys === null) return [{ graphNodeId, keys: null }];
-		if (armKeys.size === 0 && deriveKeys.length === 0 && rowKeys.length === 0) return [];
+		if (
+			armKeys.size === 0 &&
+			deriveKeys.length === 0 &&
+			rowKeys.length === 0 &&
+			staticRowKeys.length === 0
+		)
+			return [];
 		const projected = deriveKeys.filter((key) => key === PROJECTION_PROP_NAME);
 		const data = derivePaths.filter(([key]) => key !== PROJECTION_PROP_NAME);
 		const narrowed = data.filter(([, paths]) => !readsWhole(paths));
@@ -379,6 +402,7 @@ export function ssrPropCellSeedsForCell(
 				...(data.length > 0 ? { deriveKeys: data.map(([key]) => key) } : {}),
 				...(narrowed.length > 0 ? { derivePaths: Object.fromEntries(narrowed) } : {}),
 				...(rowKeys.length > 0 ? { rowKeys } : {}),
+				...(staticRowKeys.length > 0 ? { staticRowKeys } : {}),
 			},
 		];
 	});
@@ -419,17 +443,23 @@ function propCellKeys(
 	}
 
 	const rowKeysByCell = new Map<string, Set<string>>();
-	const rowKeys = bagCellId
-		? new Set([
-				...rowTemplatePropKeys(input, componentName, symbolReads),
-				...repeatCollectionPropKeys(input, componentName, bagCellId),
-			])
-		: new Set<string>();
-	for (const key of rowKeys)
-		if (!armKeysByCell.get(bagCellId!)?.has(key))
-			rowKeysByCell.set(bagCellId!, (rowKeysByCell.get(bagCellId!) ?? new Set()).add(key));
+	const staticRowKeysByCell = new Map<string, Set<string>>();
+	if (bagCellId) {
+		const templateKeys = rowTemplatePropKeys(input, componentName, symbolReads);
+		const collections = repeatCollectionPropKeys(input, componentName, bagCellId);
+		for (const key of new Set([...templateKeys, ...collections.keys])) {
+			if (armKeysByCell.get(bagCellId)?.has(key)) continue;
+			const byCell =
+				collections.staticKeys.has(key) &&
+				!templateKeys.has(key) &&
+				!deriveKeysByCell.get(bagCellId)?.has(key)
+					? staticRowKeysByCell
+					: rowKeysByCell;
+			byCell.set(bagCellId, (byCell.get(bagCellId) ?? new Set()).add(key));
+		}
+	}
 
-	return { armKeysByCell, deriveKeysByCell, rowKeysByCell };
+	return { armKeysByCell, deriveKeysByCell, rowKeysByCell, staticRowKeysByCell };
 }
 
 // The composed state a server-rendered component returns, plus the prop cells
@@ -442,6 +472,8 @@ export function ssrComposeStateExpression(
 	const composed = 'marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren)';
 	const cells = ssrPropCellSeeds(input, component, componentName);
 	if (cells.length === 0) return composed;
-	const context = cells.some((cell) => cell.deriveKeys) ? ', marklessSsrRenderContext' : '';
+	const context = cells.some((cell) => cell.deriveKeys || cell.staticRowKeys)
+		? ', marklessSsrRenderContext'
+		: '';
 	return `marklessSsrSeedPropCells(${composed}, marklessSsrProps, ${JSON.stringify(cells)}${context})`;
 }
