@@ -455,6 +455,7 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrChildInstancePath',
 					'marklessSsrStaticProps',
 					'marklessSsrStaticRows',
+					'marklessSsrStaticRowCells',
 					'marklessSsrWidgetBoundary',
 					// Keep the emitted SSR helper distinct from authored bindings.
 					'marklessSsrComposeState',

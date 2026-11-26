@@ -699,6 +699,19 @@ export function marklessSsrStaticRows<T extends { readonly view: { readonly keye
 	};
 }
 
+/** A seed's static-row keys as row keys, less the ones this instance's caller fixed. */
+export function marklessSsrStaticRowCells(
+	cells: ReadonlyArray<Parameters<typeof marklessSsrSeedPropCells>[2][number] & { readonly staticRowKeys?: ReadonlyArray<string> }>,
+	renderContext: SsrRenderContext | undefined,
+): Parameters<typeof marklessSsrSeedPropCells>[2] {
+	const fixed = marklessSsrFixedProps(renderContext);
+	return cells.map(({ staticRowKeys, ...cell }) =>
+		staticRowKeys
+			? { ...cell, rowKeys: [...(cell.rowKeys ?? []), ...staticRowKeys.filter((key) => !fixed.includes(key))] }
+			: cell,
+	);
+}
+
 export function marklessSsrChildInstancePath(
 	renderContext: SsrRenderContext | undefined,
 	placed: { readonly symbolPrefix?: string },
@@ -957,21 +970,10 @@ export function marklessSsrSeedPropCells(
 		readonly deriveKeys?: ReadonlyArray<string>;
 		readonly derivePaths?: Readonly<Record<string, ReadonlyArray<ReadonlyArray<string>>>>;
 		readonly rowKeys?: ReadonlyArray<string>;
-		readonly staticRowKeys?: ReadonlyArray<string>;
 	}>,
-	renderContext?: Pick<SsrRenderContext, 'prerenderSettle' | 'instancePath' | 'staticProps'>,
+	renderContext?: Pick<SsrRenderContext, 'prerenderSettle'>,
 ) {
-	const fixed = marklessSsrFixedProps(renderContext);
-	const seeded = cells.flatMap((given) => {
-		const cell = given.staticRowKeys
-			? {
-					...given,
-					rowKeys: [
-						...(given.rowKeys ?? []),
-						...given.staticRowKeys.filter((key) => !fixed.includes(key)),
-					],
-				}
-			: given;
+	const seeded = cells.flatMap((cell) => {
 		const name = cell.graphNodeId.slice('prop:'.length);
 		const derived = new Map<string, unknown>();
 		for (const key of cell.deriveKeys ?? []) {

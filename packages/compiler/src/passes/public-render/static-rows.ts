@@ -87,6 +87,11 @@ function rowsReadNothingBack(input: PublicRenderModuleInput, rowChunkId: string)
 			const edge = edges.get(slot.componentEdgeId);
 			if (!edge || edge.props.some((prop) => prop.kind === 'callback' || prop.kind === 'spread'))
 				return false;
+			// A row child's handler reads what its row passed it back off the list when it runs.
+			const child = childInterface(input, edge);
+			const handled = child?.handlerProps ?? [];
+			if (!child || edge.props.some((prop) => handled.includes(prop.name) || handled.includes('*')))
+				return false;
 			return slot.projectionChunkId === undefined || walk(slot.projectionChunkId);
 		});
 	};
@@ -162,14 +167,22 @@ function childStaticRowProps(
 ): ReadonlySet<string> {
 	if (edge.importSource === undefined)
 		return staticRowProps(input, edge.childComponentName, seen);
-	const component = input.source.importedModuleInterfaces?.[
-		edge.importSource
-	]?.render.components.find(
+	return new Set(childInterface(input, edge)?.staticRowProps ?? []);
+}
+
+// The child's published interface: this module's own for a same-module child, the imported module's otherwise.
+function childInterface(input: PublicRenderModuleInput, edge: SemanticComponentEdge) {
+	const components =
+		edge.importSource === undefined
+			? input.semanticGraph.moduleGraphInterface.render.components
+			: input.source.importedModuleInterfaces?.[edge.importSource]?.render.components;
+	return components?.find(
 		(candidate) =>
 			candidate.componentName === edge.childComponentName ||
-			(edge.importedName !== undefined && candidate.exportName === edge.importedName),
+			(edge.importSource !== undefined &&
+				edge.importedName !== undefined &&
+				candidate.exportName === edge.importedName),
 	);
-	return new Set(component?.staticRowProps ?? []);
 }
 
 /**

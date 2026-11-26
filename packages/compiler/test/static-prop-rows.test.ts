@@ -166,3 +166,42 @@ export default function Library() @{
 	expect(stamps(await compile(source, shelfInterface()))).toEqual([]);
 	expect(stamps(await compile(source))).toEqual([]);
 });
+
+test("a row child whose handler reads what the row passed it keeps the list; one that reads nothing of it does not", async () => {
+	const local = await compile(`
+import { state } from '@markless/core';
+function Chip({ title }) @{
+	let picked = state('');
+	<button onClick={() => (picked = title)}>{title}{picked}</button>
+}
+export default function Lane({ titles }) @{
+	<section>
+		@for (const title of titles; key title) {
+			<Chip title={title} />
+		}
+	</section>
+}
+`);
+	expect(staticRowProps(local, 'Lane')).toBeUndefined();
+	const source = `
+import Chip from './chip.tsrx';
+export default function Lane({ titles }) @{
+	<section>
+		@for (const title of titles; key title) {
+			<Chip title={title} />
+		}
+	</section>
+}
+`;
+	const chip = (handlerProps?: ReadonlyArray<string>) => ({
+		'./chip.tsrx': {
+			render: {
+				components: [{ componentName: 'Chip', exportName: 'default', ...(handlerProps ? { handlerProps } : {}) }],
+			},
+		},
+	});
+	expect(staticRowProps(await compile(source, chip(['title'])), 'Lane')).toBeUndefined();
+	expect(staticRowProps(await compile(source, chip(['*'])), 'Lane')).toBeUndefined();
+	expect(staticRowProps(await compile(source, chip(['onClick'])), 'Lane')).toEqual(['titles']);
+	expect(staticRowProps(await compile(source), 'Lane')).toBeUndefined();
+});

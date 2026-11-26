@@ -472,8 +472,9 @@ export function ssrComposeStateExpression(
 	const composed = 'marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren)';
 	const cells = ssrPropCellSeeds(input, component, componentName);
 	if (cells.length === 0) return composed;
-	const context = cells.some((cell) => cell.deriveKeys || cell.staticRowKeys)
-		? ', marklessSsrRenderContext'
-		: '';
-	return `marklessSsrSeedPropCells(${composed}, marklessSsrProps, ${JSON.stringify(cells)}${context})`;
+	const context = cells.some((cell) => cell.deriveKeys) ? ', marklessSsrRenderContext' : '';
+	const seeds = cells.some((cell) => cell.staticRowKeys)
+		? `marklessSsrStaticRowCells(${JSON.stringify(cells)}, marklessSsrRenderContext)`
+		: JSON.stringify(cells);
+	return `marklessSsrSeedPropCells(${composed}, marklessSsrProps, ${seeds}${context})`;
 }
