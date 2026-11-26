@@ -164,6 +164,7 @@
 		"packages/router/test/vite/migration-shapes.test.ts",
 		"packages/router/test/vite/modal-in-if-arm.test.ts",
 		"packages/router/test/vite/native-packing-build.test.ts",
+		"packages/router/test/vite/navigate-first-use.test.ts",
 		"packages/router/test/vite/navigation-release.test.ts",
 		"packages/router/test/vite/navigation-restyle.test.ts",
 		"packages/router/test/vite/navigation-stream.test.ts",
