@@ -287,6 +287,7 @@ extension StyleExport {
 		if everyStyledCell, let unstyled = styledCells.first(where: { !stateCells.contains($0) }) {
 			throw styleError("the payload's styled cell \(unstyled) has no state in the style export")
 		}
+		let dpr = self.dpr
 		let current = try stateCells.enumerated().map { index, cell in
 			// The page keeps the template's value for a state of each row.
 			if rowStates.contains(cell) { return assignments[initial].values[cell] ?? states[index].domain[0] }
@@ -317,7 +318,6 @@ extension StyleExport {
 				inline: index < self.inlineBoxes.count
 					? Set(self.inlineBoxes[index].map { (index < self.planNames.count ? self.planNames[index][$0] : nil) ?? $0 }) : [])
 		}
-		let dpr = self.dpr
 		return StyleLayout(
 			assignments: styles,
 			canvases: try perEntry { try self.assignments.element($0).canvas },
