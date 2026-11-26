@@ -1,0 +1,106 @@
+{
+	"rung": "S68",
+	"name": "a page whose nine independent states Dragon splits into groups shows each combination, and the z-index 3 note one group shows paints and takes the tap over the z-index 2 panel another group shows, as Chrome paints and hit-tests them",
+	"steps": [
+		{
+			"visible": [
+				"State groups",
+				"A off",
+				"B off",
+				"C off",
+				"D off",
+				"E off"
+			],
+			"absent": [
+				"Panel",
+				"Note"
+			],
+			"title": "State groups"
+		},
+		{
+			"do": {
+				"tap": "A off"
+			},
+			"visible": [
+				"A on",
+				"Panel",
+				"B off"
+			],
+			"absent": [
+				"A off",
+				"Note"
+			]
+		},
+		{
+			"do": {
+				"tap": "B off"
+			},
+			"visible": [
+				"A on",
+				"B on",
+				"Panel",
+				"Note"
+			],
+			"absent": [
+				"B off",
+				"Note tapped"
+			]
+		},
+		{
+			"do": {
+				"tap": "Note"
+			},
+			"visible": [
+				"Note tapped",
+				"Panel",
+				"E off"
+			],
+			"absent": [
+				"Panel tapped"
+			]
+		},
+		{
+			"do": {
+				"tap": "E off"
+			},
+			"visible": [
+				"E on",
+				"A on",
+				"B on",
+				"Note tapped",
+				"C off"
+			],
+			"absent": [
+				"E off"
+			]
+		},
+		{
+			"do": {
+				"tap": "C off"
+			},
+			"visible": [
+				"C on",
+				"E on",
+				"D off",
+				"A on"
+			],
+			"absent": [
+				"C off"
+			]
+		},
+		{
+			"do": {
+				"tap": "A on"
+			},
+			"visible": [
+				"A off",
+				"Note tapped",
+				"C on"
+			],
+			"absent": [
+				"A on",
+				"Panel"
+			]
+		}
+	]
+}

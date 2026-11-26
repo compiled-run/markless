@@ -451,6 +451,53 @@ private fun pressedStyles(text: String, refusesStyle: (String, String, String) -
 	refusesStyle("a group field it does not know", pressed { it.replace("\"after\": \"h0\",", "\"after\": \"h0\", \"stable\": [],") }, "stable")
 }
 
+// Factored states (dragon.native-style-export/2): Dragon's groups fixture, whose page, state:a, state:b and branch-site:0 tables
+// the host combines. Every entry (each combination, then its interaction states) must be what Dragon's reference composes
+// (state-groups.expected.json, from packages/mobile/src/harness/state-groups-fixture.ts): values, root paint, nodes, plan, names.
+private fun stateGroups(fixtures: File, name: String, combinations: Int) {
+	val expectedJson = Json.parse(File(fixtures, "$name.expected.json").readBytes()).obj("expected")
+	val pool = expectedJson.field("nodes", "expected").arr("nodes")
+	val entries = expectedJson.field("android", "expected").obj("android").field("entries", "android").arr("entries").map { it.obj("entry") }
+	// The expected entries as a plain export, decoded as any page's: the host's nodes and paint are compared by value.
+	val plain = "{\"schema\":\"dragon.native-style-export/1\",\"targets\":{\"android\":{\"backend\":\"android-views\",\"viewport\":{\"width\":412,\"height\":915},\"dpr\":2.625,\"states\":[],\"initial\":0,\"assignments\":[" +
+		entries.joinToString(",") { e -> "{\"values\":${e.getValue("values").text()},\"canvas\":${e.getValue("canvas").text()},\"bodyBackground\":${e.getValue("bodyBackground").text()},\"nodes\":[${e.getValue("nodes").arr("nodes").joinToString(",") { pool[it.num("node").toInt()].text() }}]}" } +
+		"],\"next\":[${entries.joinToString(",") { "[]" }}]}}}"
+	val want = StyleExport.decode(plain.toByteArray())
+	val exportText = File(fixtures, "$name.native-style.json").readBytes()
+	val planEntries = Json.parse(exportText).obj("export").field("targets", "export").obj("targets").field("android", "targets").obj("android").field("plan", "android").obj("plan").field("assignments", "plan").arr("assignments")
+	for ((what, decoded) in listOf(
+		"$name's export" to runCatching { StyleExport.decode(exportText) },
+		"$name's app style" to runCatching { StyleExport.decodeApp(File(fixtures, "$name.native-app-style.json").readBytes()).getValue("/") },
+	)) {
+		check("decodes the factored page from $what", decoded.isSuccess) { decoded.exceptionOrNull().toString() }
+		val got = decoded.getOrNull() ?: continue
+		check("$what: one entry per combination and interaction state", got.assignments.size == entries.size) { "${got.assignments.size} entries, ${entries.size} expected" }
+		check("$what: $combinations combinations of the four tables", got.next.size == combinations) { "${got.next.size} combinations" }
+		if (name.endsWith("stacked")) check("$what: its layer items sort by layer and z-index", got.assignments.any { a -> a.nodes.count { n -> n.writes.any { it is StyleWrite.PaintOrder } } >= 3 }) { "no combination with three layer items" }
+		var bad = 0
+		var first = ""
+		for (k in entries.indices) {
+			val a = got.assignments[k]
+			val w = want.assignments[k]
+			val nodes = a.nodes.map { it.copy(lines = null) }
+			val parts = Json.parse(got.plan!!.of(listOf(k))).obj("plan").field("assignments", "plan").arr("assignments").map { it.text() }
+			val wantParts = entries[k].getValue("parts").arr("parts").map { planEntries[it.num("part").toInt()].text() }
+			val names = entries[k].getValue("names").obj("names").mapValues { it.value.str("name") }
+			val problem = when {
+				a.values != w.values -> "values ${a.values} != ${w.values}"
+				a.canvas != w.canvas || a.body != w.body -> "root paint ${a.canvas}/${a.body} != ${w.canvas}/${w.body}"
+				nodes != w.nodes -> "nodes ${nodes.zip(w.nodes).firstOrNull { (x, y) -> x != y } ?: (nodes.size to w.nodes.size)}"
+				parts != wantParts -> "plan entries differ"
+				got.planNames[k] != names -> "names ${got.planNames[k]} != $names"
+				else -> null
+			}
+			if (problem != null) { bad++; if (first.isEmpty()) first = "entry $k: $problem" }
+		}
+		check("$what: every entry is the one Dragon's reference composes", bad == 0) { "$bad of ${entries.size} differ; $first" }
+		check("$what: a factored page's layout line names each group's entry", got.plan!!.groupsLine == ",\"groups\":[0,0,0]") { got.plan!!.groupsLine }
+	}
+}
+
 private fun dashedBorders(fixtures: File) {
 	val text = File(fixtures, "u17-borders-dashed.native-style.json").readText()
 	val export = runCatching { StyleExport.decode(text.toByteArray()) }
@@ -1254,6 +1301,8 @@ fun main(args: Array<String>) {
 	appStyle(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	appCanvas(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	dashedBorders(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	stateGroups(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")), "state-groups", 16)
+	stateGroups(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")), "state-groups-stacked", 16)
 	outlines(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	boxShadows(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	paddingBoxes()

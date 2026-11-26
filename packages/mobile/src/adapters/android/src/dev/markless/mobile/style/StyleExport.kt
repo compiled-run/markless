@@ -54,7 +54,8 @@ sealed interface StyleWrite {
 	/** The text a clip-path leaves exposed to the screen reader; a canvas clip does not change accessibility, so nothing to apply. */
 	data object ClipText : StyleWrite
 	/** The box paints in another stacking context's order (Dragon's re-hosting); [host] is that context's node. */
-	data class PaintOrder(val host: String, val bucket: Int, val rank: Int) : StyleWrite
+	/** [layer] and [z]: only in a factored page's tables, which a combination sorts its layer items by ([composedNodes]). */
+	data class PaintOrder(val host: String, val bucket: Int, val rank: Int, val layer: String? = null, val z: Double? = null) : StyleWrite
 	/** box-shadow: the computed shadows in list order. */
 	data class BoxShadow(val shadows: List<Shadow>) : StyleWrite
 	/** A themed checkbox (`appearance: auto`): drawn in [colors] over [StyledNode.checkboxMarks], checked or not as the input's live checkedness says. */
@@ -422,9 +423,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 		val hex = { list: List<Double> -> Json.Arr(list.map { Json.Str(java.lang.Long.toHexString(it.toRawBits()).padStart(16, '0')) }) }
 		val slotsText = if (slots.isEmpty()) "" else ",\"slots\":${hex(slotValues).text()}"
 		var undecided: String? = null
-		val laid = assignments.indices.map { k ->
-			// An entry the page does not show yet keeps the boxes it had; the host lays it out when a state first shows it.
-			if (entries != null && k !in entries) return@map (previous ?: this).assignments[k]
+		fun lay(k: Int): Assignment {
 			val names = planNames.getOrNull(k) ?: emptyMap()
 			val dragonId = names.entries.associate { (d, m) -> m to d }
 			// An interaction state's rows are its assignment's; laid out in the state, a row of that assignment takes the state's look
@@ -451,7 +450,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val relaidTexts = changed.associate { it.key to it.value }
 			val live = lists != null || changed.isNotEmpty()
 			val textsText = if (changed.isEmpty()) "" else (if (lists == null) ",\"rows\":[]" else "") + ",\"texts\":" + Json.Arr(changed.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }).text()
-			val line = "{\"assignment\":0,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":${plan.of(sent.keys)}$slotsText${if (lists != null) ",\"rows\":$lists" else ""}$textsText,\"sticky\":true,\"textAreas\":true}"
+			val line = "{\"assignment\":0,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":${plan.of(sent.keys)}${plan.groupsLine}$slotsText${if (lists != null) ",\"rows\":$lists" else ""}$textsText,\"sticky\":true,\"textAreas\":true}"
 			if (live && rowsLayout == null) throw MarklessDecodeError("a page whose rows or texts follow state needs Dragon's live layout")
 			val result = Json.parse(if (live) rowsLayout!!(line) else layout(line))
 			val parts = result.arr("plan layout")
@@ -581,7 +580,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				}
 			}
 			val padding = runtimeImagePadding(assignment.nodes, dpr)
-			assignment.copy(pageScroll = pageScroll, sticky = sticky, textAreas = areas, nodes = placingRuntimeImages(withRows.map { slotted ->
+			return assignment.copy(pageScroll = pageScroll, sticky = sticky, textAreas = areas, nodes = placingRuntimeImages(withRows.map { slotted ->
 				val node = moved[slotted.id]?.let { slotted.copy(writes = slotWrites(slotted, it)) } ?: slotted
 				if (node.frame == null) return@map node
 				// A text whose state emptied it has no box, as on the web.
@@ -616,6 +615,13 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				if (marks.isNotEmpty()) throw MarklessDecodeError("Dragon's layout gives checkbox marks for ${marks.keys.sorted().first()}, which it shows no box for")
 			}
 		}
+		// An entry the page does not show yet keeps the boxes it had; the host lays it out when a state first shows it. A factored
+		// page's entries are made only when read.
+		val laid: List<Assignment> = if (plan.grouped) {
+			val done = (entries ?: throw MarklessDecodeError("a factored page lays out only the entries it shows")).associateWith { lay(it) }
+			val before = (previous ?: this).assignments
+			LazyList(assignments.size) { k -> done[k] ?: before[k] }
+		} else assignments.indices.map { k -> if (entries != null && k !in entries) (previous ?: this).assignments[k] else lay(k) }
 		return copy(dpr = scale, viewportWidth = width, viewportHeight = height, assignments = laid, pageScrollUndecided = undecided ?: pageScrollUndecided)
 	}
 
@@ -760,7 +766,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 		fun decode(bytes: ByteArray, target: String = "android"): StyleExport {
 			val root = Json.parse(bytes).obj("style export")
 			val schema = root.field("schema", "style export").str("schema")
-			if (schema != STYLE_EXPORT_SCHEMA && schema != STYLE_EXPORT_SCHEMA_0) throw MarklessDecodeError("unknown style export schema \"$schema\" (this host reads $STYLE_EXPORT_SCHEMA_0 and $STYLE_EXPORT_SCHEMA)")
+			if (schema != STYLE_EXPORT_SCHEMA && schema != STYLE_EXPORT_SCHEMA_0 && schema != STYLE_EXPORT_SCHEMA_GROUPS) throw MarklessDecodeError("unknown style export schema \"$schema\" (this host reads $STYLE_EXPORT_SCHEMA_0, $STYLE_EXPORT_SCHEMA and $STYLE_EXPORT_SCHEMA_GROUPS)")
 			val t = root.field("targets", "style export").obj("targets").field(target, "targets").obj("targets.$target")
 			val backend = t.field("backend", target).str("backend")
 			if (backend != ANDROID_BACKEND) throw MarklessDecodeError("style export backend is \"$backend\", not $ANDROID_BACKEND")
@@ -776,6 +782,10 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val undecided = root["warnings"]?.arr("warnings")?.map { it.obj("warnings[]") }?.firstOrNull { w ->
 				w.field("code", "warning").str("code") == "DRAGON_PAGE_SCROLL_UNDECIDED" && w.field("message", "warning").str("message").startsWith("$target: ")
 			}?.let { it.getValue("message").str("message").removePrefix("$target: ") }
+			if (t["groups"] != null) {
+				if (schema != STYLE_EXPORT_SCHEMA_GROUPS) throw MarklessDecodeError("$target has groups, which only a $STYLE_EXPORT_SCHEMA_GROUPS export has")
+				return grouped(t, target, dpr, width, height, undecided) { v, what -> node(v, what) { w, at -> writes(w, at) } }.copy(systemFaces = root["systemFonts"]?.let { systemFaces(it, target) } ?: emptyMap())
+			}
 			val style = withPlan(program(t, target, dpr, width, height, undecided) { v, what -> node(v, what) { w, at -> writes(w, at) } }.copy(systemFaces = root["systemFonts"]?.let { systemFaces(it, target) } ?: emptyMap()), t, target)
 			val slots = root["slots"]?.let { exportSlots(it) } ?: return style
 			if (slots.isNotEmpty() && style.plan == null) throw MarklessDecodeError("style export has slots but $target has no layout plan to apply them")
@@ -868,6 +878,145 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			return StyleExport(dpr, width, height, states, initial, assignments, next, t["bands"]?.let { bands(it, "$target.bands") }, undecided, interaction = interaction)
 		}
 
+		/** One factored table's assignment: its values, nodes (a group's, only those it owns), its children's [order] and root paint. */
+		private fun tableEntry(v: Json, what: String, nodeOf: (Json, String) -> StyledNode): Pair<Assignment, Map<String, List<String>>> {
+			val o = v.obj(what)
+			val values = o.field("values", what).obj("$what.values").mapValues { (k, x) -> scalar(x, "$what.values.$k") }
+			val canvas = o["canvas"]?.let { color(it, "$what.canvas") }
+			val body = o["bodyBackground"]?.takeIf { it != Json.Null }?.let { color(it, "$what.bodyBackground") }
+			val nodes = o.field("nodes", what).arr("$what.nodes").mapIndexed { n, x -> nodeOf(x, "$what.nodes[$n]") }
+			return Assignment(values, nodes, canvas, body) to order(o["order"], "$what.order")
+		}
+
+		private fun order(v: Json?, what: String): Map<String, List<String>> = v?.obj(what)?.mapValues { (parent, ids) -> ids.arr("$what.$parent").map { it.str("$what.$parent[]") } } ?: emptyMap()
+
+		/** A factored table's interaction: per level its states (indices into the table's pool), their plan entries, and the pool. */
+		private class TableInteraction(val levels: List<List<Int>>, val planAssignments: List<List<Int>>, val pool: List<SlimState>)
+
+		private fun tableInteraction(v: Json?, what: String, nodeOf: (Json, String) -> StyledNode): TableInteraction? {
+			val o = v?.obj(what) ?: return null
+			o.only(setOf("levels", "states", "matches"), what)
+			val pool = o.field("states", what).arr("$what.states").mapIndexed { k, st ->
+				val at = "$what.states[$k]"
+				val so = st.obj(at)
+				SlimState(
+					so.field("nodes", at).arr("$at.nodes").mapIndexed { n, x -> nodeOf(x, "$at.nodes[$n]") },
+					so["removed"]?.arr("$at.removed")?.map { it.str("$at.removed[]") }?.toSet() ?: emptySet(),
+					order(so["order"], "$at.order"),
+					so["canvas"]?.let { color(it, "$at.canvas") },
+					so["bodyBackground"]?.takeIf { it != Json.Null }?.let { color(it, "$at.bodyBackground") },
+					"bodyBackground" in so,
+				)
+			}
+			val levels = o.field("levels", what).arr("$what.levels").map { it.obj("$what.levels[]") }
+			val states = levels.mapIndexed { i, l -> l.field("states", "$what.levels[$i]").arr("$what.levels[$i].states").map { x -> x.num("$what.levels[$i].states[]").toInt().also { if (it !in pool.indices) throw MarklessDecodeError("$what.levels[$i] names state $it of ${pool.size}") } } }
+			val plans = levels.mapIndexed { i, l -> l["planAssignments"]?.arr("$what.levels[$i].planAssignments")?.map { it.num("$what.levels[$i].planAssignments[]").toInt() } ?: emptyList() }
+			return TableInteraction(states, plans, pool)
+		}
+
+		private fun namesOf(v: Json?, what: String): List<Map<String, String>> = v?.arr(what)?.mapIndexed { a, list ->
+			list.arr("$what[$a]").associate { pair ->
+				val n = pair.arr("$what[$a][]")
+				if (n.size != 2) throw MarklessDecodeError("$what[$a]: expected a Dragon id and the export's id")
+				n[0].str("$what[$a][][0]") to n[1].str("$what[$a][][1]")
+			}
+		} ?: emptyList()
+
+		/**
+		 * A factored page ([STYLE_EXPORT_SCHEMA_GROUPS]): the page's table, each group's and their `product`, read as one export whose
+		 * entries are the product's combinations and then each combination's interaction states. An entry's nodes are composed from
+		 * the table that owns each node ([composedNodes]) when it is first read; it lays out from the page's plan entry with each group's.
+		 */
+		private fun grouped(t: Map<String, Json>, target: String, dpr: Double, width: Double, height: Double, undecided: String?, nodeOf: (Json, String) -> StyledNode): StyleExport {
+			if (t["anim"] != null) throw MarklessDecodeError("$target: a factored page runs no transitions or animations yet")
+			if ((t["planRepeats"]?.arr("$target.planRepeats") ?: emptyList()).isNotEmpty()) throw MarklessDecodeError("$target: a factored page has no list rows yet")
+			val planJson = t["plan"]?.obj("$target.plan") ?: throw MarklessDecodeError("$target: a factored page is laid out from Dragon's plan, and the export has none")
+			val groupsJson = t.field("groups", target).arr("$target.groups").map { it.obj("$target.groups[]") }
+			val tablesJson = listOf(t) + groupsJson
+			val entries = tablesJson.mapIndexed { k, g -> g.field("assignments", "$target table $k").arr("$target table $k assignments").mapIndexed { e, a -> tableEntry(a, "$target table $k assignments[$e]", nodeOf) } }
+			val interactions = tablesJson.mapIndexed { k, g -> tableInteraction(g["interaction"], "$target table $k interaction", nodeOf) }
+			entries.forEachIndexed { k, es -> es.forEachIndexed { e, (a, _) -> if (a.canvas == null) throw MarklessDecodeError("$target table $k assignments[$e] has no canvas") } }
+			val names = tablesJson.map { g -> namesOf(g["planNames"], "$target planNames") }
+			val owner = HashMap<String, Int>()
+			groupsJson.forEachIndexed { k, g -> for (o in g.field("owned", "$target.groups[$k]").arr("$target.groups[$k].owned")) o.str("$target.groups[$k].owned[]").let { if (it.startsWith("node:")) owner[it.removePrefix("node:")] = k + 1 } }
+			val groupStates = groupsJson.mapIndexed { k, g -> g.field("groupStates", "$target.groups[$k]").arr("$target.groups[$k].groupStates").map { it.str("$target.groups[$k].groupStates[]") } }
+			// The plan: every table's entries; a group's start at its `first`, and it gives the boxes it owns.
+			val planFields = LinkedHashMap(planJson)
+			val planEntries = planFields.remove("assignments")?.arr("$target.plan.assignments")?.map { it.text() } ?: emptyList()
+			val planGroups = planFields.remove("groups")?.arr("$target.plan.groups")?.map { it.obj("$target.plan.groups[]") } ?: emptyList()
+			if (planGroups.size != groupsJson.size) throw MarklessDecodeError("$target: the plan has ${planGroups.size} groups; the export has ${groupsJson.size}")
+			val firsts = listOf(0) + planGroups.map { it.field("first", "$target.plan.groups[]").num("first").toInt() }
+			val planOwned = planGroups.map { g -> "\"owned\":${g.field("owned", "plan group").text()},\"nodes\":${g.field("nodes", "plan group").text()}" }
+			val boxOwner = HashMap<String, Int>()
+			planGroups.forEachIndexed { k, g -> for (id in g.field("owned", "plan group").arr("plan group owned")) boxOwner[id.str("plan group owned[]")] = k + 1 }
+			// The product: each combination's entry per table, its transitions, and per combination its interaction level.
+			val product = t.field("product", target).obj("$target.product")
+			val at = "$target.product"
+			val states = product.field("states", at).arr("$at.states").mapIndexed { n, v ->
+				val o = v.obj("$at.states[$n]")
+				StyleState(o.field("key", "$at.states[$n]").str("key"), o.field("domain", "$at.states[$n]").arr("domain").map { scalar(it, "$at.states[$n].domain[]") })
+			}
+			val tuples = product.field("assignments", at).arr("$at.assignments").map { a -> a.arr("$at.assignments[]").map { it.num("$at.assignments[][]").toInt() } }
+			if (tuples.any { it.size != tablesJson.size || it.withIndex().any { (k, e) -> e !in entries[k].indices } }) throw MarklessDecodeError("$at.assignments: a combination names an entry its table does not have")
+			val initial = product.field("initial", at).num("$at.initial").toInt()
+			val next = product.field("next", at).arr("$at.next").map { row -> row.arr("$at.next[]").map { col -> col.arr("$at.next[][]").map { it.num("$at.next[][][]").toInt() } } }
+			if (initial !in tuples.indices || next.size != tuples.size || next.any { r -> r.size != states.size || r.withIndex().any { (si, c) -> c.size != states[si].domain.size || c.any { it != -1 && it !in tuples.indices } } }) throw MarklessDecodeError("$at: its initial combination or next table names no combination")
+			val rootPaint = product.field("rootPaint", at).num("$at.rootPaint").toInt()
+			val levelsJson = product["interaction"]?.obj("$at.interaction")?.field("levels", at)?.arr("$at.interaction.levels")
+			if (levelsJson != null && levelsJson.size != tuples.size) throw MarklessDecodeError("$at.interaction has ${levelsJson.size} levels for ${tuples.size} combinations")
+			// Each flat entry: a combination, or one of its interaction states as the state each table shows (-1: its entry).
+			val flat = ArrayList<Pair<Int, List<Int>?>>()
+			tuples.indices.forEach { flat.add(it to null) }
+			val interaction = levelsJson?.mapIndexed { a, l ->
+				val lo = l.obj("$at.interaction.levels[$a]")
+				val shownStates = lo.field("states", at).arr("$at.interaction.levels[$a].states").map { st -> st.arr("$at.interaction.levels[$a].states[]").map { it.num("state").toInt() } }
+				val ids = shownStates.map { st -> flat.size.also { flat.add(a to st) } }
+				InteractionLevel(
+					lo.field("tables", at).text(),
+					lo.field("addresses", at).arr("$at.interaction.levels[$a].addresses").map { it.str("address") },
+					lo["rows"]?.obj("$at.interaction.levels[$a].rows")?.mapValues { (_, r) -> r.str("row") } ?: emptyMap(),
+					ids,
+				)
+			} ?: emptyList()
+			// What table k shows at entry e and state s (-1: the entry), and its plan entry for that.
+			fun shownOf(k: Int, e: Int, s: Int): TableShown {
+				val (a, o) = entries[k][e]
+				val base = TableShown(a.nodes, o, a.canvas, a.body)
+				if (s < 0) return base
+				val ti = interactions[k] ?: throw MarklessDecodeError("$target: table $k has no interaction states")
+				return shownState(base, ti.pool[ti.levels[e][s]])
+			}
+			fun planOf(k: Int, e: Int, s: Int): Int = if (s < 0) firsts[k] + e else (interactions[k] ?: throw MarklessDecodeError("$target: table $k has no interaction states")).planAssignments[e][s]
+			fun statesOf(entry: Int): List<Int> = flat[entry].second ?: List(tablesJson.size) { -1 }
+			val valuesOf = LazyList(tuples.size) { a ->
+				val values = LinkedHashMap(entries[0][tuples[a][0]].first.values)
+				groupStates.forEachIndexed { g, keys -> val own = entries[g + 1][tuples[a][g + 1]].first.values; for (key in keys) own[key]?.let { values[key] = it } }
+				values as Map<String, JsValue>
+			}
+			val assignments = LazyList(flat.size) { entry ->
+				val (a, st) = flat[entry]
+				val tuple = tuples[a]
+				val shown = tuple.indices.map { k -> shownOf(k, tuple[k], st?.get(k) ?: -1) }
+				Assignment(valuesOf[a], composedNodes(shown) { id -> owner[id] ?: 0 }, shown[rootPaint].canvas, shown[rootPaint].body)
+			}
+			val parts = { entry: Int -> val tuple = tuples[flat[entry].first]; val st = statesOf(entry); tuple.indices.map { k -> planOf(k, tuple[k], st[k]) } }
+			// A combination's names: the page's entry's, then each group's where it names a box otherwise.
+			val planNames = LazyList(flat.size) { entry ->
+				val p = parts(entry)
+				val out = HashMap(names[0].getOrNull(p[0]) ?: emptyMap())
+				for (g in 1 until p.size) names[g].getOrNull(p[g] - firsts[g])?.let { out.putAll(it) }
+				out as Map<String, String>
+			}
+			val perPlanEntry = inlineBoxes(Json.Obj(LinkedHashMap(planJson)), "$target.plan")
+			val inline = LazyList(flat.size) { entry ->
+				val p = parts(entry)
+				val renamed = planNames[entry]
+				p.indices.flatMap { k -> (perPlanEntry.getOrNull(p[k]) ?: emptySet()).filter { (boxOwner[it] ?: 0) == k } }.map { renamed[it] ?: it }.toSet()
+			}
+			return StyleExport(dpr, width, height, states, initial, assignments, next, t["bands"]?.let { bands(it, "$target.bands") }, undecided,
+				plan = LayoutPlan(Json.Obj(planFields).text(), planEntries, parts, planOwned), planNames = planNames, interaction = interaction, inlineBoxes = inline)
+		}
+
 		private fun bands(v: Json, what: String): Bands {
 			val o = v.obj(what)
 			o.only(setOf("atoms", "bands", "conditions"), what)
@@ -931,7 +1080,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val routes = LinkedHashMap<String, StyleExport>()
 			for ((n, r) in t.field("routes", target).arr("routes").withIndex()) {
 				val o = r.obj("routes[$n]")
-				o.only(setOf("pattern", "component", "compiler", "readiness", "states", "initial", "next", "bands", "assignments", "sheets", "plan", "planNames", "planRepeats", "slots", "anim", "interaction"), "routes[$n]")
+				o.only(setOf("pattern", "component", "compiler", "readiness", "states", "initial", "next", "bands", "assignments", "sheets", "plan", "planNames", "planRepeats", "slots", "anim", "interaction", "groups", "product"), "routes[$n]")
 				val pattern = o.field("pattern", "routes[$n]").str("pattern")
 				if (pattern in routes) throw MarklessDecodeError("app style lists route $pattern twice")
 				val listed = { v: Json, what: String -> if (v is Json.Num) pooled(v, what) else listedNode(v, what) }
@@ -950,6 +1099,11 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 						hp.only(setOf("width", "height"), "$at.viewport")
 						SheetHeight(ho.field("snapPoint", at).num("$at.snapPoint"), withPlan(program(ho, at, dpr, hp.field("width", at).num("width"), hp.field("height", at).num("height"), null, listed), ho, at))
 					}.also { if (it.isEmpty() || it.map { h -> h.snapPoint }.distinct().size != it.size) throw MarklessDecodeError("$where needs one layout per resting height") }
+				}
+				if (o["groups"] != null) {
+					if (sheets.isNotEmpty() || o["slots"] != null) throw MarklessDecodeError("routes[$n] ($pattern): a factored page has no system sheets or slots yet")
+					routes[pattern] = grouped(o, "routes[$n] ($pattern)", dpr, width, height, null, listed).copy(systemFaces = faces)
+					continue
 				}
 				val planned = withPlan(program(o, "routes[$n] ($pattern)", dpr, width, height, null, listed).copy(sheets = sheets, systemFaces = faces), o, "routes[$n]")
 				val slots = o["slots"]?.let { exportSlots(it) } ?: emptyList()
@@ -1089,7 +1243,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					e.field("value", what).num("value") to (unit == "%")
 				}.also { if (it.size != 4) throw MarklessDecodeError("$what has ${it.size} inset edges, not 4") })
 				"clip-text" -> StyleWrite.ClipText.also { o.field("texts", what).arr("texts").forEach { t -> t.str("$what.texts[]") } }
-				"paint-order" -> StyleWrite.PaintOrder(o.field("host", what).str("host"), o.field("bucket", what).num("bucket").toInt(), o.field("rank", what).num("rank").toInt())
+				"paint-order" -> StyleWrite.PaintOrder(o.field("host", what).str("host"), o.field("bucket", what).num("bucket").toInt(), o.field("rank", what).num("rank").toInt(), o["layer"]?.str("$what.layer"), o["z"]?.takeIf { it != Json.Null }?.num("$what.z"))
 				"box-shadow" -> {
 					if (o.field("key", what) != Json.Str("dragonShadow.shadows")) throw MarklessDecodeError("$what: a box-shadow write's key is dragonShadow.shadows")
 					StyleWrite.BoxShadow(o.field("shadows", what).arr("$what.shadows").mapIndexed { n, x ->
@@ -1269,9 +1423,23 @@ data class TextAreaLines(val pitch: Double, val above: Double, val insets: List<
 data class StickyRow(val id: String, val row: Json)
 
 /** Dragon's layout plan as JSON text: each assignment's own, and the rest of the plan, which every assignment shares. */
-class LayoutPlan(private val rest: String, private val assignments: List<String>?) {
-	/** The plan holding only the assignments of [entries], in that order. */
-	fun of(entries: Collection<Int>): String = assignments?.let { all -> "${rest.dropLast(1)}${if (rest.length > 2) "," else ""}\"assignments\":[${entries.joinToString(",") { all[it] }}]}" } ?: rest
+class LayoutPlan(private val rest: String, private val assignments: List<String>?, private val parts: ((Int) -> List<Int>)? = null, private val groups: List<String> = emptyList()) {
+	/**
+	 * The plan holding only the assignments of [entries], in that order. A factored page's entry is laid out from the page's plan
+	 * entry and each group's ([parts]): the plan holds those, each group's entries being the one after the page's.
+	 */
+	fun of(entries: Collection<Int>): String {
+		val all = assignments ?: return rest
+		val sent = parts?.let { p -> p(entries.singleOrNull() ?: throw MarklessDecodeError("a factored page lays out one entry at a time")) } ?: entries
+		val grouped = if (parts == null) "" else ",\"groups\":[${groups.mapIndexed { g, owned -> "{\"first\":${g + 1},\"count\":1,$owned}" }.joinToString(",")}]"
+		return "${rest.dropLast(1)}${if (rest.length > 2) "," else ""}\"assignments\":[${sent.joinToString(",") { all[it] }}]$grouped}"
+	}
+
+	/** What a layout line of a factored page adds after its plan: each group's entry, the one [of] sends it. */
+	val groupsLine: String get() = if (parts == null) "" else ",\"groups\":[${groups.joinToString(",") { "0" }}]"
+
+	/** Whether the page's states are factored into groups, each entry a combination of the tables'. */
+	val grouped: Boolean get() = parts != null
 
 	/** The whole plan. */
 	val text: String get() = of(assignments?.indices?.toList() ?: emptyList())

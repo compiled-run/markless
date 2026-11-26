@@ -1695,7 +1695,7 @@ final class ViewTree {
 						scrollViews[id] = scroll
 					}
 					// A text field clips its value to the editor box itself; a view over it would take its touches.
-					if !(view is TextField), !(view is TextArea), style.childClip != nil || layout?.assignments.contains(where: { ($0[id] ?? $0[template])?.childClip != nil }) == true {
+					if !(view is TextField), !(view is TextArea), style.childClip != nil || layout?.clipsPastBordersInAnyEntry(id, template: template) == true {
 						let clip = PaddingClipView()
 						view.addSubview(clip)
 						clipViews[id] = clip

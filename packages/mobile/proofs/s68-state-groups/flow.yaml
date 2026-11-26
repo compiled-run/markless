@@ -1,0 +1,63 @@
+appId: ${APP_ID}
+name: s68-state-groups
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: State groups
+- assertVisible: A off
+- assertVisible: B off
+- assertVisible: C off
+- assertVisible: D off
+- assertVisible: E off
+- assertNotVisible: Panel
+- assertNotVisible: Note
+- assertVisible: State groups
+- tapOn: A off
+- assertVisible: Panel
+- assertNotVisible: A off
+- assertVisible: A on
+- assertVisible: Panel
+- assertVisible: B off
+- assertNotVisible: A off
+- assertNotVisible: Note
+- tapOn: B off
+- assertVisible: Note
+- assertNotVisible: B off
+- assertVisible: A on
+- assertVisible: B on
+- assertVisible: Panel
+- assertVisible: Note
+- assertNotVisible: B off
+- assertNotVisible: Note tapped
+- tapOn: Note
+- assertVisible: Note tapped
+- assertVisible: Note tapped
+- assertVisible: Panel
+- assertVisible: E off
+- assertNotVisible: Panel tapped
+- tapOn: E off
+- assertNotVisible: E off
+- assertVisible: E on
+- assertVisible: A on
+- assertVisible: B on
+- assertVisible: Note tapped
+- assertVisible: C off
+- assertNotVisible: E off
+- tapOn: C off
+- assertNotVisible: C off
+- assertVisible: C on
+- assertVisible: E on
+- assertVisible: D off
+- assertVisible: A on
+- assertNotVisible: C off
+- tapOn: A on
+- assertNotVisible: A on
+- assertVisible: A off
+- assertVisible: Note tapped
+- assertVisible: C on
+- assertNotVisible: A on
+- assertNotVisible: Panel

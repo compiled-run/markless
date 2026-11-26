@@ -385,6 +385,7 @@ test('the styles ladder has one app folder per rung, in rung order', () => {
 		'S64',
 		'S65',
 		'S66',
+		'S68',
 	]);
 	for (const folder of styleRungFolders())
 		expect(existsSync(join(proofsDir, folder, 'pages'))).toBe(true);
