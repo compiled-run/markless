@@ -91,7 +91,8 @@ const val DRAGON_LAYOUT_UNITS_PER_PX = 64.0
  * image-rendering is pixelated, the no-image outline's colour when its src can be absent (null: it always has one), and its content
  * box at the export's layout, absolute, in Dragon's layout units.
  */
-data class LoadedImageSpec(val fit: String, val position: List<Pair<Boolean, Double>>, val pixelated: Boolean, val outline: Rgba?, val content: Frame?)
+/** [follows]: the box's height follows its image, so the page is laid out again with each decoded image's natural size. */
+data class LoadedImageSpec(val fit: String, val position: List<Pair<Boolean, Double>>, val pixelated: Boolean, val outline: Rgba?, val content: Frame?, val follows: Boolean = false)
 
 /** Where a runtime image is painted from, in absolute device px: its content box, and the origin of its node's frame. */
 data class RuntimeImagePlace(val content: Frame, val originX: Double, val originY: Double)
@@ -101,6 +102,22 @@ data class RuntimeImagePlace(val content: Frame, val originX: Double, val origin
  * with Dragon's engine: from object-fit, object-position, the content box in absolute layout units, the image's size in CSS px and
  * the zoom, the destination rect, the snapped content box and the drawn part (null: none), each in absolute device px.
  */
+/** Dragon's translated runtimeImageScrollShift, when the app is built with Dragon's engine: (offset, top, was, now) to the shift. */
+object ScrollShift {
+	val engine: ((Double, Double, Double, Double) -> Double)? = try {
+		val run = Class.forName("dev.dragon.layout.MarklessPaintKt").getMethod("marklessScrollShift", Double::class.javaPrimitiveType, Double::class.javaPrimitiveType, Double::class.javaPrimitiveType, Double::class.javaPrimitiveType)
+		({ offset, top, was, now ->
+			try {
+				run.invoke(null, offset, top, was, now) as Double
+			} catch (e: java.lang.reflect.InvocationTargetException) {
+				throw e.cause ?: e
+			}
+		})
+	} catch (_: ClassNotFoundException) {
+		null
+	}
+}
+
 object RuntimeImagePaint {
 	var engine: ((fit: String, position: List<Pair<Boolean, Double>>, content: Frame, width: Double, height: Double, zoom: Double) -> Triple<Frame, Frame, Frame?>)? = try {
 		val run = Class.forName("dev.dragon.layout.MarklessPaintKt").getMethod(
@@ -411,13 +428,20 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 		return to
 	}
 
+	/** Each img of assignment [k] whose height follows its image, by Dragon id: its natural size in CSS px, or null while it has none. */
+	private fun naturalsText(k: Int, dragonId: Map<String, String>, naturals: Map<String, List<Double>>): String {
+		val followers = assignments[k].nodes.filter { it.runtimeImage?.follows == true && it.frame != null }.map { it.id }.sorted()
+		if (followers.isEmpty()) return ""
+		return ",\"naturals\":" + Json.Obj(LinkedHashMap(followers.associate { id -> (dragonId[id] ?: id) to (naturals[id]?.let { n -> Json.Arr(n.map { Json.Num(it) }) } ?: Json.Null) })).text()
+	}
+
 	/**
 	 * This export laid out again by Dragon's plan for a page [width] x [height] dp at [scale]: every assignment's frames, border
 	 * widths, text lines, dashed borders and scroll ranges, in this screen's device px. [layout] is Dragon's translated
 	 * `runMarklessLayout`; [slotValues] are the current values of [slots], in their order, and the writes they move are written
 	 * in. Without a plan the export is returned as it is.
 	 */
-	fun laidOut(width: Double, height: Double, scale: Double, layout: (String) -> String, slotValues: List<Double> = emptyList(), rows: ((Int) -> Map<String, List<LaidOutRow>>)? = null, rowsLayout: ((String) -> String)? = null, texts: Map<String, String> = emptyMap(), entries: Set<Int>? = null, previous: StyleExport? = null): StyleExport {
+	fun laidOut(width: Double, height: Double, scale: Double, layout: (String) -> String, slotValues: List<Double> = emptyList(), rows: ((Int) -> Map<String, List<LaidOutRow>>)? = null, rowsLayout: ((String) -> String)? = null, texts: Map<String, String> = emptyMap(), entries: Set<Int>? = null, previous: StyleExport? = null, naturals: Map<String, List<Double>> = emptyMap()): StyleExport {
 		val plan = plan ?: return this
 		if (slotValues.size != slots.size) throw MarklessDecodeError("the style export reads ${slots.size} slots; the layout was given ${slotValues.size} values")
 		val hex = { list: List<Double> -> Json.Arr(list.map { Json.Str(java.lang.Long.toHexString(it.toRawBits()).padStart(16, '0')) }) }
@@ -450,7 +474,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val relaidTexts = changed.associate { it.key to it.value }
 			val live = lists != null || changed.isNotEmpty()
 			val textsText = if (changed.isEmpty()) "" else (if (lists == null) ",\"rows\":[]" else "") + ",\"texts\":" + Json.Arr(changed.map { (id, text) -> Json.Arr(listOf(Json.Str(dragonId[id] ?: id), Json.Str(text))) }).text()
-			val line = "{\"assignment\":0,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":${plan.of(sent.keys)}${plan.groupsLine}$slotsText${if (lists != null) ",\"rows\":$lists" else ""}$textsText,\"sticky\":true,\"textAreas\":true}"
+			val line = "{\"assignment\":0,\"dpr\":${jsonNumber(scale)},\"viewport\":{\"width\":${jsonNumber(width)},\"height\":${jsonNumber(height)}},\"safeArea\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},\"plan\":${plan.of(sent.keys)}${plan.groupsLine}$slotsText${if (lists != null) ",\"rows\":$lists" else ""}$textsText${naturalsText(k, dragonId, naturals)},\"sticky\":true,\"textAreas\":true}"
 			if (live && rowsLayout == null) throw MarklessDecodeError("a page whose rows or texts follow state needs Dragon's live layout")
 			val result = Json.parse(if (live) rowsLayout!!(line) else layout(line))
 			val parts = result.arr("plan layout")
@@ -1272,7 +1296,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				}
 				"select-arrow" -> StyleWrite.SelectArrow(color(o.field("color", what), "$what.color"))
 				"runtime-image" -> {
-					o.only(setOf("kind", "fit", "position", "layer", "pixelated", "absent", "key", "content"), what)
+					o.only(setOf("kind", "fit", "position", "layer", "pixelated", "absent", "key", "content", "follows"), what)
+					val follows = o["follows"]?.let { (it as? Json.Bool)?.value?.takeIf { v -> v } ?: throw MarklessDecodeError("$what.follows is only ever true") } ?: false
 					if (o.field("key", what).str("$what.key") != "dragonRuntimeImage") throw MarklessDecodeError("$what: a runtime-image write's key is dragonRuntimeImage")
 					val fit = o.field("fit", what).str("$what.fit")
 					if (fit !in setOf("fill", "contain", "cover", "none", "scale-down")) throw MarklessDecodeError("$what: object-fit $fit is not a keyword Chrome has")
@@ -1295,7 +1320,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 						c.only(setOf("x", "y", "width", "height"), "$what.content")
 						Frame(c.field("x", what).num("x"), c.field("y", what).num("y"), c.field("width", what).num("width"), c.field("height", what).num("height"))
 					}
-					StyleWrite.RuntimeImage(LoadedImageSpec(fit, position, pixelated, outline, content))
+					StyleWrite.RuntimeImage(LoadedImageSpec(fit, position, pixelated, outline, content, follows))
 				}
 				"outline" -> {
 					if (o.field("key", what) != Json.Str("dragonOutline.rings")) throw MarklessDecodeError("$what: an outline write's key is dragonOutline.rings")
