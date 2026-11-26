@@ -244,8 +244,6 @@ type SsrRenderContext = SsrRecord & {
 	readonly idPrefix?: string;
 	// The composed graph's name for this instance, which can differ from its host prefix.
 	readonly instancePath?: string;
-	// The props this instance's caller passed as values that never change, stamped with the instance it names.
-	readonly staticProps?: { readonly at: string; readonly names: ReadonlyArray<string> };
 	readonly prerender?: boolean;
 	readonly prerenderSettle?: {
 		readonly graph?: {
@@ -650,68 +648,6 @@ export async function marklessSsrRunAsyncComputed(
 }
 
 /** The instance path a placed child's own graph nodes compose under, which is where its request runs are filed. */
-// A context spread from an ancestor names that ancestor, and a forced-arm probe renders placeholders, so neither fixes a prop.
-function marklessSsrFixedProps(
-	renderContext: Pick<SsrRenderContext, 'instancePath' | 'staticProps' | 'prerenderSettle'> | undefined,
-): ReadonlyArray<string> {
-	const stamped = renderContext?.staticProps;
-	return stamped && !renderContext.prerenderSettle && stamped.at === (renderContext.instancePath ?? '')
-		? stamped.names
-		: [];
-}
-
-/** The props a placed child receives fixed: values that never change, and this instance's own fixed props passed on. */
-export function marklessSsrStaticProps(
-	renderContext: SsrRenderContext | undefined,
-	placed: { readonly symbolPrefix?: string },
-	edge: {
-		readonly fixed?: ReadonlyArray<string>;
-		readonly from?: ReadonlyArray<readonly [string, string]>;
-	},
-): NonNullable<SsrRenderContext['staticProps']> {
-	const own = marklessSsrFixedProps(renderContext);
-	return {
-		at: marklessSsrChildInstancePath(renderContext, placed),
-		names: renderContext?.prerenderSettle
-			? []
-			: [
-					...(edge.fixed ?? []),
-					...(edge.from ?? []).flatMap(([name, from]) => (own.includes(from) ? [name] : [])),
-				],
-	};
-}
-
-/** Drops the records of this render's static-row lists whose prop its caller fixed: their rows stay as served. */
-export function marklessSsrStaticRows<T extends { readonly view: { readonly keyedRepeats?: ReadonlyArray<{ readonly id: string }> } }>(
-	composition: T,
-	repeats: ReadonlyArray<readonly [string, string]>,
-	renderContext: SsrRenderContext | undefined,
-): T {
-	const fixed = marklessSsrFixedProps(renderContext);
-	const dropped = new Set(repeats.flatMap(([repeatId, prop]) => (fixed.includes(prop) ? [repeatId] : [])));
-	if (dropped.size === 0 || !composition.view.keyedRepeats) return composition;
-	return {
-		...composition,
-		view: {
-			...composition.view,
-			keyedRepeats: composition.view.keyedRepeats.filter((repeat) => !dropped.has(repeat.id)),
-		},
-	};
-}
-
-/** A seed's static-row keys as row keys, less the ones this instance's caller fixed. */
-export function marklessSsrStaticRowCells(
-	cells: ReadonlyArray<Parameters<typeof marklessSsrSeedPropCells>[2][number] & { readonly staticRowKeys?: ReadonlyArray<string> }>,
-	renderContext: SsrRenderContext | undefined,
-): Parameters<typeof marklessSsrSeedPropCells>[2] {
-	const fixed = marklessSsrFixedProps(renderContext);
-	return cells.map(({ staticRowKeys, ...cell }) =>
-		staticRowKeys
-			? { ...cell, rowKeys: [...(cell.rowKeys ?? []), ...staticRowKeys.filter((key) => !fixed.includes(key))] }
-			: cell,
-	);
-}
-
 export function marklessSsrChildInstancePath(
 	renderContext: SsrRenderContext | undefined,
 	placed: { readonly symbolPrefix?: string },

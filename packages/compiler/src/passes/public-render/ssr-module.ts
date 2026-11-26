@@ -429,6 +429,10 @@ export function emitPublicSsrRenderModule(
 				names: ['marklessSsrRowQualifiedView', 'marklessRowProjectionSegment'],
 			},
 			{
+				module: 'ssr-static-rows',
+				names: ['marklessSsrStaticProps', 'marklessSsrStaticRows', 'marklessSsrStaticRowCells'],
+			},
+			{
 				module: 'ssr',
 				names: [
 					'marklessSsrRenderChild',
@@ -453,9 +457,6 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrPlacedWidgetRoots',
 					'marklessSsrChildrenWidgetRoot',
 					'marklessSsrChildInstancePath',
-					'marklessSsrStaticProps',
-					'marklessSsrStaticRows',
-					'marklessSsrStaticRowCells',
 					'marklessSsrWidgetBoundary',
 					// Keep the emitted SSR helper distinct from authored bindings.
 					'marklessSsrComposeState',
