@@ -480,6 +480,7 @@ export function runFragmentNavigation(
 		for (const item of [
 			config.entry,
 			...config.entryImports,
+			...(low ? [] : config.swapModules),
 			...(state.routes[url.pathname] ?? []),
 		]) {
 			const entry = typeof item === 'string' ? { href: item } : item;

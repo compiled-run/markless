@@ -25,6 +25,8 @@ export interface MarklessRouterClientAssetsManifest {
 		readonly fragment?: string;
 		// The files the fragment entry statically imports: a preload of the entry alone leaves them a round late.
 		readonly fragmentImports?: readonly string[];
+		// The swap's lazy modules and their imports: fetched on a press, never at idle, as the click would otherwise wait for them.
+		readonly fragmentSwapModules?: readonly string[];
 	};
 	readonly routes: MarklessRouterClientAssetRoutes;
 	// Per route: the chunk holding its resume module, then the export evaluating it inside a pack and the export holding it.
@@ -40,6 +42,7 @@ export function createClientAssetsManifest(input: {
 	readonly navigationEntry: string;
 	readonly fragmentEntry?: string;
 	readonly fragmentImports?: readonly string[];
+	readonly fragmentSwapModules?: readonly string[];
 	readonly routes: MarklessRouterClientAssetRoutes;
 }): MarklessRouterClientAssetsManifest {
 	return {
@@ -51,6 +54,9 @@ export function createClientAssetsManifest(input: {
 			navigation: input.navigationEntry,
 			...(input.fragmentEntry ? { fragment: input.fragmentEntry } : {}),
 			...(input.fragmentImports?.length ? { fragmentImports: input.fragmentImports } : {}),
+			...(input.fragmentSwapModules?.length
+				? { fragmentSwapModules: input.fragmentSwapModules }
+				: {}),
 		},
 		routes: {
 			navigation: sortRouteMap(input.routes.navigation),
@@ -252,6 +258,14 @@ async function validateClientAssetsManifest(
 					),
 				}
 			: {}),
+		...(input.entries.fragmentSwapModules !== undefined
+			? {
+					fragmentSwapModules: requiredStrings(
+						input.entries.fragmentSwapModules,
+						'entries.fragmentSwapModules',
+					),
+				}
+			: {}),
 	};
 	const routes = {
 		navigation: routeMap(input.routes.navigation, 'routes.navigation'),
@@ -269,6 +283,7 @@ async function validateClientAssetsManifest(
 		entries.navigation,
 		...(entries.fragment !== undefined ? [entries.fragment] : []),
 		...(entries.fragmentImports ?? []),
+		...(entries.fragmentSwapModules ?? []),
 		...Object.values(routes.navigation).flat(),
 		...Object.values(routes.ssr).flat(),
 		...Object.values(routes.styles).flat(),

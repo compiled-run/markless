@@ -85,6 +85,7 @@ async function install(page: Page): Promise<void> {
 		const config = {
 			entry: '',
 			entryImports: [],
+			swapModules: [],
 			linkAttribute: 'data-link',
 			prefetchAttribute: 'data-prefetch',
 			replaceAttribute: 'data-replace',

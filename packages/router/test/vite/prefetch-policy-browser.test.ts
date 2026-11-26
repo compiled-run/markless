@@ -72,6 +72,7 @@ function config(setup: Setup): FragmentNavigationConfig {
 	return {
 		entry: '/entry.js',
 		entryImports: [],
+		swapModules: ['/swap-lazy.js'],
 		linkAttribute: LINK,
 		prefetchAttribute: PREFETCH_ATTRIBUTE,
 		replaceAttribute: 'data-replace',
@@ -330,6 +331,24 @@ describe('idle tier', () => {
 			expect(inView).toContain(fetch.path);
 			expect(fetch.purpose).toBe('prefetch');
 		}
+		await s.page.close();
+	});
+
+	test("preloads the swap module but not its lazy swap modules, which wait for a visitor's intent", async () => {
+		const s = await open({});
+		const preloads = () =>
+			s.page.evaluate(() =>
+				[...document.querySelectorAll<HTMLLinkElement>('link[rel="modulepreload"]')].map(
+					(link) => new URL(link.href).pathname,
+				),
+			);
+		await s.measured(true);
+		await expect.poll(s.idle).toBe(1);
+		await expect.poll(async () => (await s.fetches()).length).toBe(6);
+		expect(await preloads()).toContain('/entry.js');
+		expect(await preloads()).not.toContain('/swap-lazy.js');
+		await s.page.hover('a[href="/p/2"]');
+		await expect.poll(preloads).toContain('/swap-lazy.js');
 		await s.page.close();
 	});
 

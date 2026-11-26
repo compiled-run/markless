@@ -566,6 +566,7 @@ function routerConfigPlugin(
 				? clientAssetFileName(manifest.entries.fragment, manifest.base)
 				: undefined;
 			fragmentEntry.imports = manifest.entries.fragmentImports;
+			fragmentEntry.swapModules = manifest.entries.fragmentSwapModules;
 			routePreloads.routes = manifest.routes;
 			routePreloads.resumeModules = manifest.resumeModules ?? {};
 			routePreloads.stylesheetSources = await clientStylesheetSources(
@@ -645,13 +646,16 @@ function routerConfigPlugin(
 					const closure = new Set<string>();
 					const scope = { chunks: everyChunk, everyChunk };
 					includeChunk(closure, scope, fragmentChunk.fileName);
-					// The swap's own lazy imports otherwise start at the click: a press fetches them beside the page.
-					for (const swapModule of fragmentChunk.dynamicImports)
-						includeChunk(closure, scope, swapModule);
 					closure.delete(fragmentChunk.fileName);
 					fragmentEntry.imports = [...closure].map((fileName) =>
 						joinURL(routePreloads.base, fileName),
 					);
+					const swapModules = new Set<string>();
+					for (const swapModule of fragmentChunk.dynamicImports)
+						includeChunk(swapModules, scope, swapModule);
+					fragmentEntry.swapModules = [...swapModules]
+						.filter((fileName) => !closure.has(fileName))
+						.map((fileName) => joinURL(routePreloads.base, fileName));
 				}
 				routePreloads.routes = routeModulePreloadsFromBundle({
 					base: routePreloads.base,
@@ -702,6 +706,7 @@ function routerConfigPlugin(
 										fragmentEntry.fileName,
 									),
 									fragmentImports: fragmentEntry.imports,
+									fragmentSwapModules: fragmentEntry.swapModules,
 								}
 							: {}),
 						routes: routePreloads.routes,
@@ -739,6 +744,7 @@ function routerConfigPlugin(
 					if (entry.fileName)
 						entry.fileName = renames.get(entry.fileName) ?? entry.fileName;
 				fragmentEntry.imports = pendingClientAssets.entries.fragmentImports;
+				fragmentEntry.swapModules = pendingClientAssets.entries.fragmentSwapModules;
 			}
 			const importMap = bundle?.[MARKLESS_IMPORT_MAP_ASSET];
 			if (importMap?.type === 'asset')
@@ -1003,6 +1009,7 @@ interface ResumeEntryState {
 	base: string;
 	fileName: string | undefined;
 	imports?: readonly string[];
+	swapModules?: readonly string[];
 }
 
 interface RoutePreloadState {
@@ -1378,6 +1385,7 @@ function linkBridgeFilesPlugin(
 					navigationEntryPath: entryPath(navigationEntry, NAVIGATION_ENTRY_ID, root),
 					fragmentEntryPath: entryPath(fragmentEntry, FRAGMENT_ENTRY_ID, root),
 					fragmentEntryImports: fragmentEntry.imports,
+					fragmentSwapModules: fragmentEntry.swapModules,
 					fragmentNavigationSource: minifiedFragmentNavigationSource(),
 					fragmentNavigationRunSource:
 						minifiedFragmentNavigationSource(runFragmentNavigation),

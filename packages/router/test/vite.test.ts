@@ -803,12 +803,11 @@ test('a page whose resolver lists no symbol gets no landing plan; the swap modul
 		};
 
 		expect(persisted.entries.fragment).toBe('/build/fragment.js');
-		// The swap's own lazy imports ride with it, so a press fetches them; what they load later does not.
-		expect(persisted.entries.fragmentImports).toEqual([
-			'/build/helper.js',
-			'/build/kept-swap.js',
-			'/build/kept-helper.js',
-		]);
+		expect(persisted.entries.fragmentImports).toEqual(['/build/helper.js']);
+		// The swap's own lazy imports are listed apart, for a press to fetch; what they load later is not.
+		expect(
+			(persisted.entries as { readonly fragmentSwapModules?: string[] }).fragmentSwapModules,
+		).toEqual(['/build/kept-swap.js', '/build/kept-helper.js']);
 		expect(persisted.routes.ssr['pages/notes.tsrx']).toEqual([]);
 		expect(persisted.routes.ssr['pages/index.tsrx']).toEqual([
 			'/build/resume.js',

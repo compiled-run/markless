@@ -4,6 +4,8 @@ import type { ModulePreloadInput } from '@markless/web/render-to-string';
 export interface FragmentNavigationConfig {
 	readonly entry: string;
 	readonly entryImports: readonly string[];
+	// Fetched on intent, never at idle: the swap imports them only once a click reaches it.
+	readonly swapModules: readonly string[];
 	readonly linkAttribute: string;
 	readonly prefetchAttribute: string;
 	readonly replaceAttribute: string;
