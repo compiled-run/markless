@@ -22,7 +22,7 @@ export function App({ label }: { label: string }) @{
 		const response = await fetch('/api/details/' + id, { signal });
 		return await response.json();
 	});
-	let input = element<HTMLInputElement>();
+	let input = element<HTMLInputElement | undefined>();
 
 	<section>
 		<input
@@ -594,7 +594,7 @@ export function App() @{
 test('B918 records element handle props and accepts same-module prop forwarding', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/ForwardedHandle.tsrx',
-		source: `import { element } from '@markless/core'; function Field(props: { input: unknown }) @{ <input el={props.input} /> } export function App() @{ const field = element<HTMLInputElement>(); <section><Field input={field} /><button onClick={() => field.focus()}>Focus</button></section> }`,
+		source: `import { element } from '@markless/core'; function Field(props: { input: unknown }) @{ <input el={props.input} /> } export function App() @{ const field = element<HTMLInputElement | undefined>(); <section><Field input={field} /><button onClick={() => field.focus()}>Focus</button></section> }`,
 	});
 
 	expect(graph.diagnostics).toEqual([]);
@@ -626,7 +626,7 @@ test('B918 records element handle props and accepts same-module prop forwarding'
 test('B918 records element handle props on imported child edges', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/App.tsrx',
-		source: `import { element } from '@markless/core'; import { Field } from './Field.tsrx'; export function App() @{ const field = element<HTMLInputElement>(); <section><Field input={field} /><button onClick={() => field.focus()}>Focus</button></section> }`,
+		source: `import { element } from '@markless/core'; import { Field } from './Field.tsrx'; export function App() @{ const field = element<HTMLInputElement | undefined>(); <section><Field input={field} /><button onClick={() => field.focus()}>Focus</button></section> }`,
 	});
 
 	expect(graph.diagnostics).toEqual([]);

@@ -120,6 +120,12 @@
 						"type": "object",
 						"required": false,
 						"doc": "The device object whose picture this shows: `const cam = camera()`."
+					},
+					{
+						"name": "class",
+						"type": "string",
+						"required": false,
+						"doc": "Classes for the picture's box on a phone, which styles size and paint; the web renders no camera."
 					}
 				]
 			},

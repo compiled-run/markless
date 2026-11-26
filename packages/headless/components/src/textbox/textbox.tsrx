@@ -22,11 +22,11 @@ export const textboxState = shared(
 			invalid: false,
 			name: '',
 		});
-		const inputEl = element<HTMLInputElement>();
-		const textareaEl = element<HTMLTextAreaElement>();
-		const labelEl = element<HTMLLabelElement>();
-		const descriptionEl = element<HTMLDivElement>();
-		const errorEl = element<HTMLDivElement>();
+		const inputEl = element<HTMLInputElement | undefined>();
+		const textareaEl = element<HTMLTextAreaElement | undefined>();
+		const labelEl = element<HTMLLabelElement | undefined>();
+		const descriptionEl = element<HTMLDivElement | undefined>();
+		const errorEl = element<HTMLDivElement | undefined>();
 
 		return {
 			...textbox,

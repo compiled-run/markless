@@ -77,8 +77,15 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 		input.semanticGraph,
 	);
 
+	const required = requiredElementHandles(input.semanticGraph);
 	const handleReadsOf = (reads: ReadonlyArray<LoweredStateRead> | undefined) =>
-		elementHandleReads(reads, handlesByGraphNodeId);
+		elementHandleReads(reads, handlesByGraphNodeId).map((read) =>
+			required.ids.has(read.handleId) ? { ...read, required: true as const } : read,
+		);
+	const handleCallsOf = (source: string) =>
+		collectElementHandleCalls(source, reachableElementHandles).map((call) =>
+			required.names.has(call.handleName) ? { ...call, required: true as const } : call,
+		);
 	const entryMarksOf = entryMarksResolver(input.semanticGraph);
 
 	// `onClick={[a, b]}` is several records on one host and event name. Their
@@ -149,7 +156,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			writes,
 			...(shownReads ? { shownReads } : {}),
 			...(entryMarks ? { entryMarks } : {}),
-			elementHandleCalls: collectElementHandleCalls(source, reachableElementHandles),
+			elementHandleCalls: handleCallsOf(source),
 			elementHandleReads: handleReadsOf(reads),
 			...(event.handlerCatchResets?.length
 				? {
@@ -1331,6 +1338,26 @@ function findModuleImport(
 	if (!rootName) return undefined;
 
 	return imports.find((item) => item.localName === rootName);
+}
+
+// A name or id counts as required only when every handle this module declares under it is.
+function requiredElementHandles(semanticGraph: SymbolResolverInput['semanticGraph']): {
+	readonly ids: ReadonlySet<string>;
+	readonly names: ReadonlySet<string>;
+} {
+	const ids = new Set<string>();
+	const names = new Set<string>();
+	const optionalIds = new Set<string>();
+	const optionalNames = new Set<string>();
+	for (const binding of semanticGraph.graphBindings) {
+		if (binding.kind !== 'element') continue;
+		const isRequired = !binding.plural && !binding.optional && !binding.sharedDefinitionId;
+		(isRequired ? ids : optionalIds).add(binding.id);
+		(isRequired ? names : optionalNames).add(binding.name);
+	}
+	for (const id of optionalIds) ids.delete(id);
+	for (const name of optionalNames) names.delete(name);
+	return { ids, names };
 }
 
 /**

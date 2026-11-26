@@ -49,7 +49,7 @@ export const wideState = shared(
 			pointerId: -1,
 			name: '',
 		});
-		const areaEl = element<HTMLDivElement>();
+		const areaEl = element<HTMLDivElement | undefined>();
 
 		return {
 			...wide,

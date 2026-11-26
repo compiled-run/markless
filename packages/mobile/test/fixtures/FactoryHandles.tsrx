@@ -3,7 +3,7 @@ import { element, shared, state, type Children } from '@markless/core';
 const boxState = shared(
 	() => {
 		const box = state({ note: 'unchecked' });
-		const fieldEl = element<HTMLInputElement>();
+		const fieldEl = element<HTMLInputElement | undefined>();
 		return {
 			...box,
 			fieldEl,

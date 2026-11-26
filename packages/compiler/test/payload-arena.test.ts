@@ -14,7 +14,7 @@ export function App() @{
 		const response = await fetch('/api/details/' + title, { signal });
 		return await response.json();
 	});
-	let input = element<HTMLInputElement>();
+	let input = element<HTMLInputElement | undefined>();
 
 	<section>
 		<input
@@ -349,7 +349,7 @@ export function App() @{
 test('B918 plans a prop-forwarded handle on the child host under the parent handle id', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/ForwardedHandle.tsrx',
-		source: `import { element } from '@markless/core'; function Field(props: { input: unknown }) @{ <input el={props.input} /> } export function App() @{ const field = element<HTMLInputElement>(); <section><Field input={field} /></section> }`,
+		source: `import { element } from '@markless/core'; function Field(props: { input: unknown }) @{ <input el={props.input} /> } export function App() @{ const field = element<HTMLInputElement | undefined>(); <section><Field input={field} /></section> }`,
 	});
 	const stateLowering = lowerStateAccess({ semanticGraph });
 

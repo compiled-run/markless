@@ -7,8 +7,8 @@ import { element, shared, state } from '@markless/core';
 export const panelState = shared(
 	() => {
 		const panel = state({ open: false });
-		const rootEl = element<HTMLDivElement>();
-		const panelEl = element<HTMLDivElement>();
+		const rootEl = element<HTMLDivElement | undefined>();
+		const panelEl = element<HTMLDivElement | undefined>();
 
 		return { ...panel, rootEl, panelEl };
 	},

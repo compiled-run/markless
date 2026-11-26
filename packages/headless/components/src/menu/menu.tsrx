@@ -63,10 +63,10 @@ export const menuState = shared(
 			keyboardAt: 0,
 			graceUntil: 0,
 		});
-		const rootEl = element<HTMLDivElement>();
-		const triggerEl = element<HTMLButtonElement>();
-		const contentEl = element<HTMLDivElement>();
-		const contextEl = element<HTMLDivElement>();
+		const rootEl = element<HTMLDivElement | undefined>();
+		const triggerEl = element<HTMLButtonElement | undefined>();
+		const contentEl = element<HTMLDivElement | undefined>();
+		const contextEl = element<HTMLDivElement | undefined>();
 		// The two rosters every walk is asked of: every submenu surface and every
 		// item of this menu, at every depth, live and in document order.
 		const itemContentEls = element<HTMLDivElement[]>();
@@ -140,8 +140,8 @@ export const menuItemState = shared(
 			restingUntil: 0,
 			closingUntil: 0,
 		});
-		const itemEl = element<HTMLDivElement>();
-		const itemContentEl = element<HTMLDivElement>();
+		const itemEl = element<HTMLDivElement | undefined>();
+		const itemContentEl = element<HTMLDivElement | undefined>();
 
 		return { ...item, itemEl, itemContentEl };
 	},

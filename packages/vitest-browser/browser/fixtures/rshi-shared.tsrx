@@ -8,7 +8,7 @@ import { markTrack } from './rshi-mark.ts';
 export const rshi = shared(
 	() => {
 		const s = state({ steps: 0 });
-		const trackEl = element<HTMLDivElement>();
+		const trackEl = element<HTMLDivElement | undefined>();
 
 		return {
 			...s,

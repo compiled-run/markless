@@ -43,8 +43,8 @@ export const sliderState = shared(
 			axisSize: 0,
 			isFlipped: false,
 		});
-		const labelEl = element<HTMLSpanElement>();
-		const trackEl = element<HTMLDivElement>();
+		const labelEl = element<HTMLSpanElement | undefined>();
+		const trackEl = element<HTMLDivElement | undefined>();
 		const thumbEls = element<HTMLDivElement[]>();
 
 		const start = computed(() => currentStart(slider.startAt, slider.seed, slider.min));

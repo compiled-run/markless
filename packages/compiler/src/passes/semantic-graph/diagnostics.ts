@@ -1393,6 +1393,68 @@ export function elementHandleRequiredDiagnostic(
 	};
 }
 
+export type ElementHandleMaybeAbsentReason =
+	| { readonly kind: 'region'; readonly region: string; readonly decidedBy?: string }
+	| { readonly kind: 'other-component'; readonly boundIn: string; readonly declaredIn: string }
+	| { readonly kind: 'shared' }
+	| { readonly kind: 'never-bound' };
+
+/**
+ * `element<T>()` promises the element is on the page whenever its component is,
+ * which is what types `clip.play()` without `?.`; any binding that cannot keep
+ * that promise is refused where it is written.
+ */
+export function elementHandleMaybeAbsentDiagnostic(input: {
+	readonly handleName: string;
+	readonly elementType?: string;
+	readonly reason: ElementHandleMaybeAbsentReason;
+	readonly line?: number;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	const type = input.elementType ?? 'Element';
+	const declared = `element<${type}>()`;
+	const optional = `element<${type} | undefined>()`;
+	const at = input.line === undefined ? '' : ` on line ${input.line}`;
+	const name = input.handleName;
+	const reason = input.reason;
+	const problem =
+		reason.kind === 'region'
+			? `el={${name}}${at} is inside ${reason.region}, ${reason.decidedBy ? `and ${reason.decidedBy} does not always render them` : 'so the element is only on the page some of the time'}`
+			: reason.kind === 'other-component'
+				? `"${name}"${at} is bound by ${reason.boundIn}, not by ${reason.declaredIn} where it is declared, so ${reason.declaredIn} cannot know whether the element is on the page`
+				: reason.kind === 'shared'
+					? `"${name}"${at} is created in a shared() factory, so the components that use it decide whether the element is rendered`
+					: `"${name}"${at} is never bound with el={${name}} in this component, so the element is never on the page`;
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_MAYBE_ABSENT',
+		title: 'element() handle may not be on the page',
+		message: `"${name}" is declared ${declared}, which says the element is always on the page, but ${problem}. Declare it ${optional} and write ${name}?. where you use it.`,
+		why: 'An element() handle typed without | undefined lets handlers call it without ?., which is only safe when the element renders whenever its component does.',
+		span: input.span,
+		suggestion:
+			reason.kind === 'never-bound'
+				? `Bind it with el={${name}} on an element that always renders, or declare it ${optional}.`
+				: `Write const ${name} = ${optional}; and use ${name}?. where you read it.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_MAYBE_ABSENT',
+	});
+}
+
+export function elementHandleArrayOptionalDiagnostic(input: {
+	readonly handleName: string;
+	readonly arrayType: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_ARRAY_OPTIONAL',
+		title: 'An element() array handle cannot be undefined',
+		message: `"${input.handleName}" is declared with an array type or undefined, but an array handle is never undefined: it is an empty array until its elements render. Declare it element<${input.arrayType}>().`,
+		why: 'An array handle answers the elements on the page right now, in page order, so "none yet" is an empty array rather than undefined.',
+		span: input.span,
+		suggestion: `Write element<${input.arrayType}>() and check its length where you read it.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_ARRAY_OPTIONAL',
+	});
+}
+
 export function elementHandlePropUnsupportedDiagnostic(
 	binding: SemanticElementHandleBinding,
 ): SemanticGraphDiagnostic {

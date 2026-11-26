@@ -5,7 +5,7 @@ import { element, shared, state } from '@markless/core';
 export const ehv = shared(
 	() => {
 		const s = state({ hits: 0 });
-		const panelEl = element<HTMLDivElement>();
+		const panelEl = element<HTMLDivElement | undefined>();
 
 		return { ...s, panelEl };
 	},

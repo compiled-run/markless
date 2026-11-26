@@ -5,7 +5,7 @@ import { computed, element, shared, state } from '@markless/core';
 // the seed, a gesture that writes, and an element() handle in an IDREF position.
 export const rpt = shared(() => {
 	const r = state({ checked: false, disabled: false, label: '' });
-	const triggerEl = element<HTMLButtonElement>();
+	const triggerEl = element<HTMLButtonElement | undefined>();
 
 	return {
 		...r,

@@ -24,7 +24,7 @@ test('a page handle bound beside a same-module part that shadows its name still 
 import { element } from '@markless/core';
 
 function SameSpot({ target }) @{
-	const rootEl = element<HTMLDivElement>();
+	const rootEl = element<HTMLDivElement | undefined>();
 
 	<div el={rootEl} onClick={() => {
 		rootEl?.setAttribute('data-probe', typeof target);
@@ -100,7 +100,7 @@ function Frame({ slotEl }) @{
 }
 
 export default function Shell() @{
-	const slotEl = element<HTMLDivElement>();
+	const slotEl = element<HTMLDivElement | undefined>();
 
 	<section>
 		<Frame slotEl={slotEl} />

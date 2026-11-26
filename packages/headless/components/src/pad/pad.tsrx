@@ -69,10 +69,10 @@ export const padState = shared(
 			boxWidth: 0,
 			boxHeight: 0,
 		});
-		const areaEl = element<HTMLDivElement>();
-		const labelEl = element<HTMLSpanElement>();
-		const descriptionEl = element<HTMLDivElement>();
-		const errorEl = element<HTMLDivElement>();
+		const areaEl = element<HTMLDivElement | undefined>();
+		const labelEl = element<HTMLSpanElement | undefined>();
+		const descriptionEl = element<HTMLDivElement | undefined>();
+		const errorEl = element<HTMLDivElement | undefined>();
 		const thumbEls = element<HTMLDivElement[]>();
 
 		const points = computed(() => {

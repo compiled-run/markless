@@ -6,8 +6,8 @@ import { element, shared, state } from '@markless/core';
 export const fieldState = shared(
 	() => {
 		const field = state({ invalid: false });
-		const errorEl = element<HTMLParagraphElement>();
-		const descriptionEl = element<HTMLParagraphElement>();
+		const errorEl = element<HTMLParagraphElement | undefined>();
+		const descriptionEl = element<HTMLParagraphElement | undefined>();
 		return { ...field, errorEl, descriptionEl };
 	},
 	{ scope: 'subtree' },

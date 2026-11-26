@@ -29,7 +29,7 @@ import { element } from '@markless/core';
 import { openOverlay } from './overlay.ts';
 
 export function Page() @{
-	const contentEl = element<HTMLDivElement>();
+	const contentEl = element<HTMLDivElement | undefined>();
 
 	<div>
 		<div el={contentEl}>content</div>
@@ -51,7 +51,7 @@ import { element, shared, state } from '@markless/core';
 export const tabs = shared(
 	() => {
 		const t = state({ hits: 0 });
-		const panelEl = element<HTMLDivElement>();
+		const panelEl = element<HTMLDivElement | undefined>();
 		return { ...t, panelEl };
 	},
 	{ scope: 'subtree' },
@@ -97,7 +97,7 @@ export function Page() @{
 		(symbol) => symbol.kind === 'event-handler',
 	);
 	expect(handler?.kind === 'event-handler' ? handler.elementHandleReads : undefined).toEqual([
-		{ source: 'box', handleId: 'element:box', handleName: 'box' },
+		{ source: 'box', handleId: 'element:box', handleName: 'box', required: true },
 	]);
 });
 
@@ -144,7 +144,7 @@ import { element } from '@markless/core';
 import { measure } from './measure.ts';
 
 export function Page() @{
-	const box = element<HTMLDivElement>();
+	const box = element<HTMLDivElement | undefined>();
 	const key = 'tagName';
 
 	<div>
@@ -170,7 +170,7 @@ import { element } from '@markless/core';
 import { measure } from './measure.ts';
 
 export function Page() @{
-	const box = element<HTMLDivElement>();
+	const box = element<HTMLDivElement | undefined>();
 
 	<div>
 		<div el={box}>box</div>

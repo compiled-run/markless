@@ -13,7 +13,7 @@ import { ic } from './ic-widget.tsrx';
 export const icCard = shared(
 	() => {
 		const card = state({ note: '' });
-		const noteEl = element<HTMLSpanElement>();
+		const noteEl = element<HTMLSpanElement | undefined>();
 
 		return { ...card, noteEl };
 	},

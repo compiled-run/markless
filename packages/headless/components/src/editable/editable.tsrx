@@ -41,12 +41,12 @@ export const editableState = shared(
 			name: '',
 			editing: false,
 		});
-		const boxEl = element<HTMLDivElement>();
-		const labelEl = element<HTMLLabelElement>();
-		const triggerEl = element<HTMLButtonElement>();
-		const inputEl = element<HTMLInputElement>();
-		const descriptionEl = element<HTMLDivElement>();
-		const errorEl = element<HTMLDivElement>();
+		const boxEl = element<HTMLDivElement | undefined>();
+		const labelEl = element<HTMLLabelElement | undefined>();
+		const triggerEl = element<HTMLButtonElement | undefined>();
+		const inputEl = element<HTMLInputElement | undefined>();
+		const descriptionEl = element<HTMLDivElement | undefined>();
+		const errorEl = element<HTMLDivElement | undefined>();
 
 		// `written`, not `value`: a lifted symbol that reads `instance.value` from a
 		// part declaring a `value` prop is refused by capture analysis.

@@ -69,7 +69,7 @@ import { element } from '@markless/core';
 import { fly } from './gems.ts';
 
 export default function One() @{
-	const one = element<HTMLElement>();
+	const one = element<HTMLElement | undefined>();
 	<div>
 		<b el={one}>one</b>
 		<button onClick={() => { ${statement} }}>go</button>
@@ -112,7 +112,7 @@ test('a handle name the lowering leaves standing is reported as a handle, with t
 import { element } from '@markless/core';
 
 export default function One() @{
-	const one = element<HTMLElement>();
+	const one = element<HTMLElement | undefined>();
 	<div>
 		<b el={one}>one</b>
 		<button onClick={() => { ${statement} }}>go</button>

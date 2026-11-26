@@ -1,0 +1,18 @@
+{
+	"perPage": {
+		"/": 227461,
+		"/notes/[id]": 182539
+	},
+	"perPageTotal": 410000,
+	"app": 167341,
+	"targets": {
+		"ios": {
+			"writeLists": 17,
+			"writeListReferences": 20
+		},
+		"android": {
+			"writeLists": 17,
+			"writeListReferences": 20
+		}
+	}
+}

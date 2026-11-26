@@ -1,0 +1,29 @@
+appId: ${APP_ID}
+name: s63-styled-camera
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp:
+    permissions:
+      camera: allow
+- assertVisible: New photo
+- assertVisible: Camera ready
+- assertVisible: Take photo
+- assertVisible: Photos 0
+- assertNotVisible: Camera starting
+- assertVisible:
+    id: markless-camera
+    text: camera on
+- tapOn: Take photo
+- assertNotVisible: Photos 0
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: camera\\.takePhoto"
+- assertVisible: Photos 1
+- assertNotVisible: Photos 0
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: camera\\.takePhoto"

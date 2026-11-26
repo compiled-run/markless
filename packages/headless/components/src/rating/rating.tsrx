@@ -50,10 +50,10 @@ export const ratingState = shared(
 			// -1, the "no hover is offering anything" sentinel `noPreview()` names.
 			previewAt: -1,
 		});
-		const groupEl = element<HTMLDivElement>();
-		const labelEl = element<HTMLSpanElement>();
-		const descriptionEl = element<HTMLDivElement>();
-		const errorEl = element<HTMLDivElement>();
+		const groupEl = element<HTMLDivElement | undefined>();
+		const labelEl = element<HTMLSpanElement | undefined>();
+		const descriptionEl = element<HTMLDivElement | undefined>();
+		const errorEl = element<HTMLDivElement | undefined>();
 		// The array type argument makes the handle plural: bound on every mark, read back live and in document order.
 		const itemEls = element<HTMLDivElement[]>();
 

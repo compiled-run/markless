@@ -2136,7 +2136,7 @@ test('B908 Unit B emits authored optional-chain element handle calls', async () 
 import { element } from '@markless/core';
 
 export function App() @{
-	const input = element<HTMLInputElement>();
+	const input = element<HTMLInputElement | undefined>();
 
 	<>
 		<input el={input} />
@@ -2158,7 +2158,7 @@ test('B908 Unit B collects element handle calls inside nested callbacks', async 
 import { element } from '@markless/core';
 
 export function App() @{
-	const input = element<HTMLInputElement>();
+	const input = element<HTMLInputElement | undefined>();
 
 	<>
 		<input el={input} />
@@ -2182,7 +2182,7 @@ test('B908 Unit B ignores element handle lookalikes inside string literals', asy
 import { element, state } from '@markless/core';
 
 export function App() @{
-	const input = element<HTMLInputElement>();
+	const input = element<HTMLInputElement | undefined>();
 	let label = state('');
 
 	<>
@@ -2210,7 +2210,7 @@ function Field(props: { input: unknown }) @{
 }
 
 export function App() @{
-	const field = element<HTMLInputElement>();
+	const field = element<HTMLInputElement | undefined>();
 
 	<section>
 		<Field input={field} />
@@ -2886,7 +2886,7 @@ import { element, state } from '@markless/core';
 
 export function App() @{
 	let status = state('idle');
-	const box = element();
+	const box = element<Element | undefined>();
 
 	<main>
 		<input el={box} placeholder="Name" />

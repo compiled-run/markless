@@ -8,7 +8,7 @@ import { element, shared, state } from '@markless/core';
 export const pairState = shared(
 	() => {
 		const pair = state({ hits: 0, name: '' });
-		const contentEl = element<HTMLDivElement>();
+		const contentEl = element<HTMLDivElement | undefined>();
 
 		return { ...pair, contentEl };
 	},
@@ -20,7 +20,7 @@ export const pairState = shared(
 export const pairLevelState = shared(
 	() => {
 		const level = state({ hits: 0, name: '' });
-		const contentEl = element<HTMLDivElement>();
+		const contentEl = element<HTMLDivElement | undefined>();
 
 		return { ...level, contentEl };
 	},

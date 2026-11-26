@@ -8589,9 +8589,7 @@ function elementHandleValueLowering(
 	// or `t.panelEl` reached through a shared() instance.
 	if (!root || !namesHandle(root, handle.handleName)) return { kind: 'refused' };
 
-	const call = callNode(memberChainNode('context.getElementHandle'), [
-		literalNode(handle.handleId),
-	]);
+	const call = elementHandleLookupNode(handle.handleId, handle.handleName, handle.required);
 	return {
 		kind: 'lowered',
 		node: hops.length === 0 ? call : elementHandleTailNode(call, hops),
@@ -8664,6 +8662,35 @@ function elementHandleTailNode(base: EmissionNode, hops: ReadonlyArray<AnyNode>)
 	return { type: 'ChainExpression', expression };
 }
 
+/**
+ * `context.getElementHandle("clip")`, and for a handle declared without `| undefined`,
+ * `?? (dev ? void console.warn(...) : undefined)`: production keeps today's quiet miss.
+ */
+function elementHandleLookupNode(
+	key: string,
+	handleName: string,
+	required: true | undefined,
+): EmissionNode {
+	const lookup = callNode(memberChainNode('context.getElementHandle'), [literalNode(key)]);
+	if (!required) return lookup;
+	return logicalNode(
+		'??',
+		lookup,
+		conditionalNode(
+			devEnabledNode(),
+			unaryNode(
+				'void',
+				callNode(memberChainNode('console.warn'), [
+					literalNode(
+						`markless: "${handleName}" is not on the page, so this read does nothing. Its component was removed before this code ran (a late click, a timer, or code after an await). If it can be missing, declare it element<… | undefined>() and check it.`,
+					),
+				]),
+			),
+			identifierNode('undefined'),
+		),
+	);
+}
+
 /** `context.getElementHandle("chart")?.setData(1)`. */
 function elementHandleCallNode(
 	node: AnyNode,
@@ -8686,9 +8713,7 @@ function elementHandleCallNode(
 				type: 'CallExpression',
 				callee: {
 					type: 'MemberExpression',
-					object: callNode(memberChainNode('context.getElementHandle'), [
-						literalNode(call.handleName),
-					]),
+					object: elementHandleLookupNode(call.handleName, call.handleName, call.required),
 					property: identifierNode(call.method),
 					computed: false,
 					optional: true,

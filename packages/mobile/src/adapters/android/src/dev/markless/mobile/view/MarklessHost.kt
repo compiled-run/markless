@@ -369,8 +369,22 @@ class MarklessHost(
 	private val overlays = Overlays(this, context, dpr)
 
 	/** The root's frame inside the viewport, when a style export placed it. */
-	var rootFrame: Rect? = null
-		private set
+	private var singleRootFrame: Rect? = null
+
+	/** Where the page's root lays out, in the page's pixels; a styled page of several top-level boxes holds them all from the page's origin. */
+	val rootFrame: Rect? get() {
+		val box = pageBox?.takeIf { style != null } ?: return singleRootFrame
+		var right = 0
+		var bottom = 0
+		for (i in 0 until box.childCount) {
+			val child = box.getChildAt(i)
+			if (child.visibility == View.GONE) continue
+			val f = box.frames[child] ?: continue
+			right = maxOf(right, f.right)
+			bottom = maxOf(bottom, f.bottom)
+		}
+		return Rect(0, 0, right, bottom)
+	}
 
 	/** Opens the page a `navigate` entry names; required for a payload with links. */
 	var onNavigate: ((JournalEntry.Navigate) -> Unit)? = null
@@ -434,7 +448,6 @@ class MarklessHost(
 
 	init {
 		val single = (payload.nodes.firstOrNull() as? Node.Element)?.takeIf { it.parent == null && it.arm == null && payload.nodes.count { n -> n.parent == null } == 1 }
-		if (single == null && style != null) throw MarklessHostError("a styled payload must start with its one root element")
 		if (single == null && payload.nodes.isEmpty()) throw MarklessHostError("payload has no nodes")
 		pageBox = if (single == null) MarklessBox(context) else null
 		for (sheet in payload.nodes.filterIsInstance<Node.Sheet>()) {
@@ -1839,8 +1852,8 @@ class MarklessHost(
 			} else {
 				Rect(ax.roundToInt() - ox, ay.roundToInt() - oy, (ax + frame.width).roundToInt() - ox, (ay + frame.height).roundToInt() - oy)
 			}
-			if (frameParent == null) rootFrame = rect else {
-				val box = scrollers[frameParent]?.second ?: views.getValue(frameParent) as MarklessBox
+			val box = if (frameParent == null) pageBox else scrollers[frameParent]?.second ?: views.getValue(frameParent) as MarklessBox
+			if (box == null) singleRootFrame = rect else {
 				if (view.parent !== box) moveInto(view, box, lifted = stackParent != null)
 				box.frames[view] = rect
 			}
