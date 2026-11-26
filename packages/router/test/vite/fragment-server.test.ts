@@ -279,6 +279,14 @@ test('plain anchors to pages get their landing plan, and the bridge names every 
 	expect(laterLinkBridge(served)).toContain('"prefetch":true');
 });
 
+test("a press fetches the swap module's imports, lazy swap modules included, beside the page", async () => {
+	const served = entry({ fragmentEntryImports: ['/helper.js', '/kept-swap.js'] });
+	const html = await (await served.fetch(new Request('https://app.test/'))).text();
+	expect(servedLinkBridge(html, served)).toContain(
+		'"code":["/fragment.js","/helper.js","/kept-swap.js"]',
+	);
+});
+
 test('prefetch: false turns every speculative fetch off in the bridge', async () => {
 	const served = entry({ prefetch: false });
 	const html = await (await served.fetch(new Request('https://app.test/'))).text();

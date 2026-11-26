@@ -313,7 +313,7 @@ export function startFragmentNavigation(
 }
 
 export type FragmentIntent = {
-	// The swap module and the files it statically imports.
+	// The swap module, the files it statically imports, and the swap modules it imports on demand.
 	readonly code: readonly string[];
 	// Which networks hover, focus and press fetch on: 0 none, 1 fast, 2 all.
 	readonly intent: number;

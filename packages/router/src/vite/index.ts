@@ -643,11 +643,11 @@ function routerConfigPlugin(
 						outputChunks(bundle).map((chunk) => [chunk.fileName, chunk]),
 					);
 					const closure = new Set<string>();
-					includeChunk(
-						closure,
-						{ chunks: everyChunk, everyChunk },
-						fragmentChunk.fileName,
-					);
+					const scope = { chunks: everyChunk, everyChunk };
+					includeChunk(closure, scope, fragmentChunk.fileName);
+					// The swap's own lazy imports otherwise start at the click: a press fetches them beside the page.
+					for (const swapModule of fragmentChunk.dynamicImports)
+						includeChunk(closure, scope, swapModule);
 					closure.delete(fragmentChunk.fileName);
 					fragmentEntry.imports = [...closure].map((fileName) =>
 						joinURL(routePreloads.base, fileName),

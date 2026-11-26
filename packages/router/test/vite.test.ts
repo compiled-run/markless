@@ -722,7 +722,7 @@ test('persists client assets for a fresh server plugin instance', async () => {
 	}
 });
 
-test('a page whose resolver lists no symbol gets no landing plan; the swap module lists what it imports', async () => {
+test('a page whose resolver lists no symbol gets no landing plan; the swap module lists what it and its lazy swap modules import', async () => {
 	const workspace = await mkdtemp(join(tmpdir(), 'markless-router-quiet-landing-'));
 	const root = join(workspace, 'app');
 	const clientOutDir = join(root, 'dist/client');
@@ -767,11 +767,19 @@ test('a page whose resolver lists no symbol gets no landing plan; the swap modul
 			moduleIds: [join(root, 'pages/notes.tsrx'), resolverId('pages/notes.tsrx')],
 		}),
 		'build/fragment.js': chunk({
+			dynamicImports: ['build/kept-swap.js'],
 			fileName: 'build/fragment.js',
 			imports: ['build/helper.js'],
 			moduleIds: ['/repo/packages/router/src/vite/entries/fragment-entry.ts'],
 		}),
 		'build/helper.js': chunk({ fileName: 'build/helper.js' }),
+		'build/kept-swap.js': chunk({
+			dynamicImports: ['build/kept-later.js'],
+			fileName: 'build/kept-swap.js',
+			imports: ['build/kept-helper.js'],
+		}),
+		'build/kept-helper.js': chunk({ fileName: 'build/kept-helper.js' }),
+		'build/kept-later.js': chunk({ fileName: 'build/kept-later.js' }),
 	};
 
 	try {
@@ -795,7 +803,12 @@ test('a page whose resolver lists no symbol gets no landing plan; the swap modul
 		};
 
 		expect(persisted.entries.fragment).toBe('/build/fragment.js');
-		expect(persisted.entries.fragmentImports).toEqual(['/build/helper.js']);
+		// The swap's own lazy imports ride with it, so a press fetches them; what they load later does not.
+		expect(persisted.entries.fragmentImports).toEqual([
+			'/build/helper.js',
+			'/build/kept-swap.js',
+			'/build/kept-helper.js',
+		]);
 		expect(persisted.routes.ssr['pages/notes.tsrx']).toEqual([]);
 		expect(persisted.routes.ssr['pages/index.tsrx']).toEqual([
 			'/build/resume.js',
