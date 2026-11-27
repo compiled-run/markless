@@ -7,9 +7,12 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolStreamedArmPatch,
 	type ProtocolSyncPolicy,
+	type ProtocolViewPayload,
 	type ProtocolSyncPolicyCondition,
 } from '@markless/serializer';
 import {
+	PROTOCOL_IDLE_EVENT_NAME,
+	PROTOCOL_VISIBLE_EVENT_NAME,
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_CONTAINER_START_COMMENT,
 	PROTOCOL_EVENT_HOST_ATTRIBUTE,
@@ -22,6 +25,7 @@ import {
 	MARKLESS_REVEAL_TRAIN_CADENCE_MS,
 } from './pending-timing.ts';
 import { createInlineInPlaceCheckSource, IN_PLACE_CHECK } from './inline/resumer.ts';
+import { resumesAtLoad, servedRowCount } from './fns/served-rows.ts';
 import {
 	artifactResumeModuleUrl,
 	assembleSsrContainer,
@@ -146,8 +150,15 @@ export async function renderToStream(
 		]);
 		output = await renderSsrOutput(component, options.props, renderContext);
 	}
-	const shell = await assembleSsrContainer(component, output, options);
 	const pendingArms = pendingStreamArms(output, renderContext);
+	const shellRows = servedRowCount(pageRepeats(output), output.state);
+	const shell = await assembleSsrContainer(component, output, {
+		...options,
+		// A page whose rows would make the first press pay for adopting them resumes after load instead.
+		...(resumesAtLoad(shellRows)
+			? {}
+			: { streamedBoundaryIds: new Set(pendingArms.map((arm) => arm.boundaryId)) }),
+	});
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
 	return {
 		shell,
@@ -160,6 +171,7 @@ export async function renderToStream(
 				pendingArms,
 				resumeModuleUrl,
 				shellState: output.state,
+				shellRows,
 			}),
 		cancel: (reason) => settleController.abort(reason),
 	};
@@ -217,7 +229,9 @@ async function* streamArmAppends(input: {
 	readonly pendingArms: ReadonlyArray<PendingArm>;
 	readonly resumeModuleUrl: string | undefined;
 	readonly shellState: ProtocolStatePayload | undefined;
+	readonly shellRows: number;
 }): AsyncGenerator<string, void, void> {
+	let rows = input.shellRows;
 	const remaining = new Map(input.pendingArms.map((arm) => [arm.boundaryId, arm]));
 	const streamed = new Set(remaining.keys());
 	const runs = input.renderContext.streaming.runs;
@@ -305,15 +319,16 @@ async function* streamArmAppends(input: {
 					parts.push(armExecutorScript(input.resumeModuleUrl, input.options.nonce));
 					executorEmitted = true;
 				}
-				parts.push(
-					renderArmAppend(
-						output,
-						arm,
-						input.options.nonce,
-						input.shellState,
-						input.renderContext.streaming.caughtErrors?.get(arm.boundaryId),
-					),
+				const append = renderArmAppend(
+					output,
+					arm,
+					input.options.nonce,
+					input.shellState,
+					input.renderContext.streaming.caughtErrors?.get(arm.boundaryId),
+					rows,
 				);
+				rows = append.rows;
+				parts.push(append.html);
 			}
 			if (parts.length > 0) yield parts.join('');
 		}
@@ -453,7 +468,8 @@ function renderArmAppend(
 	nonce: string | undefined,
 	shellState: ProtocolStatePayload | undefined,
 	caughtError: string | undefined,
-): string {
+	rowsBefore: number,
+): { readonly html: string; readonly rows: number } {
 	const renderedAnchor = output.structure?.anchors.find(
 		(candidate) => candidate.kind === 'async' && candidate.id === arm.boundaryId,
 	);
@@ -523,16 +539,21 @@ function renderArmAppend(
 	];
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 
-	const revealArguments = arm.revealDependencyIds.length
-		? `${JSON.stringify(arm.boundaryId)},${JSON.stringify(arm.revealDependencyIds)}`
-		: JSON.stringify(arm.boundaryId);
+	const rows = rowsBefore + servedRowCount(servedArmRecords.keyedRepeats ?? [], output.state);
+	const starts = armRunsWithoutInteraction(servedArmRecords) || resumesAtLoad(rows);
+	const revealArguments =
+		arm.revealDependencyIds.length || starts
+			? `${JSON.stringify(arm.boundaryId)},${JSON.stringify(arm.revealDependencyIds)}${starts ? ',1' : ''}`
+			: JSON.stringify(arm.boundaryId);
 
-	return (
-		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${withArmEventHostMarks(armEvents, armHtml)}</template>` +
-		`<script type="${PROTOCOL_STREAMED_ARM_SCRIPT_TYPE}" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armPatch))}</script>` +
-		`<script type="${PROTOCOL_STATE_PATCH_SCRIPT_TYPE}" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
-		`<script${nonceAttribute}>${sendsFormInPlace(servedArmRecords) ? escapeInlineScript(createInlineInPlaceCheckSource()) : ''}__mArm(${escapeScriptJson(revealArguments)})</script>`
-	);
+	return {
+		rows,
+		html:
+			`<template m:arm="${escapeAttribute(arm.boundaryId)}">${withArmEventHostMarks(armEvents, armHtml)}</template>` +
+			`<script type="${PROTOCOL_STREAMED_ARM_SCRIPT_TYPE}" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armPatch))}</script>` +
+			`<script type="${PROTOCOL_STATE_PATCH_SCRIPT_TYPE}" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
+			`<script${nonceAttribute}>${sendsFormInPlace(servedArmRecords) ? escapeInlineScript(createInlineInPlaceCheckSource()) : ''}__mArm(${escapeScriptJson(revealArguments)})</script>`,
+	};
 }
 
 type ServedBranch = NonNullable<ProtocolArmRecordSet['branches']>[number] & {
@@ -741,6 +762,8 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 				const mod = await (r.__mResume ||= import((own && own.getAttribute(${JSON.stringify(RESUME_MODULE_ATTRIBUTE)})) || ${JSON.stringify(resumeModuleUrl)}).catch((error) => {
 					throw ((r.__mResume = undefined), error);
 				}));
+				// A navigation that kept the container started another page while the module loaded.
+				if (r.__mL !== life) return;
 				await mod.resumeContainerEvent(input);
 			};
 			r.__marklessListen ||= (t) => r.addEventListener(t, forward, true);
@@ -748,7 +771,17 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 			r.addEventListener(t, forward, true);
 				${debugRegistration}
 			}
-			${debugActivate}`
+			${debugActivate}
+			// An arm whose hosts run at idle or when visible needs the runtime with no interaction, as the shell's own would.
+			if (starts) (globalThis.requestIdleCallback || setTimeout)(async () => {
+				if (r.__mL !== life || r.__marklessDispatch || r.__asyncResumeRuntimeStarted) return;
+				r.__marklessDelegatedDispatch = true;
+				const own = r.querySelector('script[${RESUME_MODULE_ATTRIBUTE}]');
+				const mod = await (r.__mResume ||= import((own && own.getAttribute(${JSON.stringify(RESUME_MODULE_ATTRIBUTE)})) || ${JSON.stringify(resumeModuleUrl)}).catch((error) => {
+					throw ((r.__mResume = undefined), error);
+				}));
+				if (r.__mL === life) await mod.resumeContainerEvent({ root: r, event: 0 });
+			});`
 		: '';
 	const source = `globalThis.__mArm ||= (() => {
 	const d = document;
@@ -757,7 +790,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	let last = -1 / 0;
 	let scheduled = false;
 	const idle = [];
-	const commit = (id) => {
+	const commit = (id, starts) => {
 	const w = d.createTreeWalker(d.body, 128);
 	let s, e, n;
 	while ((n = w.nextNode())) {
@@ -792,11 +825,11 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 			moved = false;
 			for (let i = 0; i < queue.length; i++) {
 				if (queue[i][1].some((dep) => !done.has(dep))) continue;
-				const id = queue.splice(i--, 1)[0][0];
+				const [id, , starts] = queue.splice(i--, 1)[0];
 				done.add(id);
 				moved = true;
 				last = performance.now();
-				try { commit(id); } catch (error) { setTimeout(() => { throw error; }); }
+				try { commit(id, starts); } catch (error) { setTimeout(() => { throw error; }); }
 			}
 		}
 		for (const f of idle.splice(0)) f();
@@ -808,13 +841,62 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 		if (!paint) return void requestAnimationFrame(flush);
 		setTimeout(flush, Math.max(paint.startTime + ${String(MARKLESS_PENDING_MIN_VISIBLE_MS)}, last + ${String(MARKLESS_REVEAL_TRAIN_CADENCE_MS)}) - performance.now());
 	};
-	const arm = (id, deps) => { queue.push([id, deps || []]); schedule(); };
+	const arm = (id, deps, starts) => { queue.push([id, deps || [], starts]); schedule(); };
 	arm.idle = (f) => (scheduled ? idle.push(f) : f());
 	arm.flush = flush;
 	return arm;
 })();`;
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 	return `<script data-markless-stream-executor${nonceAttribute}>${escapeInlineScript(source)}</script>`;
+}
+
+const UNPROMPTED_EVENT_NAMES: ReadonlySet<string> = new Set([
+	PROTOCOL_IDLE_EVENT_NAME,
+	PROTOCOL_VISIBLE_EVENT_NAME,
+]);
+
+// An arm, its rows or its painted branches naming an idle or visible host.
+function armRunsWithoutInteraction(records: ProtocolArmRecordSet): boolean {
+	const named = (set: {
+		readonly events?: ReadonlyArray<{ readonly eventName: string }>;
+		readonly keyedRepeats?: ReadonlyArray<{
+			readonly rowEvents?: ReadonlyArray<{ readonly eventName: string }>;
+		}>;
+	}) =>
+		(set.events ?? []).some((event) => UNPROMPTED_EVENT_NAMES.has(event.eventName)) ||
+		(set.keyedRepeats ?? []).some((repeat) =>
+			(repeat.rowEvents ?? []).some((event) => UNPROMPTED_EVENT_NAMES.has(event.eventName)),
+		);
+	const branches =
+		(
+			records as {
+				readonly branches?: ReadonlyArray<{
+					readonly servedArmRecords?: Parameters<typeof named>[0];
+				}>;
+			}
+		).branches ?? [];
+	return (
+		named(records) ||
+		branches.some((branch) => !!branch.servedArmRecords && named(branch.servedArmRecords))
+	);
+}
+
+// Every keyed repeat the shell served: the page's own and those in @try arms it rendered settled.
+function pageRepeats(
+	output: SsrRenderOutput,
+): ReadonlyArray<{
+	readonly collectionGraphNodeId?: string;
+	readonly collectionPath?: ReadonlyArray<string>;
+}> {
+	const view = output.view as ProtocolViewPayload | undefined;
+	return [
+		...(view?.keyedRepeats ?? []),
+		...(view?.asyncBoundaries ?? []).flatMap((boundary) =>
+			boundary.armRecords && !Array.isArray(boundary.armRecords)
+				? ((boundary.armRecords as ProtocolArmRecordSet).keyedRepeats ?? [])
+				: [],
+		),
+	];
 }
 
 function streamArmError(boundaryId: string, expected: string, where: string): Error {

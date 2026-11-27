@@ -155,6 +155,18 @@ async function addedListFill(page: Page, url: string, rowStandsFirst: boolean) {
 	} else {
 		await cdp.send('Profiler.takePreciseCoverage');
 		await page.locator('[data-add]').click();
+		// A page whose answers streamed starts its runtime at this press; that start's loads land before the held answer is let through.
+		await page.waitForFunction(
+			() =>
+				new Promise<boolean>((done) => {
+					let seen = -1;
+					const quiet = setInterval(() => {
+						const loads = performance.getEntriesByType('resource').length;
+						if (loads === seen) done((clearInterval(quiet), true));
+						seen = loads;
+					}, 300);
+				}),
+		);
 	}
 	// This fixture's document names no preloads, so the press may load the page's pack; the answer must not fetch.
 	page.on('request', (request) => {
