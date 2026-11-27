@@ -462,7 +462,7 @@ export async function compileNativeComponent(input: {
 	};
 }
 
-/** Elements a native host cannot draw on a styled page from what Dragon exports for it: a select or a @for list in a system sheet and a summary's triangle. */
+/** Elements a native host cannot draw on a styled page from what Dragon exports for it: a select in a system sheet and a summary's triangle. */
 function unstyledOnly(
 	payload: NativeViewPayload,
 	sources: NativeViewArtifact['elementSources'],
@@ -474,13 +474,6 @@ function unstyledOnly(
 	return payload.nodes.flatMap((node) => {
 		const span = sources.get(node.id)?.span;
 		const sheet = sheetOf.get(node.id);
-		if (node.kind === 'repeat' && sheet)
-			return [
-				nativeUnsupported(
-					`the @for list ${node.id} inside the system sheet ${sheet} on a styled page: a sheet's content is exported without Dragon's plan layout, so its rows get no boxes on the phone`,
-					span,
-				),
-			];
 		if (node.kind !== 'element') return [];
 		if (node.element === 'select' && sheet)
 			return [

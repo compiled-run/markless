@@ -365,11 +365,13 @@ class MarklessHost(
 	}
 
 	/** Each styled sheet's layouts, in its snap point order, and the one its resting height shows. */
-	private class SheetLayouts(val snapPoints: List<Double>, val layouts: List<Layout>) {
+	private class SheetLayouts(val snapPoints: List<Double>, val planned: List<StyleExport>, val layouts: List<Layout>) {
 		var current = 0
 		var warned = false
 	}
 	private val sheetLayouts = LinkedHashMap<String, SheetLayouts>()
+	/** Whether each styled sheet's content has had its first layout with the rows it shows. */
+	private var sheetsLaidOut = false
 
 	private fun sheetLayout(id: String): Layout? = sheetLayouts[id]?.let { it.layouts[it.current] }
 
@@ -466,7 +468,8 @@ class MarklessHost(
 			val content = MarklessBox(context).apply { named(this, sheet.id) }
 			views[sheet.id] = content
 			style?.let { st ->
-				sheetLayouts[sheet.id] = SheetLayouts(sheet.snapPoints, st.sheetHeights(sheet.id, sheet.snapPoints).map { Layout(it, everyCell = false) })
+				val heights = st.sheetHeights(sheet.id, sheet.snapPoints)
+				sheetLayouts[sheet.id] = SheetLayouts(sheet.snapPoints, heights, heights.map { Layout(it, everyCell = false) })
 				content.setBackgroundColor(android.graphics.Color.WHITE)
 			}
 			sheets[sheet.id] = SystemSheet(context, sheet, content, onRest = { snapPoint, width, height -> rested(sheet.id, snapPoint, width, height) }) { closedByPlatform(sheet.id) }
@@ -883,6 +886,9 @@ class MarklessHost(
 		if (planned?.planRepeats?.isNotEmpty() == true && journal.any { it is JournalEntry.Rows || it is JournalEntry.Arm || ((it is JournalEntry.Text || it is JournalEntry.Attribute) && '@' in it.node) }) {
 			laidOutFor?.let { (w, h) -> layOutAt(w, h, rowsMoved = true) }
 		}
+		if (sheetLayouts.values.any { s -> s.planned.any { it.planRepeats.isNotEmpty() } } && journal.any { it is JournalEntry.Rows || it is JournalEntry.Arm || ((it is JournalEntry.Text || it is JournalEntry.Attribute) && '@' in it.node) }) {
+			layOutSheets()
+		}
 		markGroupsDirty()
 		onJournal?.invoke(journal)
 		page?.let { animation?.moved(it.assignment) }
@@ -952,7 +958,32 @@ class MarklessHost(
 		if (shift != 0.0) scroller.post { scroller.scrollBy(0, shift.roundToInt()) }
 	}
 
+	/** With Dragon's plan, each styled sheet's content is laid out at every resting height with the rows and texts it shows now. */
+	fun layOutSheets() {
+		val layout = planLayout ?: return
+		if (layingOut || sheetLayouts.values.none { s -> s.planned.any { it.plan != null } }) return
+		val textNodes = payload.nodes.filterIsInstance<Node.Text>().filter { it.row == null }.map { it.id }.toSet()
+		val texts = runtime.texts().filter { it.first in textNodes }.toMap()
+		val faces = style?.systemFaces ?: emptyMap()
+		val live: (String) -> String = { line ->
+			val shaper = rowShaper ?: RowShaper(faces) { id -> fonts.bytes(id) }.also { rowShaper = it }
+			(RowShaper.rowsLayout(shaper) ?: throw MarklessHostError("a sheet with styled rows needs Dragon's live layout in the app"))(line)
+		}
+		for (sheet in sheetLayouts.values) {
+			sheet.planned.forEachIndexed { index, export ->
+				if (export.plan == null) return@forEachIndexed
+				val rows = if (export.planRepeats.isNotEmpty()) export.shownRows(payload, runtime) else null
+				sheet.layouts[index].relaid(export.laidOut(export.viewportWidth, export.viewportHeight, dpr, layout, rows = rows, rowsLayout = live, texts = texts))
+			}
+		}
+		repaint()
+	}
+
 	fun layOutAt(widthPx: Int, heightPx: Int, rowsMoved: Boolean = false): Boolean {
+		if (!sheetsLaidOut) {
+			sheetsLaidOut = true
+			layOutSheets()
+		}
 		val p = page ?: return false
 		val layout = planLayout ?: return false
 		if (planned?.plan == null || widthPx <= 0 || heightPx <= 0) return false

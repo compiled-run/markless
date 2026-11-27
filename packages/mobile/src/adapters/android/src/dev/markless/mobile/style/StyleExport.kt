@@ -1118,7 +1118,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					sheets[node] = so.field("heights", where).arr("$where.heights").mapIndexed { h, hv ->
 						val at = "$where.heights[$h]"
 						val ho = hv.obj(at)
-						ho.only(setOf("snapPoint", "viewport", "readiness", "states", "initial", "next", "bands", "assignments"), at)
+						ho.only(setOf("snapPoint", "viewport", "readiness", "states", "initial", "next", "bands", "assignments", "plan", "planNames", "planRepeats"), at)
 						val hp = ho.field("viewport", at).obj("$at.viewport")
 						hp.only(setOf("width", "height"), "$at.viewport")
 						SheetHeight(ho.field("snapPoint", at).num("$at.snapPoint"), withPlan(program(ho, at, dpr, hp.field("width", at).num("width"), hp.field("height", at).num("height"), null, listed), ho, at))

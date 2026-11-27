@@ -1,0 +1,32 @@
+appId: ${APP_ID}
+name: z8-sheet-rows
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Sizes
+- assertVisible: Pick a size
+- assertNotVisible: Choose a size
+- tapOn: Pick a size
+- assertVisible: Choose a size
+- assertVisible: Choose a size
+- assertVisible: Small
+- assertVisible: Medium
+- assertVisible: Large
+- assertVisible: Add a size
+- assertNotVisible: Extra large
+- tapOn: Add a size
+- assertVisible: Extra large
+- assertVisible: Choose a size
+- assertVisible: Small
+- assertVisible: Medium
+- assertVisible: Large
+- assertVisible: Extra large
+- tapOn: Medium
+- assertNotVisible: Choose a size
+- assertVisible: Medium
+- assertNotVisible: Choose a size
+- assertNotVisible: Pick a size

@@ -1378,7 +1378,8 @@ final class ViewTree {
 		guard let template = templates[id] else { return nil }
 		if let sheet = sheetOf[template] {
 			guard let styles = sheetStyles[sheet] else { return nil }
-			return styles.heights[styles.height].layout.assignments[styles.assignments[styles.height]][template]
+			let entry = styles.heights[styles.height].layout.assignments[styles.assignments[styles.height]]
+			return entry[id] ?? entry[template]
 		}
 		// An interaction state styles the row copy the touch was in; every other copy of that row keeps the assignment's look.
 		let row = id.firstIndex(of: "@").map { String(id[id.index(after: $0)...]) }
@@ -1391,6 +1392,14 @@ final class ViewTree {
 		for (id, view) in elements.map({ ($0.key, $0.value as UIView) }) + labels.map({ ($0.key, $0.value as UIView) }) where included(id) {
 			if let style = style(of: id) { try place(id, view, style) }
 		}
+	}
+
+	/// A sheet's content laid out again (its rows or texts moved): each resting height takes its new boxes, at the state it is in.
+	func relayoutSheet(_ sheet: String, _ heights: [(snapPoint: Double, layout: StyleLayout)]) throws {
+		guard var styles = sheetStyles[sheet], styles.heights.count == heights.count else { return }
+		styles.heights = heights
+		sheetStyles[sheet] = styles
+		try repaint { id in templates[id].flatMap { sheetOf[$0] } == sheet }
 	}
 
 	/// The sheet came to rest at another height: its content takes that height's layout.

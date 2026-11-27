@@ -229,6 +229,7 @@ public final class MarklessViewController: UIViewController {
 		tree?.library = DragonPlan.library
 		tree?.onEntries = { [weak self] in self?.layOutAtScreenSize() }
 		tree?.onNatural = { [weak self] id, size in self?.followNatural(id, size) }
+		layOutSheets()
 		tree?.onShown = { [weak self] in
 			self?.paintCanvas()
 			self?.writeLayoutDump()
@@ -309,6 +310,7 @@ public final class MarklessViewController: UIViewController {
 			try tree?.apply(journal.filter(\.isForViews))
 			followSlots(journal)
 			if movesRows(journal) { layOutAtScreenSize(rowsMoved: true) }
+			if sheetsMoveRows(journal) { layOutSheets() }
 			try runCalls(journal)
 			if let tree { animation?.moved(to: tree.assignment) }
 		} catch {
@@ -429,6 +431,48 @@ public final class MarklessViewController: UIViewController {
 			default: return false
 			}
 		}
+	}
+
+	/// Whether a journal changed what a styled sheet's list rows lay out.
+	private func sheetsMoveRows(_ journal: [NativeJournalEntry]) -> Bool {
+		guard let style, style.sheets.contains(where: { $0.heights.contains { !$0.style.planRepeats.isEmpty } }) else { return false }
+		return journal.contains { entry in
+			switch entry {
+			case .rows, .arm: return true
+			case let .text(node, _), let .attribute(node, _, _): return node.contains("@")
+			default: return false
+			}
+		}
+	}
+
+	/// With Dragon's plan, each styled sheet's content is laid out at every resting height with the rows and texts it shows now.
+	private func layOutSheets() {
+		#if canImport(DragonPlan)
+		guard let style, let tree else { return }
+		do {
+			let scale = Double(traitCollection.displayScale)
+			let shaper = coreTextRowShaper(faces: style.systemFaces, authored: fonts, dpr: scale)
+			let pageRows = Dictionary(payload.nodes.map { ($0.id, $0.row) }, uniquingKeysWith: { a, _ in a })
+			let shownTexts = try runtime.texts()
+			let texts = Dictionary(shownTexts.filter { pageRows[$0.node] != nil && pageRows[$0.node]! == nil }.map { ($0.node, $0.text) }, uniquingKeysWith: { a, _ in a })
+			for sheet in style.sheets where sheet.heights.contains(where: { $0.style.plan != nil }) {
+				let laid = try sheet.heights.map { height -> StyleExport in
+					let s = height.style
+					guard s.plan != nil else { return s }
+					let rows = s.planRepeats.isEmpty ? nil : try s.shownRows(payload, runtime: runtime)
+					return try s.laidOut(
+						width: s.viewport.width, height: s.viewport.height, scale: scale, layout: DragonPlan.layout,
+						rows: rows, rowsLayout: { DragonPlan.rowsLayout($0, shape: shaper) }, texts: texts)
+				}
+				let layouts = try style.resolveSheet(
+					sheet.node, for: payload, initialTexts: shownTexts, value: runtime.value(of:), arm: runtime.styleArm(of:),
+					dark: traitCollection.userInterfaceStyle == .dark, laidOut: laid)
+				try tree.relayoutSheet(sheet.node, layouts)
+			}
+		} catch {
+			hostFailed("\(error)")
+		}
+		#endif
 	}
 
 	private func layOutAtScreenSize(rowsMoved: Bool = false) {
@@ -647,6 +691,7 @@ public final class MarklessViewController: UIViewController {
 			try tree?.apply(journal.filter(\.isForViews))
 			followSlots(journal)
 			if movesRows(journal) { layOutAtScreenSize(rowsMoved: true) }
+			if sheetsMoveRows(journal) { layOutSheets() }
 			try runCalls(journal)
 			paintCanvas()
 			if let tree { animation?.moved(to: tree.assignment) }

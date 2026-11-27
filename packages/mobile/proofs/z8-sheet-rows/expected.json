@@ -1,0 +1,33 @@
+{
+	"rung": "Z8",
+	"name": "A keyed @for list inside a styled system sheet: the sheet's content is laid out with Dragon's plan, so each row gets its own box, and a row added while the sheet is open gets one too",
+	"steps": [
+		{
+			"visible": ["Sizes", "Pick a size"],
+			"absent": ["Choose a size"]
+		},
+		{
+			"do": { "tap": "Pick a size" },
+			"visible": ["Choose a size", "Small", "Medium", "Large", "Add a size"],
+			"absent": ["Extra large"]
+		},
+		{
+			"do": { "tap": "Add a size" },
+			"visible": ["Choose a size", "Small", "Medium", "Large", "Extra large"]
+		},
+		{
+			"do": { "tap": "Medium" },
+			"visible": ["Medium"],
+			"absent": ["Choose a size", "Pick a size"]
+		}
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": ["Sizes", "Pick a size", "On the web, the sizes open in a drawer"],
+				"absent": ["Choose a size"]
+			}
+		],
+		"absentFromOutput": ["Choose a size", "@markless/device"]
+	}
+}

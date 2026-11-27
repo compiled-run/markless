@@ -80,7 +80,7 @@ test("a sheet inside a @try's arm names no arm of the page's branches, which are
 	expect(route!.input.nodes.some((node) => node.arm?.branch === sheet.arm!.branch)).toBe(true);
 });
 
-test('a styled page refuses a @for list inside a system sheet, whose content has no plan layout to give its rows boxes', async () => {
+test('a styled page builds a @for list inside a system sheet, whose content Dragon lays out with its plan', async () => {
 	const build = await compileNativeComponent({
 		filename: 'packages/mobile/test/fixtures/StyledSheetList.tsrx',
 		source: `import { state } from '@markless/core';
@@ -104,12 +104,10 @@ export default function App() @{
 }`,
 		target: 'ios',
 	});
-	expect(build.payload).toBeNull();
-	expect(build.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
-		expect.stringMatching(
-			/^the @for list \S+ inside the system sheet \S+ on a styled page: a sheet's content is exported without Dragon's plan layout, so its rows get no boxes on the phone$/,
-		),
-	]);
+	expect(build.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	expect(build.payload).not.toBeNull();
+	const [route] = nativeStyleInputs(build.payload!, build.styles).sheets;
+	expect(route!.input.repeats).toHaveLength(1);
 });
 
 test("a sheet's markup ancestors come along without boxes, for selectors and inherited values", async () => {
