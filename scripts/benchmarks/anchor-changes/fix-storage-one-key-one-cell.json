@@ -8,18 +8,7 @@
 				"web/prerender/evaluator"
 			],
 			"delta": 382,
-			"reason": "a component an arm places reads and writes the page's one storage() cell for its key (evaluator), and a reopened arm's derive-on-read nodes that went stale while it was closed derive before the next write (resume-runtime)",
-			"date": "2026-11-27"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-runtime"
-			],
-			"delta": 155,
-			"reason": "a component an arm places reads and writes the page's one storage() cell for its key (evaluator), and a reopened arm's derive-on-read nodes that went stale while it was closed derive before the next write (resume-runtime)",
+			"reason": "a component an arm places reads and writes the page's one storage() cell for its key instead of an instance-path copy",
 			"date": "2026-11-27"
 		},
 		{
@@ -30,8 +19,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 22,
-			"reason": "a component an arm places reads and writes the page's one storage() cell for its key (evaluator), and a reopened arm's derive-on-read nodes that went stale while it was closed derive before the next write (resume-runtime)",
+			"delta": -1,
+			"reason": "a component an arm places reads and writes the page's one storage() cell for its key instead of an instance-path copy",
 			"date": "2026-11-27"
 		},
 		{
@@ -42,18 +31,7 @@
 				"web/prerender/evaluator"
 			],
 			"delta": 382,
-			"reason": "a component an arm places reads and writes the page's one storage() cell for its key (evaluator), and a reopened arm's derive-on-read nodes that went stale while it was closed derive before the next write (resume-runtime)",
-			"date": "2026-11-27"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-runtime"
-			],
-			"delta": 155,
-			"reason": "a component an arm places reads and writes the page's one storage() cell for its key (evaluator), and a reopened arm's derive-on-read nodes that went stale while it was closed derive before the next write (resume-runtime)",
+			"reason": "a component an arm places reads and writes the page's one storage() cell for its key instead of an instance-path copy",
 			"date": "2026-11-27"
 		},
 		{
@@ -64,8 +42,18 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 28,
-			"reason": "a component an arm places reads and writes the page's one storage() cell for its key (evaluator), and a reopened arm's derive-on-read nodes that went stale while it was closed derive before the next write (resume-runtime)",
+			"delta": 2,
+			"reason": "a component an arm places reads and writes the page's one storage() cell for its key instead of an instance-path copy",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/prerender/evaluator"
+			],
+			"delta": 382,
+			"reason": "a component an arm places reads and writes the page's one storage() cell for its key instead of an instance-path copy",
 			"date": "2026-11-27"
 		}
 	]
