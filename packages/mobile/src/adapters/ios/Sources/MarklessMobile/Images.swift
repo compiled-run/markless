@@ -158,6 +158,9 @@ enum LoadedPicture {
 	case bitmap(CGImage)
 	case drawing(NativeDrawing, width: Double, height: Double)
 
+	/// The natural size of each src this app has decoded, in CSS px, read and written on the main thread only.
+	@MainActor static var sizes: [String: [Double]] = [:]
+
 	var size: (width: Double, height: Double) {
 		switch self {
 		case let .bitmap(image): (Double(image.width), Double(image.height))
@@ -220,14 +223,20 @@ final class LoadedImageView: UIView {
 	@available(*, unavailable)
 	required init?(coder: NSCoder) { fatalError("LoadedImageView is made in code") }
 
-	/// The runtime's src for the img now; a new src loads off the main thread.
+	/// The image's natural size in CSS px once one has loaded, nil when there is none; a new src keeps the old size until it loads.
+	var onNatural: (([Double]?) -> Void)?
+
+	/// The runtime's src for the img now; a new src loads off the main thread. A src this app decoded before gives its size at once,
+	/// so the first layout already has it, as Chrome lays out an image it holds in memory at its size.
 	func show(_ src: String?, packaged: [String: NativeImageAsset]) {
 		guard src != wanted || src == nil else { return }
 		wanted = src
 		guard let src else { return move(to: .missing) }
+		if let size = LoadedPicture.sizes[src] { onNatural?(size) }
 		DispatchQueue.global(qos: .userInitiated).async {
 			let picture = LoadedPicture.load(src, packaged: packaged)
 			DispatchQueue.main.async { [weak self] in
+				if let picture { LoadedPicture.sizes[src] = [picture.size.width, picture.size.height] }
 				guard let self, self.wanted == src else { return }
 				self.move(to: picture.map(LoadedImageState.picture) ?? .missing)
 			}
@@ -237,6 +246,11 @@ final class LoadedImageView: UIView {
 	private func move(to next: LoadedImageState) {
 		state = next
 		setNeedsDisplay()
+		switch next {
+		case .waiting: break
+		case .missing: onNatural?(nil)
+		case let .picture(p): onNatural?([p.size.width, p.size.height])
+		}
 	}
 
 	override func draw(_ rect: CGRect) {

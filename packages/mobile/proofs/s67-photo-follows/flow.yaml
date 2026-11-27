@@ -1,0 +1,32 @@
+appId: ${APP_ID}
+name: s67-photo-follows
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Morning walk
+- assertVisible: Add a photo
+- assertVisible: Below the photo
+- assertVisible: No photo yet
+- assertVisible: Not tapped
+- assertNotVisible: Tapped below
+- assertNotVisible: Photo added
+- assertVisible: Check-in
+- tapOn: Add a photo
+- assertVisible: Photo added
+- assertNotVisible: No photo yet
+- assertVisible: Walk photo
+- assertVisible: Photo added
+- assertVisible: Morning walk
+- assertVisible: Below the photo
+- assertVisible: Not tapped
+- assertNotVisible: No photo yet
+- assertNotVisible: Tapped below
+- tapOn: Below the photo
+- assertVisible: Tapped below
+- assertNotVisible: Not tapped
+- assertVisible: Tapped below
+- assertNotVisible: Not tapped

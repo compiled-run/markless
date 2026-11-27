@@ -74,6 +74,7 @@ import dev.markless.mobile.style.StickyRow
 import dev.markless.mobile.style.Edges
 import dev.markless.mobile.style.paddingBox
 import dev.markless.mobile.style.BAND_KEY
+import dev.markless.mobile.style.ScrollShift
 import dev.markless.mobile.style.ShadowPaint
 import dev.markless.mobile.style.OutlinePaint
 import dev.markless.mobile.style.StyleExport
@@ -199,6 +200,12 @@ class MarklessHost(
 	private var rowShaper: RowShaper? = null
 	/** The page size in device px and the slot values (export order) the page was last laid out at. */
 	private var laidOutFor: Triple<Int, Int, Pair<List<Double>, Map<String, String>>>? = null
+	/** Each img whose src the app sets: its loaded image's natural size in CSS px; absent while none has loaded. */
+	private val naturals = HashMap<String, List<Double>>()
+	/** The natural sizes the page was last laid out with. */
+	private var laidOutNaturals: Map<String, List<Double>> = emptyMap()
+	/** The planted fault markless-fault-follows-stale: a new natural size does not lay the page out again. */
+	private val followsStale = (context as? android.app.Activity)?.intent?.getBooleanExtra("markless-fault-follows-stale", false) == true
 	/** The entries Dragon has laid out at [laidOutFor], and the export holding them: a page lays out only the entries it shows. */
 	private val laidEntries = mutableSetOf<Int>()
 	private var laidExport: StyleExport? = null
@@ -918,6 +925,33 @@ class MarklessHost(
 	/** The page's assignment and shown entry, at every @media band: the band a size selects is only decided once the page is laid out at it. */
 	private fun entriesShown(p: Layout, export: StyleExport): Set<Int> = export.bandTwins(p.assignment) + export.bandTwins(p.shown)
 
+	/** An img whose src the app sets has loaded an image of another natural size (null: none): the page is laid out again with it. */
+	private fun followNatural(id: String, size: List<Double>?) {
+		if (naturals[id] == size) return
+		if (size == null) naturals.remove(id) else naturals[id] = size
+		// Posted: a load may finish while a layout or a journal is being applied.
+		root.post { laidOutFor?.let { (w, h) -> layOutAt(w, h) } }
+	}
+
+	/**
+	 * Chrome's scroll anchoring for each img whose height follows its image (Dragon's runtimeImageScrollShift): the page scroller's
+	 * offset moves by its change in height when it lay wholly above a non-zero offset. Frames are device px from the page's top.
+	 */
+	private fun anchorScroll(was: StyleExport, now: StyleExport, entry: Int) {
+		val scroller = generateSequence(root.parent) { it.parent }.filterIsInstance<PageScrollView>().firstOrNull() ?: return
+		val before = was.assignments.getOrNull(entry)?.byId ?: return
+		var shift = 0.0
+		for (node in now.assignments[entry].nodes) {
+			if (node.runtimeImage?.follows != true) continue
+			val old = before[node.id] ?: continue
+			val top = old.runtimeImagePlace?.originY ?: continue
+			val oldHeight = old.frame?.height ?: continue
+			val newHeight = node.frame?.height ?: continue
+			shift += ScrollShift.engine?.invoke(scroller.scrollY.toDouble(), top, oldHeight, newHeight) ?: throw MarklessHostError("an img that follows its image is anchored by Dragon's engine, which this host does not link")
+		}
+		if (shift != 0.0) scroller.post { scroller.scrollBy(0, shift.roundToInt()) }
+	}
+
 	fun layOutAt(widthPx: Int, heightPx: Int, rowsMoved: Boolean = false): Boolean {
 		val p = page ?: return false
 		val layout = planLayout ?: return false
@@ -925,7 +959,7 @@ class MarklessHost(
 		val pageTextNodes = payload.nodes.filterIsInstance<Node.Text>().filter { it.row == null }.map { it.id }.toSet()
 		val texts = runtime.texts().filter { it.first in pageTextNodes }.toMap()
 		val at = Triple(widthPx, heightPx, planned.slots.map { slotValues.getValue(it.id) } to texts)
-		val same = !rowsMoved && laidOutFor == at
+		val same = !rowsMoved && laidOutFor == at && (followsStale || laidOutNaturals == naturals)
 		val needed = entriesShown(p, planned)
 		if (layingOut || (same && laidEntries.containsAll(needed))) return false
 		if (!same) {
@@ -940,7 +974,7 @@ class MarklessHost(
 		}
 		val rows = if (withRows) planned.shownRows(payload, runtime) else null
 		val lay = { shown: Map<String, String> ->
-			planned.laidOut(Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout, at.third.first, rows = rows, rowsLayout = live, texts = shown, entries = entries, previous = laidExport)
+			planned.laidOut(Math.ceil(widthPx / dpr - 1e-9), heightPx / dpr, dpr, layout, at.third.first, rows = rows, rowsLayout = live, texts = shown, entries = entries, previous = laidExport, naturals = naturals)
 		}
 		// Page texts in a face this host cannot shape keep the boxes the build laid them out in, as before they followed state.
 		rowShaper?.unshapedFace = false
@@ -950,10 +984,12 @@ class MarklessHost(
 			if (texts.isEmpty() || rowShaper?.unshapedFace != true) throw e
 			lay(emptyMap())
 		}
+		val was = style
 		style = next
 		laidEntries += entries
 		laidExport = next
 		laidOutFor = at
+		laidOutNaturals = HashMap(naturals)
 		layingOut = true
 		try {
 			p.relaid(next)
@@ -962,6 +998,7 @@ class MarklessHost(
 		}
 		followBand(isDark(context.resources.configuration))
 		repaint()
+		if (was != null) anchorScroll(was, next, p.shown)
 		Log.i(TAG, "laid out at ${next.viewportWidth}x${next.viewportHeight} dp, style assignment ${p.assignment}")
 		return true
 	}
@@ -1302,7 +1339,11 @@ class MarklessHost(
 			}
 			"img" -> SizedImage(context, packaged, sized = style == null).also {
 				named(it, inst.id)
-				if (style != null && node.bindings.any { b -> !b.property && b.name == "src" }) it.loadsImages()
+				if (style != null && node.bindings.any { b -> !b.property && b.name == "src" }) {
+					it.loadsImages()
+					val id = inst.id
+					it.loaded?.onNatural = { size -> followNatural(id, size) }
+				}
 			}
 			"iframe" -> EmbeddedPage(
 				context,

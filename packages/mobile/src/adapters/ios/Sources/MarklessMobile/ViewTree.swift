@@ -417,6 +417,8 @@ final class ViewTree {
 	var onShown: (() -> Void)?
 	/// Called after the page moves to another assignment or entry, so the host lays it out if it has not yet.
 	var onEntries: (() -> Void)?
+	/// An img whose src the app sets has a new natural size in CSS px, or none (nil): by node id.
+	var onNatural: ((String, [Double]?) -> Void)?
 	/// The pointer steps since the page opened, by the node each names, replayed through the current level's tables.
 	private var interactionSteps: [(op: String, node: String?)] = []
 	/// The list row (`@<key>` of its copies) the finger is pressing, and the one the focused element is in: an interaction state
@@ -1557,7 +1559,10 @@ final class ViewTree {
 					view = page
 				} else if element == "img" {
 					let image = ImageBox()
-					if layout != nil, bindings.contains(where: { !$0.isProperty && $0.name == "src" }) { image.loadsImages() }
+					if layout != nil, bindings.contains(where: { !$0.isProperty && $0.name == "src" }) {
+						image.loadsImages()
+						image.loaded?.onNatural = { [weak self] size in self?.onNatural?(id, size) }
+					}
 					// The box lays out its picture and alt text itself; the stacking layout sizes only the box.
 					leaves.insert(ObjectIdentifier(image))
 					view = image
