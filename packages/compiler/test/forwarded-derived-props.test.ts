@@ -328,7 +328,7 @@ export function Pair() @{
 });
 
 // A component that hands a prop on keeps no copy of it, so its own handler reads the prop through the graph, where the route answers.
-test('a handler in a forwarding component reads its routed prop from the graph, and a defaulted one is refused at build', async () => {
+test('a handler in a forwarding component reads its routed prop from the graph, and a defaulted one reads the default', async () => {
 	const badge = await compile(
 		'src/ui/badge.tsrx',
 		`import { computed, state } from '@markless/core';
@@ -361,7 +361,8 @@ export function Relay(${signature}) @{
 	expect(handler(plain)).toContain('context.graph.read("prop:props", ["shade"])');
 
 	const defaulted = await relay("{ shade = 'grey' }: { readonly shade?: string }");
-	expect(errors(defaulted)).toEqual(['MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED']);
+	expect(errors(defaulted)).toEqual([]);
+	expect(handler(defaulted)).toContain('context.graph.read("computed:Relay.shade")');
 });
 
 // Every read a runner makes is declared from its syntax: a shared instance's member resolves to that member's own node, and a quoted member is a member too.

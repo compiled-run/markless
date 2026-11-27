@@ -3,7 +3,7 @@ import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
 	total: 342,
-	guided: 55,
+	guided: 56,
 	groups: [
 		{
 			area: 'state',
@@ -34,6 +34,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile error',
 					guided: true,
 					words: 'a computed() writes to state markless_state_write_in_computed a computed() body writes to state.',
+				},
+				{
+					code: 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
+					title: 'A destructuring default the build cannot apply',
+					chip: 'error',
+					kind: 'compile error',
+					guided: true,
+					words: 'a destructuring default the build cannot apply markless_state_destructure_default_unsupported a destructuring default sits where the build cannot apply it.',
 				},
 				{
 					code: 'MARKLESS_STATE_STALE_LOCAL_WRITE',
@@ -186,14 +194,6 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile error',
 					guided: false,
 					words: 'a computed reads a component-body local the browser cannot recompute markless_computed_reads_render_local a computed reads a component-body local the browser cannot recompute: a markless build error.',
-				},
-				{
-					code: 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
-					title: 'A destructured prop or state has a default',
-					chip: 'error',
-					kind: 'compile error',
-					guided: false,
-					words: 'a destructured prop or state has a default markless_state_destructure_default_unsupported graph destructuring defaults are not supported yet: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',

@@ -10,7 +10,9 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import type { SemanticGraphBinding } from '../../artifacts.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
+import { collectGraphDependencies } from './collect-async.ts';
 import { graphDestructureDefaultUnsupportedDiagnostic } from './diagnostics.ts';
+import type { SourceSpan } from '../../diagnostics.ts';
 import type { WalkState } from './types.ts';
 
 export function collectDestructuredAliases(
@@ -203,7 +205,7 @@ export function collectObjectPatternAliases(
 				...propOwner,
 				propPath: [...propOwner.propPath, key],
 			};
-			if (!owned || !recordDefaultedPropAlias(value, target, owned, state)) {
+			if (!owned || !recordDefaultedPropAlias(value, targetBase, target, owned, state)) {
 				diagnoseDefaultAlias(value, target, state);
 			}
 			continue;
@@ -346,17 +348,17 @@ type PropAliasOwner = {
 	readonly componentId: string;
 	readonly componentName: string;
 	readonly propPath: ReadonlyArray<string>;
+	readonly bodyAssignmentValues?: ReadonlyArray<SourceSpan>;
 };
 
 export function sourceBindingId(span: { readonly start: number; readonly end: number }): string {
 	return `binding:${span.start}:${span.end}`;
 }
 
-// A component signature's destructuring default is the one place a part states
-// what an omitted prop means, so the prop local records the default expression
-// and every emitter that materializes the local applies it.
+// A top-level prop default read anywhere is a derived node; the rest keep an alias that only a body seed may read.
 function recordDefaultedPropAlias(
 	pattern: AnyNode,
+	targetBase: string,
 	target: string,
 	owner: PropAliasOwner,
 	state: WalkState,
@@ -370,6 +372,29 @@ function recordDefaultedPropAlias(
 
 	const bindingId = sourceBindingId(span);
 	const defaultSource = expressionSource(fallback, state.source);
+	// A function default is a callback prop, which reaches handlers as a symbol rather than a derived value.
+	if (
+		owner.propPath.length === 1 &&
+		!state.currentSharedDefinitionId &&
+		fallback.type !== 'ArrowFunctionExpression' &&
+		fallback.type !== 'FunctionExpression' &&
+		readOutsideBodyAssignments(local, owner, state)
+	) {
+		recordDefaultedPropComputed(
+			{
+				localName: local.name,
+				propsName: targetBase,
+				target,
+				fallback,
+				defaultSource,
+				bindingId,
+				span,
+			},
+			owner,
+			state,
+		);
+		return true;
+	}
 	state.graph.aliases.push({
 		name: local.name,
 		target,
@@ -392,6 +417,75 @@ function recordDefaultedPropAlias(
 		sourceSpan: span,
 	});
 	return true;
+}
+
+// A local only ever seeded from (`s.checked = checked`) is materialized by the body, so it needs no derived node.
+function readOutsideBodyAssignments(
+	local: AnyNode,
+	owner: PropAliasOwner,
+	state: WalkState,
+): boolean {
+	const semantic = state.semantic();
+	const values = owner.bodyAssignmentValues ?? [];
+	return semantic.references.some((reference) => {
+		if (!reference.binding) return false;
+		const declaration = semantic.bindings[reference.binding.id]?.declarations[0];
+		if (declaration?.start !== local.start || reference.node.start === local.start)
+			return false;
+		return !values.some(
+			(value) => value.start <= reference.node.start && reference.node.end <= value.end,
+		);
+	});
+}
+
+function recordDefaultedPropComputed(
+	prop: {
+		readonly localName: string;
+		readonly propsName: string;
+		readonly target: string;
+		readonly fallback: AnyNode;
+		readonly defaultSource: string;
+		readonly bindingId: string;
+		readonly span: NonNullable<ReturnType<typeof sourceSpan>>;
+	},
+	owner: PropAliasOwner,
+	state: WalkState,
+): void {
+	const { localName, target, fallback, defaultSource, bindingId, span } = prop;
+	const graphNodeId = `computed:${owner.componentName}.${localName}`;
+	state.graph.graphBindings.push({
+		id: graphNodeId,
+		name: localName,
+		kind: 'computed',
+		bindingId,
+		componentId: owner.componentId,
+		componentName: owner.componentName,
+		sourceSpan: span,
+		declarationKind: 'const',
+		writable: false,
+		async: false,
+		asyncCapable: false,
+		dependencies: [
+			{
+				source: target,
+				graphNodeId: 'prop:props',
+				path: owner.propPath,
+				local: { name: prop.propsName, members: owner.propPath },
+			},
+			...collectGraphDependencies(fallback, state),
+		],
+		functionSource: `() => ${target} === undefined ? (${defaultSource}) : ${target}`,
+	});
+	state.graph.componentPropBindings.push({
+		componentId: owner.componentId,
+		componentName: owner.componentName,
+		bindingId,
+		localName,
+		propPath: owner.propPath,
+		defaultSource,
+		defaultedGraphNodeId: graphNodeId,
+		sourceSpan: span,
+	});
 }
 
 function recordComponentPropBinding(

@@ -856,10 +856,21 @@ inside one `.tsrx` module:
   is a placeholder for a field no body seeds, not the family's default. All three
   seed paths agree — the server render body, the seed pass a projecting component
   answers for its parts, and the browser seed symbol — and each applies the
-  signature default before the seed expression runs. A defaulted prop local read
-  anywhere other than a component-body assignment reads the raw prop instead of
-  the default, so that read fails closed with
-  `MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED`.
+  signature default before the seed expression runs. A defaulted top-level prop
+  local read anywhere else (markup text and attributes, `computed()`, event
+  handlers, `@if`/`@for` expressions, a prop passed on to a child) reads a
+  derived node owned by the component, whose value is the prop when it is not
+  `undefined` and the default otherwise. It is a sync computed over the
+  prop cell and whatever the default expression reads, so it stays live when
+  the parent's value changes, including a change to `undefined`. A local only
+  ever read by component-body assignments gets no derived node. Two shapes still
+  read the raw prop outside a body assignment and so fail closed with
+  `MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED`: a default inside a nested
+  prop pattern (`{ options: { size = 3 } }`), because a prop cell carries only
+  the top-level value, and a function default (`{ onPick = () => {} }`), because
+  a callback prop reaches handlers as a symbol, not a derived value. A default
+  on destructured state (`const { title = 'Untitled' } = menu`) is refused with
+  the same code when the graph is built.
 - **A type assertion in the factory is transparent.** `state({ checked: false as
   boolean | 'mixed' })` declares the same known initial value as
   `state({ checked: false })`. `as`, `satisfies`, and `!` are unwrapped before

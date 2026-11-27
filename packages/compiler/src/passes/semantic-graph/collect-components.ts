@@ -2,6 +2,7 @@ import { componentExportPath, linkedComponentTarget } from '../link/component-ta
 import { isEventAttribute } from '../../ast/events.ts';
 import { asNodes, getIdentifierName, unwrapTypeAssertion, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, expressionSourceOrFallback, sourceSpan } from '../../ast/source.ts';
+import type { SourceSpan } from '../../diagnostics.ts';
 import type {
 	SemanticAsyncArmPlacement,
 	SemanticComponentEdge,
@@ -129,6 +130,25 @@ export function collectComponentProps(component: AnyNode, state: WalkState): voi
 		componentId: state.currentComponentId,
 		componentName: state.currentComponentName,
 		propPath: [],
+		bodyAssignmentValues: bodyAssignmentValues(component.body as AnyNode | undefined, state),
+	});
+}
+
+// `s.checked = checked` statements in the body itself: their right-hand sides seed state from the materialized prop local.
+function bodyAssignmentValues(body: AnyNode | undefined, state: WalkState): ReadonlyArray<SourceSpan> {
+	return asNodes(body?.body).flatMap((statement) => {
+		const expression =
+			statement.type === 'ExpressionStatement'
+				? (statement.expression as AnyNode | undefined)
+				: undefined;
+		const right = expression?.right as AnyNode | undefined;
+		const span = right && sourceSpan(right, state.filename);
+		return expression?.type === 'AssignmentExpression' &&
+			expression.operator === '=' &&
+			(expression.left as AnyNode | undefined)?.type === 'MemberExpression' &&
+			span
+			? [span]
+			: [];
 	});
 }
 
