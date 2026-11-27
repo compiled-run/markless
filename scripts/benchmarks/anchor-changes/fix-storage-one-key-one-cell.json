@@ -55,6 +55,42 @@
 			"delta": 382,
 			"reason": "a component an arm places reads and writes the page's one storage() cell for its key instead of an instance-path copy",
 			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 52,
+			"reason": "the prerender evaluator a docs page preloads reads a storage() key an arm brings in as the page's one cell",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 52,
+			"reason": "the prerender evaluator a docs page preloads reads a storage() key an arm brings in as the page's one cell",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 52,
+			"reason": "the prerender evaluator a docs page preloads reads a storage() key an arm brings in as the page's one cell",
+			"date": "2026-11-27"
 		}
 	]
 }
