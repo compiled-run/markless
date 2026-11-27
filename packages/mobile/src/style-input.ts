@@ -553,6 +553,12 @@ export function nativeStyleInput(
 			),
 		);
 	}
+	// A sheet's document holds only the branches inside it: the arms of the page's branches around it are always shown there.
+	const documentBranches = new Set(
+		nodes.flatMap((node) => (node.kind === 'branch' && !node.row ? [node.id] : [])),
+	);
+	const placed = (arm: NativeArmPlace | undefined) =>
+		arm && documentBranches.has(arm.branch) ? { arm } : {};
 	// A branch an outer arm hides keeps a value no box reads, since each arm inside it also needs that outer arm: its first.
 	const repeats = nodes.flatMap((node) =>
 		node.kind === 'repeat' && !node.row && !optionRows.has(node.id)
@@ -560,7 +566,7 @@ export function nativeStyleInput(
 					{
 						id: node.id,
 						parent: sheet && node.parent === sheet.id ? sheet.parent : node.parent,
-						...(node.arm ? { arm: node.arm } : {}),
+						...placed(node.arm),
 					},
 				]
 			: [],
@@ -579,7 +585,7 @@ export function nativeStyleInput(
 						: shown === null
 							? NATIVE_NO_ARM
 							: String(shown),
-				...(node.arm ? { arm: node.arm } : {}),
+				...placed(node.arm),
 			},
 		];
 	});
@@ -605,7 +611,7 @@ export function nativeStyleInput(
 		nodes: nodes.flatMap((node): NativeStyleInput['nodes'][number][] => {
 			// A row's nodes name their list: Dragon refuses them by name until rows are laid out on the phone.
 			const place = {
-				...(node.arm ? { arm: node.arm } : {}),
+				...placed(node.arm),
 				...(node.row ? { row: node.row } : {}),
 			};
 			if (node.kind === 'branch' || node.kind === 'repeat') return [];
@@ -615,7 +621,7 @@ export function nativeStyleInput(
 				return rows.map((key, index): NativeStyleInput['nodes'][number] => {
 					const parent =
 						node.parent === list.parent ? node.parent! : `${node.parent}@${index}`;
-					const arm = node.arm ? { arm: node.arm } : list.arm ? { arm: list.arm } : {};
+					const arm = placed(node.arm ?? list.arm);
 					if (node.kind === 'text')
 						return {
 							kind: 'text',

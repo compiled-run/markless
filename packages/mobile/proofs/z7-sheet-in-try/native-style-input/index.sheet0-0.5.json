@@ -1,0 +1,206 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "IndexSheet0",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page mk-zwsom1"
+			},
+			"boxless": true
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "div",
+			"parent": "h1",
+			"attributes": {
+				"class": "sheet mk-zwsom1"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h5",
+			"element": "h2",
+			"parent": "h4",
+			"attributes": {
+				"class": "sheet-title mk-zwsom1"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h5:text0",
+			"parent": "h5",
+			"text": "Choose a size"
+		},
+		{
+			"kind": "element",
+			"id": "h6",
+			"element": "div",
+			"parent": "h4",
+			"attributes": {
+				"class": "sizes mk-zwsom1",
+				"role": "group",
+				"aria-label": "Sizes"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:1/h0",
+			"element": "button",
+			"parent": "h6",
+			"attributes": {
+				"type": "button",
+				"class": "size mk-3meddi"
+			},
+			"attributesByState": {
+				"aria-pressed": [
+					{
+						"when": {
+							"state:picked": ""
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:picked": "Small"
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"state:picked": "Medium"
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:picked": "Large"
+						},
+						"value": "false"
+					}
+				]
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:1/h0:text0",
+			"parent": "component-edge:1/h0",
+			"text": " "
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:2/h0",
+			"element": "button",
+			"parent": "h6",
+			"attributes": {
+				"type": "button",
+				"class": "size mk-3meddi"
+			},
+			"attributesByState": {
+				"aria-pressed": [
+					{
+						"when": {
+							"state:picked": ""
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:picked": "Small"
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:picked": "Medium"
+						},
+						"value": "true"
+					},
+					{
+						"when": {
+							"state:picked": "Large"
+						},
+						"value": "false"
+					}
+				]
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:2/h0:text0",
+			"parent": "component-edge:2/h0",
+			"text": " "
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:3/h0",
+			"element": "button",
+			"parent": "h6",
+			"attributes": {
+				"type": "button",
+				"class": "size mk-3meddi"
+			},
+			"attributesByState": {
+				"aria-pressed": [
+					{
+						"when": {
+							"state:picked": ""
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:picked": "Small"
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:picked": "Medium"
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"state:picked": "Large"
+						},
+						"value": "true"
+					}
+				]
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:3/h0:text0",
+			"parent": "component-edge:3/h0",
+			"text": " "
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.size.mk-3meddi {\n\t\t\t\tmin-height: 48px;\n\t\t\t\tpadding: 12px 16px;\n\t\t\t\tborder: 2px solid #3d405b;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #3d405b;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\ttext-align: left;\n\t\t\t}\n\t\t\t.size[aria-pressed='true'].mk-3meddi {\n\t\t\t\tborder-color: #e07a5f;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n.page.mk-zwsom1 {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #f4f1de;\n\t\t\t\tcolor: #3d405b;\n\t\t\t}\n\t\t\t.title.mk-zwsom1 {\n\t\t\t\tfont-size: 26px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n\t\t\t.open.mk-zwsom1 {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 12px 20px;\n\t\t\t\tborder: 2px solid #3d405b;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #3d405b;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t}\n\t\t\t.sheet.mk-zwsom1 {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\t.sizes.mk-zwsom1 {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgap: 8px;\n\t\t\t}\n\t\t\t.sheet-title.mk-zwsom1 {\n\t\t\t\tmargin: 0 0 12px;\n\t\t\t\tfont-size: 20px;\n\t\t\t}",
+	"states": [
+		{
+			"cell": "state:picked",
+			"domain": [
+				"",
+				"Small",
+				"Medium",
+				"Large"
+			],
+			"initial": ""
+		}
+	],
+	"viewports": {
+		"ios": {
+			"width": 402,
+			"height": 435
+		},
+		"android": {
+			"width": 411,
+			"height": 371
+		}
+	}
+}

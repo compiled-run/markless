@@ -64,6 +64,54 @@ export default function App() @{
 	);
 });
 
+test("a sheet inside a @try's arm names no arm of the page's branches, which are not in its document", async () => {
+	const build = await compileRungApp(proof('z7-sheet-in-try'), 'ios');
+	const [route] = build.styleInputs;
+	const sheet = build.payload!.routes[0]!.page.nodes.find((node) => node.kind === 'sheet')!;
+	expect(sheet.arm).toBeDefined();
+	expect(route!.sheets).not.toHaveLength(0);
+	for (const { input } of route!.sheets) {
+		const branches = new Set((input.branches ?? []).map((branch) => branch.id));
+		const arms = [...input.nodes, ...(input.repeats ?? []), ...(input.branches ?? [])].flatMap((node) =>
+			node.arm ? [node.arm.branch] : [],
+		);
+		expect(arms.filter((branch) => !branches.has(branch))).toEqual([]);
+	}
+	expect(route!.input.nodes.some((node) => node.arm?.branch === sheet.arm!.branch)).toBe(true);
+});
+
+test('a styled page refuses a @for list inside a system sheet, whose content has no plan layout to give its rows boxes', async () => {
+	const build = await compileNativeComponent({
+		filename: 'packages/mobile/test/fixtures/StyledSheetList.tsrx',
+		source: `import { state } from '@markless/core';
+import { native, platform } from '@markless/device';
+
+export default function App() @{
+	let open = state(false);
+	let sizes = state(['Small', 'Large']);
+	<main>
+		<style>
+			.size { padding: 8px; }
+		</style>
+		@if (!platform.web) {
+			<native.sheet open={open} onChange={(next) => (open = next)} snapPoints={[0.5]}>
+				@for (const size of sizes; key size) {
+					<p class="size">{size}</p>
+				}
+			</native.sheet>
+		}
+	</main>
+}`,
+		target: 'ios',
+	});
+	expect(build.payload).toBeNull();
+	expect(build.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+		expect.stringMatching(
+			/^the @for list \S+ inside the system sheet \S+ on a styled page: a sheet's content is exported without Dragon's plan layout, so its rows get no boxes on the phone$/,
+		),
+	]);
+});
+
 test("a sheet's markup ancestors come along without boxes, for selectors and inherited values", async () => {
 	const build = await compileRungApp(proof('z6-sheet-page-selectors'), 'ios');
 	const page = build.payload!.routes[0]!.page;
