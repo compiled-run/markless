@@ -1297,7 +1297,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				"select-arrow" -> StyleWrite.SelectArrow(color(o.field("color", what), "$what.color"))
 				"runtime-image" -> {
 					o.only(setOf("kind", "fit", "position", "layer", "pixelated", "absent", "key", "content", "follows"), what)
-					val follows = o["follows"]?.let { (it as? Json.Bool)?.value?.takeIf { v -> v } ?: throw MarklessDecodeError("$what.follows is only ever true") } ?: false
+					val follows = o["follows"]?.let { (it as? Json.Bool)?.value ?: throw MarklessDecodeError("$what.follows is not a boolean") } ?: false
 					if (o.field("key", what).str("$what.key") != "dragonRuntimeImage") throw MarklessDecodeError("$what: a runtime-image write's key is dragonRuntimeImage")
 					val fit = o.field("fit", what).str("$what.fit")
 					if (fit !in setOf("fill", "contain", "cover", "none", "scale-down")) throw MarklessDecodeError("$what: object-fit $fit is not a keyword Chrome has")

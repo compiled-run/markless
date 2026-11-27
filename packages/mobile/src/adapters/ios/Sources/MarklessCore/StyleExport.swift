@@ -1725,7 +1725,7 @@ public struct StyleExport: Sendable {
 		case "runtime-image":
 			let f = try write.object(required: ["kind", "fit", "position", "layer", "pixelated", "absent", "key", "content"], optional: ["follows"])
 			try expectKey(f, "dragonRuntimeImage")
-			if f.has("follows"), try !f["follows"].bool() { throw PayloadError(path: try f["follows"].path, reason: "follows is only ever true") }
+			let follows = f.has("follows") ? try f["follows"].bool() : false
 			let fit = try f["fit"].string()
 			guard ["fill", "contain", "cover", "none", "scale-down"].contains(fit) else { throw PayloadError(path: write.path + ".fit", reason: "object-fit \(fit) is not a keyword Chrome has") }
 			let axes = try f["position"].array()
@@ -1749,7 +1749,7 @@ public struct StyleExport: Sendable {
 				let c = try box.object(["x", "y", "width", "height"])
 				return Frame(x: try c["x"].number(), y: try c["y"].number(), width: try c["width"].number(), height: try c["height"].number())
 			}()
-			return .runtimeImage(RuntimeImage(fit: fit, position: position, pixelated: try f["pixelated"].bool(), outline: outline, content: content, follows: f.has("follows")))
+			return .runtimeImage(RuntimeImage(fit: fit, position: position, pixelated: try f["pixelated"].bool(), outline: outline, content: content, follows: follows))
 		case "select-arrow":
 			let f = try write.object(["kind", "color", "key"])
 			try expectKey(f, "dragonSelectArrow")
