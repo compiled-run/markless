@@ -468,7 +468,7 @@ function declaredNames(statement: AnyNode): string[] {
 	});
 }
 
-// A server render with a request reads the saved value; without one, the fallback.
+// A server render with a request, or a client render, reads the saved value; otherwise the fallback.
 function storageInitializerSource(binding: GraphBinding): string {
 	return `(marklessSsrRenderContext?.${STORAGE_RENDER_CONTEXT_READER}?.(${JSON.stringify(binding.storage!.key)}) ?? ${jsonSourceWithNonFiniteNumbers(binding.initialValue)})`;
 }

@@ -645,9 +645,17 @@ or in a component body; both follow the same contract.
   the `<html>` data attribute; the startup script compares those values with
   the ones the page was rendered with and, when any differs, starts the runtime
   at idle on the same self-wake path unsettled async pages use, which brings
-  every binding to the saved value and writes the cookie. When every saved
-  value equals the rendered one (including a visit with nothing saved), no
-  extra code runs.
+  every binding to the saved value and writes the cookie. Every binding means
+  everything derived from the value too: function calls in markup, computeds,
+  attributes, `@if` and `@for`, and child props follow it as the text that
+  prints it does, with no interaction. When every saved value equals the
+  rendered one (including a visit with nothing saved), no extra code runs.
+- **A client render reads the saved value as it renders.** `render(App, {
+  target })` in the browser reads each storage cell's saved value the way the
+  head script does (cookie first, then `localStorage`), renders with it, and
+  sets the `<html>` data attribute, so the first paint and everything derived
+  from the value are right with no runtime start. A component with storage
+  cells always renders through the full runtime, which saves its writes.
 
 ### Shared state — `shared()`
 

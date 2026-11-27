@@ -1,22 +1,6 @@
-import { storageCookieName } from './storage-slot.ts';
+import { decodeStorageCookieValue, storageCookieName } from './storage-slot.ts';
 
 // Server half of storage(): the browser never loads this module.
-
-// A cookie is user-controlled input, so a value that does not decode, or that
-// is longer than a cookie can legitimately carry, reads as absent.
-const STORAGE_COOKIE_VALUE_LIMIT = 4096;
-
-export function decodeStorageCookieValue(raw: string): string | undefined {
-	if (raw.length > STORAGE_COOKIE_VALUE_LIMIT) return undefined;
-	try {
-		return decodeURIComponent(raw);
-	} catch {
-		return undefined;
-	}
-}
-
-// The server render-context property a storage() cell reads its saved value through.
-export const STORAGE_RENDER_CONTEXT_READER = 'storageValue';
 
 // Reads storage values out of a request's Cookie header. Only names minted by
 // storageCookieName are kept; everything else in the header is ignored.

@@ -2,6 +2,9 @@ export { isValidStorageKey } from './storage-key.ts';
 
 export const STORAGE_SLOT_SYMBOL_KEY = 'tsrx.storage/1';
 
+// The render-context property a storage() cell reads its saved value through.
+export const STORAGE_RENDER_CONTEXT_READER = 'storageValue';
+
 // The no-flash <html> attribute name for a driver key. Derived keys contain a
 // colon (markless:theme) which is not a clean attribute name, so any character
 // outside [A-Za-z0-9-] collapses to a hyphen: markless:theme -> data-markless-theme,
@@ -16,6 +19,19 @@ export function storageAttributeName(driverKey: string): string {
 // colon, which a cookie name cannot hold, into %3A.
 export function storageCookieName(driverKey: string): string {
 	return `markless-${encodeURIComponent(driverKey)}`;
+}
+
+// A cookie is user-controlled input, so a value that does not decode, or that
+// is longer than a cookie can legitimately carry, reads as absent.
+const STORAGE_COOKIE_VALUE_LIMIT = 4096;
+
+export function decodeStorageCookieValue(raw: string): string | undefined {
+	if (raw.length > STORAGE_COOKIE_VALUE_LIMIT) return undefined;
+	try {
+		return decodeURIComponent(raw);
+	} catch {
+		return undefined;
+	}
 }
 
 // max-age is 400 days, the longest lifetime browsers honour for a cookie.

@@ -360,3 +360,28 @@ export function Beacon() @{
 		source.match(/marklessSsrComposeView\(marklessSsrRendered\.structure, payloadView,/g)?.length,
 	).toBe(2);
 });
+
+test('a component with a storage() cell is left to the full runtime, which reads and saves its value', async () => {
+	const compile = (declaration: string) =>
+		compileTsrxModule({
+			filename: 'src/theme.tsrx',
+			source: `import { state, storage } from '@markless/core';
+
+export function App() @{
+	${declaration}
+	<main>
+		<output>{theme}</output>
+		<button type="button" onClick={() => (theme = 'dark')}>Dark</button>
+	</main>
+}
+`,
+			symbols: [],
+		});
+	const plain = await compile("let theme = state('light');");
+	const stored = await compile("let theme = storage('theme', 'light');");
+
+	expect(plain.publicRenderModule.rootExportName).toBe('App');
+	expect(stored.protocolState.storage).toEqual([{ graphNodeId: 'storage:theme', key: 'theme' }]);
+	expect(stored.publicRenderModule.rootExportName).toBeNull();
+	expect(stored.publicRenderModule.moduleSource).toBe('');
+});

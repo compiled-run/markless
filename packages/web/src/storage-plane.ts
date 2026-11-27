@@ -6,6 +6,7 @@ import {
 } from '../../serializer/src/storage-slot.ts';
 import type { ProtocolStatePayload } from '@markless/serializer/protocol';
 import type { RuntimeGraph } from '@markless/runtime';
+import { readSavedStorageValue } from './storage-saved.ts';
 
 export type StoragePlane = {
 	readonly dispose: () => void;
@@ -101,13 +102,7 @@ export function applyStorageReadInitializers(
 		const fallback = cell.value;
 		return {
 			...cell,
-			readInitializer() {
-				try {
-					return globalThis.localStorage.getItem(record.key) ?? fallback;
-				} catch {
-					return fallback;
-				}
-			},
+			readInitializer: () => readSavedStorageValue(record.key) ?? fallback,
 		};
 	});
 }

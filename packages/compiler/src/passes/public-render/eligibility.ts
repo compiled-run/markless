@@ -40,6 +40,8 @@ export function canUseDirectPublicRuntime(
 	publicView: ProtocolView,
 ): boolean {
 	if ((protocolState.sharedDefinitions?.length ?? 0) > 0) return false;
+	// Saved values are read and written by the storage plane, which only the full runtime has.
+	if ((protocolState.storage?.length ?? 0) > 0) return false;
 	if (protocolState.computed.length > 0) return false;
 	if (publicView.domUpdates.length > 0) return false;
 	if (publicView.behaviors.length > 0) return false;

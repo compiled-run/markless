@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
-import { STORAGE_RENDER_CONTEXT_READER } from '../../serializer/src/storage-cookie.ts';
+import { STORAGE_RENDER_CONTEXT_READER } from '../../serializer/src/storage-slot.ts';
 import { storageCookieName } from '../../serializer/src/storage-slot.ts';
 import { __marklessCreateHttpContext, type HttpContext } from '../src/index.ts';
 import { createServerEntry } from '../src/vite/runtime/create-server-entry.ts';
