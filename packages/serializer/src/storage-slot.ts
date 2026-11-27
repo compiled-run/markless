@@ -21,19 +21,6 @@ export function storageCookieName(driverKey: string): string {
 	return `markless-${encodeURIComponent(driverKey)}`;
 }
 
-// A cookie is user-controlled input, so a value that does not decode, or that
-// is longer than a cookie can legitimately carry, reads as absent.
-const STORAGE_COOKIE_VALUE_LIMIT = 4096;
-
-export function decodeStorageCookieValue(raw: string): string | undefined {
-	if (raw.length > STORAGE_COOKIE_VALUE_LIMIT) return undefined;
-	try {
-		return decodeURIComponent(raw);
-	} catch {
-		return undefined;
-	}
-}
-
 // max-age is 400 days, the longest lifetime browsers honour for a cookie.
 export function storageCookieAssignment(driverKey: string, value: string, secure: boolean): string {
 	return `${storageCookieName(driverKey)}=${encodeURIComponent(value)};path=/;max-age=34560000;samesite=lax${secure ? ';secure' : ''}`;

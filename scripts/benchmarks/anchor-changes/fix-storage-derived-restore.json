@@ -5,21 +5,10 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-csr",
-				"web/storage-saved"
-			],
-			"set": 1993,
-			"reason": "client render() reads saved storage() values: the reader is a lazy chunk loaded only when the component declares storage cells; a storage-free render runs only one check over its surface",
-			"date": "2026-11-27"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
 				"serializer/storage-slot"
 			],
-			"delta": 315,
-			"reason": "client render() reads saved storage() values: the reader is a lazy chunk loaded only when the component declares storage cells; a storage-free render runs only one check over its surface",
+			"delta": 81,
+			"reason": "client render() reads saved storage() values through the storage plane module, loaded only when the component declares storage cells; a storage-free render runs one check over its records",
 			"date": "2026-11-27"
 		},
 		{
@@ -29,8 +18,8 @@
 				"@fixtures/vite-csr",
 				"web/render-canonical"
 			],
-			"delta": 788,
-			"reason": "client render() reads saved storage() values: the reader is a lazy chunk loaded only when the component declares storage cells; a storage-free render runs only one check over its surface",
+			"delta": 771,
+			"reason": "client render() reads saved storage() values through the storage plane module, loaded only when the component declares storage cells; a storage-free render runs one check over its records",
 			"date": "2026-11-27"
 		},
 		{
@@ -40,8 +29,8 @@
 				"@fixtures/vite-csr",
 				"web/storage-plane"
 			],
-			"delta": -53,
-			"reason": "client render() reads saved storage() values: the reader is a lazy chunk loaded only when the component declares storage cells; a storage-free render runs only one check over its surface",
+			"delta": 1555,
+			"reason": "client render() reads saved storage() values through the storage plane module, loaded only when the component declares storage cells; a storage-free render runs one check over its records",
 			"date": "2026-11-27"
 		},
 		{
@@ -52,19 +41,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": -19,
-			"reason": "client render() reads saved storage() values: the reader is a lazy chunk loaded only when the component declares storage cells; a storage-free render runs only one check over its surface",
-			"date": "2026-11-27"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/storage-saved"
-			],
-			"set": 1993,
-			"reason": "client render() reads saved storage() values: the reader is a lazy chunk loaded only when the component declares storage cells; a storage-free render runs only one check over its surface",
+			"delta": -9,
+			"reason": "client render() reads saved storage() values through the storage plane module, loaded only when the component declares storage cells; a storage-free render runs one check over its records",
 			"date": "2026-11-27"
 		},
 		{
@@ -74,8 +52,8 @@
 				"@fixtures/vite-plus",
 				"serializer/storage-slot"
 			],
-			"delta": 315,
-			"reason": "client render() reads saved storage() values: the reader is a lazy chunk loaded only when the component declares storage cells; a storage-free render runs only one check over its surface",
+			"delta": 81,
+			"reason": "client render() reads saved storage() values through the storage plane module, loaded only when the component declares storage cells; a storage-free render runs one check over its records",
 			"date": "2026-11-27"
 		},
 		{
@@ -85,8 +63,8 @@
 				"@fixtures/vite-plus",
 				"web/render-canonical"
 			],
-			"delta": 788,
-			"reason": "client render() reads saved storage() values: the reader is a lazy chunk loaded only when the component declares storage cells; a storage-free render runs only one check over its surface",
+			"delta": 771,
+			"reason": "client render() reads saved storage() values through the storage plane module, loaded only when the component declares storage cells; a storage-free render runs one check over its records",
 			"date": "2026-11-27"
 		},
 		{
@@ -96,8 +74,8 @@
 				"@fixtures/vite-plus",
 				"web/storage-plane"
 			],
-			"delta": -53,
-			"reason": "client render() reads saved storage() values: the reader is a lazy chunk loaded only when the component declares storage cells; a storage-free render runs only one check over its surface",
+			"delta": 1555,
+			"reason": "client render() reads saved storage() values through the storage plane module, loaded only when the component declares storage cells; a storage-free render runs one check over its records",
 			"date": "2026-11-27"
 		},
 		{
@@ -108,8 +86,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": 4,
-			"reason": "client render() reads saved storage() values: the reader is a lazy chunk loaded only when the component declares storage cells; a storage-free render runs only one check over its surface",
+			"delta": -1,
+			"reason": "client render() reads saved storage() values through the storage plane module, loaded only when the component declares storage cells; a storage-free render runs one check over its records",
 			"date": "2026-11-27"
 		},
 		{
@@ -120,8 +98,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 7,
-			"reason": "client render() reads saved storage() values: the reader is a lazy chunk loaded only when the component declares storage cells; a storage-free render runs only one check over its surface",
+			"delta": -3,
+			"reason": "client render() reads saved storage() values through the storage plane module, loaded only when the component declares storage cells; a storage-free render runs one check over its records",
 			"date": "2026-11-27"
 		}
 	]

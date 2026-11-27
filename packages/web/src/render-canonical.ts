@@ -35,7 +35,7 @@ export async function renderCanonicalClientOutput(
 		const scoped = elementIdScope ? { ...authored, elementIdScope } : authored;
 		// A client render has the visitor's saved storage() values at hand, so it renders with them.
 		const surface = declaresStorage(scoped)
-			? (await import('./storage-saved.ts')).withSavedStorageValues(scoped)
+			? (await import('./storage-plane.ts')).withSavedStorageValues(scoped)
 			: scoped;
 		const loadSymbol = component.loadSymbol ?? missingCanonicalSymbol;
 		const output = await (
@@ -55,7 +55,7 @@ export async function renderCanonicalClientOutput(
 	}
 	const output = await component.renderSsr(undefined, {
 		...(elementIdScope ? { elementIdScope } : {}),
-		...(await import('./storage-saved.ts')).savedStorageRenderContext,
+		...(await import('./storage-plane.ts')).savedStorageRenderContext,
 	});
 	return clientOutputFromHtml(ownerDocument, output.html, {
 		state: output.state,
@@ -88,14 +88,12 @@ function clientOutputFromHtml(
 	};
 }
 
-function declaresStorage(surface: PrerenderDataSurface, seen = new Set<PrerenderDataSurface>()): boolean {
-	if (seen.has(surface)) return false;
-	seen.add(surface);
-	return (
-		Object.values(surface.components).some((definition) => !!definition.state.storage?.length) ||
-		Object.values(surface.imports).some((imported) => declaresStorage(imported, seen))
-	);
-}
+// The protocol omits `storage` from a component with no storage cells.
+const declaresStorage = (surface: PrerenderDataSurface, seen = new Set()): boolean =>
+	!seen.has(surface) &&
+	!!seen.add(surface) &&
+	(Object.values(surface.components).some((definition) => definition.state.storage) ||
+		Object.values(surface.imports).some((imported) => declaresStorage(imported, seen)));
 
 function missingCanonicalSymbol(symbolId: string): never {
 	throw new Error(`MARKLESS_CANONICAL_SYMBOL_MISSING: ${symbolId}`);
