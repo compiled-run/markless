@@ -15221,16 +15221,34 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's12',
-					text: ') read outside a body assignment, and a function default on a callback prop (',
+					text: '), and an object, array or function default (',
 				},
 				{
 					id: 's13',
-					text: '{ onPick = () => {} }',
+					text: '{ items = [] }',
 					code: true,
 				},
 				{
 					id: 's14',
-					text: ') read outside a body assignment.',
+					text: ', ',
+				},
+				{
+					id: 's15',
+					text: '{ onPick = () => {} }',
+					code: true,
+				},
+				{
+					id: 's16',
+					text: '), each read anywhere other than a body assignment or a ',
+				},
+				{
+					id: 's17',
+					text: 'state()',
+					code: true,
+				},
+				{
+					id: 's18',
+					text: ' initializer.',
 				},
 			],
 			how: [
@@ -15249,11 +15267,20 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's3',
-					text: 'onPick?.()',
+					text: '(items ?? []).length',
 					code: true,
 				},
 				{
 					id: 's4',
+					text: ', ',
+				},
+				{
+					id: 's5',
+					text: 'onPick?.()',
+					code: true,
+				},
+				{
+					id: 's6',
 					text: ').',
 				},
 			],

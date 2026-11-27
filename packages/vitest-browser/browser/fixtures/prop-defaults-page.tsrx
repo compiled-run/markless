@@ -10,7 +10,7 @@ export default function PropDefaultsPage() @{
 		<div data-case="undefined"><Stars size={undefined} /></div>
 		<div data-case="passed"><Stars size={5} /></div>
 		<div data-case="live"><Stars size={rating.n} /></div>
-		<div data-case="tags-omitted"><Tags /></div>
+		<div data-case="tags-omitted"><Tags tags={['x', 'y', 'z']} /></div>
 		<div data-case="tags-passed"><Tags tags={['a', 'b', 'c']} max={rating.n} /></div>
 		<ul data-case="rows">
 			@for (const row of rows; key row.id) {

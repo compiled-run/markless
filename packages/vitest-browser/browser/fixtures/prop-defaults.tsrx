@@ -17,7 +17,7 @@ export function Stars({ size = 3 }: { size?: number }) @{
 	</div>
 }
 
-export function Tags({ tags = ['none'], max = 2 }: { tags?: string[]; max?: number }) @{
+export function Tags({ tags, max = 2 }: { tags: string[]; max?: number }) @{
 	<ul data-tags>
 		@for (const tag of tags.slice(0, max); key tag) {
 			<li>{tag}</li>

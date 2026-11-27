@@ -37,7 +37,7 @@ function rowStars(container: ParentNode) {
 
 function expectFirstPaint(container: ParentNode) {
 	expect(rowStars(container)).toEqual(['★★', '★★★']);
-	expect(tags(container, 'tags-omitted')).toEqual(['none']);
+	expect(tags(container, 'tags-omitted')).toEqual(['x', 'y']);
 	expect(tags(container, 'tags-passed')).toEqual(['a']);
 	for (const name of ['omitted', 'undefined']) {
 		expect(stars(container, name), name).toMatchObject({

@@ -1,4 +1,4 @@
-import { asNodes, isNode, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, isNode, unwrapTypeAssertion, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
 	graphBindingMap,
@@ -348,7 +348,7 @@ type PropAliasOwner = {
 	readonly componentId: string;
 	readonly componentName: string;
 	readonly propPath: ReadonlyArray<string>;
-	readonly bodyAssignmentValues?: ReadonlyArray<SourceSpan>;
+	readonly bodyMaterializedReads?: ReadonlyArray<SourceSpan>;
 };
 
 export function sourceBindingId(span: { readonly start: number; readonly end: number }): string {
@@ -372,13 +372,11 @@ function recordDefaultedPropAlias(
 
 	const bindingId = sourceBindingId(span);
 	const defaultSource = expressionSource(fallback, state.source);
-	// A function default is a callback prop, which reaches handlers as a symbol rather than a derived value.
 	if (
 		owner.propPath.length === 1 &&
 		!state.currentSharedDefinitionId &&
-		fallback.type !== 'ArrowFunctionExpression' &&
-		fallback.type !== 'FunctionExpression' &&
-		readOutsideBodyAssignments(local, owner, state)
+		!OBJECT_VALUE_DEFAULTS.has(unwrapTypeAssertion(fallback)?.type ?? '') &&
+		readOutsideRenderOnlyCode(local, owner, state)
 	) {
 		recordDefaultedPropComputed(
 			{
@@ -419,14 +417,23 @@ function recordDefaultedPropAlias(
 	return true;
 }
 
-// A local only ever seeded from (`s.checked = checked`) is materialized by the body, so it needs no derived node.
-function readOutsideBodyAssignments(
+// A prop cell holds only the top-level value the parent passed, so a derived node over an object or callback prop would go stale.
+const OBJECT_VALUE_DEFAULTS = new Set([
+	'ArrowFunctionExpression',
+	'FunctionExpression',
+	'ObjectExpression',
+	'ArrayExpression',
+	'NewExpression',
+]);
+
+// A local read only by seeds and state() initializers is materialized by the body, so it needs no derived node.
+function readOutsideRenderOnlyCode(
 	local: AnyNode,
 	owner: PropAliasOwner,
 	state: WalkState,
 ): boolean {
 	const semantic = state.semantic();
-	const values = owner.bodyAssignmentValues ?? [];
+	const values = owner.bodyMaterializedReads ?? [];
 	return semantic.references.some((reference) => {
 		if (!reference.binding) return false;
 		const declaration = semantic.bindings[reference.binding.id]?.declarations[0];

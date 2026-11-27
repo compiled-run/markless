@@ -1021,7 +1021,7 @@ function isUnloweredSharedSeed(
 	);
 }
 
-// A nested or function prop default exists only where the body materializes the local, so any other read fails closed.
+// A nested, object or function prop default exists only where the body materializes the local, so any other read fails closed.
 function escapedDefaultedPropDiagnostics(input: StateLoweringInput): StateLoweringDiagnostic[] {
 	return input.semanticGraph.componentPropBindings.flatMap((binding) => {
 		if (binding.defaultSource === undefined || binding.defaultedGraphNodeId !== undefined)
@@ -1085,8 +1085,8 @@ function escapedDefaultedPropDiagnostic(
 		severity: 'error',
 		phase: 'state-lowering',
 		title: 'This prop default is only supported where the body assigns it',
-		message: `Cannot read "${source}" because "${localName}" has a destructuring default inside a nested pattern or a function default, and this position reads the prop the consumer passed instead of the default.`,
-		why: 'A default on a top-level prop such as `{ size = 3 }` works everywhere. A default inside a nested pattern (`{ options: { size = 3 } }`) or a function default (`{ onPick = () => {} }`) is applied only where the component body assigns the local; a template position, an event handler and a computed read the raw prop and would silently see undefined where a default was authored.',
+		message: `Cannot read "${source}" because "${localName}" has a destructuring default the build applies only in the component body (a default inside a nested pattern, or an object, array or function default), and this position reads the prop the consumer passed instead of the default.`,
+		why: 'A default on a top-level prop such as `{ size = 3 }` works everywhere. A default inside a nested pattern (`{ options: { size = 3 } }`), or an object, array or function default (`{ items = [] }`, `{ onPick = () => {} }`), is applied only where the component body reads the local while the page renders; a template position, an event handler and a computed read the raw prop and would silently see undefined where a default was authored.',
 		primarySpan: sourceSpan ?? fallbackSpan(filename),
 		passId: 'state-lowering',
 		artifactKeys: ['semanticGraph', 'stateLowering'],

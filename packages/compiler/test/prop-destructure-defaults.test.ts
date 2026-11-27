@@ -221,3 +221,29 @@ export function Root({ on = false, children }) @{
 		'computed:Root.on',
 	);
 });
+
+test('an array default read in markup still fails closed', async () => {
+	const compiled = await compile(`
+export function List({ items = [] }: { items?: string[] }) @{
+	<span>{items.length}</span>
+}
+`);
+
+	expect(errors(compiled)).toContain('MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED');
+});
+
+test('a default read only by a state() initializer adds no derived node', async () => {
+	const compiled = await compile(`
+import { state } from '@markless/core';
+
+export function Counter({ start = 4 }: { start?: number }) @{
+	const count = state({ n: start });
+	<button onClick={() => count.n++}>{count.n}</button>
+}
+`);
+
+	expect(errors(compiled)).toEqual([]);
+	expect(compiled.semanticGraph.graphBindings.map((binding) => binding.id)).not.toContain(
+		'computed:Counter.start',
+	);
+});

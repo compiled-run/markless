@@ -30,6 +30,7 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
 import { collectObjectPatternAliases } from './collect-aliases.ts';
+import { getFrameworkApiForCall } from './imports.ts';
 import { constantPropValue } from './constant-props.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { rowItemRead } from './row-item-read.ts';
@@ -130,13 +131,20 @@ export function collectComponentProps(component: AnyNode, state: WalkState): voi
 		componentId: state.currentComponentId,
 		componentName: state.currentComponentName,
 		propPath: [],
-		bodyAssignmentValues: bodyAssignmentValues(component.body as AnyNode | undefined, state),
+		bodyMaterializedReads: bodyMaterializedReads(component.body as AnyNode | undefined, state),
 	});
 }
 
-// `s.checked = checked` statements in the body itself: their right-hand sides seed state from the materialized prop local.
-function bodyAssignmentValues(body: AnyNode | undefined, state: WalkState): ReadonlyArray<SourceSpan> {
+// Body code that runs only while the page renders, where the destructured local already holds the default: seeds and state() initializers.
+function bodyMaterializedReads(body: AnyNode | undefined, state: WalkState): ReadonlyArray<SourceSpan> {
 	return asNodes(body?.body).flatMap((statement) => {
+		if (statement.type === 'VariableDeclaration')
+			return asNodes(statement.declarations).flatMap((declarator) => {
+				const init = declarator.init as AnyNode | undefined;
+				const api = getFrameworkApiForCall(init, state.frameworkApiImports);
+				const span = init && (api === 'state' || api === 'storage') && sourceSpan(init, state.filename);
+				return span ? [span] : [];
+			});
 		const expression =
 			statement.type === 'ExpressionStatement'
 				? (statement.expression as AnyNode | undefined)
