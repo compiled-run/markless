@@ -119,6 +119,10 @@ export function createResumeRuntime(
 				typeof record.deriveSymbolId === 'string' &&
 				!registeredComputedRefreshIds.has(record.graphNodeId),
 		);
+		// A reopened arm painted live values: a node that went stale while it was closed derives now.
+		for (const record of records)
+			if (record.deriveOnRead && registeredComputedRefreshIds.has(record.graphNodeId))
+				input.graph.read(record.graphNodeId, []);
 		if (fresh.length === 0 && !sharedSeeds?.length) return;
 		for (const record of fresh) {
 			registeredComputedRefreshIds.add(record.graphNodeId);
