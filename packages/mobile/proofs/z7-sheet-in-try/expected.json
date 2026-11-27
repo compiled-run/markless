@@ -1,0 +1,28 @@
+{
+	"rung": "Z7",
+	"name": "A system sheet inside the arm of a @try, its prompt loaded: the sheet's content is laid out as a document of its own, where the @try's arm is always the one shown",
+	"steps": [
+		{
+			"visible": ["Sizes", "Pick a size"],
+			"absent": ["Loading sizes", "Choose a size"]
+		},
+		{
+			"do": { "tap": "Pick a size" },
+			"visible": ["Choose a size", "Small", "Medium", "Large"]
+		},
+		{
+			"do": { "tap": "Medium" },
+			"visible": ["Medium"],
+			"absent": ["Choose a size", "Pick a size"]
+		}
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": ["Sizes", "Pick a size", "On the web, the sizes open in a drawer"],
+				"absent": ["Choose a size"]
+			}
+		],
+		"absentFromOutput": ["Choose a size", "@markless/device"]
+	}
+}
