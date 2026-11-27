@@ -645,7 +645,8 @@ public struct StyleExport: Sendable {
 					let s = try sheet.object(["node", "heights"])
 					let heights = try s["heights"].array().map { height in
 						let h = try height.object(
-							required: ["snapPoint", "viewport", "readiness", "states", "initial", "next", "assignments"], optional: ["bands"])
+							required: ["snapPoint", "viewport", "readiness", "states", "initial", "next", "assignments"],
+							optional: ["bands", "plan", "planNames", "planRepeats"])
 						return (snapPoint: try h["snapPoint"].number(), style: try expanded(height, h, try raw(h, "viewport")))
 					}
 					guard !heights.isEmpty else { throw sheet.fail("a sheet's styles need at least one resting height") }

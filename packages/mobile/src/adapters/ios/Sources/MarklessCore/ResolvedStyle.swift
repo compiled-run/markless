@@ -241,16 +241,17 @@ extension StyleExport {
 			initialTexts: initialTexts, value: value, arm: arm, dark: dark)
 	}
 
-	/// The layout of each resting height of the sheet `node`, in its `heights` order.
+	/// The layout of each resting height of the sheet `node`, in its `heights` order; `laidOut`: each height laid out again by Dragon's plan.
 	public func resolveSheet(
 		_ node: String, for payload: NativeViewPayload, initialTexts: [(node: String, text: String)],
-		value: (String) throws -> NativeValue, arm: (String) throws -> NativeValue? = { _ in nil }, dark: Bool = false
+		value: (String) throws -> NativeValue, arm: (String) throws -> NativeValue? = { _ in nil }, dark: Bool = false,
+		laidOut: [StyleExport]? = nil
 	) throws -> [(snapPoint: Double, layout: StyleLayout)] {
 		guard let sheet = sheets.first(where: { $0.node == node }) else { throw styleError("\(node): the style export has no styles for this system sheet") }
 		let roots = sheetRoots(of: payload)
 		let content = payload.nodes.filter { roots[$0.id] == node && $0.id != node }
-		return try sheet.heights.map { height in
-			(height.snapPoint, try height.style.layout(
+		return try sheet.heights.enumerated().map { index, height in
+			(height.snapPoint, try (laidOut?[index] ?? height.style).layout(
 				for: payload, nodes: content, root: node, everyStyledCell: false, initialTexts: initialTexts, value: value, arm: arm, dark: dark))
 		}
 	}
