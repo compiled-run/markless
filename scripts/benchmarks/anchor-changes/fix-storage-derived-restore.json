@@ -101,6 +101,122 @@
 			"delta": -3,
 			"reason": "client render() reads saved storage() values through the storage plane module, loaded only when the component declares storage cells; a storage-free render runs one check over its records",
 			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 273,
+			"reason": "render() in the browser reads a visitor's saved storage() values so a re-run example shows them with no interaction; the code is in the storage plane and render-canonical, preloaded with navigation but run only for components with storage cells",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 273,
+			"reason": "render() in the browser reads a visitor's saved storage() values so a re-run example shows them with no interaction; the code is in the storage plane and render-canonical, preloaded with navigation but run only for components with storage cells",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 273,
+			"reason": "render() in the browser reads a visitor's saved storage() values so a re-run example shows them with no interaction; the code is in the storage plane and render-canonical, preloaded with navigation but run only for components with storage cells",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 408,
+			"reason": "render() in the browser reads a visitor's saved storage() values so a re-run example shows them with no interaction; the code is in the storage plane and render-canonical, preloaded with navigation but run only for components with storage cells",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 408,
+			"reason": "render() in the browser reads a visitor's saved storage() values so a re-run example shows them with no interaction; the code is in the storage plane and render-canonical, preloaded with navigation but run only for components with storage cells",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 408,
+			"reason": "render() in the browser reads a visitor's saved storage() values so a re-run example shows them with no interaction; the code is in the storage plane and render-canonical, preloaded with navigation but run only for components with storage cells",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs / playground",
+				"jsGzipBytes"
+			],
+			"delta": 6,
+			"reason": "render() in the browser reads a visitor's saved storage() values so a re-run example shows them with no interaction; the code is in the storage plane and render-canonical, preloaded with navigation but run only for components with storage cells",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state playground",
+				"jsGzipBytes"
+			],
+			"delta": 6,
+			"reason": "render() in the browser reads a visitor's saved storage() values so a re-run example shows them with no interaction; the code is in the storage plane and render-canonical, preloaded with navigation but run only for components with storage cells",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/render-canonical"
+			],
+			"delta": 771,
+			"reason": "client render() reads saved storage() values: render-canonical checks the component's storage records and the storage plane holds the reader, run only for components with storage cells",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/storage-plane"
+			],
+			"delta": 1555,
+			"reason": "client render() reads saved storage() values: render-canonical checks the component's storage records and the storage plane holds the reader, run only for components with storage cells",
+			"date": "2026-11-27"
 		}
 	]
 }
