@@ -123,12 +123,16 @@ export {
 	PREFETCH_MARKS,
 	PREFETCH_NETWORKS,
 	PREFETCH_TRIGGERS,
+	prefetchPolicy,
+	type PrefetchLevels,
 	type PrefetchLinkChoice,
+	type PrefetchPolicy,
 	type PrefetchNetworks,
 	type PrefetchTrigger,
 	type RouterPrefetch,
 	type RouterPrefetchOptions,
 } from './prefetch-policy.ts';
+export { fragmentPageUrl } from './fragment-navigation.ts';
 
 // The compiler refuses browser code that reads these page props: they hold request data.
 const PAGE_SERVER_ONLY_PROPS = [

@@ -10,6 +10,7 @@ import {
 	FRAGMENT_IDLE_FRAGMENT_DECODED_BYTES,
 	FRAGMENT_PATH_PREFIX,
 	FRAGMENT_REGION_END,
+	FRAGMENT_PRERENDERED,
 	PREFETCH_MARKS,
 	fragmentPageUrl,
 	runFragmentNavigation,
@@ -63,6 +64,8 @@ type Setup = {
 	// 'throw': the swap module's navigate rejects.
 	readonly navigation?: 'swap' | 'hang' | 'throw';
 	readonly heldChars?: number;
+	// How long a fetched page counts as fresh.
+	readonly ttlMs?: number;
 };
 
 type Fetch = { readonly path: string; readonly purpose?: string };
@@ -92,6 +95,7 @@ function config(setup: Setup): FragmentNavigationConfig {
 		renderedEvent: 'rendered',
 		requestPrefix: FRAGMENT_PATH_PREFIX,
 		regionEndMarker: FRAGMENT_REGION_END,
+		prerenderedMarker: FRAGMENT_PRERENDERED,
 		appendMarker: '<!--append-->',
 		pageEndComment: 'end',
 		pageStartComment: 'start',
@@ -99,7 +103,7 @@ function config(setup: Setup): FragmentNavigationConfig {
 		keepAttributes: ['', '', '', '', ''],
 		documentLoads: false,
 		hoverDwellMs: 20,
-		prefetchTtlMs: 30_000,
+		prefetchTtlMs: setup.ttlMs ?? 30_000,
 		heldChars: setup.heldChars ?? FRAGMENT_HELD_CHARS,
 		prefetchConnections: policy.concurrency,
 		guessBudget: policy.budget,
@@ -211,9 +215,9 @@ async function open(setup: Setup) {
 		request.on('close', () => request.destroyed && open--);
 		const hold = setup.holdMs ?? 0;
 		if (hold === Infinity)
-			return void servers.at(-1)!.held.push(
-				Object.assign(response, { page: destination.pathname }),
-			);
+			return void servers
+				.at(-1)!
+				.held.push(Object.assign(response, { page: destination.pathname }));
 		await new Promise((done) => setTimeout(done, hold));
 		open--;
 		const answer = setup.answer?.(destination.pathname) ?? {
@@ -260,7 +264,9 @@ async function open(setup: Setup) {
 		// The page's first idle moment: guessing arms in the idle callback queued once the page is measured.
 		armed: () =>
 			expect
-				.poll(() => page.evaluate(() => (window as unknown as { __idle: () => number }).__idle()))
+				.poll(() =>
+					page.evaluate(() => (window as unknown as { __idle: () => number }).__idle()),
+				)
 				.toBeGreaterThan(0),
 		// Resolves the page's own-download measurement: whether its link is fast.
 		measured: (fast: boolean) =>
@@ -271,7 +277,9 @@ async function open(setup: Setup) {
 		// The viewport tier has observed the page's links and had its first intersection report.
 		viewportSettled: async () => {
 			await expect
-				.poll(() => page.evaluate(() => (window as unknown as { __watched: number }).__watched))
+				.poll(() =>
+					page.evaluate(() => (window as unknown as { __watched: number }).__watched),
+				)
 				.toBeGreaterThan(0);
 			await afterFrames(page);
 		},
@@ -309,8 +317,7 @@ async function open(setup: Setup) {
 // Intersection observers report at the next rendering steps, which two animation frames have passed.
 const afterFrames = (page: Page) =>
 	page.evaluate(
-		() =>
-			new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+		() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
 	);
 const sorted = (paths: string[]) =>
 	paths.toSorted((a, b) => a.localeCompare(b, 'en', { numeric: true }));
@@ -373,7 +380,9 @@ describe('viewport tier', () => {
 		const off = await open({ prefetch: { idle: 'none' } });
 		await off.measured(true);
 		await afterFrames(off.page);
-		expect(await off.page.evaluate(() => (window as unknown as { __watched: number }).__watched)).toBe(0);
+		expect(
+			await off.page.evaluate(() => (window as unknown as { __watched: number }).__watched),
+		).toBe(0);
 		expect(await off.fetches()).toEqual([]);
 		await off.page.close();
 		const s = await open({ prefetch: { viewport: 'all', idle: 'none' } });
@@ -406,7 +415,9 @@ describe('viewport tier', () => {
 		await s.page.mouse.move(501, 12 * 40 + 60);
 		await s.measured(true);
 		await s.armed();
-		await expect.poll(async () => (await s.fetches()).length, { timeout: 10_000 }).toBe(IN_VIEW);
+		await expect
+			.poll(async () => (await s.fetches()).length, { timeout: 10_000 })
+			.toBe(IN_VIEW);
 		expect(s.mostOpen()).toBe(3);
 		expect((await s.paths()).slice(0, 3).toSorted()).toEqual(['/p/11', '/p/12', '/p/13']);
 		await s.page.close();
@@ -572,6 +583,28 @@ describe('a click', () => {
 		await s.page.close();
 	});
 
+	test('on a link no guess is fetching cancels the idle guesses still arriving, keeps its own fetch and navigates', async () => {
+		const s = await open({ prefetch: { idle: 'all' }, holdMs: Infinity });
+		await s.measured(true);
+		await s.armed();
+		await expect.poll(async () => (await s.fetches()).length).toBe(2);
+		const guessed = await s.paths();
+		const target = inView.find((path) => !guessed.includes(path))!;
+		await s.page.click(`a[href="${target}"]`);
+		await expect.poll(() => s.aborted.toSorted()).toEqual(guessed.toSorted());
+		expect(await s.paths()).toEqual([...guessed, target]);
+		expect(
+			await s.page.evaluate(
+				() => (window as unknown as { __navigated: string[] }).__navigated,
+			),
+		).toEqual([target]);
+		expect(new URL(s.page.url()).pathname).toBe(target);
+		await afterFrames(s.page);
+		expect(s.aborted).not.toContain(target);
+		expect(s.errors).toEqual([]);
+		await s.page.close();
+	});
+
 	test('cancelled by a click on the page shown, guessing resumes, and the pages it dropped are fetched again', async () => {
 		// Only links 0 to 3 are guessed, so the pages fetched after the cancel can only be the ones dropped.
 		const s = await open({
@@ -579,7 +612,10 @@ describe('a click', () => {
 			holdMs: Infinity,
 			navigation: 'hang',
 			attributes: Object.fromEntries(
-				Array.from({ length: LINKS - 4 }, (_, i) => [i + 4, `${PREFETCH_ATTRIBUTE}="intent"`]),
+				Array.from({ length: LINKS - 4 }, (_, i) => [
+					i + 4,
+					`${PREFETCH_ATTRIBUTE}="intent"`,
+				]),
 			),
 		});
 		await s.measured(true);
@@ -590,7 +626,9 @@ describe('a click', () => {
 		await expect.poll(() => s.aborted.length).toBe(3);
 		await s.page.click('a[href="/"]');
 		await s.armed();
-		await expect.poll(async () => (await s.paths()).slice(4).toSorted()).toEqual(others.toSorted());
+		await expect
+			.poll(async () => (await s.paths()).slice(4).toSorted())
+			.toEqual(others.toSorted());
 		await s.page.close();
 	});
 });
@@ -697,7 +735,10 @@ describe('guessing resumes', () => {
 			holdMs: Infinity,
 			navigation: 'throw',
 			attributes: Object.fromEntries(
-				Array.from({ length: LINKS - 4 }, (_, i) => [i + 4, `${PREFETCH_ATTRIBUTE}="intent"`]),
+				Array.from({ length: LINKS - 4 }, (_, i) => [
+					i + 4,
+					`${PREFETCH_ATTRIBUTE}="intent"`,
+				]),
 			),
 		});
 		await s.measured(true);
@@ -719,7 +760,10 @@ describe('guessing resumes', () => {
 			holdMs: Infinity,
 			navigation: 'hang',
 			attributes: Object.fromEntries(
-				Array.from({ length: LINKS - 4 }, (_, i) => [i + 4, `${PREFETCH_ATTRIBUTE}="intent"`]),
+				Array.from({ length: LINKS - 4 }, (_, i) => [
+					i + 4,
+					`${PREFETCH_ATTRIBUTE}="intent"`,
+				]),
 			),
 		});
 		await s.measured(true);
@@ -746,7 +790,9 @@ describe('memory', () => {
 			prefetch: { viewport: 'all', idle: 'none', concurrency: 1 },
 			heldChars: 3.5 * 1024 * 1024,
 			answer: (path) => ({
-				body: gzipSync(`<main>${path}${'x'.repeat(1024 * 1024)}</main>${FRAGMENT_REGION_END}`),
+				body: gzipSync(
+					`<main>${path}${'x'.repeat(1024 * 1024)}</main>${FRAGMENT_REGION_END}`,
+				),
 				headers: { 'content-encoding': 'gzip' },
 			}),
 		});
@@ -767,7 +813,11 @@ describe('memory', () => {
 								};
 							}
 						).__marklessFragmentNav.prefetches.values(),
-					].map(async (entry) => Object.getOwnPropertyDescriptor(await entry.result, 'doc')?.get !== undefined),
+					].map(
+						async (entry) =>
+							Object.getOwnPropertyDescriptor(await entry.result, 'doc')?.get !==
+							undefined,
+					),
 				),
 			),
 		).toEqual([true, true, true]);
@@ -780,7 +830,9 @@ describe('guessing state', () => {
 		const s = await open({ prefetch: { viewport: 'all', idle: 'all' } });
 		await s.measured(true);
 		await afterFrames(s.page);
-		expect(await s.page.evaluate(() => (window as unknown as { __watched: number }).__watched)).toBe(0);
+		expect(
+			await s.page.evaluate(() => (window as unknown as { __watched: number }).__watched),
+		).toBe(0);
 		expect(await s.fetches()).toEqual([]);
 		// Intent is not a guess: a hover still fetches before idle.
 		await s.page.hover('a[href="/p/2"]');
@@ -841,5 +893,50 @@ describe('byte budget', () => {
 		expect(await raw.held()).toEqual([]);
 		expect((await raw.fetches()).length).toBeLessThan(IN_VIEW);
 		await raw.page.close();
+	});
+});
+
+describe('a prerendered fragment', () => {
+	test('fetched ahead but never shown, it keeps the time limit like any other page', async () => {
+		const s = await open({
+			prefetch: { idle: 'none' },
+			ttlMs: 200,
+			answer: (path) => ({
+				body: `<main>${path}</main>${FRAGMENT_PRERENDERED}${FRAGMENT_REGION_END}`,
+			}),
+		});
+		await s.measured(true);
+		await s.page.hover('a[href="/p/2"]');
+		await expect.poll(s.held).toEqual(['/p/2']);
+		await expect.poll(s.held).toEqual([]);
+		await s.page.close();
+	});
+
+	test('shown pages are kept up to eight, and within the cap on held text, the oldest dropped first', async () => {
+		const s = await open({ heldChars: 3.5 * 1024 * 1024 });
+		const kept = (pages: [string, number][]) =>
+			s.page.evaluate((pages) => {
+				const state = (
+					document as unknown as {
+						__marklessFragmentNav: {
+							keep: (key: string, text: string) => void;
+							visited: Map<string, string>;
+						};
+					}
+				).__marklessFragmentNav;
+				for (const [key, size] of pages) state.keep(key, 'x'.repeat(size));
+				return [...state.visited.keys()];
+			}, pages);
+		const small = Array.from({ length: 10 }, (_, i): [string, number] => [`/p/${i}`, 10]);
+		expect(await kept(small)).toEqual(small.slice(2).map(([key]) => key));
+		const large: [string, number][] = [
+			['/p/20', 1024 * 1024],
+			['/p/21', 1024 * 1024],
+			['/p/22', 1024 * 1024],
+			['/p/23', 1024 * 1024],
+		];
+		expect((await kept(large)).slice(-3)).toEqual(['/p/21', '/p/22', '/p/23']);
+		expect(await kept([])).not.toContain('/p/20');
+		await s.page.close();
 	});
 });

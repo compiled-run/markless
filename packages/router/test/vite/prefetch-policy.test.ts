@@ -6,6 +6,7 @@ import {
 	prefetchPolicy,
 	prefetches,
 } from '../../src/vite/prefetch-policy.ts';
+import { fragmentRequestUrl } from '../../src/vite/fragment-navigation.ts';
 import * as routerVite from '../../src/vite/index.ts';
 
 describe('router prefetch policy', () => {
@@ -51,6 +52,12 @@ describe('router prefetch policy', () => {
 
 	test('the trigger and network lists a config writer detects are exported beside router()', () => {
 		expect(routerVite.PREFETCH_TRIGGERS).toBe(PREFETCH_TRIGGERS);
+		expect(routerVite.prefetchPolicy).toBe(prefetchPolicy);
+		expect(routerVite.prefetchPolicy({ viewport: 'all', budget: 0 })).toEqual({
+			levels: [2, 2, 1],
+			concurrency: 2,
+			budget: 0,
+		});
 		expect(routerVite.PREFETCH_NETWORKS).toBe(PREFETCH_NETWORKS);
 		expect(routerVite.PREFETCH_DEFAULTS).toBe(PREFETCH_DEFAULTS);
 		expect(routerVite.PREFETCH_LINK_CHOICES).toEqual(['intent', 'viewport']);
@@ -60,5 +67,12 @@ describe('router prefetch policy', () => {
 		]);
 		for (const trigger of PREFETCH_TRIGGERS)
 			expect(PREFETCH_NETWORKS).toContain(PREFETCH_DEFAULTS[trigger]);
+	});
+
+	test('the entry tells a fragment request from any other by the page it asks for', () => {
+		const page = new URL('https://example.com/ui/combobox?tab=api');
+		expect(routerVite.fragmentPageUrl(fragmentRequestUrl(page))?.href).toBe(page.href);
+		expect(routerVite.fragmentPageUrl(page)).toBeUndefined();
+		expect(routerVite.fragmentPageUrl(new URL('https://example.com/api/x'))).toBeUndefined();
 	});
 });

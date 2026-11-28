@@ -233,7 +233,8 @@ URL itself answers the whole document.
 
 The router may fetch a linked page's fragment, and preload its code, before
 the click. `router({ prefetch })` sets when, as plain data (`RouterPrefetch` in
-`packages/router/src/vite/prefetch-policy.ts`). Each trigger runs on `'all'`
+`packages/router/src/vite/prefetch-policy.ts`; `prefetchPolicy` from `@markless/router/vite`
+checks and resolves one for tools that write it). Each trigger runs on `'all'`
 networks, `'fast'` ones, or `'none'`:
 
 - `intent` (default `'all'`): a mouse resting on a link, keyboard focus, a
@@ -264,6 +265,9 @@ networks, `'fast'` ones, or `'none'`:
   budget of 0 (`detail: { page, bytes }`, `page` the pathname only), and
   `markless:prefetch-skipped` once per page shown when guessing it would do is
   ruled out (`detail: { page, reason: 'save-data' | 'hidden' | 'network', triggers }`).
+- A click or Back/Forward cancels every guess still arriving except the one for
+  its own page, and the navigation still lands. A test or tool tells those
+  fetches from other requests with `fragmentPageUrl` from `@markless/router/vite`.
 - Guessing reads only two things from navigation: a navigation started, and a
   page is shown; the swap module's own navigation phase stays its own (#569).
 - The viewport trigger observes the page's page links when a page is shown,
@@ -298,6 +302,40 @@ a navigation is on its way, then for each page shown: shown, armed at the
 main thread's first idle moment after it (nothing is guessed, and no guess
 code runs, in the page's load), and watching once the idle scan ran. A swap, or a navigation cancelled by a click on the page shown or by
 Back or Forward to it, arms it again for the page that is shown.
+
+### Reusing fetched pages
+
+A fragment Nitro's prerenderer writes (it sends the `x-nitro-prerender`
+request header) ends its region with `<!--markless:prerendered-->`
+(`FRAGMENT_PRERENDERED` in `packages/router/src/vite/fragment-navigation.ts`).
+A fragment rendered per request, a status other than 200, and the development
+server carry no mark. A prerendered page that renders `storage()` is marked
+too: its file is the same for every visitor, and the visitor's own values are
+applied after it shows, as on a landing.
+
+- A marked fragment is one file the host serves to every visitor until the
+  next deploy, so once the tab has shown it, a revisit by link (not only Back or
+  Forward) swaps in the copy the tab holds, with no request, and no early
+  fetch of it is made. The tab keeps the last 8 pages it showed, within the
+  same cap on held text as pages fetched ahead (`FRAGMENT_HELD_CHARS`, oldest
+  first), and holds only the page just left as a parsed document.
+- A page fetched ahead but never shown keeps the 30 s limit, marked or not: its
+  code was only preloaded, and after a deploy that removes old files a click
+  hours later could import chunks that no longer exist.
+- Any other fragment is fetched again on a revisit; a prefetch of it is usable
+  for 30 s or until its `Cache-Control` ends reuse.
+- A form submit or a non-read `fetch` drops every kept page, marked or not.
+- Across a deploy, a tab that is still open keeps the pages it already holds
+  until it reloads, so a revisit there shows the version it fetched. Pages it
+  has not fetched come from the new deploy, as before.
+- The mark is the same in every build, so a page whose content did not change
+  keeps the same bytes and the host's validator (ETag) across a deploy.
+- The browser's HTTP cache is left to the host: prerendered files keep the
+  host's `Cache-Control` (Cloudflare static assets and Vercel both send
+  `public, max-age=0, must-revalidate` with an ETag), so a new tab revalidates
+  each page once (a 304 when unchanged) and the tab's own copy serves every
+  later visit. A host header rule matches the path, not a build-keyed query,
+  so marking the path immutable would outlive a deploy.
 
 ### Kept parts
 
