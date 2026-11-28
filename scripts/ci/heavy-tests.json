@@ -182,6 +182,7 @@
 		"packages/router/test/vite/repeat-key-from-fields.test.ts",
 		"packages/router/test/vite/resume-first-gestures.test.ts",
 		"packages/router/test/vite/route-bound-kept-part.test.ts",
+		"packages/router/test/vite/route-css.test.ts",
 		"packages/router/test/vite/route-href-build.test.ts",
 		"packages/router/test/vite/route-preload-data.test.ts",
 		"packages/router/test/vite/select-value-ssr.test.ts",

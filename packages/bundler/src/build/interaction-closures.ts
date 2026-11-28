@@ -573,6 +573,8 @@ export function interactionClosuresAsset(input: {
 	readonly chunkOf?: ReadonlyMap<string, readonly string[]>;
 	// A hash of each module's own code, so a route's runnable code is compared without the packs it lands in.
 	readonly moduleHashes?: ReadonlyMap<string, string>;
+	// Per emitted stylesheet whose every style module the planner places: the routes that reach one of them.
+	readonly stylesheetRoutes?: ReadonlyMap<string, readonly string[]>;
 }): string {
 	const filesFor = (route: RouteInteractionClosures, render: boolean) => {
 		const files = new Set<string>();
@@ -648,6 +650,15 @@ export function interactionClosuresAsset(input: {
 						[...packFiles(input.packs, input.chunkOf)].sort(([a], [b]) =>
 							a < b ? -1 : a > b ? 1 : 0,
 						),
+					),
+				}
+			: {}),
+		...(input.stylesheetRoutes?.size
+			? {
+					stylesheetRoutes: Object.fromEntries(
+						[...input.stylesheetRoutes]
+							.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+							.map(([file, routes]) => [file, [...routes].sort()]),
 					),
 				}
 			: {}),
