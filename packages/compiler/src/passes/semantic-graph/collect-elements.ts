@@ -1,4 +1,10 @@
-import { isEventAttribute, normalizeEventName } from '../../ast/events.ts';
+import { PROTOCOL_PASSIVE_GLOBAL_EVENT_TYPES } from '@markless/serializer/protocol-global-events';
+import {
+	globalEventAttribute,
+	isEventAttribute,
+	isGlobalEventType,
+	normalizeEventName,
+} from '../../ast/events.ts';
 import { ownedModuleAst } from './shared-ast.ts';
 import {
 	asNodes,
@@ -30,6 +36,8 @@ import type {
 	SemanticEvent,
 	SemanticGraphDiagnostic,
 	SemanticGraphBinding,
+	SemanticSyncPolicy,
+	SemanticSyncPolicyBranch,
 	SemanticTemplateBindingTarget,
 	SemanticTemplateRead,
 	SourceSpan,
@@ -83,6 +91,9 @@ import {
 	unextractableSyncPolicyDiagnostic,
 } from './collect-sync-policy.ts';
 import {
+	globalEventInRowDiagnostic,
+	globalEventPassivePreventDiagnostic,
+	globalEventUnknownDiagnostic,
 	attachHostElementRequiredDiagnostic,
 	attributeObjectValueDiagnostic,
 	duplicateAttributeDiagnostic,
@@ -1466,6 +1477,27 @@ function collectAttribute(
 	}
 
 	if (isEventAttribute(attributeName)) {
+		const global = globalEventAttribute(attributeName);
+		if (global && !isGlobalEventType(global.target, global.type)) {
+			state.graph.diagnostics.push(
+				globalEventUnknownDiagnostic({
+					attributeName,
+					...global,
+					tagName: ownerTagName ?? '',
+					span: sourceSpan(attribute.name as AnyNode, state.filename),
+				}),
+			);
+			if (expressionValue) walk(expressionValue, state);
+			return;
+		}
+		if (global && state.currentKeyedRepeatScopeIds.length > 0)
+			state.graph.diagnostics.push(
+				globalEventInRowDiagnostic({
+					attributeName,
+					target: global.target,
+					span: sourceSpan(attribute.name as AnyNode, state.filename),
+				}),
+			);
 		// `onClick={[a, b]}` runs both handlers on one event, in the order they are
 		// written. Each entry is analyzed on its own — its own reads, writes and
 		// sync policy — so nothing about being second changes what a handler is.
@@ -1521,6 +1553,19 @@ function collectAttribute(
 					),
 				);
 			}
+			if (
+				global &&
+				syncPolicy &&
+				PROTOCOL_PASSIVE_GLOBAL_EVENT_TYPES.includes(global.type) &&
+				syncPolicyBranches(syncPolicy).some((branch) => branch.actions.includes('preventDefault'))
+			)
+				state.graph.diagnostics.push(
+					globalEventPassivePreventDiagnostic({
+						attributeName,
+						type: global.type,
+						span: handler?.span,
+					}),
+				);
 			const strayCancel = syncPolicy ? uncoveredSyncPolicyCall(handler?.node, state) : null;
 			if (strayCancel) {
 				state.graph.diagnostics.push(
@@ -2804,4 +2849,8 @@ function localFunctionValueNode(declarationStart: number, state: WalkState): Any
 	});
 
 	return found;
+}
+
+function syncPolicyBranches(policy: SemanticSyncPolicy): ReadonlyArray<SemanticSyncPolicyBranch> {
+	return 'branches' in policy ? policy.branches : [policy];
 }

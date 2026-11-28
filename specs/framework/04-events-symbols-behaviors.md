@@ -273,6 +273,229 @@ Semantics:
 - **Not a lifecycle.** Like `onVisible`, it is not a reactive computation and
   not a mount hook: it needs an element, runs once, and reads current values.
 
+### `onDocument*` and `onWindow*` — page-wide events an element owns
+
+A listener on the document or the window is written on an ordinary element, as
+a prop like any other event:
+
+```tsrx
+@if (open) {
+	<dialog
+		open
+		onDocumentKeyDown={(event) => {
+			if (event.key === 'Escape') open = false;
+		}}
+		onWindowResize={() => (width = window.innerWidth)}
+	>
+		…
+	</dialog>
+}
+```
+
+`onDocument<Event>` listens on the document and `onWindow<Event>` on the window,
+for every event that reaches that target: `onDocumentKeyDown`,
+`onDocumentPointerDown`, `onDocumentVisibilityChange`, `onWindowResize`,
+`onWindowScroll`, `onWindowOnline`, `onWindowOffline`, `onWindowPopState`, and
+so on. The name after the prefix follows the element casing rule (the compiler
+lowercases it, so `onDocumentKeyDown` and `onDocumentKeydown` are one listener).
+There is no other spelling: no `document:` prefix, no special tag.
+
+Semantics:
+
+- **The element owns the listener.** It listens while that element is on the
+  page and stops when the element leaves it: an `@if` arm closing, a keyed row
+  leaving, a route change replacing the page. The author writes no cleanup. An
+  element that leaves the page stops listening for good; the element the browser
+  creates when the arm opens again, or the row comes back, is a new owner and
+  listens from the moment it is inserted, in a served page, a client-rendered
+  mount, and an arm or row the runtime inserts after a state change.
+- **The handler receives the browser's real event, as a listener on that
+  target would.** `event.target` is wherever the event happened.
+  `event.currentTarget` is `document` for `onDocument*` and `window` for
+  `onWindow*`, as for a listener added there with `addEventListener`, and the
+  types say so (`KeyboardEvent & { currentTarget: Document }`, from
+  `DocumentEventMap` and `WindowEventMap`). That holds when the handler's code
+  runs after the browser's dispatch, too. The owning element is reached the way
+  any element is in Markless, through an `element()` handle:
+
+  ```tsrx
+  let menu = element<HTMLDivElement | undefined>();
+
+  @if (open) {
+  	<div
+  		el={menu}
+  		onDocumentPointerDown={(event) => {
+  			if (!menu?.contains(event.target as Node)) open = false;
+  		}}
+  	>
+  		…
+  	</div>
+  }
+  ```
+- **Resumable like any other event, at the same cost.** The compiler records it
+  exactly as it records `onClick`: an event record on the owning element whose
+  name is `document.<type>` or `window.<type>` (`PROTOCOL_GLOBAL_EVENT_SEPARATOR`
+  in `@markless/serializer/protocol-global-events`), with the handler extracted
+  as a lazy symbol and its sync policy extracted the same way. A served page runs
+  no framework code at load for it, and the first matching event loads exactly
+  what the same handler written as `onKeyDown` on that element would: the same
+  lean dispatch tier, and in the browser the same direct client renderer. A
+  page never takes the full runtime because it owns a document or window
+  listener.
+- **Every owner is a listener on that one target, and the DOM's rules hold.**
+  Two elements that both own `onDocumentKeyDown` both run for one key press, in
+  document order of the owners. `event.stopPropagation()` in one of them does
+  not stop the other document owners (listeners on one target all run), and
+  keeps the event from every `onWindow*` owner, as it keeps a document listener's
+  event from the window. `event.stopImmediatePropagation()` also skips the
+  document owners after that one. These rules hold whether the handlers' code
+  is already loaded or loads after the browser's dispatch. A component used
+  many times, or an element inside an `@for` row, registers once per instance.
+  Inside an `@for` row that is rarely intended, so the build warns with
+  `MARKLESS_GLOBAL_EVENT_IN_ROW` and still builds; there is no way to silence
+  it, as for every Markless diagnostic, so the fix is to move the prop outside
+  the `@for`.
+- **Not "only while visible".** The owner listens while it is on the page, seen
+  or not. A handler that should act only while its element is in view checks
+  that itself, or composes with `onVisible`.
+
+#### Which events, and the build error for the rest
+
+The names are generated from TypeScript's `DocumentEventMap` and
+`WindowEventMap` (`packages/typescript-plugin/scripts/generate-global-event-types.ts`
+writes both the compiler's list and the prop types), less the events that never
+reach that target in the bubble phase:
+
+- events fired at an element without bubbling (`focus`, `blur`, `mouseenter`,
+  `mouseleave`, `pointerenter`, `pointerleave`, `toggle`, `invalid`, `cancel`,
+  `close`, media events such as `play` and `timeupdate`, `load` and `error` of
+  an element) are refused on both targets;
+- window-own events (`focus`, `blur`, `load`, `error`, `resize`) are refused on
+  the document and accepted on the window;
+- `selectionchange` fires at the document without bubbling, so it is refused on
+  the window;
+- mixed-case names (`DOMContentLoaded`) cannot be spelled through the
+  lowercasing rule, and the `webkit*` aliases fire as their standard names.
+
+Any other name is the build error `MARKLESS_GLOBAL_EVENT_UNKNOWN`. When there
+is a prop that works, its title names it: the bubbling form on the same target
+(`"focus" does not reach the document; use onDocumentFocusIn`), or the same
+event on the other target (`"resize" does not reach the document; use
+onWindowResize`). The prop types reject the same names, so the editor and
+`pnpm run typecheck` report them before the build does, and give the handler the
+event type the map names (`KeyboardEvent` for `keydown`). In completions,
+`onDocument*` and `onWindow*` rank below the element's own events, and first
+once `onD` or `onW` is typed.
+
+Element event props have no capture-phase spelling (a trailing `Capture` is
+dropped, and the listener is the ordinary one), so neither do these: there is no
+`onDocument*Capture`.
+
+#### Ordering with element events
+
+The listeners sit on the document and the window in the bubble phase. For one
+browser event, element handlers run first, then document handlers, then window
+handlers, as listeners at those places do natively. The served page's capture
+listener on the container forwards the element's event before the document
+listener forwards its own, and both go through the page's one dispatch queue, so
+the lazy handlers run in that order too. An element handler that stops
+propagation through its sync policy stops the event before it reaches the
+document; one that stops it later, in its lazy body, still keeps the queued
+document and window handlers from running. A document owner cannot stop an
+element handler, which has already run. The relay records which phase each
+stop call came from on the browser's event (element, document or window, and
+which owner made an immediate stop), and the compiled handler of a document or
+window record first asks the relay whether its owner still hears the event, so
+the rules above hold for handlers whose code loads after the browser's dispatch
+returned.
+
+#### `preventDefault` before code has loaded
+
+As with element events, the browser decides the default action when its
+listener returns, and the handler's code is still loading then. The compiler
+extracts the same sync policy it extracts for an element event
+(`if (open && event.key === 'Escape') event.preventDefault()`), and it runs in
+the listener: the relay raises its event at the owner synchronously, inside the
+browser's own dispatch, so the container's listener runs the owner's policy
+exactly as it would for a click on that element; the raised event reads its
+fields from the browser's event and forwards `preventDefault()`,
+`stopPropagation()` and `stopImmediatePropagation()` to it. So the first Escape
+on a page that has run no code is cancelled. What cannot be cancelled on that
+first event is anything the policy cannot express: a condition that reads the
+DOM or calls a function fails the build with the existing sync-policy
+diagnostic, exactly as for an element event.
+
+#### Passive events
+
+`scroll`, `wheel`, `touchstart` and `touchmove` are listened for passively
+(`PROTOCOL_PASSIVE_GLOBAL_EVENT_TYPES`): browsers already treat touch and wheel
+listeners on the document and window as passive so scrolling never waits for
+code, and `scroll` cannot be cancelled at all. A handler on one of them whose
+sync policy calls `preventDefault()` would do nothing, so it fails the build
+with `MARKLESS_GLOBAL_EVENT_PASSIVE_PREVENT`; the fix is an ordinary `on*` prop
+on the element that scrolls, or CSS `touch-action` / `overscroll-behavior`.
+`stopPropagation()` in them is allowed.
+
+#### How a listener reaches the browser
+
+A page that owns no `document.*` or `window.*` record pays nothing for this
+feature: its HTML and every chunk it downloads and runs are byte-identical to a
+build without it.
+
+Everything the feature costs lives in code that only a page owning such a record
+loads:
+
+- **The owner attribute.** The compiler writes `m:g="document.keydown ..."`
+  (`PROTOCOL_GLOBAL_EVENT_OWNER_ATTRIBUTE`) on every element that owns one, in
+  served markup and in the templates the browser builds arms, rows and pages
+  from.
+- **One relay per record name per document**
+  (`packages/web/src/inline/global-relay.ts`). It listens on the document or
+  window, and on each event raises a non-bubbling `CustomEvent` named after the
+  record at every element that carries the owner attribute, in document order,
+  with the browser's event as `detail`. Owners are found when the event fires,
+  so an element that left the page (an `@if` closing, a row leaving, a route
+  change) is simply not found, and one the browser inserts later is. A served
+  page whose records name such an event gets the relay inline after its boot,
+  served minified; an app module whose elements own one starts it with
+  `import('@markless/web/fns/global-relay')`, so a page rendered or navigated
+  to in the browser gets it from the module that needs it. A composed MDX page
+  gets it the same two ways: inline when its composed records name one, and
+  from the child's own module.
+- **Routing, unchanged.** The raised event is an ordinary event on the owning
+  element, so the boot, every dispatch tier, the runtime, a client mount and the
+  direct client renderer route it with no change: the record named
+  `document.keydown` matches it. The compiled handler of such a record starts by
+  calling the carrier's `PROTOCOL_GLOBAL_EVENT_ENTER` function, which returns
+  false when a stop call keeps this owner from the event and otherwise points
+  the browser's event's `currentTarget` at the document or window; the handler
+  then runs on the browser's event from `detail`.
+- **Early events.** An event that lands while the shell is still parsing is
+  held by an early capture script, served only on such a page, for the relay to
+  replay.
+
+A page whose records name one of these events takes the same dispatch tier and
+client renderer it would take with the same handlers on element events
+(`packages/compiler/test/global-events.test.ts` compares the two).
+
+Native targets do not take these props in this version.
+
+Validated by `packages/compiler/test/global-events.test.ts` (records, the
+`@for` warning, the unknown-event and passive errors, and the same first-use
+demand as an element event),
+`packages/web/test/global-events.test.ts` (owners, order, removal, passive
+registration, the policy inside the listener, each stop rule, `currentTarget`),
+`packages/vitest-browser/browser/global-events/global-events.test.ts` (CSR and
+SSR: Escape closes a served dialog with no framework module run before the key;
+an `@if` removal stops it and a re-inserted dialog listens; two owners;
+`onWindowResize`; element, document, window order; `currentTarget` and the
+stop rules across owners; the first Escape cancelled before code loads; a route
+change), `packages/bundler/test/global-event-relay.test.ts`
+(a page without such a record has no relay, owner attribute or relay import; one
+with it has all three), and the prop types and completions in
+`packages/typescript-plugin/test/markless-tsc.test.ts` and
+`completion-matrix.test.ts`.
+
 A pure pull graph also deletes a class of resumability hazards: resume is
 always re-derivation, with no effect-ordering or "did it already run during
 initial render" semantics to replay.

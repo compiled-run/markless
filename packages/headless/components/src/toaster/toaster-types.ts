@@ -62,6 +62,8 @@ export type ToasterInstanceState = {
 	minted: number;
 	/** The stack's one clock, or 0 while nothing is counting down. */
 	ticker: number;
+	/** F8 moved focus into the region; Escape inside it hands focus back. */
+	expanded: boolean;
 };
 
 /**

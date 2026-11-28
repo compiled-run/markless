@@ -1,3 +1,4 @@
+import { protocolGlobalEvent } from '@markless/serializer/protocol-global-events';
 import { factorRenderDataLiterals } from './render-data-literals.ts';
 import { dirname, isAbsolute, resolve } from 'pathe';
 import { parseSync, transformSync } from 'rolldown/experimental';
@@ -940,6 +941,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					),
 					hasLiveSharedState,
 					hasIdleEvents: moduleHasIdleEvents(compiled.semanticGraph),
+					globalEventNames: moduleGlobalEventNames(compiled.semanticGraph),
 					runtimeDemandMap: compiled.runtimeDemandMap,
 					resumeModuleUrl: input.resumeModuleUrl,
 					scalarActions: input.includeScalarActionPlans
@@ -1750,6 +1752,16 @@ function componentEdgesReachableFrom(
 }
 
 // A client-rendered mount wakes its runtime at idle from the module whose own records, arms and rows included, name idle.
+function moduleGlobalEventNames(graph: {
+	readonly events: ReadonlyArray<{ readonly eventName: string }>;
+}): ReadonlyArray<string> {
+	return [
+		...new Set(
+			graph.events.flatMap((event) => (protocolGlobalEvent(event.eventName) ? [event.eventName] : [])),
+		),
+	];
+}
+
 function moduleHasIdleEvents(graph: {
 	readonly events: ReadonlyArray<{ readonly eventName: string }>;
 }): boolean {

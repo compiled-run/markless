@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 342,
-	guided: 56,
+	total: 345,
+	guided: 59,
 	groups: [
 		{
 			area: 'state',
@@ -588,6 +588,14 @@ export const errorIndex: ErrorIndex = {
 			blurb: 'Handlers, callbacks, and what they can read.',
 			codes: [
 				{
+					code: 'MARKLESS_GLOBAL_EVENT_IN_ROW',
+					title: 'A document or window listener sits inside a list row',
+					chip: 'error',
+					kind: 'compile error',
+					guided: true,
+					words: 'a document or window listener sits inside a list row markless_global_event_in_row an `ondocument…` or `onwindow…` prop inside an `@for` row adds one listener per row.',
+				},
+				{
 					code: 'MARKLESS_HANDLER_WRITES_RENDER_LOCAL',
 					title: 'A handler changes a value that is not state',
 					chip: 'error',
@@ -620,6 +628,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'a handler uses a prop the browser cannot get back markless_capture_opaque_prop an event handler uses a prop whose value the browser cannot get back.',
 				},
 				{
+					code: 'MARKLESS_GLOBAL_EVENT_PASSIVE_PREVENT',
+					title: 'A scroll, wheel or touch listener calls preventDefault',
+					chip: 'error',
+					kind: 'compile error',
+					guided: true,
+					words: 'a scroll, wheel or touch listener calls preventdefault markless_global_event_passive_prevent a document or window `scroll`, `wheel`, `touchstart` or `touchmove` handler calls `event.preventdefault()`, which the browser ignores there.',
+				},
+				{
 					code: 'MARKLESS_DIRECT_EVAL_UNSUPPORTED',
 					title: 'eval() reads the component’s names',
 					chip: 'error',
@@ -642,6 +658,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile error',
 					guided: true,
 					words: 'onclick gets a value, not a function markless_event_handler_not_a_function an event prop like onclick gets a value instead of a function.',
+				},
+				{
+					code: 'MARKLESS_GLOBAL_EVENT_UNKNOWN',
+					title: 'onDocument or onWindow names an event that never gets there',
+					chip: 'error',
+					kind: 'compile error',
+					guided: true,
+					words: 'ondocument or onwindow names an event that never gets there markless_global_event_unknown an `ondocument…` or `onwindow…` prop names an event that never reaches the document or the window.',
 				},
 				{
 					code: 'MARKLESS_CALLBACK_SLOT_SOURCE_UNSUPPORTED',
