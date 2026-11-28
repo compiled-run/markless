@@ -969,10 +969,9 @@ function resetControl(element: Element): void {
 // A kept node takes the next page's classes in one step: a CSS transition between two pages' styles shows as morphing.
 // Transitions stay off until the frame after the swap has computed its styles; turning them on then starts none.
 // Transitions the swap starts are cancelled before each of its first frames paints; a sheet turning them off restyles the whole document twice.
-function withoutTransitions(d: Document): () => void {
+function withoutTransitions(d: Document, running: ReadonlySet<Animation> | undefined): () => void {
 	const w = d.defaultView as Window & typeof globalThis;
-	if (w.ResizeObserver && w.CSSTransition && d.getAnimations) {
-		const running = new Set(d.getAnimations());
+	if (running) {
 		const beforePaint = (frames: number) => {
 			const observer = new w.ResizeObserver(() => {
 				observer.disconnect();
@@ -1007,6 +1006,34 @@ function forgetRuntimeState(root: Element, kept: string): void {
 	forget(root);
 	const walker = root.ownerDocument.createTreeWalker(root, 129);
 	for (let node = walker.nextNode(); node; node = walker.nextNode()) forget(node);
+}
+
+// Read before the head merge writes: once a hidden arriving sheet is in the head, WebKit restyles the whole leaving page for any read.
+type LeavingPage = {
+	readonly x: number;
+	readonly y: number;
+	readonly boxes: readonly (readonly [element: Element, top: number, left: number])[];
+	readonly running: ReadonlySet<Animation> | undefined;
+};
+
+function readLeavingPage(d: Document, scrolled: ReadonlySet<Element>, scope: Element): LeavingPage {
+	const w = d.defaultView as Window & typeof globalThis;
+	const boxes: [Element, number, number][] = [];
+	for (const element of scrolled) {
+		if (!element.isConnected || !scope.contains(element)) continue;
+		const top = element.scrollTop;
+		const left = element.scrollLeft;
+		if (top || left) boxes.push([element, top, left]);
+	}
+	return {
+		x: w.scrollX,
+		y: w.scrollY,
+		boxes,
+		running:
+			w.ResizeObserver && w.CSSTransition && d.getAnimations
+				? new Set(d.getAnimations())
+				: undefined,
+	};
 }
 
 // Scrolled boxes (a sidebar) keep their offset when the same box is there after the swap:
@@ -1245,6 +1272,10 @@ export async function navigate(
 		);
 	const ranFiles = filesRan(d);
 	const leaving = { key: state.shown, name: pageName(d) };
+	let leavingPage: LeavingPage | undefined = readLeavingPage(d, state.scrolled, scope);
+	// A scroll before the swap moves what was read, so the swap reads it again.
+	const moved = () => (leavingPage = undefined);
+	w.addEventListener('scroll', moved, { capture: true, passive: true, once: true });
 	const head = await mergeHead(
 		d,
 		next,
@@ -1299,6 +1330,8 @@ export async function navigate(
 	let scripts: Element[] = [];
 	const commit = (): boolean => {
 		if (stale()) return false;
+		w.removeEventListener('scroll', moved, true);
+		const read = leavingPage ?? readLeavingPage(d, state.scrolled, scope);
 		if (mode === 'traverse') {
 			const key = (typeof scroll === 'object' ? scroll.id : undefined) ?? LANDING_ENTRY;
 			const saved = session.positions.get(key);
@@ -1308,7 +1341,7 @@ export async function navigate(
 			const leaving =
 				(w.history.state as { __marklessFragment?: { id?: string } } | null)
 					?.__marklessFragment?.id ?? LANDING_ENTRY;
-			session.positions.set(session.current ?? leaving, { x: w.scrollX, y: w.scrollY });
+			session.positions.set(session.current ?? leaving, { x: read.x, y: read.y });
 			w.history.scrollRestoration = 'manual';
 			const entry = { __marklessFragment: { id: (session.current = entryId()), x: 0, y: 0 } };
 			if (mode === 'push') w.history.pushState(entry, '', landed.href);
@@ -1316,20 +1349,18 @@ export async function navigate(
 		}
 		// The leaving page keeps its stream until now: closed early, its unanswered @try runs the recipe in the browser.
 		session.streaming?.abort();
-		const settle = withoutTransitions(d);
+		const settle = withoutTransitions(d, read.running);
 		const offsets: ScrolledBox[] = [];
-		for (const element of state.scrolled) {
-			if (!element.isConnected || !scope.contains(element)) continue;
-			if (element.scrollTop || element.scrollLeft)
+		for (const [element, top, left] of read.boxes)
+			if (element.isConnected && scope.contains(element))
 				offsets.push({
 					element,
 					path: elementPath(scope, element),
 					id: element.id,
 					kind: boxKind(element),
-					top: element.scrollTop,
-					left: element.scrollLeft,
+					top,
+					left,
 				});
-		}
 		state.scrolled.clear();
 		retire(state, outgoing);
 		forgetRuntimeState(outgoing, sharedProperty);
@@ -1403,6 +1434,9 @@ export async function navigate(
 		else if (wholeBody) region.append((end = d.createComment('')));
 		else outgoing.after((end = d.createComment('')));
 		scripts = fresh.flatMap(scriptsIn);
+		// Before any box scrolls: scrolling lays out the page, which must already have its own stylesheets.
+		head.show();
+		for (const element of head.stale) element.remove();
 		// A box the swap kept still has its offset; scrolling it again would lay out the page before it paints.
 		// 'instant': a `scroll-behavior: smooth` page would otherwise animate every landing.
 		for (const box of offsets) {
@@ -1412,8 +1446,6 @@ export async function navigate(
 			// No scroll event says so before the next navigation may need it.
 			if (placed) state.scrolled.add(placed);
 		}
-		head.show();
-		for (const element of head.stale) element.remove();
 		if (next.title && d.title !== next.title) d.title = next.title;
 		settle();
 		return true;
