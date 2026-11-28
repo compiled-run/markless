@@ -1,0 +1,4 @@
+{
+  "AD": "add the boolean `adaptive` to it: `<modal.root adaptive>` or `<dialog adaptive>`.",
+  "PR": "set `presentation=\"adaptive\"` on it: `<modal.root presentation=\"adaptive\">` or `<dialog presentation=\"adaptive\">`."
+}

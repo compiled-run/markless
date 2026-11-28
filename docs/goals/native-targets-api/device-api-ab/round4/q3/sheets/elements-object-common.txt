@@ -1,0 +1,4 @@
+// Each element that shows a device object is one box with no parts and no behaviour of its own: settings and commands
+// live on the object (cam.flip(), cam.takePhoto(), doc.page = 3). The author sizes and places the box with `class`;
+// what is inside it is drawn by the device and cannot be styled: on iPhone and Android, the system's own camera
+// preview and PDF view; on the website, the browser's camera picture and the browser's PDF viewer.

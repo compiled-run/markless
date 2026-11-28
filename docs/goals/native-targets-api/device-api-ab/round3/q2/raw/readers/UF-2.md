@@ -1,0 +1,9 @@
+1: The "Get the app" link shows when `platform.web` is true, so I read it as website visitors only. "Press ⌘K to search" shows when `platform.macOS` is true, which I take to mean the Mac app. "Press Ctrl+K to search" shows everywhere else: Windows, the website, iPhone and Android. That leaves a ⌘K/Ctrl+K hint on phones, where there is usually no keyboard, which looks like an oversight. "Add to Apple Wallet" shows only when `platform.iOS` is true, which I read as the iPhone app. "Swipe back to close" shows only when `platform.android` is true, which I read as the Android app. All of this assumes the flags name build targets. That is a guess.
+
+2: (c) The code does not let me tell. `platform` has a `web` flag next to `macOS`, `iOS` and `android`. That suggests the flags name the five builds and only one is true at a time. If so, Safari on a Mac gets the website build, `macOS` is false, and the visitor sees "Press Ctrl+K to search" even though ⌘K is the right shortcut on their machine. The other reading is that `macOS` describes the operating system the code runs on. Then both `web` and `macOS` would be true, and the visitor would see ⌘K. Nothing in the code says whether the flags can overlap or whether `macOS` means "the Mac app" or "running on a Mac". I lean toward (b), but that is a guess.
+
+3: It depends on the same unknown. If the flags are build targets, `iOS` is false on the website and the iPhone Safari visitor does not see the button. They would see "Get the app" and the Ctrl+K hint instead. If `iOS` means the device's operating system, they would see "Add to Apple Wallet" as well as "Get the app". My guess is that they do not see it, but I can't confirm that from the code.
+
+4: 2/5. Both answers depend on what the `platform` flags mean, and the code doesn't show that.
+
+Tools used: none

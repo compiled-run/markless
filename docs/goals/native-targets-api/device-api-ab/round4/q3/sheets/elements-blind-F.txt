@@ -1,0 +1,3 @@
+// One element shows any device object: a camera made with camera(), a PDF made with pdf(), and others later. The same
+// tag is used for every kind of object; its tag name and where it comes from are not published.
+// Its props: { el: Camera | Pdf; class?: string }

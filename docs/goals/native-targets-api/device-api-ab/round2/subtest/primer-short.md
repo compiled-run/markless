@@ -1,0 +1,62 @@
+# Markless (short guidance)
+
+- Import `state`, `computed`, `element`, `shared` and `storage` from `@markless/core`. Components live in `.tsrx` files.
+- Declare mutable state with `state(...)`, derived values with `computed(...)`, and update state by assignment. No hooks, no effects, no re-renders.
+- Treat event arguments as native events.
+
+## Shape
+
+```tsrx
+import { computed, state } from '@markless/core';
+import { getItems, getQuote } from './api.ts';
+
+function Row({ id }: { id: number }) @{
+	const quote = computed(async () => await getQuote(id));
+	<li>
+		@try {
+			<span>{quote.price}</span>
+		} @pending {
+			<span>Loading…</span>
+		} @catch (error, reset) {
+			<button onClick={reset}>{error.message}</button>
+		}
+	</li>
+}
+
+export default function App() @{
+	let query = state('');
+	let reload = state(0);
+	const items = computed(async ({ signal }) => {
+		reload;
+		return await getItems(query, signal);
+	});
+
+	<main>
+		<input value={query} onInput={(event) => (query = event.currentTarget.value)} />
+		<button onClick={() => reload++}>Refresh</button>
+		@try {
+			<ul>
+				@for (const item of items; key item.id) {
+					<Row id={item.id} />
+				}
+			</ul>
+		} @pending {
+			<p>Loading…</p>
+		} @catch (error, reset) {
+			<p>
+				{error.message}
+				<button onClick={reset}>Retry</button>
+			</p>
+		}
+	</main>
+}
+```
+
+- The body runs once: no hooks, effects, `onMount` or re-renders. Update state by assignment (`reload++`). Widen a type with `state<number | null>(null)`.
+- A body is `@{ statements; one root element }`. Props follow the parent's state. A callback prop takes at most one parameter.
+- Every `@try`, `@pending`, `@catch`, `@if`, `@else` and `@for` block holds exactly one node; wrap siblings in an element or `<>…</>`.
+- `@try` needs `@pending` or `@catch` (or both, in that order). `@catch` may name `(error)` or `(error, reset)`.
+- An async computed is typed as its resolved value and read only inside `@try`, including by handlers there.
+- It runs again when any state it reads changes (`reload;` is a read). Only the newest run's answer is shown; `signal` aborts the old request.
+- Each component instance has its own state and loads, so a row component gives each row its own `@try`.
+- In `@catch`, put `error.message` and state in separate `{}`. A handler in `@catch` cannot read `error`. Only `error.name` and `error.message` survive.

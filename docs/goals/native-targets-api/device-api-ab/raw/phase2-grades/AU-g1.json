@@ -1,0 +1,398 @@
+{
+ "label": "AU",
+ "grader": "g1",
+ "answers": {
+  "A1": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 6,
+    "markless": []
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 3,
+    "markless": []
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": [
+     "Live values wrapped in computed(() => ...); acceptable, not required."
+    ]
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 6,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 3,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   }
+  },
+  "A2": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": [
+     "Config and permissions.json written per task folder instead of one app-level file."
+    ]
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 6,
+    "markless": []
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 3,
+    "markless": []
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": [
+     "Live values wrapped in computed(() => ...); acceptable, not required."
+    ]
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 8,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 3,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   }
+  },
+  "A3": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 6,
+    "markless": []
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 3,
+    "markless": []
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": [
+     "Live values wrapped in computed(() => ...); acceptable, not required."
+    ]
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 7,
+    "markless": [
+     "Elapsed counted by incrementing per interval tick rather than from a start time; minor drift."
+    ]
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 3,
+    "markless": [
+     "Adds a minutes input beyond the task's scope."
+    ]
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   }
+  },
+  "A4": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 6,
+    "markless": []
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 4,
+    "markless": []
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": [
+     "Calls deviceOrientation() twice in one expression; harmless."
+    ]
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 7,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 3,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   }
+  },
+  "A5": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 1,
+    "misuseNotes": [
+     "No 'camera' grant in markless.config.ts (and no permissions.json usage text); the sheet requires permissions declared in config."
+    ],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": [
+     "No try/catch around showCapturePicker; a rejection is unhandled."
+    ]
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 7,
+    "markless": [
+     "Camera only opens after a Start button press; acceptable. Config files written per task folder."
+    ]
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 3,
+    "markless": []
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": [
+     "Live values wrapped in computed(() => ...); acceptable, not required."
+    ]
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 7,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 3,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   }
+  }
+ }
+}

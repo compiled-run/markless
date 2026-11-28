@@ -1,0 +1,8 @@
+reader1: KO AU MS BC EJ UW
+reader2: EJ MS KO UW BC AU
+reader3: MS KO UW AU BC EJ
+reader4: AU MS UW BC EJ KO
+reader5: KO EJ MS BC AU UW
+reader6: KO EJ AU BC UW MS
+reader7: BC AU KO MS EJ UW
+reader8: AU KO EJ BC MS UW

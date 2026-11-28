@@ -1,0 +1,407 @@
+{
+ "label": "KO",
+ "grader": "g1",
+ "answers": {
+  "A1": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 11,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 12,
+    "markless": [
+     "Refusal message shown only when canAsk is false; a 'denied' state that can still ask shows only the Allow button"
+    ]
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 12,
+    "markless": [
+     "Async computed calls request() during load (no user gesture)"
+    ]
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 8,
+    "markless": []
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 13,
+    "markless": [
+     "Progress listener attached for the whole component lifetime rather than only while recording"
+    ]
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 14,
+    "markless": [
+     "Navigation via window.location.assign (no router given)"
+    ]
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 4,
+    "markless": []
+   }
+  },
+  "A2": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 11,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 12,
+    "markless": [
+     "cam.takePicture() called without a null check on the element handle"
+    ]
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 11,
+    "markless": [
+     "Async computed calls request() during load (no user gesture)"
+    ]
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 8,
+    "markless": []
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 13,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 14,
+    "markless": [
+     "Navigation via window.location.assign (no router given)"
+    ]
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 4,
+    "markless": []
+   }
+  },
+  "A3": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 9,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 14,
+    "markless": [
+     "cam.takePicture() called without a null check on the element handle"
+    ]
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 12,
+    "markless": [
+     "`attempt` state is read but never written (dead retry counter)",
+     "Async computed calls request() during load"
+    ]
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 8,
+    "markless": []
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 13,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 12,
+    "markless": [
+     "Navigation via window.location.assign (no router given)"
+    ]
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 4,
+    "markless": []
+   }
+  },
+  "A4": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 11,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 12,
+    "markless": []
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 12,
+    "markless": [
+     "Location read only after a button press via handler state instead of an async computed with @try; works but bypasses Markless async model"
+    ]
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 8,
+    "markless": []
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 13,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 12,
+    "markless": [
+     "Navigation via window.location.assign (no router given)",
+     "Unused `node` parameter in attach functions"
+    ]
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 5,
+    "markless": []
+   }
+  },
+  "A5": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 8,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 12,
+    "markless": []
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 12,
+    "markless": [
+     "Async computed calls request() during load"
+    ]
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 8,
+    "markless": []
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 10,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 11,
+    "markless": [
+     "Navigation via window.location.assign (no router given)",
+     "Tap listener only active while this component is mounted"
+    ]
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 4,
+    "markless": []
+   }
+  }
+ }
+}

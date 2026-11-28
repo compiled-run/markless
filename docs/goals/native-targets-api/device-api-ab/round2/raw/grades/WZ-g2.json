@@ -1,0 +1,534 @@
+{
+ "label": "WZ",
+ "grader": "g2",
+ "answers": {
+  "A1": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Flip button sits outside camera.root; fine since facing is state."
+     ]
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Handle made with camera.handle() in the page body and passed as a prop to header and body; sheet allows a component body."
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Last code text and expression in separate {} inside <p>; fine."
+     ]
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "JSX comment {/* */} inside markup used for the relies-comment; syntax validity unconfirmed by primer."
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Relies on rec.clip rather than onRecord; supported by RecorderHandle.clip."
+     ]
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Relies on <a href> click being a same-app in-place navigation (true per rubric facts).",
+      "NamedPlace extends Place passed as at/center; structurally valid."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "src taken as a prop instead of a fixed path; fine."
+     ]
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Every shutter in tasks 1-4 is camera.trigger, which the sheet says is disabled until the camera is ready."
+    },
+    "B2": {
+     "value": true,
+     "why": "Root gets active={review === null}; the sheet says active={false} releases the camera while the root stays."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header receives only a CameraHandle prop and renders <camera.trigger for={cam}>; no camera internals."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label is {rec.recording ? 'Stop' : 'Record'}, reading the recorder handle's own live field."
+    },
+    "B5": {
+     "value": true,
+     "why": "Search link onClick calls moveTo on a module-level map handle, then a same-app <a href=\"/map\"> navigation keeps the module; sheet says with no root shown the root starts at the moved place."
+    }
+   },
+   "confusion": [
+    "Guess: unsure whether a part like <camera.error> takes one child or several, so wrapped children in a <div> (\"to be safe\").",
+    "Guess: unsure whether handle fields read in markup update live (\"The sheet calls them 'live fields', so I assumed they do\")."
+   ]
+  },
+  "A2": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Handle created in page body and passed as prop; allowed."
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "No camera.error message in this task; not required."
+     ]
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "No camera.error; not required.",
+      "JSX comment {/* */} for the relies-comment."
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "<p><recorder.label /> s</p> is not wrapped in @if (rec.recording), so a stray ' s' shows when idle since the label is present only while recording; cosmetic."
+     ]
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "@for over an inline places.filter(...) expression instead of a computed; likely fine but unconfirmed.",
+      "Relies on same-app <a href> navigation keeping the module handle."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Every shutter in tasks 1-4 is camera.trigger, which the sheet says is disabled until the camera is ready."
+    },
+    "B2": {
+     "value": true,
+     "why": "Root gets active={review === null}; the sheet says active={false} releases the camera while the root stays."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header receives only a CameraHandle prop and renders <camera.trigger for={cam}>; no camera internals."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label is {rec.recording ? 'Stop' : 'Record'}, reading the recorder handle's own live field."
+    },
+    "B5": {
+     "value": true,
+     "why": "Search link onClick calls moveTo on a module-level map handle, then a same-app <a href=\"/map\"> navigation keeps the module; sheet says with no root shown the root starts at the moved place."
+    }
+   },
+   "confusion": [
+    "Task 5 places ' s' text beside <recorder.label /> outside any recording check, although the sheet says the label is present only while recording: '<p><recorder.label /> s</p>'.",
+    "Guess: whether triggers render their children as the button label (\"I also assumed the camera, recorder and player triggers render their children as the button's label\")."
+   ]
+  },
+  "A3": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Handle in a shared .ts module, same as reference."
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "JSX comment {/* */} for the relies-comment."
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "<recorder.label /> placed bare with no unit; fine since it is present only while recording.",
+      "Audio shown only when !rec.recording && rec.clip."
+     ]
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Selection kept as id with a sync computed lookup; fine.",
+      "Relies on same-app <a href> navigation."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Every shutter in tasks 1-4 is camera.trigger, which the sheet says is disabled until the camera is ready."
+    },
+    "B2": {
+     "value": true,
+     "why": "Root gets active={review === null}; the sheet says active={false} releases the camera while the root stays."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header imports only a shared handle from a .ts module and renders <camera.trigger for={cam}>."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label is {rec.recording ? 'Stop' : 'Record'}, reading the recorder handle's own live field."
+    },
+    "B5": {
+     "value": true,
+     "why": "Search link onClick calls moveTo on a module-level map handle, then a same-app <a href=\"/map\"> navigation keeps the module; sheet says with no root shown the root starts at the moved place."
+    }
+   },
+   "confusion": [
+    "Guess: whether a trigger's children become its label and whether a plain <button> inside <camera.root> is allowed (\"A plain <button> inside <camera.root> (the flip button) is fine\")."
+   ]
+  },
+  "A4": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "onClick={openSettings} passes the click event to a zero-parameter function; harmless."
+     ]
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Handle in a shared .ts module, same as reference."
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "JSX comment {/* */} for the relies-comment."
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "' s' beside <recorder.label /> not wrapped in a recording check; cosmetic stray text when idle."
+     ]
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Search results come from an invented /api/places endpoint via async computed inside @try, not the map's own place list; works only if that endpoint exists.",
+      "Relies on same-app <a href> navigation."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Every shutter in tasks 1-4 is camera.trigger, which the sheet says is disabled until the camera is ready."
+    },
+    "B2": {
+     "value": true,
+     "why": "Root gets active={review === null}; the sheet says active={false} releases the camera while the root stays."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header imports only a shared handle from a .ts module and renders <camera.trigger for={cam}>."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label is {rec.recording ? 'Stop' : 'Record'}, reading the recorder handle's own live field."
+    },
+    "B5": {
+     "value": true,
+     "why": "Search link onClick calls moveTo on a module-level map handle, then a same-app <a href=\"/map\"> navigation keeps the module; sheet says with no root shown the root starts at the moved place."
+    }
+   },
+   "confusion": [
+    "Guess on task 4: \"I assumed active={false} keeps camera.area in place (blank or frozen) and that the panel covers it with CSS, which I did not write\" \u2014 unsure what the area shows when inactive.",
+    "Guess: \"I also assumed a part can sit inside non-part elements (such as a div) within its root and still wire itself to that root.\"",
+    "Task 5 shows '<p><recorder.label /> s</p>' unconditionally although the label is present only while recording."
+   ]
+  },
+  "A5": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Handle created in page body and passed as prop; allowed."
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "JSX comment {/* */} and inline style string for the overlay."
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Copies the clip from onRecord into app state instead of reading rec.clip; fine, both declared."
+     ]
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Relies on same-app <a href> navigation."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "\u00b0 sign shows before the first reading while the label is empty; writer notes this."
+     ]
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Every shutter in tasks 1-4 is camera.trigger, which the sheet says is disabled until the camera is ready."
+    },
+    "B2": {
+     "value": true,
+     "why": "Root gets active={review === null}; the sheet says active={false} releases the camera while the root stays."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header receives only a CameraHandle prop and renders <camera.trigger for={cam}>; no camera internals."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label is {rec.recording ? 'Stop' : 'Record'}, reading the recorder handle's own live field."
+    },
+    "B5": {
+     "value": true,
+     "why": "Search link onClick calls moveTo on a module-level map handle, then a same-app <a href=\"/map\"> navigation keeps the module; sheet says with no root shown the root starts at the moved place."
+    }
+   },
+   "confusion": [
+    "Task 8 guess: \"the \u00b0 sign shows even before the first reading, while the label is still empty. Without a compass handle I had no way to hide it.\"",
+    "Guess: whether part components accept children as button labels (\"a trigger's children become the button label\")."
+   ]
+  }
+ }
+}

@@ -1,0 +1,11 @@
+1: system.camera: yes, as far as I can tell. A website visitor likely gets a live camera preview drawn by the browser, after the browser asks for camera permission. I'm guessing this is a <video> fed by getUserMedia, and that on the web takePhoto grabs a frame and flip switches between the front and back cameras. system.sheet: yes, probably. The visitor likely gets the browser's own modal, something like a native <dialog>, rather than an iOS or Android bottom sheet. system.pdf: yes, probably. The visitor likely gets the browser's built-in PDF viewer, as with an <embed> or <iframe>. Here is my evidence. The page guards platform-specific content explicitly with @if (platform.ios). None of the three system.* elements has a guard, so the author expects them to render in all three builds. I'm inferring this from the code's structure; nothing in the code states what the web versions are.
+
+2: (c). The page puts phone-only behaviour behind platform checks, but uses system.* everywhere without them. So "system" seems to mean "the host platform draws this itself": UIKit or Android controls in the apps, and the browser's own elements (video, dialog, PDF viewer) on the website. It is not (b), because a phone-only meaning would need guards for the website build. It is not (d), because a styled library would not include camera or pdf as components.
+
+3: Somewhat. It's imported from @markless/ui next to base and drawer, which are component families, and "system" is a word people use for design systems. But its members (camera, sheet, pdf) are platform-provided features rather than styled widgets. The pairing with @markless/device also points to "the system's own UI", not a branded library. A quick reader could still take it for a design system.
+
+4: Filters sheet: the system decides how it looks: the presentation, the sheet's frame, the animation and the dismiss gesture. The author only supplies what goes inside (the heading and the buttons) and controls when it opens through open/onChange. Comments drawer: the page's author decides. It is built from separate parts (root, trigger, backdrop, content, title, close), and content carries class="comments" for the author's own CSS. That reads as unstyled, author-styled components. I'm guessing from naming and structure.
+
+5: Question 1: 3/5. Question 2: 4/5.
+
+Tools used: none

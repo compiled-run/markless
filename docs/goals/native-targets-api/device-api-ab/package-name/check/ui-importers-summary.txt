@@ -1,0 +1,8 @@
+records 202 files 96
+website	59 files	97 records
+docs/goals/native-targets-api	34 files	68 records
+packages/headless/sr-app	1 files	35 records
+packages/headless/tools	1 files	1 records
+packages/router	1 files	1 records
+specifiers [('@markless/ui', 199), ('@markless/ui/pad', 1), ('@markless/ui/api/manifest.json?raw', 1), ('@markless/ui/vite', 1)] distinct 4
+Counter({'tsrx': 93, 'ts': 3})

@@ -1,0 +1,12 @@
+rank/raw/web-1	native system pair builtin host os
+rank/raw/web-2	host system pair native os builtin
+rank/raw/web-3	pair native builtin system os host
+rank/raw/web-4	builtin system native pair host os
+rank/raw/web-5	host os builtin pair native system
+rank/raw/web-6	os builtin system pair native host
+rank/raw/mobile-1	os system host builtin pair native
+rank/raw/mobile-2	system host pair native builtin os
+rank/raw/mobile-3	builtin pair os host native system
+rank/raw/mobile-4	pair native os system host builtin
+rank/raw/mobile-5	native system host pair builtin os
+rank/raw/mobile-6	builtin system pair native os host

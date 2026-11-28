@@ -1,0 +1,495 @@
+{
+ "label": "JR",
+ "grader": "g1",
+ "answers": {
+  "A1": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Header imports camera but never uses it."
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Shows open-settings on denied in place of the record button (extra, fine)."
+     ]
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Search uses location.assign (full reload) instead of a same-app link or navigate().",
+      "Search calls an invented searchPlaces in ./api.ts.",
+      "Centre read from location.search in an attach on <main> and assigned to map.center after mount, not the starting centre."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Every shutter in tasks 1-4 is disabled until ready (and takePhoto waits until ready per the sheet)."
+    },
+    "B2": {
+     "value": true,
+     "why": "Sets cam.active = false after the photo, which the sheet says releases the camera; true on close."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header uses named<Camera>(name), reads ready for disabled and makes one takePhoto call; photo goes up via a callback."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label reads rec.recording, the recorder's own live state."
+    },
+    "B5": {
+     "value": true,
+     "why": "Reload starts the page fresh with ?lat&lng in the URL; attach runs in the browser and assigns map.center, which the sheet says moves the map."
+    }
+   },
+   "confusion": []
+  },
+  "A2": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "<camera el> stays rendered when denied; refusal message shown beside it (works, but see confusion)."
+     ]
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Header calls named() again inside the handler as a hedge against named() not being live."
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Centre read from window.location.search in an attach on <mapview> (attach signature guessed) and assigned to m.center after mount.",
+      "Unused node parameter in the attachment."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Every shutter in tasks 1-4 is disabled until ready (and takePhoto waits until ready per the sheet)."
+    },
+    "B2": {
+     "value": true,
+     "why": "Sets cam.active = false after the photo, which the sheet says releases the camera; true on close."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header uses only named<Camera>(name), reads ready, and calls takePhoto once; photo goes up via a callback."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label reads rec.recording, the recorder's own live state."
+    },
+    "B5": {
+     "value": true,
+     "why": "Same-app <a href> to /map?lat&lng; the attach reads location.search in the browser and assigns m.center, which moves the map."
+    }
+   },
+   "confusion": [
+    "Guess: 'the camera keeps running when access is denied, so <camera el> stays on screen and the message is shown next to it.'",
+    "Header re-calls named<Camera>('main-camera') inside the handler 'in case it is not' live."
+   ]
+  },
+  "A3": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "The page h1 sits in <main>, not the header (not required)."
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Assumes the route component receives a url: URL prop (router PageProps), which matches the reference."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Every shutter in tasks 1-4 is disabled until ready (and takePhoto waits until ready per the sheet)."
+    },
+    "B2": {
+     "value": true,
+     "why": "Sets cam.active = false after the photo, which the sheet says releases the camera; true on close."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header uses named<Camera>(name), reads ready for disabled and makes one takePhoto call; photo goes up via a callback."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label reads rec.recording, the recorder's own live state."
+    },
+    "B5": {
+     "value": true,
+     "why": "Same-app link carries ?lat&lng; the map reads the url prop into mapview's starting centre."
+    }
+   },
+   "confusion": []
+  },
+  "A4": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [
+      "returns-centred"
+     ],
+     "markless": [
+      "targetFromUrl reads globalThis.location in the component body, which runs on the server where location is absent, so the starting centre is always HOME.",
+      "selected is a plain function, not computed.",
+      "Search calls an invented searchPlaces in ./api.ts."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Every shutter in tasks 1-4 is disabled until ready (and takePhoto waits until ready per the sheet)."
+    },
+    "B2": {
+     "value": true,
+     "why": "Sets cam.active = false after the photo, which the sheet says releases the camera; true on close."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header uses named<Camera>(name), reads ready for disabled and makes one takePhoto call; photo goes up via a callback."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label reads rec.recording, the recorder's own live state."
+    },
+    "B5": {
+     "value": false,
+     "why": "The starting centre is read from globalThis.location in the body, which runs on the server, so it falls back to HOME; nothing moves the map in the browser."
+    }
+   },
+   "confusion": []
+  },
+  "A5": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Header calls named() again inside the handler as a hedge."
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Assumes a url: URL route prop; search endpoint /api/places is invented."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Every shutter in tasks 1-4 is disabled until ready (and takePhoto waits until ready per the sheet)."
+    },
+    "B2": {
+     "value": true,
+     "why": "Sets cam.active = false after the photo, which the sheet says releases the camera; true on close."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header uses only named<Camera>(name), reads ready, and calls takePhoto once; the URL goes up via a callback."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label reads rec.recording, the recorder's own live state."
+    },
+    "B5": {
+     "value": true,
+     "why": "Same-app link carries ?lat&lng; the map reads the url prop into mapview's starting centre."
+    }
+   },
+   "confusion": [
+    "Header re-calls named<Camera>(MAIN_CAMERA) inside the handler 'to get the current object'."
+   ]
+  }
+ }
+}

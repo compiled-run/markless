@@ -1,0 +1,18 @@
+1: `tabs.root`, `tabs.list`, `tabs.trigger` and `tabs.content` come from the `@markless/ui` package (the `tabs` import). `base.button` also comes from `@markless/ui` (the `base` import). The camera tag, `native.camera`, comes from `@markless/ui` too, through the `native` namespace. The camera itself is not in that tag: it comes from `@markless/device` (`camera()`), and the page hands it to the tag through `el={cam}`. The PDF tag, `native.pdf`, also comes from `@markless/ui` through `native`. `button` and `img` are plain HTML. No tag comes from Markless itself; only `@if` does, and it is a template block, not a tag. The import lines settle the sources. I am guessing about what `native` means: it suggests a view the platform draws (iOS, Android or the browser), not markup made by Markless.
+
+2: The author styles `native.camera` (`class="preview"`), `native.pdf` (`class="document"`) and `img` (`class="photo"`). The `button`s, `base.button` and the `tabs.*` tags have no class here, though they presumably could take one. The two `native.*` tags are the ones whose inside the author probably cannot style. My guess is that the platform draws their content (camera preview, PDF pages), so the `class` reaches only the outer box (size, position, border), and page CSS cannot reach the viewfinder or the PDF toolbar. That comes from the name `native`, not from anything in the code that proves it.
+
+3: Tags with behaviour of their own:
+`tabs.root`/`list`/`trigger`/`content` keep the selected tab, switch panels on click and probably handle arrow-key moves and ARIA; that is a guess from the usual headless tabs pattern.
+`base.button` is a toggle that keeps a pressed state and fires `onChange`, so it is more than a button.
+`native.camera` runs a live preview driven by the `cam` controller (`ready`, `facing`, `flip()`, `takePhoto()`).
+`native.pdf` loads and renders a document, fires `onLoad` with `info.pages`, and follows the `page` prop. It may also handle scrolling and zooming itself, which is a guess.
+Boxes with nothing of their own: `div`, `p` and `img`. The plain `button`s are standard HTML: they only run the handler the author gave them, beyond the browser's default focus and click behaviour.
+
+4: The code does not say, so this is a guess. For the camera, most likely a browser video preview of the webcam through getUserMedia, after a permission prompt. If permission is refused or there is no camera, `cam.ready` stays false and "Take photo" stays disabled; or there may be a fallback message. For the PDF, most likely the browser's own PDF viewer (an embed or iframe) or a viewer rendered in JavaScript. Nothing in the code shows a fallback, an `@try`/`@catch` or a check for which platform it runs on, so it seems to be expected to work on the web as well.
+
+5: Can't tell. It is written with dot notation (`native.camera`) and imported from a package, so it is a component, not an HTML tag name; HTML has no `<camera>` element. What it puts on the page could be a `<video>` element on the web and a platform view on iPhone and Android. The code shows neither.
+
+6: For question 1, 4 out of 5: the imports settle where each tag comes from. What I am not sure of is whether `native` means views drawn by iOS and Android, and whether `el={cam}` means the tag only shows a device object that `@markless/device` owns. For question 5, 2 out of 5. To be sure I would need the documentation or source for `native.camera`: what it renders on each target (web DOM element or platform view), whether `class` reaches its inside, and how the web build works for camera and PDF, including any fallback.
+
+Tools used: none

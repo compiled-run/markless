@@ -1,0 +1,18 @@
+{
+  "HV": {
+    "what": "HTML element takes the object: <video src={cam}>, <embed src={doc}>",
+    "ui": "import { base, tabs } from '@markless/ui';",
+    "device": "import { camera, pdf, type Photo } from '@markless/device';",
+    "cam": "video src={cam}",
+    "pdf": "embed src={doc}",
+    "decl": "// No new tags: the HTML element that already shows that kind of content takes the device object as its source.\n//   <video src={cam} />              the camera's live picture\n//   <embed src={doc} />              the PDF's current page\n//   <audio src={rec.clip} controls /> a recorded clip (already in use)\n// On the website these are the browser's own elements; on iPhone and Android the system's view is drawn in their place.\n// Capturing stays on the object: cam.takePhoto()."
+  },
+  "GN": {
+    "what": "one generic element from @markless/device (blind pick): <View el={cam} />, <View el={doc} />",
+    "ui": "import { base, tabs } from '@markless/ui';",
+    "device": "import { camera, pdf, View, type Photo } from '@markless/device';",
+    "cam": "View el={cam}",
+    "pdf": "View el={doc}",
+    "decl": "// Module: @markless/device, the one element that shows any device object:\n//   <View el={cam} />   <View el={doc} />\nexport declare function View(props: { el: Camera | Pdf; class?: string }): Element;"
+  }
+}

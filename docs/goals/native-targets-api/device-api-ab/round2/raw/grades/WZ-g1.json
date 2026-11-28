@@ -1,0 +1,526 @@
+{
+ "label": "WZ",
+ "grader": "g1",
+ "answers": {
+  "A1": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Flip button sits outside camera.root; fine since it only changes state."
+     ]
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Handle made in page body and passed as a prop; sheet allows a body-made handle."
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "{/* */} comment inside markup; unverified tsrx syntax (not counted)."
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Reads clip from rec.clip instead of onRecord; supported by the handle."
+     ]
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Place-shaped objects with extra fields passed as at/center; structurally fine.",
+      "Relies on <a href='/map'> onClick running before same-app navigation."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Every shutter is camera.trigger, which the sheet says is disabled until the camera is ready."
+    },
+    "B2": {
+     "value": true,
+     "why": "active={review === null} sets active false while the panel shows; the sheet says active={false} releases the camera."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header takes only a CameraHandle prop and uses <camera.trigger for={cam}>."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label reads rec.recording from the recorder's own handle."
+    },
+    "B5": {
+     "value": true,
+     "why": "Link click runs moveTo on the shared module-level handle while no map root is shown; same-app link keeps the module value, so the map root starts at the chosen place."
+    }
+   },
+   "confusion": [
+    "Guess: 'Whether reading handle fields ... in markup updates the page live, like state. The sheet calls them \"live fields\", so I assumed they do.'",
+    "Guess: 'assumed active becoming true again restarts the camera' (sheet only states release)."
+   ]
+  },
+  "A2": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Handle made in page body and passed as a prop."
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "{/* */} comment inside markup; unverified tsrx syntax (not counted)."
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "'<recorder.label /> s' sits outside an @if, so a stray ' s' shows when not recording (label is present only while recording); cosmetic."
+     ]
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "@for over an inline places.filter(...) expression; unverified shape."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "'°' shows even before first compass reading; cosmetic."
+     ]
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Every shutter is camera.trigger, which the sheet says is disabled until the camera is ready."
+    },
+    "B2": {
+     "value": true,
+     "why": "active={review === null} sets active false while the panel shows; the sheet says active={false} releases the camera."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header takes only a CameraHandle prop and uses <camera.trigger for={cam}>."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label reads rec.recording from the recorder's own handle."
+    },
+    "B5": {
+     "value": true,
+     "why": "Link click runs moveTo on the shared module-level handle while no map root is shown; same-app link keeps the module value, so the map root starts at the chosen place."
+    }
+   },
+   "confusion": [
+    "Guess: 'Reading handle fields ... in markup updates the page live, like reading state does.'",
+    "Guess: 'changing active back to true restarts the camera, which the sheet only implies.'"
+   ]
+  },
+  "A3": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "{/* */} comment inside markup; unverified tsrx syntax (not counted)."
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Audio gated on !rec.recording && rec.clip; fine."
+     ]
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Notes it would need the place in the URL if the link reloads, but had no API for reading it."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "'°' shows before first reading; cosmetic."
+     ]
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Every shutter is camera.trigger, which the sheet says is disabled until the camera is ready."
+    },
+    "B2": {
+     "value": true,
+     "why": "active={review === null} sets active false while the panel shows; the sheet says active={false} releases the camera."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header imports only the shared handle from a .ts module and uses <camera.trigger for={cam}>."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label reads rec.recording from the recorder's own handle."
+    },
+    "B5": {
+     "value": true,
+     "why": "Link click runs moveTo on the shared module-level handle while no map root is shown; same-app link keeps the module value, so the map root starts at the chosen place."
+    }
+   },
+   "confusion": [
+    "Guess: 'Handle fields ... are reactive when read in markup'.",
+    "Guess: 'In task 4, setting active back to true starts the camera again. The sheet only says that active={false} releases it.'"
+   ]
+  },
+  "A4": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "onClick={openSettings} passes the click event to a zero-arg function; harmless."
+     ]
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "{/* */} comment inside markup; unverified tsrx syntax (not counted)."
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "'<recorder.label /> s' not gated on recording, so ' s' shows when idle; cosmetic."
+     ]
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Search uses an invented /api/places endpoint via async computed; relative fetch would run in the component body on the server first. Search page itself is present.",
+      "Fewer than three places (two); not a sheet issue."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "'°' shows before first reading; cosmetic."
+     ]
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Every shutter is camera.trigger, which the sheet says is disabled until the camera is ready."
+    },
+    "B2": {
+     "value": true,
+     "why": "active={review === null} sets active false while the panel shows; the sheet says active={false} releases the camera."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header imports only the shared handle from a .ts module and uses <camera.trigger for={cam}>."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label reads rec.recording from the recorder's own handle."
+    },
+    "B5": {
+     "value": true,
+     "why": "Link click runs moveTo on the shared module-level handle while no map root is shown; same-app link keeps the module value, so the map root starts at the chosen place."
+    }
+   },
+   "confusion": [
+    "Guess: 'I assumed active={false} keeps camera.area in place (blank or frozen) and that the panel covers it with CSS' - unsure what the area shows when released.",
+    "Guess: 'A handle created with const x = camera.handle() in a component body can be read by handlers and markup without state()'.",
+    "Guess: 'a part can sit inside non-part elements (such as a div) within its root and still wire itself to that root.'"
+   ]
+  },
+  "A5": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Handle made in page body and passed as a prop."
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "{/* */} comment inside markup; unverified tsrx syntax (not counted)."
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Keeps clip in app state from onRecord rather than rec.clip; fine. Recording label reads rec.recording."
+     ]
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "'°' shows before first reading; writer notes it."
+     ]
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Every shutter is camera.trigger, which the sheet says is disabled until the camera is ready."
+    },
+    "B2": {
+     "value": true,
+     "why": "active={review === null} sets active false while the panel shows; the sheet says active={false} releases the camera."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header takes only a CameraHandle prop and uses <camera.trigger for={cam}>."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label reads rec.recording from the handle; the app-kept clip state only gates playback."
+    },
+    "B5": {
+     "value": true,
+     "why": "Link click runs moveTo on the shared module-level handle while no map root is shown; same-app link keeps the module value, so the map root starts at the chosen place."
+    }
+   },
+   "confusion": [
+    "Guess: 'Reading a handle's fields in markup ... updates live ... The sheet only says handles carry \"live fields\".'",
+    "Guess: 'switching active from false back to true starts the camera again. The sheet only states the release half.'",
+    "Guess: 'Without a compass handle I had no way to hide it' (no compass handle/ready state)."
+   ]
+  }
+ }
+}

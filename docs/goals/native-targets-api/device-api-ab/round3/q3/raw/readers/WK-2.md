@@ -1,0 +1,11 @@
+1: Three calls open a screen that belongs to the phone itself. `openSettings()` opens the phone's Settings, probably at this app's permissions page. That part is a guess. `openShareSheet({ url: last.url })` opens the system share sheet. `takePhoto()` (the bare import, used by "Use phone camera") most likely opens the phone's own camera app or screen. I am inferring that from the button label and from the fact that it is separate from `cam.takePhoto()`. `choosePhoto()` most likely opens the system photo picker. That is also a guess from the name and the `?? last` fallback.
+
+2: `cam.takePhoto()`. It belongs to the `camera()` object `cam`, which is passed to `<base.camera el={cam} />` and is gated by `cam.ready`.
+
+3: `openSettings()` returns nothing the code uses, so probably void. `cam.takePhoto()` returns a Promise of a `Photo` that is never null; it is assigned straight to `last` with no fallback, so it probably throws or rejects on failure. That part is a guess. `takePhoto()` returns a Promise of `Photo | null` or `undefined`. The empty value presumably means the user cancelled, which is why there is `?? last`. `choosePhoto()` also returns a Promise of `Photo | null` or `undefined`, where empty means nothing was picked. `openShareSheet({ url })` has its result ignored, so it is probably void or a Promise I can't see. A `Photo` has at least a `.url`.
+
+4: "Use phone camera" calls the bare `takePhoto()`. It probably opens the phone's own camera screen and takes a new photo. "Choose a photo" calls `choosePhoto()`, which probably opens the gallery or picker to pick an existing photo. Both can come back empty, and then `last` stays the same. Neither one uses the on-page camera or depends on `cam.ready` or on camera access.
+
+5: Yes. `takePhoto()` (the imported function) and `cam.takePhoto()` (the method) have the same name but different behaviour: one goes through the phone's camera, the other through the camera on this page. Their return types also differ (one can be empty, the other apparently cannot). I'm also unsure whether `cam.access === 'denied'` affects the bare `takePhoto()`. Two smaller unknowns: `camera()` sounds like it might open the camera itself, but it seems to only create a handle; and it's unclear whether `openSettings()` opens app-specific or general settings.
+
+Tools used: none

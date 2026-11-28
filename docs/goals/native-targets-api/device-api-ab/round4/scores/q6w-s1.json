@@ -1,0 +1,532 @@
+{
+ "AU-1": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "Address modal.root nested inside <p>; no author CSS overriding placement."
+ },
+ "AU-2": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "Uncontrolled drawer and alert modal; no author CSS."
+ },
+ "AU-3": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "Classes on parts but no stylesheet shown, so no placement override; address modal inside <p>."
+ },
+ "AU-4": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "Address picks are modal.close items; no author CSS."
+ },
+ "AU-5": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "Address modal inside <p>; no author CSS."
+ },
+ "LI-1": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "Address drawer inside <p>; Delete confirm is a plain button setting open=false."
+ },
+ "LI-2": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "Writer notes drawer is a bottom sheet on laptops too."
+ },
+ "LI-3": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "Address picks are drawer.close items."
+ },
+ "LI-4": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "Writer notes a centered modal might suit the website better but no per-platform switch."
+ },
+ "LI-5": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": null,
+  "notes": "Chose drawer for address list deliberately; noted modal would also work."
+ },
+ "AD-1": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with the opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "pieces": [
+    "address"
+   ],
+   "spelledAsSheet": true,
+   "spelling": "adaptive"
+  },
+  "notes": "Noted adaptive is absent from modal.root type."
+ },
+ "AD-2": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with the opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "pieces": [
+    "address"
+   ],
+   "spelledAsSheet": true,
+   "spelling": "adaptive"
+  },
+  "notes": "Address modal inside <p>; noted adaptive absent from type."
+ },
+ "AD-3": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with the opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "pieces": [
+    "address"
+   ],
+   "spelledAsSheet": true,
+   "spelling": "adaptive"
+  },
+  "notes": "Noted adaptive absent from type."
+ },
+ "AD-4": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with the opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "pieces": [
+    "address"
+   ],
+   "spelledAsSheet": true,
+   "spelling": "adaptive"
+  },
+  "notes": "Phone/Website lines give bare answers without element names; noted adaptive absent from type."
+ },
+ "AD-5": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with the opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "pieces": [
+    "address"
+   ],
+   "spelledAsSheet": true,
+   "spelling": "adaptive"
+  },
+  "notes": "Noted adaptive absent from type."
+ },
+ "PR-1": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with the opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "pieces": [
+    "address"
+   ],
+   "spelledAsSheet": true,
+   "spelling": "presentation=\"adaptive\""
+  },
+  "notes": "Noted presentation absent from modal.root type."
+ },
+ "PR-2": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with the opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "pieces": [
+    "address"
+   ],
+   "spelledAsSheet": true,
+   "spelling": "presentation=\"adaptive\""
+  },
+  "notes": "Address modal inside <p>; noted presentation absent from type."
+ },
+ "PR-3": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with the opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "pieces": [
+    "address"
+   ],
+   "spelledAsSheet": true,
+   "spelling": "presentation=\"adaptive\""
+  },
+  "notes": "modal.trigger placed inside a <p> within modal.root; noted presentation absent from type."
+ },
+ "PR-4": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with the opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "pieces": [
+    "address"
+   ],
+   "spelledAsSheet": true,
+   "spelling": "presentation=\"adaptive\""
+  },
+  "notes": "Noted presentation absent from type."
+ },
+ "PR-5": {
+  "filters": {
+   "element": "drawer",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "delete": {
+   "element": "modal alert",
+   "phoneByRule": "centered box",
+   "phoneSaid": "centered box",
+   "surprise": false
+  },
+  "address": {
+   "element": "modal with the opt-in",
+   "phoneByRule": "bottom sheet",
+   "phoneSaid": "bottom sheet",
+   "surprise": false
+  },
+  "webSurprises": 0,
+  "optIn": {
+   "piecesWithOptIn": 1,
+   "pieces": [
+    "address"
+   ],
+   "spelledAsSheet": true,
+   "spelling": "presentation=\"adaptive\""
+  },
+  "notes": "Noted presentation absent from type."
+ }
+}

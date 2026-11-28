@@ -1,0 +1,10 @@
+A: None matches everything I predicted. Rule 1 comes closest. On iPhone I guessed Edit name would be a native sheet and Comments a bottom sheet, which is what Rule 1 does. But I guessed Share, the raw `<dialog open>`, would be a plain box in the page, and under Rule 1 it would become a bottom sheet. Rules 2 and 3 match my Comments answer but not my Edit name guess.
+
+B: Rule 3. The code means the same thing on every platform: `modal` is a centered box, `drawer` is a bottom sheet. When I want the iOS or Android convention, I ask for it with one visible word on the element. From SwiftUI and Compose I'm used to choosing `.sheet` or `.alert`, and `ModalBottomSheet` or `Dialog`, explicitly, and Rule 3 keeps that. Rule 1 feels more native out of the box, but placement depends on hidden heuristics: an alert flag, or whether my CSS happens to include `margin` or `inset`. Six months later I couldn't predict a screen by reading its code. Rule 2 is predictable but leaves no tidy way to get a native sheet for a modal on phones and a centered box on the web.
+
+C:
+Rule 1: My `.edit` card, rounded on all four corners and styled as a centered box, would turn into a swipeable bottom sheet. Even the raw non-modal `<dialog open>` I show with my own `@if` would become a sheet with a grab handle. Worse, adding an unrelated `margin: auto` while restyling would silently move it back to the center. I'd also wonder whether swiping it closed sets my `sharing` state back to false.
+Rule 2: Modals are centered boxes on iPhone. That's fine on Android, where Material dialogs are centered, but on iOS it looks un-native for anything bigger than an alert. A form like Edit name would feel cramped, and users would expect to swipe it away and couldn't.
+Rule 3: The name `adaptive` doesn't say what it adapts to. I'd first guess screen size, such as iPad or a wide Android screen rather than phone versus web, and wonder whether a narrow mobile browser gets the sheet too. I'd also wonder what `adaptive` does on a non-modal `<dialog open>` or on an alert, and whether a typo in it silently does nothing.
+
+Tools used: none

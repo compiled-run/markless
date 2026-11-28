@@ -1,0 +1,545 @@
+{
+ "RQ-1": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 0,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 4,
+   "q5": 2
+  },
+  "zeros": {
+   "3": "These tags have behaviour of their own. ... `base.pdf` loads a file, shows a given `page` and fires `onLoad` with `info.pages`.",
+   "5": "Can't tell. `base.camera` is a component from `@markless/ui`, not an HTML tag name."
+  },
+  "pauses": [
+   "The only doubt is whether `base.*` tags are just thin wrappers over HTML elements."
+  ]
+ },
+ "RQ-2": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 0,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 4,
+   "q5": 2
+  },
+  "zeros": {
+   "3": "These carry behaviour of their own: ... `base.pdf`: it loads the file, shows the `page` it is given, and fires `onLoad` ... It may also handle scrolling or zooming inside itself (a guess).",
+   "5": "Can't tell. `base.camera` is a component from `@markless/ui`, not an HTML element in itself"
+  },
+  "pauses": [
+   "whether `base.*` is really part of `@markless/ui` or a re-export from somewhere else"
+  ]
+ },
+ "RQ-3": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 0,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 4,
+   "q5": 2
+  },
+  "zeros": {
+   "3": "These tags have behaviour of their own: ... `base.pdf` loads and renders the file, shows the given `page`, and fires `onLoad`",
+   "5": "Can't tell. The name `base.camera` is not an HTML tag name"
+  },
+  "pauses": [
+   "whether `base.*` tags are thin wrappers around HTML elements or part of Markless's core set"
+  ]
+ },
+ "MZ-1": {
+  "1a": 1,
+  "1b": 0,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 1,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 3,
+   "q5": 4
+  },
+  "zeros": {
+   "1b": "I guess it is tied to `@markless/device`, since its name matches the imported `camera()` ... It could also be a Markless built-in tag, so this is a guess.",
+   "3": "`camera`: shows a live stream tied to the `cam` handle ... `pdf`: loads the file, renders the page given in `page`, and fires `onLoad` (listed under 'These tags have behaviour of their own')"
+  },
+  "pauses": [
+   "I guess it is tied to `@markless/device`, since its name matches the imported `camera()` and it takes that handle through `el={cam}`. It could also be a Markless built-in tag",
+   "It is a Markless or `@markless/device` tag.",
+   "`camera` is lowercase but shares its name with an import"
+  ]
+ },
+ "MZ-2": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 1,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 3,
+   "q5": 4
+  },
+  "zeros": {
+   "3": "These tags carry behaviour of their own: ... The camera tag runs the live preview ... The PDF tag loads the file, renders the current `page` and fires `onLoad`"
+  },
+  "pauses": [
+   "Its name matches the imported `camera` function, but in JSX-style code a lowercase tag is normally intrinsic (built into the framework), not a variable.",
+   "whether lowercase tags like `camera` and `pdf` are a fixed list of Markless built-in tags, or are resolved from imports with the same name (`camera` from `@markless/device`)"
+  ]
+ },
+ "MZ-3": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 0,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": "5 for tabs/base.button/button/img, 3 for camera/pdf",
+   "q5": 2
+  },
+  "zeros": {
+   "3": "Tags with behaviour of their own: ... `camera` runs the live stream. ... `pdf` loads the file, draws the current `page` and fires `onLoad`.",
+   "5": "Can't tell, but probably not."
+  },
+  "pauses": [
+   "The only `camera` in scope is the function imported from `@markless/device`. So it is either a built-in Markless tag that you hand a device controller through `el={cam}`, or a tag that `@markless/device` provides and that is found by its name.",
+   "does `<camera>` refer to the imported `camera` binding, or is it a built-in?"
+  ]
+ },
+ "FJ-1": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 0,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 4,
+   "q5": 2
+  },
+  "zeros": {
+   "3": "Tags with behaviour of their own: ... `native.camera`: runs a live preview ... `native.pdf`: loads the file, renders the page ... It probably also handles its own scrolling and zooming (a guess).",
+   "5": "Can't tell. `native.camera` is a component from `@markless/ui`, not an HTML tag name"
+  },
+  "pauses": [
+   "whether `native.*` is truly part of `@markless/ui` or just re-exported there from Markless or `@markless/device`"
+  ]
+ },
+ "FJ-2": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 0,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 4,
+   "q5": 2
+  },
+  "zeros": {
+   "3": "Tags with behaviour of their own: ... `native.camera` runs a live preview ... `native.pdf` loads and renders a document ... It may also handle scrolling and zooming itself",
+   "5": "Can't tell. It is written with dot notation (`native.camera`) and imported from a package, so it is a component"
+  },
+  "pauses": []
+ },
+ "FJ-3": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 0,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 4,
+   "q5": 2
+  },
+  "zeros": {
+   "3": "These tags have behaviour of their own: ... `native.pdf` loads and draws the document, probably handles scrolling and zoom, follows the `page` prop and fires `onLoad`.",
+   "5": "Can't tell. In the source, `native.camera` is a package component, not an HTML element"
+  },
+  "pauses": [
+   "whether `native.camera` belongs to `@markless/ui` or is supplied by `@markless/device` through `el={cam}`"
+  ]
+ },
+ "LT-1": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 1,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 4,
+   "q5": 3
+  },
+  "zeros": {
+   "3": "These tags carry behaviour of their own: ... `system.camera` runs a live camera feed ... `system.pdf` loads and renders the document ... and probably handles its own scrolling and zoom."
+  },
+  "pauses": [
+   "apart from how `@markless/device` and `@markless/ui` split the camera work"
+  ]
+ },
+ "LT-2": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 0,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 4,
+   "q5": 2
+  },
+  "zeros": {
+   "3": "These carry their own behaviour: ... `system.camera` runs a live preview driven by `cam` ... `system.pdf` loads the file, shows the page given by `page`, and fires `onLoad`",
+   "5": "Can't tell. The lowercase dotted name `system.camera` is a component from `@markless/ui`, not an HTML tag name."
+  },
+  "pauses": [
+   "whether `system.*` really belongs to the UI package or only re-exports device views"
+  ]
+ },
+ "LT-3": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 1,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 4,
+   "q5": 3
+  },
+  "zeros": {
+   "3": "These tags have behaviour of their own: ... `system.camera`: it runs its own live preview stream ... `system.pdf`: it loads and renders the document itself."
+  },
+  "pauses": []
+ },
+ "WY-1": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 1,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 4,
+   "q5": 3
+  },
+  "zeros": {
+   "3": "These tags have behaviour of their own: ... `pdfview`: it loads the file, shows the page it is given, and reports `onLoad` ... It may also handle scrolling or zooming, but that is a guess."
+  },
+  "pauses": [
+   "`cameraview` and `pdfview` are lowercase like HTML tags, but neither exists in HTML. I am treating them as references to the imported names, not as built-in tags.",
+   "How `.tsrx` decides between a lowercase imported name and an HTML tag."
+  ]
+ },
+ "WY-2": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 1,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": "4 for tabs/base.button/button/img, 3 for cameraview/pdfview",
+   "q5": 3
+  },
+  "zeros": {
+   "3": "These tags have behaviour of their own: ... `pdfview`: it loads the file, shows the `page` it is given, fires `onLoad` ... and probably handles scrolling and zoom itself."
+  },
+  "pauses": [
+   "Both are lowercase like HTML tags, but they are imported names, so they are package components, not HTML.",
+   "on the web it may well output a `<video>` or a custom element",
+   "the rule for how Markless resolves a lowercase tag that matches an imported name: does the import win over HTML?"
+  ]
+ },
+ "WY-3": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 0,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 4,
+   "q5": 2
+  },
+  "zeros": {
+   "3": "These tags have behaviour of their own: ... `cameraview` runs the live preview of the `cam` handle. `pdfview` loads the file, renders the page ... and may handle scrolling or zoom (a guess).",
+   "5": "Can't tell. In the code it is an imported component (`cameraview` from `@markless/device`), not a standard HTML element"
+  },
+  "pauses": [
+   "they are lowercase, which normally means HTML, but `cameraview` and `pdfview` are imported names ... So they are package tags that happen to be spelled like HTML.",
+   "On the website it might render a `<video>` element or a custom element named `<cameraview>`",
+   "The lowercase spelling suggests it is meant to read like an element"
+  ]
+ },
+ "KC-1": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 0,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 4,
+   "q5": 2
+  },
+  "zeros": {
+   "3": "These tags carry behaviour of their own: ... `PdfView`: it loads and renders the file, follows the `page` prop and fires `onLoad` ... It may also handle scrolling or zooming inside itself (a guess).",
+   "5": "Can't tell, but probably not on iPhone and Android."
+  },
+  "pauses": []
+ },
+ "KC-2": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 0,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 4,
+   "q5": 2
+  },
+  "zeros": {
+   "3": "These carry behaviour of their own: ... `CameraView` runs the live preview ... `PdfView` loads and renders the PDF, shows the page given by `page`, and reports `info.pages` through `onLoad`.",
+   "5": "Can't tell. It is a component imported from `@markless/device`, not an HTML tag name."
+  },
+  "pauses": []
+ },
+ "KC-3": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 0,
+  "7": null,
+  "8": null,
+  "q9": "",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 4,
+   "q5": 2
+  },
+  "zeros": {
+   "3": "These tags carry behaviour of their own: ... `CameraView`: it drives the camera bound through `el={cam}`. ... `PdfView`: it loads the file, moves to `page` and fires `onLoad`",
+   "5": "Can't tell. `CameraView` is a capitalised component imported from `@markless/device`, not a lowercase HTML tag"
+  },
+  "pauses": []
+ },
+ "HV-1": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 1,
+  "7": 1,
+  "8": 1,
+  "q9": "Partly. Can tell: live preview, Take photo (disabled until ready), Front camera toggle, last photo; PDF view, 'Page X of N', Previous/Next disabled at ends. Can't tell: layout, sizes, base.button look, whether changing doc.page scrolls the embed, whether the viewer has a toolbar, whether the hidden panel unmounts (stopping the camera).",
+  "videoRemark": "Q1: 'So the tag is HTML and the device package supplies what it plays.' Q7: 'It only shows the picture. There is no record call, no start or stop, and no `controls` on the tag. ... `camera()` might also have a recording feature this page doesn't use.' No remark that a video is the wrong element for a camera.",
+  "confidence": {
+   "q1": 4,
+   "q5": 3
+  },
+  "zeros": {
+   "3": "Tags with their own behaviour: ... `<video>` plays the live camera feed. `<embed>` has the PDF viewer's own scrolling and zoom."
+  },
+  "pauses": [
+   "On the iPhone and Android apps I can't tell. The compiler may turn it into a native camera view",
+   "whether `<video>` and `<embed>` stay HTML tags when their source is a device object"
+  ]
+ },
+ "HV-2": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 1,
+  "7": 1,
+  "8": 1,
+  "q9": "Partly. Can tell: tabs Camera/Document, live preview, Take photo, Front camera toggle, last photo; PDF, 'Page N of M', Previous/Next disabling at ends. Can't tell: look of tabs/buttons/viewer, one page vs scrolling, viewer toolbar, pre-ready/denied state, front-camera mirroring, whether hidden tab stays mounted.",
+  "videoRemark": "Q1: 'Its `src` is the `camera()` object from `@markless/device`, not a URL.' Q5: 'On the website it is likely a real `<video>` element playing the camera stream.' Q7: 'It only shows the picture. Nothing calls a record or start/stop method, there's no `muted` or `controls`'. No remark that a video is the wrong element for a camera.",
+  "confidence": {
+   "q1": 4,
+   "q5": 3
+  },
+  "zeros": {
+   "3": "These have behaviour of their own: ... `video` with the camera: it runs a live feed ... `embed` with the PDF: a viewer with its own scrolling, and possibly zoom."
+  },
+  "pauses": [
+   "On iPhone and Android I can't tell: the same tag may be swapped for a native camera view",
+   "'a device object as `src` on a plain tag' is my reading of an unusual pattern"
+  ]
+ },
+ "HV-3": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 0,
+  "7": 1,
+  "8": 1,
+  "q9": "Partly. Can tell: Camera tab open first, live preview, Take photo, Front camera toggle, last photo; PDF viewer box, 'Page X of Y', Previous/Next. Can't tell: layout/sizes/look, one page vs scroll, whether inactive panels stay mounted, permission error or loading states.",
+  "videoRemark": "Q7: '`video` just means a moving image here, not recording.' Q5: '`src={cam}` passes a device object, not a URL, so Markless or the device package must handle it specially.'",
+  "confidence": {
+   "q1": 3,
+   "q5": 2
+  },
+  "zeros": {
+   "3": "`video` plays a live stream and `embed` hosts a viewer that probably scrolls and zooms itself (listed with the tags that have behaviour of their own)",
+   "5": "Can't tell. The tag name `video` is HTML ... But `src={cam}` passes a device object, not a URL, so Markless or the device package must handle it specially."
+  },
+  "pauses": [
+   "I am guessing that `video` and `embed` stay real HTML elements when given a device object, since the package might swap them for native views on phones.",
+   "On iPhone and Android it may be drawn as a native camera view rather than an HTML element."
+  ]
+ },
+ "GN-1": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 1,
+  "4": 1,
+  "5": 0,
+  "7": 1,
+  "8": 1,
+  "q9": "Partly. Can tell: two tabs (Camera first), preview, Take photo, Front camera toggle, last photo; PDF view, 'Page N of M', Previous/Next. Can't tell: layout/size, what View draws per platform, pre-ready/loading state (no @pending/@catch), permission denial, PDF scroll/zoom.",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 4,
+   "q5": 2
+  },
+  "zeros": {
+   "5": "Can't tell. `View` is capitalized, so it is a component, not an HTML tag name."
+  },
+  "pauses": [
+   "My uncertainty is whether `View` is really one generic component and not something that changes per object."
+  ]
+ },
+ "GN-2": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 1,
+  "4": 1,
+  "5": 0,
+  "7": 1,
+  "8": 1,
+  "q9": "Partly. Can tell: preview box, Take photo, Front camera toggle, last photo; PDF view, 'Page X of Y', Previous/Next. Can't tell: what View draws per platform, size/layout, loading/denied states, one page vs scroll, whether the unselected panel stays mounted (camera keeps running).",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 4,
+   "q5": 2
+  },
+  "zeros": {
+   "5": "Can't tell. `View` is a capitalized imported component, so in the source it is not an HTML element."
+  },
+  "pauses": [
+   "the uncertainty is whether `View` is one generic component or several"
+  ]
+ },
+ "GN-3": {
+  "1a": 1,
+  "1b": 1,
+  "2": 1,
+  "3": 0,
+  "4": 1,
+  "5": 0,
+  "7": 1,
+  "8": 1,
+  "q9": "Can tell: tab bar Camera/Document (Camera first), preview, Take photo, Front camera toggle, last photo; /guide.pdf rendering, 'Page X of Y', Previous/Next disabling at ends. Can't tell: size/layout/look of View and whether it covers other content, ui styling, whether inactive panel stays mounted, loading/failure states, doc.pages before load, permission prompts.",
+  "videoRemark": "",
+  "confidence": {
+   "q1": 4,
+   "q5": 2
+  },
+  "zeros": {
+   "3": "`View el={cam}`: a live camera feed whose `ready` and `facing` change on their own. `View el={doc}`: a document renderer, probably with scroll or zoom, and possibly it changes `doc.page` itself (listed under 'These carry their own behaviour').",
+   "5": "Can't tell. `View` is capitalised, so it is a component, not an HTML tag."
+  },
+  "pauses": []
+ }
+}

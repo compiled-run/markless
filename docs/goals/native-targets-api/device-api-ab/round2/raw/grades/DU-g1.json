@@ -1,0 +1,547 @@
+{
+ "label": "DU",
+ "grader": "g1",
+ "answers": {
+  "A1": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Passes the element() handle as a prop to Header and CameraBody (same shape as the reference)."
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "`//` comment written inside markup (inside @else before <section>); may render as text or count as a second node in the block."
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [
+      "returns-centred"
+     ],
+     "markless": [
+      "Uses location.assign('/map') (full reload) instead of a same-app link or navigate().",
+      "Hands the centre over through storage() + JSON; body runs on the server with the fallback centre.",
+      "Invented /api/places search backend."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Wraps isOnline()/heading() in computed; harmless."
+     ]
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "Every shutter is disabled={!ready}; task 4 resets ready on capture. Flip does not reset ready (same as the reference)."
+    },
+    "B2": {
+     "value": true,
+     "why": "The review panel replaces the @else branch holding <Camera>, so the view leaves the page and the sheet says the camera runs only while in the page."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header gets the camera handle as a prop and makes one call, camera?.capture()."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label reads rec.recording, the recorder's own live field."
+    },
+    "B5": {
+     "value": false,
+     "why": "Passes the place via storage('map-center') and location.assign('/map'): a fresh page load whose body runs on the server (no localStorage) with the fallback centre; the sheet does not promise MapView moves when `center` changes after it opens, so centring on the result is not guaranteed."
+    }
+   },
+   "confusion": [
+    "Guess: 'element<CameraElement>() ... gives a binding that is null until the view is mounted ... I also assumed it can be passed as a prop to another component (task 2). The sheet only shows el={camera} on the view itself.'",
+    "Guess: unsure whether onReady fires again after flip ('I don't set ready back to false, because onReady might not fire again').",
+    "Unsure whether MapView applies a stored centre after server render ('I assumed the stored centre is applied on the client before first paint, or right after')."
+   ]
+  },
+  "A2": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Calls camera.capture() without ?. though the handle may be empty before bind."
+     ]
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Passes the element() handle as a prop to Header and CameraBody."
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "camera.capture() without null guard."
+     ]
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "`//` comment written inside markup inside the @else block before <Camera>, making a possible extra text node in a one-node block."
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [
+      "returns-centred"
+     ],
+     "markless": [
+      "MapPage.tsrx uses computed without importing it (noted by the writer).",
+      "location.assign('/map') full reload instead of navigate()/link.",
+      "Hands the centre over through storage() + JSON; server body uses the fallback centre.",
+      "Invented /api/places backend; map.locate() without null guard."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "video.play()/pause()/seek() without null guard."
+     ]
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Wraps isOnline()/heading() in computed; harmless."
+     ]
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "All shutters disabled={!ready}; flip resets ready, task 4 resets ready on Close."
+    },
+    "B2": {
+     "value": true,
+     "why": "The review branch replaces the @else branch holding <Camera>, removing the view from the page."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header gets the handle as a prop and makes one call, camera?.capture()."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label reads rec.recording directly."
+    },
+    "B5": {
+     "value": false,
+     "why": "Passes the place via storage('map-center') and location.assign('/map'): a fresh page load whose body runs on the server (no localStorage) with the fallback centre; the sheet does not promise MapView moves when `center` changes after it opens, so centring on the result is not guaranteed."
+    }
+   },
+   "confusion": [
+    "Guess: 'I assumed an element<T>() handle can be called like the element itself ... The guidance never shows how a handle is read.'",
+    "Guess: changing facing restarts the camera and fires onReady again (resets ready on flip)."
+   ]
+  },
+  "A3": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Passes the element() handle as a prop."
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Nested @if/@else directly inside @else (writer unsure it counts as one node)."
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [
+      "returns-centred"
+     ],
+     "markless": [
+      "location.assign('/map') full reload instead of navigate()/link.",
+      "Hands the centre over through storage() + JSON; with no stored value center is undefined; server body has no stored value.",
+      "Invented /api/places backend."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Calls isOnline()/heading() directly in markup; heading() called twice."
+     ]
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "All shutters disabled={!ready}; task 4 resets ready on capture; flip does not reset ready (same as the reference)."
+    },
+    "B2": {
+     "value": true,
+     "why": "Review branch replaces the branch holding <Camera>, so it leaves the page."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header gets the handle as a prop and makes one call, camera?.capture()."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label reads rec.recording directly."
+    },
+    "B5": {
+     "value": false,
+     "why": "Passes the place via storage('map-center') and location.assign('/map'): a fresh page load whose body runs on the server (no localStorage) with the fallback centre; the sheet does not promise MapView moves when `center` changes after it opens, so centring on the result is not guaranteed."
+    }
+   },
+   "confusion": [
+    "Guess: 'An element<T>() handle can be used directly as the element ... and it is null until bound.'",
+    "Guess: unsure whether onReady fires again after a flip.",
+    "Guess: 'I'm not sure ... that a computed over storage can feed the center prop.'"
+   ]
+  },
+  "A4": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Redundant photo?. inside @if (photo)."
+     ]
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Header receives an onShutter callback; handle passed as a prop to the body (same shape as the reference)."
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "`//` comment written inside markup inside <section>; may render as text (writer flagged the doubt)."
+     ]
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [
+      "returns-centred"
+     ],
+     "markless": [
+      "location.assign('/map') full reload instead of navigate()/link.",
+      "Hands the centre over through storage() + JSON; server body uses the fallback centre.",
+      "Invented /api/places backend."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Calls isOnline()/heading() directly in markup."
+     ]
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "All shutters disabled={!ready}; task 4 resets ready on capture; onError resets ready in task 1."
+    },
+    "B2": {
+     "value": true,
+     "why": "Review branch replaces the section holding <Camera>, removing it from the page."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header only receives a ready flag and an onShutter callback; the page calls camera?.capture()."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label reads rec.recording directly."
+    },
+    "B5": {
+     "value": false,
+     "why": "Passes the place via storage('map-center') and location.assign('/map'): a fresh page load whose body runs on the server (no localStorage) with the fallback centre; the sheet does not promise MapView moves when `center` changes after it opens, so centring on the result is not guaranteed."
+    }
+   },
+   "confusion": [
+    "Guess: 'the binding from element<CameraElement>() ... reads as the element itself, possibly null ... rather than something like camera.current.'",
+    "Guess: assumed MapView's center prop follows state changes."
+   ]
+  },
+  "A5": {
+   "tasks": {
+    "1": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "2": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Lifts facing/photo to the page and passes the element() handle as a prop."
+     ]
+    },
+    "3": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "4": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "5": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": []
+    },
+    "6": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [
+      "returns-centred"
+     ],
+     "markless": [
+      "location.assign('/map') full reload instead of navigate()/link.",
+      "Hands the centre over through storage() + JSON; server body uses the fallback centre; the last place sticks on later visits (writer noted)."
+     ]
+    },
+    "7": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Uses event.target cast instead of currentTarget; fine."
+     ]
+    },
+    "8": {
+     "offSheet": 0,
+     "offSheetNames": [],
+     "misuse": 0,
+     "misuseNotes": [],
+     "missing": [],
+     "markless": [
+      "Calls isOnline()/heading() directly in markup."
+     ]
+    }
+   },
+   "bugs": {
+    "B1": {
+     "value": false,
+     "why": "All shutters disabled={!ready}; flip resets ready; task 4 resets ready on capture."
+    },
+    "B2": {
+     "value": true,
+     "why": "Review branch replaces the branch holding <Camera>, removing it from the page."
+    },
+    "B3": {
+     "value": true,
+     "why": "Header gets the handle as a prop and makes one call, camera?.capture()."
+    },
+    "B4": {
+     "value": true,
+     "why": "Label reads memo.recording directly."
+    },
+    "B5": {
+     "value": false,
+     "why": "Passes the place via storage('map-center') and location.assign('/map'): a fresh page load whose body runs on the server (no localStorage) with the fallback centre; the sheet does not promise MapView moves when `center` changes after it opens, so centring on the result is not guaranteed."
+    }
+   },
+   "confusion": [
+    "Guess: 'I assumed an element<CameraElement>() handle is typed CameraElement | null and its methods are called directly on it ... with no .current.'",
+    "Guess: assumed onReady fires again after facing changes ('If it does not fire again, the shutter stays disabled after a flip').",
+    "Guess: assumed MapView follows a reactive center prop."
+   ]
+  }
+ }
+}

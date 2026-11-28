@@ -1,0 +1,879 @@
+{
+ "variants": {
+  "AZ": {
+   "A1": {
+    "tasks": {
+     "1": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "2": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "3": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "4": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "5": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "6": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "7": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     }
+    },
+    "task7": {
+     "inPage": "cam.capture()",
+     "system": "takePhoto()",
+     "confused": false,
+     "why": "separate names; in-page shutter uses cam.capture(), system button uses the imported takePhoto()"
+    }
+   },
+   "A2": {
+    "tasks": {
+     "1": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "2": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "3": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "4": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "5": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "6": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "7": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     }
+    },
+    "task7": {
+     "inPage": "cam.capture()",
+     "system": "takePhoto()",
+     "confused": false,
+     "why": "separate names; in-page shutter uses cam.capture(), system button uses the imported takePhoto()"
+    }
+   },
+   "A3": {
+    "tasks": {
+     "1": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "2": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "3": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "4": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "5": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "6": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "7": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     }
+    },
+    "task7": {
+     "inPage": "cam.capture()",
+     "system": "takePhoto()",
+     "confused": false,
+     "why": "separate names; in-page shutter uses cam.capture(), system button uses the imported takePhoto()"
+    }
+   },
+   "A4": {
+    "tasks": {
+     "1": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "2": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "3": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "4": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "5": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "6": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "7": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     }
+    },
+    "task7": {
+     "inPage": "cam.capture()",
+     "system": "takePhoto()",
+     "confused": false,
+     "why": "separate names; in-page shutter uses cam.capture(), system button uses the imported takePhoto()"
+    }
+   },
+   "A5": {
+    "tasks": {
+     "1": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "2": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "3": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "4": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "5": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "6": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "7": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     }
+    },
+    "task7": {
+     "inPage": "cam.capture()",
+     "system": "takePhoto()",
+     "confused": false,
+     "why": "separate names; in-page shutter uses cam.capture(), system button uses the imported takePhoto()"
+    }
+   }
+  },
+  "MM": {
+   "A1": {
+    "tasks": {
+     "1": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "2": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "3": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "4": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "5": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "6": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "7": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     }
+    },
+    "task7": {
+     "inPage": "cam.capture()",
+     "system": "screen.open()",
+     "confused": false,
+     "why": "separate objects; shutter uses cam.capture(), system button uses cameraScreen().open() via screen"
+    }
+   },
+   "A2": {
+    "tasks": {
+     "1": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "2": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "3": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "4": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "5": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "6": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "7": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     }
+    },
+    "task7": {
+     "inPage": "cam.capture()",
+     "system": "screen.open()",
+     "confused": false,
+     "why": "separate objects; shutter uses cam.capture(), system button uses cameraScreen().open() via screen"
+    }
+   },
+   "A3": {
+    "tasks": {
+     "1": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "2": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "3": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "4": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "5": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "6": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "7": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     }
+    },
+    "task7": {
+     "inPage": "cam.capture()",
+     "system": "screen.open()",
+     "confused": false,
+     "why": "separate objects; shutter uses cam.capture(), system button uses cameraScreen().open() via screen"
+    }
+   },
+   "A4": {
+    "tasks": {
+     "1": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "2": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "3": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "4": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "5": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "6": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "7": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     }
+    },
+    "task7": {
+     "inPage": "cam.capture()",
+     "system": "screen.open()",
+     "confused": false,
+     "why": "separate objects; shutter uses cam.capture(), system button uses cameraScreen().open() via screen"
+    }
+   },
+   "A5": {
+    "tasks": {
+     "1": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "2": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "3": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "4": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "5": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "6": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "7": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     }
+    },
+    "task7": {
+     "inPage": "cam.capture()",
+     "system": "screen.open()",
+     "confused": false,
+     "why": "separate objects; shutter uses cam.capture(), system button uses cameraScreen().open() via screen"
+    }
+   }
+  },
+  "EC": {
+   "A1": {
+    "tasks": {
+     "1": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "2": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "3": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "4": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "5": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "6": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "7": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     }
+    },
+    "task7": {
+     "inPage": "cam.takePhoto()",
+     "system": "camera.takePhoto()",
+     "confused": false,
+     "why": "same verb on two receivers, used correctly: shutter calls the instance cam.takePhoto(), system button calls the import camera.takePhoto() and handles its null result"
+    }
+   },
+   "A2": {
+    "tasks": {
+     "1": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "2": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "3": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "4": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "5": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "6": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "7": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     }
+    },
+    "task7": {
+     "inPage": "cam.takePhoto()",
+     "system": "camera.takePhoto()",
+     "confused": false,
+     "why": "same verb on two receivers, used correctly: shutter calls the instance cam.takePhoto(), system button calls the import camera.takePhoto() and handles its null result"
+    }
+   },
+   "A3": {
+    "tasks": {
+     "1": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "2": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "3": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "4": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "5": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "6": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "7": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     }
+    },
+    "task7": {
+     "inPage": "cam.takePhoto()",
+     "system": "camera.takePhoto()",
+     "confused": false,
+     "why": "same verb on two receivers, used correctly: shutter calls the instance cam.takePhoto(), system button calls the import camera.takePhoto() and handles its null result"
+    }
+   },
+   "A4": {
+    "tasks": {
+     "1": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "2": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "3": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "4": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "5": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "6": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "7": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     }
+    },
+    "task7": {
+     "inPage": "cam.takePhoto()",
+     "system": "camera.takePhoto()",
+     "confused": false,
+     "why": "same verb on two receivers, used correctly: shutter calls the instance cam.takePhoto(), system button calls the import camera.takePhoto() and handles its null result"
+    }
+   },
+   "A5": {
+    "tasks": {
+     "1": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "2": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "3": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "4": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "5": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "6": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     },
+     "7": {
+      "offSheet": [],
+      "misuse": [],
+      "missing": []
+     }
+    },
+    "task7": {
+     "inPage": "cam.takePhoto()",
+     "system": "camera.takePhoto()",
+     "confused": false,
+     "why": "same verb on two receivers, used correctly: shutter calls the instance cam.takePhoto(), system button calls the import camera.takePhoto() and handles its null result"
+    }
+   }
+  }
+ },
+ "blind": {
+  "B1": {
+   "1": {
+    "shape": "split",
+    "name": "takePhoto()"
+   },
+   "2": {
+    "shape": "split",
+    "name": "currentPosition()"
+   },
+   "3": {
+    "shape": "split",
+    "name": "location({ watch: true })",
+    "liveIsObject": true,
+    "note": "live position is an object made in the component body: location()"
+   },
+   "4": {
+    "shape": "split",
+    "name": "share({ title, url })"
+   },
+   "5": {
+    "shape": "split",
+    "name": "haptic('light')"
+   },
+   "6": {
+    "shape": "split",
+    "name": "scheduleNotification({...})"
+   },
+   "7": {
+    "shape": "split",
+    "name": "takePhoto()"
+   }
+  },
+  "B2": {
+   "1": {
+    "shape": "split",
+    "name": "takePhoto()"
+   },
+   "2": {
+    "shape": "split",
+    "name": "currentPosition()"
+   },
+   "3": {
+    "shape": "split",
+    "name": "geolocation({ accuracy: 'high' })",
+    "liveIsObject": true,
+    "note": "live position is an object made in the component body: geolocation()"
+   },
+   "4": {
+    "shape": "split",
+    "name": "share({ title, url })"
+   },
+   "5": {
+    "shape": "split",
+    "name": "haptic('light')"
+   },
+   "6": {
+    "shape": "split",
+    "name": "scheduleNotification({...})"
+   },
+   "7": {
+    "shape": "split",
+    "name": "takePhoto()"
+   }
+  },
+  "B3": {
+   "1": {
+    "shape": "split",
+    "name": "takePhoto()"
+   },
+   "2": {
+    "shape": "split",
+    "name": "getPosition()"
+   },
+   "3": {
+    "shape": "split",
+    "name": "position()",
+    "liveIsObject": true,
+    "note": "live position is an object made in the component body: position()"
+   },
+   "4": {
+    "shape": "split",
+    "name": "share({ title, url })"
+   },
+   "5": {
+    "shape": "split",
+    "name": "haptic('light')"
+   },
+   "6": {
+    "shape": "split",
+    "name": "scheduleNotification({...})"
+   },
+   "7": {
+    "shape": "split",
+    "name": "takePhoto()"
+   }
+  },
+  "B4": {
+   "1": {
+    "shape": "split",
+    "name": "takePhoto()"
+   },
+   "2": {
+    "shape": "split",
+    "name": "currentPosition({ signal })"
+   },
+   "3": {
+    "shape": "split",
+    "name": "location({ watch: true })",
+    "liveIsObject": true,
+    "note": "live position is an object made in the component body: location()"
+   },
+   "4": {
+    "shape": "split",
+    "name": "share({ title, url })"
+   },
+   "5": {
+    "shape": "split",
+    "name": "haptic('light')"
+   },
+   "6": {
+    "shape": "split",
+    "name": "scheduleNotification({...})"
+   },
+   "7": {
+    "shape": "split",
+    "name": "takePhoto()"
+   }
+  },
+  "B5": {
+   "1": {
+    "shape": "objects",
+    "name": "systemCamera().capture()"
+   },
+   "2": {
+    "shape": "split",
+    "name": "currentPosition()"
+   },
+   "3": {
+    "shape": "split",
+    "name": "position({ accuracy: 'high' })",
+    "liveIsObject": true,
+    "note": "live position is an object made in the component body: position()"
+   },
+   "4": {
+    "shape": "split",
+    "name": "share({ title, url })"
+   },
+   "5": {
+    "shape": "split",
+    "name": "haptic('light')"
+   },
+   "6": {
+    "shape": "split",
+    "name": "scheduleNotification({...})"
+   },
+   "7": {
+    "shape": "objects",
+    "name": "systemCamera().capture()"
+   }
+  },
+  "B6": {
+   "1": {
+    "shape": "split",
+    "name": "takePhoto()"
+   },
+   "2": {
+    "shape": "split",
+    "name": "getPosition({ signal })"
+   },
+   "3": {
+    "shape": "split",
+    "name": "geolocation({ watch: true })",
+    "liveIsObject": true,
+    "note": "live position is an object made in the component body: geolocation()"
+   },
+   "4": {
+    "shape": "split",
+    "name": "share({ title, url })"
+   },
+   "5": {
+    "shape": "split",
+    "name": "haptic('light')"
+   },
+   "6": {
+    "shape": "split",
+    "name": "scheduleNotification({...})"
+   },
+   "7": {
+    "shape": "split",
+    "name": "takePhoto()"
+   }
+  }
+ }
+}
