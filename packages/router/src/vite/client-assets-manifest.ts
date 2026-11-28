@@ -2,6 +2,7 @@ import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, normalize, relative } from 'pathe';
 import { joinURL } from 'ufo';
 import { marklessBuildManifestDir } from '@markless/bundler/rolldown';
+import type { FragmentSwapModules } from './entries/fragment-entry.ts';
 
 export const MARKLESS_ROUTER_CLIENT_ASSETS_MANIFEST = 'router-client-manifest.json';
 
@@ -25,8 +26,8 @@ export interface MarklessRouterClientAssetsManifest {
 		readonly fragment?: string;
 		// The files the fragment entry statically imports: a preload of the entry alone leaves them a round late.
 		readonly fragmentImports?: readonly string[];
-		// The swap's lazy modules and their imports: fetched on a press, never at idle, as the click would otherwise wait for them.
-		readonly fragmentSwapModules?: readonly string[];
+		// The swap's lazy modules and their imports, shared-swap's then kept-swap's: a press fetches the ones the page shown needs.
+		readonly fragmentSwapModules?: FragmentSwapModules;
 	};
 	readonly routes: MarklessRouterClientAssetRoutes;
 	// Per route: the chunk holding its resume module, then the export evaluating it inside a pack and the export holding it.
@@ -42,7 +43,7 @@ export function createClientAssetsManifest(input: {
 	readonly navigationEntry: string;
 	readonly fragmentEntry?: string;
 	readonly fragmentImports?: readonly string[];
-	readonly fragmentSwapModules?: readonly string[];
+	readonly fragmentSwapModules?: FragmentSwapModules;
 	readonly routes: MarklessRouterClientAssetRoutes;
 }): MarklessRouterClientAssetsManifest {
 	return {
@@ -54,7 +55,7 @@ export function createClientAssetsManifest(input: {
 			navigation: input.navigationEntry,
 			...(input.fragmentEntry ? { fragment: input.fragmentEntry } : {}),
 			...(input.fragmentImports?.length ? { fragmentImports: input.fragmentImports } : {}),
-			...(input.fragmentSwapModules?.length
+			...(input.fragmentSwapModules?.some((files) => files.length)
 				? { fragmentSwapModules: input.fragmentSwapModules }
 				: {}),
 		},
@@ -260,10 +261,7 @@ async function validateClientAssetsManifest(
 			: {}),
 		...(input.entries.fragmentSwapModules !== undefined
 			? {
-					fragmentSwapModules: requiredStrings(
-						input.entries.fragmentSwapModules,
-						'entries.fragmentSwapModules',
-					),
+					fragmentSwapModules: swapModules(input.entries.fragmentSwapModules),
 				}
 			: {}),
 	};
@@ -283,7 +281,7 @@ async function validateClientAssetsManifest(
 		entries.navigation,
 		...(entries.fragment !== undefined ? [entries.fragment] : []),
 		...(entries.fragmentImports ?? []),
-		...(entries.fragmentSwapModules ?? []),
+		...(entries.fragmentSwapModules?.flat() ?? []),
 		...Object.values(routes.navigation).flat(),
 		...Object.values(routes.ssr).flat(),
 		...Object.values(routes.styles).flat(),
@@ -331,6 +329,13 @@ function routeResumeModules(input: unknown): Record<string, readonly string[]> {
 				`has an invalid resume module for route ${JSON.stringify(routeFile)}`,
 			);
 	return modules;
+}
+
+function swapModules(input: unknown): FragmentSwapModules {
+	const label = 'entries.fragmentSwapModules';
+	if (!Array.isArray(input) || input.length !== 2)
+		throw clientAssetsManifestError(`has invalid ${label}`);
+	return [requiredStrings(input[0], `${label}[0]`), requiredStrings(input[1], `${label}[1]`)];
 }
 
 function requiredStrings(input: unknown, label: string): readonly string[] {

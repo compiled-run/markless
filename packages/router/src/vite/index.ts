@@ -58,6 +58,7 @@ import {
 	renameClientAssetChunks,
 	writeClientAssetsManifest,
 } from './client-assets-manifest.ts';
+import type { FragmentSwapModules } from './entries/fragment-entry.ts';
 import { htmlTransformPlugin } from './html-transform.ts';
 import { mdxTransformPlugin } from './mdx.ts';
 import { compactRoutePreloadData, routePreloadDecoderSource } from './route-preload-data.ts';
@@ -158,6 +159,9 @@ const NAVIGATION_ENTRY_PATH_ID = 'virtual:markless-router/navigation-entry-path'
 const FRAGMENT_ENTRY_ID = 'virtual:markless-router/fragment-entry';
 const FRAGMENT_ENTRY_ORIGIN = '/entries/fragment-entry.ts';
 const FRAGMENT_ENTRY_PATH_ID = 'virtual:markless-router/fragment-entry-path';
+// The fragment entry's own dynamic imports (entries/fragment-entry.ts), in the order its config lists them.
+const SHARED_SWAP_MODULE = '@markless/web/shared-swap';
+const KEPT_SWAP_MODULE = '@markless/web/kept-swap';
 const ROUTE_PRELOADS_ID = 'virtual:markless-router/route-preloads';
 const ROUTE_PRELOADS_PLACEHOLDER = '__MARKLESS_ROUTER_ROUTE_PRELOADS__';
 const DOCUMENT_STYLESHEETS_PLACEHOLDER = '__MARKLESS_ROUTER_DOCUMENT_STYLESHEETS__';
@@ -433,20 +437,31 @@ function routerConfigPlugin(
 	let pendingClientAssets: MarklessRouterClientAssetsManifest | undefined;
 	let capturedChunkNames = new Map<string, string | undefined>();
 	const navigationPolyfillIds = new Set<string>();
+	const swapModuleIds = new Map<string, Set<string>>();
 
 	return {
 		name: 'markless-router:vite',
 		enforce: 'pre',
 		sharedDuringBuild: true,
 		resolveId: {
-			filter: { id: new RegExp(`^${escapeRegExp(NAVIGATION_POLYFILL_MODULE)}$`) },
+			filter: {
+				id: new RegExp(
+					`^(?:${[NAVIGATION_POLYFILL_MODULE, SHARED_SWAP_MODULE, KEPT_SWAP_MODULE].map(escapeRegExp).join('|')})$`,
+				),
+			},
 			async handler(source, importer, options) {
-				if (source !== NAVIGATION_POLYFILL_MODULE) return null;
+				const swap = source === SHARED_SWAP_MODULE || source === KEPT_SWAP_MODULE;
+				if (source !== NAVIGATION_POLYFILL_MODULE && !swap) return null;
 				const resolved = await this.resolve(source, importer, {
 					...options,
 					skipSelf: true,
 				});
-				if (resolved) navigationPolyfillIds.add(resolved.id);
+				if (resolved && swap)
+					swapModuleIds.set(
+						source,
+						(swapModuleIds.get(source) ?? new Set()).add(resolved.id),
+					);
+				else if (resolved) navigationPolyfillIds.add(resolved.id);
 				return resolved;
 			},
 		},
@@ -650,12 +665,21 @@ function routerConfigPlugin(
 					fragmentEntry.imports = [...closure].map((fileName) =>
 						joinURL(routePreloads.base, fileName),
 					);
-					const swapModules = new Set<string>();
-					for (const swapModule of fragmentChunk.dynamicImports)
-						includeChunk(swapModules, scope, swapModule);
-					fragmentEntry.swapModules = [...swapModules]
-						.filter((fileName) => !closure.has(fileName))
-						.map((fileName) => joinURL(routePreloads.base, fileName));
+					const swapModule = (specifier: string) => {
+						const ids = swapModuleIds.get(specifier);
+						const chunk = fragmentChunk.dynamicImports.find((fileName) =>
+							everyChunk.get(fileName)?.moduleIds?.some((id) => ids?.has(id)),
+						);
+						const files = new Set<string>();
+						if (chunk) includeChunk(files, scope, chunk);
+						return [...files]
+							.filter((fileName) => !closure.has(fileName))
+							.map((fileName) => joinURL(routePreloads.base, fileName));
+					};
+					fragmentEntry.swapModules = [
+						swapModule(SHARED_SWAP_MODULE),
+						swapModule(KEPT_SWAP_MODULE),
+					];
 				}
 				routePreloads.routes = routeModulePreloadsFromBundle({
 					base: routePreloads.base,
@@ -1009,7 +1033,7 @@ interface ResumeEntryState {
 	base: string;
 	fileName: string | undefined;
 	imports?: readonly string[];
-	swapModules?: readonly string[];
+	swapModules?: FragmentSwapModules;
 }
 
 interface RoutePreloadState {

@@ -27,6 +27,9 @@ vi.setConfig({ testTimeout: 30_000 });
 
 const servers: { server: Server; held: ServerResponse[] }[] = [];
 const LINK = 'data-link';
+const KEPT_INSTANCE = 'data-kept-instance';
+const SHARED = '__shared';
+const SWAP_MODULES = ['/shared-swap.js', '/kept-swap.js', '/kept-helper.js'];
 const LINKS = 40;
 // 40 links 40 px apart from y=45 in an 800x600 viewport: links 0 to 13 are in view on landing; a home link sits at the top.
 const IN_VIEW = 14;
@@ -63,6 +66,8 @@ type Setup = {
 	// 'throw': the swap module's navigate rejects.
 	readonly navigation?: 'swap' | 'hang' | 'throw';
 	readonly heldChars?: number;
+	// What the page shown holds that navigate needs a swap module for: a kept part with state, or a bound shared() instance.
+	readonly swap?: 'kept' | 'shared';
 };
 
 type Fetch = { readonly path: string; readonly purpose?: string };
@@ -72,7 +77,7 @@ function config(setup: Setup): FragmentNavigationConfig {
 	return {
 		entry: '/entry.js',
 		entryImports: [],
-		swapModules: ['/swap-lazy.js'],
+		swapModules: [['/shared-swap.js'], ['/kept-swap.js', '/kept-helper.js']],
 		linkAttribute: LINK,
 		prefetchAttribute: PREFETCH_ATTRIBUTE,
 		replaceAttribute: 'data-replace',
@@ -84,7 +89,7 @@ function config(setup: Setup): FragmentNavigationConfig {
 		retireProperty: 'x',
 		handlingProperty: 'x',
 		reaskProperty: 'x',
-		sharedInstances: ['x', 'x'],
+		sharedInstances: [SHARED, 'x'],
 		streamExecutorGlobal: 'x',
 		streamedArmSelector: 'x',
 		streamOpenProperty: 'x',
@@ -97,7 +102,7 @@ function config(setup: Setup): FragmentNavigationConfig {
 		pageEndComment: 'end',
 		pageStartComment: 'start',
 		containerAttributes: ['x', 'x'],
-		keepAttributes: ['', '', '', '', ''],
+		keepAttributes: ['', '', '', KEPT_INSTANCE, ''],
 		documentLoads: false,
 		hoverDwellMs: 20,
 		prefetchTtlMs: 30_000,
@@ -128,8 +133,9 @@ function landing(setup: Setup): string {
 		...Array.from({ length: LINKS }, (_, i) => [`/p/${i}`, []]),
 	]);
 	return `<!doctype html><html><head></head><body style="margin:0;height:${LINKS * 40 + 600}px">
-<a ${LINK} href="/" ${PREFETCH_ATTRIBUTE}="none" style="position:absolute;left:400px;top:5px">home</a>${links}<script>
+<a ${LINK} href="/" ${PREFETCH_ATTRIBUTE}="none" style="position:absolute;left:400px;top:5px">home</a>${links}${setup.swap === 'kept' ? `<nav ${KEPT_INSTANCE}="side"></nav>` : ''}<script>
 const d = document;
+${setup.swap === 'shared' ? `d.${SHARED} = { version: 1, instances: { theme: { shape: 'theme', cells: {}, listeners: [] } } };` : ''}
 d.__marklessFragmentIdle = new Promise((done) => (window.__gate = done));
 window.__navigated = [];
 window.__watched = 0;
@@ -230,6 +236,8 @@ async function open(setup: Setup) {
 	const own: { server: Server; held: ServerResponse[] } = { server, held: [] };
 	servers.push(own);
 	const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+	const requested: string[] = [];
+	page.on('request', (request) => requested.push(new URL(request.url()).pathname));
 	page.on('requestfailed', (request) => {
 		const destination = fragmentPageUrl(new URL(request.url()));
 		if (destination) aborted.push(destination.pathname);
@@ -245,6 +253,7 @@ async function open(setup: Setup) {
 		aborted,
 		fetches,
 		paths,
+		requested,
 		mostOpen: () => mostOpen,
 		// Answers every response held so far, as an instantly answering server would have.
 		release: () => {
@@ -335,7 +344,7 @@ describe('idle tier', () => {
 	});
 
 	test("preloads the swap module but not its lazy swap modules, which wait for a visitor's intent", async () => {
-		const s = await open({});
+		const s = await open({ swap: 'kept' });
 		const preloads = () =>
 			s.page.evaluate(() =>
 				[...document.querySelectorAll<HTMLLinkElement>('link[rel="modulepreload"]')].map(
@@ -346,9 +355,9 @@ describe('idle tier', () => {
 		await expect.poll(s.idle).toBe(1);
 		await expect.poll(async () => (await s.fetches()).length).toBe(6);
 		expect(await preloads()).toContain('/entry.js');
-		expect(await preloads()).not.toContain('/swap-lazy.js');
+		expect(await preloads()).not.toContain('/kept-swap.js');
 		await s.page.hover('a[href="/p/2"]');
-		await expect.poll(preloads).toContain('/swap-lazy.js');
+		await expect.poll(preloads).toContain('/kept-swap.js');
 		await s.page.close();
 	});
 
@@ -527,6 +536,45 @@ describe('intent', () => {
 		await s.page.hover('a[href="/p/8"]');
 		await expect.poll(s.paths).toContain('/p/8');
 		await expect.poll(() => s.aborted).toEqual([guess]);
+		await s.page.close();
+	});
+});
+
+describe('swap modules at a press', () => {
+	const press = async (setup: Setup) => {
+		const s = await open({ ...setup, prefetch: { idle: 'none' }, holdMs: Infinity });
+		await s.measured(true);
+		await s.page.focus('a[href="/p/2"]');
+		await expect.poll(s.paths).toEqual(['/p/2']);
+		await expect.poll(() => s.requested).toContain('/entry.js');
+		return s;
+	};
+
+	test.each([
+		['a kept part with state', 'kept', ['/kept-swap.js', '/kept-helper.js']],
+		['a bound shared() instance', 'shared', ['/shared-swap.js']],
+	] as const)(
+		'leaving a page with %s, a press fetches what navigate imports while the page is still on its way',
+		async (_, swap, modules) => {
+			const s = await press({ swap });
+			await expect
+				.poll(() => s.requested.filter((path) => SWAP_MODULES.includes(path)))
+				.toEqual(modules);
+			expect(s.answered).toEqual([{ path: '/p/2', purpose: 'prefetch' }]);
+			s.release();
+			await s.page.close();
+		},
+	);
+
+	test('leaving a page with neither, nothing asks for a swap module, before the page arrives or after', async () => {
+		const s = await press({});
+		s.release();
+		await expect.poll(s.allArrived).toBe(true);
+		await s.page.hover('a[href="/p/3"]');
+		await expect.poll(s.paths).toEqual(['/p/2', '/p/3']);
+		s.release();
+		await expect.poll(s.allArrived).toBe(true);
+		expect(s.requested.filter((path) => SWAP_MODULES.includes(path))).toEqual([]);
 		await s.page.close();
 	});
 });

@@ -10,6 +10,7 @@ import {
 	PROTOCOL_KEEP_INSTANCE_ATTRIBUTE,
 } from '../../../serializer/src/protocol-keep.ts';
 import { buildFixture } from '../support/fixture-build.ts';
+import { openHoldingPages } from '../support/swap-press.ts';
 
 // /guide and /reference render one side navigation with its own state and a `path` prop; /about renders a different one.
 
@@ -26,9 +27,16 @@ beforeAll(async () => {
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
-	await buildFixture({
-		root,
-	});
+	const nodeEnv = process.env.NODE_ENV;
+	process.env.NODE_ENV = 'production';
+	try {
+		await buildFixture({
+			root,
+		});
+	} finally {
+		if (nodeEnv === undefined) delete process.env.NODE_ENV;
+		else process.env.NODE_ENV = nodeEnv;
+	}
 	server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
@@ -101,6 +109,24 @@ test('the server marks a part with state that two pages render alike as kept, wi
 	expect(attribute(about, PROTOCOL_KEEP_ATTRIBUTE)).not.toBe(
 		attribute(guide, PROTOCOL_KEEP_ATTRIBUTE),
 	);
+});
+
+test('leaving a page with a kept part, a press fetches kept-swap while the page is on its way, and nothing only shared-swap needs', async () => {
+	const page = await browser!.newPage();
+	const swap = await openHoldingPages(
+		page,
+		join(root, '.output/public'),
+		`${server!.origin}/guide`,
+	);
+	expect(swap.kept.length).toBeGreaterThan(0);
+	const wanted = swap.kept.filter((path) => !swap.landed.includes(path));
+	expect(wanted.length).toBeGreaterThan(0);
+	await swap.press('[data-nav="reference"]');
+	await expect.poll(() => swap.requested().toSorted()).toEqual([...new Set(wanted)].toSorted());
+	expect(swap.held()).toBeGreaterThan(0);
+	await swap.release();
+	expect(swap.requested().every((path) => swap.kept.includes(path))).toBe(true);
+	await page.close();
 });
 
 test('a kept part keeps its state and its nodes across an in-place navigation', async () => {

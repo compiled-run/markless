@@ -1,11 +1,14 @@
 // The swap half of fragment navigation; the inline link bridge (vite/fragment-navigation.ts) fetches, this module commits.
 import type { ModulePreloadInput } from '@markless/web/render-to-string';
 
+// The swap's lazy modules with their imports: shared-swap's, then kept-swap's.
+export type FragmentSwapModules = readonly [shared: readonly string[], kept: readonly string[]];
+
 export interface FragmentNavigationConfig {
 	readonly entry: string;
 	readonly entryImports: readonly string[];
-	// Fetched on intent, never at idle: the swap imports them only once a click reaches it.
-	readonly swapModules: readonly string[];
+	// A press fetches each only when the page shown is one navigate imports it from; idle never does.
+	readonly swapModules: FragmentSwapModules;
 	readonly linkAttribute: string;
 	readonly prefetchAttribute: string;
 	readonly replaceAttribute: string;

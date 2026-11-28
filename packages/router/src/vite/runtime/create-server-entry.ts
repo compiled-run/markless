@@ -92,7 +92,7 @@ import {
 	watchViewport,
 	type FragmentNavigationConfig,
 } from '../fragment-navigation.ts';
-import type { FragmentPreload } from '../entries/fragment-entry.ts';
+import type { FragmentPreload, FragmentSwapModules } from '../entries/fragment-entry.ts';
 import {
 	prefetches,
 	prefetchPolicy,
@@ -138,8 +138,8 @@ export interface ServerEntryOptions {
 	readonly fragmentEntryPath?: string;
 	// The files the fragment entry statically imports, preloaded beside it.
 	readonly fragmentEntryImports?: readonly string[];
-	// The swap's lazy modules and their imports: a press fetches them with the page, idle never does.
-	readonly fragmentSwapModules?: readonly string[];
+	// The swap's lazy modules and their imports, for the run half: the page bridge never names them.
+	readonly fragmentSwapModules?: FragmentSwapModules;
 	// The inline half of fragment navigation, minified by the build (the source form serves otherwise).
 	readonly fragmentNavigationSource?: string;
 	// The half of fragment navigation the bridge loads on the first link intent or at idle, minified the same way.
@@ -214,7 +214,7 @@ function fragmentBridgeFor(
 		? {
 				entry: options.fragmentEntryPath,
 				entryImports: options.fragmentEntryImports ?? [],
-				swapModules: options.fragmentSwapModules ?? [],
+				swapModules: options.fragmentSwapModules ?? [[], []],
 				source: options.fragmentNavigationSource ?? startFragmentNavigation.toString(),
 				runSource: options.fragmentNavigationRunSource ?? runFragmentNavigation.toString(),
 				viewportSource:
@@ -1123,7 +1123,7 @@ function linkBridgeBody(
 	const fragmentNavigation = fragment !== undefined;
 	const fragmentSource = fragment
 		? `
-(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${JSON.stringify(LINK_TABLE_SCRIPT_ATTRIBUTE)},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${prefetches(fragment.prefetch) ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports, ...fragment.swapModules], intent: fragment.prefetch.levels[0], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE, idleBytesPerSecond: FRAGMENT_IDLE_BYTES_PER_SECOND, idleMeasuredBytes: FRAGMENT_IDLE_MEASURED_BYTES }) : 'null'}),${MARKLESS_NAV_SETTLE_DEADLINE_MS}${inline ? `,${checkBridgeMove.toString()}` : ''});`
+(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${JSON.stringify(LINK_TABLE_SCRIPT_ATTRIBUTE)},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${prefetches(fragment.prefetch) ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], intent: fragment.prefetch.levels[0], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE, idleBytesPerSecond: FRAGMENT_IDLE_BYTES_PER_SECOND, idleMeasuredBytes: FRAGMENT_IDLE_MEASURED_BYTES }) : 'null'}),${MARKLESS_NAV_SETTLE_DEADLINE_MS}${inline ? `,${checkBridgeMove.toString()}` : ''});`
 		: '';
 	const indexed =
 		!fragmentNavigation && linkIntent
@@ -1331,7 +1331,7 @@ interface FragmentBridge {
 	readonly runSource: string;
 	readonly viewportSource: string;
 	readonly entryImports: readonly string[];
-	readonly swapModules: readonly string[];
+	readonly swapModules: FragmentSwapModules;
 	readonly prefetch: PrefetchPolicy;
 	readonly pages: readonly string[];
 }

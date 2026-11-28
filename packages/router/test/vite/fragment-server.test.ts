@@ -279,14 +279,17 @@ test('plain anchors to pages get their landing plan, and the bridge names every 
 	expect(laterLinkBridge(served)).toContain('"prefetch":true');
 });
 
-test("a press fetches the swap module's imports, lazy swap modules included, beside the page", async () => {
+test("the page bridge never names the swap's lazy modules; the run half carries them for a press to fetch", async () => {
 	const served = entry({
 		fragmentEntryImports: ['/helper.js'],
-		fragmentSwapModules: ['/kept-swap.js'],
+		fragmentSwapModules: [['/shared-swap.js'], ['/kept-swap.js']],
 	});
 	const html = await (await served.fetch(new Request('https://app.test/'))).text();
-	expect(servedLinkBridge(html, served)).toContain(
-		'"code":["/fragment.js","/helper.js","/kept-swap.js"]',
+	const bridge = servedLinkBridge(html, served);
+	expect(bridge).toContain('"code":["/fragment.js","/helper.js"]');
+	expect(bridge).not.toContain('swap.js');
+	expect(laterLinkBridge(served)).toContain(
+		'"swapModules":[["/shared-swap.js"],["/kept-swap.js"]]',
 	);
 });
 
