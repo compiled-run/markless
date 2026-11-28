@@ -1,6 +1,6 @@
 {
 	"rung": "Y-checkin",
-	"name": "Yardstick checkin as one app: empty list, settings (switch, select), back, setting kept, access, new check-in with a note",
+	"name": "Yardstick checkin as one app: empty list, settings (switch, select), back, setting kept, access, new check-in with a note, save it, its page, back to the list",
 	"steps": [
 		{
 			"visible": [
@@ -61,6 +61,17 @@
 			"do": { "type": { "field": "Note", "text": "Gauge reads 4 bar" } },
 			"fields": { "Note": "Gauge reads 4 bar" },
 			"visible": ["Save check-in"]
+		},
+		{
+			"do": { "tap": "Save check-in" },
+			"visible": ["East fence", "Gauge reads 4 bar", "Not recorded", "All check-ins"],
+			"absent": ["Save check-in"]
+		},
+		{
+			"do": { "tap": "All check-ins" },
+			"visible": ["New check-in"],
+			"absent": ["No check-ins yet. Start one when you reach a site.", "Not recorded"],
+			"title": "Check-ins"
 		}
 	]
 }
