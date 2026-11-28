@@ -41,10 +41,12 @@ describe('native conformance vectors', () => {
 		expect(committed('counter.json')).toEqual(vectors);
 	});
 
-	it('every committed vector file matches a fresh build (rewrite with test/write-conformance.ts)', async () => {
-		for (const entry of CONFORMANCE_CASES)
-			expect(committed(`${entry.name}.json`), entry.name).toEqual(await caseVector(entry));
-	});
+	it.each(CONFORMANCE_CASES.map((entry) => [entry.name, entry] as const))(
+		'the committed %s vector file matches a fresh build (rewrite with test/write-conformance.ts)',
+		async (name, entry) => {
+			expect(committed(`${name}.json`), name).toEqual(await caseVector(entry));
+		},
+	);
 
 	it('every committed navigation vector file matches a fresh build of its app', async () => {
 		for (const entry of APP_CONFORMANCE_CASES)
