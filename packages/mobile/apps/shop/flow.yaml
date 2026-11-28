@@ -61,3 +61,36 @@ name: shop
 - assertVisible: £128\.00
 - assertVisible: 2 in cart
 - assertNotVisible: 1 in cart
+- tapOn: Place order
+- assertNotVisible: 2 in cart
+- assertVisible: Keep shopping
+- assertNotVisible: Place order
+- assertNotVisible: 2 in cart
+- tapOn: Categories
+- assertNotVisible: Keep shopping
+- assertVisible: Categories
+- assertVisible: Kitchen
+- assertVisible: For slow mornings
+- assertVisible: Lamps, chairs and soft things
+- assertNotVisible: Keep shopping
+- assertVisible: Categories
+- tapOn: For slow mornings
+- assertNotVisible: Lamps, chairs and soft things
+- assertVisible: Kitchen
+- assertVisible: All categories
+- assertVisible: Stone mug£18\.00
+- assertVisible: Copper kettle£64\.00
+- assertNotVisible: Lamps, chairs and soft things
+- assertVisible: Kitchen
+- tapOn: Account
+- assertNotVisible: All categories
+- assertVisible: Account
+- assertVisible: Guest shopper
+- assertVisible: Your orders
+- assertNotVisible: All categories
+- assertNotVisible: No orders yet\.
+- assertVisible: Account
+- tapOn: ^Order .*
+- assertNotVisible: Guest shopper
+- assertVisible: Keep shopping
+- assertNotVisible: Guest shopper

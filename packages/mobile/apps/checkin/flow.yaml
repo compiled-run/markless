@@ -71,3 +71,17 @@ name: checkin
 - assertVisible: Gauge reads 4 bar
 - assertVisible: Save check-in
 - assertVisible: Gauge reads 4 bar
+- tapOn: Save check-in
+- assertNotVisible: Save check-in
+- assertVisible: East fence
+- assertVisible: Gauge reads 4 bar
+- assertVisible: Not recorded
+- assertVisible: All check-ins
+- assertNotVisible: Save check-in
+- tapOn: All check-ins
+- assertNotVisible: Not recorded
+- assertVisible: Check-ins
+- assertVisible: New check-in
+- assertNotVisible: No check-ins yet\. Start one when you reach a site\.
+- assertNotVisible: Not recorded
+- assertVisible: Check-ins
