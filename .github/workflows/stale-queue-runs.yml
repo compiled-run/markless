@@ -18,10 +18,7 @@ permissions:
 jobs:
     cancel:
         if: github.event_name != 'workflow_run' || github.event.workflow_run.event == 'merge_group'
-        # On the job, so a pull request's skipped run cannot replace a pending sweep in the group.
-        concurrency:
-            group: stale-queue-runs
-            cancel-in-progress: false
+        # No concurrency group: it cancels the pending sweep it replaces, a red check on main's head; sweeps are idempotent.
         runs-on: ubuntu-latest
         timeout-minutes: 5
         permissions:

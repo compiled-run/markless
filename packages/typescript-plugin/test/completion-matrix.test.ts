@@ -888,6 +888,36 @@ test('M10 intrinsic attributes complete both event casings the compiler binds', 
 	expect(sortText('accessKey')! > sortText('accesskey')!).toBe(true);
 }, 20_000);
 
+test('M10 document and window props complete after the element\'s own events, and first once their prefix is typed', async () => {
+	const fixture = openFixture('global-event-completions.tsrx');
+	const at = async (marker: string) => {
+		const completion = await server.completionInfo(
+			fixture.file,
+			positionAfterMarker(fixture.marked, marker),
+		);
+		const sortText = (name: string) =>
+			completionEntries(completion).find((entry: any) => entry.name === name)?.sortText as
+				| string
+				| undefined;
+		return { names: completionNames(completion), sortText };
+	};
+	const on = await at('/*M10_GLOBAL_ON*/');
+	expect(on.names).toEqual(
+		expect.arrayContaining(['onKeyDown', 'onDocumentKeyDown', 'onDocumentVisibilityChange', 'onWindowResize']),
+	);
+	expect(on.names).not.toContain('onDocumentFocus');
+	expect(on.names).not.toContain('onWindowSelectionChange');
+	for (const element of ['onKeyDown', 'onClick', 'onWheel'])
+		for (const global of ['onDocumentKeyDown', 'onWindowResize'])
+			expect(on.sortText(element)! < on.sortText(global)!, `${element} before ${global}`).toBe(true);
+
+	const onD = await at('/*M10_GLOBAL_OND*/');
+	expect(onD.sortText('onDocumentKeyDown')! < onD.sortText('onDrag')!).toBe(true);
+	expect(onD.sortText('onDblClick')! < onD.sortText('onWindowResize')!).toBe(true);
+	const onW = await at('/*M10_GLOBAL_ONW*/');
+	expect(onW.sortText('onWindowResize')! < onW.sortText('onWheel')!).toBe(true);
+}, 20_000);
+
 test('M10 intrinsic contract rejects className, bogus and tag-wrong attributes, and object children at authored tokens', async () => {
 	const fixture = openFixture('intrinsic-contract-errors.tsrx');
 	const diagnostics = await server.semanticDiagnosticsSync(fixture.file);

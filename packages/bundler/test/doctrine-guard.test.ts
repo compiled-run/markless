@@ -129,6 +129,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Same reason for shared() instances that outlive the page: a CSR mount builds its graph without a resume module, so the binding module is named by client output or the mount never binds to the document instance.',
 	"packages/bundler/src/source-module.ts :: input.environment === 'client' && input.hasIdleEvents === true && !symbolsOnly":
 		'Same reason for onIdle: a CSR mount has no resume module and no inline trigger, so the app module with an idle record hands the mount its idle wake or the handlers never run.',
+	"packages/bundler/src/source-module.ts :: input.environment === 'client' && (input.globalEventNames?.length ?? 0) > 0":
+		'Same reason for onDocument*/onWindow*: a page the browser renders has no inline relay, so the app module whose elements own such a record starts the relay for its names or they never listen.',
 	"packages/bundler/src/source-module.ts :: input.environment === 'client' ? clientRowMintLoader(input) : null,":
 		'Same reason again for the row mints: a CSR mount reaches the resume runtime through client output and never evaluates a resume module, so the mint loader is installed there or its rows never build or rebuild.',
 	"packages/bundler/src/transform.ts :: const linkedClientRenderData = input.environment === 'client' && !input.prerenderRecords;":

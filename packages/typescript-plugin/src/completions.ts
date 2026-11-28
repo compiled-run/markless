@@ -1,5 +1,6 @@
 import {
 	compileTsrxForTypeService,
+	globalEventAttribute,
 	isCamelCaseAttributeSpelling,
 } from '@markless/compiler/type-service';
 import type * as ts from 'typescript';
@@ -231,7 +232,11 @@ export function installMarklessCompletions(
 			return base;
 		}
 		const prefix = source.slice(0, position).match(/@\w*$/)?.[0];
-		if (!prefix) return withAdditionalEntries(withCamelCaseAttributesLast(typeScript, base), importEntries);
+		if (!prefix)
+			return withAdditionalEntries(
+				withElementAttributesFirst(typeScript, base, typedName(base, source, position)),
+				importEntries,
+			);
 
 		const context = validConstructContext(source, fileName, position, prefix.length, info);
 		if (context === 'none') return withoutSyntheticEntries(base);
@@ -933,22 +938,34 @@ function withAdditionalEntries(
 	};
 }
 
-// camelCase spellings type-check too, but completion lists the real attribute names first.
-function withCamelCaseAttributesLast(
+// The name being typed, as TypeScript spans it, so a document or window prop ranks first once its own prefix is written.
+function typedName(base: ts.CompletionInfo | undefined, source: string, position: number): string {
+	const span = base?.optionalReplacementSpan;
+	return span && span.start <= position ? source.slice(span.start, position) : '';
+}
+
+// camelCase spellings type-check too, but completion lists the real attribute names first; an element's own events rank above the document and window ones it can also own.
+function withElementAttributesFirst(
 	typeScript: TypeScript,
 	base: ts.CompletionInfo | undefined,
+	typed: string,
 ): ts.CompletionInfo | undefined {
 	if (!base) return undefined;
 	const attributeKinds = new Set<string>([
 		typeScript.ScriptElementKind.jsxAttribute,
 		typeScript.ScriptElementKind.memberVariableElement,
 	]);
+	const rank = (entry: ts.CompletionEntry): string => {
+		const global = globalEventAttribute(entry.name);
+		if (!global) return isCamelCaseAttributeSpelling(entry.name) ? `~${entry.sortText}` : entry.sortText;
+		const reached =
+			typed.length > 2 && (global.prefix.startsWith(typed) || typed.startsWith(global.prefix));
+		return reached ? `!${entry.sortText}` : `~${entry.sortText}`;
+	};
 	return {
 		...base,
 		entries: base.entries.map((entry) =>
-			attributeKinds.has(entry.kind) && isCamelCaseAttributeSpelling(entry.name)
-				? { ...entry, sortText: `~${entry.sortText}` }
-				: entry,
+			attributeKinds.has(entry.kind) ? { ...entry, sortText: rank(entry) } : entry,
 		),
 	};
 }

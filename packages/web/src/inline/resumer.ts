@@ -142,6 +142,8 @@ export type InlineResumerSourceVariants = {
 	readonly defer?: string;
 	/** The wake functions, minified; served in place of their authored text. */
 	readonly wakes?: InlineWakeSources;
+	/** The document and window relay function, minified. */
+	readonly globalRelay?: string;
 };
 
 /** Function expressions the wake scripts call, plus the module loader they pass. */

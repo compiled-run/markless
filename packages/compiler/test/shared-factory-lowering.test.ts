@@ -412,7 +412,7 @@ test('the projected-child seed pass writes the seed unconditionally too', async 
 	expect(seedPass).toContain('{ const marklessSharedSeed = (checked); marklessSsrSeeds.set(');
 });
 
-test('a defaulted prop read outside a body assignment fails closed', async () => {
+test('a defaulted prop read beside a body seed reads the default too', async () => {
 	const compiled = await compile(
 		'src/spike.tsrx',
 		`
@@ -432,15 +432,15 @@ export function Root({ checked = false, children }) @{
 `,
 	);
 
+	expect(errors(compiled)).toEqual([]);
 	expect(
-		compiled.stateLowering.diagnostics.filter((diagnostic) => diagnostic.severity === 'error'),
-	).toEqual([
-		expect.objectContaining({
-			code: 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
-			severity: 'error',
-			phase: 'state-lowering',
-		}),
-	]);
+		compiled.symbolResolver.symbols.find(
+			(symbol) => symbol.kind === 'dom-update' && symbol.source === 'checked',
+		),
+	).toEqual(expect.objectContaining({ graphNodeId: 'computed:Root.checked' }));
+	expect(compiled.publicRenderModule.ssrModuleSource).toContain(
+		'const { checked = false, children } = marklessSsrProps ?? {};',
+	);
 });
 
 // B6 (owner ruling) — a family shape that is app-scoped only by omission.

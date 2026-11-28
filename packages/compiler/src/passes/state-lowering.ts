@@ -1021,14 +1021,11 @@ function isUnloweredSharedSeed(
 	);
 }
 
-// A destructuring default on a component signature is applied where the body
-// materializes the local: the render body, and the symbol modules that seed
-// state from a component-body assignment. Every other reader — a template
-// position, an event handler, a computed — takes the raw prop, so it fails
-// closed instead of quietly rendering undefined where a default was authored.
+// A nested, object or function prop default exists only where the body materializes the local, so any other read fails closed.
 function escapedDefaultedPropDiagnostics(input: StateLoweringInput): StateLoweringDiagnostic[] {
 	return input.semanticGraph.componentPropBindings.flatMap((binding) => {
-		if (binding.defaultSource === undefined) return [];
+		if (binding.defaultSource === undefined || binding.defaultedGraphNodeId !== undefined)
+			return [];
 
 		const seedValueSpans = input.semanticGraph.stateWrites.flatMap((write) =>
 			write.writeScope === 'component' &&
@@ -1088,8 +1085,8 @@ function escapedDefaultedPropDiagnostic(
 		severity: 'error',
 		phase: 'state-lowering',
 		title: 'This prop default is only supported where the body assigns it',
-		message: `Cannot read "${source}" because the prop "${localName}" has a destructuring default, and this position reads the prop the consumer passed instead of the default.`,
-		why: 'A destructuring default runs only when the prop is undefined. The component body materializes the defaulted local, so a component-body assignment sees it; a template position, an event handler and a computed read the raw prop cell and would silently render undefined where a default was authored.',
+		message: `Cannot read "${source}" because "${localName}" has a destructuring default the build applies only in the component body (a default inside a nested pattern, or an object, array or function default), and this position reads the prop the consumer passed instead of the default.`,
+		why: 'A default on a top-level prop such as `{ size = 3 }` works everywhere. A default inside a nested pattern (`{ options: { size = 3 } }`), or an object, array or function default (`{ items = [] }`, `{ onPick = () => {} }`), is applied only where the component body reads the local while the page renders; a template position, an event handler and a computed read the raw prop and would silently see undefined where a default was authored.',
 		primarySpan: sourceSpan ?? fallbackSpan(filename),
 		passId: 'state-lowering',
 		artifactKeys: ['semanticGraph', 'stateLowering'],

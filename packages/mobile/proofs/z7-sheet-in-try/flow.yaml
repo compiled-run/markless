@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: z7-sheet-in-try
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - clearState
+- launchApp
+- assertVisible: Sizes
+- assertVisible: Pick a size
+- assertNotVisible: Loading sizes
+- assertNotVisible: Choose a size
+- tapOn: Pick a size
+- assertVisible: Choose a size
+- assertVisible: Choose a size
+- assertVisible: Small
+- assertVisible: Medium
+- assertVisible: Large
+- tapOn: Medium
+- assertNotVisible: Choose a size
+- assertVisible: Medium
+- assertNotVisible: Choose a size
+- assertNotVisible: Pick a size

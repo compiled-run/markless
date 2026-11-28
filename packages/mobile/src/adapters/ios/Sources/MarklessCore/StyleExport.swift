@@ -138,6 +138,8 @@ public struct RuntimeImage: Equatable, Sendable {
 	public let pixelated: Bool
 	public let outline: RGBA?
 	public let content: Frame?
+	/// The box's height follows its image: the page is laid out again with each decoded image's natural size.
+	public var follows: Bool = false
 }
 
 /// Where a runtime image is painted from, in absolute device px: its content box, and the origin of its node's frame.
@@ -643,7 +645,8 @@ public struct StyleExport: Sendable {
 					let s = try sheet.object(["node", "heights"])
 					let heights = try s["heights"].array().map { height in
 						let h = try height.object(
-							required: ["snapPoint", "viewport", "readiness", "states", "initial", "next", "assignments"], optional: ["bands"])
+							required: ["snapPoint", "viewport", "readiness", "states", "initial", "next", "assignments"],
+							optional: ["bands", "plan", "planNames", "planRepeats"])
 						return (snapPoint: try h["snapPoint"].number(), style: try expanded(height, h, try raw(h, "viewport")))
 					}
 					guard !heights.isEmpty else { throw sheet.fail("a sheet's styles need at least one resting height") }
@@ -1137,7 +1140,8 @@ public struct StyleExport: Sendable {
 	public func laidOut(
 		width: Double, height: Double, scale: Double, slots values: [Double] = [], layout: (String) -> String,
 		rows: ((Int) throws -> [String: [LaidOutRow]])? = nil, rowsLayout: ((String) -> String)? = nil,
-		texts: [String: String] = [:], entries: Set<Int>? = nil, previous: StyleExport? = nil
+		texts: [String: String] = [:], entries: Set<Int>? = nil, previous: StyleExport? = nil,
+		naturals: [String: [Double]] = [:]
 	) throws -> StyleExport {
 		guard let plan else { return self }
 		guard values.count == slots.count else {
@@ -1185,6 +1189,14 @@ public struct StyleExport: Sendable {
 			if !changed.isEmpty {
 				if shown == nil { line += ",\"rows\":[]" }
 				line += ",\"texts\":" + JSONValue.array(changed.map { .array([.string(dragonId[$0.key] ?? $0.key), .string($0.value)]) }).jsonText
+			}
+			// Each img of this assignment whose height follows its image, by Dragon id: its decoded natural size in CSS px, or null while
+			// it has none (laid out 0 by 0).
+			let followers = assignments[k].nodes.filter { $0.runtimeImage?.follows == true && $0.frame != nil }.map(\.id)
+			if !followers.isEmpty {
+				line += ",\"naturals\":" + JSONValue.object(followers.sorted().map { id in
+					(dragonId[id] ?? id, naturals[id].map { JSONValue.array($0.map { .number($0) }) } ?? .null)
+				}).jsonText
 			}
 			line += ",\"sticky\":true,\"textAreas\":true}"
 			guard !live || rowsLayout != nil else { throw PayloadError(path: "plan layout", reason: "a page whose texts follow state needs Dragon's live layout") }
@@ -1712,8 +1724,9 @@ public struct StyleExport: Sendable {
 			_ = try f["canvas"].bool()
 			return .visibility(value)
 		case "runtime-image":
-			let f = try write.object(["kind", "fit", "position", "layer", "pixelated", "absent", "key", "content"])
+			let f = try write.object(required: ["kind", "fit", "position", "layer", "pixelated", "absent", "key", "content"], optional: ["follows"])
 			try expectKey(f, "dragonRuntimeImage")
+			let follows = f.has("follows") ? try f["follows"].bool() : false
 			let fit = try f["fit"].string()
 			guard ["fill", "contain", "cover", "none", "scale-down"].contains(fit) else { throw PayloadError(path: write.path + ".fit", reason: "object-fit \(fit) is not a keyword Chrome has") }
 			let axes = try f["position"].array()
@@ -1737,7 +1750,7 @@ public struct StyleExport: Sendable {
 				let c = try box.object(["x", "y", "width", "height"])
 				return Frame(x: try c["x"].number(), y: try c["y"].number(), width: try c["width"].number(), height: try c["height"].number())
 			}()
-			return .runtimeImage(RuntimeImage(fit: fit, position: position, pixelated: try f["pixelated"].bool(), outline: outline, content: content))
+			return .runtimeImage(RuntimeImage(fit: fit, position: position, pixelated: try f["pixelated"].bool(), outline: outline, content: content, follows: follows))
 		case "select-arrow":
 			let f = try write.object(["kind", "color", "key"])
 			try expectKey(f, "dragonSelectArrow")

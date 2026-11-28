@@ -38,6 +38,7 @@ import {
 } from './shared.ts';
 import { componentSeedCellIndexes } from './derive-set.ts';
 import { ssrComposeStateExpression } from './prop-cell-seed.ts';
+import { staticRowsComposition } from './static-rows.ts';
 
 // A boundary case runs its runner through the registry only when the boundary has one.
 function settlesAsyncBoundary(input: PublicRenderModuleInput, componentName: string): boolean {
@@ -168,7 +169,7 @@ export function emitSameModuleSsrComponents(
 			),
 			...dataLines.serveComputed,
 			'	const marklessSsrHtml = marklessSsrRendered.html;',
-			`	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, ${ssrComposedPayloadView(input, componentName)}, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);`,
+			`	const marklessSsrComposition = ${staticRowsComposition(input, componentName, `marklessSsrComposeView(marklessSsrRendered.structure, ${ssrComposedPayloadView(input, componentName)}, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix)`)};`,
 			`	const marklessSsrState = ${ssrComposeStateExpression(input, rootInfo.component, componentName)};`,
 			`	return { html: marklessSsrHtml, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps), structure: marklessSsrRendered.structure, structureTokens: marklessSsrRendered.structureTokens${widgetFallbacksOutputField(input, componentName)}${remapsGraphProps ? ', m(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); }' : ''} };`,
 			'}',

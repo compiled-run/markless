@@ -4,6 +4,7 @@ import {
 	emitPrerenderBoundaryRendererModule,
 	emitPrerenderTriggerGroupModule,
 	planPrerenderTriggerGroups,
+	planTriggerGroupHelpers,
 } from '../src/trigger-groups.ts';
 
 test('external delegation does not stage a browser wake group', () => {
@@ -355,6 +356,64 @@ test('a packed trigger group loads its symbols through imports the bundler can s
 	expect(packed).not.toContain('@vite-ignore');
 	for (const symbol of symbols)
 		expect(packed).toContain(`import(${JSON.stringify(symbol.chunk)})`);
+});
+
+test('trigger groups that bind symbols the same way import one copy of the bound-row helpers', () => {
+	const group = (hostNodeId: string, symbolIds: string[]) => ({
+		id: `${hostNodeId}:click`,
+		hostNodeId,
+		eventName: 'click',
+		hostIndex: 0,
+		hostTagName: 'button',
+		graphNodeIds: [],
+		symbolIds,
+		state: { version: 1 as const, cells: [], computed: [] },
+		view: {
+			version: 1 as const,
+			locators: [],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+		},
+	});
+	const bound = (id: string, instancePath?: string) => ({
+		id,
+		baseSymbolId: 'symbol:base',
+		...(instancePath ? { instancePath } : {}),
+		componentEdgePath: ['edge:0'],
+		ancestry: [{ componentEdgeId: 'edge:0', branchScopeIds: [], keyedRepeatScopeIds: [] }],
+		captureSlots: [],
+	});
+	const groups = [
+		group('h0', ['bound:play', 'symbol:base']),
+		group('h1', ['bound:skip', 'symbol:base']),
+		group('h2', ['bound:row', 'symbol:base']),
+		group('h3', ['symbol:base']),
+	];
+	const symbols = [{ id: 'symbol:base', chunk: './base.js', exportName: 'base' }];
+	const boundRows = [bound('bound:play'), bound('bound:skip'), bound('bound:row', 'c0:')];
+	const plan = planTriggerGroupHelpers({ filename: '/app/Player.tsrx', groups, symbols, boundRows });
+	const [play, skip, row, plain] = plan.helpersModuleIds;
+	expect(play).toBeDefined();
+	expect(skip).toBe(play);
+	expect(row).toBeUndefined();
+	expect(plain).toBeUndefined();
+	expect(plan.modules.map((module) => module.id)).toEqual([play]);
+	expect(plan.modules[0]!.source).toContain('function createCaptureContext(');
+
+	const emitted = groups.map((entry, index) =>
+		emitPrerenderTriggerGroupModule({
+			group: entry,
+			symbols,
+			boundRows,
+			helpersModuleId: plan.helpersModuleIds[index],
+		}),
+	);
+	expect(emitted[0]).toContain(`from ${JSON.stringify(play)}`);
+	expect(emitted[0]).not.toContain('function createCaptureContext(');
+	expect(emitted[2]).toContain('function createCaptureContext(');
 });
 
 test('self-wake groups render settled arms through their demand-loaded update symbol', () => {

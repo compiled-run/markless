@@ -97,6 +97,21 @@ test('standard event casing and numeric attribute strings typecheck', () => {
 	expect(result.status).toBe(0);
 });
 
+test('document and window props typecheck with the event the browser sends and the document or window as currentTarget', () => {
+	const result = runMarklessTsc('global-events');
+	expect(result.output).toBe('');
+	expect(result.status).toBe(0);
+});
+
+test('a document or window prop naming an event that never reaches that target, or a wrong event field, fails', () => {
+	const result = runMarklessTsc('global-event-errors');
+	expect(result.status).not.toBe(0);
+	for (const name of ['onDocumentFocus', 'onWindowSelectionChange', 'onDocumentResize'])
+		expect(result.output).toContain(`Property '${name}' does not exist`);
+	expect(result.output).toContain(`Property 'clientX' does not exist on type`);
+	expect(result.output).toMatch(/Type '(EventTarget & )?Document' is missing the following properties from type 'HTMLParagraphElement'/);
+});
+
 test('standard HTML, SVG, ARIA and XML namespace attributes typecheck on the elements that define them', () => {
 	const result = runMarklessTsc('standard-attributes');
 	expect(result.output).toBe('');
@@ -109,6 +124,14 @@ test('a misspelled attribute, a React rename, or a wrong value for a camelCase s
 	for (const name of ['datetiem', 'tabIndx', 'htmlFor', 'className', 'xmlnss', 'strokeWidht', 'startOfset', 'nme'])
 		expect(result.output).toContain(`Property '${name}' does not exist`);
 	expect(result.output).toContain(`page.tsrx(9,10): error TS2322: Type '"flat"' is not assignable`);
+});
+
+test('the generated document and window event types match the DOM event maps they are generated from', async () => {
+	const { generateGlobalEventTypes, GLOBAL_EVENT_TYPES_DTS_FILE, GLOBAL_EVENT_TYPES_COMPILER_FILE } =
+		await import('../scripts/generate-global-event-types.ts');
+	const generated = generateGlobalEventTypes();
+	expect(readFileSync(GLOBAL_EVENT_TYPES_DTS_FILE, 'utf8')).toBe(generated.dts);
+	expect(readFileSync(GLOBAL_EVENT_TYPES_COMPILER_FILE, 'utf8')).toBe(generated.compiler);
 });
 
 test('the generated attribute names and camelCase spellings match the lists they are generated from', async () => {
@@ -162,6 +185,8 @@ test.each([
 	'anchor-prefetch-errors',
 	'standard-attributes',
 	'standard-attribute-misspellings',
+	'global-events',
+	'global-event-errors',
 ])('TypeScript 7.1 with the content mapper reports what markless-tsc reports: %s', (fixture) => {
 	const typescript5 = runMarklessTsc(fixture);
 	const typescript7 = runTypescript7(fixture);

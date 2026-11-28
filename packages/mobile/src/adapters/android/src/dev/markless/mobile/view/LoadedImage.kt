@@ -97,20 +97,40 @@ class LoadedImageView(context: Context, private val packaged: Map<String, Packag
 		importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
 	}
 
-	/** The runtime's src for the img now; a new src loads off the main thread. */
+	/** The image's natural size in CSS px once one has loaded, null when there is none; a new src keeps the old size until it loads. */
+	var onNatural: ((List<Double>?) -> Unit)? = null
+
+	/**
+	 * The runtime's src for the img now; a new src loads off the main thread. A src this app decoded before gives its size at once,
+	 * so the first layout already has it, as Chrome lays out an image it holds in memory at its size.
+	 */
 	fun show(src: String?) {
 		if (src != null && src == wanted) return
 		wanted = src
 		if (src == null) return move(LoadedImageState.Missing)
+		sizes[src]?.let { onNatural?.invoke(it) }
 		loader.execute {
 			val picture = runCatching { LoadedPicture.load(context, src, packaged) }.getOrNull()
-			post { if (wanted == src) move(picture?.let { LoadedImageState.Shown(it) } ?: LoadedImageState.Missing) }
+			post {
+				if (picture != null) sizes[src] = listOf(picture.width, picture.height)
+				if (wanted == src) move(picture?.let { LoadedImageState.Shown(it) } ?: LoadedImageState.Missing)
+			}
 		}
 	}
 
 	private fun move(next: LoadedImageState) {
 		state = next
 		invalidate()
+		when (next) {
+			is LoadedImageState.Shown -> onNatural?.invoke(listOf(next.picture.width, next.picture.height))
+			LoadedImageState.Missing -> onNatural?.invoke(null)
+			else -> {}
+		}
+	}
+
+	private companion object {
+		/** The natural size of each src this app has decoded, in CSS px, read and written on the main thread only. */
+		val sizes = HashMap<String, List<Double>>()
 	}
 
 	override fun onDraw(canvas: Canvas) {

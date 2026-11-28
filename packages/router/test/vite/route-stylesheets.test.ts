@@ -162,6 +162,96 @@ test('collects stylesheets from a route’s dynamic and symbol chunks, and only 
 	}
 });
 
+// The pack planner can put one route set's component into a pack every route loads, so the pack's sheet is reached
+// from every route. A page links a sheet only when the planner attributes one of its style modules to that page; a
+// sheet it cannot attribute stays on every route that reaches it.
+test('a shared pack’s sheet is linked only on the routes that render its styles', async () => {
+	const workspace = await mkdtemp(join(tmpdir(), 'markless-router-rendered-styles-'));
+	const root = join(workspace, 'app');
+	const clientOutDir = join(root, 'dist/client');
+	const resolvedConfig = {
+		base: '/',
+		command: 'build',
+		environments: {
+			browser: { consumer: 'client', build: { outDir: 'dist/client' } },
+			ssr: { consumer: 'server', build: { outDir: join(root, 'dist/server') } },
+		},
+		root,
+	};
+	const bundle = {
+		'build/navigation.js': chunk({
+			code: `const routePreloadsJson = "__MARKLESS_ROUTER_ROUTE_PRELOADS__"; const routes = {"pages/home.tsrx":()=>import("./home.js"),"pages/dial.tsrx":()=>import("./dial.js")};`,
+			dynamicImports: ['build/home.js', 'build/dial.js'],
+			fileName: 'build/navigation.js',
+			moduleIds: ['/repo/packages/router/src/vite/entries/client-entry.ts'],
+		}),
+		'build/resume.js': chunk({
+			fileName: 'build/resume.js',
+			moduleIds: ['/repo/packages/router/src/vite/entries/resume-entry.ts'],
+		}),
+		'build/home.js': chunk({
+			fileName: 'build/home.js',
+			imports: ['build/wide-pack.js'],
+			moduleIds: [join(root, 'pages/home.tsrx')],
+		}),
+		'build/dial.js': chunk({
+			fileName: 'build/dial.js',
+			imports: ['build/wide-pack.js'],
+			moduleIds: [join(root, 'pages/dial.tsrx')],
+		}),
+		'build/wide-pack.js': chunk({
+			fileName: 'build/wide-pack.js',
+			viteMetadata: { importedCss: ['assets/nav.css', 'assets/study.css', 'assets/vendor.css'] },
+		}),
+		'build/interaction-closures.json': {
+			type: 'asset',
+			fileName: 'build/interaction-closures.json',
+			source: JSON.stringify({
+				routes: [],
+				stylesheetRoutes: {
+					'assets/nav.css': ['pages/dial.tsrx', 'pages/home.tsrx'],
+					'assets/study.css': ['pages/dial.tsrx'],
+				},
+			}),
+		},
+	};
+
+	try {
+		const plugins = flattenPlugins([router()]);
+		const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
+		const clientContext = { environment: { config: resolvedConfig.environments.browser } };
+		configPlugin?.configResolved?.(resolvedConfig as never);
+		await hookHandler(configPlugin?.buildStart)?.call(clientContext);
+		await hookHandler(configPlugin?.generateBundle)?.call(clientContext, {}, bundle);
+		for (const fileName of [
+			...Object.keys(bundle),
+			'assets/nav.css',
+			'assets/study.css',
+			'assets/vendor.css',
+		]) {
+			const path = join(clientOutDir, fileName);
+			await mkdir(join(path, '..'), { recursive: true });
+			await writeFile(path, fileName.endsWith('.js') ? 'export {};' : '/* sheet */');
+		}
+		await hookHandler(configPlugin?.writeBundle)?.call(clientContext, {}, bundle);
+		const persisted = JSON.parse(
+			await readFile(clientAssetsManifestPath(clientOutDir), 'utf8'),
+		) as { readonly routes: { readonly styles: Record<string, readonly string[]> } };
+
+		expect(persisted.routes.styles['pages/dial.tsrx']).toEqual([
+			'/assets/nav.css',
+			'/assets/study.css',
+			'/assets/vendor.css',
+		]);
+		expect(persisted.routes.styles['pages/home.tsrx']).toEqual([
+			'/assets/nav.css',
+			'/assets/vendor.css',
+		]);
+	} finally {
+		await rm(workspace, { force: true, recursive: true });
+	}
+});
+
 // The document module lives only in the server build, so its scoped CSS (its
 // own block and its rendered components') never reaches the client manifest.
 // The server build patches that closure into the route-preloads module, and

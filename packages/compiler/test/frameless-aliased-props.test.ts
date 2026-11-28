@@ -52,7 +52,7 @@ test('a plain prop destructures under its own name', async () => {
 	expect(plain.publicRenderModule.ssrModuleSource).toContain('const { label } = marklessSsrProps ?? {};');
 });
 
-test('a prop default is re-emitted on the body destructure, and a template read of it fails closed', async () => {
+test('a prop default is re-emitted on the body destructure, and a template read of it reads the default', async () => {
 	const defaulted = await compile(`
 		export function Defaulted({ label = "fallback" }) @{
 			<span>{label}</span>
@@ -62,13 +62,14 @@ test('a prop default is re-emitted on the body destructure, and a template read 
 	expect(defaulted.publicRenderModule.ssrModuleSource).toContain(
 		'const { label = "fallback" } = marklessSsrProps ?? {};',
 	);
-	// The template residue reads the prop cell, not the defaulted local, so the
-	// read is an error rather than a silent undefined.
 	expect(
 		defaulted.stateLowering.diagnostics.filter(
 			(diagnostic) => diagnostic.severity === 'error',
 		),
-	).toEqual([
-		expect.objectContaining({ code: 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED' }),
-	]);
+	).toEqual([]);
+	expect(
+		defaulted.symbolResolver.symbols.find(
+			(symbol) => symbol.kind === 'dom-update' && symbol.source === 'label',
+		),
+	).toEqual(expect.objectContaining({ graphNodeId: 'computed:Defaulted.label' }));
 });

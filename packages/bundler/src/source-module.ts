@@ -324,6 +324,8 @@ export function emitSourceModule(input: {
 	readonly hasOverlayMarks?: boolean;
 	readonly hasLiveSharedState?: boolean;
 	readonly hasIdleEvents?: boolean;
+	/** The document and window record names this module's own elements own (`document.keydown`). */
+	readonly globalEventNames?: ReadonlyArray<string>;
 	readonly runtimeDemandMap?: unknown;
 	readonly scalarActions?: RuntimeDemandMapArtifact['actions'];
 	// Plain-SSR actions whose closure plans a composing page may route to.
@@ -421,6 +423,10 @@ export function emitSourceModule(input: {
 		// And for `onIdle`: a CSR mount gets the idle wake only from an app module with an idle record.
 		input.environment === 'client' && input.hasIdleEvents === true && !symbolsOnly
 			? emitIdleTriggerInstall()
+			: null,
+		// A composed page loads a child only as its symbols, so the relay rides there too.
+		input.environment === 'client' && (input.globalEventNames?.length ?? 0) > 0
+			? emitGlobalEventRelayInstall(input.globalEventNames!)
 			: null,
 		// And the same split again for the row mints. A CSR mount reaches
 		// the resume runtime through THIS module and never evaluates a resume
@@ -613,6 +619,11 @@ export function emitIdleTriggerInstall(): string {
 		"import { installMarklessIdle } from '@markless/web/fns/idle-trigger';",
 		'installMarklessIdle();',
 	].join('\n');
+}
+
+/** Only a module that owns a document or window record names the relay, so no other app ships it. */
+export function emitGlobalEventRelayInstall(names: ReadonlyArray<string>): string {
+	return `void import('@markless/web/fns/global-relay').then((m) => m.marklessRelayGlobalEvents(${JSON.stringify(names)}));`;
 }
 
 /**

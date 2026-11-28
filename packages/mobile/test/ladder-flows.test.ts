@@ -385,6 +385,7 @@ test('the styles ladder has one app folder per rung, in rung order', () => {
 		'S64',
 		'S65',
 		'S66',
+		'S67',
 		'S68',
 	]);
 	for (const folder of styleRungFolders())

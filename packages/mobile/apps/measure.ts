@@ -106,14 +106,17 @@ export async function measureApp(app: string, styles = false): Promise<ScreenRes
 	if (styles) {
 		const scratch = mkdtempSync(join(tmpdir(), 'markless-measure-'));
 		try {
+			let written = 0;
 			for (const input of build.styleInputs) {
-				const file = join(scratch, `${styledBy.size}.json`);
-				writeFileSync(
-					file,
-					JSON.stringify(nativeStyleInputAt(input.input, (font) => relative(scratch, resolve(repoRoot, font)))),
-				);
 				try {
-					await dragonStyleExport(file);
+					for (const one of [input.input, ...input.sheets.map((sheet) => sheet.input)]) {
+						const file = join(scratch, `${written++}.json`);
+						writeFileSync(
+							file,
+							JSON.stringify(nativeStyleInputAt(one, (font) => relative(scratch, resolve(repoRoot, font)))),
+						);
+						await dragonStyleExport(file);
+					}
 					styledBy.set(input.pattern, true);
 				} catch (error) {
 					const reasons = (error as Error).message.split('\n').slice(1).join(' ').trim();

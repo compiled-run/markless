@@ -7230,6 +7230,1446 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_GLOBAL_EVENT_IN_ROW',
+		title: 'A document or window listener sits inside a list row',
+		area: 'events',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'An `onDocument…` or `onWindow…` prop inside an `@for` row adds one listener per row.',
+		printed: [
+			'MARKLESS_GLOBAL_EVENT_IN_ROW: <attributeName> sits inside an @for row, so every row listens on the <target> and one event runs the handler once for each row on the page.',
+			'A <target> listener belongs to the element it is written on. Each row is its own element, so each row adds its own listener.',
+			'Move <attributeName> to an element outside the @for, and find the row the event is about inside the handler.',
+			'https://markless.dev/errors/MARKLESS_GLOBAL_EVENT_IN_ROW',
+		],
+		structured: true,
+		why: 'A <target> listener belongs to the element it is written on. Each row is its own element, so each row adds its own listener.',
+		suggestion:
+			'Move <attributeName> to an element outside the @for, and find the row the event is about inside the handler.',
+		guide: {
+			summary:
+				'An `onDocument…` or `onWindow…` prop inside an `@for` row adds one listener per row.',
+			what: [
+				{
+					id: 's0',
+					text: 'A document or window listener belongs to the element it is written on, and each row is its own element. With a hundred rows, one key press runs the handler a hundred times. The page still builds; this is a warning because it is rarely what you meant.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Move the prop to an element outside the ',
+				},
+				{
+					id: 's1',
+					text: '@for',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ', and work out inside the handler which row the event is about, for example from ',
+				},
+				{
+					id: 's3',
+					text: 'event.target',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' or from state that names the selected row.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: '<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'ul',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'onDocumentKeyDown',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r5',
+							text: '{(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: 'event',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r7',
+							text: ') ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r9',
+							text: ' event.key ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: '===',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r11',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: "'Delete'",
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
+						},
+						{
+							id: 'r13',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r14',
+							text: '&&',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r15',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r16',
+							text: 'remove',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r17',
+							text: '(selected)}>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: '@for',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r2',
+							text: ' (',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'const',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r4',
+							text: ' row ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'of',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r6',
+							text: ' rows; ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: 'key',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r8',
+							text: ' row.id) {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'li',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'onClick',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r5',
+							text: '{() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r7',
+							text: ' (selected ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r9',
+							text: ' row.id)}>{row.name}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: 'li',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r11',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: '</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'ul',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r2',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+			before: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'import',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r1',
+							text: ' { state } ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'from',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: "'@markless/core'",
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
+						},
+						{
+							id: 'r5',
+							text: ';',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'Files',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r5',
+							text: '() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'let',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r2',
+							text: ' rows ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'state',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r6',
+							text: '([{ id: ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: "'a'",
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
+						},
+						{
+							id: 'r8',
+							text: ', name: ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r9',
+							text: "'notes.txt'",
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
+						},
+						{
+							id: 'r10',
+							text: ' }]);',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [],
+				},
+				{
+					id: 'l5',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'ul',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r2',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l6',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: '@for',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r2',
+							text: ' (',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'const',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r4',
+							text: ' row ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'of',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r6',
+							text: ' rows; ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: 'key',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r8',
+							text: ' row.id) {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l7',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'li',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+					],
+				},
+				{
+					id: 'l8',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t\t\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'onDocumentKeyDown',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r2',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r3',
+							text: '{(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'event',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r5',
+							text: ') ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r7',
+							text: ' {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l9',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t\t\t\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'if',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r2',
+							text: ' (event.key ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: '===',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: "'Delete'",
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
+						},
+						{
+							id: 'r6',
+							text: ') rows ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r8',
+							text: ' rows.',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r9',
+							text: 'filter',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r10',
+							text: '((',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r11',
+							text: 'other',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r12',
+							text: ') ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r13',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r14',
+							text: ' other.id ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r15',
+							text: '!==',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r16',
+							text: ' row.id);',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l10',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t\t\t}}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l11',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t\t>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l12',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t\t\t{row.name}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l13',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t\t</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'li',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r2',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l14',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l15',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'ul',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r2',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l16',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+					],
+				},
+			],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_GLOBAL_EVENT_PASSIVE_PREVENT',
+		title: 'A scroll, wheel or touch listener calls preventDefault',
+		area: 'events',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'A document or window `scroll`, `wheel`, `touchstart` or `touchmove` handler calls `event.preventDefault()`, which the browser ignores there.',
+		printed: [
+			'MARKLESS_GLOBAL_EVENT_PASSIVE_PREVENT: <attributeName> calls event.preventDefault(), but a "<type>" listener on the document or window is passive, so the browser ignores the call.',
+			'Browsers treat touchstart, touchmove and wheel listeners on the document and window as passive so scrolling never waits for code, and a scroll event cannot be cancelled at all.',
+			'Put the handler on the element that scrolls or is touched, with an ordinary on* prop, or use the CSS touch-action or overscroll-behavior property.',
+			'https://markless.dev/errors/MARKLESS_GLOBAL_EVENT_PASSIVE_PREVENT',
+		],
+		structured: true,
+		why: 'Browsers treat touchstart, touchmove and wheel listeners on the document and window as passive so scrolling never waits for code, and a scroll event cannot be cancelled at all.',
+		suggestion:
+			'Put the handler on the element that scrolls or is touched, with an ordinary on* prop, or use the CSS touch-action or overscroll-behavior property.',
+		guide: {
+			summary:
+				'A document or window `scroll`, `wheel`, `touchstart` or `touchmove` handler calls `event.preventDefault()`, which the browser ignores there.',
+			what: [
+				{
+					id: 's0',
+					text: 'Browsers treat touch and wheel listeners on the document and window as passive, so scrolling never waits for code, and a scroll event cannot be cancelled at all. Markless listens for these passively too, so the call would do nothing.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Put the handler on the element that scrolls or is touched, as an ordinary ',
+				},
+				{
+					id: 's1',
+					text: 'onWheel',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' or ',
+				},
+				{
+					id: 's3',
+					text: 'onTouchMove',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' prop, or stop the scroll with the CSS ',
+				},
+				{
+					id: 's5',
+					text: 'touch-action',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ' or ',
+				},
+				{
+					id: 's7',
+					text: 'overscroll-behavior',
+					code: true,
+				},
+				{
+					id: 's8',
+					text: ' property.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: '<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'div',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'class',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r2',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r3',
+							text: '"canvas"',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'onWheel',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r2',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r3',
+							text: '{(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'event',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r5',
+							text: ') ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r7',
+							text: ' {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\tevent.',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'preventDefault',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r2',
+							text: '();',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'zoom',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r2',
+							text: '(event.deltaY);',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l5',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t}}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l6',
+					runs: [
+						{
+							id: 'r0',
+							text: '/>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+			before: [],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_GLOBAL_EVENT_UNKNOWN',
+		title: 'onDocument or onWindow names an event that never gets there',
+		area: 'events',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'An `onDocument…` or `onWindow…` prop names an event that never reaches the document or the window.',
+		printed: [
+			'MARKLESS_GLOBAL_EVENT_UNKNOWN: <attributeName> on <<tagName>> listens for "<type>" on the <target>, but the <target> never receives a "<type>" event: either no such event exists, or it fires on an element without bubbling up.',
+			'onDocument* and onWindow* listen on the <target> itself. An event that does not bubble, such as focus or mouseenter, never reaches it, so the handler would never run.',
+			'bubbles',
+			'https://markless.dev/errors/MARKLESS_GLOBAL_EVENT_UNKNOWN',
+		],
+		structured: true,
+		why: 'onDocument* and onWindow* listen on the <target> itself. An event that does not bubble, such as focus or mouseenter, never reaches it, so the handler would never run.',
+		suggestion: 'bubbles',
+		guide: {
+			summary:
+				'An `onDocument…` or `onWindow…` prop names an event that never reaches the document or the window.',
+			what: [
+				{
+					id: 's0',
+					text: 'onDocument…',
+					code: true,
+				},
+				{
+					id: 's1',
+					text: ' listens on the document and ',
+				},
+				{
+					id: 's2',
+					text: 'onWindow…',
+					code: true,
+				},
+				{
+					id: 's3',
+					text: ' on the window. Some events fire on one element and do not bubble up, such as ',
+				},
+				{
+					id: 's4',
+					text: 'focus',
+					code: true,
+				},
+				{
+					id: 's5',
+					text: ', ',
+				},
+				{
+					id: 's6',
+					text: 'mouseenter',
+					code: true,
+				},
+				{
+					id: 's7',
+					text: " or a video's ",
+				},
+				{
+					id: 's8',
+					text: 'play',
+					code: true,
+				},
+				{
+					id: 's9',
+					text: ', so a listener on the document never hears them. Others exist only on the window, such as ',
+				},
+				{
+					id: 's10',
+					text: 'resize',
+					code: true,
+				},
+				{
+					id: 's11',
+					text: ', or the name is not an event at all.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'The error names the prop to write when there is one: the bubbling form on the same target (',
+				},
+				{
+					id: 's1',
+					text: 'onDocumentFocusIn',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' for ',
+				},
+				{
+					id: 's3',
+					text: 'onDocumentFocus',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', ',
+				},
+				{
+					id: 's5',
+					text: 'onDocumentPointerOver',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ' for ',
+				},
+				{
+					id: 's7',
+					text: 'onDocumentPointerEnter',
+					code: true,
+				},
+				{
+					id: 's8',
+					text: '), or the same event on the other target (',
+				},
+				{
+					id: 's9',
+					text: 'onWindowResize',
+					code: true,
+				},
+				{
+					id: 's10',
+					text: ' for ',
+				},
+				{
+					id: 's11',
+					text: 'onDocumentResize',
+					code: true,
+				},
+				{
+					id: 's12',
+					text: '). For an event on one element, put an ordinary ',
+				},
+				{
+					id: 's13',
+					text: 'on…',
+					code: true,
+				},
+				{
+					id: 's14',
+					text: ' prop on that element.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: '<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'form',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'onDocumentFocusIn',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r5',
+							text: '{() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r7',
+							text: ' (focused ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r9',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: 'true',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r11',
+							text: ')}>{focused}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: 'form',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r13',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+			before: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'import',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r1',
+							text: ' { state } ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'from',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: "'@markless/core'",
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
+						},
+						{
+							id: 'r5',
+							text: ';',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'Search',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r5',
+							text: '() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'let',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r2',
+							text: ' focused ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'state',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r6',
+							text: '(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: 'false',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r8',
+							text: ');',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [],
+				},
+				{
+					id: 'l5',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'form',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'onDocumentFocus',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r5',
+							text: '{() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r7',
+							text: ' (focused ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r9',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: 'true',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r11',
+							text: ')}>{focused}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: 'form',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r13',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l6',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+					],
+				},
+			],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_HANDLER_READS_RENDER_LOCAL',
 		title: 'A handler reads a value the browser cannot rebuild',
 		area: 'events',
@@ -15146,12 +16586,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
-		title: 'A destructured prop or state has a default',
+		title: 'A destructuring default the build cannot apply',
 		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
-		description: 'Graph destructuring defaults are not supported yet: a Markless build error.',
+		description: 'A destructuring default sits where the build cannot apply it.',
 		printed: [
 			'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED: Cannot create graph alias "<localName>" from "<target>" with a default value.',
 			'A destructuring default must run only when the property value is undefined. The current graph alias artifact can represent a graph path, but not a fallback expression without changing JavaScript semantics.',
@@ -15162,6 +16602,448 @@ export const errorEntries: readonly ErrorEntry[] = [
 		why: 'A destructuring default must run only when the property value is undefined. The current graph alias artifact can represent a graph path, but not a fallback expression without changing JavaScript semantics.',
 		suggestion:
 			'Use an explicit computed() for fallback logic, or read the graph path directly without a destructuring default.',
+		guide: {
+			summary: 'A destructuring default sits where the build cannot apply it.',
+			what: [
+				{
+					id: 's0',
+					text: 'A default on a top-level prop, such as ',
+				},
+				{
+					id: 's1',
+					text: '{ size = 3 }',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ', works everywhere: markup, ',
+				},
+				{
+					id: 's3',
+					text: 'computed()',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', event handlers, ',
+				},
+				{
+					id: 's5',
+					text: '@if',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ' and ',
+				},
+				{
+					id: 's7',
+					text: '@for',
+					code: true,
+				},
+				{
+					id: 's8',
+					text: ', and props passed on. Three shapes still stop the build: a default on state you destructure (',
+				},
+				{
+					id: 's9',
+					text: 'const { title = "Untitled" } = menu',
+					code: true,
+				},
+				{
+					id: 's10',
+					text: '), a default inside a nested prop pattern (',
+				},
+				{
+					id: 's11',
+					text: '{ options: { size = 3 } }',
+					code: true,
+				},
+				{
+					id: 's12',
+					text: '), and an object, array or function default (',
+				},
+				{
+					id: 's13',
+					text: '{ items = [] }',
+					code: true,
+				},
+				{
+					id: 's14',
+					text: ', ',
+				},
+				{
+					id: 's15',
+					text: '{ onPick = () => {} }',
+					code: true,
+				},
+				{
+					id: 's16',
+					text: '), each read anywhere other than a body assignment or a ',
+				},
+				{
+					id: 's17',
+					text: 'state()',
+					code: true,
+				},
+				{
+					id: 's18',
+					text: ' initializer.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Make the value its own top-level prop with the default there, or write the fallback where you read the value (',
+				},
+				{
+					id: 's1',
+					text: 'menu.title ?? "Untitled"',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ', ',
+				},
+				{
+					id: 's3',
+					text: '(items ?? []).length',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', ',
+				},
+				{
+					id: 's5',
+					text: 'onPick?.()',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ').',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'Card',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r5',
+							text: '({ ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: 'size',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r7',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r9',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: '3',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r11',
+							text: ' }',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r13',
+							text: ' { ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r14',
+							text: 'size',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r15',
+							text: '?:',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r16',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r17',
+							text: 'number',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r18',
+							text: ' }) ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r19',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'span',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r2',
+							text: '>{size}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'span',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+					],
+				},
+			],
+			before: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'Card',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r5',
+							text: '({ ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: 'options',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r7',
+							text: ': { ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: 'size',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r9',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r11',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: '3',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r13',
+							text: ' } }',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r14',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r15',
+							text: ' { ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r16',
+							text: 'options',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r17',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r18',
+							text: ' { ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r19',
+							text: 'size',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r20',
+							text: '?:',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r21',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r22',
+							text: 'number',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r23',
+							text: ' } }) ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r24',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'span',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r2',
+							text: '>{size}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'span',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+					],
+				},
+			],
+		},
 		sources: [
 			{
 				id: 'f0',

@@ -14,6 +14,7 @@ import {
 } from '@markless/web/inline/resumer';
 import { __marklessDebugBootstrapSource } from '../../web/src/debug-channel.ts';
 import { createMarklessDefer } from '../../web/src/inline/defer.ts';
+import { authoredGlobalRelaySource } from '../../web/src/inline/global-relay.ts';
 import type { MarklessExecutionLogMode } from './types.ts';
 import { minifySync, transformSync } from 'rolldown/experimental';
 
@@ -65,8 +66,10 @@ async function compileInlineResumerSourceVariants(options: {
 	]);
 	const defer = await compileDeferFactorySource();
 	const wakes = compileInlineWakeSources();
+	const globalRelay = compileExpressionSource('markless-global-relay.js', authoredGlobalRelaySource());
 	return {
 		...shared,
+		globalRelay,
 		event,
 		syncPolicy,
 		graphSyncPolicyOwner,

@@ -38,7 +38,7 @@ export default function Document({ url, children }: { readonly url?: { readonly 
 		<head>
 			<meta charset="utf-8" />
 			<link rel="stylesheet" href={sheet} />
-			<style>{'body { margin: 0; font: 14px sans-serif; } .side a { display: block; padding: 4px 8px; } .badge, .panel { transition: background-color 1s, color 1s; } .badge-solid { background-color: rgb(250, 0, 0); } .badge-outline { background-color: rgb(0, 0, 250); }'}</style>
+			<style>{'body { margin: 0; font: 14px sans-serif; } .side a { display: block; padding: 4px 8px; } .badge, .panel { transition: background-color 1s, color 1s; } .badge-solid { background-color: rgb(250, 0, 0); } .badge-outline { background-color: rgb(0, 0, 250); } .top { position: sticky; top: 0; background: white; } .side { height: 200px; overflow: auto; }'}</style>
 		</head>
 		<body>{children}</body>
 	</Html>;
@@ -126,6 +126,102 @@ test('a navigation from a link the swap removes restyles the whole document once
 	expect(await wholeDocumentRestyles(page, '[data-in-page]', 'Beta')).toBe(1);
 	expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
 	expect(errors).toEqual([]);
+	await page.close();
+});
+
+// Every read here makes the engine bring style and layout up to date; WebKit restyles the whole leaving page once a hidden sheet is in its head.
+const READS: readonly (readonly [string, string, 'method' | 'getter'])[] = [
+	['Document', 'getAnimations', 'method'],
+	['Element', 'getAnimations', 'method'],
+	['Element', 'getBoundingClientRect', 'method'],
+	['Element', 'getClientRects', 'method'],
+	['Element', 'scrollTop', 'getter'],
+	['Element', 'scrollLeft', 'getter'],
+	['Element', 'scrollWidth', 'getter'],
+	['Element', 'scrollHeight', 'getter'],
+	['Element', 'clientWidth', 'getter'],
+	['Element', 'clientHeight', 'getter'],
+	['HTMLElement', 'offsetWidth', 'getter'],
+	['HTMLElement', 'offsetHeight', 'getter'],
+	['HTMLElement', 'offsetTop', 'getter'],
+	['HTMLElement', 'offsetLeft', 'getter'],
+	['HTMLElement', 'innerText', 'getter'],
+	['HTMLElement', 'focus', 'method'],
+	['Window', 'getComputedStyle', 'method'],
+	['Window', 'scrollX', 'getter'],
+	['Window', 'scrollY', 'getter'],
+	['Window', 'pageXOffset', 'getter'],
+	['Window', 'pageYOffset', 'getter'],
+];
+
+test('a navigation reads no style or layout of the leaving page once the arriving stylesheet is in its head', async () => {
+	const page = await browser!.newPage({ viewport: { width: 1000, height: 700 } });
+	await page.addInitScript((reads) => {
+		const host = globalThis as unknown as Record<string, unknown>;
+		const seen: string[] = [];
+		host.__readsAfterMerge = seen;
+		const mixed = () =>
+			document.querySelector('[data-title]')?.textContent === 'Alpha' &&
+			document.head?.querySelector('link[href="/beta.css"]') !== null;
+		for (const [owner, name, kind] of reads) {
+			// A global's attributes live on the global itself, not on its prototype.
+			const proto = owner === 'Window' && Object.getOwnPropertyDescriptor(globalThis, name) ? globalThis : (host[owner] as { prototype: object } | undefined)?.prototype;
+			const descriptor = proto && Object.getOwnPropertyDescriptor(proto, name);
+			const original = kind === 'getter' ? descriptor?.get : descriptor?.value;
+			if (!proto || !descriptor || typeof original !== 'function') continue;
+			const wrapped = function (this: unknown, ...args: unknown[]) {
+				if (mixed()) seen.push(`${owner}.${name}`);
+				return (original as (...args: unknown[]) => unknown).apply(this, args);
+			};
+			Object.defineProperty(proto, name, kind === 'getter' ? { ...descriptor, get: wrapped } : { ...descriptor, value: wrapped });
+		}
+	}, READS);
+	await page.goto(`${server!.origin}/alpha`);
+	await page.waitForLoadState('networkidle');
+	await page.evaluate(async () => {
+		document.querySelector('.side')!.scrollTop = 120;
+		window.scrollTo(0, 400);
+		await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+	});
+	const box = (await page.locator('[data-top="beta"]').boundingBox())!;
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+	await page.waitForTimeout(450);
+	await page.mouse.down();
+	await page.mouse.up();
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Beta');
+	expect(await page.evaluate(() => (globalThis as { __readsAfterMerge?: string[] }).__readsAfterMerge)).toEqual([]);
+	// What those reads were for still holds: the kept sidebar keeps its offset, and Back lands where the reader left Alpha.
+	expect(await page.evaluate(() => document.querySelector('.side')!.scrollTop)).toBe(120);
+	await page.goBack();
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Alpha');
+	await page.waitForFunction(() => window.scrollY === 400);
+	await page.close();
+});
+
+test('a scroll while the swap waits for its stylesheet is where Back lands', async () => {
+	const page = await browser!.newPage({ viewport: { width: 1000, height: 700 } });
+	let release!: () => void;
+	const held = new Promise<void>((done) => (release = done));
+	await page.route('**/beta.css', async (route) => {
+		await held;
+		await route.continue();
+	});
+	await page.goto(`${server!.origin}/alpha`);
+	await page.waitForFunction(() => document.querySelector('[data-top="beta"]') !== null);
+	await page.evaluate(() => window.scrollTo(0, 400));
+	await page.locator('[data-top="beta"]').click();
+	// The swap has merged the head and waits for the arriving stylesheet.
+	await page.waitForFunction(() => document.head.querySelector('link[href="/beta.css"][media="not all"]') !== null);
+	await page.evaluate(async () => {
+		window.scrollTo(0, 250);
+		await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+	});
+	expect(await page.evaluate(() => document.querySelector('[data-title]')?.textContent)).toBe('Alpha');
+	release();
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Beta');
+	await page.goBack();
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Alpha');
+	await page.waitForFunction(() => window.scrollY === 250);
 	await page.close();
 });
 

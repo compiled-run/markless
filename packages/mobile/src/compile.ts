@@ -472,9 +472,9 @@ function unstyledOnly(
 	const tested = new Set(css.flatMap((text) => [...selectorAttributes(text)]));
 	const sheetOf = sheetsOf(payload);
 	return payload.nodes.flatMap((node) => {
-		if (node.kind !== 'element') return [];
 		const span = sources.get(node.id)?.span;
 		const sheet = sheetOf.get(node.id);
+		if (node.kind !== 'element') return [];
 		if (node.element === 'select' && sheet)
 			return [
 				nativeUnsupported(

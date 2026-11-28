@@ -20,7 +20,11 @@ public final class MarklessViewController: UIViewController {
 	private let payload: NativeViewPayload
 	private let style: StyleExport?
 	/// The page area in points and the slot values the views were last laid out for by Dragon's plan; nil until then.
-	private var laidOutFor: (size: CGSize, slots: [Double], texts: [String: String])?
+	private var laidOutFor: (size: CGSize, slots: [Double], texts: [String: String], naturals: [String: [Double]])?
+	/// Each img whose src the app sets: its loaded image's natural size in CSS px; absent while none has loaded.
+	private var naturals: [String: [Double]] = [:]
+	/// The planted fault `-markless-fault-follows-stale`: a new natural size does not lay the page out again.
+	private let followsStale = ProcessInfo.processInfo.arguments.contains("-markless-fault-follows-stale")
 	/// The entries Dragon has laid out at `laidOutFor`, and the export holding them: a page lays out only the entries it shows.
 	private var laidEntries: Set<Int> = []
 	private var laidExport: StyleExport?
@@ -224,6 +228,8 @@ public final class MarklessViewController: UIViewController {
 		#if canImport(DragonPlan)
 		tree?.library = DragonPlan.library
 		tree?.onEntries = { [weak self] in self?.layOutAtScreenSize() }
+		tree?.onNatural = { [weak self] id, size in self?.followNatural(id, size) }
+		layOutSheets()
 		tree?.onShown = { [weak self] in
 			self?.paintCanvas()
 			self?.writeLayoutDump()
@@ -304,6 +310,7 @@ public final class MarklessViewController: UIViewController {
 			try tree?.apply(journal.filter(\.isForViews))
 			followSlots(journal)
 			if movesRows(journal) { layOutAtScreenSize(rowsMoved: true) }
+			if sheetsMoveRows(journal) { layOutSheets() }
 			try runCalls(journal)
 			if let tree { animation?.moved(to: tree.assignment) }
 		} catch {
@@ -426,6 +433,48 @@ public final class MarklessViewController: UIViewController {
 		}
 	}
 
+	/// Whether a journal changed what a styled sheet's list rows lay out.
+	private func sheetsMoveRows(_ journal: [NativeJournalEntry]) -> Bool {
+		guard let style, style.sheets.contains(where: { $0.heights.contains { !$0.style.planRepeats.isEmpty } }) else { return false }
+		return journal.contains { entry in
+			switch entry {
+			case .rows, .arm: return true
+			case let .text(node, _), let .attribute(node, _, _): return node.contains("@")
+			default: return false
+			}
+		}
+	}
+
+	/// With Dragon's plan, each styled sheet's content is laid out at every resting height with the rows and texts it shows now.
+	private func layOutSheets() {
+		#if canImport(DragonPlan)
+		guard let style, let tree else { return }
+		do {
+			let scale = Double(traitCollection.displayScale)
+			let shaper = coreTextRowShaper(faces: style.systemFaces, authored: fonts, dpr: scale)
+			let pageRows = Dictionary(payload.nodes.map { ($0.id, $0.row) }, uniquingKeysWith: { a, _ in a })
+			let shownTexts = try runtime.texts()
+			let texts = Dictionary(shownTexts.filter { pageRows[$0.node] != nil && pageRows[$0.node]! == nil }.map { ($0.node, $0.text) }, uniquingKeysWith: { a, _ in a })
+			for sheet in style.sheets where sheet.heights.contains(where: { $0.style.plan != nil }) {
+				let laid = try sheet.heights.map { height -> StyleExport in
+					let s = height.style
+					guard s.plan != nil else { return s }
+					let rows = s.planRepeats.isEmpty ? nil : try s.shownRows(payload, runtime: runtime)
+					return try s.laidOut(
+						width: s.viewport.width, height: s.viewport.height, scale: scale, layout: DragonPlan.layout,
+						rows: rows, rowsLayout: { DragonPlan.rowsLayout($0, shape: shaper) }, texts: texts)
+				}
+				let layouts = try style.resolveSheet(
+					sheet.node, for: payload, initialTexts: shownTexts, value: runtime.value(of:), arm: runtime.styleArm(of:),
+					dark: traitCollection.userInterfaceStyle == .dark, laidOut: laid)
+				try tree.relayoutSheet(sheet.node, layouts)
+			}
+		} catch {
+			hostFailed("\(error)")
+		}
+		#endif
+	}
+
 	private func layOutAtScreenSize(rowsMoved: Bool = false) {
 		#if canImport(DragonPlan)
 		guard let style, style.plan != nil, let tree else { return }
@@ -441,6 +490,7 @@ public final class MarklessViewController: UIViewController {
 			let texts = Dictionary(try runtime.texts().filter { pageRows[$0.node] != nil && pageRows[$0.node]! == nil }.map { ($0.node, $0.text) }, uniquingKeysWith: { a, _ in a })
 			guard size.width > 0, size.height > 0, !layingOut else { return }
 			let same = !rowsMoved && size == laidOutFor?.size && slots.map(\.bitPattern) == laidOutFor?.slots.map(\.bitPattern) && texts == laidOutFor?.texts
+				&& (followsStale || naturals == laidOutFor?.naturals)
 			// The shown entries, at every @media band: the band this size selects is only decided once the page is laid out at it.
 			let needed = style.bandTwins(of: tree.assignment).union(style.bandTwins(of: tree.shown))
 			if same && needed.isSubset(of: laidEntries) { return }
@@ -460,7 +510,8 @@ public final class MarklessViewController: UIViewController {
 			let lay = { (texts: [String: String]) in
 				try style.laidOut(
 					width: Double(size.width), height: Double(size.height), scale: scale, slots: slots, layout: DragonPlan.layout,
-					rows: rows, rowsLayout: { DragonPlan.rowsLayout($0, shape: shape) }, texts: texts, entries: entries, previous: self.laidExport)
+					rows: rows, rowsLayout: { DragonPlan.rowsLayout($0, shape: shape) }, texts: texts, entries: entries, previous: self.laidExport,
+					naturals: self.naturals)
 			}
 			// Page texts in a face this host cannot shape keep the boxes the build laid them out in, as before they followed state.
 			let relaid: StyleExport
@@ -475,10 +526,12 @@ public final class MarklessViewController: UIViewController {
 				dark: traitCollection.userInterfaceStyle == .dark)
 			laidEntries.formUnion(entries)
 			laidExport = relaid
-			laidOutFor = (size, slots, texts)
+			laidOutFor = (size, slots, texts, naturals)
 			layingOut = true
 			defer { layingOut = false }
+			let followers = before(followersOf: now, in: tree)
 			try tree.relayout(now)
+			try anchorScroll(followers, in: tree)
 			layout = now
 			applyBand()
 			layoutMilliseconds = (CFAbsoluteTimeGetCurrent() - started) * 1000
@@ -488,6 +541,42 @@ public final class MarklessViewController: UIViewController {
 		#endif
 		writeLayoutDump()
 	}
+
+	/// An img whose src the app sets has loaded an image of another natural size (nil: none): the page is laid out again with it.
+	private func followNatural(_ id: String, _ size: [Double]?) {
+		if naturals[id] == size { return }
+		naturals[id] = size
+		// Later on the main queue: a load may finish while a layout or a journal is being applied.
+		DispatchQueue.main.async { [weak self] in
+			guard let self, self.isViewLoaded else { return }
+			self.layOutAtScreenSize()
+		}
+	}
+
+	/// Each shown img whose height follows its image, with its top and height in the page's content before the layout, in points.
+	private func before(followersOf now: StyleLayout, in tree: ViewTree) -> [(UIView, top: Double, height: Double)] {
+		Set(now.assignments.flatMap { styles in styles.compactMap { $0.value.runtimeImage?.image.follows == true ? $0.key : nil } }).sorted().compactMap { id in
+			guard let view = tree.elements[id], view.window != nil else { return nil }
+			let r = view.convert(view.bounds, to: tree.page)
+			return (view, Double(r.minY), Double(r.height))
+		}
+	}
+
+	#if canImport(DragonPlan)
+	/// Chrome's scroll anchoring for those imgs (Dragon's runtimeImageScrollShift): the page's offset moves by each one's change in
+	/// height when it lay wholly above a non-zero offset.
+	private func anchorScroll(_ followers: [(UIView, top: Double, height: Double)], in tree: ViewTree) throws {
+		guard !followers.isEmpty else { return }
+		tree.page.layoutIfNeeded()
+		let page = tree.page
+		let offset = Double(page.contentOffset.y + page.adjustedContentInset.top)
+		var shift = 0.0
+		for (view, top, was) in followers {
+			shift += try DragonPlan.runtimeImageScrollShift(offset: offset, top: top, was: was, now: Double(view.bounds.height))
+		}
+		if shift != 0 { page.contentOffset.y += CGFloat(shift) }
+	}
+	#endif
 
 	/// A `slot` entry's value, or a page text's change, lays the page out again at its current size, once the rest of the journal is applied.
 	private func followSlots(_ journal: [NativeJournalEntry]) {
@@ -602,6 +691,7 @@ public final class MarklessViewController: UIViewController {
 			try tree?.apply(journal.filter(\.isForViews))
 			followSlots(journal)
 			if movesRows(journal) { layOutAtScreenSize(rowsMoved: true) }
+			if sheetsMoveRows(journal) { layOutSheets() }
 			try runCalls(journal)
 			paintCanvas()
 			if let tree { animation?.moved(to: tree.assignment) }

@@ -1,0 +1,100 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Index",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page mk-zwsom1"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h1",
+			"attributes": {
+				"class": "title mk-zwsom1"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Sizes"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "button",
+			"parent": "h1",
+			"attributes": {
+				"class": "open mk-zwsom1"
+			},
+			"arm": {
+				"branch": "boundary:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": " ",
+			"arm": {
+				"branch": "boundary:0",
+				"index": 0
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h7",
+			"element": "p",
+			"parent": "h1",
+			"attributes": {
+				"class": "mk-zwsom1"
+			},
+			"arm": {
+				"branch": "boundary:0",
+				"index": 1
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h7:text0",
+			"parent": "h7",
+			"text": "Loading sizes",
+			"arm": {
+				"branch": "boundary:0",
+				"index": 1
+			}
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.size.mk-3meddi {\n\t\t\t\tmin-height: 48px;\n\t\t\t\tpadding: 12px 16px;\n\t\t\t\tborder: 2px solid #3d405b;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #3d405b;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\ttext-align: left;\n\t\t\t}\n\t\t\t.size[aria-pressed='true'].mk-3meddi {\n\t\t\t\tborder-color: #e07a5f;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n.page.mk-zwsom1 {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #f4f1de;\n\t\t\t\tcolor: #3d405b;\n\t\t\t}\n\t\t\t.title.mk-zwsom1 {\n\t\t\t\tfont-size: 26px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n\t\t\t.open.mk-zwsom1 {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 12px 20px;\n\t\t\t\tborder: 2px solid #3d405b;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #3d405b;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t}\n\t\t\t.sheet.mk-zwsom1 {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\t.sizes.mk-zwsom1 {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgap: 8px;\n\t\t\t}\n\t\t\t.sheet-title.mk-zwsom1 {\n\t\t\t\tmargin: 0 0 12px;\n\t\t\t\tfont-size: 20px;\n\t\t\t}",
+	"states": [
+		{
+			"cell": "state:picked",
+			"domain": [
+				"",
+				"Small",
+				"Medium",
+				"Large"
+			],
+			"initial": ""
+		}
+	],
+	"branches": [
+		{
+			"id": "boundary:0",
+			"domain": [
+				"0",
+				"1",
+				"2"
+			],
+			"initial": "1"
+		}
+	]
+}

@@ -1,0 +1,64 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": -1,
+			"reason": "the docs playground ships the compiler and the editor's prop types; teaching them onDocument*/onWindow* (both targets' event lists, the handler types, the diagnostics that name the prop to write) costs this; pages that render no playground are unchanged",
+			"date": "2026-11-28"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": -1,
+			"reason": "the docs playground ships the compiler and the editor's prop types; teaching them onDocument*/onWindow* (both targets' event lists, the handler types, the diagnostics that name the prop to write) costs this; pages that render no playground are unchanged",
+			"date": "2026-11-28"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": -1,
+			"reason": "the docs playground ships the compiler and the editor's prop types; teaching them onDocument*/onWindow* (both targets' event lists, the handler types, the diagnostics that name the prop to write) costs this; pages that render no playground are unchanged",
+			"date": "2026-11-28"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs / playground",
+				"jsGzipBytes"
+			],
+			"delta": 2311,
+			"reason": "the docs playground ships the compiler and the editor's prop types; teaching them onDocument*/onWindow* (both targets' event lists, the handler types, the diagnostics that name the prop to write) costs this; pages that render no playground are unchanged",
+			"date": "2026-11-28"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state playground",
+				"jsGzipBytes"
+			],
+			"delta": 2693,
+			"reason": "the docs playground ships the compiler and the editor's prop types; teaching them onDocument*/onWindow* (both targets' event lists, the handler types, the diagnostics that name the prop to write) costs this; pages that render no playground are unchanged",
+			"date": "2026-11-28"
+		}
+	]
+}

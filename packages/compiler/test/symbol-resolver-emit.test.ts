@@ -1,5 +1,9 @@
 import { expect, test } from 'vitest';
-import { emitSymbolResolverModule } from '../src/passes/symbol-resolver-module.ts';
+import {
+	emitSymbolResolverHelpersModule,
+	emitSymbolResolverModule,
+	symbolResolverHelpersVariant,
+} from '../src/passes/symbol-resolver-module.ts';
 
 test('emitSymbolResolverModule emits compact table rows with a constant loader', async () => {
 	const moduleUrl = `data:text/javascript,${encodeURIComponent(
@@ -575,4 +579,71 @@ test('emitSymbolResolverModule hands back a callable when a symbol reads a callb
 		}),
 	).resolves.toBe('ran');
 	expect(calls).toEqual([['symbol:7', ['ping']]]);
+});
+
+function sharedHelpersInput(chunk: string) {
+	return {
+		symbols: [{ id: 'symbol:child', chunk, exportName: 'symbol_child' }],
+		boundSymbols: [
+			{
+				id: 'bound:label',
+				baseSymbolId: 'symbol:child',
+				loaderSymbolId: 'symbol:child',
+				instancePath: 'c0:',
+				componentEdgePath: ['edge:0'],
+				ancestry: [{ componentEdgeId: 'edge:0', branchScopeIds: [], keyedRepeatScopeIds: [] }],
+				captureSlots: [
+					{
+						slotId: 'slot:label',
+						path: [],
+						legacyGraphRead: { graphNodeId: 'prop:props', path: ['label'] },
+						route: { kind: 'compiler-known-constant' as const, componentEdgeId: 'edge:0', value: 'Save' },
+					},
+				],
+			},
+		],
+		importedCaptureRows: true,
+	};
+}
+
+async function runBoundLabel(resolverSource: string) {
+	const resolver = (await import(`data:text/javascript,${encodeURIComponent(resolverSource)}`)) as {
+		loadSymbol(id: string): Promise<(context: unknown) => Promise<unknown>>;
+	};
+	const reads: unknown[] = [];
+	const bound = await resolver.loadSymbol('bound:label');
+	const result = await bound({
+		graph: { read: (graphNodeId: string, path: string[]) => (reads.push([graphNodeId, path]), 'own') },
+	});
+	return { result, reads };
+}
+
+test('a resolver that imports its helpers runs a bound row as the self-contained one does', async () => {
+	const chunk = `data:text/javascript,${encodeURIComponent(
+		'export async function symbol_child(context) { return [context.graph.read("prop:props", ["label"]), context.graph.read("state:hits", [])]; }',
+	)}`;
+	const input = sharedHelpersInput(chunk);
+	const helpers = emitSymbolResolverHelpersModule(input);
+	const helpersModuleId = `data:text/javascript,${encodeURIComponent(helpers)}`;
+	const shared = emitSymbolResolverModule({ ...input, helpersModuleId });
+	const inline = emitSymbolResolverModule(input);
+	expect(await runBoundLabel(shared)).toEqual(await runBoundLabel(inline));
+	expect(await runBoundLabel(shared)).toEqual({ result: ['Save', 'own'], reads: [['c0:state:hits', []]] });
+	for (const helper of ['createCaptureContext', 'createBoundGraph', 'instanceScopedBase', 'decodeBoundRow'])
+		expect(shared).not.toContain(`function ${helper}`);
+});
+
+test('resolvers whose bound rows need the same helpers share one helpers variant', () => {
+	const input = sharedHelpersInput('chunk:a');
+	const sibling = {
+		...input,
+		symbols: [{ id: 'symbol:other', chunk: 'chunk:b', exportName: 'symbol_other' }],
+		boundSymbols: input.boundSymbols.map((row) => ({ ...row, id: 'bound:other', baseSymbolId: 'symbol:other' })),
+	};
+	expect(symbolResolverHelpersVariant(sibling)).toBe(symbolResolverHelpersVariant(input));
+	expect(emitSymbolResolverHelpersModule(sibling)).toBe(emitSymbolResolverHelpersModule(input));
+	expect(symbolResolverHelpersVariant({ ...input, importedCaptureRows: false })).not.toBe(
+		symbolResolverHelpersVariant(input),
+	);
+	expect(symbolResolverHelpersVariant({ symbols: input.symbols })).toBeUndefined();
 });

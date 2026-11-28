@@ -324,6 +324,8 @@ export type SemanticComponentPropDeclaration = {
 	readonly propPath: ReadonlyArray<string>;
 	// The authored destructuring default, applied only when the prop is undefined.
 	readonly defaultSource?: string;
+	/** The computed that applies `defaultSource`; every read of the local reads it instead of the prop. */
+	readonly defaultedGraphNodeId?: string;
 	readonly sourceSpan: SourceSpan;
 };
 
@@ -711,6 +713,12 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly derivedPropPaths?: Readonly<
 				Record<string, ReadonlyArray<ReadonlyArray<string>>>
 			>;
+			/**
+			 * Props a keyed repeat in this component's tree iterates and never reads
+			 * back: a caller passing one a value that never changes says so, and the
+			 * render then serves neither the list record nor the collection.
+			 */
+			readonly staticRowProps?: ReadonlyArray<string>;
 			/**
 			 * Present when a keyed repeat sits at this component's top level, so its
 			 * rows need the container as their parent.
@@ -1285,6 +1293,9 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED'
 		| 'MARKLESS_DETACHED_CONTENT_DYNAMIC'
 		| 'MARKLESS_ATTACH_NO_START_TRIGGER'
+		| 'MARKLESS_GLOBAL_EVENT_UNKNOWN'
+		| 'MARKLESS_GLOBAL_EVENT_IN_ROW'
+		| 'MARKLESS_GLOBAL_EVENT_PASSIVE_PREVENT'
 		| 'MARKLESS_OVERLAY_VALUE_UNSUPPORTED'
 		| 'MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED'
 		| 'MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION'
@@ -3311,6 +3322,10 @@ export type TriggerGroupArtifact = {
 
 export type SymbolResolverModuleInput = {
 	readonly literalImports?: boolean;
+	// Imports the bound-row helpers from this module (see emitSymbolResolverHelpersModule) instead of inlining them.
+	readonly helpersModuleId?: string;
+	// Some bound rows belong to an imported child whose symbols still read their legacy prop cell.
+	readonly importedCaptureRows?: boolean;
 	// Small resolvers too: trigger-group resolvers set it so a packed build reaches every symbol it loads.
 	readonly bundlerVisibleImports?: boolean;
 	readonly buildId?: string;

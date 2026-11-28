@@ -376,7 +376,8 @@ async function appStyle(dir: string, name: string, inputs: NativeAppBuild['style
 						exportOf(
 							`${base}.sheet${sheetNodes.indexOf(sheet.node)}-${sheet.snapPoint}.json`,
 							sheet.input,
-							false,
+							// Only a sheet whose content holds a list is laid out on the phone: the others keep the build's boxes.
+							(sheet.input.repeats?.length ?? 0) > 0,
 						),
 					) - 1,
 			})),

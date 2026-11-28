@@ -123,9 +123,9 @@ being a namespace call.
    `toaster.root` throws `TypeError: Cannot read properties of undefined
    (reading 'listSharedDefinitions')` from
    `packages/web/src/fns/instance-scope.ts:502` by way of
-   `activateAuthoredBehaviors`. That is what the F8 hotkey was written as
-   (`toaster-hotkey.ts` is still here, unwired), so the hotkey ships nowhere and
-   the focus-restore rule that rode with it does not either.
+   `activateAuthoredBehaviors`. The F8 hotkey was first written as that behavior;
+   it now ships as `onDocumentKeyDown` on `toaster.root`, which needs no behavior,
+   with the focus restore in `toaster-hotkey.ts`. The crash itself is still open.
 5. **CLOSED — a component row now mints client-side.** The wall recorded here
    ("a component row never mints") is gone: `toaster.item` inside a consumer's
    `@for` raises, lands inside the region, stacks and dismisses. Eleven of the

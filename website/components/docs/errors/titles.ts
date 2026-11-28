@@ -37,6 +37,7 @@ const PREFIXES: readonly (readonly [string, ErrorArea])[] = [
 	['MODULE_INSTANCE', 'state'],
 	['SEED_', 'state'],
 	['EVENT_', 'events'],
+	['GLOBAL_EVENT_', 'events'],
 	['HANDLER_', 'events'],
 	['CALLBACK_', 'events'],
 	['ATTACH_', 'events'],
@@ -121,6 +122,9 @@ export function areaOf(code: string, stage: 'compile' | 'build' | 'runtime', gui
 export const TITLES: Readonly<Record<string, string>> = {
 	// Codes with a written guide.
 	MARKLESS_ATTACH_NO_START_TRIGGER: 'Nothing starts this attach function',
+	MARKLESS_GLOBAL_EVENT_UNKNOWN: 'onDocument or onWindow names an event that never gets there',
+	MARKLESS_GLOBAL_EVENT_IN_ROW: 'A document or window listener sits inside a list row',
+	MARKLESS_GLOBAL_EVENT_PASSIVE_PREVENT: 'A scroll, wheel or touch listener calls preventDefault',
 	MARKLESS_FRAMEWORK_IMPORT_REQUIRED: 'state() is used without importing it',
 	MARKLESS_FRAMEWORK_API_RUNTIME_CALL: 'state() ran outside a .tsrx file',
 	MARKLESS_FRAMEWORK_API_ALIAS_UNSUPPORTED: 'state() was copied into a variable',
@@ -192,7 +196,7 @@ export const TITLES: Readonly<Record<string, string>> = {
 	MARKLESS_RESOLVER_CLAIMS_DIVERGED: 'Two builds of one file disagree',
 	MARKLESS_ROUTE_ARTIFACT_REGISTERED_LATE: 'A route’s code was registered too late',
 	MARKLESS_SOURCE_SYMBOL_CLAIMS_DIVERGED: 'Two builds of one file disagree',
-	MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED: 'A destructured prop or state has a default',
+	MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED: 'A destructuring default the build cannot apply',
 	MARKLESS_STATE_CLASS_INSTANCE: 'state() holds a class instance',
 	MARKLESS_STATE_CLASS_METHOD_CALL: 'Code calls a method on a class instance in state',
 	MARKLESS_STATE_CLASS_METHOD_UNBOUND: 'A handler is a method read off state',

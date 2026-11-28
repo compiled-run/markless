@@ -1,0 +1,47 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Index",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page mk-p00s7b"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "title mk-p00s7b"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Sizes"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"class": "open mk-p00s7b"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Pick a size"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.page.mk-p00s7b {\n\t\t\t\tpadding: 24px;\n\t\t\t\tbackground: #f4f1de;\n\t\t\t\tcolor: #3d405b;\n\t\t\t}\n\t\t\t.title.mk-p00s7b {\n\t\t\t\tfont-size: 26px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n\t\t\t.open.mk-p00s7b {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin-top: 16px;\n\t\t\t\tpadding: 12px 20px;\n\t\t\t\tborder: 2px solid #3d405b;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #3d405b;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t}\n\t\t\t.sheet.mk-p00s7b {\n\t\t\t\tpadding: 24px;\n\t\t\t}\n\t\t\t.sheet-title.mk-p00s7b {\n\t\t\t\tmargin: 0 0 12px;\n\t\t\t\tfont-size: 20px;\n\t\t\t}\n\t\t\t.sizes.mk-p00s7b {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgap: 8px;\n\t\t\t}\n\t\t\t.size.mk-p00s7b {\n\t\t\t\tmin-height: 48px;\n\t\t\t\tpadding: 12px 16px;\n\t\t\t\tborder: 2px solid #3d405b;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #3d405b;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\ttext-align: left;\n\t\t\t}\n\t\t\t.more.mk-p00s7b {\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tpadding: 8px 12px;\n\t\t\t\tborder: 2px solid #e07a5f;\n\t\t\t\tborder-radius: 12px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t\tcolor: #e07a5f;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 16px;\n\t\t\t}",
+	"states": []
+}
