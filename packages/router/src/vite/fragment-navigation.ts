@@ -470,24 +470,6 @@ export function runFragmentNavigation(
 			target && target.nodeType === 1 ? (target as Element) : target?.parentElement;
 		return element?.closest('a[href]');
 	};
-	// What navigate imports leaving the page shown: shared-swap once a runtime bound a shared() instance, kept-swap beside a kept part with state.
-	const swapModules = () => {
-		const [shared, kept] = config.swapModules;
-		const instanceAttribute = config.keepAttributes[3];
-		const bound = [d, d.querySelector(`[${config.containerAttributes[0]}]`)].some((place) =>
-			Object.values(
-				(
-					place as {
-						[key: string]: { instances?: Record<string, { shape?: string }> };
-					} | null
-				)?.[config.sharedInstances[0]]?.instances ?? {},
-			).some((instance) => instance.shape),
-		);
-		return [
-			...(bound ? shared : []),
-			...(instanceAttribute && d.querySelector(`[${instanceAttribute}]`) ? kept : []),
-		];
-	};
 	// The destination's landing plan plus the swap module: what the page needs once it is in.
 	const preloadCode = (url: URL, low: boolean) => {
 		const present = new Set(
@@ -498,7 +480,6 @@ export function runFragmentNavigation(
 		for (const item of [
 			config.entry,
 			...config.entryImports,
-			...(low ? [] : swapModules()),
 			...(state.routes[url.pathname] ?? []),
 		]) {
 			const entry = typeof item === 'string' ? { href: item } : item;

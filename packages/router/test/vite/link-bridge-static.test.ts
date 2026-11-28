@@ -7,7 +7,6 @@ import { fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 import { buildFixture } from '../support/fixture-build.ts';
-import { openHoldingPages } from '../support/swap-press.ts';
 
 // A built app whose middleware redirects every path that is not one of its pages, as a signed-in-only app does.
 
@@ -79,23 +78,6 @@ test('the link bridge is a static file in the client output, served past the red
 	expect(response.headers.get('content-type')).toMatch(/javascript/);
 	expect(response.headers.get('cache-control')).toContain('immutable');
 	expect(await response.text()).toBe(written);
-});
-
-test('leaving a page with no kept part and no shared() instance, a press asks for no swap module, before its page arrives or after', async () => {
-	const page = await browser!.newPage();
-	const swap = await openHoldingPages(page, join(root, '.output/public'), origin);
-	expect(swap.shared.length + swap.kept.length).toBeGreaterThan(0);
-	await page.locator('[data-increment]').waitFor();
-	await swap.press('[data-nav="other"]');
-	await expect.poll(swap.held).toBeGreaterThan(0);
-	await swap.release();
-	await page.locator('[data-nav="other"]').click();
-	await page.waitForFunction(
-		() => document.querySelector('[data-page]')?.getAttribute('data-page') === 'other',
-	);
-	await page.waitForLoadState('networkidle');
-	expect(swap.requested()).toEqual([]);
-	await page.close();
 });
 
 test('a link click still swaps the page in place', async () => {

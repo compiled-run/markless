@@ -287,6 +287,7 @@ async function marklessRenderSsr(marklessSsrProps = {}, marklessSsrRenderContext
 		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
+		...(marklessSsrChildren.some((marklessSsrChild) => marklessSsrChild.output.keptState) ? { keptState: true } : {}),
 	};
 }",
     "symbolModules": "symbol:0
@@ -546,6 +547,7 @@ async function marklessRenderSsr(marklessSsrProps = {}, marklessSsrRenderContext
 		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
+		...(marklessSsrChildren.some((marklessSsrChild) => marklessSsrChild.output.keptState) ? { keptState: true } : {}),
 	};
 }",
     "symbolModules": "symbol:0
@@ -822,6 +824,7 @@ async function marklessRenderSsr(marklessSsrProps = {}, marklessSsrRenderContext
 		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
+		...(marklessSsrChildren.some((marklessSsrChild) => marklessSsrChild.output.keptState) ? { keptState: true } : {}),
 	};
 }",
     "symbolModules": "symbol:0
@@ -1035,6 +1038,7 @@ async function marklessRenderSsr(marklessSsrProps = {}, marklessSsrRenderContext
 		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
+		...(marklessSsrChildren.some((marklessSsrChild) => marklessSsrChild.output.keptState) ? { keptState: true } : {}),
 	};
 }",
     "symbolModules": "symbol:0
@@ -1240,6 +1244,7 @@ async function marklessRenderSsr(marklessSsrProps = {}, marklessSsrRenderContext
 		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
+		...(marklessSsrChildren.some((marklessSsrChild) => marklessSsrChild.output.keptState) ? { keptState: true } : {}),
 	};
 }",
     "symbolModules": "symbol:0
@@ -1395,6 +1400,7 @@ async function marklessRenderSsr(marklessSsrProps = {}, marklessSsrRenderContext
 		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
+		...(marklessSsrChildren.some((marklessSsrChild) => marklessSsrChild.output.keptState) ? { keptState: true } : {}),
 	};
 }
 marklessRenderSsr.marklessElementHandles = [...(marklessSsrComponentPart(__marklessSsrComponent0,"Child")?.renderSsr?.marklessElementHandles??[])];",
@@ -1655,6 +1661,7 @@ async function marklessRenderSsr(marklessSsrProps = {}, marklessSsrRenderContext
 		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
+		...(marklessSsrChildren.some((marklessSsrChild) => marklessSsrChild.output.keptState) ? { keptState: true } : {}),
 	};
 }",
     "symbolModules": "symbol:0
@@ -2041,6 +2048,7 @@ async function marklessRenderSsr(marklessSsrProps = {}, marklessSsrRenderContext
 		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
+		...(marklessSsrChildren.some((marklessSsrChild) => marklessSsrChild.output.keptState) ? { keptState: true } : {}),
 	};
 }",
     "symbolModules": "symbol:0
@@ -2161,6 +2169,7 @@ async function marklessRenderSsr(marklessSsrProps = {}, marklessSsrRenderContext
 		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
+		...(marklessSsrChildren.some((marklessSsrChild) => marklessSsrChild.output.keptState) ? { keptState: true } : {}),
 	};
 }",
     "symbolModules": "",
@@ -2410,6 +2419,7 @@ async function marklessRenderSsr(marklessSsrProps = {}, marklessSsrRenderContext
 		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
+		...(marklessSsrChildren.some((marklessSsrChild) => marklessSsrChild.output.keptState) ? { keptState: true } : {}),
 	};
 }",
     "symbolModules": "",
@@ -2713,6 +2723,7 @@ async function marklessRenderSsr(marklessSsrProps = {}, marklessSsrRenderContext
 		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
+		...(marklessSsrChildren.some((marklessSsrChild) => marklessSsrChild.output.keptState) ? { keptState: true } : {}),
 	};
 }",
     "symbolModules": "symbol:0
@@ -2851,6 +2862,7 @@ async function marklessRenderSsr(marklessSsrProps = {}, marklessSsrRenderContext
 		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
+		...(marklessSsrChildren.some((marklessSsrChild) => marklessSsrChild.output.keptState) ? { keptState: true } : {}),
 	};
 }",
     "symbolModules": "",
@@ -3060,6 +3072,7 @@ async function marklessRenderSsr(marklessSsrProps = {}, marklessSsrRenderContext
 		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
+		...(marklessSsrChildren.some((marklessSsrChild) => marklessSsrChild.output.keptState) ? { keptState: true } : {}),
 	};
 }",
     "symbolModules": "symbol:0
@@ -3279,6 +3292,7 @@ async function marklessRenderSsr(marklessSsrProps = {}, marklessSsrRenderContext
 		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
+		...(marklessSsrChildren.some((marklessSsrChild) => marklessSsrChild.output.keptState) ? { keptState: true } : {}),
 	};
 }",
     "symbolModules": "symbol:0

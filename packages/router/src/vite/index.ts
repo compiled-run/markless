@@ -74,6 +74,7 @@ import {
 	watchViewport,
 } from './fragment-navigation.ts';
 import { prefetches, prefetchPolicy, type RouterPrefetch } from './prefetch-policy.ts';
+import { fetchSwapModulesAtPress } from './swap-modules-at-press.ts';
 import { fragmentRequestModule } from './nitro-fragment-requests.ts';
 import {
 	brotliCopiesPlugin,
@@ -1215,12 +1216,12 @@ function virtualModulesPlugin(
 					);
 				}
 				if (id.startsWith(`\0${FRAGMENT_ENTRY_PATH_ID}`)) {
-					return entryPathSource(
+					return `${entryPathSource(
 						'fragmentEntryPath',
 						fragmentEntry,
 						FRAGMENT_ENTRY_ID,
 						root,
-					);
+					)}\nexport const fragmentSwapModules = ${JSON.stringify(fragmentEntry.swapModules)};`;
 				}
 				// A built page names its own resume module in its route script; only dev resumes through the table.
 				if (id.startsWith(`\0${DEV_RESUME_MODULES_ID}`)) {
@@ -1409,7 +1410,6 @@ function linkBridgeFilesPlugin(
 					navigationEntryPath: entryPath(navigationEntry, NAVIGATION_ENTRY_ID, root),
 					fragmentEntryPath: entryPath(fragmentEntry, FRAGMENT_ENTRY_ID, root),
 					fragmentEntryImports: fragmentEntry.imports,
-					fragmentSwapModules: fragmentEntry.swapModules,
 					fragmentNavigationSource: minifiedFragmentNavigationSource(),
 					fragmentNavigationRunSource:
 						minifiedFragmentNavigationSource(runFragmentNavigation),
@@ -1461,7 +1461,7 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`import { resumeEntryPath } from ${JSON.stringify(`${RESUME_ENTRY_PATH_ID}${query}`)};`,
 		`import { prerenderWakeEntryPath } from ${JSON.stringify(`${PRERENDER_WAKE_ENTRY_PATH_ID}${query}`)};`,
 		`import { navigationEntryPath } from ${JSON.stringify(`${NAVIGATION_ENTRY_PATH_ID}${query}`)};`,
-		`import { fragmentEntryPath } from ${JSON.stringify(`${FRAGMENT_ENTRY_PATH_ID}${query}`)};`,
+		`import { fragmentEntryPath, fragmentSwapModules } from ${JSON.stringify(`${FRAGMENT_ENTRY_PATH_ID}${query}`)};`,
 		`import { documentStylesheets, routeModulePreloads, routeSsrModulePreloads, routeStylesheets, stylesheetSources, inlineStylesheets, documentImportMap, routeResumeModules } from ${JSON.stringify(`${ROUTE_PRELOADS_ID}${query}`)};`,
 		`import { pageModuleLoaders, routeFileIds } from ${JSON.stringify(`${ROUTE_DISCOVERY_ID}${query}`)};`,
 		`import { documentNavigation } from ${JSON.stringify(`${ROUTER_OPTIONS_ID}${query}`)};`,
@@ -1475,6 +1475,8 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`  prerenderWakeEntryPath,`,
 		`  navigationEntryPath,`,
 		`  fragmentEntryPath,`,
+		`  fragmentSwapModules,`,
+		`  fragmentPressSource: ${JSON.stringify(minifiedFragmentNavigationSource(fetchSwapModulesAtPress))},`,
 		`  fragmentNavigationSource: ${JSON.stringify(minifiedFragmentNavigationSource())},`,
 		`  fragmentNavigationRunSource: ${JSON.stringify(minifiedFragmentNavigationSource(runFragmentNavigation))},`,
 		`  fragmentNavigationViewportSource: ${JSON.stringify(minifiedFragmentNavigationSource(watchViewport))},`,

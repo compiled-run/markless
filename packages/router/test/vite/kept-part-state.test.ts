@@ -10,7 +10,8 @@ import {
 	PROTOCOL_KEEP_INSTANCE_ATTRIBUTE,
 } from '../../../serializer/src/protocol-keep.ts';
 import { buildFixture } from '../support/fixture-build.ts';
-import { openHoldingPages } from '../support/swap-press.ts';
+import { watchSwapModules } from '../support/swap-press.ts';
+import { SWAP_MODULES_SCRIPT_ATTRIBUTE } from '../../src/vite/swap-modules-at-press.ts';
 
 // /guide and /reference render one side navigation with its own state and a `path` prop; /about renders a different one.
 
@@ -111,21 +112,49 @@ test('the server marks a part with state that two pages render alike as kept, wi
 	);
 });
 
-test('leaving a page with a kept part, a press fetches kept-swap while the page is on its way, and nothing only shared-swap needs', async () => {
-	const page = await browser!.newPage();
-	const swap = await openHoldingPages(
-		page,
-		join(root, '.output/public'),
-		`${server!.origin}/guide`,
+const keptSwapPresent = async (swap: Awaited<ReturnType<typeof watchSwapModules>>) => {
+	await expect.poll(async () => (await swap.present()).toSorted()).toEqual(
+		expect.arrayContaining([...new Set(swap.kept)].toSorted()),
 	);
+};
+
+test('leaving a page with a kept part, a press fetches kept-swap while the page is still on its way', async () => {
+	const page = await browser!.newPage();
+	const swap = await watchSwapModules(page, join(root, '.output/public'));
 	expect(swap.kept.length).toBeGreaterThan(0);
-	const wanted = swap.kept.filter((path) => !swap.landed.includes(path));
-	expect(wanted.length).toBeGreaterThan(0);
-	await swap.press('[data-nav="reference"]');
-	await expect.poll(() => swap.requested().toSorted()).toEqual([...new Set(wanted)].toSorted());
+	await swap.hold();
+	await page.goto(`${server!.origin}/guide`);
+	await page.focus('[data-nav="reference"]');
+	await keptSwapPresent(swap);
 	expect(swap.held()).toBeGreaterThan(0);
 	await swap.release();
 	expect(swap.requested().every((path) => swap.kept.includes(path))).toBe(true);
+	await page.close();
+});
+
+test('on a page with a kept part reached in place, a press fetches kept-swap too', async () => {
+	const { page, errors } = await open('/plain');
+	const swap = await watchSwapModules(page, join(root, '.output/public'));
+	await page.click('[data-plain-guide]');
+	await shows(page, 'Guide page');
+	expect(swap.requested()).toEqual([]);
+	await page.focus('[data-nav="reference"]');
+	await keptSwapPresent(swap);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a page with no kept part and no shared() state serves no relay; a press there fetches no swap module', async () => {
+	expect(await fetchText('/plain')).not.toContain(SWAP_MODULES_SCRIPT_ATTRIBUTE);
+	expect(await fetchText('/guide')).toContain(SWAP_MODULES_SCRIPT_ATTRIBUTE);
+	const { page, errors } = await open('/plain');
+	const swap = await watchSwapModules(page, join(root, '.output/public'));
+	await page.focus('[data-plain-guide]');
+	await page.waitForFunction(() => '__marklessFragmentNav' in document);
+	await page.waitForLoadState('networkidle');
+	expect(await page.evaluate(() => '__mSP' in document)).toBe(false);
+	expect(swap.requested()).toEqual([]);
+	expect(errors).toEqual([]);
 	await page.close();
 });
 

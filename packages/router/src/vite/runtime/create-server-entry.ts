@@ -43,6 +43,7 @@ import {
 	PROTOCOL_STREAM_OPEN_PROPERTY,
 	RESUME_MODULE_ATTRIBUTE,
 } from '@markless/web/fns/container-region';
+import { hasLiveSharedDefinitions } from '../../../../serializer/src/protocol-shared-instances.ts';
 import {
 	installKeepParts,
 	PROTOCOL_KEEP_ATTRIBUTE,
@@ -93,6 +94,7 @@ import {
 	type FragmentNavigationConfig,
 } from '../fragment-navigation.ts';
 import type { FragmentPreload, FragmentSwapModules } from '../entries/fragment-entry.ts';
+import { fetchSwapModulesAtPress, SWAP_MODULES_SCRIPT_ATTRIBUTE } from '../swap-modules-at-press.ts';
 import {
 	prefetches,
 	prefetchPolicy,
@@ -138,8 +140,10 @@ export interface ServerEntryOptions {
 	readonly fragmentEntryPath?: string;
 	// The files the fragment entry statically imports, preloaded beside it.
 	readonly fragmentEntryImports?: readonly string[];
-	// The swap's lazy modules and their imports, for the run half: the page bridge never names them.
+	// The swap's lazy modules and their imports: a press on a page that needs them fetches them beside the page.
 	readonly fragmentSwapModules?: FragmentSwapModules;
+	// The relay that fetches them, minified by the build (the source form serves otherwise).
+	readonly fragmentPressSource?: string;
 	// The inline half of fragment navigation, minified by the build (the source form serves otherwise).
 	readonly fragmentNavigationSource?: string;
 	// The half of fragment navigation the bridge loads on the first link intent or at idle, minified the same way.
@@ -196,7 +200,6 @@ export type LinkBridgeOptions = Pick<
 	| 'navigation'
 	| 'fragmentEntryPath'
 	| 'fragmentEntryImports'
-	| 'fragmentSwapModules'
 	| 'fragmentNavigationSource'
 	| 'fragmentNavigationRunSource'
 	| 'fragmentNavigationViewportSource'
@@ -214,7 +217,6 @@ function fragmentBridgeFor(
 		? {
 				entry: options.fragmentEntryPath,
 				entryImports: options.fragmentEntryImports ?? [],
-				swapModules: options.fragmentSwapModules ?? [[], []],
 				source: options.fragmentNavigationSource ?? startFragmentNavigation.toString(),
 				runSource: options.fragmentNavigationRunSource ?? runFragmentNavigation.toString(),
 				viewportSource:
@@ -469,6 +471,10 @@ export function createServerEntry(options: ServerEntryOptions) {
 			documentLoads,
 			fragmentBridge,
 			linkBridges,
+			options.fragmentSwapModules && {
+				modules: options.fragmentSwapModules,
+				source: options.fragmentPressSource ?? fetchSwapModulesAtPress.toString(),
+			},
 		);
 		let rendersStorage = false;
 		const routedArtifact = {
@@ -700,6 +706,7 @@ function routedPageArtifact(
 	documentLoads = false,
 	fragment?: FragmentBridge,
 	linkBridgePaths?: readonly [string, string],
+	swapModules?: SwapModulesAtPress,
 ) {
 	// The document's own injections (dev links its scoped-style closure there) come first: the shell's CSS precedes the page's.
 	const headInjections = dedupeHeadLinks([
@@ -731,16 +738,32 @@ function routedPageArtifact(
 						linkBridgePaths,
 					)
 				: '';
+			const press = fragment && swapModules ? swapModulesAtPress(output, swapModules) : '';
 			const stateWithProps = withPagePropsCell(output.state, pageProps);
-			return routeScript || linkBridge || stateWithProps !== output.state
+			return routeScript || linkBridge || press || stateWithProps !== output.state
 				? {
 						...output,
 						state: stateWithProps,
-						html: `${output.html}${routeScript}${linkBridge}`,
+						html: `${output.html}${routeScript}${linkBridge}${press}`,
 					}
 				: output;
 		},
 	};
+}
+
+type SwapModulesAtPress = { readonly modules: FragmentSwapModules; readonly source: string };
+
+// Only a page whose render keeps state across a navigation names the swap's lazy modules and the relay that fetches them at a press.
+function swapModulesAtPress(output: RenderOutput, swap: SwapModulesAtPress): string {
+	const [shared, kept] = swap.modules;
+	const files = new Set([
+		...(hasLiveSharedDefinitions(output.state as Parameters<typeof hasLiveSharedDefinitions>[0])
+			? shared
+			: []),
+		...((output as { readonly keptState?: true }).keptState ? kept : []),
+	]);
+	if (files.size === 0) return '';
+	return `<script type="application/json" ${SWAP_MODULES_SCRIPT_ATTRIBUTE}>${escapeScriptJson([...files])}</script><script>(${swap.source})(document,${JSON.stringify(SWAP_MODULES_SCRIPT_ATTRIBUTE)},${FRAGMENT_HOVER_DWELL_MS})</script>`;
 }
 
 // Symbol modules and props+state computeds re-running on a resumed page read
@@ -1331,7 +1354,6 @@ interface FragmentBridge {
 	readonly runSource: string;
 	readonly viewportSource: string;
 	readonly entryImports: readonly string[];
-	readonly swapModules: FragmentSwapModules;
 	readonly prefetch: PrefetchPolicy;
 	readonly pages: readonly string[];
 }
@@ -1359,7 +1381,6 @@ function fragmentConfig(
 	return {
 		entry: fragment.entry,
 		entryImports: fragment.entryImports,
-		swapModules: fragment.swapModules,
 		linkAttribute: LINK_ATTRIBUTE,
 		prefetchAttribute: PREFETCH_ATTRIBUTE,
 		replaceAttribute: REPLACE_ATTRIBUTE,

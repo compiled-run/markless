@@ -7,8 +7,6 @@ export type FragmentSwapModules = readonly [shared: readonly string[], kept: rea
 export interface FragmentNavigationConfig {
 	readonly entry: string;
 	readonly entryImports: readonly string[];
-	// A press fetches each only when the page shown is one navigate imports it from; idle never does.
-	readonly swapModules: FragmentSwapModules;
 	readonly linkAttribute: string;
 	readonly prefetchAttribute: string;
 	readonly replaceAttribute: string;
