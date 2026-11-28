@@ -15146,12 +15146,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
-		title: 'A destructured prop or state has a default',
+		title: 'A destructuring default the build cannot apply',
 		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
-		description: 'Graph destructuring defaults are not supported yet: a Markless build error.',
+		description: 'A destructuring default sits where the build cannot apply it.',
 		printed: [
 			'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED: Cannot create graph alias "<localName>" from "<target>" with a default value.',
 			'A destructuring default must run only when the property value is undefined. The current graph alias artifact can represent a graph path, but not a fallback expression without changing JavaScript semantics.',
@@ -15162,6 +15162,448 @@ export const errorEntries: readonly ErrorEntry[] = [
 		why: 'A destructuring default must run only when the property value is undefined. The current graph alias artifact can represent a graph path, but not a fallback expression without changing JavaScript semantics.',
 		suggestion:
 			'Use an explicit computed() for fallback logic, or read the graph path directly without a destructuring default.',
+		guide: {
+			summary: 'A destructuring default sits where the build cannot apply it.',
+			what: [
+				{
+					id: 's0',
+					text: 'A default on a top-level prop, such as ',
+				},
+				{
+					id: 's1',
+					text: '{ size = 3 }',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ', works everywhere: markup, ',
+				},
+				{
+					id: 's3',
+					text: 'computed()',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', event handlers, ',
+				},
+				{
+					id: 's5',
+					text: '@if',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ' and ',
+				},
+				{
+					id: 's7',
+					text: '@for',
+					code: true,
+				},
+				{
+					id: 's8',
+					text: ', and props passed on. Three shapes still stop the build: a default on state you destructure (',
+				},
+				{
+					id: 's9',
+					text: 'const { title = "Untitled" } = menu',
+					code: true,
+				},
+				{
+					id: 's10',
+					text: '), a default inside a nested prop pattern (',
+				},
+				{
+					id: 's11',
+					text: '{ options: { size = 3 } }',
+					code: true,
+				},
+				{
+					id: 's12',
+					text: '), and an object, array or function default (',
+				},
+				{
+					id: 's13',
+					text: '{ items = [] }',
+					code: true,
+				},
+				{
+					id: 's14',
+					text: ', ',
+				},
+				{
+					id: 's15',
+					text: '{ onPick = () => {} }',
+					code: true,
+				},
+				{
+					id: 's16',
+					text: '), each read anywhere other than a body assignment or a ',
+				},
+				{
+					id: 's17',
+					text: 'state()',
+					code: true,
+				},
+				{
+					id: 's18',
+					text: ' initializer.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Make the value its own top-level prop with the default there, or write the fallback where you read the value (',
+				},
+				{
+					id: 's1',
+					text: 'menu.title ?? "Untitled"',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ', ',
+				},
+				{
+					id: 's3',
+					text: '(items ?? []).length',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', ',
+				},
+				{
+					id: 's5',
+					text: 'onPick?.()',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ').',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'Card',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r5',
+							text: '({ ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: 'size',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r7',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r9',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: '3',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r11',
+							text: ' }',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r13',
+							text: ' { ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r14',
+							text: 'size',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r15',
+							text: '?:',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r16',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r17',
+							text: 'number',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r18',
+							text: ' }) ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r19',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'span',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r2',
+							text: '>{size}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'span',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+					],
+				},
+			],
+			before: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'Card',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r5',
+							text: '({ ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: 'options',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r7',
+							text: ': { ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: 'size',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r9',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r11',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: '3',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r13',
+							text: ' } }',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r14',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r15',
+							text: ' { ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r16',
+							text: 'options',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r17',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r18',
+							text: ' { ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r19',
+							text: 'size',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
+						},
+						{
+							id: 'r20',
+							text: '?:',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r21',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r22',
+							text: 'number',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
+						},
+						{
+							id: 'r23',
+							text: ' } }) ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r24',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'span',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r2',
+							text: '>{size}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'span',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+					],
+				},
+			],
+		},
 		sources: [
 			{
 				id: 'f0',

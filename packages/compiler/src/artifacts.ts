@@ -324,6 +324,8 @@ export type SemanticComponentPropDeclaration = {
 	readonly propPath: ReadonlyArray<string>;
 	// The authored destructuring default, applied only when the prop is undefined.
 	readonly defaultSource?: string;
+	/** The computed that applies `defaultSource`; every read of the local reads it instead of the prop. */
+	readonly defaultedGraphNodeId?: string;
 	readonly sourceSpan: SourceSpan;
 };
 

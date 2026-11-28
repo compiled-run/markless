@@ -65,30 +65,40 @@ test('a quoted key leaves the rest pattern holding everything else', async () =>
 	]);
 });
 
-test('a quoted key with a default keeps the default and its template-read diagnostic', async () => {
+test('a quoted key with a default keeps the default, and a template read of it reads the default', async () => {
 	const compiled = await compile(`
 		export function Thumb({ 'aria-label': label = 'Resize' }) @{
 			<span>{label}</span>
 		}
 	`);
 
-	expect(compiled.semanticGraph.aliases).toEqual(
+	expect(compiled.semanticGraph.componentPropBindings).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({
-				name: 'label',
+				localName: 'label',
 				propPath: ['aria-label'],
 				defaultSource: "'Resize'",
+				defaultedGraphNodeId: 'computed:Thumb.label',
 			}),
 		]),
+	);
+	const derive = compiled.symbolResolver.symbols.find(
+		(symbol) =>
+			symbol.kind === 'sync-computed-derive' &&
+			'graphNodeId' in symbol &&
+			symbol.graphNodeId === 'computed:Thumb.label',
+	);
+	expect(
+		compiled.symbolModules.modules.find((module) => module.symbolId === derive?.id)?.source,
+	).toContain(
+		`context.graph.read("prop:props", ["aria-label"]) === undefined ? 'Resize' : context.graph.read("prop:props", ["aria-label"])`,
 	);
 	expect(compiled.publicRenderModule.ssrModuleSource).toContain(
 		`const { "aria-label": label = 'Resize' } = marklessSsrProps ?? {};`,
 	);
 	expect(
 		compiled.stateLowering.diagnostics.filter((diagnostic) => diagnostic.severity === 'error'),
-	).toEqual([
-		expect.objectContaining({ code: 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED' }),
-	]);
+	).toEqual([]);
 });
 
 test('a quoted key that is a plain name reads like the unquoted one', async () => {

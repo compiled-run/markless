@@ -192,7 +192,7 @@ export const TITLES: Readonly<Record<string, string>> = {
 	MARKLESS_RESOLVER_CLAIMS_DIVERGED: 'Two builds of one file disagree',
 	MARKLESS_ROUTE_ARTIFACT_REGISTERED_LATE: 'A route’s code was registered too late',
 	MARKLESS_SOURCE_SYMBOL_CLAIMS_DIVERGED: 'Two builds of one file disagree',
-	MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED: 'A destructured prop or state has a default',
+	MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED: 'A destructuring default the build cannot apply',
 	MARKLESS_STATE_CLASS_INSTANCE: 'state() holds a class instance',
 	MARKLESS_STATE_CLASS_METHOD_CALL: 'Code calls a method on a class instance in state',
 	MARKLESS_STATE_CLASS_METHOD_UNBOUND: 'A handler is a method read off state',

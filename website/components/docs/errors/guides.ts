@@ -156,6 +156,21 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 			'}',
 		],
 	},
+	MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED: {
+		summary: 'A destructuring default sits where the build cannot apply it.',
+		what: 'A default on a top-level prop, such as `{ size = 3 }`, works everywhere: markup, `computed()`, event handlers, `@if` and `@for`, and props passed on. Three shapes still stop the build: a default on state you destructure (`const { title = "Untitled" } = menu`), a default inside a nested prop pattern (`{ options: { size = 3 } }`), and an object, array or function default (`{ items = [] }`, `{ onPick = () => {} }`), each read anywhere other than a body assignment or a `state()` initializer.',
+		how: 'Make the value its own top-level prop with the default there, or write the fallback where you read the value (`menu.title ?? "Untitled"`, `(items ?? []).length`, `onPick?.()`).',
+		example: [
+			'export function Card({ size = 3 }: { size?: number }) @{',
+			'\t<span>{size}</span>',
+			'}',
+		],
+		before: [
+			'export function Card({ options: { size = 3 } }: { options: { size?: number } }) @{',
+			'\t<span>{size}</span>',
+			'}',
+		],
+	},
 	MARKLESS_STATE_WRITE_IN_COMPUTED: {
 		summary: 'A computed() body writes to state.',
 		what: 'A `computed()` reads values and returns a result. This one also writes to state, and that write wakes the same computed again.',
