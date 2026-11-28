@@ -722,7 +722,7 @@ test('persists client assets for a fresh server plugin instance', async () => {
 	}
 });
 
-test('a page whose resolver lists no symbol gets no landing plan; the swap module lists what it imports', async () => {
+test('a page whose resolver lists no symbol gets no landing plan; the swap module lists what it and each lazy swap module import', async () => {
 	const workspace = await mkdtemp(join(tmpdir(), 'markless-router-quiet-landing-'));
 	const root = join(workspace, 'app');
 	const clientOutDir = join(root, 'dist/client');
@@ -767,11 +767,24 @@ test('a page whose resolver lists no symbol gets no landing plan; the swap modul
 			moduleIds: [join(root, 'pages/notes.tsrx'), resolverId('pages/notes.tsrx')],
 		}),
 		'build/fragment.js': chunk({
+			dynamicImports: ['build/kept-swap.js', 'build/shared-swap.js'],
 			fileName: 'build/fragment.js',
 			imports: ['build/helper.js'],
 			moduleIds: ['/repo/packages/router/src/vite/entries/fragment-entry.ts'],
 		}),
 		'build/helper.js': chunk({ fileName: 'build/helper.js' }),
+		'build/kept-swap.js': chunk({
+			dynamicImports: ['build/kept-later.js'],
+			moduleIds: ['/repo/packages/web/src/kept-swap.ts'],
+			fileName: 'build/kept-swap.js',
+			imports: ['build/kept-helper.js', 'build/helper.js'],
+		}),
+		'build/shared-swap.js': chunk({
+			moduleIds: ['/repo/packages/web/src/shared-swap.ts'],
+			fileName: 'build/shared-swap.js',
+		}),
+		'build/kept-helper.js': chunk({ fileName: 'build/kept-helper.js' }),
+		'build/kept-later.js': chunk({ fileName: 'build/kept-later.js' }),
 	};
 
 	try {
@@ -779,8 +792,15 @@ test('a page whose resolver lists no symbol gets no landing plan; the swap modul
 		const plugins = flattenPlugins([router()]);
 		const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
 		configPlugin?.configResolved?.(resolvedConfig as never);
-		const context = { environment: { config: resolvedConfig.environments.browser } };
+		const context = {
+			environment: { config: resolvedConfig.environments.browser },
+			resolve: async (source: string) => ({
+				id: `/repo/packages/web/src/${source.slice('@markless/web/'.length)}.ts`,
+			}),
+		};
 		await hookHandler(configPlugin?.buildStart)?.call(context);
+		for (const source of ['@markless/web/shared-swap', '@markless/web/kept-swap'])
+			await hookHandler(configPlugin?.resolveId)?.call(context, source, undefined, {});
 		await hookHandler(configPlugin?.generateBundle)?.call(context, {}, bundle);
 		for (const fileName of Object.keys(bundle)) {
 			await mkdir(join(clientOutDir, fileName, '..'), { recursive: true });
@@ -790,12 +810,21 @@ test('a page whose resolver lists no symbol gets no landing plan; the swap modul
 		const persisted = JSON.parse(
 			await readFile(clientAssetsManifestPath(clientOutDir), 'utf8'),
 		) as {
-			readonly entries: { readonly fragment?: string; readonly fragmentImports?: string[] };
+			readonly entries: {
+				readonly fragment?: string;
+				readonly fragmentImports?: string[];
+				readonly fragmentSwapModules?: readonly [string[], string[]];
+			};
 			readonly routes: { readonly ssr: Record<string, readonly string[]> };
 		};
 
 		expect(persisted.entries.fragment).toBe('/build/fragment.js');
 		expect(persisted.entries.fragmentImports).toEqual(['/build/helper.js']);
+		// Each lazy swap module is listed on its own, shared-swap's first, without what the swap module loads anyway or what it loads later.
+		expect(persisted.entries.fragmentSwapModules).toEqual([
+			['/build/shared-swap.js'],
+			['/build/kept-swap.js', '/build/kept-helper.js'],
+		]);
 		expect(persisted.routes.ssr['pages/notes.tsrx']).toEqual([]);
 		expect(persisted.routes.ssr['pages/index.tsrx']).toEqual([
 			'/build/resume.js',

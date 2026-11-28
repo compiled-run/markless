@@ -179,7 +179,7 @@ function renderOverlayLoader(): string {
 
 function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 	return [
-		`import { composeMdxState, composeMdxView, createMdxRenderDataSurface, loadMdxRepeatModules, loadMdxSymbol, mdxSymbolLoader, renderMdxChild, tryResumeMdxScalar } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
+		`import { composeMdxState, composeMdxView, createMdxRenderDataSurface, loadMdxRepeatModules, loadMdxSymbol, mdxKeptState, mdxSymbolLoader, renderMdxChild, tryResumeMdxScalar } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
 		...route.imports,
 		'',
 		`const marklessMdxParts = ${JSON.stringify(route.parts)};`,
@@ -203,7 +203,8 @@ function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 		`    const html = ${renderHtmlExpression(route)};`,
 		'    const state = composeMdxState(marklessMdxChildren);',
 		'    const view = composeMdxView(marklessMdxParts, marklessMdxChildren, 0);',
-		'    return { html, ...(state ? { state } : {}), ...(view ? { view } : {}) };',
+		'    const keptState = mdxKeptState(marklessMdxChildren);',
+		'    return { html, ...(state ? { state } : {}), ...(view ? { view } : {}), ...(keptState ? { keptState } : {}) };',
 		'  },',
 		...renderMdxPreload(route.components),
 		'};',

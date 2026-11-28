@@ -43,6 +43,8 @@ export type MdxRenderOutput = {
 	// What the compiled artifact counted as it rendered: every element it
 	// emitted, arm content and repeat rows included.
 	readonly elementCount?: number;
+	// Its html holds a kept part with state of its own (fns/keep-parts.ts leaves this on the output it marks).
+	keptState?: boolean;
 	readonly loadSymbol?: (symbolId: string) => unknown;
 };
 
@@ -53,6 +55,8 @@ export type MdxChild = {
 	// The tags of the elements in the markdown written between the component's tags, in document order.
 	readonly childrenElementTags?: ReadonlyArray<string>;
 	readonly output?: MdxRenderOutput;
+	// Its html, as placed, holds a kept part with state of its own.
+	readonly keptState?: true;
 };
 
 export type MdxComponentArtifact = {
@@ -373,12 +377,20 @@ export async function renderMdxChild(
 					rendered as MdxRenderOutput & { readonly html: string },
 				)
 			: rendered;
-	if (output) children.push({ ...child, output });
 	const keep = (globalThis as Record<symbol, KeepParts | undefined>)[Symbol.for('markless.keep-parts')];
 	// An island with markdown between its tags places that content itself, so only a childless one is offered for keeping.
-	return output?.html && keep && !child.childrenElementTags?.length
-		? keep(output.html, undefined, { ...output, instancePath: child.hostPrefix })
-		: (output?.html ?? '');
+	const offered: MdxRenderOutput & { instancePath?: string } = { ...output, instancePath: child.hostPrefix };
+	const html =
+		output?.html && keep && !child.childrenElementTags?.length
+			? keep(output.html, undefined, offered)
+			: (output?.html ?? '');
+	if (output) children.push({ ...child, output, ...(offered.keptState ? { keptState: true as const } : {}) });
+	return html;
+}
+
+/** Whether a page's islands left a kept part with state in its html, which a navigation carries. */
+export function mdxKeptState(children: readonly MdxChild[]): true | undefined {
+	return children.some((child) => child.keptState) || undefined;
 }
 
 // Markdown children travel as a projection, so the island counts their elements where its `{children}` lands.

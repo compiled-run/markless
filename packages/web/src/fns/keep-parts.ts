@@ -480,8 +480,14 @@ function keptPart(child: object): KeptPart | undefined {
 	return sites ? { sites } : statefulPart(child as SsrDataChildOutput, view);
 }
 
-const keepParts: KeepParts = (html, projected, child) =>
-	keepMarked(html, projected, keptPart(child));
+// Leaves on the child's output whether its html as placed holds a kept part with state, which a navigation carries:
+// a part kept whole drops the marks nested in it, so only its own instance counts then.
+const keepParts: KeepParts = (html, projected, child) => {
+	const part = keptPart(child);
+	const marked = keepMarked(html, projected, part);
+	if (marked !== html) (child as { keptState?: boolean }).keptState = part?.instance !== undefined;
+	return marked;
+};
 
 /** Installs keep-parts for every render in this process. */
 export function installKeepParts(): void {

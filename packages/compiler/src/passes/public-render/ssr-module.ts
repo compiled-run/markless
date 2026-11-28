@@ -373,6 +373,7 @@ export function emitPublicSsrRenderModule(
 		'		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps),',
 		'		structure: marklessSsrRendered.structure,',
 		'		structureTokens: marklessSsrRendered.structureTokens,',
+		'		...(marklessSsrChildren.some((marklessSsrChild) => marklessSsrChild.output.keptState) ? { keptState: true } : {}),',
 		...(widgetFallbacksOutputField(input, rootInfo.componentName)
 			? [`	${widgetFallbacksOutputField(input, rootInfo.componentName).slice(2)},`]
 			: []),

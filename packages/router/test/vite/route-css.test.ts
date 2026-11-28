@@ -7,6 +7,8 @@ import { fragmentRequestUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 import { buildFixture } from '../support/fixture-build.ts';
+import { watchSwapModules } from '../support/swap-press.ts';
+import { SWAP_MODULES_SCRIPT_ATTRIBUTE } from '../../src/vite/swap-modules-at-press.ts';
 
 // Only the two ui pages render the study, whose sheet the pack planner places in a pack every page reaches.
 
@@ -94,5 +96,25 @@ test('a navigation from a page without the study to one with it shows the study 
 	await page.locator('[data-toggle]').click();
 	await expect.poll(() => page.locator('.part-1').count()).toBe(1);
 	expect(await studyLook(page)).toEqual(coldLook);
+	await page.close();
+});
+
+test('an app with no kept part and no shared() state serves no swap module relay, and a press and its click fetch no swap module', async () => {
+	for (const path of ['/', '/notes', '/ui/dial']) {
+		expect(await html(path)).not.toContain(SWAP_MODULES_SCRIPT_ATTRIBUTE);
+		expect(await fragment(path)).not.toContain(SWAP_MODULES_SCRIPT_ATTRIBUTE);
+	}
+	const page = await browser!.newPage();
+	const swap = await watchSwapModules(page, join(root, '.output/public'));
+	expect(swap.shared.length + swap.kept.length).toBeGreaterThan(0);
+	await page.goto(server!.origin);
+	await page.waitForLoadState('networkidle');
+	await page.focus('nav a[href="/notes"]');
+	await page.waitForFunction(() => '__marklessFragmentNav' in document);
+	await page.click('nav a[href="/notes"]');
+	await page.waitForURL(`${server!.origin}/notes`);
+	await page.waitForLoadState('networkidle');
+	expect(await page.evaluate(() => '__mSP' in document)).toBe(false);
+	expect(swap.requested()).toEqual([]);
 	await page.close();
 });

@@ -53,6 +53,18 @@ const markup = (open: string, count: string, note = 'Count') =>
 	`<div class="counter" data-open="${open}"><button type="button">Raise</button><span>${note}</span><span>${count}</span>${filler}</div>`;
 const attribute = (html: string, name: string) => new RegExp(`${name}="([^"]*)"`).exec(html)?.[1];
 
+test('a part kept with its own state leaves that on its output, and an unkept part keeps what its own render said', () => {
+	const kept: { keptState?: boolean } = counter();
+	keep(markup('false', '0'), undefined, kept);
+	expect(kept.keptState).toBe(true);
+	const unkept = { ...counter(), keptState: true };
+	keep('<p>short</p>', undefined, unkept);
+	expect(unkept.keptState).toBe(true);
+	const plain: { keptState?: boolean } = counter();
+	keep('<p>short</p>', undefined, plain);
+	expect(plain.keptState).toBeUndefined();
+});
+
 test('a part with state is kept with its instance path, and what its records write is left out of the hash', () => {
 	const first = keep(markup('false', '0'), undefined, counter());
 	const later = keep(markup('true', '7'), undefined, counter());
