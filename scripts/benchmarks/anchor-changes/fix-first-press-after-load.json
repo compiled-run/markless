@@ -1,0 +1,212 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/event-current-target"
+			],
+			"delta": 2117,
+			"reason": "a pointer press whose handler runs after the browser's dispatch ended keeps the capture it takes, so the moves and release sent while its code loaded reach the capturing element; measured +16 to +36 B gzip on the fixtures' emitted runtime",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/render-csr"
+			],
+			"delta": 98,
+			"reason": "a pointer press whose handler runs after the browser's dispatch ended keeps the capture it takes, so the moves and release sent while its code loaded reach the capturing element; measured +16 to +36 B gzip on the fixtures' emitted runtime",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 36,
+			"reason": "a pointer press whose handler runs after the browser's dispatch ended keeps the capture it takes, so the moves and release sent while its code loaded reach the capturing element; measured +16 to +36 B gzip on the fixtures' emitted runtime",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-ssr",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 16,
+			"reason": "a pointer press whose handler runs after the browser's dispatch ended keeps the capture it takes, so the moves and release sent while its code loaded reach the capturing element; measured +16 to +36 B gzip on the fixtures' emitted runtime",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-ssr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 16,
+			"reason": "a pointer press whose handler runs after the browser's dispatch ended keeps the capture it takes, so the moves and release sent while its code loaded reach the capturing element; measured +16 to +36 B gzip on the fixtures' emitted runtime",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/event-current-target"
+			],
+			"delta": 2117,
+			"reason": "a pointer press whose handler runs after the browser's dispatch ended keeps the capture it takes, so the moves and release sent while its code loaded reach the capturing element; measured +16 to +36 B gzip on the fixtures' emitted runtime",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/render-csr"
+			],
+			"delta": 98,
+			"reason": "a pointer press whose handler runs after the browser's dispatch ended keeps the capture it takes, so the moves and release sent while its code loaded reach the capturing element; measured +16 to +36 B gzip on the fixtures' emitted runtime",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 31,
+			"reason": "a pointer press whose handler runs after the browser's dispatch ended keeps the capture it takes, so the moves and release sent while its code loaded reach the capturing element; measured +16 to +36 B gzip on the fixtures' emitted runtime",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/event-current-target"
+			],
+			"delta": 2127,
+			"reason": "the first drag on a fresh page keeps the pointer capture its handler takes once its code loads, so the moves and release sent meanwhile reach the dragged element (no code added to what runs at load)",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/render-csr"
+			],
+			"delta": 98,
+			"reason": "the first drag on a fresh page keeps the pointer capture its handler takes once its code loads, so the moves and release sent meanwhile reach the dragged element (no code added to what runs at load)",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 450,
+			"reason": "the first drag on a fresh page keeps the pointer capture its handler takes once its code loads, so the moves and release sent meanwhile reach the dragged element (no code added to what runs at load)",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 450,
+			"reason": "the first drag on a fresh page keeps the pointer capture its handler takes once its code loads, so the moves and release sent meanwhile reach the dragged element (no code added to what runs at load)",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 450,
+			"reason": "the first drag on a fresh page keeps the pointer capture its handler takes once its code loads, so the moves and release sent meanwhile reach the dragged element (no code added to what runs at load)",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 535,
+			"reason": "the first drag on a fresh page keeps the pointer capture its handler takes once its code loads, so the moves and release sent meanwhile reach the dragged element (no code added to what runs at load)",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 547,
+			"reason": "the first drag on a fresh page keeps the pointer capture its handler takes once its code loads, so the moves and release sent meanwhile reach the dragged element (no code added to what runs at load)",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 561,
+			"reason": "the first drag on a fresh page keeps the pointer capture its handler takes once its code loads, so the moves and release sent meanwhile reach the dragged element (no code added to what runs at load)",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs / playground",
+				"jsGzipBytes"
+			],
+			"delta": 10,
+			"reason": "the first drag on a fresh page keeps the pointer capture its handler takes once its code loads, so the moves and release sent meanwhile reach the dragged element (no code added to what runs at load)",
+			"date": "2026-11-24"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state playground",
+				"jsGzipBytes"
+			],
+			"delta": 37,
+			"reason": "the first drag on a fresh page keeps the pointer capture its handler takes once its code loads, so the moves and release sent meanwhile reach the dragged element (no code added to what runs at load)",
+			"date": "2026-11-24"
+		}
+	]
+}

@@ -9,6 +9,7 @@ import type {
 import { MARKLESS_COMPONENT_PART_BRAND } from '@markless/web/render-to-string';
 import type { StorageSeedMetadata } from '@markless/serializer';
 import { ASYNC_PROTOCOL_VERSION, hasLiveSharedDefinitions } from '@markless/serializer';
+import { POINTER_CAPTURE_PROPERTY } from '../../web/src/event-current-target.ts';
 import type { RuntimeDemandMapArtifact } from '@markless/compiler';
 import { emitScalarPlanLoader } from './scalar-plan-loader.ts';
 import { scalarPlanSourceReference } from './scalar-plan-source.ts';
@@ -1123,7 +1124,8 @@ export function emitQueuedResumeContainerEvent(
 		'\t\t\tlastEventTime = eventTime;',
 		'\t\t\tlet release;',
 		'\t\t\tconst started = new Promise(resolve => release = resolve);',
-		'\t\t\tconst run = () => root.__mL === life ? (root.__marklessReleaseDispatch = release, handler(next)) : release();',
+		// A capture a replayed press took aims this pointer's later events at its element, decided once the events before it ran.
+		`\t\t\tconst run = () => root.__mL === life ? (root.__marklessReleaseDispatch = release, handler(globalThis.${POINTER_CAPTURE_PROPERTY}?.(next) ?? next)) : release();`,
 		'\t\t\tdone = tail.then(run, run);',
 		'\t\t\tdone.then(release, release);',
 		'\t\t\ttail = started;',

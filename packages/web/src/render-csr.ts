@@ -34,6 +34,7 @@ import {
 	marklessNoteArrivingControlEdits,
 } from './control-edit-hold.ts';
 import type { MarklessIdleHost } from './fns/idle-trigger.ts';
+import { marklessCapturedInput } from './event-current-target.ts';
 
 declare const __MARKLESS_DEV_ENABLED__: boolean;
 
@@ -96,6 +97,7 @@ export async function renderCsrRuntime(input: {
 		const dispatch = async () => {
 			if (disposed) return undefined;
 			(output.root as unknown as ResumeDomElement).__marklessReleaseDispatch = release;
+			marklessCapturedInput({ root: output.root, event });
 			return dispatchHandler(event, dispatchOptions);
 		};
 		const next = dispatchTail.then(dispatch, dispatch);
