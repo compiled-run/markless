@@ -114,6 +114,7 @@ const buildOrder: PackUserConfig[] = [
 			decode: './src/value-decode.ts',
 			'decode-client': './src/value-decode-client.ts',
 			protocol: './src/protocol.ts',
+			'protocol-global-events': './src/protocol-global-events.ts',
 			'protocol-validation': './src/protocol-validation-storage.ts',
 			'record-templates': './src/protocol-record-templates.ts',
 			'render-data-hosts': './src/render-data-hosts.ts',
@@ -341,6 +342,8 @@ export default defineConfig({
 			'packages/typescript-plugin/test/fixtures/**',
 			'demos/chained-async-comparison/**/routeTree.gen.ts',
 			'packages/typescript-plugin/src/element-attribute-names.generated.d.ts',
+			'packages/typescript-plugin/src/global-event-types.generated.d.ts',
+			'packages/compiler/src/ast/global-event-types.generated.ts',
 			// Written by packages/mobile/test/write-conformance.ts: the phone engine's text, which native-script.ts holds as strings.
 			'packages/mobile/conformance/engine/**',
 		],

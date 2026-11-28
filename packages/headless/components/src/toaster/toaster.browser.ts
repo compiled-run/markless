@@ -188,6 +188,27 @@ test('CSR: a message never takes focus away from what a person was doing', async
 	expect(document.activeElement).toBe(el(Save));
 });
 
+// The key reaches the region through a document listener the root owns, wherever focus is.
+const key = (target: Element, name: string) =>
+	target.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }));
+
+for (const mode of ['CSR', 'SSR'] as const)
+	test(`${mode}: F8 moves focus into the region, and Escape there hands it back`, async () => {
+		await (mode === 'CSR' ? render(Basic) : renderSSR(Basic));
+		el<HTMLButtonElement>(Save).focus();
+		// The browser reads the cancel before any handler code has loaded.
+		expect(key(el(Save), 'F8')).toBe(false);
+		await expect.poll(() => document.activeElement).toBe(el(Root));
+		expect(el(Root).hasAttribute('ui-expanded')).toBe(true);
+		expect(key(el(Root), 'Escape')).toBe(true);
+		await expect.poll(() => document.activeElement).toBe(el(Save));
+		expect(el(Root).hasAttribute('ui-expanded')).toBe(false);
+		// Outside the region Escape is someone else's.
+		key(el(Save), 'Escape');
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(document.activeElement).toBe(el(Save));
+	});
+
 // The one wall the shipped row mint does not clear. Every clock in this family is
 // started inside `toast()`, a method on the app-scoped shared instance that a
 // consumer module cannot call - and `expire`, `hasExpired`, `holdAll` and

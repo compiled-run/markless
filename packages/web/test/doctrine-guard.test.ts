@@ -80,6 +80,8 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'The deferred-trigger census tells the page start and end comments from the elements it counts.',
 	'packages/web/src/inline/defer.ts :: ...root.querySelectorAll(':
 		'The deferred-trigger helper finds the hosts of its lane by the m:on event host attribute the server wrote, one native attribute query in place of a census walk.',
+	'packages/web/src/fns/global-relay.ts :: for (const owner of current.querySelectorAll(selector(name))) {':
+		'The document and window relay finds the owners of its record name by the owner attribute the compiler wrote on them, the same native attribute query the deferred-trigger helper makes.',
 	'packages/web/src/inline/resumer.ts :: for (const element of input.root.querySelectorAll(':
 		'Debug builds only: the inline debug registration finds event hosts by their m:on attribute to record them for explainInteraction.',
 	'packages/web/src/inline/resumer.ts :: const walker = document.createTreeWalker(root, 129);':

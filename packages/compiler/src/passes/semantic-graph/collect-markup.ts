@@ -1,8 +1,9 @@
+import { PROTOCOL_GLOBAL_EVENT_OWNER_ATTRIBUTE } from '@markless/serializer/protocol-global-events';
 import {
 	ENUMERATED_BOOLEAN_ATTRIBUTE,
 	marklessAttributeValue as attributeText,
 } from '@markless/web/dom-attribute';
-import { isEventAttribute } from '../../ast/events.ts';
+import { globalEventAttribute, isEventAttribute, normalizeEventName } from '../../ast/events.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
@@ -575,6 +576,9 @@ function emitNode(
 	let spreadClassResidue: SemanticMarkupResidue | null = null;
 	// A textarea ignores a value attribute: its text content is the value it shows.
 	let textareaValue: AnyNode | null = null;
+	const ownedGlobalEvents = globalEventOwnerValue(elementAttributes);
+	if (ownedGlobalEvents)
+		append(builder, ` ${PROTOCOL_GLOBAL_EVENT_OWNER_ATTRIBUTE}="${ownedGlobalEvents}"`);
 	for (const attribute of elementAttributes) {
 		if (isSpreadAttribute(attribute)) {
 			const expression = unwrapExpressionContainer(
@@ -1134,6 +1138,8 @@ function emitDynamicHost(
 		  }
 	> = [];
 	const elementAttributes = getElementAttributes(node);
+	const ownedGlobalEvents = globalEventOwnerValue(elementAttributes);
+	if (ownedGlobalEvents) staticAttributes[PROTOCOL_GLOBAL_EVENT_OWNER_ATTRIBUTE] = ownedGlobalEvents;
 	const declaredAttributeNames = elementAttributes.flatMap((candidate) => {
 		if (isSpreadAttribute(candidate)) return [];
 		const name = getIdentifierName(candidate.name as AnyNode | undefined);
@@ -1644,4 +1650,15 @@ function isAlwaysPresentValue(expression: AnyNode): boolean {
 			(typeof node.value === 'string' || typeof node.value === 'number')
 		);
 	});
+}
+
+// The document and window records this element owns, as the owner attribute writes them.
+function globalEventOwnerValue(attributes: ReadonlyArray<AnyNode>): string {
+	const names = new Set<string>();
+	for (const attribute of attributes) {
+		if (isSpreadAttribute(attribute)) continue;
+		const name = getIdentifierName(attribute.name as AnyNode | undefined);
+		if (name && globalEventAttribute(name)) names.add(normalizeEventName(name));
+	}
+	return [...names].join(' ');
 }

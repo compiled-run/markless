@@ -25,7 +25,8 @@
 		"./render-data-hosts": "./src/render-data-hosts.ts",
 		"./native-view": "./src/native-view.ts",
 		"./native-device": "./src/native-device.ts",
-		"./protocol-validation": "./src/protocol-validation-storage.ts"
+		"./protocol-validation": "./src/protocol-validation-storage.ts",
+		"./protocol-global-events": "./src/protocol-global-events.ts"
 	},
 	"publishConfig": {
 		"exports": {
@@ -76,6 +77,10 @@
 			"./protocol-validation": {
 				"types": "./dist/protocol-validation.d.ts",
 				"default": "./dist/protocol-validation.js"
+			},
+			"./protocol-global-events": {
+				"types": "./dist/protocol-global-events.d.ts",
+				"default": "./dist/protocol-global-events.js"
 			}
 		},
 		"access": "public",
