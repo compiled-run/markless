@@ -3322,6 +3322,10 @@ export type TriggerGroupArtifact = {
 
 export type SymbolResolverModuleInput = {
 	readonly literalImports?: boolean;
+	// Imports the bound-row helpers from this module (see emitSymbolResolverHelpersModule) instead of inlining them.
+	readonly helpersModuleId?: string;
+	// Some bound rows belong to an imported child whose symbols still read their legacy prop cell.
+	readonly importedCaptureRows?: boolean;
 	// Small resolvers too: trigger-group resolvers set it so a packed build reaches every symbol it loads.
 	readonly bundlerVisibleImports?: boolean;
 	readonly buildId?: string;

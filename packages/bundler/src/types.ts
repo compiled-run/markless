@@ -54,6 +54,8 @@ export type MarklessVirtualModuleType =
 	| 'symbol'
 	| 'symbol-bundle'
 	| 'trigger-group'
+	// Bound-row helpers a page's trigger groups import statically: one copy, never its own entry.
+	| 'trigger-group-helpers'
 	| 'style';
 
 export type BuiltPrerenderRecords = import('./build/prerender.ts').BuiltPrerenderRecords;

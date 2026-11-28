@@ -125,7 +125,9 @@ export { lowerStateAccess } from './passes/state-lowering.ts';
 export { emitSymbolModules } from './passes/symbol-modules.ts';
 export {
 	createSymbolResolverModuleManifest,
+	emitSymbolResolverHelpersModule,
 	emitSymbolResolverModule,
+	symbolResolverHelpersVariant,
 } from './passes/symbol-resolver-module.ts';
 export { planSymbolResolver } from './passes/symbol-resolver.ts';
 

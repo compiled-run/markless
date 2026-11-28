@@ -71,6 +71,8 @@ vi.mock('@markless/compiler', async (importOriginal) => {
 			},
 		})),
 		emitSymbolResolverModule: vi.fn(() => 'export function loadSymbol() {}'),
+		emitSymbolResolverHelpersModule: actual.emitSymbolResolverHelpersModule,
+		symbolResolverHelpersVariant: actual.symbolResolverHelpersVariant,
 	};
 });
 
