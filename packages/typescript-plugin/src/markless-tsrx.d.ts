@@ -1,5 +1,7 @@
 // oxlint-disable-next-line typescript/triple-slash-reference -- an import would turn this global contract into a module
 /// <reference path="./element-attribute-names.generated.d.ts" />
+// oxlint-disable-next-line typescript/triple-slash-reference -- same global contract as above
+/// <reference path="./global-event-types.generated.d.ts" />
 type __MarklessFrameworkApiIndex = typeof import('@markless/core');
 
 declare namespace __MarklessTypeService {
@@ -128,11 +130,45 @@ declare namespace __MarklessTypeService {
 	};
 
 	/**
+	 * `onDocument<Event>` and `onWindow<Event>`: a listener on the document or the
+	 * window that the element owns, for as long as the element is on the page. The
+	 * names are the events that reach that target (`global-event-types.generated.d.ts`);
+	 * `event.target` is wherever the event happened; `currentTarget` is the document
+	 * or the window, as for a listener added there. Reach the owning element through
+	 * an `element()` handle.
+	 */
+	type GlobalEventHandler<Event, Target> = (
+		event: Event & { readonly currentTarget: Target },
+	) => unknown;
+	type GlobalEventAttributes = {
+		[Name in DocumentEventType as `onDocument${Capitalize<Name>}`]?: GlobalEventHandler<
+			DocumentEventMap[Name],
+			Document
+		>;
+	} & {
+		[Name in DocumentEventType & keyof EventNameWords as `onDocument${EventNameWords[Name]}`]?: GlobalEventHandler<
+			DocumentEventMap[Name],
+			Document
+		>;
+	} & {
+		[Name in WindowEventType as `onWindow${Capitalize<Name>}`]?: GlobalEventHandler<
+			WindowEventMap[Name],
+			Window
+		>;
+	} & {
+		[Name in WindowEventType & keyof EventNameWords as `onWindow${EventNameWords[Name]}`]?: GlobalEventHandler<
+			WindowEventMap[Name],
+			Window
+		>;
+	};
+
+	/**
 	 * The compiler lowercases the name after `on`, so `onKeyDown` binds `keydown`
 	 * exactly as `onKeydown` does. Word boundaries are not derivable from the DOM
 	 * event name, so the multi-word spellings are listed.
 	 */
 	type EventNameWords = {
+		afterprint: 'AfterPrint';
 		animationcancel: 'AnimationCancel';
 		animationend: 'AnimationEnd';
 		animationiteration: 'AnimationIteration';
@@ -140,7 +176,9 @@ declare namespace __MarklessTypeService {
 		auxclick: 'AuxClick';
 		beforeinput: 'BeforeInput';
 		beforematch: 'BeforeMatch';
+		beforeprint: 'BeforePrint';
 		beforetoggle: 'BeforeToggle';
+		beforeunload: 'BeforeUnload';
 		canplay: 'CanPlay';
 		canplaythrough: 'CanPlayThrough';
 		compositionend: 'CompositionEnd';
@@ -151,6 +189,9 @@ declare namespace __MarklessTypeService {
 		contextrestored: 'ContextRestored';
 		cuechange: 'CueChange';
 		dblclick: 'DblClick';
+		devicemotion: 'DeviceMotion';
+		deviceorientation: 'DeviceOrientation';
+		deviceorientationabsolute: 'DeviceOrientationAbsolute';
 		dragend: 'DragEnd';
 		dragenter: 'DragEnter';
 		dragleave: 'DragLeave';
@@ -161,15 +202,22 @@ declare namespace __MarklessTypeService {
 		focusin: 'FocusIn';
 		focusout: 'FocusOut';
 		formdata: 'FormData';
+		fullscreenchange: 'FullscreenChange';
+		fullscreenerror: 'FullscreenError';
+		gamepadconnected: 'GamepadConnected';
+		gamepaddisconnected: 'GamepadDisconnected';
 		gotpointercapture: 'GotPointerCapture';
+		hashchange: 'HashChange';
 		keydown: 'KeyDown';
 		keypress: 'KeyPress';
 		keyup: 'KeyUp';
+		languagechange: 'LanguageChange';
 		leavepictureinpicture: 'LeavePictureInPicture';
 		loadeddata: 'LoadedData';
 		loadedmetadata: 'LoadedMetadata';
 		loadstart: 'LoadStart';
 		lostpointercapture: 'LostPointerCapture';
+		messageerror: 'MessageError';
 		mousedown: 'MouseDown';
 		mouseenter: 'MouseEnter';
 		mouseleave: 'MouseLeave';
@@ -177,16 +225,26 @@ declare namespace __MarklessTypeService {
 		mouseout: 'MouseOut';
 		mouseover: 'MouseOver';
 		mouseup: 'MouseUp';
+		orientationchange: 'OrientationChange';
+		pagehide: 'PageHide';
+		pagereveal: 'PageReveal';
+		pageshow: 'PageShow';
+		pageswap: 'PageSwap';
 		pointercancel: 'PointerCancel';
 		pointerdown: 'PointerDown';
 		pointerenter: 'PointerEnter';
 		pointerleave: 'PointerLeave';
+		pointerlockchange: 'PointerLockChange';
+		pointerlockerror: 'PointerLockError';
 		pointermove: 'PointerMove';
 		pointerout: 'PointerOut';
 		pointerover: 'PointerOver';
 		pointerrawupdate: 'PointerRawUpdate';
 		pointerup: 'PointerUp';
+		popstate: 'PopState';
 		ratechange: 'RateChange';
+		readystatechange: 'ReadyStateChange';
+		rejectionhandled: 'RejectionHandled';
 		scrollend: 'ScrollEnd';
 		securitypolicyviolation: 'SecurityPolicyViolation';
 		selectionchange: 'SelectionChange';
@@ -201,6 +259,8 @@ declare namespace __MarklessTypeService {
 		transitionend: 'TransitionEnd';
 		transitionrun: 'TransitionRun';
 		transitionstart: 'TransitionStart';
+		unhandledrejection: 'UnhandledRejection';
+		visibilitychange: 'VisibilityChange';
 		volumechange: 'VolumeChange';
 		waitingforkey: 'WaitingForKey';
 	};
@@ -414,7 +474,8 @@ declare namespace __MarklessTypeService {
 
 	type Attributes<E extends globalThis.Element> = GlobalAttributes &
 		MarklessAttributes<E> &
-		NativeEventAttributes<E>;
+		NativeEventAttributes<E> &
+		GlobalEventAttributes;
 
 	type TagNameSpecificAttributes<Tag extends PropertyKey> = Tag extends 'a'
 		? LinkAttributes

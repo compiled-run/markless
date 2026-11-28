@@ -1,3 +1,4 @@
+import { globalEventAlternative } from '../../ast/events.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import { DURABLE_ERROR_FIELDS, PROTOCOL_SHARED_SCOPES } from '@markless/serializer';
@@ -457,6 +458,67 @@ export function rowValueLocalUnfollowedDiagnostic(input: {
 		}),
 		severity: 'warning',
 	};
+}
+
+export function globalEventUnknownDiagnostic(input: {
+	readonly attributeName: string;
+	readonly target: 'document' | 'window';
+	readonly type: string;
+	readonly tagName: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	const other = input.target === 'document' ? 'window' : 'document';
+	const alternative = globalEventAlternative(input.attributeName);
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_GLOBAL_EVENT_UNKNOWN',
+		title: alternative
+			? `"${input.type}" does not reach the ${input.target}; use ${alternative.attribute}`
+			: `${input.attributeName} names no event the ${input.target} receives`,
+		message: `${input.attributeName} on <${input.tagName}> listens for "${input.type}" on the ${input.target}, but the ${input.target} never receives a "${input.type}" event: either no such event exists, or it fires on an element without bubbling up.`,
+		why: `onDocument* and onWindow* listen on the ${input.target} itself. An event that does not bubble, such as focus or mouseenter, never reaches it, so the handler would never run.`,
+		span: input.span,
+		suggestion: alternative
+			? alternative.reason === 'bubbles'
+				? `Write ${alternative.attribute}: "${alternative.type}" is the form of "${input.type}" that bubbles up to the ${input.target}.`
+				: `Write ${alternative.attribute}: "${input.type}" fires on the ${other}, not the ${input.target}.`
+			: `Check the spelling, or use an ordinary on* prop on the element the event fires on.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_GLOBAL_EVENT_UNKNOWN',
+	});
+}
+
+export function globalEventInRowDiagnostic(input: {
+	readonly attributeName: string;
+	readonly target: 'document' | 'window';
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return {
+		...semanticGraphDiagnostic({
+			code: 'MARKLESS_GLOBAL_EVENT_IN_ROW',
+			title: `${input.attributeName} inside an @for row listens once per row`,
+			message: `${input.attributeName} sits inside an @for row, so every row listens on the ${input.target} and one event runs the handler once for each row on the page.`,
+			why: `A ${input.target} listener belongs to the element it is written on. Each row is its own element, so each row adds its own listener.`,
+			span: input.span,
+			suggestion: `Move ${input.attributeName} to an element outside the @for, and find the row the event is about inside the handler.`,
+			docsUrl: 'https://markless.dev/errors/MARKLESS_GLOBAL_EVENT_IN_ROW',
+		}),
+		severity: 'warning',
+	};
+}
+
+export function globalEventPassivePreventDiagnostic(input: {
+	readonly attributeName: string;
+	readonly type: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_GLOBAL_EVENT_PASSIVE_PREVENT',
+		title: `${input.attributeName} cannot cancel a "${input.type}" event`,
+		message: `${input.attributeName} calls event.preventDefault(), but a "${input.type}" listener on the document or window is passive, so the browser ignores the call.`,
+		why: 'Browsers treat touchstart, touchmove and wheel listeners on the document and window as passive so scrolling never waits for code, and a scroll event cannot be cancelled at all.',
+		span: input.span,
+		suggestion: 'Put the handler on the element that scrolls or is touched, with an ordinary on* prop, or use the CSS touch-action or overscroll-behavior property.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_GLOBAL_EVENT_PASSIVE_PREVENT',
+	});
 }
 
 function semanticGraphDiagnostic(input: {

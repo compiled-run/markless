@@ -13,6 +13,7 @@ import {
 	stackingStyle,
 	toastId,
 } from './toaster-queue.ts';
+import { rememberOpener, restoreOpener } from './toaster-hotkey.ts';
 import type {
 	ToastOptions,
 	ToasterInstanceState,
@@ -36,6 +37,7 @@ export const toasterState = shared(
 			focused: false,
 			minted: 0,
 			ticker: 0,
+			expanded: false,
 		});
 		const regionEl = element<HTMLDivElement | undefined>();
 
@@ -107,7 +109,6 @@ export const toasterItemState = shared(
 	{ scope: 'subtree' },
 );
 
-// No attach= on this root: a behavior on an app-scoped root crashes the render.
 // The region is not an <ol> and a row is not an <li>: a consumer's repeat has to
 // sit inside a wrapper element, and <ol> may hold nothing but <li>.
 export function ToasterRoot({
@@ -130,6 +131,20 @@ export function ToasterRoot({
 		tabindex={-1}
 		ui-toaster=""
 		ui-paused={toaster.paused}
+		ui-expanded={toaster.expanded}
+		// F8 is the page-wide jump into the messages; Escape answers only while the region holds focus, so it never takes one a dialog was owed.
+		onDocumentKeyDown={(event) => {
+			const region = toaster.regionEl;
+			if (event.key === 'F8') {
+				event.preventDefault();
+				rememberOpener(document.activeElement, region?.contains(document.activeElement) === true);
+				toaster.expanded = true;
+				region?.focus();
+			} else if (event.key === 'Escape' && region?.contains(document.activeElement) === true) {
+				toaster.expanded = false;
+				restoreOpener();
+			}
+		}}
 		onPointerover={(event) => {
 			toaster.pause(true);
 			onPointerover?.(event);

@@ -186,6 +186,7 @@ function payloadSeedReads(
 					...(seed.scalarKeys ?? []),
 					...(seed.deriveKeys ?? []),
 					...(seed.rowKeys ?? []),
+					...(seed.staticRowKeys ?? []),
 				].includes(propName)
 			: seed.graphNodeId === `${PROTOCOL_PROP_GRAPH_NODE_PREFIX}${propName}`,
 	);

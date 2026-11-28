@@ -1,0 +1,47 @@
+{
+	"rung": "S67",
+	"name": "A styled photo whose height follows its image, as the check-in page shows it: 0 high until the app sets its src, then as tall as the image makes it, with everything below moved down and tappable where it is drawn",
+	"steps": [
+		{
+			"visible": [
+				"Morning walk",
+				"Add a photo",
+				"Below the photo",
+				"No photo yet",
+				"Not tapped"
+			],
+			"absent": [
+				"Tapped below",
+				"Photo added"
+			],
+			"title": "Check-in"
+		},
+		{
+			"do": {
+				"tap": "Add a photo"
+			},
+			"visible": [
+				"Walk photo",
+				"Photo added",
+				"Morning walk",
+				"Below the photo",
+				"Not tapped"
+			],
+			"absent": [
+				"No photo yet",
+				"Tapped below"
+			]
+		},
+		{
+			"do": {
+				"tap": "Below the photo"
+			},
+			"visible": [
+				"Tapped below"
+			],
+			"absent": [
+				"Not tapped"
+			]
+		}
+	]
+}

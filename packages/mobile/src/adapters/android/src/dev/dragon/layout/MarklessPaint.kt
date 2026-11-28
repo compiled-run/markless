@@ -15,3 +15,6 @@ fun marklessRuntimeImagePaint(fit: String, percent: BooleanArray, position: Doub
 	fun rect(r: PixelRect) = doubleArrayOf(r.x, r.y, r.width, r.height)
 	return rect(replaced_pixelSnappedRect(dest)) + rect(replaced_pixelSnappedRect(box)) + (replaced_drawnObjectRect(dest, box)?.let(::rect) ?: DoubleArray(4) { Double.NaN })
 }
+
+/** `runtimeImageScrollShift`: how far the page's scroll offset moves when an img that follows its image changes height from [was] to [now] (one unit), its top at [top]. */
+fun marklessScrollShift(offset: Double, top: Double, was: Double, now: Double): Double = replaced_runtimeImageScrollShift(offset, top, was, now)

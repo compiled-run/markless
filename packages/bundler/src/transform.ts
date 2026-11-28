@@ -1,3 +1,4 @@
+import { protocolGlobalEvent } from '@markless/serializer/protocol-global-events';
 import { factorRenderDataLiterals } from './render-data-literals.ts';
 import { dirname, isAbsolute, resolve } from 'pathe';
 import { parseSync, transformSync } from 'rolldown/experimental';
@@ -78,9 +79,9 @@ import {
 	prerenderRowBoundarySites,
 	emitPrerenderTriggerGroupModule,
 	planPrerenderTriggerGroups,
+	planTriggerGroupHelpers,
 	triggerGroupVirtualModuleId,
 } from './trigger-groups.ts';
-import { adaptImportedCaptureResolver } from './bound-resolver.ts';
 import { emitSymbolBundleModule, planSymbolBundles } from './build/symbol-bundles.ts';
 import { planSymbolGroups, symbolGroupKey } from './build/symbol-groups.ts';
 
@@ -409,19 +410,17 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		importedBoundRows,
 	);
 	const resolverSymbols = uniqueSymbolsById([...(input.symbols ?? []), ...symbolRows]);
-	const resolverSource = adaptImportedCaptureResolver(
-		emitSymbolResolverModule({
-			literalImports: input.experimentalNativePacking,
-			bundlerVisibleImports: input.experimentalNativePacking,
-			resolverId: input.experimentalNativePacking
-				? `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodedModuleId}`
-				: undefined,
-			buildId: input.buildId,
-			symbols: resolverSymbols,
-			boundSymbols: importedBoundRows,
-		}),
-		importedBoundRows.some((row) => row.loaderSymbolId !== undefined),
-	);
+	const resolverSource = emitSymbolResolverModule({
+		literalImports: input.experimentalNativePacking,
+		bundlerVisibleImports: input.experimentalNativePacking,
+		resolverId: input.experimentalNativePacking
+			? `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodedModuleId}`
+			: undefined,
+		buildId: input.buildId,
+		symbols: resolverSymbols,
+		boundSymbols: importedBoundRows,
+		importedCaptureRows: importedBoundRows.some((row) => row.loaderSymbolId !== undefined),
+	});
 	const symbolRoutes = componentEdgeSymbolRoutes(compiled, input.artifactChildMaterializations);
 	// Plan lookups follow only the edges whose module can answer one.
 	const closurePlanRoutes = symbolRoutes.filter(
@@ -457,6 +456,14 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					renderData: compiled.renderData,
 				})
 			: [];
+	const triggerGroupSymbols = uniqueSymbolsById([...(input.symbols ?? []), ...symbolRows]);
+	const triggerGroupHelpers = planTriggerGroupHelpers({
+		filename: input.filename,
+		groups: prerenderTriggerGroups,
+		symbols: triggerGroupSymbols,
+		boundRows: importedBoundRows,
+		literalImports: input.experimentalNativePacking,
+	});
 	const selfWakeArmRendererId = prerenderTriggerGroups.some((group) => group.id === 'self-wake')
 		? triggerGroupVirtualModuleId(input.filename, prerenderTriggerGroups.length)
 		: undefined;
@@ -785,8 +792,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				type: 'trigger-group',
 				source: emitPrerenderTriggerGroupModule({
 					group,
-					symbols: uniqueSymbolsById([...(input.symbols ?? []), ...symbolRows]),
+					symbols: triggerGroupSymbols,
 					boundRows: importedBoundRows,
+					helpersModuleId: triggerGroupHelpers.helpersModuleIds[index],
 					// Every route, not just the ones naming a child module: a
 					// prerendered page owns same-module children the same way a CSR one
 					// does. Only the MANIFEST is import-source-only.
@@ -796,6 +804,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					literalImports: input.experimentalNativePacking,
 				}),
 			}),
+		),
+		...(input.prerenderWakeVariant ? triggerGroupHelpers.modules : []).map(
+			(module): MarklessVirtualModule => ({ ...module, type: 'trigger-group-helpers' }),
 		),
 		...(selfWakeArmRendererId
 			? [
@@ -940,6 +951,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					),
 					hasLiveSharedState,
 					hasIdleEvents: moduleHasIdleEvents(compiled.semanticGraph),
+					globalEventNames: moduleGlobalEventNames(compiled.semanticGraph),
 					runtimeDemandMap: compiled.runtimeDemandMap,
 					resumeModuleUrl: input.resumeModuleUrl,
 					scalarActions: input.includeScalarActionPlans
@@ -1750,6 +1762,16 @@ function componentEdgesReachableFrom(
 }
 
 // A client-rendered mount wakes its runtime at idle from the module whose own records, arms and rows included, name idle.
+function moduleGlobalEventNames(graph: {
+	readonly events: ReadonlyArray<{ readonly eventName: string }>;
+}): ReadonlyArray<string> {
+	return [
+		...new Set(
+			graph.events.flatMap((event) => (protocolGlobalEvent(event.eventName) ? [event.eventName] : [])),
+		),
+	];
+}
+
 function moduleHasIdleEvents(graph: {
 	readonly events: ReadonlyArray<{ readonly eventName: string }>;
 }): boolean {

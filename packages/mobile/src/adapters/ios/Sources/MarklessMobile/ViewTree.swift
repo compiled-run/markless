@@ -417,6 +417,8 @@ final class ViewTree {
 	var onShown: (() -> Void)?
 	/// Called after the page moves to another assignment or entry, so the host lays it out if it has not yet.
 	var onEntries: (() -> Void)?
+	/// An img whose src the app sets has a new natural size in CSS px, or none (nil): by node id.
+	var onNatural: ((String, [Double]?) -> Void)?
 	/// The pointer steps since the page opened, by the node each names, replayed through the current level's tables.
 	private var interactionSteps: [(op: String, node: String?)] = []
 	/// The list row (`@<key>` of its copies) the finger is pressing, and the one the focused element is in: an interaction state
@@ -1376,7 +1378,8 @@ final class ViewTree {
 		guard let template = templates[id] else { return nil }
 		if let sheet = sheetOf[template] {
 			guard let styles = sheetStyles[sheet] else { return nil }
-			return styles.heights[styles.height].layout.assignments[styles.assignments[styles.height]][template]
+			let entry = styles.heights[styles.height].layout.assignments[styles.assignments[styles.height]]
+			return entry[id] ?? entry[template]
 		}
 		// An interaction state styles the row copy the touch was in; every other copy of that row keeps the assignment's look.
 		let row = id.firstIndex(of: "@").map { String(id[id.index(after: $0)...]) }
@@ -1389,6 +1392,14 @@ final class ViewTree {
 		for (id, view) in elements.map({ ($0.key, $0.value as UIView) }) + labels.map({ ($0.key, $0.value as UIView) }) where included(id) {
 			if let style = style(of: id) { try place(id, view, style) }
 		}
+	}
+
+	/// A sheet's content laid out again (its rows or texts moved): each resting height takes its new boxes, at the state it is in.
+	func relayoutSheet(_ sheet: String, _ heights: [(snapPoint: Double, layout: StyleLayout)]) throws {
+		guard var styles = sheetStyles[sheet], styles.heights.count == heights.count else { return }
+		styles.heights = heights
+		sheetStyles[sheet] = styles
+		try repaint { id in templates[id].flatMap { sheetOf[$0] } == sheet }
 	}
 
 	/// The sheet came to rest at another height: its content takes that height's layout.
@@ -1557,7 +1568,10 @@ final class ViewTree {
 					view = page
 				} else if element == "img" {
 					let image = ImageBox()
-					if layout != nil, bindings.contains(where: { !$0.isProperty && $0.name == "src" }) { image.loadsImages() }
+					if layout != nil, bindings.contains(where: { !$0.isProperty && $0.name == "src" }) {
+						image.loadsImages()
+						image.loaded?.onNatural = { [weak self] size in self?.onNatural?(id, size) }
+					}
 					// The box lays out its picture and alt text itself; the stacking layout sizes only the box.
 					leaves.insert(ObjectIdentifier(image))
 					view = image

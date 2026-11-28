@@ -1663,6 +1663,7 @@ function unreducedPropReadDiagnostics(
 
 	return input.semanticGraph.componentPropBindings.flatMap((declaration) => {
 		if (!declaration.localName || !freeNames.has(declaration.localName)) return [];
+		if (declaration.defaultedGraphNodeId !== undefined) return [];
 		if (!declarationOwnsSymbol(declaration, symbol.owner?.componentName, span)) return [];
 		const propName = declaration.propPath[0] ?? declaration.localName;
 		if (routed.has(propName) || routed.has(declaration.localName)) return [];

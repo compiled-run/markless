@@ -1,3 +1,7 @@
+import {
+	PROTOCOL_GLOBAL_EVENT_ENTER,
+	protocolGlobalEvent,
+} from '@markless/serializer/protocol-global-events';
 import type {
 	ArmEscalationCandidate,
 	PropDecidedBranch,
@@ -6378,7 +6382,7 @@ export function buildEventHandlerEmission(
 				}),
 				withLeadingBlockComment(
 					exportNamedDeclarationNode(
-						eventHandlerFunctionNode(exportName, false, scalarLeaf),
+						eventHandlerFunctionNode(exportName, false, scalarLeaf, symbol),
 					),
 					EVENT_SCALAR_LEAF_MARKER,
 				),
@@ -6531,7 +6535,7 @@ export function buildEventHandlerEmission(
 								]),
 							]
 						: bodyStatements),
-				]),
+				], symbol),
 			),
 		]),
 		source: carried.source,
@@ -6691,15 +6695,72 @@ function eventHandlerFunctionNode(
 	name: string,
 	isAsync: boolean,
 	statements: ReadonlyArray<EmissionNode>,
+	symbol?: object,
 ): EmissionNode {
+	const eventName = (symbol as { readonly eventName?: unknown } | undefined)?.eventName;
 	return {
 		type: 'FunctionDeclaration',
 		id: identifierNode(name),
 		async: isAsync,
 		generator: false,
 		params: [identifierNode('context')],
-		body: { type: 'BlockStatement', body: [...statements] },
+		body: {
+			type: 'BlockStatement',
+			body: [
+				...(typeof eventName === 'string' && protocolGlobalEvent(eventName) ? globalEventPrelude() : []),
+				...statements,
+			],
+		},
 	};
+}
+
+// The relay's carrier says whether this owner still hears the browser's event; the handler then runs on that event.
+function globalEventPrelude(): EmissionNode[] {
+	return [
+		{
+			type: 'IfStatement',
+			test: {
+				type: 'UnaryExpression',
+				operator: '!',
+				prefix: true,
+				argument: {
+					type: 'CallExpression',
+					callee: memberChainNode(`context.event.${PROTOCOL_GLOBAL_EVENT_ENTER}`),
+					arguments: [],
+					optional: false,
+				},
+			},
+			consequent: { type: 'ReturnStatement', argument: null },
+			alternate: null,
+		},
+		{
+			type: 'ExpressionStatement',
+			expression: {
+				type: 'AssignmentExpression',
+				operator: '=',
+				left: identifierNode('context'),
+				right: {
+					type: 'ObjectExpression',
+					properties: [
+						{ type: 'SpreadElement', argument: identifierNode('context') },
+						objectPropertyNode('event', memberChainNode('context.event.detail')),
+					],
+				},
+			},
+		},
+	] as EmissionNode[];
+}
+
+function objectPropertyNode(key: string, value: EmissionNode): EmissionNode {
+	return {
+		type: 'Property',
+		key: identifierNode(key),
+		value,
+		kind: 'init',
+		computed: false,
+		method: false,
+		shorthand: false,
+	} as EmissionNode;
 }
 
 /**

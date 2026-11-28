@@ -2843,6 +2843,7 @@ export const parts: Readonly<Record<string, readonly PartFacts[]>> = {
 			"ariaRole": "",
 			"hidden": false,
 			"hooks": [
+				"ui-expanded",
 				"ui-paused",
 				"ui-toaster"
 			]

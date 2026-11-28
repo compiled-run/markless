@@ -2,7 +2,7 @@ import { execFile, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { readdir, readFile, rm } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { type Route } from '@playwright/test';
+import { type Browser, type Route } from '@playwright/test';
 import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
 import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
@@ -36,10 +36,12 @@ test.each([false, true])(
 		const server = spawn(process.execPath, [resolve(fixture, 'serve.mjs'), dist], {
 			stdio: ['ignore', 'pipe', 'inherit'],
 		});
-		const [port] = (await once(server.stdout, 'data')) as [Buffer];
-		const origin = `http://127.0.0.1:${String(port).trim()}`;
-		const browser = await launchBrowser();
+		const stopped = once(server, 'exit');
+		let browser: Browser | undefined;
 		try {
+			const [port] = (await once(server.stdout, 'data')) as [Buffer];
+			const origin = `http://127.0.0.1:${String(port).trim()}`;
+			browser = await launchBrowser();
 			const page = await browser.newPage();
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(error.message));
@@ -98,8 +100,9 @@ test.each([false, true])(
 			await expect.poll(() => page.locator('[data-afters]').textContent()).toBe('1');
 			expect(errors).toEqual([]);
 		} finally {
-			await browser.close();
+			await browser?.close();
 			server.kill();
+			await stopped;
 		}
 	},
 	120_000,
@@ -118,10 +121,12 @@ test.each([false, true])(
 		const server = spawn(process.execPath, [resolve(fixture, 'serve.mjs'), dist], {
 			stdio: ['ignore', 'pipe', 'inherit'],
 		});
-		const [port] = (await once(server.stdout, 'data')) as [Buffer];
-		const origin = `http://127.0.0.1:${String(port).trim()}`;
-		const browser = await launchBrowser();
+		const stopped = once(server, 'exit');
+		let browser: Browser | undefined;
 		try {
+			const [port] = (await once(server.stdout, 'data')) as [Buffer];
+			const origin = `http://127.0.0.1:${String(port).trim()}`;
+			browser = await launchBrowser();
 			const page = await browser.newPage();
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(error.message));
@@ -137,8 +142,9 @@ test.each([false, true])(
 			await expect.poll(() => page.locator('[data-cheers]').textContent()).toBe('1');
 			expect(errors).toEqual([]);
 		} finally {
-			await browser.close();
+			await browser?.close();
 			server.kill();
+			await stopped;
 		}
 	},
 	120_000,

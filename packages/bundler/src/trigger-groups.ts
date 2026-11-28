@@ -4,6 +4,7 @@ import type {
 	SemanticBranchSite,
 	SemanticComponentEdge,
 	SemanticGraphBinding,
+	SymbolResolverModuleInput,
 	SymbolResolverPlan,
 	TriggerGroupArtifact,
 } from '@markless/compiler';
@@ -14,10 +15,13 @@ import {
 	type ProtocolEventRecord,
 } from '@markless/serializer';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
-import { emitSymbolResolverModule } from '@markless/compiler';
+import {
+	emitSymbolResolverHelpersModule,
+	emitSymbolResolverModule,
+	symbolResolverHelpersVariant,
+} from '@markless/compiler';
 import type { SourceSymbolRow } from './source-module.ts';
 import type { SourceLazySymbolRoute } from './source-module.ts';
-import { adaptImportedCaptureResolver } from './bound-resolver.ts';
 import { emitSymbolRouteTable } from './rebound-symbol-route.ts';
 
 export type PrerenderTriggerGroup = {
@@ -57,6 +61,61 @@ export function triggerGroupVirtualModuleSourceFile(moduleId: string): string | 
 	}
 }
 
+/** The resolver one trigger group carries: only the symbols and bound rows its event wakes. */
+export function prerenderTriggerGroupResolverInput(input: {
+	readonly group: PrerenderTriggerGroup;
+	readonly symbols: ReadonlyArray<SourceSymbolRow>;
+	readonly boundRows: ReadonlyArray<BoundSymbolResolverRow>;
+	readonly literalImports?: boolean;
+}): SymbolResolverModuleInput {
+	const ids = new Set(input.group.symbolIds);
+	const boundRows = input.boundRows.filter((row) => ids.has(row.id));
+	return {
+		symbols: input.symbols.filter((symbol) => ids.has(symbol.id)),
+		boundSymbols: boundRows,
+		importedCaptureRows: boundRows.some((row) => row.loaderSymbolId !== undefined),
+		literalImports: input.literalImports,
+		bundlerVisibleImports: input.literalImports,
+	};
+}
+
+// Trigger groups needing the same bound-row helpers import one copy; a variant only one group needs stays inline.
+export function planTriggerGroupHelpers(input: {
+	readonly filename: string;
+	readonly groups: ReadonlyArray<PrerenderTriggerGroup>;
+	readonly symbols: ReadonlyArray<SourceSymbolRow>;
+	readonly boundRows: ReadonlyArray<BoundSymbolResolverRow>;
+	readonly literalImports?: boolean;
+}): {
+	readonly helpersModuleIds: ReadonlyArray<string | undefined>;
+	readonly modules: ReadonlyArray<{ readonly id: string; readonly source: string }>;
+} {
+	const resolvers = input.groups.map((group) =>
+		prerenderTriggerGroupResolverInput({ ...input, group }),
+	);
+	const variants = resolvers.map(symbolResolverHelpersVariant);
+	const shared = [
+		...new Set(
+			variants.filter(
+				(variant, index): variant is string =>
+					variant !== undefined && variants.indexOf(variant) !== index,
+			),
+		),
+	];
+	// Past the self-wake arm renderer's index, which is the group count.
+	const idOf = (variant: string) =>
+		triggerGroupVirtualModuleId(input.filename, input.groups.length + 1 + shared.indexOf(variant));
+	return {
+		helpersModuleIds: variants.map((variant) =>
+			variant !== undefined && shared.includes(variant) ? idOf(variant) : undefined,
+		),
+		modules: shared.map((variant) => ({
+			id: idOf(variant),
+			source: emitSymbolResolverHelpersModule(resolvers[variants.indexOf(variant)]!),
+		})),
+	};
+}
+
 export function emitPrerenderTriggerGroupModule(input: {
 	readonly group: PrerenderTriggerGroup;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
@@ -64,15 +123,13 @@ export function emitPrerenderTriggerGroupModule(input: {
 	readonly symbolRoutes?: ReadonlyArray<SourceLazySymbolRoute>;
 	readonly armRendererModuleId?: string;
 	readonly literalImports?: boolean;
+	readonly helpersModuleId?: string;
 }): string {
 	const armRendererModuleId = input.armRendererModuleId ?? input.group.armRendererModuleId;
 	const ids = new Set(input.group.symbolIds);
-	const boundRows = input.boundRows.filter((row) => ids.has(row.id));
 	let source = emitSymbolResolverModule({
-		symbols: input.symbols.filter((symbol) => ids.has(symbol.id)),
-		boundSymbols: boundRows,
-		literalImports: input.literalImports,
-		bundlerVisibleImports: input.literalImports,
+		...prerenderTriggerGroupResolverInput(input),
+		helpersModuleId: input.helpersModuleId,
 	});
 	// Keep routes exhaustive while demand-loading only their symbols.
 	// This group's resolver holds only its own bound rows.
@@ -113,10 +170,7 @@ export function emitPrerenderTriggerGroupModule(input: {
 					'}',
 				].join('\n')
 			: '',
-		adaptImportedCaptureResolver(
-			source,
-			boundRows.some((row) => row.loaderSymbolId !== undefined),
-		),
+		source,
 		`export const groupId=${JSON.stringify(input.group.id)};`,
 		`export const state=${JSON.stringify(input.group.state)};`,
 		`export const view=${JSON.stringify(input.group.view)};`,

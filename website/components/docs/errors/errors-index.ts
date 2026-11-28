@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 342,
-	guided: 55,
+	total: 345,
+	guided: 59,
 	groups: [
 		{
 			area: 'state',
@@ -34,6 +34,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile error',
 					guided: true,
 					words: 'a computed() writes to state markless_state_write_in_computed a computed() body writes to state.',
+				},
+				{
+					code: 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
+					title: 'A destructuring default the build cannot apply',
+					chip: 'error',
+					kind: 'compile error',
+					guided: true,
+					words: 'a destructuring default the build cannot apply markless_state_destructure_default_unsupported a destructuring default sits where the build cannot apply it.',
 				},
 				{
 					code: 'MARKLESS_STATE_STALE_LOCAL_WRITE',
@@ -186,14 +194,6 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile error',
 					guided: false,
 					words: 'a computed reads a component-body local the browser cannot recompute markless_computed_reads_render_local a computed reads a component-body local the browser cannot recompute: a markless build error.',
-				},
-				{
-					code: 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
-					title: 'A destructured prop or state has a default',
-					chip: 'error',
-					kind: 'compile error',
-					guided: false,
-					words: 'a destructured prop or state has a default markless_state_destructure_default_unsupported graph destructuring defaults are not supported yet: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',
@@ -588,6 +588,14 @@ export const errorIndex: ErrorIndex = {
 			blurb: 'Handlers, callbacks, and what they can read.',
 			codes: [
 				{
+					code: 'MARKLESS_GLOBAL_EVENT_IN_ROW',
+					title: 'A document or window listener sits inside a list row',
+					chip: 'error',
+					kind: 'compile error',
+					guided: true,
+					words: 'a document or window listener sits inside a list row markless_global_event_in_row an `ondocument…` or `onwindow…` prop inside an `@for` row adds one listener per row.',
+				},
+				{
 					code: 'MARKLESS_HANDLER_WRITES_RENDER_LOCAL',
 					title: 'A handler changes a value that is not state',
 					chip: 'error',
@@ -620,6 +628,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'a handler uses a prop the browser cannot get back markless_capture_opaque_prop an event handler uses a prop whose value the browser cannot get back.',
 				},
 				{
+					code: 'MARKLESS_GLOBAL_EVENT_PASSIVE_PREVENT',
+					title: 'A scroll, wheel or touch listener calls preventDefault',
+					chip: 'error',
+					kind: 'compile error',
+					guided: true,
+					words: 'a scroll, wheel or touch listener calls preventdefault markless_global_event_passive_prevent a document or window `scroll`, `wheel`, `touchstart` or `touchmove` handler calls `event.preventdefault()`, which the browser ignores there.',
+				},
+				{
 					code: 'MARKLESS_DIRECT_EVAL_UNSUPPORTED',
 					title: 'eval() reads the component’s names',
 					chip: 'error',
@@ -642,6 +658,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile error',
 					guided: true,
 					words: 'onclick gets a value, not a function markless_event_handler_not_a_function an event prop like onclick gets a value instead of a function.',
+				},
+				{
+					code: 'MARKLESS_GLOBAL_EVENT_UNKNOWN',
+					title: 'onDocument or onWindow names an event that never gets there',
+					chip: 'error',
+					kind: 'compile error',
+					guided: true,
+					words: 'ondocument or onwindow names an event that never gets there markless_global_event_unknown an `ondocument…` or `onwindow…` prop names an event that never reaches the document or the window.',
 				},
 				{
 					code: 'MARKLESS_CALLBACK_SLOT_SOURCE_UNSUPPORTED',

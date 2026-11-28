@@ -2,6 +2,7 @@ import { componentExportPath, linkedComponentTarget } from '../link/component-ta
 import { isEventAttribute } from '../../ast/events.ts';
 import { asNodes, getIdentifierName, unwrapTypeAssertion, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, expressionSourceOrFallback, sourceSpan } from '../../ast/source.ts';
+import type { SourceSpan } from '../../diagnostics.ts';
 import type {
 	SemanticAsyncArmPlacement,
 	SemanticComponentEdge,
@@ -29,6 +30,7 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
 import { collectObjectPatternAliases } from './collect-aliases.ts';
+import { getFrameworkApiForCall } from './imports.ts';
 import { constantPropValue } from './constant-props.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { rowItemRead } from './row-item-read.ts';
@@ -129,6 +131,32 @@ export function collectComponentProps(component: AnyNode, state: WalkState): voi
 		componentId: state.currentComponentId,
 		componentName: state.currentComponentName,
 		propPath: [],
+		bodyMaterializedReads: bodyMaterializedReads(component.body as AnyNode | undefined, state),
+	});
+}
+
+// Body code that runs only while the page renders, where the destructured local already holds the default: seeds and state() initializers.
+function bodyMaterializedReads(body: AnyNode | undefined, state: WalkState): ReadonlyArray<SourceSpan> {
+	return asNodes(body?.body).flatMap((statement) => {
+		if (statement.type === 'VariableDeclaration')
+			return asNodes(statement.declarations).flatMap((declarator) => {
+				const init = declarator.init as AnyNode | undefined;
+				const api = getFrameworkApiForCall(init, state.frameworkApiImports);
+				const span = init && (api === 'state' || api === 'storage') && sourceSpan(init, state.filename);
+				return span ? [span] : [];
+			});
+		const expression =
+			statement.type === 'ExpressionStatement'
+				? (statement.expression as AnyNode | undefined)
+				: undefined;
+		const right = expression?.right as AnyNode | undefined;
+		const span = right && sourceSpan(right, state.filename);
+		return expression?.type === 'AssignmentExpression' &&
+			expression.operator === '=' &&
+			(expression.left as AnyNode | undefined)?.type === 'MemberExpression' &&
+			span
+			? [span]
+			: [];
 	});
 }
 

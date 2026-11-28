@@ -74,6 +74,11 @@ import {
 import { marklessRosterPositions } from './prerender/shared-seed-slot.ts';
 import { derivePrerenderResumeRecords } from './prerender/evaluator.ts';
 import { createEarlyEventCaptureSource } from './inline/early-events.ts';
+import {
+	createEarlyGlobalEventCaptureSource,
+	createInlineGlobalRelaySource,
+	globalEventNames,
+} from './inline/global-relay.ts';
 import { CONTAINER_REASK_PROPERTY } from './resume-return-reask.ts';
 import { servedElementTree, servedLocatorPaths, withElementAttributes } from './locator-paths.ts';
 
@@ -318,6 +323,7 @@ export async function assembleSsrContainer(
 					true,
 					overlayPrimer,
 					deferredTriggerSource(view) +
+						createInlineGlobalRelaySource(browserEventNames(view), artifactSources?.globalRelay) +
 						(selfWake
 							? ''
 							: storageWakeSource(state, selectedResumeModuleUrl, artifactSources?.wakes)) +
@@ -339,7 +345,7 @@ export async function assembleSsrContainer(
 
 	return [
 		resumerScript && selectedResumeModuleUrl && !wakeChannelEnabled && !options.resumerSource
-			? `<script${options.nonce ? ` nonce="${escapeAttribute(options.nonce)}"` : ''}>${escapeInlineScript(createEarlyEventCaptureSource(browserEventNames(view)))}</script>`
+			? `<script${options.nonce ? ` nonce="${escapeAttribute(options.nonce)}"` : ''}>${escapeInlineScript(createEarlyEventCaptureSource(elementEventNames(view)) + createEarlyGlobalEventCaptureSource(browserEventNames(view)))}</script>`
 			: '',
 		storageSeedScript,
 		renderHeadInjections(artifactHeadInjections(component), options.nonce),
@@ -417,6 +423,10 @@ export async function assemblePrerenderPageParts(
 					!boot,
 					false,
 					deferredTriggerSource(view) +
+						createInlineGlobalRelaySource(
+							eventNames,
+							artifactInlineResumerSources(component)?.globalRelay,
+						) +
 						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl, wakes)) +
 						sharedWakeSource(state) +
 						returnWakeSource(view, resumeModuleUrl, wakes),
@@ -1175,6 +1185,12 @@ export function inlineResumerPage(view: ProtocolViewPayload): InlineResumerPage 
 		(forwardsUnknownElements ? INLINE_PAGE_FORWARDS_UNKNOWN : 0) |
 			(scoped ? INLINE_PAGE_SCOPED : 0),
 	];
+}
+
+// The early capture listens on the document for element events; document and window ones have their own.
+function elementEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
+	const global = new Set(globalEventNames(browserEventNames(view)));
+	return global.size ? browserEventNames(view).filter((eventName) => !global.has(eventName)) : browserEventNames(view);
 }
 
 function browserEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {

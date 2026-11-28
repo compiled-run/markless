@@ -62,6 +62,12 @@ public enum DragonPlan {
 			+ (try replaced_drawnObjectRect(dest, box).map(rect) ?? [.nan, .nan, .nan, .nan])
 	}
 
+	/// `runtimeImageScrollShift`: how far the page's scroll offset moves when an img that follows its image changes height from
+	/// `was` to `now` (all in one unit), its top at `top`: by the change when it lay wholly above a non-zero offset, else 0.
+	public static func runtimeImageScrollShift(offset: Double, top: Double, was: Double, now: Double) throws -> Double {
+		try replaced_runtimeImageScrollShift(offset, top, was, now)
+	}
+
 	/// `runMarklessAnimation`: a page's animation events and frame from its export's animator tables, over every step so far.
 	public static func animation(_ line: String) -> String {
 		do {

@@ -18,7 +18,12 @@ export {
 } from './compile-cache.ts';
 export { compileTsrxForTypeService, compile_to_volar_mappings } from './type-service.ts';
 export { parseJavaScriptModule, resetParseCache, type JavaScriptAstNode } from './js-ast.ts';
-export { isEventAttribute, normalizeEventName } from './ast/events.ts';
+export {
+	globalEventAttribute,
+	isEventAttribute,
+	isGlobalEventType,
+	normalizeEventName,
+} from './ast/events.ts';
 export {
 	callsImportedOrFreeName,
 	importedOrFreeNameCalls,
@@ -120,7 +125,9 @@ export { lowerStateAccess } from './passes/state-lowering.ts';
 export { emitSymbolModules } from './passes/symbol-modules.ts';
 export {
 	createSymbolResolverModuleManifest,
+	emitSymbolResolverHelpersModule,
 	emitSymbolResolverModule,
+	symbolResolverHelpersVariant,
 } from './passes/symbol-resolver-module.ts';
 export { planSymbolResolver } from './passes/symbol-resolver.ts';
 

@@ -1218,3 +1218,5 @@ function shouldMapWholeSourceNode(node: TsrxAstNode): boolean {
 			return false;
 	}
 }
+
+export { globalEventAttribute } from './ast/events.ts';

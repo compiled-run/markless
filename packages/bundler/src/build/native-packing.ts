@@ -70,8 +70,12 @@ export function nativePackingPlugins(
 	directCsrOnly: () => boolean = () => false,
 	maxPackBytes: () => number | undefined = () => undefined,
 	unreachableChildren?: UnreachableChildren,
+	// Whether a module id is a stylesheet; Vite owns that convention, so only its adapter passes it.
+	isStylesheet?: (id: string) => boolean,
 ): NativePackingPlugin[] {
 	let groups = new Map<string, string>();
+	let moduleRoutes = new Map<string, ReadonlySet<string>>();
+	let stylesheetModules = new Map<string, Set<string>>();
 	let routeSets = new Map<string, ReadonlyArray<string>>();
 	let eagerLazyRoutes = new Map<string, ReadonlyArray<string>>();
 	let closures: RouteInteractionClosures[] | undefined;
@@ -94,6 +98,7 @@ export function nativePackingPlugins(
 			},
 			async buildEnd(error) {
 				groups = new Map();
+				moduleRoutes = new Map();
 				routeSets = new Map();
 				eagerLazyRoutes = new Map();
 				closures = undefined;
@@ -212,6 +217,7 @@ export function nativePackingPlugins(
 					routes,
 					routeSets,
 					eagerLazyRoutes,
+					moduleRoutes,
 					maxPackBytes: maxPackBytes(),
 					pagesLoadOneRoute: routeSources.size > 0,
 					closures: partitioned ? closures : [],
@@ -232,6 +238,25 @@ export function nativePackingPlugins(
 			onLog(_level, log) {
 				if (isPlannedCoLocation(log, (id) => groups.get(id), dynamicImporters))
 					return false;
+			},
+			renderStart() {
+				stylesheetModules = new Map();
+			},
+			renderChunk: {
+				// After Vite's CSS plugin: a chunk's importedCss then names only the sheet built from its own style modules.
+				order: 'post',
+				handler(_code, chunk) {
+					const sheets = (chunk as { viteMetadata?: { importedCss?: Iterable<string> } })
+						.viteMetadata?.importedCss;
+					if (!isStylesheet || !sheets) return null;
+					const ids = chunk.moduleIds.filter(isStylesheet);
+					for (const sheet of sheets) {
+						const modules = stylesheetModules.get(sheet) ?? new Set();
+						for (const id of ids) modules.add(id);
+						stylesheetModules.set(sheet, modules);
+					}
+					return null;
+				},
 			},
 			outputOptions(output) {
 				if (output.format && !['es', 'esm', 'module'].includes(output.format))
@@ -286,6 +311,12 @@ export function nativePackingPlugins(
 					const code = this.getModuleInfo(id)?.code;
 					moduleHashes.set(id, typeof code === 'string' ? await codeHash(code) : '');
 				}
+				const stylesheetRoutes = new Map<string, readonly string[]>();
+				for (const [sheet, ids] of stylesheetModules) {
+					const routes = [...ids].map((id) => moduleRoutes.get(id));
+					if (routes.length === 0 || routes.some((reaching) => reaching === undefined)) continue;
+					stylesheetRoutes.set(sheet, [...new Set(routes.flatMap((reaching) => [...reaching!]))]);
+				}
 				const chunkOf = new Map<string, string[]>();
 				const add = (id: string, fileName: string) =>
 					chunkOf.set(id, [...(chunkOf.get(id) ?? []), fileName]);
@@ -306,6 +337,7 @@ export function nativePackingPlugins(
 						partition: partitioned ? 'tiers' : 'unsplit:entry-roots',
 						chunkOf,
 						moduleHashes,
+						stylesheetRoutes,
 					}),
 				});
 			},
