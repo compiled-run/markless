@@ -32,11 +32,88 @@ export function createSymbolResolverModuleManifest(
 
 export function emitSymbolResolverModule(input: SymbolResolverModuleInput): string {
 	const manifest = createSymbolResolverModuleManifest(input);
-	if ((input.boundSymbols?.length ?? 0) === 0) {
+	const shape = boundResolverShape(input);
+	if (!shape) {
 		return input.symbols.length > 0 && input.symbols.length <= SMALL_SYMBOL_SWITCH_LIMIT
 			? emitSmallSymbolResolverModule(input)
 			: emitTableSymbolResolverModule(manifest, input.literalImports);
 	}
+	const shared = input.helpersModuleId;
+	return [
+		...(shared
+			? [
+					`import { ${boundResolverHelperNames(shape).join(', ')} } from ${JSON.stringify(shared)};`,
+					'',
+				]
+			: boundResolverImports(shape)),
+		'export const symbolManifest = ',
+		JSON.stringify(shippedManifest(manifest, input.literalImports)),
+		';',
+		'',
+		input.literalImports
+			? literalModuleLoads(manifest)
+			: 'const moduleUrls = symbolManifest[3];',
+		'const exportNames = symbolManifest[4];',
+		'const symbolRows = symbolManifest[5];',
+		...boundRowLookup(input.boundSymbols ?? [], !shared),
+		...(shared ? [] : ['const callbackRoute = "callback-route";']),
+		'',
+		...emitLoadSymbolFunction(input.literalImports === true, true),
+		'',
+		'async function loadBoundSymbol(bound) {',
+		shape.scopesInstances
+			? '	const base = instanceScopedBase(await loadSymbol(bound.baseSymbolId), bound);'
+			: '	const base = await loadSymbol(bound.baseSymbolId);',
+		...(shape.importedCaptureRows
+			? [
+					'\treturn async (context) => {',
+					'\t\tconst pendingCallbacks = [];',
+					'\t\tconst capture = createCaptureContext(context, bound);',
+					'\t\tconst result = await base({ ...context, graph: createBoundGraph(context, bound, capture, pendingCallbacks), capture });',
+					'\t\tawait Promise.all(pendingCallbacks);',
+					'\t\treturn result;',
+					'\t};',
+				]
+			: ['	return (context) => base({ ...context, capture: createCaptureContext(context, bound) });']),
+		'}',
+		'',
+		...(shared ? [] : boundResolverHelperLines(shape)),
+	].join('\n');
+}
+
+/** The module a resolver names as `helpersModuleId`: the bound-row code all resolvers of one helpers variant share. */
+export function emitSymbolResolverHelpersModule(input: SymbolResolverModuleInput): string {
+	const shape = boundResolverShape(input);
+	if (!shape) throw new Error('A resolver that binds no symbol has no bound-row helpers.');
+	return [
+		...boundResolverImports(shape),
+		'const callbackRoute = "callback-route";',
+		`const decodeBoundRow = ${decodeBoundRow.toString()};`,
+		'',
+		...boundResolverHelperLines(shape),
+		`export { ${boundResolverHelperNames(shape).join(', ')} };`,
+		'',
+	].join('\n');
+}
+
+/** Names the bound-row helpers `input` needs; resolvers with the same variant can share one helpers module. */
+export function symbolResolverHelpersVariant(input: SymbolResolverModuleInput): string | undefined {
+	const shape = boundResolverShape(input);
+	return shape && Object.values(shape).map(Number).join('');
+}
+
+type BoundResolverShape = {
+	readonly scopesInstances: boolean;
+	readonly scopesWidgetGraphs: boolean;
+	readonly rowed: boolean;
+	readonly keyedCallbackRows: boolean;
+	readonly keyedRowLocals: boolean;
+	readonly routesCallbackSlots: boolean;
+	readonly importedCaptureRows: boolean;
+};
+
+function boundResolverShape(input: SymbolResolverModuleInput): BoundResolverShape | undefined {
+	if ((input.boundSymbols?.length ?? 0) === 0) return undefined;
 	const scopesInstances = (input.boundSymbols ?? []).some((row) => row.instancePath);
 	// Which space an id belongs to is a runtime reading, not a prefix: a shared id
 	// belongs to its widget root, a storage id to the page. Only a resolver that
@@ -67,6 +144,35 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 	const routesCallbackSlots = (input.boundSymbols ?? []).some((row) =>
 		row.captureSlots.some((slot) => slot.route.kind === 'callback-slot-route'),
 	);
+	return {
+		scopesInstances,
+		scopesWidgetGraphs,
+		rowed,
+		keyedCallbackRows,
+		keyedRowLocals,
+		routesCallbackSlots,
+		importedCaptureRows: input.importedCaptureRows === true,
+	};
+}
+
+function boundResolverHelperNames(shape: BoundResolverShape): string[] {
+	return [
+		'decodeBoundRow',
+		...(shape.scopesInstances ? ['instanceScopedBase'] : []),
+		...(shape.importedCaptureRows ? ['createBoundGraph'] : []),
+		'createCaptureContext',
+		'runGeneratedSymbolChunkInitializers',
+		'createUnknownSymbolError',
+	];
+}
+
+function boundResolverImports({
+	scopesWidgetGraphs,
+	routesCallbackSlots,
+	rowed,
+	keyedRowLocals,
+	keyedCallbackRows,
+}: BoundResolverShape): string[] {
 	return [
 		...(scopesWidgetGraphs
 			? [
@@ -83,29 +189,21 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 					'',
 				]
 			: []),
-		'export const symbolManifest = ',
-		JSON.stringify(shippedManifest(manifest, input.literalImports)),
-		';',
-		'',
-		input.literalImports
-			? literalModuleLoads(manifest)
-			: 'const moduleUrls = symbolManifest[3];',
-		'const exportNames = symbolManifest[4];',
-		'const symbolRows = symbolManifest[5];',
-		...boundRowLookup(input.boundSymbols ?? []),
-		'const callbackRoute = "callback-route";',
-		'',
-		...emitLoadSymbolFunction(input.literalImports === true, true),
-		'',
-		'async function loadBoundSymbol(bound) {',
-		scopesInstances
-			? '	const base = instanceScopedBase(await loadSymbol(bound.baseSymbolId), bound);'
-			: '	const base = await loadSymbol(bound.baseSymbolId);',
-		// The bundler's imported-capture adapter rewrites the next line verbatim.
-		'	return (context) => base({ ...context, capture: createCaptureContext(context, bound) });',
-		'}',
-		'',
+	];
+}
+
+function boundResolverHelperLines({
+	scopesInstances,
+	scopesWidgetGraphs,
+	rowed,
+	keyedCallbackRows,
+	keyedRowLocals,
+	routesCallbackSlots,
+	importedCaptureRows,
+}: BoundResolverShape): string[] {
+	return [
 		...(scopesInstances ? instanceScopeLines(scopesWidgetGraphs, rowed) : []),
+		...(importedCaptureRows ? boundGraphLines() : []),
 		'function createCaptureContext(context, bound) {',
 		'	const slots = {};',
 		'	for (const slot of bound.captureSlots) slots[slot.slotId] = slot;',
@@ -210,7 +308,39 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'	});',
 		'}',
 		'',
-	].join('\n');
+	];
+}
+
+// Imported child modules were compiled before their parent edges were known, so
+// their symbol code still reads the legacy prop graph cell. Bound rows carry the
+// parent-proven routes; this graph makes those reads edge-specific at load time.
+function boundGraphLines(): string[] {
+	return [
+		'function createBoundGraph(context, bound, capture, pendingCallbacks) {',
+		'\tconst legacySlots = new Map(bound.captureSlots.flatMap((slot) => slot.legacyGraphRead ? [[JSON.stringify([slot.legacyGraphRead.graphNodeId, slot.legacyGraphRead.path ?? []]), slot]] : []));',
+		// A legacy child handler calls its callbacks without awaiting them (the
+		// emitted code is not even async), so ordering between two invocations is
+		// this dispatcher's to provide: each invocation starts only after the
+		// previous one settles, which is the contract the capture path gives via
+		// `await context.capture.invoke`. Without the chain, a synchronous second
+		// callback races the first's async continuation and reads stale state.
+		'\tlet lastCallback = Promise.resolve();',
+		'\treturn {',
+		'\t\t...context.graph,',
+		'\t\tread(graphNodeId, path = []) {',
+		'\t\t\tconst slot = legacySlots.get(JSON.stringify([graphNodeId, path]));',
+		'\t\t\tif (!slot) return context.graph.read(graphNodeId, path);',
+		'\t\t\tif (slot.route.kind === callbackRoute) return (...args) => {',
+		'\t\t\t\tconst pending = lastCallback.then(() => capture.invoke(slot.slotId, args));',
+		'\t\t\t\tlastCallback = pending.catch(() => {});',
+		'\t\t\t\tpendingCallbacks.push(pending);',
+		'\t\t\t\treturn pending;',
+		'\t\t\t};',
+		'\t\t\treturn capture.read(slot.slotId);',
+		'\t\t},',
+		'\t};',
+		'}',
+	];
 }
 
 // A composed child's graph nodes were merged into the page graph under the
@@ -303,7 +433,10 @@ const OMITTED_EMPTY_BOUND_ROW_FIELDS = new Set([
 	'keyedRepeatScopeIds',
 ]);
 
-function boundRowLookup(rows: SymbolResolverModuleInput['boundSymbols']): string[] {
+function boundRowLookup(
+	rows: SymbolResolverModuleInput['boundSymbols'],
+	inlineDecoder: boolean,
+): string[] {
 	const serialized = serializeBoundRows(rows);
 	const tables = factorBoundRows(Object.values(JSON.parse(serialized)) as JsonBoundRow[]);
 	if (!tables)
@@ -311,7 +444,7 @@ function boundRowLookup(rows: SymbolResolverModuleInput['boundSymbols']): string
 	return [
 		`const boundRowTables = ${JSON.stringify(tables)};`,
 		'const boundRowCache = new Map();',
-		`const decodeBoundRow = ${decodeBoundRow.toString()};`,
+		...(inlineDecoder ? [`const decodeBoundRow = ${decodeBoundRow.toString()};`] : []),
 		'const boundRow = (id) => decodeBoundRow(boundRowTables, boundRowCache, id);',
 	];
 }
