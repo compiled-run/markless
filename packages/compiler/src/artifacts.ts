@@ -714,6 +714,12 @@ export type ModuleGraphInterfaceArtifact = {
 				Record<string, ReadonlyArray<ReadonlyArray<string>>>
 			>;
 			/**
+			 * Props a keyed repeat in this component's tree iterates and never reads
+			 * back: a caller passing one a value that never changes says so, and the
+			 * render then serves neither the list record nor the collection.
+			 */
+			readonly staticRowProps?: ReadonlyArray<string>;
+			/**
 			 * Present when a keyed repeat sits at this component's top level, so its
 			 * rows need the container as their parent.
 			 */

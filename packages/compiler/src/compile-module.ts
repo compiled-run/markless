@@ -31,6 +31,7 @@ import {
 } from './passes/link/children-seed-paths.ts';
 import { withClosureActionOwners } from './passes/link/closure-action-owners.ts';
 import { withDerivedProps } from './passes/link/derived-props.ts';
+import { withStaticRowProps } from './passes/link/static-row-props.ts';
 import { withRosterDerivations } from './passes/link/roster-derivations.ts';
 import { withStorageCells } from './passes/link/storage-cells.ts';
 import { withRowSlotReaders } from './passes/link/row-slot-readers.ts';
@@ -109,6 +110,16 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 		readonly symbolResolverModuleManifest: SymbolResolverModuleManifest;
 	};
 
+	const publicRenderInput = {
+		source: input,
+		semanticGraph: artifacts.semanticGraph,
+		renderData: artifacts.renderData,
+		publicRenderPlan: artifacts.publicRenderPlan,
+		symbolResolver: artifacts.symbolResolver,
+		captureAnalysis: artifacts.captureAnalysis,
+		protocolState: artifacts.protocolState,
+		protocolView: artifacts.protocolView,
+	};
 	const storageCellsInput = {
 		componentEdges: artifacts.semanticGraph.componentEdges,
 		protocolState: artifacts.protocolState,
@@ -124,16 +135,10 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 					withRowSlotReaders(
 						withSeedsFromProps(
 							withStorageCells(
-								withDerivedProps(artifacts.semanticGraph.moduleGraphInterface, {
-									source: input,
-									semanticGraph: artifacts.semanticGraph,
-									renderData: artifacts.renderData,
-									publicRenderPlan: artifacts.publicRenderPlan,
-									symbolResolver: artifacts.symbolResolver,
-									captureAnalysis: artifacts.captureAnalysis,
-									protocolState: artifacts.protocolState,
-									protocolView: artifacts.protocolView,
-								}),
+								withStaticRowProps(
+									withDerivedProps(artifacts.semanticGraph.moduleGraphInterface, publicRenderInput),
+									publicRenderInput,
+								),
 								storageCellsInput,
 							),
 							{
