@@ -1,5 +1,8 @@
 // Hands a kept part's live state to the next page of an in-place navigation, still off screen (see PROTOCOL_KEEP_INSTANCE_ATTRIBUTE).
-import { decodePayloadScriptsWithVersion } from '../../serializer/src/protocol-client.ts';
+import {
+	decodePayloadScriptsWithVersion,
+	type EncodedPayloadScripts,
+} from '../../serializer/src/protocol-client.ts';
 import { setDataField } from '../../serializer/src/value-own-field.ts';
 import { marklessInstancePath } from './fns/instance-scope.ts';
 import { bindDefinitions, cloneValue, moduleHref, sameValue } from './fns/shared-instances.ts';
@@ -44,8 +47,8 @@ export async function carryKeptParts(input: {
 	if (!store()) return undefined;
 	const { pairs } = input;
 	if (pairs.length === 0) return undefined;
-	const leaving = decoded(input.outgoing);
-	const arriving = decoded(input.incoming);
+	const leaving = decodedRecords(input.outgoing);
+	const arriving = decodedRecords(input.incoming);
 	if (!leaving || !arriving) return undefined;
 	const served = new Map(
 		(await decodeStateCells(leaving.state)).map((cell) => [cell.graphNodeId, cell.value]),
@@ -148,9 +151,12 @@ export async function carryKeptParts(input: {
 	// A handler's first read of a computed answers from the served value, which the carried state made stale.
 	const adopted = new Map(values);
 	const servedNext = new Map(cells.map((cell) => [cell.graphNodeId, cell.value]));
+	const changed = new Set(values.keys());
+	for (const [id, value] of shared) if (!sameValue(value, servedNext.get(id))) changed.add(id);
+	const stale = readersOf(arriving.state, changed);
 	for (const computed of arriving.state.computed) {
 		const id = computed.graphNodeId;
-		if (computed.async || !pairs.some(({ to }) => id.startsWith(to))) continue;
+		if (computed.async || !stale.has(id) || !pairs.some(({ to }) => id.startsWith(to))) continue;
 		const value = painted.read(id);
 		if (!sameValue(value, servedNext.get(id))) adopted.set(id, value);
 	}
@@ -163,17 +169,51 @@ export async function carryKeptParts(input: {
 	};
 }
 
-function decoded(region: Element): Decoded | undefined {
+// The leaving page's records are the ones the swap before decoded as arriving.
+const recent: Array<readonly [EncodedPayloadScripts, Decoded]> = [];
+
+export function decodedRecords(region: Element): Decoded | undefined {
 	try {
-		return decodePayloadScriptsWithVersion(
-			readPayloadScriptsFromDocument(
-				region as unknown as Parameters<typeof readPayloadScriptsFromDocument>[0],
-			),
-			true,
+		const scripts = readPayloadScriptsFromDocument(
+			region as unknown as Parameters<typeof readPayloadScriptsFromDocument>[0],
 		);
+		const known = recent.find(
+			([seen]) =>
+				seen.stateScript === scripts.stateScript && seen.viewScript === scripts.viewScript,
+		);
+		if (known) return known[1];
+		const result = decodePayloadScriptsWithVersion(scripts, true);
+		recent.unshift([scripts, result]);
+		recent.length = Math.min(recent.length, 2);
+		return result;
 	} catch {
 		return undefined;
 	}
+}
+
+// `changed` and every computed or seed that reads one of them, directly or through another; one with no recorded reads counts as reading all.
+export function readersOf(
+	state: Decoded['state'],
+	changed: ReadonlySet<string>,
+): ReadonlySet<string> {
+	const reached = new Set(changed);
+	const records: ReadonlyArray<{
+		readonly graphNodeId: string;
+		readonly dependencies?: ReadonlyArray<{ readonly graphNodeId: string }>;
+	}> = [...state.computed, ...(state.sharedSeeds ?? [])];
+	for (let grew = true; grew; ) {
+		grew = false;
+		for (const record of records)
+			if (
+				!reached.has(record.graphNodeId) &&
+				(!record.dependencies ||
+					record.dependencies.some((dependency) => reached.has(dependency.graphNodeId)))
+			) {
+				reached.add(record.graphNodeId);
+				grew = true;
+			}
+	}
+	return reached;
 }
 
 // A part's own state() cells; its props and the callbacks its parent handed it come from the next page.

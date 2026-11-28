@@ -1,0 +1,14 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/kept-swap"
+			],
+			"delta": 982,
+			"reason": "a kept part's carry reads only the computeds its carried state feeds and reuses the leaving page's decoded records: docs click to first frame WebKit 83 -> 66 ms, Chromium 61 -> 42 ms",
+			"date": "2026-11-27"
+		}
+	]
+}
