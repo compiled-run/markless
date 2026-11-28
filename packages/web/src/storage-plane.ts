@@ -1,11 +1,14 @@
 import {
+	STORAGE_RENDER_CONTEXT_READER,
 	STORAGE_SLOT_SYMBOL_KEY,
 	storageAttributeName,
 	storageCookieAssignment,
+	storageCookieName,
 	storageSlotEntryKeyFromGraphNodeId,
 } from '../../serializer/src/storage-slot.ts';
 import type { ProtocolStatePayload } from '@markless/serializer/protocol';
 import type { RuntimeGraph } from '@markless/runtime';
+import type { PrerenderDataDefinition, PrerenderDataSurface } from './prerender/evaluator.ts';
 
 export type StoragePlane = {
 	readonly dispose: () => void;
@@ -101,13 +104,7 @@ export function applyStorageReadInitializers(
 		const fallback = cell.value;
 		return {
 			...cell,
-			readInitializer() {
-				try {
-					return globalThis.localStorage.getItem(record.key) ?? fallback;
-				} catch {
-					return fallback;
-				}
-			},
+			readInitializer: () => readSavedStorageValue(record.key) ?? fallback,
 		};
 	});
 }
@@ -122,4 +119,65 @@ function setStorageAttribute(key: string, value: unknown): void {
 	try {
 		globalThis.document.documentElement.setAttribute(storageAttributeName(key), String(value));
 	} catch {}
+}
+
+/**
+ * The value a visitor saved under a storage() key, read the way the page head script reads it:
+ * the cookie first, then `localStorage`. A saved value also goes on the `<html>` data attribute.
+ */
+export function readSavedStorageValue(key: string): string | undefined {
+	let value: string | null | undefined;
+	try {
+		const name = `${storageCookieName(key)}=`;
+		const cookie = globalThis.document.cookie.split('; ').find((part) => part.startsWith(name));
+		if (cookie) value = decodeURIComponent(cookie.slice(name.length));
+	} catch {}
+	if (value === undefined)
+		try {
+			value = globalThis.localStorage.getItem(key);
+		} catch {}
+	if (value == null) return undefined;
+	setStorageAttribute(key, value);
+	return value;
+}
+
+/** What a client render hands a compiled render body, so each storage() cell renders its saved value. */
+export const savedStorageRenderContext = { [STORAGE_RENDER_CONTEXT_READER]: readSavedStorageValue };
+
+/** The surface with each storage() cell starting from its saved value, in this module and the ones it imports. */
+export function withSavedStorageValues(
+	surface: PrerenderDataSurface,
+	seeded = new Map<PrerenderDataSurface, PrerenderDataSurface>(),
+): PrerenderDataSurface {
+	const known = seeded.get(surface);
+	if (known) return known;
+	const copy: { -readonly [K in keyof PrerenderDataSurface]: PrerenderDataSurface[K] } = { ...surface };
+	seeded.set(surface, copy);
+	copy.components = Object.fromEntries(
+		Object.entries(surface.components).map(([name, definition]) => [name, withSavedCells(definition)]),
+	);
+	copy.imports = Object.fromEntries(
+		Object.entries(surface.imports).map(([source, imported]) => [
+			source,
+			withSavedStorageValues(imported, seeded),
+		]),
+	);
+	return copy;
+}
+
+function withSavedCells(definition: PrerenderDataDefinition): PrerenderDataDefinition {
+	const saved = new Map<string, string>();
+	for (const record of definition.state.storage ?? []) {
+		const value = readSavedStorageValue(record.key);
+		if (value !== undefined) saved.set(record.graphNodeId, value);
+	}
+	if (saved.size === 0) return definition;
+	return {
+		...definition,
+		initialValues: definition.initialValues?.map((initial) =>
+			saved.has(initial.graphNodeId)
+				? { graphNodeId: initial.graphNodeId, value: { kind: 'constant', value: saved.get(initial.graphNodeId) } }
+				: initial,
+		),
+	};
 }

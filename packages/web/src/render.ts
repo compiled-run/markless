@@ -3,6 +3,7 @@ import type { EventOnlyResumeContainer } from './event-only-resume.ts';
 import type { RuntimeGraph } from '@markless/runtime';
 import type { ResumeDomElement, ResumeRuntime, ResumeRuntimeInput } from './resume.ts';
 import type { PrerenderDataSurface } from './prerender/evaluator.ts';
+import type { STORAGE_RENDER_CONTEXT_READER } from '../../serializer/src/storage-slot.ts';
 
 // A mount target is a real DOM element in the browser and a structural stand-in in tests,
 // so the child parameter names both worlds.
@@ -35,7 +36,10 @@ export type CsrRenderArtifact = {
 	readonly renderCsr?: (props?: unknown) => CsrRenderOutput;
 	readonly renderSsr?: (
 		props?: unknown,
-		renderContext?: { readonly elementIdScope?: string },
+		renderContext?: {
+			readonly elementIdScope?: string;
+			readonly [STORAGE_RENDER_CONTEXT_READER]?: (key: string) => string | undefined;
+		},
 	) =>
 		| {
 				readonly html: string;

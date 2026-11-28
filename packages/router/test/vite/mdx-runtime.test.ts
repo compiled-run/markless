@@ -14,7 +14,7 @@ import {
 	protocolStateVersion,
 	STORAGE_PROTOCOL_VERSION,
 } from '../../../serializer/src/protocol-constants.ts';
-import { STORAGE_RENDER_CONTEXT_READER } from '../../../serializer/src/storage-cookie.ts';
+import { STORAGE_RENDER_CONTEXT_READER } from '../../../serializer/src/storage-slot.ts';
 import { PACK_RESIDENT } from '../../../web/src/fns/resident-load.ts';
 import { transformMdxRoute } from '../../src/vite/mdx.ts';
 import { renderSsrData, type SsrRenderData } from '../../../web/src/ssr-data/renderer.ts';

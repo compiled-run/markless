@@ -2,6 +2,9 @@ export { isValidStorageKey } from './storage-key.ts';
 
 export const STORAGE_SLOT_SYMBOL_KEY = 'tsrx.storage/1';
 
+// The render-context property a storage() cell reads its saved value through.
+export const STORAGE_RENDER_CONTEXT_READER = 'storageValue';
+
 // The no-flash <html> attribute name for a driver key. Derived keys contain a
 // colon (markless:theme) which is not a clean attribute name, so any character
 // outside [A-Za-z0-9-] collapses to a hyphen: markless:theme -> data-markless-theme,

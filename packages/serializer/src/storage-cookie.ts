@@ -15,9 +15,6 @@ export function decodeStorageCookieValue(raw: string): string | undefined {
 	}
 }
 
-// The server render-context property a storage() cell reads its saved value through.
-export const STORAGE_RENDER_CONTEXT_READER = 'storageValue';
-
 // Reads storage values out of a request's Cookie header. Only names minted by
 // storageCookieName are kept; everything else in the header is ignored.
 export function createStorageCookieReader(

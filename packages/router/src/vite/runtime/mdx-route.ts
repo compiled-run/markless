@@ -9,7 +9,7 @@ import { marklessThen } from '../../../../web/src/ssr-data/awaitable.ts';
 import { marklessWhenLoaded, PACK_RESIDENT } from '../../../../web/src/fns/resident-load.ts';
 import { type StructureToken, withProjectionSpan } from '../../../../web/src/ssr-data/renderer.ts';
 import { marklessSsrRosterPositionContext } from '../../../../web/src/fns/roster-position.ts';
-import { STORAGE_RENDER_CONTEXT_READER } from '../../../../serializer/src/storage-cookie.ts';
+import { STORAGE_RENDER_CONTEXT_READER } from '../../../../serializer/src/storage-slot.ts';
 import { marklessSsrIslandRosterAnswered } from '../../../../web/src/prerender/island-roster.ts';
 import type { KeepParts } from '../../../../web/src/fns/keep-parts-hook.ts';
 import {
