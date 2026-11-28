@@ -1,0 +1,96 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 382,
+			"reason": "a component an arm places reads and writes the page's one storage() cell for its key instead of an instance-path copy",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "a component an arm places reads and writes the page's one storage() cell for its key instead of an instance-path copy",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 382,
+			"reason": "a component an arm places reads and writes the page's one storage() cell for its key instead of an instance-path copy",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "a component an arm places reads and writes the page's one storage() cell for its key instead of an instance-path copy",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/prerender/evaluator"
+			],
+			"delta": 382,
+			"reason": "a component an arm places reads and writes the page's one storage() cell for its key instead of an instance-path copy",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 52,
+			"reason": "the prerender evaluator a docs page preloads reads a storage() key an arm brings in as the page's one cell",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 52,
+			"reason": "the prerender evaluator a docs page preloads reads a storage() key an arm brings in as the page's one cell",
+			"date": "2026-11-27"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 52,
+			"reason": "the prerender evaluator a docs page preloads reads a storage() key an arm brings in as the page's one cell",
+			"date": "2026-11-27"
+		}
+	]
+}

@@ -895,8 +895,11 @@ function instanceCellIds(
 	instancePrefix: string,
 	visiting: Set<PrerenderDataDefinition>,
 ): string[] {
+	const pageCells = pageSpaceCellIds(definition);
 	const ids = [
-		...ownedStateCells(definition).map((cell) => instancePrefix + cell.graphNodeId),
+		...ownedStateCells(definition)
+			.filter((cell) => !pageCells.has(cell.graphNodeId))
+			.map((cell) => instancePrefix + cell.graphNodeId),
 		...(definition.propCellId ? [instancePrefix + definition.propCellId] : []),
 	];
 	if (visiting.has(definition)) return ids;
@@ -936,6 +939,11 @@ function ownedComputed(definition: PrerenderDataDefinition): ProtocolStatePayloa
 	return definition.state.computed.filter(
 		(computed) => owned.size === 0 || owned.has(computed.graphNodeId),
 	);
+}
+
+// A storage() key is one page cell for every declaration of it, so no instance path spells it.
+function pageSpaceCellIds(definition: PrerenderDataDefinition): ReadonlySet<string> {
+	return new Set((definition.state.storage ?? []).map((record) => record.graphNodeId));
 }
 
 function ownedStateCells(definition: PrerenderDataDefinition): ProtocolStatePayload['cells'] {
@@ -1035,13 +1043,16 @@ export function evaluatePrerenderDataComponent(input: {
 	// escalated arm re-settle renders what the interaction wrote, not the
 	// compile-time initial value seeded into `values`.
 	// A fresh instance owns only ITS cells; a module-mate's stay live.
+	const ownCellIds = ownedStateCells(definition).map((cell) => cell.graphNodeId);
+	const pageCellIds = pageSpaceCellIds(definition);
+	// A storage() cell another declaration already placed stays live.
 	const freshOwnCellIds = input.freshInstance
-		? new Set(ownedStateCells(definition).map((cell) => cell.graphNodeId))
+		? new Set(ownCellIds.filter((id) => !pageCellIds.has(id) || input.graph?.read(id) === undefined))
 		: undefined;
 	// Composition merges a child's nodes under its instance path, which is the
 	// prefix its symbols already carry; the commit writes composed ids.
-	for (const graphNodeId of freshOwnCellIds ?? [])
-		input.freshCellIds?.add(input.symbolPrefix + graphNodeId);
+	for (const id of freshOwnCellIds ?? [])
+		input.freshCellIds?.add(pageCellIds.has(id) ? id : input.symbolPrefix + id);
 	// Its derives read props off the graph, where nothing has written them yet.
 	if (input.freshInstance && definition.propCellId)
 		input.freshCellIds?.add(input.symbolPrefix + definition.propCellId);
@@ -1056,7 +1067,7 @@ export function evaluatePrerenderDataComponent(input: {
 	const instanceCellIds =
 		input.graph && input.symbolPrefix
 			? new Set([
-					...ownedStateCells(definition).map((cell) => cell.graphNodeId),
+					...ownCellIds.filter((id) => !pageCellIds.has(id)),
 					...ownedComputed(definition).map((computed) => computed.graphNodeId),
 				])
 			: undefined;
